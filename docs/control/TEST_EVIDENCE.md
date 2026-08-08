@@ -113,6 +113,16 @@ The initial public-image pull exposed Docker Desktop's Windows credential helper
 | Post-rename receipt | Ignored receipt SHA-256 `abb1d417ac0e45dbcbcd9bed8a6d13936906b252176b6fd9948dd1d9edb316e0` records current source/path identity and the pre-rename receipt hash | PASS |
 | Independent implementation re-review | `.omx/evidence/session-00/implementation-review.md` SHA-256 `87b84524bee8894f1c63f23a8d730c4d51995199c99089a88294389ac1a3a19c`; explicit post-remediation verdict **APPROVE** | PASS |
 | Adversarial review | `.omx/evidence/session-00/acceptance-audit.md` SHA-256 `80d865efcec010cbc2c05c12362ff41f29073bd840b1a7cffcf72e84796fe137`; fresh focused suite **35 passed**; 375-path staging projection had no forbidden paths; explicit verdict **CLEAR** for the local closure sequence | PASS |
-| Git checkpoints | Branch remains unborn; bootstrap, evidence-closure, and state-pointer commits are not yet recorded | PENDING |
+| Git checkpoints | Pre-commit audit projected 375 safe paths; bootstrap, evidence-closure, and state-pointer commits were not yet recorded at the time of this matrix | PENDING at matrix time; superseded below |
 
 The full ignored verification summary is `.omx/evidence/session-00/verification.md` (SHA-256 `d98ebb7fdc03c67c82991b3d52eb7aa0a6f30daa429e3d822d474045007a6e7c`). The passing gates and independent reviews establish readiness for the required Git transition; they do not themselves complete Session 00.
+
+## 2026-08-08T20:52:00Z — Bootstrap commit receipt
+
+- Staged-path count: **375**.
+- Staged-path manifest SHA-256: `6ee2b86a28bdae5fcca1140573e63ac23d5700a83f8aae08495c99b512971658`.
+- Forbidden staged paths: none; staged symlinks: none.
+- Immutable source hashes immediately before commit: PDF `c9cd31775d1d79be31c3a8092d8d49fc71d52e695f97cbfb580fcbb35f240fad`; workbook `4dbecbb8ad6fdd9fe2323eb164ffd2d7c99143cf5de20de5ec98a1bdf90d7f2b`.
+- Bootstrap commit: `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`; exact subject verified.
+
+The evidence-closure commit, atomic transition, and state-pointer commit remain pending, so Session 00 remains incomplete at this checkpoint.

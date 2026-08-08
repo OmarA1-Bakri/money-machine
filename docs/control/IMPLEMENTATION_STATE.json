@@ -4,11 +4,11 @@
   "repo_root": "/mnt/d/Money Machine",
   "windows_repo_root": "D:\\Money Machine",
   "branch": "build/full-automation",
-  "head_sha": null,
-  "bootstrap_commit_sha": null,
+  "head_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
+  "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "evidence_closure_commit_sha": null,
-  "last_verified_commit": null,
-  "state_revision": 8,
+  "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
+  "state_revision": 9,
   "session_status": "incomplete",
   "current_session": 0,
   "completed_sessions": [],
@@ -76,7 +76,7 @@
     "clean_bootstrap_passed": true,
     "implementation_review_approved": true,
     "adversarial_review_clear": true,
-    "bootstrap_commit_recorded": false,
+    "bootstrap_commit_recorded": true,
     "evidence_closure_commit_recorded": false
   },
   "transition_contract": {
@@ -92,5 +92,5 @@
   },
   "next_session": 0,
   "next_prompt": "03_SESSION_00_DISCOVERY_AND_REPO_BOOTSTRAP.md",
-  "updated_at": "2026-08-08T20:45:00Z"
+  "updated_at": "2026-08-08T20:52:00Z"
 }

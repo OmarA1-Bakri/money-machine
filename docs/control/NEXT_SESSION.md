@@ -4,7 +4,7 @@ Session 00 remains active. Continue with `prompts/implementation/03_SESSION_00_D
 
 ## Required before advancement
 
-1. Create the exact bootstrap commit, record its SHA as `last_verified_commit`, then create a distinct evidence-closure commit containing the still-incomplete state. Run the atomic completion transition while `HEAD` is that closure commit, then create a later state-pointer commit containing the completed state; do not write the state-pointer commit's own SHA into its contents.
+1. Create a distinct evidence-closure commit containing this still-incomplete state, whose `bootstrap_commit_sha`, `last_verified_commit`, and pre-transition `head_sha` all identify bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. Run the atomic completion transition while `HEAD` is that closure commit, then create a later state-pointer commit containing the completed state; do not write the state-pointer commit's own SHA into its contents.
 2. Push only if an authenticated remote named exactly `money-machine` is verified private; otherwise retain the precise push-only blocker.
 3. Transition control state to complete only when every required evidence flag is true.
 
