@@ -139,3 +139,17 @@ The evidence-closure commit, atomic transition, and state-pointer commit remain 
 | Completed-shape static gates | Ruff format/check remained clean across 271 files; strict Pyright remained clean | PASS |
 
 The later state-pointer commit checkpoints this completed control state without attempting a self-referential SHA. On the completed revision-10 state, the final post-transition run reported Ruff format/check clean across 271 files, strict Pyright **0 errors**, and **53 Pytest tests passed** with one third-party Starlette deprecation warning. The ignored raw receipt is `.omx/evidence/session-00/post-transition-verification.log`.
+
+## 2026-08-08T23:36:23Z — GitHub publication and CodeRabbit receipt
+
+| Gate | Evidence | Verdict |
+|---|---|---|
+| Public repository | `gh repo view OmarA1-Bakri/money-machine` returned URL `https://github.com/OmarA1-Bakri/money-machine`, visibility `PUBLIC`, and `isPrivate: false` | PASS |
+| Push equality | Local `ef4a2039d976285d295e429cebbfdd9951bd7bf4` equalled `git ls-remote` for `origin/build/full-automation` | PASS |
+| Published content boundary | Canonical tracked tree remained 375 paths with no PDF, secret, OMX/runtime evidence, browser/customer/provider payload, dependency cache, knowledge graph, or symlink | PASS |
+| CodeRabbit agents/domain/integrations | Bounded reviews completed with zero issues | PASS |
+| CodeRabbit control | Four files reviewed; one critical, one major, and one trivial issue raised in `src/money_machine/control/state.py` | OPEN |
+| CodeRabbit orchestration | Eighteen files reviewed; one trivial logging-configuration issue raised in `_foundation.py` | OPEN |
+| Remaining CodeRabbit scopes | Persistence, API, tests, apps, and scripts returned recoverable `rate_limit`; CLI requested a 51-52 minute wait or assigned seat/API key | BLOCKED BY CODERABBIT ACCOUNT LIMIT |
+
+Ignored NDJSON receipts are under `.omx/evidence/session-00/coderabbit-scoped/`. The review is truthfully partial: completed scopes produced four issues, while rate-limited scopes are not represented as reviewed.

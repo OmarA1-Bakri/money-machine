@@ -43,3 +43,7 @@ The evidence-closure commit must contain the exact live incomplete state that ex
 ## D-0007 — Local session completion is distinct from remote publication
 
 The current PRD/test specification permits Session 00 to complete locally when its repository, runtime, review, and Git-evidence gates pass. A missing remote blocks only authenticated private push; it does not invalidate the real local bootstrap, evidence-closure, or state-pointer commits. Accordingly, Session 00 advances to Session 01 while retaining `REMOTE_NOT_CONFIGURED` with scope exactly `push only`. No remote is guessed or created, and no publication authority is inferred.
+
+## D-0008 — Explicit operator authorization for a public remote
+
+After Session 00 closed, the operator explicitly instructed that the GitHub repository be created and kept public. That instruction supersedes D-0001/D-0007's earlier private-remote assumption for `OmarA1-Bakri/money-machine` only. The repository therefore uses public visibility and default branch `build/full-automation`; this does not authorize publishing products, customer/provider data, credentials, runtime evidence, the source PDF, or any live commercial effect. Strict-deny tracking rules remain unchanged.

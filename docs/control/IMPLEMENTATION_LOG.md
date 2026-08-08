@@ -64,3 +64,11 @@
 - Ran the shipped `money_machine.control apply-completion` entry point while branch `build/full-automation` was clean and attached at that closure commit. The validator resolved both commit objects, checked the exact bootstrap subject and ancestry, compared the closure document with the live state, and atomically advanced state revision 9 to 10.
 - Session 00 is now locally complete: `completed_sessions` is `[0]`, `next_session` is `1`, the canonical Session 01 prompt is selected, all completion evidence is true, and only the precise push-only `REMOTE_NOT_CONFIGURED` blocker remains.
 - This completed state and the four companion control documents are checkpointed by the later state-pointer commit containing this entry; the state intentionally does not claim that commit's own object ID.
+
+## 2026-08-08T23:36:23Z — Public GitHub publication and CodeRabbit review
+
+- Acting on explicit operator authorization, created public repository `OmarA1-Bakri/money-machine`, configured `origin`, and pushed `build/full-automation`. Remote HEAD for that branch exactly matched local `ef4a2039d976285d295e429cebbfdd9951bd7bf4`; GitHub reported visibility `PUBLIC` and selected the pushed branch as default.
+- The public-visibility instruction supersedes the earlier private-remote assumption for this repository only. The immutable PDF, `.omx`, runtime evidence, secrets, browser state, customer/provider payloads, dependency caches, and local knowledge graph were not tracked or pushed.
+- CodeRabbit's all-file CLI attempt was rejected by the 150-file limit, so the review was split into bounded scopes using an isolated empty Git metadata baseline without changing the canonical worktree/index/history.
+- CodeRabbit completed agents, domain, integrations, control, and orchestration reviews. It raised four issues: one critical and one major in `control/state.py`, plus trivial locking and logging findings. Persistence, API, tests, apps, and scripts retries were blocked by a 51-52 minute account rate limit because the selected organization lacks an assigned seat/API key.
+- No CodeRabbit-suggested change was applied automatically. The issues and incomplete scopes are carried into Session 01 for validation and an authorized fix/re-review cycle.

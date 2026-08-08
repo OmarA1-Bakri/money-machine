@@ -8,7 +8,7 @@
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "evidence_closure_commit_sha": "50350b9937ad97dabf4be3762a00638d62aaa5b9",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 10,
+  "state_revision": 11,
   "session_status": "complete",
   "current_session": 0,
   "completed_sessions": [
@@ -50,9 +50,9 @@
   },
   "blockers": [
     {
-      "code": "REMOTE_NOT_CONFIGURED",
-      "scope": "push only",
-      "detail": "No Git remote exists; private visibility and authentication cannot yet be verified."
+      "code": "CODERABBIT_REVIEW_OPEN",
+      "scope": "Session 01 entry",
+      "detail": "Validate four CodeRabbit issues (one critical, one major, two trivial); persistence, API, tests, apps, and scripts scopes require retry after the CLI rate limit resets or a seat/API key is assigned."
     }
   ],
   "required_completion_evidence": {
@@ -89,5 +89,5 @@
   },
   "next_session": 1,
   "next_prompt": "04_SESSION_01_PLAYBOOK_MAPPING_AND_ARCHITECTURE.md",
-  "updated_at": "2026-08-08T20:57:00Z"
+  "updated_at": "2026-08-08T23:36:23Z"
 }
