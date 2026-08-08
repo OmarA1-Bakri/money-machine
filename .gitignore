@@ -1,0 +1,96 @@
+# Immutable private source material
+*.pdf
+private/source/*
+!private/source/.gitkeep
+
+# OMX, agent runtime, and local knowledge graph state
+.omx/
+# Detailed preservation/rename receipts are runtime evidence, never source documentation.
+.omx/**/*receipt*.json
+.trigger-tree/
+.codebase-memory/
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.token
+secrets/
+/token.txt
+/access_token.json
+/oauth-token.json
+
+# Browser/provider/customer material
+browser-profile*/
+/browser_profile/
+/.browser-profile/
+/chrome-profile/
+playwright/.auth/
+cookies*.json
+/Cookies
+customer-data/
+provider-payloads/
+screenshots/
+receipts/
+**/receipts/
+/screenshot.png
+/receipt.json
+/customer.json
+/provider-payload.json
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+coverage.xml
+.coverage
+htmlcov/
+
+# Node and build output
+node_modules/
+.next/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Runtime/generated data
+runtime/
+generated/
+artifacts/
+evidence/generated/
+*.log
+*.pid
+*.sqlite*
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Preserve the canonical runtime directory scaffold without tracking runtime data.
+!runtime/
+runtime/*
+!runtime/artifacts/
+runtime/artifacts/*
+!runtime/artifacts/.gitkeep
+!runtime/screenshots/
+runtime/screenshots/*
+!runtime/screenshots/.gitkeep
+!runtime/receipts/
+runtime/receipts/*
+!runtime/receipts/.gitkeep
+!runtime/browser-profiles/
+runtime/browser-profiles/*
+!runtime/browser-profiles/.gitkeep
+!runtime/temp/
+runtime/temp/*
+!runtime/temp/.gitkeep

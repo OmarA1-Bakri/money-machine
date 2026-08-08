@@ -1,0 +1,1 @@
+## Uncommissioned migration template scaffold.

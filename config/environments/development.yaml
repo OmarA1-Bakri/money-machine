@@ -1,0 +1,4 @@
+environment: development
+provider_mode: simulation
+external_mutations_enabled: false
+

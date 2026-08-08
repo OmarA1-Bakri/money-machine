@@ -1,0 +1,4 @@
+environment: production
+provider_mode: disabled
+external_mutations_enabled: false
+

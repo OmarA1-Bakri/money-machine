@@ -1,0 +1,5 @@
+version: 1
+mode: simulation
+external_mutations_enabled: false
+spend_enabled: false
+

@@ -1,0 +1,176 @@
+{
+  "source": "hands-off-money-machine-full-implementation-workbook.md",
+  "source_sha256": "4dbecbb8ad6fdd9fe2323eb164ffd2d7c99143cf5de20de5ec98a1bdf90d7f2b",
+  "appendix_manifest_sha256": "0a559cdda4d1cdb837883b02c8e2c8d7c7495176093245198b66fa1f91c0a475",
+  "file_count": 21,
+  "files": [
+    {
+      "name": "00_READ_ME_FIRST.md",
+      "source_start_line": 244,
+      "source_end_line": 353,
+      "lines": 110,
+      "bytes": 4491,
+      "sha256": "eb9fedf8b07cd17a02e0a3141d21b2037fcc509ef403813e52a038a1077f6b91"
+    },
+    {
+      "name": "01_MASTER_CONTROL_PROMPT.md",
+      "source_start_line": 369,
+      "source_end_line": 1241,
+      "lines": 873,
+      "bytes": 24993,
+      "sha256": "a42fea06ae89c595294258aa41ee09b6929743671a0feb8e3f1bbe94eff0fe8f"
+    },
+    {
+      "name": "02_CANONICAL_REPOSITORY_STRUCTURE.md",
+      "source_start_line": 1257,
+      "source_end_line": 1697,
+      "lines": 441,
+      "bytes": 16177,
+      "sha256": "17aa97358ccf78425e5a7fea3c07ae61e810b40ec3e0436eada75419169947f7"
+    },
+    {
+      "name": "03_SESSION_00_DISCOVERY_AND_REPO_BOOTSTRAP.md",
+      "source_start_line": 1727,
+      "source_end_line": 1983,
+      "lines": 257,
+      "bytes": 5989,
+      "sha256": "207a79ffdaa903da128c678628eb4736f9977fe5c0a8d434d2b3bc4410e944ba"
+    },
+    {
+      "name": "04_SESSION_01_PLAYBOOK_MAPPING_AND_ARCHITECTURE.md",
+      "source_start_line": 2013,
+      "source_end_line": 2249,
+      "lines": 237,
+      "bytes": 5581,
+      "sha256": "104b890e45f84d96be48a77f6247bfb616a807ac775771f6ac6dcf1299db5ada"
+    },
+    {
+      "name": "05_SESSION_02_ENGINEERING_FOUNDATION_AND_DATABASE.md",
+      "source_start_line": 2279,
+      "source_end_line": 2513,
+      "lines": 235,
+      "bytes": 4593,
+      "sha256": "dd64137dfa21792e7956d3fe4a24b449aa59625872af05c567e294eee2aad0ab"
+    },
+    {
+      "name": "06_SESSION_03_DURABLE_ORCHESTRATOR.md",
+      "source_start_line": 2543,
+      "source_end_line": 2746,
+      "lines": 204,
+      "bytes": 4552,
+      "sha256": "3adc85b2d98f9dca22062bd13391d55633862110d3ed1fe2afa56882f1d3f232"
+    },
+    {
+      "name": "07_SESSION_04_AGENT_RUNTIME_AND_ROSTER.md",
+      "source_start_line": 2776,
+      "source_end_line": 2954,
+      "lines": 179,
+      "bytes": 4261,
+      "sha256": "beb748811662b90c06098e51ab14a691f634f56900daf05c57e0fbdec0f826a3"
+    },
+    {
+      "name": "08_SESSION_05_MARKET_RESEARCH_TO_PRODUCT_SPEC.md",
+      "source_start_line": 2984,
+      "source_end_line": 3204,
+      "lines": 221,
+      "bytes": 4943,
+      "sha256": "e7df623562b0cc4a79e1440c19a11258115c05fcfccea10d9e8b5f348e723db5"
+    },
+    {
+      "name": "09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md",
+      "source_start_line": 3234,
+      "source_end_line": 3457,
+      "lines": 224,
+      "bytes": 5016,
+      "sha256": "7ef25c4fb6bd00bcd85a1996e4b8ce5de4442b369cca4066dca3dbb38b1c3df9"
+    },
+    {
+      "name": "10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md",
+      "source_start_line": 3487,
+      "source_end_line": 3723,
+      "lines": 237,
+      "bytes": 5255,
+      "sha256": "d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d"
+    },
+    {
+      "name": "11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md",
+      "source_start_line": 3753,
+      "source_end_line": 3988,
+      "lines": 236,
+      "bytes": 5092,
+      "sha256": "a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33"
+    },
+    {
+      "name": "12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md",
+      "source_start_line": 4018,
+      "source_end_line": 4271,
+      "lines": 254,
+      "bytes": 5597,
+      "sha256": "eab1e4a5ae05008e06607526a1bf45b0fb35850a5bbf82e4002bd94954f58936"
+    },
+    {
+      "name": "13_SESSION_10_ANALYTICS_CULL_MULTIPLY_CLOSED_LOOP.md",
+      "source_start_line": 4301,
+      "source_end_line": 4534,
+      "lines": 234,
+      "bytes": 4813,
+      "sha256": "250a666a2e0e81790066b96caaf0f017fde59027cc2921b1417ea71c99677e7a"
+    },
+    {
+      "name": "14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md",
+      "source_start_line": 4564,
+      "source_end_line": 4763,
+      "lines": 200,
+      "bytes": 4556,
+      "sha256": "f5e5c5a000285286bbc3389ae4dd564b3accd9cc820f01b506b8b1cb536a1428"
+    },
+    {
+      "name": "15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md",
+      "source_start_line": 4793,
+      "source_end_line": 5018,
+      "lines": 226,
+      "bytes": 4280,
+      "sha256": "c84a6c59948264f654efc1c11448e3a01bbc0c0f07960b1792d7681e96e48677"
+    },
+    {
+      "name": "16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md",
+      "source_start_line": 5048,
+      "source_end_line": 5303,
+      "lines": 256,
+      "bytes": 4650,
+      "sha256": "d277afd72c2c90c29e0a8d2e4b607bb342b32d84fd485151de7ad6a1b32e21f2"
+    },
+    {
+      "name": "17_SESSION_14_DEPLOYMENT.md",
+      "source_start_line": 5333,
+      "source_end_line": 5509,
+      "lines": 177,
+      "bytes": 3456,
+      "sha256": "92d8c9a1b99e523ea227b2a4dc339fd0e32c6d007a9d05a4735b7a163cf7b624"
+    },
+    {
+      "name": "18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md",
+      "source_start_line": 5539,
+      "source_end_line": 5801,
+      "lines": 263,
+      "bytes": 5243,
+      "sha256": "b09859086ad510862f493227c1da075cc0a29d76ebd07ca4cd6f80710c8ce712"
+    },
+    {
+      "name": "19_RECOVERY_AND_CONTINUATION_PROMPT.md",
+      "source_start_line": 5817,
+      "source_end_line": 5879,
+      "lines": 63,
+      "bytes": 1955,
+      "sha256": "75677038b5bd148e1efab565f1e3ccf27d45657b4530eb0078477ba426c3e8de"
+    },
+    {
+      "name": "20_FINAL_ACCEPTANCE_CHECKLIST.md",
+      "source_start_line": 5895,
+      "source_end_line": 6044,
+      "lines": 150,
+      "bytes": 5092,
+      "sha256": "b0f1a3b7c8ca6a9bebda664cca1253e018d95697cce7ad2bb76024a4e8c22797"
+    }
+  ]
+}

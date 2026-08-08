@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "path": "The-Hands-Off-Money-Machine-Playbook.pdf",
+      "role": "business_logic_authority",
+      "sha256": "c9cd31775d1d79be31c3a8092d8d49fc71d52e695f97cbfb580fcbb35f240fad",
+      "bytes": 829165,
+      "kind": "pdf",
+      "pages": 82,
+      "required_in_clean_clone": false,
+      "git_policy": "ignored_private_source"
+    },
+    {
+      "path": "hands-off-money-machine-full-implementation-workbook.md",
+      "role": "engineering_session_authority",
+      "sha256": "4dbecbb8ad6fdd9fe2323eb164ffd2d7c99143cf5de20de5ec98a1bdf90d7f2b",
+      "bytes": 157125,
+      "kind": "markdown",
+      "lines": 6222,
+      "required_in_clean_clone": true,
+      "git_policy": "registered_source"
+    }
+  ]
+}

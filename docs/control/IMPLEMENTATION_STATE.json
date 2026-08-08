@@ -1,0 +1,96 @@
+{
+  "programme": "hands-off-money-machine",
+  "version": "1.0",
+  "repo_root": "/mnt/d/Money Machine",
+  "windows_repo_root": "D:\\Money Machine",
+  "branch": "build/full-automation",
+  "head_sha": null,
+  "bootstrap_commit_sha": null,
+  "evidence_closure_commit_sha": null,
+  "last_verified_commit": null,
+  "state_revision": 8,
+  "session_status": "incomplete",
+  "current_session": 0,
+  "completed_sessions": [],
+  "services": {
+    "api": "fresh_container_health_200_verified_2026-08-08",
+    "worker": "fresh_container_exit_78_restart_0_verified_2026-08-08",
+    "scheduler": "fresh_container_exit_78_restart_0_verified_2026-08-08",
+    "web": "fresh_container_health_and_nine_route_build_verified_2026-08-08",
+    "postgres": "fresh_container_healthy_authenticated_tcp_select_1_2026-08-08"
+  },
+  "commissioned_agents": [],
+  "tests": {
+    "source_registration": "passed_82_pages_and_immutable_hashes_2026-08-08",
+    "prompt_pack": "passed_21_files_2026-08-08",
+    "control_transition": "passed_35_focused_real_git_and_false_evidence_rejections_2026-08-08",
+    "canonical_scaffold": "passed_293_files_96_directories_2026-08-08",
+    "bootstrap_outer_gates": "passed_53_python_web_docker_scripts_and_clean_bootstrap_2026-08-08"
+  },
+  "environment_versions": {
+    "captured_at": "2026-08-08T16:37:31Z",
+    "windows": "Microsoft Windows 10.0.26200.8973",
+    "powershell": "5.1.26100.8972",
+    "wsl": "2.7.11.0",
+    "wsl_kernel": "6.18.33.2-microsoft-standard-WSL2",
+    "wslg": "1.0.73.2",
+    "git": "2.43.0",
+    "github_cli": "2.92.0",
+    "docker_client": "29.4.2 build 055a478",
+    "docker_compose": "v5.1.3",
+    "docker_daemon": "29.4.2 server active; Compose runtime verified",
+    "python": "3.12.3",
+    "uv": "0.11.7",
+    "node": "24.15.0",
+    "pnpm": "10.33.2",
+    "browser": "Chromium 150.0.7871.128; launchers at /snap/bin/chromium and /usr/bin/chromium-browser",
+    "playwright": "not installed in the Session 00 project"
+  },
+  "blockers": [
+    {
+      "code": "REMOTE_NOT_CONFIGURED",
+      "scope": "push only",
+      "detail": "No Git remote exists; private visibility and authentication cannot yet be verified."
+    },
+    {
+      "code": "SESSION_00_OUTER_GATES_PENDING",
+      "scope": "session completion",
+      "detail": "Bootstrap commit, evidence-closure commit, atomic transition, and later state-pointer commit are not yet proven."
+    }
+  ],
+  "required_completion_evidence": {
+    "canonical_root_verified": true,
+    "canonical_scaffold_verified": true,
+    "sources_byte_identical": true,
+    "pdf_pages_1_through_82_mapped": true,
+    "required_playbook_items_mapped": true,
+    "prompt_pack_verified": true,
+    "git_ignore_audit_passed": true,
+    "environment_versions_recorded": true,
+    "git_evidence_semantics_verified": true,
+    "python_checks_passed": true,
+    "web_checks_passed": true,
+    "compose_postgres_healthy": true,
+    "api_health_live": true,
+    "scripts_parse": true,
+    "clean_bootstrap_passed": true,
+    "implementation_review_approved": true,
+    "adversarial_review_clear": true,
+    "bootstrap_commit_recorded": false,
+    "evidence_closure_commit_recorded": false
+  },
+  "transition_contract": {
+    "completion_requires_all_evidence_true": true,
+    "completion_requires_current_session_in_completed_sessions": true,
+    "completion_requires_next_session": 1,
+    "completion_requires_distinct_commit_shas": true,
+    "completion_requires_existing_git_commits": true,
+    "completion_requires_bootstrap_ancestor_of_closure": true,
+    "completion_records_pre_transition_closure_head": true,
+    "completion_requires_later_state_pointer_commit": true,
+    "unsupported_completion_is_rejected": true
+  },
+  "next_session": 0,
+  "next_prompt": "03_SESSION_00_DISCOVERY_AND_REPO_BOOTSTRAP.md",
+  "updated_at": "2026-08-08T20:45:00Z"
+}

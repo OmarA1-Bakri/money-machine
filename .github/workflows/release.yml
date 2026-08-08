@@ -1,0 +1,17 @@
+name: Release gate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-disabled:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse release before commissioning
+        run: |
+          echo "Release is uncommissioned; no artifacts were published." >&2
+          exit 78
