@@ -126,3 +126,16 @@ The full ignored verification summary is `.omx/evidence/session-00/verification.
 - Bootstrap commit: `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`; exact subject verified.
 
 The evidence-closure commit, atomic transition, and state-pointer commit remain pending, so Session 00 remains incomplete at this checkpoint.
+
+## 2026-08-08T20:57:00Z — Evidence closure and atomic transition receipt
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Distinct real commits | Bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`; evidence closure `50350b9937ad97dabf4be3762a00638d62aaa5b9` | PASS |
+| Exact bootstrap contract | Git subject equals `chore(bootstrap): initialise money machine autonomous monorepo`; bootstrap is the direct parent/ancestor of closure | PASS |
+| Closure state | `git show 50350b9:docs/control/IMPLEMENTATION_STATE.json` was byte-identical to the live incomplete revision-9 state before transition | PASS |
+| Repository boundary | Attached branch was `build/full-automation`; tracked and nonignored untracked status was clean at closure; candidate remained ignored under `.omx/` | PASS |
+| Shipped atomic transition | `python3 -m money_machine.control apply-completion` applied revision 10 with completed session 0, next session 1, exact Session 01 prompt, closure SHA, all evidence true, and only the push-only remote blocker | PASS |
+| Completed-shape static gates | Ruff format/check remained clean across 271 files; strict Pyright remained clean | PASS |
+
+The later state-pointer commit checkpoints this completed control state without attempting a self-referential SHA. On the completed revision-10 state, the final post-transition run reported Ruff format/check clean across 271 files, strict Pyright **0 errors**, and **53 Pytest tests passed** with one third-party Starlette deprecation warning. The ignored raw receipt is `.omx/evidence/session-00/post-transition-verification.log`.

@@ -4,14 +4,16 @@
   "repo_root": "/mnt/d/Money Machine",
   "windows_repo_root": "D:\\Money Machine",
   "branch": "build/full-automation",
-  "head_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
+  "head_sha": "50350b9937ad97dabf4be3762a00638d62aaa5b9",
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "evidence_closure_commit_sha": null,
+  "evidence_closure_commit_sha": "50350b9937ad97dabf4be3762a00638d62aaa5b9",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 9,
-  "session_status": "incomplete",
+  "state_revision": 10,
+  "session_status": "complete",
   "current_session": 0,
-  "completed_sessions": [],
+  "completed_sessions": [
+    0
+  ],
   "services": {
     "api": "fresh_container_health_200_verified_2026-08-08",
     "worker": "fresh_container_exit_78_restart_0_verified_2026-08-08",
@@ -51,11 +53,6 @@
       "code": "REMOTE_NOT_CONFIGURED",
       "scope": "push only",
       "detail": "No Git remote exists; private visibility and authentication cannot yet be verified."
-    },
-    {
-      "code": "SESSION_00_OUTER_GATES_PENDING",
-      "scope": "session completion",
-      "detail": "Bootstrap commit, evidence-closure commit, atomic transition, and later state-pointer commit are not yet proven."
     }
   ],
   "required_completion_evidence": {
@@ -77,7 +74,7 @@
     "implementation_review_approved": true,
     "adversarial_review_clear": true,
     "bootstrap_commit_recorded": true,
-    "evidence_closure_commit_recorded": false
+    "evidence_closure_commit_recorded": true
   },
   "transition_contract": {
     "completion_requires_all_evidence_true": true,
@@ -90,7 +87,7 @@
     "completion_requires_later_state_pointer_commit": true,
     "unsupported_completion_is_rejected": true
   },
-  "next_session": 0,
-  "next_prompt": "03_SESSION_00_DISCOVERY_AND_REPO_BOOTSTRAP.md",
-  "updated_at": "2026-08-08T20:52:00Z"
+  "next_session": 1,
+  "next_prompt": "04_SESSION_01_PLAYBOOK_MAPPING_AND_ARCHITECTURE.md",
+  "updated_at": "2026-08-08T20:57:00Z"
 }

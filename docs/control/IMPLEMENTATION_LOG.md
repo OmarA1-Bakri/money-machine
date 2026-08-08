@@ -57,3 +57,10 @@
 - Independent focused re-review changed the implementation verdict from REJECT to **APPROVE** after both HIGH findings were repaired. Adversarial clearance and the three-commit local closure sequence remain pending; the remote blocker remains push-only.
 - Independent adversarial re-audit then issued **CLEAR** for the leader-owned local closure sequence after 35 fresh focused tests and a 375-path staging projection with no forbidden paths. This clearance is not itself a completion or push claim; the three required local commits and atomic transition remain.
 - Created the exact 375-path bootstrap commit `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d` with subject `chore(bootstrap): initialise money machine autonomous monorepo`. The staged-path manifest matched the adversarial projection, contained no forbidden path or symlink, and immutable source hashes were unchanged immediately before commit.
+
+## 2026-08-08T20:57:00Z — Session 00 atomic completion
+
+- Created evidence-closure commit `50350b9937ad97dabf4be3762a00638d62aaa5b9`, a direct descendant of bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`, containing the exact still-incomplete pre-transition state.
+- Ran the shipped `money_machine.control apply-completion` entry point while branch `build/full-automation` was clean and attached at that closure commit. The validator resolved both commit objects, checked the exact bootstrap subject and ancestry, compared the closure document with the live state, and atomically advanced state revision 9 to 10.
+- Session 00 is now locally complete: `completed_sessions` is `[0]`, `next_session` is `1`, the canonical Session 01 prompt is selected, all completion evidence is true, and only the precise push-only `REMOTE_NOT_CONFIGURED` blocker remains.
+- This completed state and the four companion control documents are checkpointed by the later state-pointer commit containing this entry; the state intentionally does not claim that commit's own object ID.

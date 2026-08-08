@@ -39,3 +39,7 @@ The canonical scaffold requires the `runtime/` directory tree to exist, but runt
 ## D-0006 — Completion candidates cannot manufacture closure evidence
 
 The evidence-closure commit must contain the exact live incomplete state that existed before the completion command. Every non-Git evidence fact and all continuity fields are locked before that commit; the completion candidate may only perform the declared Session 00 transition, record the distinct closure SHA, flip the closure-recorded flag, remove exactly the Session 00 outer-gates blocker, advance the timestamp/revision/session pointer, and preserve unrelated blockers such as the push-only remote blocker. This prevents reviews, tests, service results, or other completion facts from being fabricated after closure.
+
+## D-0007 — Local session completion is distinct from remote publication
+
+The current PRD/test specification permits Session 00 to complete locally when its repository, runtime, review, and Git-evidence gates pass. A missing remote blocks only authenticated private push; it does not invalidate the real local bootstrap, evidence-closure, or state-pointer commits. Accordingly, Session 00 advances to Session 01 while retaining `REMOTE_NOT_CONFIGURED` with scope exactly `push only`. No remote is guessed or created, and no publication authority is inferred.
