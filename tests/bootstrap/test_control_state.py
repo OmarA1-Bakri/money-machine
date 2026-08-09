@@ -2,15 +2,22 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import IO, NoReturn, TypedDict, cast
 
 import pytest
+
+from money_machine.control import locking as control_locking
+from money_machine.control import state as control_state
+from money_machine.control.locking import ControlLockError, exclusive_control_lock
+from money_machine.control.state import ControlStateError
 
 ROOT = Path(__file__).parents[2]
 STATE_PATH = ROOT / "docs/control/IMPLEMENTATION_STATE.json"
@@ -21,6 +28,8 @@ CONTROL_FILES = {
     "TEST_EVIDENCE.md",
     "NEXT_SESSION.md",
 }
+CONTROL_LOCK_FILE = "IMPLEMENTATION_STATE.json.lock"
+CONTROL_LOCK_IGNORE_RULE = f"/docs/control/{CONTROL_LOCK_FILE}"
 BRANCH = "build/full-automation"
 BOOTSTRAP_SUBJECT = "chore(bootstrap): initialise money machine autonomous monorepo"
 OUTER_GATES_BLOCKER = "SESSION_00_OUTER_GATES_PENDING"
@@ -163,6 +172,19 @@ def run_transition(state_path: Path, candidate_path: Path) -> subprocess.Complet
     )
 
 
+def transition_command(state_path: Path, candidate_path: Path) -> list[str]:
+    return [
+        sys.executable,
+        "-m",
+        "money_machine.control",
+        "apply-completion",
+        "--state",
+        str(state_path),
+        "--candidate",
+        str(candidate_path),
+    ]
+
+
 def prepare_transition(tmp_path: Path) -> GitTransition:
     repo = tmp_path / "repository"
     state_path = repo / "docs/control/IMPLEMENTATION_STATE.json"
@@ -173,11 +195,15 @@ def prepare_transition(tmp_path: Path) -> GitTransition:
     write_state(state_path, state)
     evidence_path = repo / "evidence.txt"
     evidence_path.write_text("reviewed evidence\n", encoding="utf-8")
+    (repo / ".gitignore").write_text(
+        (ROOT / ".gitignore").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
 
     git(repo, "init", "-b", BRANCH)
     git(repo, "config", "user.name", "Control Test")
     git(repo, "config", "user.email", "control-test@example.invalid")
-    git(repo, "add", "docs/control/IMPLEMENTATION_STATE.json", "evidence.txt")
+    git(repo, "add", ".gitignore", "docs/control/IMPLEMENTATION_STATE.json", "evidence.txt")
     git(repo, "commit", "-m", BOOTSTRAP_SUBJECT)
     bootstrap = git(repo, "rev-parse", "HEAD")
 
@@ -203,10 +229,342 @@ def prepare_transition(tmp_path: Path) -> GitTransition:
     return GitTransition(repo, state_path, candidate_path, candidate, bootstrap, closure)
 
 
+def test_git_timeout_is_reported_as_control_state_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    def raise_timeout(*args: object, **kwargs: object) -> NoReturn:
+        raise subprocess.TimeoutExpired(cmd=("git", "status"), timeout=1)
+
+    monkeypatch.setattr(control_state.subprocess, "run", raise_timeout)
+
+    with pytest.raises(ControlStateError, match=r"^git command timed out$"):
+        control_state._run_git(ROOT, "status")  # pyright: ignore[reportPrivateUsage]
+
+
+def test_git_invocation_uses_timeout_and_utf8(monkeypatch: pytest.MonkeyPatch) -> None:
+    received_command: tuple[str, ...] | None = None
+    received_options: dict[str, object] | None = None
+
+    def record_run(command: tuple[str, ...], **options: object) -> subprocess.CompletedProcess[str]:
+        nonlocal received_command, received_options
+        received_command = command
+        received_options = options
+        return subprocess.CompletedProcess(command, 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(control_state.subprocess, "run", record_run)
+
+    assert (
+        control_state._run_git(  # pyright: ignore[reportPrivateUsage]
+            ROOT, "status", "--short"
+        )
+        == "ok\n"
+    )
+    assert received_command == ("git", "status", "--short")
+    assert received_options is not None
+    assert received_options["cwd"] == ROOT
+    assert received_options["timeout"] == control_state.CONTROL_GIT_TIMEOUT_SECONDS
+    assert received_options["text"] is True
+    assert received_options["encoding"] == "utf-8"
+    assert received_options["capture_output"] is True
+    assert received_options["check"] is False
+
+
+def test_atomic_write_closes_descriptor_once_when_fdopen_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "state.json"
+    target.write_text("{}\n", encoding="utf-8")
+    descriptor_seen: int | None = None
+    close_calls: list[int] = []
+    real_close = os.close
+
+    def fail_fdopen(descriptor: int, mode: str) -> NoReturn:
+        nonlocal descriptor_seen
+        descriptor_seen = descriptor
+        raise OSError(f"fdopen failed in {mode}")
+
+    def record_close(descriptor: int) -> None:
+        close_calls.append(descriptor)
+        real_close(descriptor)
+
+    monkeypatch.setattr(control_state.os, "fdopen", fail_fdopen)
+    monkeypatch.setattr(control_state.os, "close", record_close)
+
+    with pytest.raises(OSError, match="fdopen failed"):
+        control_state._atomic_write_json(  # pyright: ignore[reportPrivateUsage]
+            target, {"state_revision": 1}
+        )
+
+    assert descriptor_seen is not None
+    if close_calls != [descriptor_seen]:
+        real_close(descriptor_seen)
+    assert close_calls == [descriptor_seen]
+    assert not list(tmp_path.glob(".state.json.*.tmp"))
+
+
+def test_atomic_write_closes_owned_descriptor_and_removes_temp_on_write_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "state.json"
+    target.write_text("{}\n", encoding="utf-8")
+    real_close = os.close
+    streams: list[FailingWriteStream] = []
+
+    class FailingWriteStream:
+        def __init__(self, descriptor: int) -> None:
+            self.descriptor = descriptor
+            self.close_count = 0
+
+        def __enter__(self) -> FailingWriteStream:
+            return self
+
+        def __exit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc_value: BaseException | None,
+            traceback: object,
+        ) -> None:
+            self.close()
+
+        def fileno(self) -> int:
+            return self.descriptor
+
+        def write(self, payload: bytes) -> NoReturn:
+            raise OSError(f"write failed for {len(payload)} bytes")
+
+        def flush(self) -> None:
+            raise AssertionError("flush must not run after a failed write")
+
+        def close(self) -> None:
+            self.close_count += 1
+            real_close(self.descriptor)
+
+    def failing_stream(descriptor: int, mode: str) -> IO[bytes]:
+        assert mode == "wb"
+        stream = FailingWriteStream(descriptor)
+        streams.append(stream)
+        return cast(IO[bytes], stream)
+
+    monkeypatch.setattr(control_state.os, "fdopen", failing_stream)
+
+    with pytest.raises(OSError, match="write failed"):
+        control_state._atomic_write_json(  # pyright: ignore[reportPrivateUsage]
+            target, {"state_revision": 1}
+        )
+
+    assert len(streams) == 1
+    assert streams[0].close_count == 1
+    assert not list(tmp_path.glob(".state.json.*.tmp"))
+
+
+def test_atomic_write_succeeds_without_fchmod(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "state.json"
+    target.write_text("{}\n", encoding="utf-8")
+    descriptor_seen: int | None = None
+    real_mkstemp = control_state.tempfile.mkstemp
+
+    def record_mkstemp(
+        suffix: str | None = None,
+        prefix: str | None = None,
+        dir: str | os.PathLike[str] | None = None,
+        text: bool = False,
+    ) -> tuple[int, str]:
+        nonlocal descriptor_seen
+        descriptor, temporary_name = real_mkstemp(
+            suffix=suffix,
+            prefix=prefix,
+            dir=dir,
+            text=text,
+        )
+        descriptor_seen = descriptor
+        return descriptor, temporary_name
+
+    monkeypatch.setattr(control_state.tempfile, "mkstemp", record_mkstemp)
+    monkeypatch.delattr(control_state.os, "fchmod")
+
+    try:
+        control_state._atomic_write_json(  # pyright: ignore[reportPrivateUsage]
+            target, {"state_revision": 1}
+        )
+    finally:
+        if descriptor_seen is not None:
+            try:
+                os.fstat(descriptor_seen)
+            except OSError:
+                pass
+            else:
+                os.close(descriptor_seen)
+
+    assert json.loads(target.read_text(encoding="utf-8")) == {"state_revision": 1}
+    assert not list(tmp_path.glob(".state.json.*.tmp"))
+
+
+@pytest.mark.skipif(os.name != "posix", reason="the process barrier wrapper requires POSIX PATH")
+def test_canonical_and_symlink_alias_transitions_allow_exactly_one_writer(
+    tmp_path: Path,
+) -> None:
+    transition = prepare_transition(tmp_path)
+    wrapper_dir = tmp_path / "git-wrapper"
+    wrapper_dir.mkdir()
+    barrier_dir = tmp_path / "status-barrier"
+    wrapper_path = wrapper_dir / "git"
+    real_git = shutil.which("git")
+    assert real_git is not None
+    wrapper_path.write_text(
+        f"#!{sys.executable}\n"
+        "import os\n"
+        "import subprocess\n"
+        "import sys\n"
+        "import time\n"
+        "from pathlib import Path\n"
+        "arguments = sys.argv[1:]\n"
+        "if 'status' in arguments and '--porcelain=v1' in arguments:\n"
+        "    real_git = os.environ['CONTROL_TEST_REAL_GIT']\n"
+        "    result = subprocess.run([real_git, *arguments], capture_output=True)\n"
+        "    barrier = Path(os.environ['CONTROL_TEST_BARRIER'])\n"
+        "    barrier.mkdir(parents=True, exist_ok=True)\n"
+        "    owner = os.getppid()\n"
+        "    counter = barrier / f'counter-{{owner}}'\n"
+        "    phase = int(counter.read_text() or '0') + 1 if counter.exists() else 1\n"
+        "    counter.write_text(str(phase))\n"
+        "    (barrier / f'phase-{{phase}}-{{owner}}').touch()\n"
+        "    deadline = time.monotonic() + 0.75\n"
+        "    while time.monotonic() < deadline:\n"
+        "        if len(list(barrier.glob(f'phase-{{phase}}-*'))) >= 2:\n"
+        "            break\n"
+        "        time.sleep(0.01)\n"
+        "    sys.stdout.buffer.write(result.stdout)\n"
+        "    sys.stderr.buffer.write(result.stderr)\n"
+        "    raise SystemExit(result.returncode)\n"
+        "os.execv(os.environ['CONTROL_TEST_REAL_GIT'], "
+        "[os.environ['CONTROL_TEST_REAL_GIT'], *arguments])\n",
+        encoding="utf-8",
+    )
+    wrapper_path.chmod(0o755)
+    environment = os.environ.copy()
+    environment["PATH"] = f"{wrapper_dir}{os.pathsep}{environment['PATH']}"
+    environment["CONTROL_TEST_BARRIER"] = str(barrier_dir)
+    environment["CONTROL_TEST_REAL_GIT"] = real_git
+    alias_path = transition.state_path.with_name("state-alias.json")
+    alias_path.symlink_to(transition.state_path)
+    commands = [
+        transition_command(transition.state_path, transition.candidate_path),
+        transition_command(alias_path, transition.candidate_path),
+    ]
+
+    processes = [
+        subprocess.Popen(
+            command,
+            cwd=ROOT,
+            env=environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for command in commands
+    ]
+    results = [process.communicate(timeout=15) for process in processes]
+
+    assert sorted(process.returncode for process in processes) == [0, 2], results
+    assert load_state(transition.state_path) == transition.candidate
+    assert (
+        load_state(transition.state_path)["state_revision"]
+        == transition.candidate["state_revision"]
+    )
+    assert not list(transition.state_path.parent.glob(".IMPLEMENTATION_STATE.json.*.tmp"))
+
+
+def test_transition_sidecar_is_durable_ignored_and_the_only_extra_control_file(
+    tmp_path: Path,
+) -> None:
+    transition = prepare_transition(tmp_path)
+
+    result = run_transition(transition.state_path, transition.candidate_path)
+
+    assert result.returncode == 0, result.stderr
+    lock_path = transition.state_path.with_name(CONTROL_LOCK_FILE)
+    assert lock_path.read_bytes() == b"\0"
+    assert {path.name for path in transition.state_path.parent.iterdir() if path.is_file()} == {
+        transition.state_path.name,
+        CONTROL_LOCK_FILE,
+    }
+    assert (
+        CONTROL_LOCK_IGNORE_RULE in (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+    )
+    relative_lock_path = str(lock_path.relative_to(transition.repo))
+    assert git(transition.repo, "check-ignore", relative_lock_path) == relative_lock_path
+    assert git(transition.repo, "status", "--short", "--untracked-files=all").splitlines() == [
+        "M docs/control/IMPLEMENTATION_STATE.json"
+    ]
+
+
+class FakeMsvcrt:
+    LK_LOCK = 1
+    LK_UNLCK = 2
+
+    def __init__(self, failure_mode: int | None = None) -> None:
+        self.failure_mode = failure_mode
+        self.calls: list[tuple[int, int, int, int]] = []
+
+    def locking(self, descriptor: int, mode: int, size: int) -> None:
+        self.calls.append((descriptor, mode, size, os.lseek(descriptor, 0, os.SEEK_CUR)))
+        if mode == self.failure_mode:
+            raise OSError("simulated msvcrt failure")
+
+
+def test_windows_locking_acquires_and_releases_byte_zero(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake_msvcrt = FakeMsvcrt()
+    monkeypatch.setattr(control_locking.sys, "platform", "win32")
+    monkeypatch.setattr(control_locking, "msvcrt", fake_msvcrt, raising=False)
+    lock_path = tmp_path / "state.json.lock"
+
+    with exclusive_control_lock(lock_path):
+        assert lock_path.read_bytes() == b"\0"
+
+    assert [(mode, size, position) for _, mode, size, position in fake_msvcrt.calls] == [
+        (fake_msvcrt.LK_LOCK, 1, 0),
+        (fake_msvcrt.LK_UNLCK, 1, 0),
+    ]
+
+
+def test_windows_locking_reports_acquisition_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake_msvcrt = FakeMsvcrt(failure_mode=FakeMsvcrt.LK_LOCK)
+    monkeypatch.setattr(control_locking.sys, "platform", "win32")
+    monkeypatch.setattr(control_locking, "msvcrt", fake_msvcrt, raising=False)
+
+    with (
+        pytest.raises(ControlLockError, match="cannot acquire control lock"),
+        exclusive_control_lock(tmp_path / "state.json.lock"),
+    ):
+        pytest.fail("lock body must not run after acquisition failure")
+
+
+def test_windows_locking_reports_release_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake_msvcrt = FakeMsvcrt(failure_mode=FakeMsvcrt.LK_UNLCK)
+    monkeypatch.setattr(control_locking.sys, "platform", "win32")
+    monkeypatch.setattr(control_locking, "msvcrt", fake_msvcrt, raising=False)
+
+    with (
+        pytest.raises(ControlLockError, match="cannot release control lock"),
+        exclusive_control_lock(tmp_path / "state.json.lock"),
+    ):
+        pass
+
+
 def test_control_files_are_exactly_the_five_continuity_files() -> None:
-    assert {
-        path.name for path in (ROOT / "docs/control").iterdir() if path.is_file()
-    } == CONTROL_FILES
+    control_files = {path.name for path in (ROOT / "docs/control").iterdir() if path.is_file()}
+
+    assert control_files - {CONTROL_LOCK_FILE} == CONTROL_FILES
+    assert control_files <= CONTROL_FILES | {CONTROL_LOCK_FILE}
 
 
 def test_checked_in_state_is_a_valid_session_zero_continuity_shape() -> None:

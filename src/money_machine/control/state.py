@@ -10,11 +10,14 @@ import tempfile
 from pathlib import Path
 from typing import TypedDict, cast
 
+from money_machine.control.locking import ControlLockError, exclusive_control_lock
+
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 SUPPORTED_COMPLETION_SESSION = 0
 BOOTSTRAP_COMMIT_SUBJECT = "chore(bootstrap): initialise money machine autonomous monorepo"
 CANONICAL_STATE_RELATIVE_PATH = Path("docs/control/IMPLEMENTATION_STATE.json")
 SESSION_01_PROMPT = "04_SESSION_01_PLAYBOOK_MAPPING_AND_ARCHITECTURE.md"
+CONTROL_GIT_TIMEOUT_SECONDS = 10.0
 
 
 class ControlState(TypedDict):
@@ -272,29 +275,29 @@ def validate_completion_transition(previous: ControlState, current: ControlState
         raise ControlStateError("head_sha must identify the pre-transition evidence-closure commit")
 
 
-def _git(
-    repo_root: Path,
-    *arguments: str,
-    allowed_returncodes: frozenset[int] = frozenset({0}),
-) -> subprocess.CompletedProcess[str]:
+def _run_git(repo_root: Path, *arguments: str) -> str:
     try:
         result = subprocess.run(
-            ["git", "-C", str(repo_root), *arguments],
-            check=False,
-            capture_output=True,
+            ("git", *arguments),
+            cwd=repo_root,
+            timeout=CONTROL_GIT_TIMEOUT_SECONDS,
             text=True,
+            encoding="utf-8",
+            capture_output=True,
+            check=False,
         )
+    except subprocess.TimeoutExpired as error:
+        raise ControlStateError("git command timed out") from error
     except OSError as error:
         raise ControlStateError(f"cannot execute Git: {error}") from error
-    if result.returncode not in allowed_returncodes:
+    if result.returncode != 0:
         detail = result.stderr.strip() or result.stdout.strip() or "unknown Git error"
         raise ControlStateError(f"Git verification failed for {' '.join(arguments)}: {detail}")
-    return result
+    return result.stdout
 
 
 def _resolve_commit(repo_root: Path, commit_id: str, label: str) -> str:
-    result = _git(repo_root, "rev-parse", "--verify", f"{commit_id}^{{commit}}")
-    resolved = result.stdout.strip()
+    resolved = _run_git(repo_root, "rev-parse", "--verify", f"{commit_id}^{{commit}}").strip()
     if resolved != commit_id:
         raise ControlStateError(f"{label} must be a full commit object ID")
     return resolved
@@ -305,18 +308,18 @@ def _assert_repo_at_closure(
     closure: str,
     recorded_branch: str,
 ) -> None:
-    head = _git(repo_root, "rev-parse", "--verify", "HEAD^{commit}").stdout.strip()
+    head = _run_git(repo_root, "rev-parse", "--verify", "HEAD^{commit}").strip()
     if head != closure:
         raise ControlStateError("repository HEAD must equal the evidence-closure commit")
-    branch = _git(repo_root, "symbolic-ref", "--quiet", "--short", "HEAD").stdout.strip()
+    branch = _run_git(repo_root, "symbolic-ref", "--quiet", "--short", "HEAD").strip()
     if branch != recorded_branch:
         raise ControlStateError("repository HEAD must be attached to the recorded branch")
-    status = _git(
+    status = _run_git(
         repo_root,
         "status",
         "--porcelain=v1",
         "--untracked-files=no",
-    ).stdout
+    )
     if status:
         raise ControlStateError("all tracked repository files must be clean before transition")
 
@@ -335,11 +338,11 @@ def _validate_git_evidence(
     if not repo_root.is_dir():
         raise ControlStateError("repo_root must identify an existing Git repository")
 
-    git_root = Path(_git(repo_root, "rev-parse", "--show-toplevel").stdout.strip()).resolve()
+    git_root = Path(_run_git(repo_root, "rev-parse", "--show-toplevel").strip()).resolve()
     if git_root != repo_root:
         raise ControlStateError("repo_root must identify the Git worktree root")
     recorded_branch = current["branch"]
-    actual_branch = _git(repo_root, "symbolic-ref", "--quiet", "--short", "HEAD").stdout.strip()
+    actual_branch = _run_git(repo_root, "symbolic-ref", "--quiet", "--short", "HEAD").strip()
     if actual_branch != recorded_branch:
         raise ControlStateError("recorded branch must equal the current Git branch")
 
@@ -350,29 +353,27 @@ def _validate_git_evidence(
     _resolve_commit(repo_root, bootstrap, "bootstrap_commit_sha")
     _resolve_commit(repo_root, closure, "evidence_closure_commit_sha")
 
-    bootstrap_subject = _git(repo_root, "show", "-s", "--format=%s", bootstrap).stdout.rstrip("\n")
+    bootstrap_subject = _run_git(repo_root, "show", "-s", "--format=%s", bootstrap).rstrip("\n")
     if bootstrap_subject != BOOTSTRAP_COMMIT_SUBJECT:
         raise ControlStateError(
             f"bootstrap commit subject must be exactly {BOOTSTRAP_COMMIT_SUBJECT!r}"
         )
-    ancestry = _git(
+    ancestry = _run_git(
         repo_root,
-        "merge-base",
-        "--is-ancestor",
-        bootstrap,
-        closure,
-        allowed_returncodes=frozenset({0, 1}),
+        "rev-list",
+        "--ancestry-path",
+        f"{bootstrap}..{closure}",
     )
-    if ancestry.returncode != 0:
+    if not ancestry.strip():
         raise ControlStateError("bootstrap commit must be an ancestor of evidence-closure commit")
 
     state_relative = CANONICAL_STATE_RELATIVE_PATH
     _assert_repo_at_closure(repo_root, closure, recorded_branch)
-    closure_document = _git(
+    closure_document = _run_git(
         repo_root,
         "show",
         f"{closure}:{state_relative.as_posix()}",
-    ).stdout
+    )
     try:
         decoded_closure = cast(object, json.loads(closure_document))
     except json.JSONDecodeError as error:
@@ -395,7 +396,7 @@ def _validate_git_evidence(
 
 
 def _atomic_write_json(path: Path, document: dict[str, object]) -> None:
-    payload = (json.dumps(document, indent=2, ensure_ascii=False) + "\n").encode()
+    payload = (json.dumps(document, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
     descriptor, temporary_name = tempfile.mkstemp(
         dir=path.parent,
         prefix=f".{path.name}.",
@@ -403,9 +404,15 @@ def _atomic_write_json(path: Path, document: dict[str, object]) -> None:
     )
     temporary_path = Path(temporary_name)
     try:
-        if path.exists():
-            os.fchmod(descriptor, path.stat().st_mode)
-        with os.fdopen(descriptor, "wb") as stream:
+        try:
+            stream = os.fdopen(descriptor, "wb")
+        except BaseException:
+            os.close(descriptor)
+            raise
+        with stream:
+            fchmod = getattr(os, "fchmod", None)
+            if path.exists() and fchmod is not None:
+                fchmod(stream.fileno(), path.stat().st_mode)
             stream.write(payload)
             stream.flush()
             os.fsync(stream.fileno())
@@ -424,18 +431,25 @@ def _atomic_write_json(path: Path, document: dict[str, object]) -> None:
 def apply_completion_transition(state_path: Path, candidate_path: Path) -> ControlState:
     """Validate a candidate and atomically replace the current state file."""
     try:
-        if state_path.resolve() == candidate_path.resolve():
+        canonical_state_path = state_path.resolve()
+        canonical_candidate_path = candidate_path.resolve()
+        if canonical_state_path == canonical_candidate_path:
             raise ControlStateError("candidate must be separate from the current state file")
     except OSError as error:
         raise ControlStateError(f"cannot resolve state paths: {error}") from error
 
-    previous, _ = _parse_state(state_path, "current state")
-    current, current_raw = _parse_state(candidate_path, "candidate state")
-    validate_completion_transition(previous, current)
-    repo_root, closure = _validate_git_evidence(state_path, previous, current)
-    _assert_repo_at_closure(repo_root, closure, current["branch"])
     try:
-        _atomic_write_json(state_path, current_raw)
-    except OSError as error:
-        raise ControlStateError(f"atomic state write failed: {error}") from error
-    return current
+        lock_path = canonical_state_path.with_name(f"{canonical_state_path.name}.lock")
+        with exclusive_control_lock(lock_path):
+            previous, _ = _parse_state(canonical_state_path, "current state")
+            current, current_raw = _parse_state(canonical_candidate_path, "candidate state")
+            validate_completion_transition(previous, current)
+            repo_root, closure = _validate_git_evidence(canonical_state_path, previous, current)
+            _assert_repo_at_closure(repo_root, closure, current["branch"])
+            try:
+                _atomic_write_json(canonical_state_path, current_raw)
+            except OSError as error:
+                raise ControlStateError(f"atomic state write failed: {error}") from error
+            return current
+    except ControlLockError as error:
+        raise ControlStateError(f"control lock failed: {error}") from error

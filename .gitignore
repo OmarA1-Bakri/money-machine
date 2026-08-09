@@ -66,6 +66,7 @@ runtime/
 generated/
 artifacts/
 evidence/generated/
+/docs/control/IMPLEMENTATION_STATE.json.lock
 *.log
 *.pid
 *.sqlite*
