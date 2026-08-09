@@ -1,0 +1,10 @@
+:root {
+  --theme-name: "{{ variant_name }}";
+  --background: hsl({{ hue }} 35% 96%);
+  --surface: hsl({{ hue }} 40% 100%);
+  --accent: hsl({{ accent_hue }} 42% 38%);
+  --text: hsl({{ hue }} 18% 18%);
+}
+body { margin: 0 auto; max-width: 72rem; padding: 2rem; color: var(--text); background: var(--background); font: 16px/1.5 system-ui, sans-serif; }
+header, section, nav { margin-block: 1rem; padding: 1rem; border-radius: .75rem; background: var(--surface); }
+a { color: var(--accent); }

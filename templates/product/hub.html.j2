@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ hub_name }} | {{ title }}</title>
+  <link rel="stylesheet" href="../assets/{{ default_theme }}.css">
+</head>
+<body>
+  <header><a href="../home.html">Back to dashboard</a><h1>{{ hub_name }}</h1></header>
+  <main>
+    <p>{{ hub_description }}</p>
+    <nav aria-label="Other hubs"><ul>{% for slug, name in hubs %}<li><a href="{{ slug }}.html">{{ name }}</a></li>{% endfor %}</ul></nav>
+    <section><h2>Useful views</h2><ul>{% for feature in features %}<li>{{ feature }}</li>{% endfor %}</ul></section>
+  </main>
+</body>
+</html>

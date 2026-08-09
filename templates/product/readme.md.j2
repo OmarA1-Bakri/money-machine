@@ -1,0 +1,19 @@
+# {{ title }}
+
+Built for **{{ target_buyer }}** to {{ promised_outcome }}.
+
+## Open the product
+
+Open `home.html` in a browser. The bundle is self-contained and makes no network requests.
+
+## Included hubs
+
+{% for slug, name in hubs %}- {{ name }}
+{% endfor %}
+
+## Colour themes
+
+{% for slug, name in variants %}- {{ name }}
+{% endfor %}
+
+Renderer: `{{ renderer_version }}`

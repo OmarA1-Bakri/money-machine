@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="assets/{{ default_theme }}.css">
+</head>
+<body>
+  <header><p>{{ identity_niche }}</p><h1>{{ title }}</h1><p>{{ promised_outcome }}</p></header>
+  <main>
+    <section aria-label="Build progress" data-build-progress="6/6"><strong>Bundle ready</strong></section>
+    <nav aria-label="Product hubs"><ul>{% for slug, name in hubs %}<li><a href="hubs/{{ slug }}.html">{{ name }}</a></li>{% endfor %}</ul></nav>
+    <section><h2>Designed for</h2><p>{{ target_buyer }}</p></section>
+    <section><h2>Verified product facts</h2><ul>{% for fact in product_facts %}<li>{{ fact }}</li>{% endfor %}</ul></section>
+  </main>
+</body>
+</html>
