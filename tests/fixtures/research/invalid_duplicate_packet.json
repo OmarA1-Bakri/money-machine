@@ -1,0 +1,994 @@
+{
+  "observations": [
+    {
+      "observation_id": "OBS-001",
+      "evidence": {
+        "evidence_id": "EVD-001",
+        "source_url": "https://fixtures.example.invalid/listing/1",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "marketplace": "fixture-market",
+      "title": "Budget Moms Planner example 1",
+      "category": "Planner",
+      "identity_niche": "Budget Moms",
+      "base_category": "Planner",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "8",
+        "differentiation": "8",
+        "build_feasibility": "8",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-001",
+      "evidence": {
+        "evidence_id": "EVD-002",
+        "source_url": "https://fixtures.example.invalid/listing/2",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000002"
+      },
+      "marketplace": "fixture-market",
+      "title": "Budget Moms Planner example 2",
+      "category": "Planner",
+      "identity_niche": " BUDGET MOMS ",
+      "base_category": "planner",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "8",
+        "differentiation": "8",
+        "build_feasibility": "8",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-003",
+      "evidence": {
+        "evidence_id": "EVD-003",
+        "source_url": "https://fixtures.example.invalid/listing/3",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000003"
+      },
+      "marketplace": "fixture-market",
+      "title": "Budget Moms Planner example 3",
+      "category": "Planner",
+      "identity_niche": "Budget Moms",
+      "base_category": "Planner",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "8",
+        "differentiation": "8",
+        "build_feasibility": "8",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-004",
+      "evidence": {
+        "evidence_id": "EVD-004",
+        "source_url": "https://fixtures.example.invalid/listing/4",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000004"
+      },
+      "marketplace": "fixture-market",
+      "title": "Budget Moms Planner example 4",
+      "category": "Planner",
+      "identity_niche": " BUDGET MOMS ",
+      "base_category": "planner",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "8",
+        "differentiation": "8",
+        "build_feasibility": "8",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-005",
+      "evidence": {
+        "evidence_id": "EVD-005",
+        "source_url": "https://fixtures.example.invalid/listing/5",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000005"
+      },
+      "marketplace": "fixture-market",
+      "title": "Budget Moms Planner example 5",
+      "category": "Planner",
+      "identity_niche": "Budget Moms",
+      "base_category": "Planner",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "8",
+        "differentiation": "8",
+        "build_feasibility": "8",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-006",
+      "evidence": {
+        "evidence_id": "EVD-006",
+        "source_url": "https://fixtures.example.invalid/listing/6",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000006"
+      },
+      "marketplace": "fixture-market",
+      "title": "Freelance Designers Client Portal example 1",
+      "category": "Client Portal",
+      "identity_niche": "Freelance Designers",
+      "base_category": "Client Portal",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "9",
+        "differentiation": "7",
+        "build_feasibility": "8",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-007",
+      "evidence": {
+        "evidence_id": "EVD-007",
+        "source_url": "https://fixtures.example.invalid/listing/7",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000007"
+      },
+      "marketplace": "fixture-market",
+      "title": "Freelance Designers Client Portal example 2",
+      "category": "Client Portal",
+      "identity_niche": " FREELANCE DESIGNERS ",
+      "base_category": "client portal",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "9",
+        "differentiation": "7",
+        "build_feasibility": "8",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-008",
+      "evidence": {
+        "evidence_id": "EVD-008",
+        "source_url": "https://fixtures.example.invalid/listing/8",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000008"
+      },
+      "marketplace": "fixture-market",
+      "title": "Freelance Designers Client Portal example 3",
+      "category": "Client Portal",
+      "identity_niche": "Freelance Designers",
+      "base_category": "Client Portal",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "9",
+        "differentiation": "7",
+        "build_feasibility": "8",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-009",
+      "evidence": {
+        "evidence_id": "EVD-009",
+        "source_url": "https://fixtures.example.invalid/listing/9",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000009"
+      },
+      "marketplace": "fixture-market",
+      "title": "Freelance Designers Client Portal example 4",
+      "category": "Client Portal",
+      "identity_niche": " FREELANCE DESIGNERS ",
+      "base_category": "client portal",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "9",
+        "differentiation": "7",
+        "build_feasibility": "8",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-010",
+      "evidence": {
+        "evidence_id": "EVD-010",
+        "source_url": "https://fixtures.example.invalid/listing/10",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "000000000000000000000000000000000000000000000000000000000000000a"
+      },
+      "marketplace": "fixture-market",
+      "title": "Freelance Designers Client Portal example 5",
+      "category": "Client Portal",
+      "identity_niche": "Freelance Designers",
+      "base_category": "Client Portal",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "9",
+        "differentiation": "7",
+        "build_feasibility": "8",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-011",
+      "evidence": {
+        "evidence_id": "EVD-011",
+        "source_url": "https://fixtures.example.invalid/listing/11",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "000000000000000000000000000000000000000000000000000000000000000b"
+      },
+      "marketplace": "fixture-market",
+      "title": "Home Bakers Order Tracker example 1",
+      "category": "Order Tracker",
+      "identity_niche": "Home Bakers",
+      "base_category": "Order Tracker",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "8",
+        "differentiation": "7",
+        "build_feasibility": "9",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-012",
+      "evidence": {
+        "evidence_id": "EVD-012",
+        "source_url": "https://fixtures.example.invalid/listing/12",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "000000000000000000000000000000000000000000000000000000000000000c"
+      },
+      "marketplace": "fixture-market",
+      "title": "Home Bakers Order Tracker example 2",
+      "category": "Order Tracker",
+      "identity_niche": " HOME BAKERS ",
+      "base_category": "order tracker",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "8",
+        "differentiation": "7",
+        "build_feasibility": "9",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-013",
+      "evidence": {
+        "evidence_id": "EVD-013",
+        "source_url": "https://fixtures.example.invalid/listing/13",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "000000000000000000000000000000000000000000000000000000000000000d"
+      },
+      "marketplace": "fixture-market",
+      "title": "Home Bakers Order Tracker example 3",
+      "category": "Order Tracker",
+      "identity_niche": "Home Bakers",
+      "base_category": "Order Tracker",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "8",
+        "differentiation": "7",
+        "build_feasibility": "9",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-014",
+      "evidence": {
+        "evidence_id": "EVD-014",
+        "source_url": "https://fixtures.example.invalid/listing/14",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "000000000000000000000000000000000000000000000000000000000000000e"
+      },
+      "marketplace": "fixture-market",
+      "title": "Home Bakers Order Tracker example 4",
+      "category": "Order Tracker",
+      "identity_niche": " HOME BAKERS ",
+      "base_category": "order tracker",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "8",
+        "differentiation": "7",
+        "build_feasibility": "9",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-015",
+      "evidence": {
+        "evidence_id": "EVD-015",
+        "source_url": "https://fixtures.example.invalid/listing/15",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "000000000000000000000000000000000000000000000000000000000000000f"
+      },
+      "marketplace": "fixture-market",
+      "title": "Home Bakers Order Tracker example 5",
+      "category": "Order Tracker",
+      "identity_niche": "Home Bakers",
+      "base_category": "Order Tracker",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "8",
+        "differentiation": "7",
+        "build_feasibility": "9",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-016",
+      "evidence": {
+        "evidence_id": "EVD-016",
+        "source_url": "https://fixtures.example.invalid/listing/16",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000010"
+      },
+      "marketplace": "fixture-market",
+      "title": "Wedding Photographers Workflow example 1",
+      "category": "Workflow",
+      "identity_niche": "Wedding Photographers",
+      "base_category": "Workflow",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "7",
+        "differentiation": "8",
+        "build_feasibility": "8",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-017",
+      "evidence": {
+        "evidence_id": "EVD-017",
+        "source_url": "https://fixtures.example.invalid/listing/17",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000011"
+      },
+      "marketplace": "fixture-market",
+      "title": "Wedding Photographers Workflow example 2",
+      "category": "Workflow",
+      "identity_niche": " WEDDING PHOTOGRAPHERS ",
+      "base_category": "workflow",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "7",
+        "differentiation": "8",
+        "build_feasibility": "8",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-018",
+      "evidence": {
+        "evidence_id": "EVD-018",
+        "source_url": "https://fixtures.example.invalid/listing/18",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000012"
+      },
+      "marketplace": "fixture-market",
+      "title": "Wedding Photographers Workflow example 3",
+      "category": "Workflow",
+      "identity_niche": "Wedding Photographers",
+      "base_category": "Workflow",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "7",
+        "differentiation": "8",
+        "build_feasibility": "8",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-019",
+      "evidence": {
+        "evidence_id": "EVD-019",
+        "source_url": "https://fixtures.example.invalid/listing/19",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000013"
+      },
+      "marketplace": "fixture-market",
+      "title": "Wedding Photographers Workflow example 4",
+      "category": "Workflow",
+      "identity_niche": " WEDDING PHOTOGRAPHERS ",
+      "base_category": "workflow",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "7",
+        "differentiation": "8",
+        "build_feasibility": "8",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-020",
+      "evidence": {
+        "evidence_id": "EVD-020",
+        "source_url": "https://fixtures.example.invalid/listing/20",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000014"
+      },
+      "marketplace": "fixture-market",
+      "title": "Wedding Photographers Workflow example 5",
+      "category": "Workflow",
+      "identity_niche": "Wedding Photographers",
+      "base_category": "Workflow",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "7",
+        "differentiation": "8",
+        "build_feasibility": "8",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-021",
+      "evidence": {
+        "evidence_id": "EVD-021",
+        "source_url": "https://fixtures.example.invalid/listing/21",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000015"
+      },
+      "marketplace": "fixture-market",
+      "title": "Language Tutors Lesson Planner example 1",
+      "category": "Lesson Planner",
+      "identity_niche": "Language Tutors",
+      "base_category": "Lesson Planner",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "7",
+        "differentiation": "7",
+        "build_feasibility": "9",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-022",
+      "evidence": {
+        "evidence_id": "EVD-022",
+        "source_url": "https://fixtures.example.invalid/listing/22",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000016"
+      },
+      "marketplace": "fixture-market",
+      "title": "Language Tutors Lesson Planner example 2",
+      "category": "Lesson Planner",
+      "identity_niche": " LANGUAGE TUTORS ",
+      "base_category": "lesson planner",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "7",
+        "differentiation": "7",
+        "build_feasibility": "9",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-023",
+      "evidence": {
+        "evidence_id": "EVD-023",
+        "source_url": "https://fixtures.example.invalid/listing/23",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000017"
+      },
+      "marketplace": "fixture-market",
+      "title": "Language Tutors Lesson Planner example 3",
+      "category": "Lesson Planner",
+      "identity_niche": "Language Tutors",
+      "base_category": "Lesson Planner",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "7",
+        "differentiation": "7",
+        "build_feasibility": "9",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-024",
+      "evidence": {
+        "evidence_id": "EVD-024",
+        "source_url": "https://fixtures.example.invalid/listing/24",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000018"
+      },
+      "marketplace": "fixture-market",
+      "title": "Language Tutors Lesson Planner example 4",
+      "category": "Lesson Planner",
+      "identity_niche": " LANGUAGE TUTORS ",
+      "base_category": "lesson planner",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "7",
+        "differentiation": "7",
+        "build_feasibility": "9",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-025",
+      "evidence": {
+        "evidence_id": "EVD-025",
+        "source_url": "https://fixtures.example.invalid/listing/25",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000019"
+      },
+      "marketplace": "fixture-market",
+      "title": "Language Tutors Lesson Planner example 5",
+      "category": "Lesson Planner",
+      "identity_niche": "Language Tutors",
+      "base_category": "Lesson Planner",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "7",
+        "differentiation": "7",
+        "build_feasibility": "9",
+        "buyer_value": "8"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-026",
+      "evidence": {
+        "evidence_id": "EVD-026",
+        "source_url": "https://fixtures.example.invalid/listing/26",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "000000000000000000000000000000000000000000000000000000000000001a"
+      },
+      "marketplace": "fixture-market",
+      "title": "Fitness Coaches Client Tracker example 1",
+      "category": "Client Tracker",
+      "identity_niche": "Fitness Coaches",
+      "base_category": "Client Tracker",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "8",
+        "differentiation": "8",
+        "build_feasibility": "7",
+        "buyer_value": "7"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-027",
+      "evidence": {
+        "evidence_id": "EVD-027",
+        "source_url": "https://fixtures.example.invalid/listing/27",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "000000000000000000000000000000000000000000000000000000000000001b"
+      },
+      "marketplace": "fixture-market",
+      "title": "Fitness Coaches Client Tracker example 2",
+      "category": "Client Tracker",
+      "identity_niche": " FITNESS COACHES ",
+      "base_category": "client tracker",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "8",
+        "differentiation": "8",
+        "build_feasibility": "7",
+        "buyer_value": "7"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-028",
+      "evidence": {
+        "evidence_id": "EVD-028",
+        "source_url": "https://fixtures.example.invalid/listing/28",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "000000000000000000000000000000000000000000000000000000000000001c"
+      },
+      "marketplace": "fixture-market",
+      "title": "Fitness Coaches Client Tracker example 3",
+      "category": "Client Tracker",
+      "identity_niche": "Fitness Coaches",
+      "base_category": "Client Tracker",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "8",
+        "differentiation": "8",
+        "build_feasibility": "7",
+        "buyer_value": "7"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-029",
+      "evidence": {
+        "evidence_id": "EVD-029",
+        "source_url": "https://fixtures.example.invalid/listing/29",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "000000000000000000000000000000000000000000000000000000000000001d"
+      },
+      "marketplace": "fixture-market",
+      "title": "Fitness Coaches Client Tracker example 4",
+      "category": "Client Tracker",
+      "identity_niche": " FITNESS COACHES ",
+      "base_category": "client tracker",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "8",
+        "differentiation": "8",
+        "build_feasibility": "7",
+        "buyer_value": "7"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    },
+    {
+      "observation_id": "OBS-030",
+      "evidence": {
+        "evidence_id": "EVD-030",
+        "source_url": "https://fixtures.example.invalid/listing/30",
+        "observed_at": "2026-08-08T12:00:00Z",
+        "source_mode": "fixture",
+        "freshness_status": "current",
+        "content_sha256": "000000000000000000000000000000000000000000000000000000000000001e"
+      },
+      "marketplace": "fixture-market",
+      "title": "Fitness Coaches Client Tracker example 5",
+      "category": "Client Tracker",
+      "identity_niche": "Fitness Coaches",
+      "base_category": "Client Tracker",
+      "price": "12.00",
+      "currency": "USD",
+      "demand_proxies": {
+        "reviews": "10"
+      },
+      "competition_proxies": {
+        "results": "20"
+      },
+      "qualification_inputs": {
+        "demand": "8",
+        "differentiation": "8",
+        "build_feasibility": "7",
+        "buyer_value": "7"
+      },
+      "listing_quality_notes": [
+        "fixture-only observation"
+      ]
+    }
+  ]
+}
