@@ -147,9 +147,10 @@ Each observation contains:
 - marketplace and source URL;
 - observed timestamp;
 - title and category;
+- normalized identity niche and base category;
 - price and currency when available;
-- demand proxy fields;
-- competition proxy fields;
+- raw demand and competition proxy fields;
+- evidence-backed normalized qualification inputs for demand, differentiation, build feasibility, and buyer value;
 - listing-quality observations;
 - evidence hash;
 - source mode and freshness status.
@@ -158,9 +159,9 @@ The importer rejects missing provenance, duplicate observation identities, futur
 
 ## 10. Qualification and selection
 
-The four playbook dimensions are configuration-backed and scored from 0 to 10. A candidate below 30/40 cannot enter product specification.
+The four playbook dimensions are configuration-backed and scored from 0 to 10. Observations group by normalized `(identity_niche, base_category)`. Each dimension is the half-up rounded median of its admitted normalized inputs. A candidate below 30/40 cannot enter product specification.
 
-The workflow persists exactly five shortlisted candidates when at least five qualifying concepts exist. It selects the highest-scoring candidate deterministically using total score, evidence strength, lower operational complexity, and canonical candidate ID as ordered tie-breakers.
+The workflow persists exactly five shortlisted candidates when at least five qualifying concepts exist. It selects the highest-scoring candidate deterministically using total score descending, evidence count descending, build-feasibility score descending, and canonical candidate ID ascending as ordered tie-breakers.
 
 A low-supply packet completes as `INSUFFICIENT_EVIDENCE`; it does not invent filler candidates.
 ## 11. Product build
