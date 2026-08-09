@@ -387,3 +387,90 @@ def test_job_completion_rejects_lease_that_expires_after_transaction_start() -> 
         await database.dispose()
 
     asyncio.run(scenario())
+
+
+def test_job_failure_rejects_lease_that_expires_after_caller_timestamp() -> None:
+    config = Config(str(REPO_ROOT / "alembic.ini"))
+    config.set_main_option("script_location", str(REPO_ROOT / "migrations"))
+    config.set_main_option("sqlalchemy.url", os.environ["MONEY_MACHINE_TEST_DATABASE_URL"])
+    command.upgrade(config, "head")
+
+    async def scenario() -> None:
+        database = Database.from_url(os.environ["MONEY_MACHINE_TEST_DATABASE_URL"])
+        actual_now = datetime.now(UTC)
+        workflow_id = UUID("00000000-0000-0000-0000-000000000221")
+        job_id = UUID("00000000-0000-0000-0000-000000000222")
+        workflow = WorkflowRun(
+            workflow_run_id=workflow_id,
+            workflow_type="FIRST_PRODUCT",
+            packet_id="RPK-failure-statement-clock",
+            state=ProductState.RESEARCHED,
+            idempotency_key="workflow:failure-statement-clock",
+            created_at=NOW,
+            updated_at=NOW,
+        )
+        job = JobEnvelope(
+            job_id=job_id,
+            workflow_run_id=workflow_id,
+            job_type="ADMIT_RESEARCH_PACKET",
+            state=JobState.READY,
+            idempotency_key="job:failure-statement-clock",
+            input_sha256="9" * 64,
+            retry_class=RetryClass.TRANSIENT_INTERNAL,
+            max_attempts=3,
+        )
+        async with UnitOfWork(database) as uow:
+            await uow.workflows.add(workflow)
+            await uow.jobs.add(job, available_at=actual_now, created_at=actual_now)
+
+        async with UnitOfWork(database) as uow:
+            claim = await uow.jobs.claim_next(
+                owner="worker-failure-statement-clock",
+                token="lease-token",
+                now=actual_now,
+                expires_at=actual_now + timedelta(milliseconds=300),
+            )
+            assert claim is not None
+            await uow.jobs.mark_running(claim, actual_now)
+
+        async with UnitOfWork(database) as uow:
+            assert uow.session is not None
+            sampled_at = await uow.session.scalar(select(func.clock_timestamp()))
+            assert sampled_at is not None
+            await asyncio.sleep(0.6)
+            with pytest.raises(ValueError, match="job failure lease mismatch"):
+                await uow.jobs.fail_running(
+                    claim,
+                    now=sampled_at,
+                    retry_at=sampled_at + timedelta(seconds=1),
+                    error_code="TRANSIENT",
+                )
+
+        async with database.session_factory() as session:
+            row = (
+                await session.execute(
+                    select(
+                        jobs.c.state,
+                        jobs.c.lease_owner,
+                        jobs.c.lease_token,
+                        jobs.c.lease_expires_at,
+                    ).where(jobs.c.job_id == job_id)
+                )
+            ).one()
+            assert row.state == JobState.RUNNING.value
+            assert row.lease_owner == "worker-failure-statement-clock"
+            assert row.lease_token == "lease-token"
+            assert row.lease_expires_at is not None
+            attempt = (
+                await session.execute(
+                    select(job_attempts.c.state, job_attempts.c.completed_at).where(
+                        job_attempts.c.job_id == job_id,
+                        job_attempts.c.attempt_number == 1,
+                    )
+                )
+            ).one()
+            assert attempt.state == JobState.RUNNING.value
+            assert attempt.completed_at is None
+        await database.dispose()
+
+    asyncio.run(scenario())

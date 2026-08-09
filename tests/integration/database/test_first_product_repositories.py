@@ -597,6 +597,7 @@ def test_job_repository_persists_failure_retry_and_expiry_transitions() -> None:
 
     async def scenario() -> None:
         database = Database.from_url(os.environ["MONEY_MACHINE_TEST_DATABASE_URL"])
+        actual_now = datetime.now(UTC)
         workflow = WorkflowRun(
             workflow_run_id=UUID("00000000-0000-0000-0000-000000000401"),
             workflow_type="FIRST_PRODUCT",
@@ -638,7 +639,7 @@ def test_job_repository_persists_failure_retry_and_expiry_transitions() -> None:
                 owner="worker-retry",
                 token="token-retry",
                 now=NOW,
-                expires_at=NOW + timedelta(seconds=30),
+                expires_at=actual_now + timedelta(seconds=30),
             )
             assert retry_claim is not None and retry_claim.job.job_id == retry_job.job_id
             await uow.jobs.mark_running(retry_claim, NOW)
@@ -659,7 +660,7 @@ def test_job_repository_persists_failure_retry_and_expiry_transitions() -> None:
                 owner="worker-retry-final",
                 token="token-retry-final",
                 now=NOW + timedelta(seconds=10),
-                expires_at=NOW + timedelta(seconds=20),
+                expires_at=actual_now + timedelta(seconds=30),
             )
             assert final_claim is not None and final_claim.job.job_id == retry_job.job_id
             await uow.jobs.mark_running(final_claim, NOW + timedelta(seconds=10))
@@ -675,15 +676,15 @@ def test_job_repository_persists_failure_retry_and_expiry_transitions() -> None:
                 owner="worker-expired",
                 token="token-expired",
                 now=NOW + timedelta(seconds=10),
-                expires_at=NOW + timedelta(seconds=11),
+                expires_at=actual_now + timedelta(seconds=1),
             )
             assert expired_claim is not None and expired_claim.job.job_id == expired_job.job_id
         async with UnitOfWork(database) as uow:
-            expired = await uow.jobs.list_expired(NOW + timedelta(seconds=12))
+            expired = await uow.jobs.list_expired(actual_now + timedelta(seconds=12))
             assert expired_claim in expired
             await uow.jobs.recover_expired(
                 expired_claim,
-                now=NOW + timedelta(seconds=12),
+                now=actual_now + timedelta(seconds=12),
                 retry_at=None,
             )
         async with UnitOfWork(database) as uow:

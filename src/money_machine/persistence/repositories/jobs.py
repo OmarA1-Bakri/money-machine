@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -269,7 +269,7 @@ class JobRepository:
                     jobs.c.lease_owner == claim.owner,
                     jobs.c.lease_token == claim.token,
                     jobs.c.attempt_count == claim.attempt_number,
-                    jobs.c.lease_expires_at > now,
+                    jobs.c.lease_expires_at > func.clock_timestamp(),
                 )
                 .values(
                     state=target.value,
