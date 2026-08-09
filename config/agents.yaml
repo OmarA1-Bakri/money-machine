@@ -1,4 +1,26 @@
 version: 1
-status: foundation_only
-agents: []
-
+roles:
+  - role_id: market_research
+    enabled: true
+    external_mutations_enabled: false
+  - role_id: product_strategy
+    enabled: true
+    external_mutations_enabled: false
+  - role_id: catalogue_dedupe
+    enabled: true
+    external_mutations_enabled: false
+  - role_id: notion_product_builder
+    enabled: true
+    external_mutations_enabled: false
+  - role_id: product_qa
+    enabled: true
+    external_mutations_enabled: false
+  - role_id: merchandising
+    enabled: true
+    external_mutations_enabled: false
+  - role_id: creative_assets
+    enabled: true
+    external_mutations_enabled: false
+  - role_id: preflight
+    enabled: true
+    external_mutations_enabled: false

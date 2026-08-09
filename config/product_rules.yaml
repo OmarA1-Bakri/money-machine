@@ -1,4 +1,21 @@
 version: 1
-status: not_implemented
-rules: []
-
+research:
+  min_rows: 25
+  max_rows: 40
+qualification:
+  shortlist_size: 5
+  minimum_total_score: 30
+  dimension_minimum: 0
+  dimension_maximum: 10
+product:
+  min_hubs: 6
+  max_hubs: 8
+  min_colour_variants: 3
+  max_colour_variants: 4
+listing:
+  tag_count: 13
+  image_count: 10
+  video_count: 1
+safety:
+  external_mutations_enabled: false
+  spend_enabled: false
