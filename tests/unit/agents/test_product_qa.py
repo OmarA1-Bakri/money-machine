@@ -899,6 +899,124 @@ def test_product_qa_rejects_unbound_claims_in_semantic_attributes(
     assert "UNSUPPORTED_CLAIM:home.html" in result.findings
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        '<meta name="keywords" content="Guaranteed sales overnight">',
+        '<meta name="author" content="Trusted by ten thousand buyers">',
+        '<meta name="arbitrary" content="Passive income guaranteed">',
+    ],
+)
+def test_product_qa_rejects_unknown_semantic_metadata(tmp_path: Path, payload: str) -> None:
+    build = _build(tmp_path)
+    home = Path(build.root_artifact_path) / "home.html"
+    coherent = _coherent_replace(build, "home.html", home.read_text() + payload)
+
+    result = _qa().evaluate(coherent)
+
+    assert result.passed is False
+    assert "INVALID_METADATA:home.html" in result.findings
+
+
+def test_product_qa_accepts_exact_renderer_structural_metadata(tmp_path: Path) -> None:
+    build = _build(tmp_path)
+    home = Path(build.root_artifact_path) / "home.html"
+
+    assert '<meta charset="utf-8">' in home.read_text(encoding="utf-8")
+    assert '<meta name="viewport" content="width=device-width, initial-scale=1">' in home.read_text(
+        encoding="utf-8"
+    )
+    assert _qa().evaluate(build).passed is True
+
+
+_DUPLICATE_ATTRIBUTE_CASES = [
+    ("aria-label", "section", "seven hubs", "Trusted by ten thousand buyers"),
+    ("title", "a", "seven hubs", "Trusted by ten thousand buyers"),
+    ("alt", "img", "seven hubs", "Trusted by ten thousand buyers"),
+    ("name", "meta", "viewport", "arbitrary"),
+    ("content", "meta", "width=device-width, initial-scale=1", "Passive income guaranteed"),
+    ("href", "a", "home.html", "https://evil.example/path"),
+    ("src", "img", "home.html", "https://evil.example/pixel.png"),
+    ("srcset", "img", "home.html 1x", "https://evil.example/pixel.png 2x"),
+]
+
+
+def _duplicate_attribute_payload(
+    attribute: str,
+    tag: str,
+    first: str,
+    second: str,
+    *,
+    second_name: str | None = None,
+) -> str:
+    attributes = f'{attribute}="{first}" {second_name or attribute}="{second}"'
+    if tag == "section":
+        return f"<section {attributes}></section>"
+    if tag == "a":
+        return (
+            f'<a {attributes} href="home.html">seven hubs</a>'
+            if attribute != "href"
+            else f"<a {attributes}>seven hubs</a>"
+        )
+    if tag == "img":
+        return (
+            f'<img {attributes} src="home.html">'
+            if attribute not in {"src", "srcset"}
+            else f'<img {attributes} alt="seven hubs">'
+        )
+    if attribute == "name":
+        return f'<meta {attributes} content="width=device-width, initial-scale=1">'
+    return f'<meta name="viewport" {attributes}>'
+
+
+@pytest.mark.parametrize("attribute,tag,safe,unsafe", _DUPLICATE_ATTRIBUTE_CASES)
+@pytest.mark.parametrize("unsafe_first", [False, True], ids=["safe-first", "unsafe-first"])
+def test_product_qa_rejects_duplicate_attributes_in_both_orders(
+    tmp_path: Path,
+    attribute: str,
+    tag: str,
+    safe: str,
+    unsafe: str,
+    *,
+    unsafe_first: bool,
+) -> None:
+    build = _build(tmp_path)
+    home = Path(build.root_artifact_path) / "home.html"
+    first, second = (unsafe, safe) if unsafe_first else (safe, unsafe)
+    payload = _duplicate_attribute_payload(attribute, tag, first, second)
+    coherent = _coherent_replace(build, "home.html", home.read_text() + payload)
+
+    result = _qa().evaluate(coherent)
+
+    assert result.passed is False
+    assert f"DUPLICATE_ATTRIBUTE:home.html:{tag}[{attribute}]" in result.findings
+
+
+@pytest.mark.parametrize("attribute,tag,safe,unsafe", _DUPLICATE_ATTRIBUTE_CASES)
+def test_product_qa_rejects_case_variant_duplicate_attributes(
+    tmp_path: Path,
+    attribute: str,
+    tag: str,
+    safe: str,
+    unsafe: str,
+) -> None:
+    build = _build(tmp_path)
+    home = Path(build.root_artifact_path) / "home.html"
+    payload = _duplicate_attribute_payload(
+        attribute,
+        tag,
+        safe,
+        unsafe,
+        second_name=attribute.upper(),
+    )
+    coherent = _coherent_replace(build, "home.html", home.read_text() + payload)
+
+    result = _qa().evaluate(coherent)
+
+    assert result.passed is False
+    assert f"DUPLICATE_ATTRIBUTE:home.html:{tag}[{attribute}]" in result.findings
+
+
 @pytest.mark.parametrize("unexpected", ["payload.html", "assets/remote.js"])
 def test_product_qa_rejects_unmanifested_inventory_entries(tmp_path: Path, unexpected: str) -> None:
     build = _build(tmp_path)

@@ -69,6 +69,17 @@ _ALLOWED_TAG_ATTRIBUTES: Mapping[str, frozenset[str]] = {
     "img": frozenset({"src", "srcset", "alt"}),
     "button": frozenset({"type", "aria-label", "title"}),
 }
+_SEMANTIC_METADATA_NAMES = frozenset(
+    {
+        "description",
+        "title",
+        "og:title",
+        "og:description",
+        "twitter:title",
+        "twitter:description",
+    }
+)
+_VIEWPORT_CONTENT = "width=device-width, initial-scale=1"
 _AMBIGUOUS_CONTROL_NAMES = frozenset(
     {"click here", "here", "learn more", "more", "read more", "link", "go"}
 )
@@ -371,6 +382,10 @@ class ProductQAService:
                 findings.add(f"ACTIVE_TAG:{path}:{detail}")
             for detail in sorted(parser.active_attributes):
                 findings.add(f"ACTIVE_ATTRIBUTE:{path}:{detail}")
+            for detail in sorted(parser.duplicate_attributes):
+                findings.add(f"DUPLICATE_ATTRIBUTE:{path}:{detail}")
+            if parser.invalid_metadata:
+                findings.add(f"INVALID_METADATA:{path}")
             if not parser.has_accessible_h1:
                 findings.add(f"ACCESSIBLE_HEADING_MISSING:{path}")
             if not _valid_heading_hierarchy(parser.heading_levels):
@@ -434,6 +449,7 @@ class _LinkParser(HTMLParser):
         self.active_content: set[str] = set()
         self.active_tags: set[str] = set()
         self.active_attributes: set[str] = set()
+        self.duplicate_attributes: set[str] = set()
         self.accessible_labels: list[str] = []
         self.semantic_copy: list[str] = []
         self.text_chunks: list[str] = []
@@ -442,6 +458,7 @@ class _LinkParser(HTMLParser):
         self.ambiguous_control_indexes: set[int] = set()
         self.malformed_control = False
         self.nested_control = False
+        self.invalid_metadata = False
         self._control_stack: list[_ControlState] = []
         self._control_index = 0
         self._h1_depth = 0
@@ -453,14 +470,26 @@ class _LinkParser(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         lowered_tag = tag.casefold()
-        attributes = {name.casefold(): value for name, value in attrs}
+        ordered_attributes = [(name.casefold(), value) for name, value in attrs]
+        seen_attributes: set[str] = set()
+        duplicate_names: set[str] = set()
+        for name, _ in ordered_attributes:
+            if name in seen_attributes:
+                duplicate_names.add(name)
+            seen_attributes.add(name)
+        for name in duplicate_names:
+            self.duplicate_attributes.add(f"{lowered_tag}[{name}]")
+        validated_attributes = () if duplicate_names else tuple(ordered_attributes)
+        attributes = dict(validated_attributes)
         allowed_attributes = _ALLOWED_TAG_ATTRIBUTES.get(lowered_tag)
         if allowed_attributes is None:
             self.active_tags.add(lowered_tag)
         if lowered_tag in {"script", "style", "iframe", "object", "embed", "form", "base"}:
             self.active_content.add(lowered_tag)
-        if lowered_tag == "meta" and (attributes.get("http-equiv") or "").casefold() == "refresh":
-            self.active_content.add("meta-refresh")
+        if lowered_tag == "meta":
+            if (attributes.get("http-equiv") or "").casefold() == "refresh":
+                self.active_content.add("meta-refresh")
+            self._validate_metadata(attributes)
         if lowered_tag in {"a", "button"}:
             if self._control_stack:
                 self.nested_control = True
@@ -482,19 +511,7 @@ class _LinkParser(HTMLParser):
             if label:
                 self.accessible_labels.append(label)
                 self.semantic_copy.append(label)
-        if lowered_tag == "meta" and (attributes.get("name") or "").casefold() in {
-            "description",
-            "title",
-            "og:title",
-            "og:description",
-            "twitter:title",
-            "twitter:description",
-        }:
-            content = attributes.get("content")
-            if content:
-                self.semantic_copy.append(content)
-        for name, value in attrs:
-            lowered_name = name.casefold()
+        for lowered_name, value in validated_attributes:
             if value is None:
                 continue
             if lowered_name.startswith("on") or (
@@ -523,6 +540,21 @@ class _LinkParser(HTMLParser):
             if image_alt:
                 for state in self._control_stack:
                     state["text"].append(image_alt)
+
+    def _validate_metadata(self, attributes: Mapping[str, str | None]) -> None:
+        if attributes == {"charset": "utf-8"}:
+            return
+        if set(attributes) != {"name", "content"}:
+            self.invalid_metadata = True
+            return
+        name = attributes["name"]
+        content = attributes["content"]
+        if name == "viewport" and content == _VIEWPORT_CONTENT:
+            return
+        if name in _SEMANTIC_METADATA_NAMES and content:
+            self.semantic_copy.append(content)
+            return
+        self.invalid_metadata = True
 
     def handle_endtag(self, tag: str) -> None:
         lowered_tag = tag.casefold()
