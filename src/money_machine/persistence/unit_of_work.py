@@ -7,13 +7,15 @@ from types import TracebackType
 from typing import Any, Self, cast
 from uuid import UUID
 
-from sqlalchemy import Table, func, insert, update
+from sqlalchemy import Table, func, insert, select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncSessionTransaction
 
 from money_machine.domain.events import DomainEvent
 from money_machine.domain.models.job import JobEnvelope
+from money_machine.domain.models.workflow import WorkflowRun
 from money_machine.domain.value_objects import FrozenModel, canonical_json, canonical_sha256
+from money_machine.domain.workflow_progress import next_product_state
 from money_machine.persistence.database import Database
 from money_machine.persistence.repositories.artifacts import ArtifactRepository
 from money_machine.persistence.repositories.events import EventRepository
@@ -33,6 +35,7 @@ from money_machine.persistence.tables import (
     product_qa_results,
     product_specs,
     research_packets,
+    workflow_runs,
 )
 
 
@@ -117,10 +120,15 @@ class UnitOfWork:
                     lease_expires_at=None,
                     updated_at=event.occurred_at,
                 )
+                .returning(jobs.c.workflow_run_id, jobs.c.job_type)
             ),
         )
-        if completion.rowcount != 1:
+        completed_job = completion.one_or_none()
+        if completed_job is None:
             raise ValueError("job completion lease mismatch")
+        workflow_run_id, job_type = completed_job
+        if event.job_id != job_id or event.workflow_run_id != workflow_run_id:
+            raise ValueError("job completion event binding mismatch")
 
         attempt_completion = cast(
             CursorResult[Any],
@@ -139,8 +147,53 @@ class UnitOfWork:
             raise ValueError("job attempt completion lease mismatch")
         await self._insert_result(result_type, result_payload)
         await self.events.add(event)
+        await self._advance_workflow(
+            workflow_run_id,
+            job_type,
+            event,
+        )
         if successor is not None:
             await self.jobs.add(successor)
+
+    async def _advance_workflow(
+        self,
+        workflow_run_id: UUID,
+        job_type: str,
+        event: DomainEvent,
+    ) -> None:
+        session = self._require_session()
+        row = (
+            await session.execute(
+                select(workflow_runs.c.payload)
+                .where(workflow_runs.c.workflow_run_id == workflow_run_id)
+                .with_for_update()
+            )
+        ).one_or_none()
+        if row is None:
+            raise ValueError("workflow missing during job completion")
+
+        workflow = WorkflowRun.model_validate_json(json.dumps(row.payload, separators=(",", ":")))
+        target = next_product_state(job_type, workflow.state, event.name)
+        advanced = workflow.model_copy(update={"state": target, "updated_at": event.occurred_at})
+        advanced_payload = json.loads(canonical_json(advanced))
+        progress = cast(
+            CursorResult[Any],
+            await session.execute(
+                update(workflow_runs)
+                .where(
+                    workflow_runs.c.workflow_run_id == workflow_run_id,
+                    workflow_runs.c.state == workflow.state.value,
+                )
+                .values(
+                    state=target.value,
+                    payload=advanced_payload,
+                    payload_sha256=canonical_sha256(advanced),
+                    updated_at=event.occurred_at,
+                )
+            ),
+        )
+        if progress.rowcount != 1:
+            raise ValueError("workflow progress state mismatch")
 
     async def _insert_result(self, result_type: str, result: FrozenModel) -> None:
         session = self._require_session()

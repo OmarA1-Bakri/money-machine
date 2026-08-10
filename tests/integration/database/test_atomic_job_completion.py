@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -9,7 +10,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import func, insert, select, update
+from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 
 from money_machine.domain.enums import JobState, ProductState, RetryClass
@@ -19,7 +20,13 @@ from money_machine.domain.models.product_spec import ProductFact, ProductSpec
 from money_machine.domain.models.workflow import WorkflowRun
 from money_machine.domain.value_objects import canonical_sha256
 from money_machine.persistence.database import Database
-from money_machine.persistence.tables import domain_events, job_attempts, jobs, product_specs
+from money_machine.persistence.tables import (
+    domain_events,
+    job_attempts,
+    jobs,
+    product_specs,
+    workflow_runs,
+)
 from money_machine.persistence.unit_of_work import UnitOfWork
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -56,6 +63,131 @@ def _product_facts() -> tuple[ProductFact, ...]:
     )
 
 
+def test_job_completion_advances_workflow_state_and_canonical_payload_atomically() -> None:
+    config = Config(str(REPO_ROOT / "alembic.ini"))
+    config.set_main_option("script_location", str(REPO_ROOT / "migrations"))
+    config.set_main_option("sqlalchemy.url", os.environ["MONEY_MACHINE_TEST_DATABASE_URL"])
+    command.upgrade(config, "head")
+
+    async def scenario() -> None:
+        database = Database.from_url(os.environ["MONEY_MACHINE_TEST_DATABASE_URL"])
+        actual_now = datetime.now(UTC)
+        workflow_id = UUID("00000000-0000-0000-0000-000000000221")
+        job_id = UUID("00000000-0000-0000-0000-000000000222")
+        workflow = WorkflowRun(
+            workflow_run_id=workflow_id,
+            workflow_type="FIRST_PRODUCT_VERTICAL_SLICE",
+            packet_id="RPK-workflow-progress",
+            state=ProductState.QUALIFIED,
+            idempotency_key="workflow:RPK-workflow-progress",
+            created_at=NOW,
+            updated_at=NOW,
+        )
+        job = JobEnvelope(
+            job_id=job_id,
+            workflow_run_id=workflow_id,
+            job_type="CREATE_PRODUCT_SPEC",
+            state=JobState.READY,
+            idempotency_key="job:workflow-progress",
+            input_sha256="9" * 64,
+            retry_class=RetryClass.NEVER,
+            max_attempts=1,
+        )
+        async with UnitOfWork(database) as uow:
+            await uow.workflows.add(workflow)
+            await uow.jobs.add(job)
+            assert uow.session is not None
+            await uow.session.execute(
+                update(jobs)
+                .where(jobs.c.job_id == job_id)
+                .values(
+                    state="RUNNING",
+                    attempt_count=1,
+                    lease_owner="worker-progress",
+                    lease_token="lease-token",
+                    leased_at=actual_now,
+                    lease_expires_at=actual_now + timedelta(minutes=5),
+                )
+            )
+            await uow.session.execute(
+                insert(job_attempts).values(
+                    job_id=job_id,
+                    attempt_number=1,
+                    state="RUNNING",
+                    lease_token="lease-token",
+                    started_at=actual_now,
+                )
+            )
+
+        spec = ProductSpec(
+            product_spec_id="PS-workflow-progress",
+            candidate_id="candidate-workflow-progress",
+            identity_niche="students",
+            base_category="planner",
+            target_buyer="People managing students",
+            promised_outcome="A structured planner workspace",
+            hubs=("home", "courses", "tasks", "calendar", "notes", "review"),
+            colour_variants=("ink", "sage", "sand"),
+            features=("weekly review",),
+            product_facts=_product_facts(),
+            source_evidence_ids=("EV-1",),
+            spec_sha256="8" * 64,
+        )
+        event_payload = {"product_spec_id": spec.product_spec_id}
+        event = DomainEvent(
+            event_id=UUID("00000000-0000-0000-0000-000000000223"),
+            workflow_run_id=workflow_id,
+            job_id=job_id,
+            name=DomainEventName.PRODUCT_SPEC_CREATED,
+            occurred_at=actual_now,
+            payload=event_payload,
+            payload_sha256=canonical_sha256(event_payload),
+        )
+
+        async with UnitOfWork(database) as uow:
+            await uow.commit_job_success(
+                job_id,
+                "lease-token",
+                1,
+                "product_specs",
+                spec,
+                event,
+                None,
+            )
+
+        async with database.session_factory() as session:
+            row = (
+                await session.execute(
+                    select(
+                        workflow_runs.c.state,
+                        workflow_runs.c.payload,
+                        workflow_runs.c.payload_sha256,
+                        workflow_runs.c.updated_at,
+                    ).where(workflow_runs.c.workflow_run_id == workflow_id)
+                )
+            ).one()
+            persisted = WorkflowRun.model_validate_json(json.dumps(row.payload))
+            assert row.state == ProductState.SPECIFIED.value
+            assert persisted.state is ProductState.SPECIFIED
+            assert persisted.updated_at == event.occurred_at
+            assert row.updated_at == event.occurred_at
+            assert row.payload_sha256 == canonical_sha256(persisted)
+            assert (
+                await session.scalar(select(jobs.c.state).where(jobs.c.job_id == job_id))
+                == JobState.SUCCEEDED.value
+            )
+            await session.execute(
+                delete(product_specs).where(product_specs.c.product_spec_id == spec.product_spec_id)
+            )
+            await session.execute(
+                delete(workflow_runs).where(workflow_runs.c.workflow_run_id == workflow_id)
+            )
+            await session.commit()
+        await database.dispose()
+
+    asyncio.run(scenario())
+
+
 def test_job_completion_rolls_back_result_event_parent_and_successor() -> None:
     config = Config(str(REPO_ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(REPO_ROOT / "migrations"))
@@ -71,7 +203,7 @@ def test_job_completion_rolls_back_result_event_parent_and_successor() -> None:
             workflow_run_id=workflow_id,
             workflow_type="FIRST_PRODUCT",
             packet_id="RPK-atomic",
-            state=ProductState.RESEARCHED,
+            state=ProductState.QUALIFIED,
             idempotency_key="workflow:RPK-atomic",
             created_at=NOW,
             updated_at=NOW,
@@ -181,6 +313,15 @@ def test_job_completion_rolls_back_result_event_parent_and_successor() -> None:
             assert await session.scalar(select(func.count()).select_from(product_specs)) == 0
             assert await session.scalar(select(func.count()).select_from(domain_events)) == 0
             assert await session.scalar(select(func.count()).select_from(jobs)) == 2
+            persisted_workflow = (
+                await session.execute(
+                    select(workflow_runs.c.state, workflow_runs.c.payload).where(
+                        workflow_runs.c.workflow_run_id == workflow_id
+                    )
+                )
+            ).one()
+            assert persisted_workflow.state == ProductState.QUALIFIED.value
+            assert persisted_workflow.payload["state"] == ProductState.QUALIFIED.value
         await database.dispose()
 
     asyncio.run(scenario())
