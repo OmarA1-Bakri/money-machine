@@ -72,33 +72,56 @@ class FirstProductResultStore:
         if contract is None or contract.result_model is not result_model:
             raise TypeError("requested result does not match the exact step contract")
         async with self._database.session_factory() as session:
-            row = (
+            job_row = (
                 await session.execute(
-                    select(jobs.c.job_id, jobs.c.state).where(
+                    select(jobs.c.job_id, jobs.c.workflow_run_id, jobs.c.state).where(
                         jobs.c.workflow_run_id == workflow_run_id,
                         jobs.c.job_type == job_type,
                     )
                 )
             ).one_or_none()
-            if row is None or row.state != "SUCCEEDED":
+            if job_row is None or job_row.state != "SUCCEEDED":
                 raise LookupError(f"{job_type} has no durable successful result")
-            payloads = (
-                (
-                    await session.execute(
-                        select(domain_events.c.payload).where(domain_events.c.job_id == row.job_id)
-                    )
+            event_rows = (
+                await session.execute(
+                    select(
+                        domain_events.c.event_id,
+                        domain_events.c.workflow_run_id,
+                        domain_events.c.job_id,
+                        domain_events.c.name,
+                        domain_events.c.occurred_at,
+                        domain_events.c.payload,
+                        domain_events.c.payload_sha256,
+                    ).where(domain_events.c.job_id == job_row.job_id)
                 )
-                .scalars()
-                .all()
-            )
-            if len(payloads) != 1:
+            ).all()
+            if len(event_rows) != 1:
                 raise LookupError(f"{job_type} must have exactly one durable event")
-            event = DomainEvent.model_validate_json(json.dumps(payloads[0]))
-            if event.name is not contract.event_name:
-                raise ValueError(f"{job_type} durable event does not match its contract")
+            event_row = event_rows[0]
+            event = DomainEvent.model_validate_json(json.dumps(event_row.payload))
+            expected_event_hash = canonical_sha256(event.payload)
+            if (
+                job_row.workflow_run_id != workflow_run_id
+                or event_row.workflow_run_id != workflow_run_id
+                or event.workflow_run_id != workflow_run_id
+                or event_row.job_id != job_row.job_id
+                or event.job_id != job_row.job_id
+                or event.event_id != event_row.event_id
+                or event.name is not contract.event_name
+                or event.name.value != event_row.name
+                or event.occurred_at != event_row.occurred_at
+                or event.payload_sha256 != event_row.payload_sha256
+                or event.payload_sha256 != expected_event_hash
+            ):
+                raise ValueError(f"{job_type} durable event binding or hash mismatch")
             result = await self._load_identity(session, result_model, event.payload)
-        if type(result) is not result_model:
-            raise TypeError(f"{job_type} durable result model mismatch")
+            if type(result) is not result_model:
+                raise TypeError(f"{job_type} durable result model mismatch")
+            _validate_result_event_payload(
+                contract.result_type,
+                cast(FrozenModel, result),
+                event.payload,
+            )
         return cast(ResultT, result)
 
     async def catalogue(self, *, exclude_product_spec_id: str) -> tuple[ProductSpec, ...]:
@@ -311,8 +334,7 @@ class FirstProductHandlers:
 
     def _success(self, job: JobEnvelope, result: FrozenModel) -> HandlerOutcome:
         contract = FIRST_PRODUCT_STEP_OUTPUTS[job.job_type]
-        identity = _result_identity(result)
-        payload = {_identity_field(result): identity}
+        payload = _result_event_payload(contract.result_type, result)
         return HandlerOutcome(
             result_type=contract.result_type,
             result=result,
@@ -403,6 +425,25 @@ def _result_identity(result: FrozenModel) -> str:
     if not isinstance(value, str) or not value:
         raise ValueError("first-product result identity is invalid")
     return value
+
+
+def _result_event_payload(result_type: str, result: FrozenModel) -> dict[str, str]:
+    identity = _result_identity(result)
+    return {
+        _identity_field(result): identity,
+        "result_type": result_type,
+        "result_id": identity,
+        "result_sha256": canonical_sha256(result),
+    }
+
+
+def _validate_result_event_payload(
+    result_type: str,
+    result: FrozenModel,
+    payload: Mapping[str, object],
+) -> None:
+    if payload != _result_event_payload(result_type, result):
+        raise ValueError("durable event result identity mismatch")
 
 
 __all__ = ["FirstProductHandlers", "FirstProductResultStore"]
