@@ -30,6 +30,7 @@ class LocalNotionAdapter:
     def build(self, spec: ProductSpec, destination: Path) -> BuildResult:
         """Render a complete deterministic product bundle and manifest."""
 
+        spec.ensure_truth_contract()
         hub_pairs = tuple(sorted((_slug(name), name) for name in spec.hubs))
         variant_pairs = tuple(sorted((_slug(name), name) for name in spec.colour_variants))
         _require_unique_slugs(hub_pairs, "hub")

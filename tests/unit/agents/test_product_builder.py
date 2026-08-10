@@ -153,7 +153,15 @@ def test_builder_is_byte_identical_and_idempotent_on_replay(tmp_path: Path) -> N
 def test_hub_and_variant_slugs_must_be_unique(tmp_path: Path) -> None:
     duplicated = _spec().model_copy(
         update={
-            "hubs": ("Home", "Tasks", "TASKS", "Habits", "Finance", "Meals"),
+            "hubs": (
+                "Home",
+                "Tasks",
+                "TASKS",
+                "Habits",
+                "Finance",
+                "Meals",
+                "Quick Notes",
+            ),
             "colour_variants": ("Sage Calm", "sage-calm", "Warm Sand"),
         }
     )
@@ -166,7 +174,7 @@ def test_hub_and_variant_slugs_must_be_unique(tmp_path: Path) -> None:
         raise AssertionError("duplicate hub slugs were accepted")
 
 
-def test_builder_escapes_untrusted_spec_text_and_emits_no_active_remote_content(
+def test_builder_rejects_unvalidated_semantic_spec_before_writing_artifacts(
     tmp_path: Path,
 ) -> None:
     injected = _spec().model_copy(
@@ -176,18 +184,11 @@ def test_builder_escapes_untrusted_spec_text_and_emits_no_active_remote_content(
         }
     )
 
-    result = LocalNotionAdapter().build(injected, tmp_path / "product")
-    rendered = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in Path(result.root_artifact_path).rglob("*")
-        if path.suffix in {".html", ".md"}
-    )
+    destination = tmp_path / "product"
+    with pytest.raises(ValueError, match="target buyer"):
+        LocalNotionAdapter().build(injected, destination)
 
-    assert "<script" not in rendered
-    assert "<style" not in rendered
-    assert "&lt;script" in rendered
-    assert '<script src="https://example.invalid' not in rendered
-    assert '<style>@import url("https://example.invalid' not in rendered
+    assert not destination.exists()
 
 
 def test_builder_fails_closed_when_jinja_is_unavailable(

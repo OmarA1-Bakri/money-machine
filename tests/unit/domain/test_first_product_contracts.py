@@ -578,6 +578,26 @@ def test_truth_contract_rejects_commercial_claims_after_unvalidated_model_copy(
         forged.ensure_truth_contract()
 
 
+@pytest.mark.parametrize("evidence_ids", [(), ("evidence-0", "evidence-0")])
+def test_truth_contract_rechecks_nested_fact_evidence_after_model_copy(
+    evidence_ids: tuple[str, ...],
+) -> None:
+    original = _spec()
+    forged = original.model_copy(
+        update={
+            "product_facts": tuple(
+                fact.model_copy(update={"evidence_ids": evidence_ids})
+                if fact.category == "HUB_INVENTORY"
+                else fact
+                for fact in original.product_facts
+            )
+        }
+    )
+
+    with pytest.raises(ValueError, match="product fact evidence IDs"):
+        forged.ensure_truth_contract()
+
+
 def test_job_envelope_is_strict_and_bounded() -> None:
     job = JobEnvelope(
         job_id=UUID("00000000-0000-0000-0000-000000000001"),

@@ -66,6 +66,11 @@ class ProductSpec(FrozenModel):
         claims = tuple(fact.claim for fact in self.product_facts)
         if len(claims) != len(set(claims)):
             raise ValueError("product fact claims must be unique")
+        if any(
+            not fact.evidence_ids or len(fact.evidence_ids) != len(set(fact.evidence_ids))
+            for fact in self.product_facts
+        ):
+            raise ValueError("product fact evidence IDs must be non-empty and unique")
         source_ids = set(self.source_evidence_ids)
         if any(not set(fact.evidence_ids).issubset(source_ids) for fact in self.product_facts):
             raise ValueError("product fact evidence must belong to ProductSpec source evidence")
