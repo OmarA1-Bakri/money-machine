@@ -11,11 +11,20 @@ from sqlalchemy import Table, func, insert, select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncSessionTransaction
 
+from money_machine.domain.enums import ProductState
 from money_machine.domain.events import DomainEvent
 from money_machine.domain.models.job import JobEnvelope
-from money_machine.domain.models.workflow import WorkflowRun
+from money_machine.domain.models.workflow import (
+    WorkflowBlocker,
+    WorkflowRun,
+    workflow_blocker_payload,
+)
 from money_machine.domain.value_objects import FrozenModel, canonical_json, canonical_sha256
-from money_machine.domain.workflow_progress import next_product_state
+from money_machine.domain.workflow_progress import (
+    next_product_state,
+    terminal_event_name,
+    terminal_product_state,
+)
 from money_machine.persistence.database import Database
 from money_machine.persistence.repositories.artifacts import ArtifactRepository
 from money_machine.persistence.repositories.events import EventRepository
@@ -206,14 +215,169 @@ class UnitOfWork:
         if progress.rowcount != 1:
             raise ValueError("workflow progress state mismatch")
 
+    async def commit_job_terminal(
+        self,
+        job_id: UUID,
+        lease_token: str,
+        attempt_number: int,
+        blocker: WorkflowBlocker,
+        event: DomainEvent,
+        *,
+        result_type: str | None = None,
+        result_payload: FrozenModel | None = None,
+    ) -> None:
+        """Atomically persist an adverse terminal result, blocker, event, job and workflow."""
+
+        if (result_type is None) is not (result_payload is None):
+            raise ValueError("terminal result type and payload must be provided together")
+        if blocker.terminal_state is not ProductState.FAILED and result_payload is None:
+            raise ValueError("business terminal requires a durable step result")
+        if blocker.job_id != job_id or event.job_id != job_id:
+            raise ValueError("job terminal blocker binding mismatch")
+        if event.name is not terminal_event_name(blocker.terminal_state):
+            raise ValueError("job terminal event name mismatch")
+        if event.occurred_at != blocker.occurred_at:
+            raise ValueError("job terminal event time mismatch")
+        expected_event_payload = workflow_blocker_payload(blocker)
+        expected_event_hash = canonical_sha256(expected_event_payload)
+        if (
+            canonical_sha256(event.payload) != expected_event_hash
+            or event.payload_sha256 != expected_event_hash
+        ):
+            raise ValueError("job terminal event payload mismatch")
+        if result_type is not None and result_payload is not None:
+            result_identity = self._result_identity(result_type, result_payload)
+            if (
+                blocker.result_type != result_type
+                or blocker.result_id != str(result_identity)
+                or blocker.result_sha256 != canonical_sha256(result_payload)
+            ):
+                raise ValueError("job terminal result identity mismatch")
+        elif any(
+            value is not None
+            for value in (blocker.result_type, blocker.result_id, blocker.result_sha256)
+        ):
+            raise ValueError("job terminal blocker declares an absent result")
+
+        session = self._require_session()
+        job_target = "FAILED" if blocker.terminal_state is ProductState.FAILED else "SUCCEEDED"
+        completion = cast(
+            CursorResult[Any],
+            await session.execute(
+                update(jobs)
+                .where(
+                    jobs.c.job_id == job_id,
+                    jobs.c.lease_token == lease_token,
+                    jobs.c.attempt_count == attempt_number,
+                    jobs.c.state == "RUNNING",
+                    jobs.c.lease_expires_at > func.clock_timestamp(),
+                )
+                .values(
+                    state=job_target,
+                    lease_owner=None,
+                    lease_token=None,
+                    leased_at=None,
+                    lease_expires_at=None,
+                    updated_at=event.occurred_at,
+                )
+                .returning(jobs.c.workflow_run_id, jobs.c.job_type)
+            ),
+        )
+        completed_job = completion.one_or_none()
+        if completed_job is None:
+            raise ValueError("job terminal lease mismatch")
+        workflow_run_id, job_type = completed_job
+        if event.workflow_run_id != workflow_run_id:
+            raise ValueError("job terminal event binding mismatch")
+
+        attempt_completion = cast(
+            CursorResult[Any],
+            await session.execute(
+                update(job_attempts)
+                .where(
+                    job_attempts.c.job_id == job_id,
+                    job_attempts.c.attempt_number == attempt_number,
+                    job_attempts.c.lease_token == lease_token,
+                    job_attempts.c.state == "RUNNING",
+                )
+                .values(
+                    state=job_target,
+                    completed_at=event.occurred_at,
+                    error_code=(
+                        blocker.code if blocker.terminal_state is ProductState.FAILED else None
+                    ),
+                )
+            ),
+        )
+        if attempt_completion.rowcount != 1:
+            raise ValueError("job terminal attempt lease mismatch")
+        if result_type is not None and result_payload is not None:
+            await self._insert_result(result_type, result_payload)
+        await self.events.add(event)
+        await self._terminalize_workflow(
+            workflow_run_id,
+            job_type,
+            blocker,
+            event,
+        )
+
+    async def _terminalize_workflow(
+        self,
+        workflow_run_id: UUID,
+        job_type: str,
+        blocker: WorkflowBlocker,
+        event: DomainEvent,
+    ) -> None:
+        session = self._require_session()
+        row = (
+            await session.execute(
+                select(workflow_runs.c.payload)
+                .where(workflow_runs.c.workflow_run_id == workflow_run_id)
+                .with_for_update()
+            )
+        ).one_or_none()
+        if row is None:
+            raise ValueError("workflow missing during job terminalization")
+        workflow = WorkflowRun.model_validate_json(json.dumps(row.payload, separators=(",", ":")))
+        if event.occurred_at < workflow.updated_at:
+            raise ValueError("workflow event time precedes current update")
+        target = terminal_product_state(job_type, workflow.state, blocker.terminal_state)
+        terminal = WorkflowRun(
+            schema_version=workflow.schema_version,
+            workflow_run_id=workflow.workflow_run_id,
+            workflow_type=workflow.workflow_type,
+            packet_id=workflow.packet_id,
+            state=target,
+            idempotency_key=workflow.idempotency_key,
+            created_at=workflow.created_at,
+            updated_at=event.occurred_at,
+            terminal_blocker=blocker,
+        )
+        progress = cast(
+            CursorResult[Any],
+            await session.execute(
+                update(workflow_runs)
+                .where(
+                    workflow_runs.c.workflow_run_id == workflow_run_id,
+                    workflow_runs.c.state == workflow.state.value,
+                )
+                .values(
+                    state=target.value,
+                    payload=json.loads(canonical_json(terminal)),
+                    payload_sha256=canonical_sha256(terminal),
+                    updated_at=event.occurred_at,
+                )
+            ),
+        )
+        if progress.rowcount != 1:
+            raise ValueError("workflow terminal state mismatch")
+
     async def _insert_result(self, result_type: str, result: FrozenModel) -> None:
         session = self._require_session()
-        table, identity_column, identity_attribute = _RESULT_TABLES.get(
-            result_type, (None, None, None)
-        )
-        if table is None or identity_column is None or identity_attribute is None:
+        table, identity_column, _ = _RESULT_TABLES.get(result_type, (None, None, None))
+        identity = self._result_identity(result_type, result)
+        if table is None or identity_column is None:
             raise ValueError(f"unsupported result type: {result_type}")
-        identity = getattr(result, identity_attribute)
         values: dict[str, object] = {
             identity_column: identity,
             "payload": json.loads(canonical_json(result)),
@@ -229,6 +393,15 @@ class UnitOfWork:
             if foreign_key in table.c and hasattr(result, foreign_key):
                 values[foreign_key] = getattr(result, foreign_key)
         await session.execute(insert(table).values(**values))
+
+    @staticmethod
+    def _result_identity(result_type: str, result: FrozenModel) -> object:
+        table, identity_column, identity_attribute = _RESULT_TABLES.get(
+            result_type, (None, None, None)
+        )
+        if table is None or identity_column is None or identity_attribute is None:
+            raise ValueError(f"unsupported result type: {result_type}")
+        return getattr(result, identity_attribute)
 
 
 _RESULT_TABLES: dict[str, tuple[Table, str, str]] = {

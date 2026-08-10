@@ -66,6 +66,23 @@ FIRST_PRODUCT_WORKFLOW_PROGRESS: Final[Mapping[str, WorkflowProgressContract]] =
     }
 )
 
+_ADVERSE_TERMINAL_EVENTS: Final[Mapping[ProductState, DomainEventName]] = MappingProxyType(
+    {
+        ProductState.INSUFFICIENT_EVIDENCE: DomainEventName.INSUFFICIENT_EVIDENCE,
+        ProductState.REJECTED: DomainEventName.WORKFLOW_REJECTED,
+        ProductState.FAILED: DomainEventName.WORKFLOW_FAILED,
+    }
+)
+
+_BUSINESS_TERMINALS: Final[Mapping[str, ProductState]] = MappingProxyType(
+    {
+        "QUALIFY_CANDIDATES": ProductState.INSUFFICIENT_EVIDENCE,
+        "CHECK_CATALOGUE_DEDUPE": ProductState.REJECTED,
+        "RUN_PRODUCT_QA": ProductState.REJECTED,
+        "RUN_PREFLIGHT": ProductState.REJECTED,
+    }
+)
+
 
 def next_product_state(
     job_type: str,
@@ -84,3 +101,32 @@ def next_product_state(
     elif contract.target is not current:
         assert_product_transition(current, contract.target)
     return contract.target
+
+
+def terminal_event_name(state: ProductState) -> DomainEventName:
+    """Return the exact event reserved for one adverse terminal state."""
+
+    event = _ADVERSE_TERMINAL_EVENTS.get(state)
+    if event is None:
+        raise ValueError(f"state is not an adverse terminal: {state.value}")
+    return event
+
+
+def terminal_product_state(
+    job_type: str,
+    current: ProductState,
+    target: ProductState,
+) -> ProductState:
+    """Authorize only an exact business terminal or technical failure transition."""
+
+    progress = FIRST_PRODUCT_WORKFLOW_PROGRESS.get(job_type)
+    business_target = _BUSINESS_TERMINALS.get(job_type)
+    authorized = (
+        progress is not None
+        and progress.current is current
+        and (target is ProductState.FAILED or business_target is target)
+    )
+    if not authorized:
+        raise ValueError(f"workflow terminal mismatch: {job_type} {current.value} {target.value}")
+    assert_product_transition(current, target)
+    return target

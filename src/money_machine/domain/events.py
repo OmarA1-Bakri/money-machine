@@ -27,6 +27,9 @@ class DomainEventName(StrEnum):
     LISTING_PACKAGE_CREATED = "listing_package_created"
     PREFLIGHT_PASSED = "preflight_passed"
     DRAFT_READY = "draft_ready"
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+    WORKFLOW_REJECTED = "workflow_rejected"
+    WORKFLOW_FAILED = "workflow_failed"
 
 
 class DomainEvent(FrozenModel):

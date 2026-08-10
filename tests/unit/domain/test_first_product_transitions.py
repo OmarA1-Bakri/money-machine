@@ -120,4 +120,7 @@ def test_domain_event_names_are_exact_and_stable() -> None:
         "listing_package_created",
         "preflight_passed",
         "draft_ready",
+        "insufficient_evidence",
+        "workflow_rejected",
+        "workflow_failed",
     ]

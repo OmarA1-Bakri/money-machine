@@ -16,11 +16,12 @@ from sqlalchemy.exc import IntegrityError
 from money_machine.domain.enums import JobState, ProductState, RetryClass
 from money_machine.domain.events import DomainEvent, DomainEventName
 from money_machine.domain.models.job import JobEnvelope
-from money_machine.domain.models.product_spec import ProductFact, ProductSpec
-from money_machine.domain.models.workflow import WorkflowRun
+from money_machine.domain.models.product_spec import DedupeResult, ProductFact, ProductSpec
+from money_machine.domain.models.workflow import WorkflowBlocker, WorkflowRun
 from money_machine.domain.value_objects import canonical_sha256
 from money_machine.persistence.database import Database
 from money_machine.persistence.tables import (
+    dedupe_results,
     domain_events,
     job_attempts,
     jobs,
@@ -313,6 +314,192 @@ def test_job_completion_rejects_backward_workflow_event_time_atomically() -> Non
             assert persisted_workflow.payload_sha256 == canonical_sha256(workflow)
             assert await session.scalar(select(func.count()).select_from(product_specs)) == 0
             assert await session.scalar(select(func.count()).select_from(domain_events)) == 0
+            await session.execute(
+                delete(workflow_runs).where(workflow_runs.c.workflow_run_id == workflow_id)
+            )
+            await session.commit()
+        await database.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_business_terminal_persists_result_blocker_event_and_workflow_atomically() -> None:
+    config = Config(str(REPO_ROOT / "alembic.ini"))
+    config.set_main_option("script_location", str(REPO_ROOT / "migrations"))
+    config.set_main_option("sqlalchemy.url", os.environ["MONEY_MACHINE_TEST_DATABASE_URL"])
+    command.upgrade(config, "head")
+
+    async def scenario() -> None:
+        database = Database.from_url(os.environ["MONEY_MACHINE_TEST_DATABASE_URL"])
+        actual_now = datetime.now(UTC)
+        workflow_id = UUID("00000000-0000-0000-0000-000000000241")
+        job_id = UUID("00000000-0000-0000-0000-000000000242")
+        workflow = WorkflowRun(
+            workflow_run_id=workflow_id,
+            workflow_type="FIRST_PRODUCT_VERTICAL_SLICE",
+            packet_id="RPK-terminal-dedupe",
+            state=ProductState.SPECIFIED,
+            idempotency_key="workflow:RPK-terminal-dedupe",
+            created_at=NOW,
+            updated_at=NOW,
+        )
+        job = JobEnvelope(
+            job_id=job_id,
+            workflow_run_id=workflow_id,
+            job_type="CHECK_CATALOGUE_DEDUPE",
+            state=JobState.READY,
+            idempotency_key="job:terminal-dedupe",
+            input_sha256="5" * 64,
+            retry_class=RetryClass.NEVER,
+            max_attempts=1,
+        )
+        product_spec = ProductSpec(
+            product_spec_id="PS-terminal-dedupe",
+            candidate_id="candidate-terminal-dedupe",
+            identity_niche="students",
+            base_category="planner",
+            target_buyer="People managing students",
+            promised_outcome="A structured planner workspace",
+            hubs=("home", "courses", "tasks", "calendar", "notes", "review"),
+            colour_variants=("ink", "sage", "sand"),
+            features=("weekly review",),
+            product_facts=_product_facts(),
+            source_evidence_ids=("EV-1",),
+            spec_sha256="3" * 64,
+        )
+        async with UnitOfWork(database) as uow:
+            await uow.workflows.add(workflow)
+            await uow.jobs.add(job)
+            await uow.products.add_spec(product_spec)
+            assert uow.session is not None
+            await uow.session.execute(
+                update(jobs)
+                .where(jobs.c.job_id == job_id)
+                .values(
+                    state="RUNNING",
+                    attempt_count=1,
+                    lease_owner="worker-terminal-dedupe",
+                    lease_token="lease-token",
+                    leased_at=actual_now,
+                    lease_expires_at=actual_now + timedelta(minutes=5),
+                )
+            )
+            await uow.session.execute(
+                insert(job_attempts).values(
+                    job_id=job_id,
+                    attempt_number=1,
+                    state="RUNNING",
+                    lease_token="lease-token",
+                    started_at=actual_now,
+                )
+            )
+
+        result = DedupeResult(
+            dedupe_result_id="DDR-terminal-dedupe",
+            product_spec_id="PS-terminal-dedupe",
+            passed=False,
+            matched_product_spec_ids=("PS-existing",),
+            reasons=("TITLE_TOKEN_OVERLAP_AT_OR_ABOVE_0.700",),
+            result_sha256="4" * 64,
+        )
+        result_hash = canonical_sha256(result)
+        blocker = WorkflowBlocker(
+            blocker_id="BLK-terminal-dedupe",
+            job_id=job_id,
+            terminal_state=ProductState.REJECTED,
+            code="CATALOGUE_DUPLICATE",
+            message="The product specification matches an existing catalogue item.",
+            result_type="dedupe_results",
+            result_id=result.dedupe_result_id,
+            result_sha256=result_hash,
+            occurred_at=actual_now,
+        )
+        event_payload = {
+            "blocker_id": blocker.blocker_id,
+            "terminal_state": blocker.terminal_state.value,
+            "code": blocker.code,
+            "message": blocker.message,
+            "result_type": blocker.result_type,
+            "result_id": blocker.result_id,
+            "result_sha256": blocker.result_sha256,
+        }
+        event = DomainEvent(
+            event_id=UUID("00000000-0000-0000-0000-000000000243"),
+            workflow_run_id=workflow_id,
+            job_id=job_id,
+            name=DomainEventName.WORKFLOW_REJECTED,
+            occurred_at=actual_now,
+            payload=event_payload,
+            payload_sha256=canonical_sha256(event_payload),
+        )
+
+        async with UnitOfWork(database) as uow:
+            await uow.commit_job_terminal(
+                job_id,
+                "lease-token",
+                1,
+                blocker,
+                event,
+                result_type="dedupe_results",
+                result_payload=result,
+            )
+
+        with pytest.raises(ValueError, match="job terminal lease mismatch"):
+            async with UnitOfWork(database) as uow:
+                await uow.commit_job_terminal(
+                    job_id,
+                    "lease-token",
+                    1,
+                    blocker,
+                    event,
+                    result_type="dedupe_results",
+                    result_payload=result,
+                )
+
+        async with database.session_factory() as session:
+            persisted_job = (
+                await session.execute(
+                    select(jobs.c.state, jobs.c.lease_token).where(jobs.c.job_id == job_id)
+                )
+            ).one()
+            persisted_attempt = (
+                await session.execute(
+                    select(job_attempts.c.state, job_attempts.c.completed_at).where(
+                        job_attempts.c.job_id == job_id,
+                        job_attempts.c.attempt_number == 1,
+                    )
+                )
+            ).one()
+            persisted_workflow = (
+                await session.execute(
+                    select(
+                        workflow_runs.c.state,
+                        workflow_runs.c.payload,
+                        workflow_runs.c.payload_sha256,
+                    ).where(workflow_runs.c.workflow_run_id == workflow_id)
+                )
+            ).one()
+            reloaded = WorkflowRun.model_validate_json(json.dumps(persisted_workflow.payload))
+            assert persisted_job.state == JobState.SUCCEEDED.value
+            assert persisted_job.lease_token is None
+            assert persisted_attempt.state == JobState.SUCCEEDED.value
+            assert persisted_attempt.completed_at == actual_now
+            assert persisted_workflow.state == ProductState.REJECTED.value
+            assert reloaded.state is ProductState.REJECTED
+            assert reloaded.terminal_blocker == blocker
+            assert persisted_workflow.payload_sha256 == canonical_sha256(reloaded)
+            assert await session.scalar(select(func.count()).select_from(dedupe_results)) == 1
+            assert await session.scalar(select(func.count()).select_from(domain_events)) == 1
+            await session.execute(
+                delete(dedupe_results).where(
+                    dedupe_results.c.dedupe_result_id == result.dedupe_result_id
+                )
+            )
+            await session.execute(
+                delete(product_specs).where(
+                    product_specs.c.product_spec_id == product_spec.product_spec_id
+                )
+            )
             await session.execute(
                 delete(workflow_runs).where(workflow_runs.c.workflow_run_id == workflow_id)
             )
