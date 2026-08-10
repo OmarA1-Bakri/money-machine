@@ -24,6 +24,7 @@ from money_machine.domain.workflow_progress import (
     next_product_state,
     terminal_event_name,
     terminal_product_state,
+    validate_terminal_result,
 )
 from money_machine.persistence.database import Database
 from money_machine.persistence.repositories.artifacts import ArtifactRepository
@@ -289,6 +290,12 @@ class UnitOfWork:
         workflow_run_id, job_type = completed_job
         if event.workflow_run_id != workflow_run_id:
             raise ValueError("job terminal event binding mismatch")
+        validate_terminal_result(
+            job_type,
+            blocker.terminal_state,
+            result_type,
+            result_payload,
+        )
 
         attempt_completion = cast(
             CursorResult[Any],

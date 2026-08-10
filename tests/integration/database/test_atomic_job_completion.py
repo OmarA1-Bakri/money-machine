@@ -433,6 +433,122 @@ def test_business_terminal_persists_result_blocker_event_and_workflow_atomically
             payload_sha256=canonical_sha256(event_payload),
         )
 
+        async def assert_terminal_rollback() -> None:
+            async with database.session_factory() as session:
+                persisted_job = (
+                    await session.execute(
+                        select(jobs.c.state, jobs.c.lease_token).where(jobs.c.job_id == job_id)
+                    )
+                ).one()
+                persisted_attempt = (
+                    await session.execute(
+                        select(job_attempts.c.state, job_attempts.c.completed_at).where(
+                            job_attempts.c.job_id == job_id,
+                            job_attempts.c.attempt_number == 1,
+                        )
+                    )
+                ).one()
+                persisted_workflow = (
+                    await session.execute(
+                        select(
+                            workflow_runs.c.state,
+                            workflow_runs.c.payload,
+                            workflow_runs.c.payload_sha256,
+                        ).where(workflow_runs.c.workflow_run_id == workflow_id)
+                    )
+                ).one()
+                assert persisted_job.state == JobState.RUNNING.value
+                assert persisted_job.lease_token == "lease-token"
+                assert persisted_attempt.state == JobState.RUNNING.value
+                assert persisted_attempt.completed_at is None
+                assert persisted_workflow.state == ProductState.SPECIFIED.value
+                assert persisted_workflow.payload["terminal_blocker"] is None
+                assert persisted_workflow.payload_sha256 == canonical_sha256(workflow)
+                assert await session.scalar(select(func.count()).select_from(product_specs)) == 1
+                assert await session.scalar(select(func.count()).select_from(dedupe_results)) == 0
+                assert await session.scalar(select(func.count()).select_from(domain_events)) == 0
+
+        wrong_result = product_spec.model_copy(
+            update={
+                "product_spec_id": "PS-wrong-terminal-result",
+                "spec_sha256": "8" * 64,
+            }
+        )
+        wrong_result_hash = canonical_sha256(wrong_result)
+        wrong_blocker = blocker.model_copy(
+            update={
+                "blocker_id": "BLK-wrong-terminal-result",
+                "result_type": "product_specs",
+                "result_id": wrong_result.product_spec_id,
+                "result_sha256": wrong_result_hash,
+            }
+        )
+        wrong_event_payload = {
+            "blocker_id": wrong_blocker.blocker_id,
+            "terminal_state": wrong_blocker.terminal_state.value,
+            "code": wrong_blocker.code,
+            "message": wrong_blocker.message,
+            "result_type": wrong_blocker.result_type,
+            "result_id": wrong_blocker.result_id,
+            "result_sha256": wrong_blocker.result_sha256,
+        }
+        wrong_event = event.model_copy(
+            update={
+                "event_id": UUID("00000000-0000-0000-0000-000000000244"),
+                "payload": wrong_event_payload,
+                "payload_sha256": canonical_sha256(wrong_event_payload),
+            }
+        )
+        with pytest.raises(ValueError, match="terminal result contract mismatch"):
+            async with UnitOfWork(database) as uow:
+                await uow.commit_job_terminal(
+                    job_id,
+                    "lease-token",
+                    1,
+                    wrong_blocker,
+                    wrong_event,
+                    result_type="product_specs",
+                    result_payload=wrong_result,
+                )
+        await assert_terminal_rollback()
+
+        forged_result = result.model_copy(update={"passed": True})
+        forged_result_hash = canonical_sha256(forged_result)
+        forged_blocker = blocker.model_copy(
+            update={
+                "blocker_id": "BLK-forged-terminal-result",
+                "result_sha256": forged_result_hash,
+            }
+        )
+        forged_event_payload = {
+            "blocker_id": forged_blocker.blocker_id,
+            "terminal_state": forged_blocker.terminal_state.value,
+            "code": forged_blocker.code,
+            "message": forged_blocker.message,
+            "result_type": forged_blocker.result_type,
+            "result_id": forged_blocker.result_id,
+            "result_sha256": forged_blocker.result_sha256,
+        }
+        forged_event = event.model_copy(
+            update={
+                "event_id": UUID("00000000-0000-0000-0000-000000000245"),
+                "payload": forged_event_payload,
+                "payload_sha256": canonical_sha256(forged_event_payload),
+            }
+        )
+        with pytest.raises(ValueError, match="terminal result model invalid"):
+            async with UnitOfWork(database) as uow:
+                await uow.commit_job_terminal(
+                    job_id,
+                    "lease-token",
+                    1,
+                    forged_blocker,
+                    forged_event,
+                    result_type="dedupe_results",
+                    result_payload=forged_result,
+                )
+        await assert_terminal_rollback()
+
         async with UnitOfWork(database) as uow:
             await uow.commit_job_terminal(
                 job_id,

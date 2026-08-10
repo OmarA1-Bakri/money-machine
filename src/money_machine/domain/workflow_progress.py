@@ -9,7 +9,11 @@ from typing import Final
 
 from money_machine.domain.enums import ProductState
 from money_machine.domain.events import DomainEventName
-from money_machine.domain.value_objects import assert_product_transition
+from money_machine.domain.models.candidate import CandidateShortlist
+from money_machine.domain.models.listing import PreflightResult
+from money_machine.domain.models.product import ProductQAResult
+from money_machine.domain.models.product_spec import DedupeResult
+from money_machine.domain.value_objects import FrozenModel, assert_product_transition
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,6 +23,14 @@ class WorkflowProgressContract:
     event: DomainEventName
     current: ProductState
     target: ProductState
+
+
+@dataclass(frozen=True, slots=True)
+class TerminalOutputContract:
+    """Exact result table and validated model for one business terminal."""
+
+    result_type: str
+    result_model: type[FrozenModel]
 
 
 FIRST_PRODUCT_WORKFLOW_PROGRESS: Final[Mapping[str, WorkflowProgressContract]] = MappingProxyType(
@@ -83,6 +95,29 @@ _BUSINESS_TERMINALS: Final[Mapping[str, ProductState]] = MappingProxyType(
     }
 )
 
+FIRST_PRODUCT_TERMINAL_OUTPUTS: Final[Mapping[tuple[str, ProductState], TerminalOutputContract]] = (
+    MappingProxyType(
+        {
+            ("QUALIFY_CANDIDATES", ProductState.INSUFFICIENT_EVIDENCE): TerminalOutputContract(
+                "candidate_shortlists",
+                CandidateShortlist,
+            ),
+            ("CHECK_CATALOGUE_DEDUPE", ProductState.REJECTED): TerminalOutputContract(
+                "dedupe_results",
+                DedupeResult,
+            ),
+            ("RUN_PRODUCT_QA", ProductState.REJECTED): TerminalOutputContract(
+                "product_qa_results",
+                ProductQAResult,
+            ),
+            ("RUN_PREFLIGHT", ProductState.REJECTED): TerminalOutputContract(
+                "preflight_results",
+                PreflightResult,
+            ),
+        }
+    )
+)
+
 
 def next_product_state(
     job_type: str,
@@ -130,3 +165,30 @@ def terminal_product_state(
         raise ValueError(f"workflow terminal mismatch: {job_type} {current.value} {target.value}")
     assert_product_transition(current, target)
     return target
+
+
+def validate_terminal_result(
+    job_type: str,
+    terminal_state: ProductState,
+    result_type: str | None,
+    result: FrozenModel | None,
+) -> None:
+    """Reject terminal results that differ from the durable job's exact contract."""
+
+    if terminal_state is ProductState.FAILED:
+        if result_type is not None or result is not None:
+            raise ValueError("FAILED terminal result contract mismatch")
+        return
+
+    contract = FIRST_PRODUCT_TERMINAL_OUTPUTS.get((job_type, terminal_state))
+    if (
+        contract is None
+        or result_type != contract.result_type
+        or result is None
+        or type(result) is not contract.result_model
+    ):
+        raise ValueError(f"terminal result contract mismatch for {job_type}")
+    try:
+        contract.result_model.model_validate(result.model_dump(mode="python"))
+    except ValueError as exc:
+        raise ValueError(f"terminal result model invalid for {job_type}") from exc
