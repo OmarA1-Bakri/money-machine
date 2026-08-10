@@ -62,3 +62,15 @@ class ArtifactRepository:
         return (
             None if payload is None else ArtifactReference.model_validate_json(json.dumps(payload))
         )
+
+    async def list_for_workflow(self, workflow_run_id: UUID) -> tuple[ArtifactReference, ...]:
+        payloads = (
+            await self._session.execute(
+                select(artifacts.c.payload)
+                .where(artifacts.c.workflow_run_id == workflow_run_id)
+                .order_by(artifacts.c.relative_path, artifacts.c.artifact_id)
+            )
+        ).scalars()
+        return tuple(
+            ArtifactReference.model_validate_json(json.dumps(payload)) for payload in payloads
+        )

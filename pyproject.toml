@@ -22,6 +22,7 @@ dependencies = [
 
 [project.scripts]
 money-machine-control = "money_machine.control.cli:main"
+money-machine = "money_machine.cli.main:main"
 
 [dependency-groups]
 dev = [
