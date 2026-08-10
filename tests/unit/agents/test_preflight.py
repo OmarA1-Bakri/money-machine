@@ -18,7 +18,7 @@ from money_machine.assets.renderer import render_listing_png
 from money_machine.domain.models.asset import ArtifactReference
 from money_machine.domain.models.listing import ListingPackage
 from money_machine.domain.models.product import BuildResult, ProductQAResult
-from money_machine.domain.models.product_spec import ProductSpec
+from money_machine.domain.models.product_spec import ProductFact, ProductSpec
 
 NOW = datetime(2026, 8, 9, 12, tzinfo=UTC)
 SHA = "a" * 64
@@ -30,17 +30,37 @@ def spec() -> ProductSpec:
         candidate_id="candidate-1",
         identity_niche="adhd students",
         base_category="digital planner",
-        target_buyer="Students who need a low-friction planning system",
-        promised_outcome="Organize coursework in one consistent workspace",
+        target_buyer="People managing adhd students",
+        promised_outcome="A structured digital planner workspace",
         hubs=("Home", "Courses", "Tasks", "Notes", "Reviews", "Archive"),
         colour_variants=("Ink", "Sand", "Sage"),
         features=("Linked course and task views",),
         product_facts=(
-            "Includes six navigation hubs",
-            "Includes linked course and task views",
-            "Available in ink, sand, and sage colour variants",
-            "Students who need a low-friction planning system",
-            "Organize coursework in one consistent workspace",
+            ProductFact(
+                claim="Configured with 6 hubs",
+                category="HUB_INVENTORY",
+                evidence_ids=("evidence-1",),
+            ),
+            ProductFact(
+                claim="Includes Linked course and task views",
+                category="FEATURE",
+                evidence_ids=("evidence-1",),
+            ),
+            ProductFact(
+                claim="Configured with 3 colour variants",
+                category="COLOUR_VARIANTS",
+                evidence_ids=("evidence-1",),
+            ),
+            ProductFact(
+                claim="People managing adhd students",
+                category="BUYER_FIT",
+                evidence_ids=("evidence-1",),
+            ),
+            ProductFact(
+                claim="A structured digital planner workspace",
+                category="WORKFLOW_OUTCOME",
+                evidence_ids=("evidence-1",),
+            ),
         ),
         source_evidence_ids=("evidence-1",),
         spec_sha256=SHA,
@@ -211,6 +231,53 @@ def test_preflight_rejects_unbound_copy_even_with_recomputed_package_hash(
 
     assert result.passed is False
     assert "LISTING_COPY_MISMATCH" in result.findings
+    assert "UNSUPPORTED_CLAIM" in result.findings
+
+
+@pytest.mark.parametrize(
+    ("field", "claim"),
+    (
+        ("promised_outcome", "Track guaranteed profits"),
+        ("promised_outcome", "Manage passive income"),
+        ("promised_outcome", "Access recurring revenue"),
+        ("target_buyer", "Creators planning guaranteed profits"),
+    ),
+)
+def test_commercial_claims_fail_every_listing_asset_and_preflight_boundary(
+    tmp_path: Path,
+    field: str,
+    claim: str,
+) -> None:
+    original = spec()
+    safe_package = rendered(tmp_path)
+    replaced = original.promised_outcome if field == "promised_outcome" else original.target_buyer
+    unsupported = original.model_copy(
+        update={
+            field: claim,
+            "product_facts": tuple(
+                fact.model_copy(update={"claim": claim}) if fact.claim == replaced else fact
+                for fact in original.product_facts
+            ),
+        }
+    )
+
+    with pytest.raises(ValueError, match="product fact"):
+        ListingService().create(unsupported, build(), qa())
+    with pytest.raises(ValueError):
+        CreativeAssetService().render(
+            safe_package,
+            tmp_path / "invalid",
+            spec=unsupported,
+            build=build(),
+        )
+    result = PreflightService(tmp_path).evaluate(
+        safe_package,
+        qa(),
+        spec=unsupported,
+        build=build(),
+        now=NOW,
+    )
+    assert result.passed is False
     assert "UNSUPPORTED_CLAIM" in result.findings
 
 

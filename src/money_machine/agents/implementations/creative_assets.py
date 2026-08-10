@@ -186,7 +186,7 @@ def _image_detail(role: str, index: int, spec: ProductSpec) -> str:
         return f"Local files for {spec.target_buyer}"
     if role == "how-it-works":
         return spec.promised_outcome
-    return spec.product_facts[(index - 1) % len(spec.product_facts)]
+    return spec.product_facts[(index - 1) % len(spec.product_facts)].claim
 
 
 def render_expected_listing_image(
@@ -282,7 +282,7 @@ class CreativeAssetService:
                     "promised_outcome": spec.promised_outcome,
                     "hubs": list(spec.hubs),
                     "colour_variants": list(spec.colour_variants),
-                    "product_facts": list(spec.product_facts),
+                    "product_facts": [fact.model_dump(mode="json") for fact in spec.product_facts],
                 },
                 "claims": [
                     {

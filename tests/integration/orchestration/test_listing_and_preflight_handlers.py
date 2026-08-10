@@ -14,7 +14,7 @@ from money_machine.agents.implementations.merchandising import handle_merchandis
 from money_machine.agents.implementations.preflight import handle_preflight
 from money_machine.domain.models.listing import PreflightResult
 from money_machine.domain.models.product import BuildResult, ProductQAResult
-from money_machine.domain.models.product_spec import ProductSpec
+from money_machine.domain.models.product_spec import ProductFact, ProductSpec
 from money_machine.persistence.database import Database
 from money_machine.persistence.tables import metadata, preflight_results
 from money_machine.persistence.unit_of_work import UnitOfWork
@@ -28,17 +28,37 @@ def spec() -> ProductSpec:
         candidate_id="candidate-1",
         identity_niche="adhd students",
         base_category="digital planner",
-        target_buyer="Students who need a low-friction planning system",
-        promised_outcome="Organize coursework in one consistent workspace",
+        target_buyer="People managing adhd students",
+        promised_outcome="A structured digital planner workspace",
         hubs=("Home", "Courses", "Tasks", "Notes", "Reviews", "Archive"),
         colour_variants=("Ink", "Sand", "Sage"),
         features=("Linked course and task views",),
         product_facts=(
-            "Includes six navigation hubs",
-            "Includes linked course and task views",
-            "Available in ink, sand, and sage colour variants",
-            "Students who need a low-friction planning system",
-            "Organize coursework in one consistent workspace",
+            ProductFact(
+                claim="Configured with 6 hubs",
+                category="HUB_INVENTORY",
+                evidence_ids=("evidence-1",),
+            ),
+            ProductFact(
+                claim="Includes Linked course and task views",
+                category="FEATURE",
+                evidence_ids=("evidence-1",),
+            ),
+            ProductFact(
+                claim="Configured with 3 colour variants",
+                category="COLOUR_VARIANTS",
+                evidence_ids=("evidence-1",),
+            ),
+            ProductFact(
+                claim="People managing adhd students",
+                category="BUYER_FIT",
+                evidence_ids=("evidence-1",),
+            ),
+            ProductFact(
+                claim="A structured digital planner workspace",
+                category="WORKFLOW_OUTCOME",
+                evidence_ids=("evidence-1",),
+            ),
         ),
         source_evidence_ids=("evidence-1",),
         spec_sha256=SHA,

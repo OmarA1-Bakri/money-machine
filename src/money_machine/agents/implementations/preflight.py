@@ -342,7 +342,7 @@ class PreflightService:
                 "promised_outcome": spec.promised_outcome,
                 "hubs": list(spec.hubs),
                 "colour_variants": list(spec.colour_variants),
-                "product_facts": list(spec.product_facts),
+                "product_facts": [fact.model_dump(mode="json") for fact in spec.product_facts],
             },
             "claims": [
                 {

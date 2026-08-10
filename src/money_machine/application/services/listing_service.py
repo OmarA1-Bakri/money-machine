@@ -16,21 +16,12 @@ from money_machine.domain.services.claim_validation import (
     AdmittedFact,
     ClaimRecord,
     ClaimValidationService,
-    FactCategory,
 )
 from money_machine.domain.value_objects import canonical_sha256
 
 _NON_TAG = re.compile(r"[^a-z0-9 ]+")
 _SPACE = re.compile(r"\s+")
 _TEMPLATE_ROOT = Path(__file__).resolve().parents[4] / "templates"
-_BUYER_FIT = re.compile(
-    r"^[A-Za-z][A-Za-z -]+ (?:who need (?:a|an|the)|planning) [A-Za-z][A-Za-z -]+$"
-)
-_FEATURE = re.compile(r"^[A-Za-z][A-Za-z ]+ and [A-Za-z][A-Za-z ]+ views$")
-_WORKFLOW_OUTCOME = re.compile(
-    r"^(?:Organize|Plan|Track|Manage|Centralize|Simplify|Customize|Access) "
-    r"[A-Za-z][A-Za-z -]+$"
-)
 
 
 def _tag(value: str) -> str:
@@ -90,46 +81,28 @@ def copy_package_sha256(package: ListingPackage) -> str:
     return listing_package_sha256(copy_only)
 
 
-def _joined(values: tuple[str, ...]) -> str:
-    if len(values) == 1:
-        return values[0].casefold()
-    return f"{', '.join(values[:-1]).casefold()}, and {values[-1].casefold()}"
-
-
 def admitted_product_facts(spec: ProductSpec) -> tuple[AdmittedFact, ...]:
-    """Derive the only admissible factual claims from typed ProductSpec fields."""
+    """Adapt upstream-admitted typed ProductSpec facts to the listing ledger."""
 
-    if not spec.source_evidence_ids:
-        return ()
-    evidence_ids = spec.source_evidence_ids
-    number_words = {6: "six", 7: "seven", 8: "eight"}
-    candidates: list[tuple[str, FactCategory]] = []
-    hub_count = number_words.get(len(spec.hubs))
-    if hub_count is not None:
-        candidates.append((f"Includes {hub_count} navigation hubs", "HUB_INVENTORY"))
-    candidates.extend(
-        (f"Includes {feature[:1].lower()}{feature[1:]}", "FEATURE")
-        for feature in spec.features
-        if _FEATURE.fullmatch(feature)
-    )
-    candidates.append(
-        (f"Available in {_joined(spec.colour_variants)} colour variants", "COLOUR_VARIANTS")
-    )
-    if _BUYER_FIT.fullmatch(spec.target_buyer):
-        candidates.append((spec.target_buyer, "BUYER_FIT"))
-    if _WORKFLOW_OUTCOME.fullmatch(spec.promised_outcome):
-        candidates.append((spec.promised_outcome, "WORKFLOW_OUTCOME"))
-    declared = set(spec.product_facts)
     return tuple(
-        AdmittedFact(claim=claim, category=category, evidence_ids=evidence_ids)
-        for claim, category in candidates
-        if claim in declared
+        AdmittedFact(
+            claim=fact.claim,
+            category=fact.category,
+            evidence_ids=fact.evidence_ids,
+        )
+        for fact in spec.product_facts
     )
+
+
+def _product_fact_claims(spec: ProductSpec) -> tuple[str, ...]:
+    return tuple(fact.claim for fact in spec.product_facts)
 
 
 def listing_claim_records(spec: ProductSpec, package: ListingPackage) -> tuple[ClaimRecord, ...]:
     """Rebuild the complete, typed claim ledger from the admitted ProductSpec."""
 
+    spec.ensure_truth_contract()
+    product_facts = _product_fact_claims(spec)
     structural = (
         _listing_title(spec),
         f"A digital {spec.base_category} for {spec.identity_niche}.",
@@ -151,7 +124,7 @@ def listing_claim_records(spec: ProductSpec, package: ListingPackage) -> tuple[C
     )
     result = ClaimValidationService().validate(
         claims,
-        spec.product_facts,
+        product_facts,
         admitted_facts=admitted_product_facts(spec),
         structural_claims=structural,
     )
@@ -176,9 +149,14 @@ class ListingService:
         if not qa.passed:
             raise ValueError("product QA must pass before merchandising")
 
+        try:
+            spec.ensure_truth_contract()
+        except ValueError as error:
+            raise ValueError("ProductSpec contains an unsupported product fact") from error
+        product_facts = _product_fact_claims(spec)
         validation = ClaimValidationService().validate(
-            spec.product_facts,
-            spec.product_facts,
+            product_facts,
+            product_facts,
             admitted_facts=admitted_product_facts(spec),
         )
         if not validation.passed:
@@ -186,7 +164,7 @@ class ListingService:
 
         title = _listing_title(spec)
 
-        facts = "\n".join(f"- {fact}" for fact in spec.product_facts)
+        facts = "\n".join(f"- {fact}" for fact in product_facts)
         hubs = ", ".join(spec.hubs)
         colours = ", ".join(spec.colour_variants)
         environment = Environment(
@@ -233,7 +211,7 @@ class ListingService:
             title=title,
             description=description,
             tags=tags,
-            feature_statements=spec.product_facts,
+            feature_statements=product_facts,
             buyer_fit_statements=(spec.target_buyer, spec.promised_outcome),
             preview_video_status="NOT_GENERATED",
             package_sha256="0" * 64,
