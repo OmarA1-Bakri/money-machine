@@ -549,6 +549,51 @@ def test_business_terminal_persists_result_blocker_event_and_workflow_atomically
                 )
         await assert_terminal_rollback()
 
+        passing_result = DedupeResult(
+            dedupe_result_id="DDR-passing-terminal-result",
+            product_spec_id=product_spec.product_spec_id,
+            passed=True,
+            matched_product_spec_ids=(),
+            reasons=(),
+            result_sha256="9" * 64,
+        )
+        passing_result_hash = canonical_sha256(passing_result)
+        passing_blocker = blocker.model_copy(
+            update={
+                "blocker_id": "BLK-passing-terminal-result",
+                "result_id": passing_result.dedupe_result_id,
+                "result_sha256": passing_result_hash,
+            }
+        )
+        passing_event_payload = {
+            "blocker_id": passing_blocker.blocker_id,
+            "terminal_state": passing_blocker.terminal_state.value,
+            "code": passing_blocker.code,
+            "message": passing_blocker.message,
+            "result_type": passing_blocker.result_type,
+            "result_id": passing_blocker.result_id,
+            "result_sha256": passing_blocker.result_sha256,
+        }
+        passing_event = event.model_copy(
+            update={
+                "event_id": UUID("00000000-0000-0000-0000-000000000246"),
+                "payload": passing_event_payload,
+                "payload_sha256": canonical_sha256(passing_event_payload),
+            }
+        )
+        with pytest.raises(ValueError, match="terminal result semantic mismatch"):
+            async with UnitOfWork(database) as uow:
+                await uow.commit_job_terminal(
+                    job_id,
+                    "lease-token",
+                    1,
+                    passing_blocker,
+                    passing_event,
+                    result_type="dedupe_results",
+                    result_payload=passing_result,
+                )
+        await assert_terminal_rollback()
+
         async with UnitOfWork(database) as uow:
             await uow.commit_job_terminal(
                 job_id,

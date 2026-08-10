@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import UUID
 
 import pytest
@@ -10,10 +11,16 @@ from pydantic import ValidationError
 
 from money_machine.domain.enums import ProductState
 from money_machine.domain.events import DomainEventName
+from money_machine.domain.models.candidate import CandidateShortlist, QualificationScore
+from money_machine.domain.models.listing import PreflightResult
+from money_machine.domain.models.product import ProductQAResult
+from money_machine.domain.models.product_spec import DedupeResult
 from money_machine.domain.models.workflow import WorkflowBlocker, WorkflowRun
+from money_machine.domain.value_objects import FrozenModel
 from money_machine.domain.workflow_progress import (
     terminal_event_name,
     terminal_product_state,
+    validate_terminal_result,
 )
 
 NOW = datetime(2026, 8, 10, tzinfo=UTC)
@@ -86,6 +93,85 @@ def test_workflow_revalidates_nested_blocker_instances_before_persistence() -> N
     forged = _blocker().model_copy(update={"code": ""})
     with pytest.raises(ValidationError, match="at least 1 character"):
         _workflow(ProductState.REJECTED, forged)
+
+
+@pytest.mark.parametrize(
+    ("job_type", "state", "result_type", "result"),
+    [
+        (
+            "QUALIFY_CANDIDATES",
+            ProductState.INSUFFICIENT_EVIDENCE,
+            "candidate_shortlists",
+            CandidateShortlist(
+                shortlist_id="CS-qualifying",
+                packet_id="RPK-qualifying",
+                candidates=(
+                    QualificationScore(
+                        candidate_id="candidate-qualifying",
+                        demand=8,
+                        differentiation=8,
+                        build_feasibility=7,
+                        buyer_value=7,
+                        evidence_ids=("EV-qualifying",),
+                    ),
+                ),
+                selected_candidate_id="candidate-qualifying",
+                backup_candidate_id=None,
+                shortlist_sha256="b" * 64,
+            ),
+        ),
+        (
+            "CHECK_CATALOGUE_DEDUPE",
+            ProductState.REJECTED,
+            "dedupe_results",
+            DedupeResult(
+                dedupe_result_id="DDR-passing",
+                product_spec_id="PS-passing",
+                passed=True,
+                matched_product_spec_ids=(),
+                reasons=(),
+                result_sha256="c" * 64,
+            ),
+        ),
+        (
+            "RUN_PRODUCT_QA",
+            ProductState.REJECTED,
+            "product_qa_results",
+            ProductQAResult(
+                qa_result_id="PQA-passing",
+                build_id="BLD-passing",
+                passed=True,
+                findings=(),
+                checked_at=NOW,
+                result_sha256="d" * 64,
+            ),
+        ),
+        (
+            "RUN_PREFLIGHT",
+            ProductState.REJECTED,
+            "preflight_results",
+            PreflightResult(
+                preflight_result_id="PFR-passing",
+                listing_package_id="LP-passing",
+                passed=True,
+                findings=(),
+                checked_at=NOW,
+                external_effect_mode="draft",
+                incremental_spend=Decimal("0.00"),
+                publication_receipt_present=False,
+                result_sha256="e" * 64,
+            ),
+        ),
+    ],
+)
+def test_adverse_terminal_rejects_semantically_successful_result(
+    job_type: str,
+    state: ProductState,
+    result_type: str,
+    result: FrozenModel,
+) -> None:
+    with pytest.raises(ValueError, match="terminal result semantic mismatch"):
+        validate_terminal_result(job_type, state, result_type, result)
 
 
 @pytest.mark.parametrize(

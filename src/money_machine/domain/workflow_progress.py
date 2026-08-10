@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Final
@@ -31,6 +31,32 @@ class TerminalOutputContract:
 
     result_type: str
     result_model: type[FrozenModel]
+    is_adverse: Callable[[FrozenModel], bool]
+
+
+def _is_insufficient_shortlist(result: FrozenModel) -> bool:
+    return (
+        isinstance(result, CandidateShortlist)
+        and result.selected_candidate_id is None
+        and result.backup_candidate_id is None
+    )
+
+
+def _is_rejected_dedupe(result: FrozenModel) -> bool:
+    return (
+        isinstance(result, DedupeResult)
+        and not result.passed
+        and bool(result.matched_product_spec_ids)
+        and bool(result.reasons)
+    )
+
+
+def _is_rejected_product_qa(result: FrozenModel) -> bool:
+    return isinstance(result, ProductQAResult) and not result.passed and bool(result.findings)
+
+
+def _is_rejected_preflight(result: FrozenModel) -> bool:
+    return isinstance(result, PreflightResult) and not result.passed and bool(result.findings)
 
 
 FIRST_PRODUCT_WORKFLOW_PROGRESS: Final[Mapping[str, WorkflowProgressContract]] = MappingProxyType(
@@ -101,18 +127,22 @@ FIRST_PRODUCT_TERMINAL_OUTPUTS: Final[Mapping[tuple[str, ProductState], Terminal
             ("QUALIFY_CANDIDATES", ProductState.INSUFFICIENT_EVIDENCE): TerminalOutputContract(
                 "candidate_shortlists",
                 CandidateShortlist,
+                _is_insufficient_shortlist,
             ),
             ("CHECK_CATALOGUE_DEDUPE", ProductState.REJECTED): TerminalOutputContract(
                 "dedupe_results",
                 DedupeResult,
+                _is_rejected_dedupe,
             ),
             ("RUN_PRODUCT_QA", ProductState.REJECTED): TerminalOutputContract(
                 "product_qa_results",
                 ProductQAResult,
+                _is_rejected_product_qa,
             ),
             ("RUN_PREFLIGHT", ProductState.REJECTED): TerminalOutputContract(
                 "preflight_results",
                 PreflightResult,
+                _is_rejected_preflight,
             ),
         }
     )
@@ -189,6 +219,8 @@ def validate_terminal_result(
     ):
         raise ValueError(f"terminal result contract mismatch for {job_type}")
     try:
-        contract.result_model.model_validate(result.model_dump(mode="python"))
+        validated = contract.result_model.model_validate(result.model_dump(mode="python"))
     except ValueError as exc:
         raise ValueError(f"terminal result model invalid for {job_type}") from exc
+    if not contract.is_adverse(validated):
+        raise ValueError(f"terminal result semantic mismatch for {job_type}")
