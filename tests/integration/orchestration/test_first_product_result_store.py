@@ -129,6 +129,8 @@ def _wrong_identity(
 ) -> None:
     event_body = cast(dict[str, object], payload["payload"])
     event_body["packet_id"] = alternative.packet_id
+    event_body["result_id"] = alternative.packet_id
+    event_body["result_sha256"] = canonical_sha256(alternative)
 
 
 @pytest.mark.parametrize(
