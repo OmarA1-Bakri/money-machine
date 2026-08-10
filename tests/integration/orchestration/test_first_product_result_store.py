@@ -17,7 +17,11 @@ from sqlalchemy import delete, insert, select, text, update
 from money_machine.agents.registry import FirstProductResultStore
 from money_machine.agents.runtime import FirstProductRuntime
 from money_machine.application.services.research_service import ResearchService
+from money_machine.config.loader import load_first_product_config
+from money_machine.domain.models.product_spec import ProductSpec
 from money_machine.domain.models.research import ResearchPacket
+from money_machine.domain.services.low_ticket import QualificationService
+from money_machine.domain.services.product_rules import ProductRules, ProductStrategyService
 from money_machine.domain.value_objects import canonical_sha256
 from money_machine.persistence.database import Database
 from money_machine.persistence.tables import domain_events, jobs
@@ -215,6 +219,79 @@ def test_predecessor_load_requires_exactly_one_durable_event(
 
         with pytest.raises(LookupError, match="exactly one durable event"):
             await store.load_result(workflow_id, "ADMIT_RESEARCH_PACKET", ResearchPacket)
+        await database.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_product_spec_event_cannot_redirect_to_same_candidate_from_another_packet(
+    tmp_path: Path,
+) -> None:
+    _migrate()
+
+    async def scenario() -> None:
+        database, store, workflow_id, _admit_job_id, alternative = await _completed_admission(
+            tmp_path
+        )
+        runtime = FirstProductRuntime(
+            database,
+            artifact_root=tmp_path / "artifacts",
+            config_root=REPO_ROOT / "config",
+            worker_id="spec-redirect-worker",
+            clock=lambda: NOW,
+        )
+        assert (await runtime.run_once()).status == "processed"
+        assert (await runtime.run_once()).status == "processed"
+
+        qualification = QualificationService()
+        alternative_scores = qualification.score(alternative)
+        alternative_shortlist = qualification.shortlist(alternative, alternative_scores)
+        selected = next(
+            score
+            for score in alternative_shortlist.candidates
+            if score.candidate_id == alternative_shortlist.selected_candidate_id
+        )
+        config = load_first_product_config(REPO_ROOT / "config")
+        alternative_spec = ProductStrategyService().create_spec(
+            alternative,
+            alternative_shortlist,
+            selected,
+            ProductRules.from_config(config.product_rules.product),
+        )
+        async with UnitOfWork(database) as uow:
+            await uow.products.add_spec(alternative_spec)
+
+        async with database.session_factory() as session, session.begin():
+            job_id = cast(
+                UUID,
+                await session.scalar(
+                    select(jobs.c.job_id).where(
+                        jobs.c.workflow_run_id == workflow_id,
+                        jobs.c.job_type == "CREATE_PRODUCT_SPEC",
+                    )
+                ),
+            )
+            stored = cast(
+                dict[str, object],
+                await session.scalar(
+                    select(domain_events.c.payload).where(domain_events.c.job_id == job_id)
+                ),
+            )
+            envelope = cast(dict[str, object], json.loads(json.dumps(stored)))
+            body = cast(dict[str, object], envelope["payload"])
+            body["product_spec_id"] = alternative_spec.product_spec_id
+            body["result_id"] = alternative_spec.product_spec_id
+            body["result_sha256"] = canonical_sha256(alternative_spec)
+            event_hash = canonical_sha256(body)
+            envelope["payload_sha256"] = event_hash
+            await session.execute(
+                update(domain_events)
+                .where(domain_events.c.job_id == job_id)
+                .values(payload=envelope, payload_sha256=event_hash)
+            )
+
+        with pytest.raises(ValueError, match="binding"):
+            await store.load_result(workflow_id, "CREATE_PRODUCT_SPEC", ProductSpec)
         await database.dispose()
 
     asyncio.run(scenario())

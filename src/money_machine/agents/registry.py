@@ -44,7 +44,6 @@ from money_machine.persistence.repositories.products import ProductRepository
 from money_machine.persistence.repositories.research import ResearchRepository
 from money_machine.persistence.repositories.workflows import WorkflowRepository
 from money_machine.persistence.tables import (
-    candidate_shortlists,
     domain_events,
     jobs,
     product_specs,
@@ -87,7 +86,14 @@ class FirstProductResultStore:
                 raise LookupError("workflow is absent")
             job_row = (
                 await session.execute(
-                    select(jobs.c.job_id, jobs.c.workflow_run_id, jobs.c.state).where(
+                    select(
+                        jobs.c.job_id,
+                        jobs.c.workflow_run_id,
+                        jobs.c.state,
+                        jobs.c.result_type,
+                        jobs.c.result_id,
+                        jobs.c.result_sha256,
+                    ).where(
                         jobs.c.workflow_run_id == workflow_run_id,
                         jobs.c.job_type == job_type,
                     )
@@ -113,6 +119,9 @@ class FirstProductResultStore:
             event_row = event_rows[0]
             event = DomainEvent.model_validate_json(json.dumps(event_row.payload))
             expected_event_hash = canonical_sha256(event.payload)
+            event_result_type = _identity(event.payload, "result_type")
+            event_result_id = _identity(event.payload, "result_id")
+            event_result_sha256 = _identity(event.payload, "result_sha256")
             if (
                 job_row.workflow_run_id != workflow_run_id
                 or event_row.workflow_run_id != workflow_run_id
@@ -125,6 +134,10 @@ class FirstProductResultStore:
                 or event.occurred_at != event_row.occurred_at
                 or event.payload_sha256 != event_row.payload_sha256
                 or event.payload_sha256 != expected_event_hash
+                or job_row.result_type != contract.result_type
+                or event_result_type != job_row.result_type
+                or event_result_id != job_row.result_id
+                or event_result_sha256 != job_row.result_sha256
             ):
                 raise ValueError(f"{job_type} durable event binding or hash mismatch")
             result = await self._load_identity(session, result_model, event.payload)
@@ -135,11 +148,13 @@ class FirstProductResultStore:
                 cast(FrozenModel, result),
                 event.payload,
             )
-            await _validate_workflow_result_lineage(
-                session,
-                workflow_packet_id,
-                cast(FrozenModel, result),
-            )
+            frozen_result = cast(FrozenModel, result)
+            if (
+                _result_identity(frozen_result) != job_row.result_id
+                or canonical_sha256(frozen_result) != job_row.result_sha256
+            ):
+                raise ValueError(f"{job_type} durable job result binding mismatch")
+            _validate_workflow_packet_binding(workflow_packet_id, frozen_result)
         return cast(ResultT, result)
 
     async def catalogue(self, *, exclude_product_spec_id: str) -> tuple[ProductSpec, ...]:
@@ -464,8 +479,7 @@ def _validate_result_event_payload(
         raise ValueError("durable event result identity mismatch")
 
 
-async def _validate_workflow_result_lineage(
-    session: AsyncSession,
+def _validate_workflow_packet_binding(
     workflow_packet_id: str,
     result: FrozenModel,
 ) -> None:
@@ -473,67 +487,8 @@ async def _validate_workflow_result_lineage(
         if result.packet_id != workflow_packet_id:
             raise ValueError("research result does not belong to the workflow packet")
         return
-    if type(result) is CandidateShortlist:
-        if result.packet_id != workflow_packet_id:
-            raise ValueError("shortlist does not belong to the workflow packet")
-        return
-
-    shortlist_rows = (
-        await session.execute(
-            select(
-                candidate_shortlists.c.payload,
-                candidate_shortlists.c.payload_sha256,
-            ).where(candidate_shortlists.c.packet_id == workflow_packet_id)
-        )
-    ).all()
-    if len(shortlist_rows) != 1:
-        raise ValueError("workflow must have exactly one durable shortlist lineage anchor")
-    shortlist = CandidateShortlist.model_validate_json(json.dumps(shortlist_rows[0].payload))
-    if (
-        shortlist.packet_id != workflow_packet_id
-        or canonical_sha256(shortlist) != shortlist_rows[0].payload_sha256
-        or shortlist.selected_candidate_id is None
-    ):
-        raise ValueError("workflow shortlist lineage anchor is invalid")
-
-    products = ProductRepository(session)
-    listings = ListingRepository(session)
-    if type(result) is ProductSpec:
-        if result.candidate_id != shortlist.selected_candidate_id:
-            raise ValueError("ProductSpec does not belong to the workflow shortlist")
-        return
-    if type(result) is DedupeResult:
-        spec = await products.get_spec(result.product_spec_id)
-        if spec is None:
-            raise ValueError("dedupe result ProductSpec lineage is absent")
-        await _validate_workflow_result_lineage(session, workflow_packet_id, spec)
-        return
-    if type(result) is BuildResult:
-        spec = await products.get_spec(result.product_spec_id)
-        if spec is None:
-            raise ValueError("build result ProductSpec lineage is absent")
-        await _validate_workflow_result_lineage(session, workflow_packet_id, spec)
-        return
-    if type(result) is ProductQAResult:
-        build = await products.get_build(result.build_id)
-        if build is None:
-            raise ValueError("product QA build lineage is absent")
-        await _validate_workflow_result_lineage(session, workflow_packet_id, build)
-        return
-    if type(result) is ListingPackage:
-        spec = await products.get_spec(result.product_spec_id)
-        build = await products.get_build(result.build_id)
-        if spec is None or build is None or build.product_spec_id != spec.product_spec_id:
-            raise ValueError("listing package product lineage is invalid")
-        await _validate_workflow_result_lineage(session, workflow_packet_id, spec)
-        return
-    if type(result) is PreflightResult:
-        package = await listings.get_package(result.listing_package_id)
-        if package is None:
-            raise ValueError("preflight listing lineage is absent")
-        await _validate_workflow_result_lineage(session, workflow_packet_id, package)
-        return
-    raise TypeError("unsupported first-product workflow lineage model")
+    if type(result) is CandidateShortlist and result.packet_id != workflow_packet_id:
+        raise ValueError("shortlist does not belong to the workflow packet")
 
 
 __all__ = ["FirstProductHandlers", "FirstProductResultStore"]

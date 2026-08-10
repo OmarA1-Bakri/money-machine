@@ -95,10 +95,22 @@ jobs = Table(
     Column("payload", JSONB, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("result_type", Text),
+    Column("result_id", Text),
+    Column("result_sha256", Text),
     CheckConstraint(_in_check("state", JOB_STATES), name="ck_jobs_state"),
     CheckConstraint("attempt_count >= 0", name="ck_jobs_attempt_count"),
     CheckConstraint("max_attempts BETWEEN 1 AND 5", name="ck_jobs_max_attempts"),
     CheckConstraint("char_length(input_sha256) = 64", name="ck_jobs_input_hash"),
+    CheckConstraint(
+        "(result_type IS NULL AND result_id IS NULL AND result_sha256 IS NULL) OR "
+        "(result_type IS NOT NULL AND result_id IS NOT NULL AND result_sha256 IS NOT NULL)",
+        name="ck_jobs_result_binding",
+    ),
+    CheckConstraint(
+        "result_sha256 IS NULL OR char_length(result_sha256) = 64",
+        name="ck_jobs_result_hash",
+    ),
     CheckConstraint(
         "lease_expires_at IS NULL OR leased_at IS NULL OR lease_expires_at > leased_at",
         name="ck_jobs_lease_expiry",

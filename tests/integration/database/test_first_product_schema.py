@@ -146,6 +146,8 @@ EXPECTED_CHECK_CONSTRAINTS.update(
             "ck_jobs_attempt_count",
             "ck_jobs_max_attempts",
             "ck_jobs_input_hash",
+            "ck_jobs_result_binding",
+            "ck_jobs_result_hash",
             "ck_jobs_lease_expiry",
             "ck_jobs_lease_binding",
         },
@@ -217,6 +219,12 @@ EXPECTED_CHECK_EXPRESSIONS.update(
         "jobs": {
             "ck_jobs_attempt_count": "attempt_count >= 0",
             "ck_jobs_input_hash": "char_length(input_sha256) = 64",
+            "ck_jobs_result_binding": (
+                "result_type IS NULL AND result_id IS NULL AND result_sha256 IS NULL OR "
+                "result_type IS NOT NULL AND result_id IS NOT NULL "
+                "AND result_sha256 IS NOT NULL"
+            ),
+            "ck_jobs_result_hash": ("result_sha256 IS NULL OR char_length(result_sha256) = 64"),
             "ck_jobs_lease_binding": (
                 "(state = ANY (ARRAY['LEASED'::text, 'RUNNING'::text])) "
                 "AND lease_owner IS NOT NULL AND lease_token IS NOT NULL "
@@ -395,6 +403,10 @@ def test_migration_creates_exact_first_slice_schema_and_replays() -> None:
     assert schema.unique_constraints == EXPECTED_UNIQUE_CONSTRAINTS
     assert schema.check_constraints == EXPECTED_CHECK_CONSTRAINTS
     assert schema.check_expressions == EXPECTED_CHECK_EXPRESSIONS
+    assert {"result_type", "result_id", "result_sha256"} <= {
+        column[0] for column in schema.columns["jobs"]
+    }
+    assert {"ck_jobs_result_binding", "ck_jobs_result_hash"} <= schema.check_constraints["jobs"]
     assert "ix_jobs_ready_queue" in schema.indexes["jobs"]
     assert "ix_domain_events_workflow_order" in schema.indexes["domain_events"]
     assert "ix_artifacts_workflow_path" in schema.indexes["artifacts"]
@@ -413,6 +425,8 @@ def test_migration_creates_exact_first_slice_schema_and_replays() -> None:
         "ck_jobs_attempt_count",
         "ck_jobs_max_attempts",
         "ck_jobs_input_hash",
+        "ck_jobs_result_binding",
+        "ck_jobs_result_hash",
         "ck_jobs_lease_expiry",
         "ck_jobs_lease_binding",
     } <= schema.check_constraints["jobs"]

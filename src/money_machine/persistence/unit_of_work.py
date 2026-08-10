@@ -115,6 +115,8 @@ class UnitOfWork:
         """Atomically persist result, attempt, event, parent completion, and successor."""
 
         session = self._require_session()
+        result_identity = str(self._result_identity(result_type, result_payload))
+        result_sha256 = canonical_sha256(result_payload)
         completion = cast(
             CursorResult[Any],
             await session.execute(
@@ -132,6 +134,9 @@ class UnitOfWork:
                     lease_token=None,
                     leased_at=None,
                     lease_expires_at=None,
+                    result_type=result_type,
+                    result_id=result_identity,
+                    result_sha256=result_sha256,
                     updated_at=event.occurred_at,
                 )
                 .returning(jobs.c.workflow_run_id, jobs.c.job_type)
@@ -254,12 +259,15 @@ class UnitOfWork:
             or event.payload_sha256 != expected_event_hash
         ):
             raise ValueError("job terminal event payload mismatch")
+        result_identity: str | None = None
+        result_sha256: str | None = None
         if result_type is not None and result_payload is not None:
-            result_identity = self._result_identity(result_type, result_payload)
+            result_identity = str(self._result_identity(result_type, result_payload))
+            result_sha256 = canonical_sha256(result_payload)
             if (
                 blocker.result_type != result_type
-                or blocker.result_id != str(result_identity)
-                or blocker.result_sha256 != canonical_sha256(result_payload)
+                or blocker.result_id != result_identity
+                or blocker.result_sha256 != result_sha256
             ):
                 raise ValueError("job terminal result identity mismatch")
         elif any(
@@ -287,6 +295,9 @@ class UnitOfWork:
                     lease_token=None,
                     leased_at=None,
                     lease_expires_at=None,
+                    result_type=result_type,
+                    result_id=result_identity,
+                    result_sha256=result_sha256,
                     updated_at=event.occurred_at,
                 )
                 .returning(jobs.c.workflow_run_id, jobs.c.job_type)
