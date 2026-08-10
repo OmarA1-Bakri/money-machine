@@ -7,13 +7,17 @@ from types import TracebackType
 from typing import Any, Self, cast
 from uuid import UUID
 
-from sqlalchemy import Table, func, insert, select, update
+from sqlalchemy import Table, func, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncSessionTransaction
 
 from money_machine.domain.enums import ProductState
 from money_machine.domain.events import DomainEvent
+from money_machine.domain.models.candidate import CandidateShortlist
 from money_machine.domain.models.job import JobEnvelope
+from money_machine.domain.models.listing import ListingPackage
+from money_machine.domain.models.product import BuildResult
 from money_machine.domain.models.workflow import (
     WorkflowBlocker,
     WorkflowRun,
@@ -155,7 +159,11 @@ class UnitOfWork:
         )
         if attempt_completion.rowcount != 1:
             raise ValueError("job attempt completion lease mismatch")
-        await self._insert_result(result_type, result_payload)
+        await self._insert_result(
+            result_type,
+            result_payload,
+            workflow_run_id=workflow_run_id,
+        )
         await self.events.add(event)
         await self._advance_workflow(
             workflow_run_id,
@@ -319,7 +327,11 @@ class UnitOfWork:
         if attempt_completion.rowcount != 1:
             raise ValueError("job terminal attempt lease mismatch")
         if result_type is not None and result_payload is not None:
-            await self._insert_result(result_type, result_payload)
+            await self._insert_result(
+                result_type,
+                result_payload,
+                workflow_run_id=workflow_run_id,
+            )
         await self.events.add(event)
         await self._terminalize_workflow(
             workflow_run_id,
@@ -379,7 +391,13 @@ class UnitOfWork:
         if progress.rowcount != 1:
             raise ValueError("workflow terminal state mismatch")
 
-    async def _insert_result(self, result_type: str, result: FrozenModel) -> None:
+    async def _insert_result(
+        self,
+        result_type: str,
+        result: FrozenModel,
+        *,
+        workflow_run_id: UUID,
+    ) -> None:
         session = self._require_session()
         table, identity_column, _ = _RESULT_TABLES.get(result_type, (None, None, None))
         identity = self._result_identity(result_type, result)
@@ -399,7 +417,45 @@ class UnitOfWork:
         ):
             if foreign_key in table.c and hasattr(result, foreign_key):
                 values[foreign_key] = getattr(result, foreign_key)
-        await session.execute(insert(table).values(**values))
+        inserted = (
+            await session.execute(
+                pg_insert(table)
+                .values(**values)
+                .on_conflict_do_nothing(index_elements=[table.c[identity_column]])
+                .returning(table.c[identity_column])
+            )
+        ).scalar_one_or_none()
+        if inserted is None:
+            stored_hash = await session.scalar(
+                select(table.c.payload_sha256).where(table.c[identity_column] == identity)
+            )
+            if stored_hash != values["payload_sha256"]:
+                raise ValueError(f"identity collision for {identity}")
+        await self._persist_related_results(result, workflow_run_id)
+
+    async def _persist_related_results(
+        self,
+        result: FrozenModel,
+        workflow_run_id: UUID,
+    ) -> None:
+        if type(result) is CandidateShortlist:
+            for score in result.candidates:
+                await self.research.add_score(result.packet_id, score)
+            return
+        if type(result) is BuildResult:
+            for artifact in result.artifacts:
+                await self.artifacts.add(artifact, workflow_run_id=workflow_run_id)
+            return
+        if type(result) is ListingPackage:
+            artifacts = (
+                *result.listing_images,
+                result.delivery_document,
+                result.preview_video,
+                result.package_manifest,
+            )
+            for artifact in artifacts:
+                if artifact is not None:
+                    await self.artifacts.add(artifact, workflow_run_id=workflow_run_id)
 
     @staticmethod
     def _result_identity(result_type: str, result: FrozenModel) -> object:
