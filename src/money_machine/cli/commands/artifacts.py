@@ -33,8 +33,11 @@ def inspect_artifacts(
                 if await uow.workflows.get(run_id) is None:
                     raise ValueError("workflow does not exist")
                 durable = await uow.artifacts.list_for_workflow(run_id)
-            root = (settings.artifact_root / str(run_id)).resolve()
-            if root.parent != settings.artifact_root.resolve() or root.is_symlink():
+            lexical_root = settings.artifact_root / str(run_id)
+            if lexical_root.is_symlink():
+                raise ValueError("artifact root is not confined")
+            root = lexical_root.resolve()
+            if root.parent != settings.artifact_root.resolve():
                 raise ValueError("artifact root is not confined")
             files: list[dict[str, object]] = []
             if root.is_dir():

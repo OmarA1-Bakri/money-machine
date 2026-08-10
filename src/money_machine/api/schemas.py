@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pathlib import PurePosixPath
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import Self
 from uuid import UUID
 
@@ -71,7 +71,12 @@ class ArtifactSummary(ResponseModel):
     @field_validator("relative_path")
     @classmethod
     def require_relative_posix_path(cls, value: str) -> str:
-        if "\\" in value or not value or PurePosixPath(value).is_absolute():
+        if (
+            "\\" in value
+            or not value
+            or PurePosixPath(value).is_absolute()
+            or bool(PureWindowsPath(value).drive)
+        ):
             raise ValueError("artifact path must be relative POSIX")
         if ".." in PurePosixPath(value).parts:
             raise ValueError("artifact path cannot traverse")

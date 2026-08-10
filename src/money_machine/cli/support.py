@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Coroutine
+from collections.abc import Callable, Coroutine
 from typing import Any, NoReturn
 
 import typer
+from alembic.util.exc import CommandError
+from sqlalchemy.exc import SQLAlchemyError
 
 from money_machine.config.settings import Settings
 
@@ -28,10 +30,25 @@ def settings_or_exit() -> Settings:
         fail("CONFIGURATION_ERROR", str(exc))
 
 
+def call[T](operation: Callable[[], T]) -> T:
+    try:
+        return operation()
+    except typer.Exit:
+        raise
+    except CommandError:
+        fail("MIGRATION_ERROR", "database migration failed", exit_code=1)
+    except SQLAlchemyError:
+        fail("DATABASE_ERROR", "database operation failed", exit_code=1)
+    except (OSError, RuntimeError, ValueError) as exc:
+        fail(type(exc).__name__.upper(), str(exc), exit_code=1)
+
+
 def run[T](awaitable: Coroutine[Any, Any, T]) -> T:
     try:
         return asyncio.run(awaitable)
     except typer.Exit:
         raise
+    except SQLAlchemyError:
+        fail("DATABASE_ERROR", "database operation failed", exit_code=1)
     except (OSError, RuntimeError, ValueError) as exc:
-        fail(type(exc).__name__.upper(), str(exc))
+        fail(type(exc).__name__.upper(), str(exc), exit_code=1)

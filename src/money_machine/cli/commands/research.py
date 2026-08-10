@@ -7,7 +7,7 @@ from typing import Annotated
 import typer
 
 from money_machine.application.services.research_service import ResearchService
-from money_machine.cli.support import emit, run, settings_or_exit
+from money_machine.cli.support import call, emit, run, settings_or_exit
 from money_machine.persistence.database import Database
 from money_machine.persistence.unit_of_work import UnitOfWork
 
@@ -25,7 +25,7 @@ def import_packet(
 ) -> None:
     del json_output
     settings = settings_or_exit()
-    imported = ResearchService().import_packet(packet, now=datetime.now(UTC))
+    imported = call(lambda: ResearchService().import_packet(packet, now=datetime.now(UTC)))
 
     async def persist() -> None:
         database = Database.from_url(settings.database_url)

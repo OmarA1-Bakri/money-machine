@@ -12,6 +12,7 @@ from alembic import command
 from alembic.config import Config
 from typer.testing import CliRunner
 
+from money_machine.cli.commands import database as database_command
 from money_machine.cli.main import app
 from money_machine.config.settings import Settings
 
@@ -130,6 +131,63 @@ def test_first_product_cli_import_start_drain_replay_and_inspect(
         and not Path(str(cast(dict[str, object], item)["relative_path"])).is_absolute()
         for item in cast(list[object], files)
     )
+
+    workflow_root = artifact_root / workflow_id
+    sibling_root = artifact_root / "sibling-workflow"
+    workflow_root.rename(sibling_root)
+    workflow_root.symlink_to(sibling_root, target_is_directory=True)
+
+    symlinked = runner.invoke(app, ["artifacts", "inspect", workflow_id, "--json"])
+    assert symlinked.exit_code != 0
+    assert _last_json(symlinked.output)["error"] == {
+        "code": "VALUEERROR",
+        "message": "artifact root is not confined",
+    }
+
+
+def test_research_validate_only_failure_is_machine_readable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv(
+        "MONEY_MACHINE_DATABASE_URL",
+        "postgresql+asyncpg://operator:local@127.0.0.1/money_machine",
+    )
+    malformed = tmp_path / "malformed.json"
+    malformed.write_text("{not-json", encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        ["research", "import", "--packet", str(malformed), "--validate-only", "--json"],
+    )
+
+    assert result.exit_code != 0
+    error = _last_json(result.output)["error"]
+    assert isinstance(error, dict)
+    assert error["code"] == "VALUEERROR"
+    assert isinstance(error["message"], str) and error["message"]
+
+
+def test_database_migration_failure_is_machine_readable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "MONEY_MACHINE_DATABASE_URL",
+        "postgresql+asyncpg://operator:local@127.0.0.1/money_machine",
+    )
+
+    def fail_upgrade(*_args: object, **_kwargs: object) -> None:
+        raise ValueError("synthetic migration failure")
+
+    monkeypatch.setattr(database_command.command, "upgrade", fail_upgrade)
+
+    result = CliRunner().invoke(app, ["db", "migrate", "--json"])
+
+    assert result.exit_code != 0
+    assert _last_json(result.output)["error"] == {
+        "code": "VALUEERROR",
+        "message": "synthetic migration failure",
+    }
 
 
 def test_first_product_cli_rejects_missing_database_configuration(

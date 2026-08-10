@@ -12,10 +12,12 @@ import httpx
 import pytest
 from alembic import command
 from alembic.config import Config
+from pydantic import ValidationError
 from sqlalchemy import select
 
 from money_machine.agents.runtime import FirstProductRuntime
 from money_machine.api.main import create_app
+from money_machine.api.schemas import ArtifactSummary
 from money_machine.application.services.research_service import ResearchService
 from money_machine.persistence.database import Database
 from money_machine.persistence.tables import listing_packages, product_specs
@@ -23,6 +25,17 @@ from money_machine.persistence.unit_of_work import UnitOfWork
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "research" / "valid_packet_30.json"
+
+
+def test_artifact_summary_rejects_windows_drive_absolute_forward_slash_path() -> None:
+    with pytest.raises(ValidationError, match="artifact path must be relative POSIX"):
+        ArtifactSummary(
+            artifact_id="artifact-1",
+            relative_path="C:/tmp/private-artifact.png",
+            media_type="image/png",
+            byte_count=1,
+            sha256="0" * 64,
+        )
 
 
 def _assert_no_absolute_paths(value: object) -> None:
