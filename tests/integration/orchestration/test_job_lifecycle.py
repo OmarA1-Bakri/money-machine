@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -9,19 +10,22 @@ from uuid import UUID
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import delete, func, select, text, update
 
+from money_machine.domain.enums import ProductState
 from money_machine.domain.events import DomainEvent, DomainEventName
 from money_machine.domain.models.job import JobEnvelope
-from money_machine.domain.models.product_spec import ProductFact, ProductSpec
+from money_machine.domain.models.product_spec import DedupeResult, ProductFact, ProductSpec
 from money_machine.domain.models.research import ResearchPacket
+from money_machine.domain.models.workflow import WorkflowBlocker, WorkflowRun
 from money_machine.domain.value_objects import canonical_sha256
 from money_machine.orchestration.engine import OrchestrationEngine
 from money_machine.orchestration.leases import LeaseManager
-from money_machine.orchestration.worker import HandlerOutcome, Worker
+from money_machine.orchestration.worker import HandlerOutcome, TerminalHandlerOutcome, Worker
 from money_machine.persistence.database import Database
 from money_machine.persistence.repositories.jobs import JobRepository
 from money_machine.persistence.tables import (
+    dedupe_results,
     domain_events,
     job_attempts,
     jobs,
@@ -29,6 +33,7 @@ from money_machine.persistence.tables import (
     research_packets,
     workflow_runs,
 )
+from money_machine.persistence.unit_of_work import UnitOfWork
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 NOW = datetime(2030, 8, 9, 12, 0, tzinfo=UTC)
@@ -203,6 +208,143 @@ def test_worker_rejects_wrong_result_event_semantics_without_durable_effects() -
             ]
             assert await session.scalar(select(func.count()).select_from(product_specs)) == 0
             assert await session.scalar(select(func.count()).select_from(domain_events)) == 0
+        await database.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_worker_persists_business_terminal_without_activating_successor() -> None:
+    _migrate()
+
+    async def scenario() -> None:
+        database = Database.from_url(_database_url())
+        workflow_id = await OrchestrationEngine(database).start_first_product(
+            "packet-worker-terminal"
+        )
+        spec = _product_spec().model_copy(update={"product_spec_id": "PS-worker-terminal"})
+        async with database.session_factory() as session, session.begin():
+            payload = await session.scalar(
+                select(workflow_runs.c.payload).where(
+                    workflow_runs.c.workflow_run_id == workflow_id
+                )
+            )
+            assert payload is not None
+            workflow = WorkflowRun.model_validate_json(json.dumps(payload, separators=(",", ":")))
+            specified = WorkflowRun(
+                workflow_run_id=workflow.workflow_run_id,
+                workflow_type=workflow.workflow_type,
+                packet_id=workflow.packet_id,
+                state=ProductState.SPECIFIED,
+                idempotency_key=workflow.idempotency_key,
+                created_at=workflow.created_at,
+                updated_at=workflow.updated_at,
+            )
+            await session.execute(
+                update(workflow_runs)
+                .where(workflow_runs.c.workflow_run_id == workflow_id)
+                .values(
+                    state=ProductState.SPECIFIED.value,
+                    payload=specified.model_dump(mode="json"),
+                    payload_sha256=canonical_sha256(specified),
+                )
+            )
+            await session.execute(
+                update(jobs)
+                .where(
+                    jobs.c.workflow_run_id == workflow_id,
+                    jobs.c.job_type.in_(
+                        ("ADMIT_RESEARCH_PACKET", "QUALIFY_CANDIDATES", "CREATE_PRODUCT_SPEC")
+                    ),
+                )
+                .values(state="SUCCEEDED")
+            )
+            await session.execute(
+                update(jobs)
+                .where(
+                    jobs.c.workflow_run_id == workflow_id,
+                    jobs.c.job_type == "CHECK_CATALOGUE_DEDUPE",
+                )
+                .values(state="READY")
+            )
+        async with UnitOfWork(database) as uow:
+            await uow.products.add_spec(spec)
+
+        result = DedupeResult(
+            dedupe_result_id="DDR-worker-terminal",
+            product_spec_id=spec.product_spec_id,
+            passed=False,
+            matched_product_spec_ids=("PS-existing",),
+            reasons=("TITLE_TOKEN_OVERLAP_AT_OR_ABOVE_0.700",),
+            result_sha256="f" * 64,
+        )
+
+        async def terminal_handler(job: JobEnvelope) -> TerminalHandlerOutcome:
+            blocker = WorkflowBlocker(
+                blocker_id="BLK-worker-terminal",
+                job_id=job.job_id,
+                terminal_state=ProductState.REJECTED,
+                code="CATALOGUE_DUPLICATE",
+                message="The product specification matches an existing catalogue item.",
+                result_type="dedupe_results",
+                result_id=result.dedupe_result_id,
+                result_sha256=canonical_sha256(result),
+                occurred_at=NOW,
+            )
+            event_payload = {
+                "blocker_id": blocker.blocker_id,
+                "terminal_state": blocker.terminal_state.value,
+                "code": blocker.code,
+                "message": blocker.message,
+                "result_type": blocker.result_type,
+                "result_id": blocker.result_id,
+                "result_sha256": blocker.result_sha256,
+            }
+            return TerminalHandlerOutcome(
+                result_type="dedupe_results",
+                result=result,
+                blocker=blocker,
+                event=DomainEvent(
+                    event_id=job.job_id,
+                    workflow_run_id=job.workflow_run_id,
+                    job_id=job.job_id,
+                    name=DomainEventName.WORKFLOW_REJECTED,
+                    occurred_at=NOW,
+                    payload=event_payload,
+                    payload_sha256=canonical_sha256(event_payload),
+                ),
+            )
+
+        worker = Worker(
+            database,
+            worker_id="worker-terminal",
+            handlers={"CHECK_CATALOGUE_DEDUPE": terminal_handler},
+            lease_ttl=timedelta(seconds=30),
+            clock=lambda: NOW,
+        )
+        assert (await worker.run_once()).status == "processed"
+
+        async with database.session_factory() as session:
+            durable = (
+                await session.execute(
+                    select(workflow_runs.c.state, workflow_runs.c.payload).where(
+                        workflow_runs.c.workflow_run_id == workflow_id
+                    )
+                )
+            ).one()
+            assert durable.state == ProductState.REJECTED.value
+            assert durable.payload["terminal_blocker"]["blocker_id"] == "BLK-worker-terminal"
+            state_rows = (
+                await session.execute(
+                    select(jobs.c.job_type, jobs.c.state).where(
+                        jobs.c.workflow_run_id == workflow_id
+                    )
+                )
+            ).tuples()
+            states: dict[str, str] = {str(job_type): str(state) for job_type, state in state_rows}
+            assert states["CHECK_CATALOGUE_DEDUPE"] == "SUCCEEDED"
+            assert states["BUILD_PRODUCT"] == "PENDING"
+            assert await session.scalar(select(func.count()).select_from(dedupe_results)) == 1
+            assert await session.scalar(select(func.count()).select_from(domain_events)) == 1
         await database.dispose()
 
     asyncio.run(scenario())

@@ -13,6 +13,7 @@ from uuid import UUID
 from money_machine.domain.enums import JobState
 from money_machine.domain.events import DomainEvent
 from money_machine.domain.models.job import JobEnvelope
+from money_machine.domain.models.workflow import WorkflowBlocker
 from money_machine.domain.value_objects import FrozenModel
 from money_machine.orchestration._foundation import unavailable
 from money_machine.orchestration.dependency_resolver import DependencyResolver
@@ -25,7 +26,7 @@ from money_machine.persistence.database import Database
 from money_machine.persistence.repositories.jobs import JobRepository
 from money_machine.persistence.unit_of_work import UnitOfWork
 
-JobHandler = Callable[[JobEnvelope], Awaitable["HandlerOutcome"]]
+JobHandler = Callable[[JobEnvelope], Awaitable["HandlerOutcome | TerminalHandlerOutcome"]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +35,14 @@ class HandlerOutcome:
     result: FrozenModel
     event: DomainEvent
     successor_job_type: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class TerminalHandlerOutcome:
+    result_type: str | None
+    result: FrozenModel | None
+    blocker: WorkflowBlocker
+    event: DomainEvent
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,35 +98,47 @@ class Worker:
                 or outcome.event.workflow_run_id != job.workflow_run_id
             ):
                 raise ValueError("handler event binding mismatch")
-            validate_step_output(
-                job.job_type,
-                outcome.result_type,
-                outcome.result,
-                outcome.event.name,
-                outcome.successor_job_type,
-            )
-            self._successors.validate(job.job_type, outcome.successor_job_type)
+            if isinstance(outcome, HandlerOutcome):
+                validate_step_output(
+                    job.job_type,
+                    outcome.result_type,
+                    outcome.result,
+                    outcome.event.name,
+                    outcome.successor_job_type,
+                )
+                self._successors.validate(job.job_type, outcome.successor_job_type)
             completion_time = self._clock()
             async with UnitOfWork(self._database) as uow:
                 if uow.session is None:
                     raise RuntimeError("unit of work did not open a session")
                 session = uow.session
                 await self._transitions.require_live_running_lease(session, lease, completion_time)
-                await uow.commit_job_success(
-                    lease.job_id,
-                    lease.token,
-                    lease.attempt_number,
-                    outcome.result_type,
-                    outcome.result,
-                    outcome.event,
-                    None,
-                )
-                if outcome.successor_job_type is not None:
-                    await self._dependencies.activate_successor(
-                        uow.jobs,
+                if isinstance(outcome, TerminalHandlerOutcome):
+                    await uow.commit_job_terminal(
                         lease.job_id,
-                        outcome.successor_job_type,
+                        lease.token,
+                        lease.attempt_number,
+                        outcome.blocker,
+                        outcome.event,
+                        result_type=outcome.result_type,
+                        result_payload=outcome.result,
                     )
+                else:
+                    await uow.commit_job_success(
+                        lease.job_id,
+                        lease.token,
+                        lease.attempt_number,
+                        outcome.result_type,
+                        outcome.result,
+                        outcome.event,
+                        None,
+                    )
+                    if outcome.successor_job_type is not None:
+                        await self._dependencies.activate_successor(
+                            uow.jobs,
+                            lease.job_id,
+                            outcome.successor_job_type,
+                        )
             return WorkerResult("processed", lease.job_id)
         except Exception as exc:
             await self._fail_if_owned(
