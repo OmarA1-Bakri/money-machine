@@ -167,6 +167,7 @@ def _all_approved_contracts() -> tuple[BaseModel, ...]:
             packet_id="packet-25",
             candidates=(score,),
             selected_candidate_id=score.candidate_id,
+            backup_candidate_id=None,
             shortlist_sha256=SHA256,
         ),
         _spec(),
@@ -395,6 +396,7 @@ def test_shortlist_selection_requires_a_listed_threshold_candidate() -> None:
         packet_id="packet-25",
         candidates=scores,
         selected_candidate_id="candidate-34",
+        backup_candidate_id="candidate-33",
         shortlist_sha256=SHA256,
     )
     assert len(shortlist.candidates) == 5
@@ -405,6 +407,7 @@ def test_shortlist_selection_requires_a_listed_threshold_candidate() -> None:
             packet_id="packet-25",
             candidates=scores,
             selected_candidate_id="candidate-unlisted",
+            backup_candidate_id="candidate-33",
             shortlist_sha256=SHA256,
         )
 

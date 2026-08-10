@@ -1,4 +1,4 @@
-"""RUN_DEDUPE fixture/local handler."""
+"""CHECK_CATALOGUE_DEDUPE fixture/local handler."""
 
 from money_machine.agents.contracts.catalogue_dedupe import (
     CatalogueDedupeOutcome,
@@ -20,7 +20,7 @@ class CatalogueDedupeHandler:
         self._service = service or DedupeService()
 
     async def handle(self, job: JobEnvelope) -> CatalogueDedupeOutcome:
-        if job.job_type != "RUN_DEDUPE":
+        if job.job_type != "CHECK_CATALOGUE_DEDUPE":
             raise ValueError("catalogue dedupe handler received an undeclared job type")
         spec = await self._repository.load_predecessor_result(job.job_id, ProductSpec)
         result = self._service.evaluate(spec, await self._repository.load_catalogue())

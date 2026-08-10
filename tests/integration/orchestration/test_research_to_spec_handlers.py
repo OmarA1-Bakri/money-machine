@@ -119,7 +119,7 @@ def test_handlers_load_exact_predecessors_and_emit_declared_typed_results() -> N
     async def scenario() -> None:
         repository = FakeResearchRepository()
         shortlist_outcome = await MarketResearchHandler(repository).handle(
-            _job(1, "SCORE_AND_SHORTLIST")
+            _job(1, "QUALIFY_CANDIDATES")
         )
         assert shortlist_outcome.event_name is DomainEventName.CANDIDATE_SHORTLISTED
         assert shortlist_outcome.terminal_state is None
@@ -134,7 +134,9 @@ def test_handlers_load_exact_predecessors_and_emit_declared_typed_results() -> N
         assert spec_outcome.event_name is DomainEventName.PRODUCT_SPEC_CREATED
         repository.results[UUID(int=3)] = spec_outcome.result
 
-        dedupe_outcome = await CatalogueDedupeHandler(repository).handle(_job(3, "RUN_DEDUPE"))
+        dedupe_outcome = await CatalogueDedupeHandler(repository).handle(
+            _job(3, "CHECK_CATALOGUE_DEDUPE")
+        )
         assert dedupe_outcome.event_name is DomainEventName.DEDUPE_PASSED
         assert dedupe_outcome.result.passed
         assert repository.loads == [
@@ -149,7 +151,7 @@ def test_handlers_load_exact_predecessors_and_emit_declared_typed_results() -> N
 def test_low_supply_is_terminal_and_never_declares_product_successor() -> None:
     async def scenario() -> None:
         repository = FakeResearchRepository(low_supply=True)
-        outcome = await MarketResearchHandler(repository).handle(_job(1, "SCORE_AND_SHORTLIST"))
+        outcome = await MarketResearchHandler(repository).handle(_job(1, "QUALIFY_CANDIDATES"))
         assert outcome.result is None
         assert outcome.event_name is None
         assert outcome.terminal_state is ProductState.INSUFFICIENT_EVIDENCE
@@ -169,7 +171,7 @@ def test_handlers_reject_wrong_job_types_before_repository_access() -> None:
         ):
             repository.loads.clear()
             try:
-                await handler.handle(_job(1, "BUILD_LOCAL_PRODUCT"))
+                await handler.handle(_job(1, "BUILD_PRODUCT"))
             except ValueError as exc:
                 assert "job type" in str(exc)
             else:
@@ -288,9 +290,9 @@ def test_postgresql_handlers_persist_all_scores_and_load_exact_predecessors() ->
         packet = _packet()
         jobs = (
             _job(701, "ADMIT_RESEARCH_PACKET", workflow_id=workflow_id),
-            _job(702, "SCORE_AND_SHORTLIST", workflow_id=workflow_id),
+            _job(702, "QUALIFY_CANDIDATES", workflow_id=workflow_id),
             _job(703, "CREATE_PRODUCT_SPEC", workflow_id=workflow_id),
-            _job(704, "RUN_DEDUPE", workflow_id=workflow_id),
+            _job(704, "CHECK_CATALOGUE_DEDUPE", workflow_id=workflow_id),
         )
         workflow = WorkflowRun(
             workflow_run_id=workflow_id,

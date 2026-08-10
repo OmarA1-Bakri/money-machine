@@ -128,7 +128,7 @@ class ProductService:
         """Build only the exact specification approved by catalogue dedupe."""
 
         if not dedupe.passed or dedupe.product_spec_id != spec.product_spec_id:
-            raise ValueError("BUILD_LOCAL_PRODUCT requires a dedupe-approved ProductSpec")
+            raise ValueError("BUILD_PRODUCT requires a dedupe-approved ProductSpec")
         spec.ensure_truth_contract()
         destination = self._artifact_root / str(workflow_run_id) / "product"
         return self._builder.build(spec, destination)

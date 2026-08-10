@@ -37,6 +37,7 @@ class CandidateShortlist(FrozenModel):
     packet_id: NonEmptyStr
     candidates: Annotated[tuple[QualificationScore, ...], Field(min_length=1, max_length=5)]
     selected_candidate_id: str | None
+    backup_candidate_id: str | None
     shortlist_sha256: Sha256
 
     @model_validator(mode="after")
@@ -44,6 +45,8 @@ class CandidateShortlist(FrozenModel):
         """Require a selection to identify a shortlisted score of at least 30."""
 
         if self.selected_candidate_id is None:
+            if self.backup_candidate_id is not None:
+                raise ValueError("backup candidate requires a selected candidate")
             return self
         selected = next(
             (
@@ -57,4 +60,16 @@ class CandidateShortlist(FrozenModel):
             raise ValueError("selected candidate must appear in candidates")
         if not selected.meets_threshold:
             raise ValueError("selected candidate must meet the 30/40 threshold")
+        if self.backup_candidate_id is None:
+            return self
+        if self.backup_candidate_id == self.selected_candidate_id:
+            raise ValueError("backup candidate must differ from selected candidate")
+        backup = next(
+            (score for score in self.candidates if score.candidate_id == self.backup_candidate_id),
+            None,
+        )
+        if backup is None:
+            raise ValueError("backup candidate must appear in candidates")
+        if not backup.meets_threshold:
+            raise ValueError("backup candidate must meet the 30/40 threshold")
         return self

@@ -78,7 +78,7 @@ def test_process_restart_reclaims_once_and_commits_without_duplicate_outputs() -
                     payload=payload,
                     payload_sha256=canonical_sha256(payload),
                 ),
-                successor_job_type="SCORE_AND_SHORTLIST",
+                successor_job_type="QUALIFY_CANDIDATES",
             )
 
         worker = Worker(

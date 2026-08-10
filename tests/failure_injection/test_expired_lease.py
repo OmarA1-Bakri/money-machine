@@ -164,7 +164,7 @@ def test_slow_handler_cannot_terminalize_a_db_clock_expired_lease() -> None:
                     payload=payload,
                     payload_sha256=canonical_sha256(payload),
                 ),
-                successor_job_type="SCORE_AND_SHORTLIST",
+                successor_job_type="QUALIFY_CANDIDATES",
             )
 
         worker = Worker(

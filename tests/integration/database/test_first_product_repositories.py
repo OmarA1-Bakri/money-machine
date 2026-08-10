@@ -173,7 +173,7 @@ def test_workflow_and_job_round_trip_is_immutable_ordered_and_current() -> None:
         successor = job.model_copy(
             update={
                 "job_id": UUID("00000000-0000-0000-0000-000000000103"),
-                "job_type": "SCORE_AND_SHORTLIST",
+                "job_type": "QUALIFY_CANDIDATES",
                 "state": JobState.PENDING,
                 "idempotency_key": "job:RPK-test:score",
             }
@@ -261,7 +261,7 @@ def test_successor_activation_requires_every_declared_dependency_to_succeed() ->
         unsatisfied_parent = parent.model_copy(
             update={
                 "job_id": UUID("00000000-0000-0000-0000-000000000123"),
-                "job_type": "SCORE_AND_SHORTLIST",
+                "job_type": "QUALIFY_CANDIDATES",
                 "state": JobState.PENDING,
                 "idempotency_key": "job:all-dependencies:unsatisfied-parent",
             }
@@ -321,7 +321,7 @@ def test_claim_next_skips_ready_jobs_with_unsatisfied_dependencies() -> None:
         successor = parent.model_copy(
             update={
                 "job_id": UUID("00000000-0000-0000-0000-000000000133"),
-                "job_type": "SCORE_AND_SHORTLIST",
+                "job_type": "QUALIFY_CANDIDATES",
                 "state": JobState.READY,
                 "idempotency_key": "job:claim-dependencies:successor",
             }
@@ -382,6 +382,7 @@ def test_every_slice_result_round_trips_with_canonical_hash_and_collision_reject
             packet_id=packet.packet_id,
             candidates=(score_30, score_31),
             selected_candidate_id=score_31.candidate_id,
+            backup_candidate_id=score_30.candidate_id,
             shortlist_sha256=SHA256,
         )
         spec = _spec()

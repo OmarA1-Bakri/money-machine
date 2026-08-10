@@ -49,6 +49,16 @@ def test_exact_first_slice_workflow_steps_are_registered_once_and_in_order() -> 
 
     assert config.workflows.workflows[0].workflow_id == "first-product"
     assert tuple(step.job_type for step in workflow.steps) == FIRST_PRODUCT_JOB_TYPES
+    assert FIRST_PRODUCT_JOB_TYPES == (
+        "ADMIT_RESEARCH_PACKET",
+        "QUALIFY_CANDIDATES",
+        "CREATE_PRODUCT_SPEC",
+        "CHECK_CATALOGUE_DEDUPE",
+        "BUILD_PRODUCT",
+        "RUN_PRODUCT_QA",
+        "CREATE_LISTING_PACKAGE",
+        "RUN_PREFLIGHT",
+    )
     assert len(workflow.steps) == len({step.job_type for step in workflow.steps})
     assert workflow.external_mutations_enabled is False
     assert workflow.spend_enabled is False

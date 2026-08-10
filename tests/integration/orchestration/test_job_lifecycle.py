@@ -118,7 +118,7 @@ def test_worker_commits_result_event_and_declared_successor_atomically() -> None
                     payload=payload,
                     payload_sha256=canonical_sha256(payload),
                 ),
-                successor_job_type="SCORE_AND_SHORTLIST",
+                successor_job_type="QUALIFY_CANDIDATES",
             )
 
         worker = Worker(
@@ -141,7 +141,7 @@ def test_worker_commits_result_event_and_declared_successor_atomically() -> None
             ).all()
             assert states[:3] == [
                 ("ADMIT_RESEARCH_PACKET", "SUCCEEDED"),
-                ("SCORE_AND_SHORTLIST", "READY"),
+                ("QUALIFY_CANDIDATES", "READY"),
                 ("CREATE_PRODUCT_SPEC", "PENDING"),
             ]
             assert await session.scalar(select(func.count()).select_from(research_packets)) == 1
@@ -175,7 +175,7 @@ def test_worker_rejects_wrong_result_event_semantics_without_durable_effects() -
                     payload=payload,
                     payload_sha256=canonical_sha256(payload),
                 ),
-                successor_job_type="SCORE_AND_SHORTLIST",
+                successor_job_type="QUALIFY_CANDIDATES",
             )
 
         worker = Worker(
@@ -198,7 +198,7 @@ def test_worker_rejects_wrong_result_event_semantics_without_durable_effects() -
             ).all()
             assert states[:3] == [
                 ("ADMIT_RESEARCH_PACKET", "FAILED"),
-                ("SCORE_AND_SHORTLIST", "PENDING"),
+                ("QUALIFY_CANDIDATES", "PENDING"),
                 ("CREATE_PRODUCT_SPEC", "PENDING"),
             ]
             assert await session.scalar(select(func.count()).select_from(product_specs)) == 0

@@ -50,6 +50,7 @@ def test_shortlist_is_deterministic_and_selects_first_qualifying_candidate() -> 
     )
     assert shortlist.candidates == expected
     assert shortlist.selected_candidate_id == expected[0].candidate_id
+    assert shortlist.backup_candidate_id == expected[1].candidate_id
     assert shortlist.shortlist_id == f"SL-{shortlist.shortlist_sha256[:24]}"
 
 

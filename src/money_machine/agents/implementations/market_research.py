@@ -1,4 +1,4 @@
-"""SCORE_AND_SHORTLIST fixture/local handler."""
+"""QUALIFY_CANDIDATES fixture/local handler."""
 
 from money_machine.agents.contracts.market_research import (
     MarketResearchOutcome,
@@ -21,7 +21,7 @@ class MarketResearchHandler:
         self._service = service or QualificationService()
 
     async def handle(self, job: JobEnvelope) -> MarketResearchOutcome:
-        if job.job_type != "SCORE_AND_SHORTLIST":
+        if job.job_type != "QUALIFY_CANDIDATES":
             raise ValueError("market research handler received an undeclared job type")
         packet = await self._repository.load_predecessor_result(job.job_id, ResearchPacket)
         scores = self._service.score(packet)

@@ -1,4 +1,4 @@
-"""Contract for the RUN_DEDUPE research handler."""
+"""Contract for the CHECK_CATALOGUE_DEDUPE research handler."""
 
 from __future__ import annotations
 

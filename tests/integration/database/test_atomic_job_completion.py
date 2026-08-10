@@ -89,7 +89,7 @@ def test_job_completion_rolls_back_result_event_parent_and_successor() -> None:
         occupied = JobEnvelope(
             job_id=UUID("00000000-0000-0000-0000-000000000203"),
             workflow_run_id=workflow_id,
-            job_type="RUN_DEDUPE",
+            job_type="CHECK_CATALOGUE_DEDUPE",
             state=JobState.PENDING,
             idempotency_key="job:duplicate-successor",
             input_sha256="b" * 64,

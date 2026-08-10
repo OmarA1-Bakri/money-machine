@@ -14,10 +14,10 @@ from money_machine.domain.value_objects import FrozenModel
 
 FIRST_PRODUCT_JOB_SEQUENCE: Final[tuple[str, ...]] = (
     "ADMIT_RESEARCH_PACKET",
-    "SCORE_AND_SHORTLIST",
+    "QUALIFY_CANDIDATES",
     "CREATE_PRODUCT_SPEC",
-    "RUN_DEDUPE",
-    "BUILD_LOCAL_PRODUCT",
+    "CHECK_CATALOGUE_DEDUPE",
+    "BUILD_PRODUCT",
     "RUN_PRODUCT_QA",
     "CREATE_LISTING_PACKAGE",
     "RUN_PREFLIGHT",
@@ -42,9 +42,9 @@ FIRST_PRODUCT_STEP_OUTPUTS: Final = MappingProxyType(
             "research_packets",
             ResearchPacket,
             DomainEventName.RESEARCH_PACKET_ADMITTED,
-            "SCORE_AND_SHORTLIST",
+            "QUALIFY_CANDIDATES",
         ),
-        "SCORE_AND_SHORTLIST": StepOutputContract(
+        "QUALIFY_CANDIDATES": StepOutputContract(
             "candidate_shortlists",
             CandidateShortlist,
             DomainEventName.CANDIDATE_SHORTLISTED,
@@ -54,15 +54,15 @@ FIRST_PRODUCT_STEP_OUTPUTS: Final = MappingProxyType(
             "product_specs",
             ProductSpec,
             DomainEventName.PRODUCT_SPEC_CREATED,
-            "RUN_DEDUPE",
+            "CHECK_CATALOGUE_DEDUPE",
         ),
-        "RUN_DEDUPE": StepOutputContract(
+        "CHECK_CATALOGUE_DEDUPE": StepOutputContract(
             "dedupe_results",
             DedupeResult,
             DomainEventName.DEDUPE_PASSED,
-            "BUILD_LOCAL_PRODUCT",
+            "BUILD_PRODUCT",
         ),
-        "BUILD_LOCAL_PRODUCT": StepOutputContract(
+        "BUILD_PRODUCT": StepOutputContract(
             "build_results",
             BuildResult,
             DomainEventName.PRODUCT_BUILT,

@@ -1,4 +1,4 @@
-"""Contract for the SCORE_AND_SHORTLIST research handler."""
+"""Contract for the QUALIFY_CANDIDATES research handler."""
 
 from __future__ import annotations
 

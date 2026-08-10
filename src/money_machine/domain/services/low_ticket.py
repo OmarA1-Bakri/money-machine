@@ -40,6 +40,7 @@ class _ShortlistBody(FrozenModel):
     packet_id: str
     candidates: tuple[QualificationScore, ...]
     selected_candidate_id: str | None
+    backup_candidate_id: str | None
 
 
 class QualificationService:
@@ -112,11 +113,14 @@ class QualificationService:
                 ),
             )[:5]
         )
-        selected = next((item.candidate_id for item in ordered if item.meets_threshold), None)
+        qualifying = tuple(item.candidate_id for item in ordered if item.meets_threshold)
+        selected = qualifying[0] if qualifying else None
+        backup = qualifying[1] if len(qualifying) > 1 else None
         body = _ShortlistBody(
             packet_id=packet.packet_id,
             candidates=ordered,
             selected_candidate_id=selected,
+            backup_candidate_id=backup,
         )
         digest = canonical_sha256(body)
         return CandidateShortlist(
@@ -124,6 +128,7 @@ class QualificationService:
             packet_id=packet.packet_id,
             candidates=ordered,
             selected_candidate_id=selected,
+            backup_candidate_id=backup,
             shortlist_sha256=digest,
         )
 

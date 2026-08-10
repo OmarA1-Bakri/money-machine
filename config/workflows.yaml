@@ -7,16 +7,16 @@ workflows:
       - job_type: ADMIT_RESEARCH_PACKET
         role_id: market_research
         retry_class: TRANSIENT_PROVIDER_READ
-      - job_type: SCORE_AND_SHORTLIST
+      - job_type: QUALIFY_CANDIDATES
         role_id: market_research
         retry_class: NEVER
       - job_type: CREATE_PRODUCT_SPEC
         role_id: product_strategy
         retry_class: NEVER
-      - job_type: RUN_DEDUPE
+      - job_type: CHECK_CATALOGUE_DEDUPE
         role_id: catalogue_dedupe
         retry_class: NEVER
-      - job_type: BUILD_LOCAL_PRODUCT
+      - job_type: BUILD_PRODUCT
         role_id: notion_product_builder
         retry_class: TRANSIENT_INTERNAL
       - job_type: RUN_PRODUCT_QA
