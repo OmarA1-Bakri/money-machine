@@ -25,6 +25,7 @@ from money_machine.domain.value_objects import canonical_sha256
 from money_machine.orchestration.engine import OrchestrationEngine
 from money_machine.orchestration.leases import LeaseManager
 from money_machine.orchestration.worker import HandlerOutcome, TerminalHandlerOutcome, Worker
+from money_machine.orchestration.workflows.product_experiment import success_event_payload
 from money_machine.persistence.database import Database
 from money_machine.persistence.repositories.jobs import JobRepository
 from money_machine.persistence.tables import (
@@ -113,7 +114,7 @@ def test_worker_commits_result_event_and_declared_successor_atomically() -> None
         )
 
         async def handler(job: JobEnvelope) -> HandlerOutcome:
-            payload = {"packet_id": packet.packet_id}
+            payload = success_event_payload("research_packets", packet)
             return HandlerOutcome(
                 result_type="research_packets",
                 result=packet,
@@ -154,6 +155,84 @@ def test_worker_commits_result_event_and_declared_successor_atomically() -> None
             ]
             assert await session.scalar(select(func.count()).select_from(research_packets)) == 1
             assert await session.scalar(select(func.count()).select_from(domain_events)) == 1
+        await database.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_worker_rejects_success_event_without_exact_result_binding_before_commit() -> None:
+    _migrate()
+
+    async def scenario() -> None:
+        database = Database.from_url(_database_url())
+        workflow_id = await OrchestrationEngine(database).start_first_product(
+            "packet-worker-missing-event-binding"
+        )
+        packet = ResearchPacket.model_construct(
+            packet_id="packet-worker-missing-event-binding",
+            observations=(),
+            packet_sha256="9" * 64,
+        )
+
+        async def malformed_handler(job: JobEnvelope) -> HandlerOutcome:
+            payload = {"packet_id": packet.packet_id}
+            return HandlerOutcome(
+                result_type="research_packets",
+                result=packet,
+                event=DomainEvent(
+                    event_id=job.job_id,
+                    workflow_run_id=job.workflow_run_id,
+                    job_id=job.job_id,
+                    name=DomainEventName.RESEARCH_PACKET_ADMITTED,
+                    occurred_at=NOW + timedelta(seconds=1),
+                    payload=payload,
+                    payload_sha256=canonical_sha256(payload),
+                ),
+                successor_job_type="QUALIFY_CANDIDATES",
+            )
+
+        worker = Worker(
+            database,
+            worker_id="worker-missing-event-binding",
+            handlers={"ADMIT_RESEARCH_PACKET": malformed_handler},
+            lease_ttl=timedelta(seconds=30),
+            clock=lambda: NOW,
+        )
+        result = await worker.run_once()
+        assert result.status == "failed"
+        assert result.error_code == "VALUEERROR"
+
+        async with database.session_factory() as session:
+            parent = (
+                await session.execute(
+                    select(
+                        jobs.c.state,
+                        jobs.c.result_type,
+                        jobs.c.result_id,
+                        jobs.c.result_sha256,
+                    ).where(
+                        jobs.c.workflow_run_id == workflow_id,
+                        jobs.c.job_type == "ADMIT_RESEARCH_PACKET",
+                    )
+                )
+            ).one()
+            assert parent.state == "FAILED"
+            assert (parent.result_type, parent.result_id, parent.result_sha256) == (
+                None,
+                None,
+                None,
+            )
+            assert (
+                await session.scalar(
+                    select(jobs.c.state).where(
+                        jobs.c.workflow_run_id == workflow_id,
+                        jobs.c.job_type == "QUALIFY_CANDIDATES",
+                    )
+                )
+                == "PENDING"
+            )
+            assert await session.scalar(select(func.count()).select_from(research_packets)) == 0
+            assert await session.scalar(select(func.count()).select_from(domain_events)) == 0
         await database.dispose()
 
     asyncio.run(scenario())

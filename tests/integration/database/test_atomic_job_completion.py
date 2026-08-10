@@ -19,6 +19,7 @@ from money_machine.domain.models.job import JobEnvelope
 from money_machine.domain.models.product_spec import DedupeResult, ProductFact, ProductSpec
 from money_machine.domain.models.workflow import WorkflowBlocker, WorkflowRun
 from money_machine.domain.value_objects import canonical_sha256
+from money_machine.orchestration.workflows.product_experiment import success_event_payload
 from money_machine.persistence.database import Database
 from money_machine.persistence.tables import (
     dedupe_results,
@@ -134,7 +135,7 @@ def test_job_completion_advances_workflow_state_and_canonical_payload_atomically
             source_evidence_ids=("EV-1",),
             spec_sha256="8" * 64,
         )
-        event_payload = {"product_spec_id": spec.product_spec_id}
+        event_payload = success_event_payload("product_specs", spec)
         event = DomainEvent(
             event_id=UUID("00000000-0000-0000-0000-000000000223"),
             workflow_run_id=workflow_id,
@@ -259,7 +260,7 @@ def test_job_completion_rejects_backward_workflow_event_time_atomically() -> Non
             source_evidence_ids=("EV-1",),
             spec_sha256="6" * 64,
         )
-        event_payload = {"product_spec_id": spec.product_spec_id}
+        event_payload = success_event_payload("product_specs", spec)
         event = DomainEvent(
             event_id=UUID("00000000-0000-0000-0000-000000000233"),
             workflow_run_id=workflow_id,
@@ -751,7 +752,7 @@ def test_job_completion_rolls_back_result_event_parent_and_successor() -> None:
             source_evidence_ids=("EV-1",),
             spec_sha256="c" * 64,
         )
-        event_payload = {"product_spec_id": spec.product_spec_id}
+        event_payload = success_event_payload("product_specs", spec)
         event = DomainEvent(
             event_id=UUID("00000000-0000-0000-0000-000000000204"),
             workflow_run_id=workflow_id,
@@ -899,7 +900,7 @@ def test_job_completion_rejects_invalid_or_expired_running_lease_atomically(
             source_evidence_ids=("EV-1",),
             spec_sha256="e" * 64,
         )
-        event_payload = {"product_spec_id": spec.product_spec_id}
+        event_payload = success_event_payload("product_specs", spec)
         event = DomainEvent(
             event_id=uuid5(NAMESPACE_URL, f"event-{suffix}"),
             workflow_run_id=workflow_id,
@@ -1004,7 +1005,7 @@ def test_job_completion_rejects_lease_that_expires_after_transaction_start() -> 
             source_evidence_ids=("EV-1",),
             spec_sha256="1" * 64,
         )
-        event_payload = {"product_spec_id": spec.product_spec_id}
+        event_payload = success_event_payload("product_specs", spec)
         event = DomainEvent(
             event_id=UUID("00000000-0000-0000-0000-000000000213"),
             workflow_run_id=workflow_id,

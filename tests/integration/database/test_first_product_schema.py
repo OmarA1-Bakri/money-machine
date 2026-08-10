@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,10 +9,11 @@ from typing import Any
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from money_machine.domain.value_objects import canonical_sha256
 from money_machine.persistence.tables import metadata as schema_metadata
 
 EXPECTED_TABLES = {
@@ -442,3 +444,165 @@ def test_migration_creates_exact_first_slice_schema_and_replays() -> None:
     assert asyncio.run(_schema_snapshot()).tables == {"alembic_version"}
     command.upgrade(config, "head")
     assert asyncio.run(_schema_snapshot()) == schema
+
+
+def test_migration_backfills_exact_binding_for_populated_completed_jobs() -> None:
+    config = _alembic_config()
+    command.downgrade(config, "base")
+    command.upgrade(config, "0001")
+
+    async def seed() -> None:
+        engine = create_async_engine(_database_url())
+        try:
+            async with engine.begin() as connection:
+                await connection.execute(
+                    text(
+                        """
+                        INSERT INTO workflow_runs (
+                            workflow_run_id, workflow_type, packet_id, state,
+                            idempotency_key, payload, payload_sha256, created_at, updated_at
+                        ) VALUES (
+                            CAST(:workflow_id AS uuid), 'FIRST_PRODUCT_VERTICAL_SLICE',
+                            :packet_id, 'RESEARCHED', :workflow_key,
+                            CAST(:workflow_payload AS jsonb), :hash, now(), now()
+                        )
+                        """
+                    ),
+                    {
+                        "workflow_id": "00000000-0000-0000-0000-000000000901",
+                        "packet_id": "RPK-legacy-binding",
+                        "workflow_key": "workflow:RPK-legacy-binding",
+                        "workflow_payload": json.dumps({"legacy": True}),
+                        "hash": "a" * 64,
+                    },
+                )
+                await connection.execute(
+                    text(
+                        """
+                        INSERT INTO research_packets (
+                            packet_id, payload, payload_sha256
+                        ) VALUES (
+                            :packet_id, CAST(:packet_payload AS jsonb), :result_hash
+                        )
+                        """
+                    ),
+                    {
+                        "packet_id": "RPK-legacy-binding",
+                        "packet_payload": json.dumps({"packet_id": "RPK-legacy-binding"}),
+                        "result_hash": "b" * 64,
+                    },
+                )
+                await connection.execute(
+                    text(
+                        """
+                        INSERT INTO jobs (
+                            job_id, workflow_run_id, job_type, state, idempotency_key,
+                            input_sha256, retry_class, max_attempts, attempt_count, payload
+                        ) VALUES (
+                            CAST(:job_id AS uuid), CAST(:workflow_id AS uuid),
+                            'ADMIT_RESEARCH_PACKET', 'SUCCEEDED', :job_key,
+                            :input_hash, 'NEVER', 1, 1, CAST(:job_payload AS jsonb)
+                        )
+                        """
+                    ),
+                    {
+                        "job_id": "00000000-0000-0000-0000-000000000902",
+                        "workflow_id": "00000000-0000-0000-0000-000000000901",
+                        "job_key": "job:legacy-binding",
+                        "input_hash": "c" * 64,
+                        "job_payload": json.dumps({"legacy": True}),
+                    },
+                )
+                await connection.execute(
+                    text(
+                        """
+                        INSERT INTO domain_events (
+                            event_id, workflow_run_id, job_id, name, occurred_at,
+                            payload, payload_sha256
+                        ) VALUES (
+                            CAST(:event_id AS uuid), CAST(:workflow_id AS uuid),
+                            CAST(:job_id AS uuid), 'research_packet_admitted', now(),
+                            CAST(:event_payload AS jsonb), :event_hash
+                        )
+                        """
+                    ),
+                    {
+                        "event_id": "00000000-0000-0000-0000-000000000903",
+                        "workflow_id": "00000000-0000-0000-0000-000000000901",
+                        "job_id": "00000000-0000-0000-0000-000000000902",
+                        "event_payload": json.dumps(
+                            {
+                                "event_id": "00000000-0000-0000-0000-000000000903",
+                                "workflow_run_id": "00000000-0000-0000-0000-000000000901",
+                                "job_id": "00000000-0000-0000-0000-000000000902",
+                                "name": "research_packet_admitted",
+                                "occurred_at": "2026-08-10T00:00:00Z",
+                                "payload": {"packet_id": "RPK-legacy-binding"},
+                                "payload_sha256": "d" * 64,
+                            }
+                        ),
+                        "event_hash": "d" * 64,
+                    },
+                )
+        finally:
+            await engine.dispose()
+
+    async def read_binding() -> tuple[str | None, str | None, str | None]:
+        engine = create_async_engine(_database_url())
+        try:
+            async with engine.connect() as connection:
+                row = (
+                    await connection.execute(
+                        text(
+                            """
+                            SELECT result_type, result_id, result_sha256
+                            FROM jobs
+                            WHERE job_id = CAST(:job_id AS uuid)
+                            """
+                        ),
+                        {"job_id": "00000000-0000-0000-0000-000000000902"},
+                    )
+                ).one()
+                return row.result_type, row.result_id, row.result_sha256
+        finally:
+            await engine.dispose()
+
+    async def read_event() -> tuple[dict[str, Any], str]:
+        engine = create_async_engine(_database_url())
+        try:
+            async with engine.connect() as connection:
+                row = (
+                    await connection.execute(
+                        text(
+                            """
+                            SELECT payload, payload_sha256
+                            FROM domain_events
+                            WHERE event_id = CAST(:event_id AS uuid)
+                            """
+                        ),
+                        {"event_id": "00000000-0000-0000-0000-000000000903"},
+                    )
+                ).one()
+                return dict(row.payload), row.payload_sha256
+        finally:
+            await engine.dispose()
+
+    asyncio.run(seed())
+    command.upgrade(config, "head")
+    assert asyncio.run(read_binding()) == (
+        "research_packets",
+        "RPK-legacy-binding",
+        "b" * 64,
+    )
+    event_payload = {
+        "packet_id": "RPK-legacy-binding",
+        "result_type": "research_packets",
+        "result_id": "RPK-legacy-binding",
+        "result_sha256": "b" * 64,
+    }
+    event_hash = canonical_sha256(event_payload)
+    event_envelope, normalized_event_hash = asyncio.run(read_event())
+    assert event_envelope["payload"] == event_payload
+    assert event_envelope["payload_sha256"] == event_hash
+    assert normalized_event_hash == event_hash
+    command.downgrade(config, "base")

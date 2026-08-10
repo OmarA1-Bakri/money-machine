@@ -37,6 +37,7 @@ from money_machine.orchestration.worker import (
 from money_machine.orchestration.workflows.product_experiment import (
     FIRST_PRODUCT_JOB_SEQUENCE,
     FIRST_PRODUCT_STEP_OUTPUTS,
+    success_event_payload,
 )
 from money_machine.persistence.database import Database
 from money_machine.persistence.repositories.listings import ListingRepository
@@ -367,7 +368,7 @@ class FirstProductHandlers:
 
     def _success(self, job: JobEnvelope, result: FrozenModel) -> HandlerOutcome:
         contract = FIRST_PRODUCT_STEP_OUTPUTS[job.job_type]
-        payload = _result_event_payload(contract.result_type, result)
+        payload = success_event_payload(contract.result_type, result)
         return HandlerOutcome(
             result_type=contract.result_type,
             result=result,
@@ -460,22 +461,12 @@ def _result_identity(result: FrozenModel) -> str:
     return value
 
 
-def _result_event_payload(result_type: str, result: FrozenModel) -> dict[str, str]:
-    identity = _result_identity(result)
-    return {
-        _identity_field(result): identity,
-        "result_type": result_type,
-        "result_id": identity,
-        "result_sha256": canonical_sha256(result),
-    }
-
-
 def _validate_result_event_payload(
     result_type: str,
     result: FrozenModel,
     payload: Mapping[str, object],
 ) -> None:
-    if payload != _result_event_payload(result_type, result):
+    if payload != success_event_payload(result_type, result):
         raise ValueError("durable event result identity mismatch")
 
 

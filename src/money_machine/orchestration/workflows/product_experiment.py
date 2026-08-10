@@ -10,7 +10,7 @@ from money_machine.domain.models.listing import ListingPackage, PreflightResult
 from money_machine.domain.models.product import BuildResult, ProductQAResult
 from money_machine.domain.models.product_spec import DedupeResult, ProductSpec
 from money_machine.domain.models.research import ResearchPacket
-from money_machine.domain.value_objects import FrozenModel
+from money_machine.domain.value_objects import FrozenModel, canonical_sha256
 
 FIRST_PRODUCT_JOB_SEQUENCE: Final[tuple[str, ...]] = (
     "ADMIT_RESEARCH_PACKET",
@@ -88,6 +88,33 @@ FIRST_PRODUCT_STEP_OUTPUTS: Final = MappingProxyType(
         ),
     }
 )
+
+
+def success_event_payload(result_type: str, result: FrozenModel) -> dict[str, str]:
+    """Return the exact independently persisted identity contract for a successful step."""
+
+    identity_fields: dict[type[FrozenModel], str] = {
+        ResearchPacket: "packet_id",
+        CandidateShortlist: "shortlist_id",
+        ProductSpec: "product_spec_id",
+        DedupeResult: "dedupe_result_id",
+        BuildResult: "build_id",
+        ProductQAResult: "qa_result_id",
+        ListingPackage: "listing_package_id",
+        PreflightResult: "preflight_result_id",
+    }
+    identity_field = identity_fields.get(type(result))
+    if identity_field is None:
+        raise TypeError("unsupported first-product result model")
+    identity = getattr(result, identity_field)
+    if not isinstance(identity, str) or not identity:
+        raise ValueError("first-product result identity is invalid")
+    return {
+        identity_field: identity,
+        "result_type": result_type,
+        "result_id": identity,
+        "result_sha256": canonical_sha256(result),
+    }
 
 
 def validate_step_output(

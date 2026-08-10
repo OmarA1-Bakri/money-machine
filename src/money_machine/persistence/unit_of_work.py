@@ -30,6 +30,7 @@ from money_machine.domain.workflow_progress import (
     terminal_product_state,
     validate_terminal_result,
 )
+from money_machine.orchestration.workflows.product_experiment import success_event_payload
 from money_machine.persistence.database import Database
 from money_machine.persistence.repositories.artifacts import ArtifactRepository
 from money_machine.persistence.repositories.events import EventRepository
@@ -117,6 +118,10 @@ class UnitOfWork:
         session = self._require_session()
         result_identity = str(self._result_identity(result_type, result_payload))
         result_sha256 = canonical_sha256(result_payload)
+        expected_event_payload = success_event_payload(result_type, result_payload)
+        expected_event_hash = canonical_sha256(expected_event_payload)
+        if event.payload != expected_event_payload or event.payload_sha256 != expected_event_hash:
+            raise ValueError("job success event result binding mismatch")
         completion = cast(
             CursorResult[Any],
             await session.execute(

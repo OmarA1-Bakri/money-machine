@@ -19,6 +19,7 @@ from money_machine.orchestration.leases import LeaseManager
 from money_machine.orchestration.retry import retry_delay
 from money_machine.orchestration.transition_guard import TransitionGuard
 from money_machine.orchestration.worker import HandlerOutcome, Worker
+from money_machine.orchestration.workflows.product_experiment import success_event_payload
 from money_machine.persistence.database import Database
 from money_machine.persistence.tables import domain_events, job_attempts, jobs, research_packets
 from money_machine.persistence.unit_of_work import UnitOfWork
@@ -151,7 +152,7 @@ def test_slow_handler_cannot_terminalize_a_db_clock_expired_lease() -> None:
 
         async def slow_handler(job: JobEnvelope) -> HandlerOutcome:
             await asyncio.sleep(0.4)
-            payload = {"packet_id": packet.packet_id}
+            payload = success_event_payload("research_packets", packet)
             return HandlerOutcome(
                 result_type="research_packets",
                 result=packet,
