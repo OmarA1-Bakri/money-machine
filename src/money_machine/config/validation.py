@@ -72,6 +72,7 @@ class ListingRules(StrictConfigModel):
     tag_count: Literal[13]
     image_count: Literal[10]
     video_count: Literal[1]
+    video_mode: Literal["REQUIRED_GENERATED"]
 
 
 class SafetyRules(StrictConfigModel):

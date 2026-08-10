@@ -30,6 +30,7 @@ def test_product_rules_freeze_all_slice_counts_and_safety_flags() -> None:
     assert rules.listing.tag_count == 13
     assert rules.listing.image_count == 10
     assert rules.listing.video_count == 1
+    assert rules.listing.video_mode == "REQUIRED_GENERATED"
     assert rules.safety.external_mutations_enabled is False
     assert rules.safety.spend_enabled is False
 

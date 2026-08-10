@@ -26,6 +26,7 @@ from money_machine.application.services.listing_service import (
 )
 from money_machine.assets.pdf import pdf_page_count
 from money_machine.assets.renderer import png_dimensions
+from money_machine.assets.video import render_preview_video, validate_preview_video
 from money_machine.domain.models.asset import ArtifactReference
 from money_machine.domain.models.listing import ListingPackage, PreflightResult
 from money_machine.domain.models.product import BuildResult, ProductQAResult
@@ -175,8 +176,8 @@ class PreflightService:
             findings.append("DELIVERY_PDF_MISSING")
         if package.package_manifest is None:
             findings.append("LINEAGE_MANIFEST_MISSING")
-        if package.preview_video_status != "NOT_GENERATED" or package.preview_video is not None:
-            findings.append("VIDEO_GENERATION_UNCOMMISSIONED")
+        if package.preview_video_status != "GENERATED" or package.preview_video is None:
+            findings.append("VIDEO_REQUIRED")
         if listing_package_sha256(package) != package.package_sha256:
             findings.append("PACKAGE_HASH_MISMATCH")
         return findings
@@ -271,11 +272,27 @@ class PreflightService:
                     findings.append("DELIVERY_PDF_INVALID")
         return findings
 
-    def _video_findings(self, package: ListingPackage) -> list[str]:
+    def _video_findings(
+        self,
+        package: ListingPackage,
+        spec: ProductSpec,
+        build: BuildResult,
+    ) -> list[str]:
         findings: list[str] = []
-        if package.preview_video is not None:
-            self._read_artifact(package.preview_video, findings)
-            findings.append("VIDEO_GENERATION_UNCOMMISSIONED")
+        video = package.preview_video
+        if video is None:
+            return findings
+        expected_path = Path("listing") / package.listing_package_id / "video" / "preview.mp4"
+        if video.relative_path != expected_path:
+            findings.append("VIDEO_ROLE_MISMATCH")
+        if video.media_type != "video/mp4":
+            findings.append("VIDEO_MEDIA_TYPE_INVALID")
+        data = self._read_artifact(video, findings)
+        if data is not None:
+            try:
+                validate_preview_video(data, package, spec, build)
+            except ValueError:
+                findings.append("VIDEO_RENDER_MISMATCH")
         return findings
 
     def _read_manifest(self, package: ListingPackage) -> tuple[object | None, list[str]]:
@@ -325,6 +342,15 @@ class PreflightService:
                 "byte_count": len(pdf_data),
             }
         )
+        video_data = render_preview_video(package, spec, build)
+        artifacts.append(
+            {
+                "path": (package_root / "video" / "preview.mp4").as_posix(),
+                "media_type": "video/mp4",
+                "sha256": hashlib.sha256(video_data).hexdigest(),
+                "byte_count": len(video_data),
+            }
+        )
         return {
             "schema_version": 1,
             "listing_package_id": package.listing_package_id,
@@ -355,7 +381,7 @@ class PreflightService:
                 for record in claims
             ],
             "artifacts": artifacts,
-            "preview_video_status": "NOT_GENERATED",
+            "preview_video_status": "GENERATED",
             "external_mutations": [],
             "incremental_spend": "0.00",
         }
@@ -429,7 +455,7 @@ class PreflightService:
         findings.extend(self._copy_findings(package, qa, spec, build))
         findings.extend(self._image_findings(package, spec))
         findings.extend(self._pdf_findings(package, spec, build))
-        findings.extend(self._video_findings(package))
+        findings.extend(self._video_findings(package, spec, build))
         findings.extend(self._manifest_findings(package, spec, build))
         return self._result(package, findings, now, external_effect_mode)
 

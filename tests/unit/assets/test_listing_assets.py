@@ -10,6 +10,7 @@ from money_machine.application.services.listing_service import ListingService
 from money_machine.assets.design_tokens import DEFAULT_TOKENS, contrast_ratio
 from money_machine.assets.pdf import pdf_page_count
 from money_machine.assets.renderer import png_dimensions
+from money_machine.assets.video import validate_preview_video
 from money_machine.domain.models.asset import ArtifactReference
 from money_machine.domain.models.product import BuildResult, ProductQAResult
 from money_machine.domain.models.product_spec import ProductFact, ProductSpec
@@ -115,8 +116,12 @@ def test_listing_asset_render_is_complete_local_and_deterministic(tmp_path: Path
     assert all(hub.encode() in pdf_data for hub in spec().hubs)
     assert all(colour.encode() in pdf_data for colour in spec().colour_variants)
     assert build().artifacts[0].relative_path.as_posix().encode() in pdf_data
-    assert first.preview_video is None
-    assert first.preview_video_status == "NOT_GENERATED"
+    assert first.preview_video is not None
+    assert first.preview_video_status == "GENERATED"
+    video_path = tmp_path / "one" / first.preview_video.relative_path
+    assert video_path.is_file()
+    assert first.preview_video.media_type == "video/mp4"
+    validate_preview_video(video_path.read_bytes(), first, spec(), build())
     assert first.package_manifest is not None
     assert not any(
         "http://" in path.read_text(errors="ignore") for path in (tmp_path / "one").rglob("*.*")
@@ -131,7 +136,8 @@ def test_listing_asset_render_is_complete_local_and_deterministic(tmp_path: Path
     assert set(first.feature_statements).issubset(recorded_claims)
     assert spec().target_buyer in recorded_claims
     assert spec().promised_outcome in recorded_claims
-    assert manifest["preview_video_status"] == "NOT_GENERATED"
+    assert manifest["preview_video_status"] == "GENERATED"
+    assert manifest["artifacts"][-1]["path"] == first.preview_video.relative_path.as_posix()
 
 
 def test_asset_paths_reject_traversal_and_symlink_without_escape(tmp_path: Path) -> None:

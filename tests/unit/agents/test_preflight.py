@@ -102,15 +102,28 @@ def rendered(tmp_path: Path):
 
 
 def test_complete_local_package_passes_with_zero_effects(tmp_path: Path) -> None:
-    result = PreflightService(tmp_path).evaluate(
-        rendered(tmp_path), qa(), spec=spec(), build=build(), now=NOW
-    )
+    package = rendered(tmp_path)
+    result = PreflightService(tmp_path).evaluate(package, qa(), spec=spec(), build=build(), now=NOW)
 
+    assert package.preview_video_status == "GENERATED"
+    assert package.preview_video is not None
+    assert package.preview_video.media_type == "video/mp4"
+    assert (tmp_path / package.preview_video.relative_path).is_file()
     assert result.passed is True
     assert result.findings == ()
     assert result.external_effect_mode == "simulation"
     assert str(result.incremental_spend) == "0.00"
     assert result.publication_receipt_present is False
+
+
+def test_preview_video_renderer_is_identity_bound_and_byte_stable() -> None:
+    from money_machine.assets.video import render_preview_video
+
+    package = ListingService().create(spec(), build(), qa())
+    first = render_preview_video(package, spec(), build())
+    assert first == render_preview_video(package, spec(), build())
+    changed = package.model_copy(update={"listing_package_id": "listing-other"})
+    assert render_preview_video(changed, spec(), build()) != first
 
 
 def test_preflight_reopens_and_rehashes_artifacts(tmp_path: Path) -> None:
@@ -343,13 +356,13 @@ def _with_generated_video(
     media_type: str,
 ) -> ListingPackage:
     assert package.package_manifest is not None
-    suffix = "mp4" if media_type == "video/mp4" else "webm"
-    relative = Path(f"listing/video/preview.{suffix}")
+    assert package.preview_video is not None
+    relative = package.preview_video.relative_path
     path = root / relative
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
     video = ArtifactReference(
-        artifact_id=f"video-{suffix}",
+        artifact_id=f"video-{hashlib.sha256(data).hexdigest()[:24]}",
         relative_path=relative,
         media_type=media_type,
         byte_count=len(data),
@@ -357,14 +370,12 @@ def _with_generated_video(
     )
     manifest_path = root / package.package_manifest.relative_path
     payload = json.loads(manifest_path.read_text())
-    payload["artifacts"].append(
-        {
-            "path": relative.as_posix(),
-            "media_type": media_type,
-            "sha256": video.content_sha256,
-            "byte_count": len(data),
-        }
-    )
+    payload["artifacts"][-1] = {
+        "path": relative.as_posix(),
+        "media_type": media_type,
+        "sha256": video.content_sha256,
+        "byte_count": len(data),
+    }
     payload["preview_video_status"] = "GENERATED"
     manifest_data = json.dumps(
         payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True
@@ -406,7 +417,7 @@ def test_generated_video_rejects_random_and_truncated_containers(
     result = PreflightService(tmp_path).evaluate(package, qa(), spec=spec(), build=build(), now=NOW)
 
     assert result.passed is False
-    assert "VIDEO_GENERATION_UNCOMMISSIONED" in result.findings
+    assert "VIDEO_RENDER_MISMATCH" in result.findings
 
 
 @pytest.mark.parametrize(
@@ -423,7 +434,7 @@ def test_generated_video_rejects_container_shells_without_video_tracks(
     result = PreflightService(tmp_path).evaluate(package, qa(), spec=spec(), build=build(), now=NOW)
 
     assert result.passed is False
-    assert "VIDEO_GENERATION_UNCOMMISSIONED" in result.findings
+    assert "VIDEO_RENDER_MISMATCH" in result.findings
 
 
 @pytest.mark.parametrize(
@@ -440,14 +451,14 @@ def test_generated_video_rejects_declared_stream_shells(
     result = PreflightService(tmp_path).evaluate(package, qa(), spec=spec(), build=build(), now=NOW)
 
     assert result.passed is False
-    assert "VIDEO_GENERATION_UNCOMMISSIONED" in result.findings
+    assert "VIDEO_RENDER_MISMATCH" in result.findings
 
 
 @pytest.mark.parametrize(
     ("data", "media_type"),
     ((_REAL_MP4, "video/mp4"), (_REAL_WEBM, "video/webm")),
 )
-def test_generated_video_rejects_real_video_streams_without_commissioned_decoder(
+def test_generated_video_rejects_foreign_real_video_streams(
     tmp_path: Path,
     data: bytes,
     media_type: str,
@@ -457,7 +468,7 @@ def test_generated_video_rejects_real_video_streams_without_commissioned_decoder
     result = PreflightService(tmp_path).evaluate(package, qa(), spec=spec(), build=build(), now=NOW)
 
     assert result.passed is False
-    assert "VIDEO_GENERATION_UNCOMMISSIONED" in result.findings
+    assert "VIDEO_RENDER_MISMATCH" in result.findings
 
 
 def test_preflight_rejects_symlink_artifact_root(tmp_path: Path) -> None:

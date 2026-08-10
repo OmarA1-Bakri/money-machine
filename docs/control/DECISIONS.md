@@ -47,3 +47,18 @@ The current PRD/test specification permits Session 00 to complete locally when i
 ## D-0008 — Explicit operator authorization for a public remote
 
 After Session 00 closed, the operator explicitly instructed that the GitHub repository be created and kept public. That instruction supersedes D-0001/D-0007's earlier private-remote assumption for `OmarA1-Bakri/money-machine` only. The repository therefore uses public visibility and default branch `build/full-automation`; this does not authorize publishing products, customer/provider data, credentials, runtime evidence, the source PDF, or any live commercial effect. Strict-deny tracking rules remain unchanged.
+
+## D-0009 — A generated preview video is required for the first product milestone
+
+The original first-product design and implementation plan allowed either one short preview video
+or an explicit `NOT_GENERATED` receipt while no deterministic renderer existed. The continuation
+directive dated 2026-08-10 is a narrower, later engineering contract for
+`FIRST_PRODUCT_VERTICAL_SLICE_COMPLETE` and requires one valid video stream in both the fixture
+product and canary package.
+
+For this milestone, `NOT_GENERATED` therefore remains a truthful non-ready status but cannot pass
+preflight or produce `DRAFT_READY`. Configuration freezes `REQUIRED_GENERATED`, the local renderer
+emits one replay-stable H.264 MP4 bound to the exact ProductSpec, build, and listing identities, and
+preflight reopens and validates its exact bytes and lineage. This decision changes only the video
+fallback; the approved truth-only copy, ten-image, PDF-lineage, local-draft, zero-mutation, and
+zero-spend contracts remain unchanged.

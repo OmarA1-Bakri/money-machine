@@ -16,6 +16,7 @@ listing:
   tag_count: 13
   image_count: 10
   video_count: 1
+  video_mode: REQUIRED_GENERATED
 safety:
   external_mutations_enabled: false
   spend_enabled: false

@@ -513,7 +513,7 @@ def test_coherently_resigned_foreign_image_still_fails_preflight(tmp_path: Path)
             for finding in ("IMAGE_RENDER_MISMATCH", "IMAGE_DIGEST_DUPLICATE")
         )
         assert "draft_ready" not in names
-        assert (await _counts(database))["artifacts"] == 24
+        assert (await _counts(database))["artifacts"] == 25
         await database.dispose()
 
     asyncio.run(scenario())

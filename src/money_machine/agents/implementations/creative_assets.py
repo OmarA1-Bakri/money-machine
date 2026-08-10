@@ -21,7 +21,7 @@ from money_machine.application.services.listing_service import (
 )
 from money_machine.assets.pdf import render_delivery_pdf
 from money_machine.assets.renderer import render_listing_png
-from money_machine.assets.video import video_status
+from money_machine.assets.video import render_preview_video, video_status
 from money_machine.domain.models.asset import ArtifactReference
 from money_machine.domain.models.listing import ListingPackage
 from money_machine.domain.models.product import BuildResult
@@ -227,7 +227,7 @@ def render_expected_delivery_pdf(
 
 
 class CreativeAssetService:
-    """Render ten Pillow PNGs, one fpdf2 PDF, and complete local lineage."""
+    """Render ten PNGs, one PDF, one MP4, and complete local lineage."""
 
     def render(
         self,
@@ -263,6 +263,11 @@ class CreativeAssetService:
             pdf_data = render_expected_delivery_pdf(package, spec, build)
             writer.write(pdf_relative, pdf_data)
             delivery = _reference(pdf_relative, pdf_data, "application/pdf")
+
+            video_relative = package_root / "video" / "preview.mp4"
+            video_data = render_preview_video(package, spec, build)
+            writer.write(video_relative, video_data)
+            video = _reference(video_relative, video_data, "video/mp4")
 
             manifest_relative = package_root / "manifest.json"
             manifest_payload = {
@@ -301,7 +306,7 @@ class CreativeAssetService:
                         "sha256": item.content_sha256,
                         "byte_count": item.byte_count,
                     }
-                    for item in (*images, delivery)
+                    for item in (*images, delivery, video)
                 ],
                 "preview_video_status": video_status(),
                 "external_mutations": [],
@@ -318,7 +323,7 @@ class CreativeAssetService:
                     "listing_images": tuple(images),
                     "delivery_document": delivery,
                     "package_manifest": manifest,
-                    "preview_video": None,
+                    "preview_video": video,
                     "preview_video_status": video_status(),
                     "package_sha256": "0" * 64,
                 }

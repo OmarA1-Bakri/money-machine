@@ -143,7 +143,9 @@ def test_fixture_packet_reaches_durable_draft_ready(tmp_path: Path) -> None:
             assert len({image.content_sha256 for image in listing.listing_images}) == 10
             assert listing.delivery_document is not None
             assert listing.package_manifest is not None
-            assert listing.preview_video_status in {"GENERATED", "NOT_GENERATED"}
+            assert listing.preview_video_status == "GENERATED"
+            assert listing.preview_video is not None
+            assert listing.preview_video.media_type == "video/mp4"
             assert preflight.passed
             assert preflight.external_effect_mode == "simulation"
             assert preflight.incremental_spend == Decimal("0.00")
