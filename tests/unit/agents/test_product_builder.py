@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from money_machine.domain.models.product_spec import ProductSpec
+from money_machine.domain.models.product_spec import ProductFact, ProductSpec
 from money_machine.integrations.notion.fixture_adapter import LocalNotionAdapter
 
 
@@ -15,12 +15,48 @@ def _spec() -> ProductSpec:
         candidate_id="candidate-001",
         identity_niche="Budget Moms",
         base_category="Planner",
-        target_buyer="busy budget-conscious mothers",
-        promised_outcome="plan the household week with confidence",
+        target_buyer="People managing Budget Moms",
+        promised_outcome="A structured Planner workspace",
         hubs=("Home", "Tasks", "Events", "Habits", "Finance", "Meals", "Quick Notes"),
         colour_variants=("Sage Calm", "Ocean Focus", "Warm Sand"),
         features=("weekly priorities", "monthly calendar", "quick notes"),
-        product_facts=("seven hubs", "three colour themes", "local-first bundle"),
+        product_facts=(
+            ProductFact(
+                claim="Configured with 7 hubs",
+                category="HUB_INVENTORY",
+                evidence_ids=("evidence-001",),
+            ),
+            ProductFact(
+                claim="Configured with 3 colour variants",
+                category="COLOUR_VARIANTS",
+                evidence_ids=("evidence-002",),
+            ),
+            ProductFact(
+                claim="Includes weekly priorities",
+                category="FEATURE",
+                evidence_ids=("evidence-001",),
+            ),
+            ProductFact(
+                claim="Includes monthly calendar",
+                category="FEATURE",
+                evidence_ids=("evidence-001",),
+            ),
+            ProductFact(
+                claim="Includes quick notes",
+                category="FEATURE",
+                evidence_ids=("evidence-001",),
+            ),
+            ProductFact(
+                claim="People managing Budget Moms",
+                category="BUYER_FIT",
+                evidence_ids=("evidence-001", "evidence-002"),
+            ),
+            ProductFact(
+                claim="A structured Planner workspace",
+                category="WORKFLOW_OUTCOME",
+                evidence_ids=("evidence-001", "evidence-002"),
+            ),
+        ),
         source_evidence_ids=("evidence-001", "evidence-002"),
         spec_sha256="1" * 64,
     )
@@ -67,8 +103,8 @@ def test_builder_creates_complete_manifest_backed_bundle(tmp_path: Path) -> None
     assert 'data-build-progress="6/6"' in home
     expected_hubs = ("tasks", "events", "habits", "finance", "meals", "quick-notes")
     assert all(f'href="hubs/{slug}.html"' in home for slug in expected_hubs)
-    assert "busy budget-conscious mothers" in home
-    assert "plan the household week with confidence" in home
+    assert "People managing Budget Moms" in home
+    assert "A structured Planner workspace" in home
 
     for path in root.rglob("*"):
         if path.is_file():

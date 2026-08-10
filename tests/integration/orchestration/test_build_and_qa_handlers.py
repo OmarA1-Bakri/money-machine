@@ -13,7 +13,7 @@ from alembic.config import Config
 from sqlalchemy import select
 
 from money_machine.application.services.product_service import ProductService
-from money_machine.domain.models.product_spec import DedupeResult, ProductSpec
+from money_machine.domain.models.product_spec import DedupeResult, ProductFact, ProductSpec
 from money_machine.integrations.notion.fixture_adapter import LocalNotionAdapter
 from money_machine.persistence.database import Database
 from money_machine.persistence.tables import product_qa_results
@@ -36,12 +36,48 @@ def _spec() -> ProductSpec:
         candidate_id="candidate-handler",
         identity_niche="Freelance Designers",
         base_category="Client Portal",
-        target_buyer="independent designers",
-        promised_outcome="keep client delivery clear and calm",
+        target_buyer="People managing Freelance Designers",
+        promised_outcome="A structured Client Portal workspace",
         hubs=("Home", "Clients", "Projects", "Content", "Invoices", "Tasks", "Notes"),
         colour_variants=("Ink", "Clay", "Moss", "Sky"),
         features=("project stages", "invoice tracking", "client notes"),
-        product_facts=("seven hubs", "four local themes"),
+        product_facts=(
+            ProductFact(
+                claim="Configured with 7 hubs",
+                category="HUB_INVENTORY",
+                evidence_ids=("evidence-handler",),
+            ),
+            ProductFact(
+                claim="Includes project stages",
+                category="FEATURE",
+                evidence_ids=("evidence-handler",),
+            ),
+            ProductFact(
+                claim="Includes invoice tracking",
+                category="FEATURE",
+                evidence_ids=("evidence-handler",),
+            ),
+            ProductFact(
+                claim="Includes client notes",
+                category="FEATURE",
+                evidence_ids=("evidence-handler",),
+            ),
+            ProductFact(
+                claim="Configured with 4 colour variants",
+                category="COLOUR_VARIANTS",
+                evidence_ids=("evidence-handler",),
+            ),
+            ProductFact(
+                claim="People managing Freelance Designers",
+                category="BUYER_FIT",
+                evidence_ids=("evidence-handler",),
+            ),
+            ProductFact(
+                claim="A structured Client Portal workspace",
+                category="WORKFLOW_OUTCOME",
+                evidence_ids=("evidence-handler",),
+            ),
+        ),
         source_evidence_ids=("evidence-handler",),
         spec_sha256="3" * 64,
     )

@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from money_machine.domain.enums import JobState, ProductState, RetryClass
 from money_machine.domain.events import DomainEvent, DomainEventName
 from money_machine.domain.models.job import JobEnvelope
-from money_machine.domain.models.product_spec import ProductSpec
+from money_machine.domain.models.product_spec import ProductFact, ProductSpec
 from money_machine.domain.models.workflow import WorkflowRun
 from money_machine.domain.value_objects import canonical_sha256
 from money_machine.persistence.database import Database
@@ -24,6 +24,36 @@ from money_machine.persistence.unit_of_work import UnitOfWork
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 NOW = datetime(2026, 8, 9, tzinfo=UTC)
+
+
+def _product_facts() -> tuple[ProductFact, ...]:
+    return (
+        ProductFact(
+            claim="Configured with 6 hubs",
+            category="HUB_INVENTORY",
+            evidence_ids=("EV-1",),
+        ),
+        ProductFact(
+            claim="Includes weekly review",
+            category="FEATURE",
+            evidence_ids=("EV-1",),
+        ),
+        ProductFact(
+            claim="Configured with 3 colour variants",
+            category="COLOUR_VARIANTS",
+            evidence_ids=("EV-1",),
+        ),
+        ProductFact(
+            claim="People managing students",
+            category="BUYER_FIT",
+            evidence_ids=("EV-1",),
+        ),
+        ProductFact(
+            claim="A structured planner workspace",
+            category="WORKFLOW_OUTCOME",
+            evidence_ids=("EV-1",),
+        ),
+    )
 
 
 def test_job_completion_rolls_back_result_event_parent_and_successor() -> None:
@@ -98,12 +128,12 @@ def test_job_completion_rolls_back_result_event_parent_and_successor() -> None:
             candidate_id="candidate-atomic",
             identity_niche="students",
             base_category="planner",
-            target_buyer="students",
-            promised_outcome="organise coursework",
+            target_buyer="People managing students",
+            promised_outcome="A structured planner workspace",
             hubs=("home", "courses", "tasks", "calendar", "notes", "review"),
             colour_variants=("ink", "sage", "sand"),
             features=("weekly review",),
-            product_facts=("contains six hubs",),
+            product_facts=_product_facts(),
             source_evidence_ids=("EV-1",),
             spec_sha256="c" * 64,
         )
@@ -237,12 +267,12 @@ def test_job_completion_rejects_invalid_or_expired_running_lease_atomically(
             candidate_id=f"candidate-{suffix}",
             identity_niche="students",
             base_category="planner",
-            target_buyer="students",
-            promised_outcome="organise coursework",
+            target_buyer="People managing students",
+            promised_outcome="A structured planner workspace",
             hubs=("home", "courses", "tasks", "calendar", "notes", "review"),
             colour_variants=("ink", "sage", "sand"),
             features=("weekly review",),
-            product_facts=("contains six hubs",),
+            product_facts=_product_facts(),
             source_evidence_ids=("EV-1",),
             spec_sha256="e" * 64,
         )
@@ -342,12 +372,12 @@ def test_job_completion_rejects_lease_that_expires_after_transaction_start() -> 
             candidate_id="candidate-transaction-expiry",
             identity_niche="students",
             base_category="planner",
-            target_buyer="students",
-            promised_outcome="organise coursework",
+            target_buyer="People managing students",
+            promised_outcome="A structured planner workspace",
             hubs=("home", "courses", "tasks", "calendar", "notes", "review"),
             colour_variants=("ink", "sage", "sand"),
             features=("weekly review",),
-            product_facts=("contains six hubs",),
+            product_facts=_product_facts(),
             source_evidence_ids=("EV-1",),
             spec_sha256="1" * 64,
         )

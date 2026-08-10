@@ -64,7 +64,7 @@ class LocalNotionAdapter:
                         "promised_outcome": spec.promised_outcome,
                         "default_theme": default_theme,
                         "hubs": hub_pairs,
-                        "product_facts": tuple(sorted(spec.product_facts)),
+                        "product_facts": tuple(sorted(fact.claim for fact in spec.product_facts)),
                     },
                 ),
                 "text/html",

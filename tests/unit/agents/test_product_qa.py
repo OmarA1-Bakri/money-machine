@@ -14,7 +14,7 @@ import money_machine.application.services.product_service as product_service_mod
 from money_machine.application.services.product_service import ProductQAService
 from money_machine.domain.models.asset import ArtifactReference
 from money_machine.domain.models.product import BuildResult
-from money_machine.domain.models.product_spec import ProductSpec
+from money_machine.domain.models.product_spec import ProductFact, ProductSpec
 from money_machine.domain.value_objects import canonical_json
 from money_machine.integrations.notion.fixture_adapter import LocalNotionAdapter
 from money_machine.integrations.notion.interface import deterministic_build_id
@@ -28,12 +28,48 @@ def _spec() -> ProductSpec:
         candidate_id="candidate-qa",
         identity_niche="Budget Moms",
         base_category="Planner",
-        target_buyer="busy budget-conscious mothers",
-        promised_outcome="plan the household week with confidence",
+        target_buyer="People managing Budget Moms",
+        promised_outcome="A structured Planner workspace",
         hubs=("Home", "Tasks", "Events", "Habits", "Finance", "Meals", "Quick Notes"),
         colour_variants=("Sage Calm", "Ocean Focus", "Warm Sand"),
         features=("weekly priorities", "monthly calendar", "quick notes"),
-        product_facts=("seven hubs", "three colour themes", "local-first bundle"),
+        product_facts=(
+            ProductFact(
+                claim="Configured with 7 hubs",
+                category="HUB_INVENTORY",
+                evidence_ids=("evidence-qa",),
+            ),
+            ProductFact(
+                claim="Configured with 3 colour variants",
+                category="COLOUR_VARIANTS",
+                evidence_ids=("evidence-qa",),
+            ),
+            ProductFact(
+                claim="Includes weekly priorities",
+                category="FEATURE",
+                evidence_ids=("evidence-qa",),
+            ),
+            ProductFact(
+                claim="Includes monthly calendar",
+                category="FEATURE",
+                evidence_ids=("evidence-qa",),
+            ),
+            ProductFact(
+                claim="Includes quick notes",
+                category="FEATURE",
+                evidence_ids=("evidence-qa",),
+            ),
+            ProductFact(
+                claim="People managing Budget Moms",
+                category="BUYER_FIT",
+                evidence_ids=("evidence-qa",),
+            ),
+            ProductFact(
+                claim="A structured Planner workspace",
+                category="WORKFLOW_OUTCOME",
+                evidence_ids=("evidence-qa",),
+            ),
+        ),
         source_evidence_ids=("evidence-qa",),
         spec_sha256="2" * 64,
     )
@@ -208,7 +244,7 @@ def test_product_qa_passes_a_complete_bundle_deterministically(tmp_path: Path) -
         ("broken_link", "BROKEN_INTERNAL_LINK:home.html->hubs/missing.html"),
         ("duplicate_slug", "DUPLICATE_HUB_SLUG:tasks"),
         ("placeholder", "PLACEHOLDER_TEXT:home.html"),
-        ("absent_fact", "FACT_MISSING:local-first bundle"),
+        ("absent_fact", "FACT_MISSING:Includes weekly priorities"),
         ("variant_drift", "VARIANT_DRIFT:assets/warm-sand.css"),
         ("modified_artifact", "ARTIFACT_HASH_MISMATCH:README.md"),
         ("absolute_path", "ABSOLUTE_ARTIFACT_PATH:/tmp/escape.txt"),
@@ -227,14 +263,22 @@ def test_product_qa_reports_exact_corruption_codes(
         _append(root / "home.html", '<a href="hubs/missing.html">missing</a>')
     elif corruption == "duplicate_slug":
         product = json.loads((root / "product.json").read_text(encoding="utf-8"))
-        product["hubs"] = ["Home", "Tasks", "TASKS", "Habits", "Finance", "Meals"]
+        product["hubs"] = [
+            "Home",
+            "Tasks",
+            "TASKS",
+            "Habits",
+            "Finance",
+            "Meals",
+            "Quick Notes",
+        ]
         (root / "product.json").write_text(json.dumps(product), encoding="utf-8")
     elif corruption == "placeholder":
         _append(root / "home.html", "{{ unfinished }}")
     elif corruption == "absent_fact":
         home = (root / "home.html").read_text(encoding="utf-8")
         (root / "home.html").write_text(
-            home.replace("local-first bundle", "offline package"), encoding="utf-8"
+            home.replace("Includes weekly priorities", "offline package"), encoding="utf-8"
         )
     elif corruption == "variant_drift":
         _append(root / "assets/warm-sand.css", "\n.unexpected { display: none; }\n")
@@ -766,9 +810,9 @@ def test_r5_behavior_contract_qa_is_fail_closed(
 @pytest.mark.parametrize(
     ("container", "copy", "expected_pass"),
     [
-        ("li", "seven hubs", True),
-        ("section", "seven hubs", True),
-        ("h2", "seven hubs", True),
+        ("li", "Configured with 7 hubs", True),
+        ("section", "Configured with 7 hubs", True),
+        ("h2", "Configured with 7 hubs", True),
         ("li", "Trusted by ten thousand buyers", False),
         ("section", "Every buyer saves money instantly", False),
     ],

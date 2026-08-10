@@ -21,7 +21,12 @@ from money_machine.domain.models.candidate import CandidateShortlist, Qualificat
 from money_machine.domain.models.job import JobAttempt, JobEnvelope
 from money_machine.domain.models.listing import ListingPackage, PreflightResult
 from money_machine.domain.models.product import BuildResult, ProductQAResult
-from money_machine.domain.models.product_spec import DedupeResult, ProductSpec
+from money_machine.domain.models.product_spec import (
+    DedupeResult,
+    ProductFact,
+    ProductFactCategory,
+    ProductSpec,
+)
 from money_machine.domain.models.research import (
     EvidenceReference,
     ResearchObservation,
@@ -97,16 +102,50 @@ def _spec(**overrides: Any) -> ProductSpec:
         "candidate_id": "candidate-30",
         "identity_niche": "adhd-students",
         "base_category": "planner",
-        "target_buyer": "Students who need a low-friction planning system",
-        "promised_outcome": "Organize coursework in one consistent workspace",
+        "target_buyer": "People managing adhd-students",
+        "promised_outcome": "A structured planner workspace",
         "hubs": ("home", "courses", "tasks", "notes", "reviews", "archive"),
         "colour_variants": ("ink", "sand", "sage"),
         "features": ("Linked course and task views",),
-        "product_facts": ("Includes six navigation hubs",),
         "source_evidence_ids": ("evidence-0",),
         "spec_sha256": SHA256,
     }
     fields.update(overrides)
+    if "product_facts" not in overrides:
+        hubs = cast(tuple[str, ...], fields["hubs"])
+        features = cast(tuple[str, ...], fields["features"])
+        colour_variants = cast(tuple[str, ...], fields["colour_variants"])
+        evidence_ids = cast(tuple[str, ...], fields["source_evidence_ids"])
+        fields["product_facts"] = (
+            ProductFact(
+                claim=f"Configured with {len(hubs)} hubs",
+                category="HUB_INVENTORY",
+                evidence_ids=evidence_ids,
+            ),
+            *(
+                ProductFact(
+                    claim=f"Includes {feature}",
+                    category="FEATURE",
+                    evidence_ids=evidence_ids,
+                )
+                for feature in features
+            ),
+            ProductFact(
+                claim=f"Configured with {len(colour_variants)} colour variants",
+                category="COLOUR_VARIANTS",
+                evidence_ids=evidence_ids,
+            ),
+            ProductFact(
+                claim=cast(str, fields["target_buyer"]),
+                category="BUYER_FIT",
+                evidence_ids=evidence_ids,
+            ),
+            ProductFact(
+                claim=cast(str, fields["promised_outcome"]),
+                category="WORKFLOW_OUTCOME",
+                evidence_ids=evidence_ids,
+            ),
+        )
     return ProductSpec.model_validate(fields, strict=True)
 
 
@@ -392,6 +431,151 @@ def test_product_spec_accepts_inclusive_variant_boundaries(variant_count: int) -
 def test_product_spec_rejects_variants_outside_boundaries(variant_count: int) -> None:
     with pytest.raises(ValidationError):
         _spec(colour_variants=tuple(f"variant-{index}" for index in range(variant_count)))
+
+
+def test_product_spec_requires_typed_fact_specific_evidence() -> None:
+    body: dict[str, object] = {
+        "candidate_id": "candidate-30",
+        "identity_niche": "adhd-students",
+        "base_category": "planner",
+        "target_buyer": "People managing adhd-students",
+        "promised_outcome": "A structured planner workspace",
+        "hubs": ("home", "courses", "tasks", "notes", "reviews", "archive"),
+        "colour_variants": ("ink", "sand", "sage"),
+        "features": ("Linked course and task views",),
+        "product_facts": (
+            {
+                "claim": "Configured with 6 hubs",
+                "category": "HUB_INVENTORY",
+                "evidence_ids": ("evidence-0",),
+            },
+            {
+                "claim": "Includes Linked course and task views",
+                "category": "FEATURE",
+                "evidence_ids": ("evidence-0",),
+            },
+            {
+                "claim": "Configured with 3 colour variants",
+                "category": "COLOUR_VARIANTS",
+                "evidence_ids": ("evidence-0",),
+            },
+            {
+                "claim": "People managing adhd-students",
+                "category": "BUYER_FIT",
+                "evidence_ids": ("evidence-0",),
+            },
+            {
+                "claim": "A structured planner workspace",
+                "category": "WORKFLOW_OUTCOME",
+                "evidence_ids": ("evidence-0",),
+            },
+        ),
+        "source_evidence_ids": ("evidence-0",),
+    }
+    digest = canonical_sha256(body)
+
+    spec = ProductSpec.model_validate(
+        {"product_spec_id": f"PS-{digest[:24]}", "spec_sha256": digest, **body},
+        strict=True,
+    )
+
+    assert spec.product_facts[0].category == "HUB_INVENTORY"
+    assert spec.product_facts[0].evidence_ids == ("evidence-0",)
+
+
+def test_product_spec_rejects_commercial_outcome_even_with_recomputed_identity() -> None:
+    body: dict[str, object] = {
+        "candidate_id": "candidate-30",
+        "identity_niche": "adhd-students",
+        "base_category": "planner",
+        "target_buyer": "People managing adhd-students",
+        "promised_outcome": "Track guaranteed profits",
+        "hubs": ("home", "courses", "tasks", "notes", "reviews", "archive"),
+        "colour_variants": ("ink", "sand", "sage"),
+        "features": ("Linked course and task views",),
+        "product_facts": (
+            {
+                "claim": "People managing adhd-students",
+                "category": "BUYER_FIT",
+                "evidence_ids": ("evidence-0",),
+            },
+            {
+                "claim": "Track guaranteed profits",
+                "category": "WORKFLOW_OUTCOME",
+                "evidence_ids": ("evidence-0",),
+            },
+        ),
+        "source_evidence_ids": ("evidence-0",),
+    }
+    digest = canonical_sha256(body)
+
+    with pytest.raises(ValidationError, match="promised outcome"):
+        ProductSpec.model_validate(
+            {"product_spec_id": f"PS-{digest[:24]}", "spec_sha256": digest, **body},
+            strict=True,
+        )
+
+
+@pytest.mark.parametrize(
+    ("category", "claim"),
+    (
+        ("FEATURE", "Guaranteed sales overnight"),
+        ("HUB_INVENTORY", "Trusted by ten thousand buyers"),
+        ("COLOUR_VARIANTS", "Passive income guaranteed"),
+    ),
+)
+def test_product_spec_rejects_arbitrary_structural_fact_copy(
+    category: ProductFactCategory,
+    claim: str,
+) -> None:
+    original = _spec()
+    facts = tuple(
+        fact.model_copy(update={"claim": claim}) if fact.category == category else fact
+        for fact in original.product_facts
+    )
+    if not any(fact.category == category for fact in facts):
+        facts = (*facts, ProductFact(claim=claim, category=category, evidence_ids=("evidence-0",)))
+    body = original.model_dump(
+        mode="python",
+        exclude={"schema_version", "product_spec_id", "spec_sha256", "product_facts"},
+    )
+    body["product_facts"] = tuple(fact.model_dump(mode="python") for fact in facts)
+    digest = canonical_sha256(body)
+
+    with pytest.raises(ValidationError, match="product facts"):
+        ProductSpec.model_validate(
+            {"product_spec_id": f"PS-{digest[:24]}", "spec_sha256": digest, **body},
+            strict=True,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "category", "claim"),
+    (
+        ("promised_outcome", "WORKFLOW_OUTCOME", "Track guaranteed profits"),
+        ("promised_outcome", "WORKFLOW_OUTCOME", "Manage passive income"),
+        ("promised_outcome", "WORKFLOW_OUTCOME", "Access recurring revenue"),
+        ("target_buyer", "BUYER_FIT", "Creators planning guaranteed profits"),
+    ),
+)
+def test_truth_contract_rejects_commercial_claims_after_unvalidated_model_copy(
+    field: str,
+    category: str,
+    claim: str,
+) -> None:
+    original = _spec()
+    forged = original.model_copy(
+        update={
+            field: claim,
+            "product_facts": tuple(
+                fact.model_copy(update={"claim": claim}) if fact.category == category else fact
+                for fact in original.product_facts
+            ),
+        }
+    )
+
+    with pytest.raises(ValueError, match="derived"):
+        forged.ensure_truth_contract()
 
 
 def test_job_envelope_is_strict_and_bounded() -> None:

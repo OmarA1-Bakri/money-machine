@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from money_machine.config.validation import ProductRulesSection
 from money_machine.domain.models.candidate import CandidateShortlist, QualificationScore
-from money_machine.domain.models.product_spec import ProductSpec
+from money_machine.domain.models.product_spec import ProductFact, ProductSpec
 from money_machine.domain.models.research import ResearchPacket
 from money_machine.domain.services.low_ticket import (
     QualificationService,
@@ -56,7 +56,7 @@ class _SpecBody(FrozenModel):
     hubs: tuple[str, ...]
     colour_variants: tuple[str, ...]
     features: tuple[str, ...]
-    product_facts: tuple[str, ...]
+    product_facts: tuple[ProductFact, ...]
     source_evidence_ids: tuple[str, ...]
 
 
@@ -109,20 +109,49 @@ class ProductStrategyService:
 
         identity_niche = normalize_concept(observations[0].identity_niche)
         base_category = normalize_concept(observations[0].base_category)
+        target_buyer = f"People managing {identity_niche}"
+        promised_outcome = f"A structured {base_category} workspace"
+        features = tuple(f"{hub} hub" for hub in rules.hubs)
+        product_facts = (
+            ProductFact(
+                claim=f"Configured with {len(rules.hubs)} hubs",
+                category="HUB_INVENTORY",
+                evidence_ids=evidence_ids,
+            ),
+            *(
+                ProductFact(
+                    claim=f"Includes {feature}",
+                    category="FEATURE",
+                    evidence_ids=evidence_ids,
+                )
+                for feature in features
+            ),
+            ProductFact(
+                claim=f"Configured with {len(rules.colour_variants)} colour variants",
+                category="COLOUR_VARIANTS",
+                evidence_ids=evidence_ids,
+            ),
+            ProductFact(
+                claim=target_buyer,
+                category="BUYER_FIT",
+                evidence_ids=evidence_ids,
+            ),
+            ProductFact(
+                claim=promised_outcome,
+                category="WORKFLOW_OUTCOME",
+                evidence_ids=evidence_ids,
+            ),
+        )
         body = _SpecBody(
             candidate_id=selected.candidate_id,
             identity_niche=identity_niche,
             base_category=base_category,
-            target_buyer=f"People managing {identity_niche}",
-            promised_outcome=f"A structured {base_category} workspace",
+            target_buyer=target_buyer,
+            promised_outcome=promised_outcome,
             hubs=rules.hubs,
             colour_variants=rules.colour_variants,
-            features=tuple(f"{hub} hub" for hub in rules.hubs),
-            product_facts=(
-                f"Configured with {len(rules.hubs)} hubs",
-                f"Configured with {len(rules.colour_variants)} colour variants",
-                *(f"Supported by evidence {evidence_id}" for evidence_id in evidence_ids),
-            ),
+            features=features,
+            product_facts=product_facts,
             source_evidence_ids=evidence_ids,
         )
         digest = canonical_sha256(body)

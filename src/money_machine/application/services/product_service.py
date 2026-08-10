@@ -335,7 +335,7 @@ class ProductQAService:
                     findings.add(f"VARIANT_DRIFT:{path}")
 
         home = readable.get("home.html", b"").decode("utf-8", errors="replace")
-        for fact in sorted(spec.product_facts):
+        for fact in sorted(item.claim for item in spec.product_facts):
             if fact not in home:
                 findings.add(f"FACT_MISSING:{fact}")
 
@@ -743,7 +743,7 @@ def _contains_unapproved_html_copy(text_chunks: Iterable[str], spec: ProductSpec
             "Useful views",
             *spec.hubs,
             *spec.features,
-            *spec.product_facts,
+            *(fact.claim for fact in spec.product_facts),
             *(f"{name} | {title}" for name in spec.hubs),
             *(f"A focused {name.lower()} workspace for {spec.target_buyer}." for name in spec.hubs),
         )
@@ -778,7 +778,7 @@ def _validate_readme(text: str, spec: ProductSpec, renderer_version: str) -> tup
     actual = tuple(
         normalised for line in text.splitlines() if (normalised := _normalise_copy(line))
     )
-    admitted = set(expected) | {_normalise_copy(fact) for fact in spec.product_facts}
+    admitted = set(expected) | {_normalise_copy(fact.claim) for fact in spec.product_facts}
     return text == expected_text and actual == expected, any(
         line not in admitted for line in actual
     )

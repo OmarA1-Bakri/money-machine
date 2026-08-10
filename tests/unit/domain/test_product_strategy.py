@@ -41,6 +41,10 @@ def test_create_spec_is_deterministic_evidence_bound_and_recomputable() -> None:
     assert 3 <= len(first.colour_variants) <= 4
     assert first.target_buyer and first.promised_outcome and first.features and first.product_facts
     assert first.source_evidence_ids == selected.evidence_ids
+    assert all(fact.evidence_ids == selected.evidence_ids for fact in first.product_facts)
+    assert {fact.category for fact in first.product_facts}.issuperset(
+        {"BUYER_FIT", "WORKFLOW_OUTCOME", "HUB_INVENTORY", "COLOUR_VARIANTS"}
+    )
     body = cast(
         dict[str, object],
         first.model_dump(exclude={"product_spec_id", "spec_sha256"}),

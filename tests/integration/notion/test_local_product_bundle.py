@@ -4,7 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from money_machine.domain.models.product_spec import ProductSpec
+from money_machine.domain.models.product_spec import ProductFact, ProductSpec
 from money_machine.integrations.notion.fixture_adapter import LocalNotionAdapter
 
 
@@ -14,12 +14,43 @@ def test_local_bundle_is_self_contained_and_manifest_verifiable(tmp_path: Path) 
         candidate_id="candidate-local-integration",
         identity_niche="Home Bakers",
         base_category="Order Planner",
-        target_buyer="home bakery owners",
-        promised_outcome="organise orders without missed details",
+        target_buyer="People managing Home Bakers",
+        promised_outcome="A structured Order Planner workspace",
         hubs=("Home", "Orders", "Customers", "Calendar", "Recipes", "Costs"),
         colour_variants=("Berry", "Vanilla", "Cocoa"),
         features=("order queue", "cost notes"),
-        product_facts=("six hubs", "three local themes"),
+        product_facts=(
+            ProductFact(
+                claim="Configured with 6 hubs",
+                category="HUB_INVENTORY",
+                evidence_ids=("evidence-local",),
+            ),
+            ProductFact(
+                claim="Includes order queue",
+                category="FEATURE",
+                evidence_ids=("evidence-local",),
+            ),
+            ProductFact(
+                claim="Includes cost notes",
+                category="FEATURE",
+                evidence_ids=("evidence-local",),
+            ),
+            ProductFact(
+                claim="Configured with 3 colour variants",
+                category="COLOUR_VARIANTS",
+                evidence_ids=("evidence-local",),
+            ),
+            ProductFact(
+                claim="People managing Home Bakers",
+                category="BUYER_FIT",
+                evidence_ids=("evidence-local",),
+            ),
+            ProductFact(
+                claim="A structured Order Planner workspace",
+                category="WORKFLOW_OUTCOME",
+                evidence_ids=("evidence-local",),
+            ),
+        ),
         source_evidence_ids=("evidence-local",),
         spec_sha256="5" * 64,
     )

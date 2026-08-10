@@ -4,22 +4,51 @@ from typing import cast
 
 import pytest
 
-from money_machine.domain.models.product_spec import ProductSpec
+from money_machine.domain.models.product_spec import ProductFact, ProductSpec
 from money_machine.domain.services.dedupe import DedupeService
 from money_machine.domain.value_objects import canonical_sha256
 
 
 def _spec(spec_id: str, niche: str, category: str) -> ProductSpec:
+    target_buyer = f"People managing {niche}"
+    promised_outcome = f"A structured {category} workspace"
+    product_facts = (
+        ProductFact(
+            claim="Configured with 6 hubs",
+            category="HUB_INVENTORY",
+            evidence_ids=("EVD-001",),
+        ),
+        ProductFact(
+            claim="Includes Structured navigation",
+            category="FEATURE",
+            evidence_ids=("EVD-001",),
+        ),
+        ProductFact(
+            claim="Configured with 3 colour variants",
+            category="COLOUR_VARIANTS",
+            evidence_ids=("EVD-001",),
+        ),
+        ProductFact(
+            claim=target_buyer,
+            category="BUYER_FIT",
+            evidence_ids=("EVD-001",),
+        ),
+        ProductFact(
+            claim=promised_outcome,
+            category="WORKFLOW_OUTCOME",
+            evidence_ids=("EVD-001",),
+        ),
+    )
     body: dict[str, object] = {
         "candidate_id": f"C-{spec_id}",
         "identity_niche": niche,
         "base_category": category,
-        "target_buyer": "A specific buyer",
-        "promised_outcome": "A structured workspace",
+        "target_buyer": target_buyer,
+        "promised_outcome": promised_outcome,
         "hubs": ["Home", "Plan", "Track", "Review", "Library", "Settings"],
         "colour_variants": ["Ink", "Sage", "Sand"],
         "features": ["Structured navigation"],
-        "product_facts": ["Includes six hubs"],
+        "product_facts": tuple(fact.model_dump(mode="json") for fact in product_facts),
         "source_evidence_ids": ["EVD-001"],
     }
     return ProductSpec(
@@ -27,12 +56,12 @@ def _spec(spec_id: str, niche: str, category: str) -> ProductSpec:
         candidate_id=f"C-{spec_id}",
         identity_niche=niche,
         base_category=category,
-        target_buyer="A specific buyer",
-        promised_outcome="A structured workspace",
+        target_buyer=target_buyer,
+        promised_outcome=promised_outcome,
         hubs=("Home", "Plan", "Track", "Review", "Library", "Settings"),
         colour_variants=("Ink", "Sage", "Sand"),
         features=("Structured navigation",),
-        product_facts=("Includes six hubs",),
+        product_facts=product_facts,
         source_evidence_ids=("EVD-001",),
         spec_sha256=canonical_sha256(body),
     )

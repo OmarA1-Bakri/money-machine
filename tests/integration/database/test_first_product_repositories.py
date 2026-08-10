@@ -20,7 +20,7 @@ from money_machine.domain.models.candidate import CandidateShortlist, Qualificat
 from money_machine.domain.models.job import JobEnvelope
 from money_machine.domain.models.listing import ListingPackage, PreflightResult
 from money_machine.domain.models.product import BuildResult, ProductQAResult
-from money_machine.domain.models.product_spec import DedupeResult, ProductSpec
+from money_machine.domain.models.product_spec import DedupeResult, ProductFact, ProductSpec
 from money_machine.domain.models.research import (
     EvidenceReference,
     ResearchObservation,
@@ -109,12 +109,38 @@ def _spec() -> ProductSpec:
         candidate_id="candidate-31",
         identity_niche="adhd-students",
         base_category="planner",
-        target_buyer="Students who need a low-friction planning system",
-        promised_outcome="Organize coursework in one consistent workspace",
+        target_buyer="People managing adhd-students",
+        promised_outcome="A structured planner workspace",
         hubs=("home", "courses", "tasks", "notes", "reviews", "archive"),
         colour_variants=("ink", "sand", "sage"),
         features=("Linked course and task views",),
-        product_facts=("Includes six navigation hubs",),
+        product_facts=(
+            ProductFact(
+                claim="Configured with 6 hubs",
+                category="HUB_INVENTORY",
+                evidence_ids=("evidence-0",),
+            ),
+            ProductFact(
+                claim="Includes Linked course and task views",
+                category="FEATURE",
+                evidence_ids=("evidence-0",),
+            ),
+            ProductFact(
+                claim="Configured with 3 colour variants",
+                category="COLOUR_VARIANTS",
+                evidence_ids=("evidence-0",),
+            ),
+            ProductFact(
+                claim="People managing adhd-students",
+                category="BUYER_FIT",
+                evidence_ids=("evidence-0",),
+            ),
+            ProductFact(
+                claim="A structured planner workspace",
+                category="WORKFLOW_OUTCOME",
+                evidence_ids=("evidence-0",),
+            ),
+        ),
         source_evidence_ids=("evidence-0",),
         spec_sha256=SHA256,
     )

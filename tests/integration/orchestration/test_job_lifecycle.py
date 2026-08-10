@@ -13,7 +13,7 @@ from sqlalchemy import delete, func, select, text
 
 from money_machine.domain.events import DomainEvent, DomainEventName
 from money_machine.domain.models.job import JobEnvelope
-from money_machine.domain.models.product_spec import ProductSpec
+from money_machine.domain.models.product_spec import ProductFact, ProductSpec
 from money_machine.domain.models.research import ResearchPacket
 from money_machine.domain.value_objects import canonical_sha256
 from money_machine.orchestration.engine import OrchestrationEngine
@@ -61,12 +61,32 @@ def _product_spec() -> ProductSpec:
         candidate_id="candidate-worker",
         identity_niche="students",
         base_category="planner",
-        target_buyer="students",
-        promised_outcome="organise coursework",
+        target_buyer="People managing students",
+        promised_outcome="A structured planner workspace",
         hubs=("home", "courses", "tasks", "calendar", "notes", "review"),
         colour_variants=("ink", "sage", "sand"),
         features=("weekly review",),
-        product_facts=("contains six hubs",),
+        product_facts=(
+            ProductFact(
+                claim="Configured with 6 hubs",
+                category="HUB_INVENTORY",
+                evidence_ids=("EV-1",),
+            ),
+            ProductFact(claim="Includes weekly review", category="FEATURE", evidence_ids=("EV-1",)),
+            ProductFact(
+                claim="Configured with 3 colour variants",
+                category="COLOUR_VARIANTS",
+                evidence_ids=("EV-1",),
+            ),
+            ProductFact(
+                claim="People managing students", category="BUYER_FIT", evidence_ids=("EV-1",)
+            ),
+            ProductFact(
+                claim="A structured planner workspace",
+                category="WORKFLOW_OUTCOME",
+                evidence_ids=("EV-1",),
+            ),
+        ),
         source_evidence_ids=("EV-1",),
         spec_sha256="c" * 64,
     )
