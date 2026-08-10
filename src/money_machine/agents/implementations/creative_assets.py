@@ -112,6 +112,19 @@ class _ArtifactWriter:
             raise ValueError("artifact path contains a symlink or invalid component") from error
         return descriptor
 
+    @staticmethod
+    def _target_matches(parent_fd: int, name: str, data: bytes) -> bool:
+        target_fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=parent_fd)
+        try:
+            if not stat.S_ISREG(os.fstat(target_fd).st_mode):
+                raise ValueError("artifact target must be a regular file")
+            chunks: list[bytes] = []
+            while chunk := os.read(target_fd, 1024 * 1024):
+                chunks.append(chunk)
+            return b"".join(chunks) == data
+        finally:
+            os.close(target_fd)
+
     def write(self, relative: Path, data: bytes) -> None:
         if (
             relative.is_absolute()
@@ -120,24 +133,20 @@ class _ArtifactWriter:
         ):
             raise ValueError("artifact path must be root-confined")
         parent_fd = self._directory(relative.parent)
-        existing_fd = -1
         temporary_name = f".{relative.name}.{hashlib.sha256(data).hexdigest()[:16]}.tmp"
+        temporary_created = False
         try:
             try:
-                existing_fd = os.open(relative.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=parent_fd)
+                matches = self._target_matches(parent_fd, relative.name, data)
             except FileNotFoundError:
                 pass
             else:
-                if not stat.S_ISREG(os.fstat(existing_fd).st_mode):
-                    raise ValueError("artifact target must be a regular file")
-                chunks: list[bytes] = []
-                while chunk := os.read(existing_fd, 1024 * 1024):
-                    chunks.append(chunk)
-                if b"".join(chunks) == data:
+                if matches:
                     return
                 raise ValueError(f"artifact collision at {relative.as_posix()}")
             flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
             file_fd = os.open(temporary_name, flags, 0o600, dir_fd=parent_fd)
+            temporary_created = True
             try:
                 view = memoryview(data)
                 while view:
@@ -146,17 +155,25 @@ class _ArtifactWriter:
                 os.fsync(file_fd)
             finally:
                 os.close(file_fd)
-            os.rename(
-                temporary_name,
-                relative.name,
-                src_dir_fd=parent_fd,
-                dst_dir_fd=parent_fd,
-            )
+            try:
+                os.link(
+                    temporary_name,
+                    relative.name,
+                    src_dir_fd=parent_fd,
+                    dst_dir_fd=parent_fd,
+                    follow_symlinks=False,
+                )
+            except FileExistsError:
+                if not self._target_matches(parent_fd, relative.name, data):
+                    raise ValueError(f"artifact collision at {relative.as_posix()}") from None
+            os.unlink(temporary_name, dir_fd=parent_fd)
+            temporary_created = False
+            os.fsync(parent_fd)
         finally:
-            if existing_fd >= 0:
-                os.close(existing_fd)
-            with suppress(FileNotFoundError):
-                os.unlink(temporary_name, dir_fd=parent_fd)
+            if temporary_created:
+                with suppress(FileNotFoundError):
+                    os.unlink(temporary_name, dir_fd=parent_fd)
+                    os.fsync(parent_fd)
             os.close(parent_fd)
 
 

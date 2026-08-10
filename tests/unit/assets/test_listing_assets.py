@@ -132,6 +132,82 @@ def test_asset_paths_reject_traversal_and_symlink_without_escape(tmp_path: Path)
     assert list(outside.iterdir()) == []
 
 
+@pytest.mark.parametrize("collision_kind", ("different", "identical"))
+def test_artifact_writer_target_creation_race_verifies_colliding_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    collision_kind: str,
+) -> None:
+    package = ListingService().create(spec(), build(), qa())
+    root = tmp_path / "root"
+    original_link = os.link
+    raced = False
+
+    def create_collision(
+        src: Pathish,
+        dst: Pathish,
+        src_dir_fd: int | None,
+        dst_dir_fd: int | None,
+    ) -> None:
+        nonlocal raced
+        if not raced:
+            assert src_dir_fd is not None
+            assert dst_dir_fd is not None
+            collision_data = b"attacker"
+            if collision_kind == "identical":
+                source_fd = os.open(src, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=src_dir_fd)
+                try:
+                    chunks: list[bytes] = []
+                    while chunk := os.read(source_fd, 1024 * 1024):
+                        chunks.append(chunk)
+                    collision_data = b"".join(chunks)
+                finally:
+                    os.close(source_fd)
+            collision_fd = os.open(
+                dst,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                0o600,
+                dir_fd=dst_dir_fd,
+            )
+            try:
+                os.write(collision_fd, collision_data)
+                os.fsync(collision_fd)
+            finally:
+                os.close(collision_fd)
+            raced = True
+
+    def racing_link(
+        src: Pathish,
+        dst: Pathish,
+        *,
+        src_dir_fd: int | None = None,
+        dst_dir_fd: int | None = None,
+        follow_symlinks: bool = True,
+    ) -> None:
+        create_collision(src, dst, src_dir_fd, dst_dir_fd)
+        return original_link(
+            src,
+            dst,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+            follow_symlinks=follow_symlinks,
+        )
+
+    monkeypatch.setattr(os, "link", racing_link)
+    if collision_kind == "different":
+        with pytest.raises(ValueError, match="artifact collision"):
+            CreativeAssetService().render(package, root, spec=spec(), build=build())
+    else:
+        CreativeAssetService().render(package, root, spec=spec(), build=build())
+
+    assert raced is True
+    collision = root / "listing" / package.listing_package_id / "images" / "01-hero.png"
+    if collision_kind == "different":
+        assert collision.read_bytes() == b"attacker"
+    else:
+        assert png_dimensions(collision.read_bytes()) == (2000, 2000)
+
+
 @pytest.mark.parametrize("swap_point", ("open", "rename"))
 def test_asset_writer_parent_swap_never_creates_an_outside_file(
     tmp_path: Path,
@@ -143,6 +219,7 @@ def test_asset_writer_parent_swap_never_creates_an_outside_file(
     outside = tmp_path / "outside"
     outside.mkdir()
     original_open = os.open
+    original_link = os.link
     original_replace = os.replace
     original_rename = os.rename
     swapped = False
@@ -187,6 +264,24 @@ def test_asset_writer_parent_swap_never_creates_an_outside_file(
             dst_dir_fd=dst_dir_fd,
         )
 
+    def racing_link(
+        src: Pathish,
+        dst: Pathish,
+        *,
+        src_dir_fd: int | None = None,
+        dst_dir_fd: int | None = None,
+        follow_symlinks: bool = True,
+    ) -> None:
+        if swap_point == "rename":
+            swap_parent(os.fsdecode(src))
+        return original_link(
+            src,
+            dst,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+            follow_symlinks=follow_symlinks,
+        )
+
     def racing_rename(
         src: Pathish,
         dst: Pathish,
@@ -204,6 +299,7 @@ def test_asset_writer_parent_swap_never_creates_an_outside_file(
         )
 
     monkeypatch.setattr(os, "open", racing_open)
+    monkeypatch.setattr(os, "link", racing_link)
     monkeypatch.setattr(os, "replace", racing_replace)
     monkeypatch.setattr(os, "rename", racing_rename)
 
