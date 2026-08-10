@@ -173,8 +173,19 @@ class UnitOfWork:
             raise ValueError("workflow missing during job completion")
 
         workflow = WorkflowRun.model_validate_json(json.dumps(row.payload, separators=(",", ":")))
+        if event.occurred_at < workflow.updated_at:
+            raise ValueError("workflow event time precedes current update")
         target = next_product_state(job_type, workflow.state, event.name)
-        advanced = workflow.model_copy(update={"state": target, "updated_at": event.occurred_at})
+        advanced = WorkflowRun(
+            schema_version=workflow.schema_version,
+            workflow_run_id=workflow.workflow_run_id,
+            workflow_type=workflow.workflow_type,
+            packet_id=workflow.packet_id,
+            state=target,
+            idempotency_key=workflow.idempotency_key,
+            created_at=workflow.created_at,
+            updated_at=event.occurred_at,
+        )
         advanced_payload = json.loads(canonical_json(advanced))
         progress = cast(
             CursorResult[Any],
