@@ -5,6 +5,8 @@ import json
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 from uuid import UUID
 
 import pytest
@@ -14,6 +16,7 @@ from sqlalchemy import delete, func, select, text, update
 
 from money_machine.domain.enums import ProductState
 from money_machine.domain.events import DomainEvent, DomainEventName
+from money_machine.domain.models.candidate import CandidateShortlist, QualificationScore
 from money_machine.domain.models.job import JobEnvelope
 from money_machine.domain.models.product_spec import DedupeResult, ProductFact, ProductSpec
 from money_machine.domain.models.research import ResearchPacket
@@ -207,6 +210,81 @@ def test_worker_rejects_wrong_result_event_semantics_without_durable_effects() -
                 ("CREATE_PRODUCT_SPEC", "PENDING"),
             ]
             assert await session.scalar(select(func.count()).select_from(product_specs)) == 0
+            assert await session.scalar(select(func.count()).select_from(domain_events)) == 0
+        await database.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_worker_rejects_undeclared_outcome_object_without_durable_effects() -> None:
+    _migrate()
+
+    async def scenario() -> None:
+        database = Database.from_url(_database_url())
+        workflow_id = await OrchestrationEngine(database).start_first_product(
+            "packet-worker-lookalike"
+        )
+        shortlist = CandidateShortlist(
+            shortlist_id="CS-worker-lookalike",
+            packet_id="packet-worker-lookalike",
+            candidates=(
+                QualificationScore(
+                    candidate_id="candidate-worker-lookalike",
+                    demand=8,
+                    differentiation=8,
+                    build_feasibility=7,
+                    buyer_value=7,
+                    evidence_ids=("EV-worker-lookalike",),
+                ),
+            ),
+            selected_candidate_id="candidate-worker-lookalike",
+            backup_candidate_id=None,
+            shortlist_sha256="7" * 64,
+        )
+
+        async def lookalike_handler(job: JobEnvelope) -> Any:
+            payload = {"packet_id": shortlist.packet_id}
+            return SimpleNamespace(
+                result_type="research_packets",
+                result=shortlist,
+                event=DomainEvent(
+                    event_id=job.job_id,
+                    workflow_run_id=job.workflow_run_id,
+                    job_id=job.job_id,
+                    name=DomainEventName.RESEARCH_PACKET_ADMITTED,
+                    occurred_at=NOW,
+                    payload=payload,
+                    payload_sha256=canonical_sha256(payload),
+                ),
+                successor_job_type="QUALIFY_CANDIDATES",
+            )
+
+        worker = Worker(
+            database,
+            worker_id="worker-lookalike",
+            handlers={"ADMIT_RESEARCH_PACKET": lookalike_handler},
+            lease_ttl=timedelta(seconds=30),
+            clock=lambda: NOW,
+        )
+        failure = await worker.run_once()
+        assert failure.status == "failed"
+        assert failure.error_code == "VALUEERROR"
+
+        async with database.session_factory() as session:
+            states = dict(
+                (
+                    await session.execute(
+                        select(jobs.c.job_type, jobs.c.state).where(
+                            jobs.c.workflow_run_id == workflow_id
+                        )
+                    )
+                )
+                .tuples()
+                .all()
+            )
+            assert states["ADMIT_RESEARCH_PACKET"] == "FAILED"
+            assert states["QUALIFY_CANDIDATES"] == "PENDING"
+            assert await session.scalar(select(func.count()).select_from(research_packets)) == 0
             assert await session.scalar(select(func.count()).select_from(domain_events)) == 0
         await database.dispose()
 

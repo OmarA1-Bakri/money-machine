@@ -93,51 +93,60 @@ class Worker:
             await self._leases.mark_running(lease, now)
             job = job.model_copy(update={"state": JobState.RUNNING})
             outcome = await handler(job)
+            if type(outcome) is HandlerOutcome:
+                success_outcome = outcome
+                terminal_outcome = None
+            elif type(outcome) is TerminalHandlerOutcome:
+                success_outcome = None
+                terminal_outcome = outcome
+            else:
+                raise ValueError("handler returned an undeclared outcome type")
             if (
                 outcome.event.job_id != lease.job_id
                 or outcome.event.workflow_run_id != job.workflow_run_id
             ):
                 raise ValueError("handler event binding mismatch")
-            if isinstance(outcome, HandlerOutcome):
+            if success_outcome is not None:
                 validate_step_output(
                     job.job_type,
-                    outcome.result_type,
-                    outcome.result,
-                    outcome.event.name,
-                    outcome.successor_job_type,
+                    success_outcome.result_type,
+                    success_outcome.result,
+                    success_outcome.event.name,
+                    success_outcome.successor_job_type,
                 )
-                self._successors.validate(job.job_type, outcome.successor_job_type)
+                self._successors.validate(job.job_type, success_outcome.successor_job_type)
             completion_time = self._clock()
             async with UnitOfWork(self._database) as uow:
                 if uow.session is None:
                     raise RuntimeError("unit of work did not open a session")
                 session = uow.session
                 await self._transitions.require_live_running_lease(session, lease, completion_time)
-                if isinstance(outcome, TerminalHandlerOutcome):
+                if terminal_outcome is not None:
                     await uow.commit_job_terminal(
                         lease.job_id,
                         lease.token,
                         lease.attempt_number,
-                        outcome.blocker,
-                        outcome.event,
-                        result_type=outcome.result_type,
-                        result_payload=outcome.result,
+                        terminal_outcome.blocker,
+                        terminal_outcome.event,
+                        result_type=terminal_outcome.result_type,
+                        result_payload=terminal_outcome.result,
                     )
                 else:
+                    assert success_outcome is not None
                     await uow.commit_job_success(
                         lease.job_id,
                         lease.token,
                         lease.attempt_number,
-                        outcome.result_type,
-                        outcome.result,
-                        outcome.event,
+                        success_outcome.result_type,
+                        success_outcome.result,
+                        success_outcome.event,
                         None,
                     )
-                    if outcome.successor_job_type is not None:
+                    if success_outcome.successor_job_type is not None:
                         await self._dependencies.activate_successor(
                             uow.jobs,
                             lease.job_id,
-                            outcome.successor_job_type,
+                            success_outcome.successor_job_type,
                         )
             return WorkerResult("processed", lease.job_id)
         except Exception as exc:
