@@ -34,4 +34,5 @@ if [[ "$state" != "DRAFT_READY" ]]; then
   exit 1
 fi
 
+run_cli artifacts export "$workflow_id" --json
 run_cli artifacts inspect "$workflow_id" --json

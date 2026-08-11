@@ -49,7 +49,7 @@ class LocalArtifactStore:
         return self._root
 
     def put_bytes(
-        self, relative_path: str | Path, data: bytes, media_type: str
+        self, relative_path: str | Path | PurePosixPath, data: bytes, media_type: str
     ) -> ArtifactReference:
         """Atomically store bytes without permitting mutation or root escape."""
 
@@ -114,6 +114,65 @@ class LocalArtifactStore:
 
         return reference
 
+    def get_bytes(
+        self,
+        relative_path: str | Path | PurePosixPath,
+        *,
+        expected_sha256: str | None = None,
+        expected_byte_count: int | None = None,
+    ) -> bytes:
+        """Read one confined regular file and optionally verify its exact identity."""
+
+        canonical_path = _canonical_relative_path(relative_path)
+        parent_fd, filename = self._open_existing_parent(canonical_path)
+        try:
+            descriptor = _open_regular_file(filename, parent_fd)
+            if descriptor is None:
+                raise FileNotFoundError(canonical_path.as_posix())
+            try:
+                chunks: list[bytes] = []
+                while chunk := os.read(descriptor, 1024 * 1024):
+                    chunks.append(chunk)
+                data = b"".join(chunks)
+            finally:
+                os.close(descriptor)
+        finally:
+            os.close(parent_fd)
+        if expected_byte_count is not None and len(data) != expected_byte_count:
+            raise ValueError("artifact byte count mismatch")
+        if expected_sha256 is not None and hashlib.sha256(data).hexdigest() != expected_sha256:
+            raise ValueError("artifact hash mismatch")
+        return data
+
+    def list_files(
+        self, relative_root: str | Path | PurePosixPath | None = None
+    ) -> tuple[PurePosixPath, ...]:
+        """List confined regular files below an existing directory without following links."""
+
+        canonical_root = (
+            _canonical_relative_path(relative_root) if relative_root is not None else None
+        )
+        descriptor = self._open_root()
+        try:
+            for part in canonical_root.parts if canonical_root is not None else ():
+                try:
+                    child = os.open(
+                        part,
+                        os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                        dir_fd=descriptor,
+                    )
+                except FileNotFoundError:
+                    return ()
+                except OSError as error:
+                    raise UnsafeArtifactPathError(
+                        "artifact path contains an unsafe directory"
+                    ) from error
+                os.close(descriptor)
+                descriptor = child
+            return tuple(_list_regular_files(descriptor))
+        finally:
+            os.close(descriptor)
+
     def _open_root(self) -> int:
         if self._root_descriptor < 0:
             raise UnsafeArtifactPathError("artifact store is closed")
@@ -152,8 +211,31 @@ class LocalArtifactStore:
             os.close(descriptor)
             raise
 
+    def _open_existing_parent(self, relative_path: PurePosixPath) -> tuple[int, str]:
+        descriptor = self._open_root()
+        try:
+            for part in relative_path.parts[:-1]:
+                try:
+                    child = os.open(
+                        part,
+                        os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                        dir_fd=descriptor,
+                    )
+                except FileNotFoundError:
+                    raise
+                except OSError as error:
+                    raise UnsafeArtifactPathError(
+                        "artifact path contains an unsafe directory"
+                    ) from error
+                os.close(descriptor)
+                descriptor = child
+            return descriptor, relative_path.name
+        except BaseException:
+            os.close(descriptor)
+            raise
 
-def _canonical_relative_path(value: str | Path) -> PurePosixPath:
+
+def _canonical_relative_path(value: str | Path | PurePosixPath) -> PurePosixPath:
     raw = str(value)
     path = PurePosixPath(raw)
     if (
@@ -181,7 +263,11 @@ def _sha256_descriptor(descriptor: int) -> str:
 
 def _open_regular_file(name: str, parent_fd: int) -> int | None:
     try:
-        descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=parent_fd)
+        descriptor = os.open(
+            name,
+            os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+            dir_fd=parent_fd,
+        )
     except FileNotFoundError:
         return None
     except OSError as error:
@@ -190,6 +276,42 @@ def _open_regular_file(name: str, parent_fd: int) -> int | None:
         os.close(descriptor)
         raise UnsafeArtifactPathError("artifact destination must be a regular file")
     return descriptor
+
+
+def _list_regular_files(
+    directory_fd: int, prefix: PurePosixPath | None = None
+) -> list[PurePosixPath]:
+    files: list[PurePosixPath] = []
+    for name in sorted(os.listdir(directory_fd)):
+        relative_path = PurePosixPath(name) if prefix is None else prefix / name
+        try:
+            entry_stat = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        except OSError as error:
+            raise UnsafeArtifactPathError("artifact inventory changed during listing") from error
+        if stat.S_ISLNK(entry_stat.st_mode):
+            raise UnsafeArtifactPathError("artifact inventory contains a symlink")
+        flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+        if stat.S_ISDIR(entry_stat.st_mode):
+            flags |= os.O_DIRECTORY
+        elif not stat.S_ISREG(entry_stat.st_mode):
+            raise UnsafeArtifactPathError("artifact inventory contains an unsafe entry")
+        try:
+            entry_fd = os.open(name, flags, dir_fd=directory_fd)
+        except OSError as error:
+            raise UnsafeArtifactPathError("artifact inventory changed during listing") from error
+        try:
+            opened_stat = os.fstat(entry_fd)
+            if (opened_stat.st_dev, opened_stat.st_ino) != (entry_stat.st_dev, entry_stat.st_ino):
+                raise UnsafeArtifactPathError("artifact inventory changed during listing")
+            if stat.S_ISDIR(opened_stat.st_mode):
+                files.extend(_list_regular_files(entry_fd, relative_path))
+            elif stat.S_ISREG(opened_stat.st_mode):
+                files.append(relative_path)
+            else:
+                raise UnsafeArtifactPathError("artifact inventory contains an unsafe entry")
+        finally:
+            os.close(entry_fd)
+    return files
 
 
 def _write_all(descriptor: int, data: bytes) -> None:

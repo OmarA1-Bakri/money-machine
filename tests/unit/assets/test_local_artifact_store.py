@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import importlib
 import os
+import signal
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -24,6 +26,10 @@ else:
         type[RuntimeError], getattr(storage_interface, "UnsafeArtifactPathError", RuntimeError)
     )
     LocalArtifactStore = cast(type[object], getattr(storage_local, "LocalArtifactStore", object))
+
+
+def _raise_timeout(_signum: int, _frame: object) -> None:
+    raise TimeoutError("filesystem operation blocked")
 
 
 @pytest.mark.parametrize(
@@ -234,3 +240,81 @@ def test_put_bytes_rejects_immutable_collision(tmp_path: Path) -> None:
         store.put_bytes("bundle/data.json", b"two", "application/json")
 
     assert (tmp_path / "artifacts/bundle/data.json").read_bytes() == b"one"
+
+
+def test_get_bytes_reads_only_exact_verified_regular_file(tmp_path: Path) -> None:
+    store = LocalArtifactStore(tmp_path / "artifacts")
+    reference = store.put_bytes("bundle/data.json", b"one", "application/json")
+
+    assert (
+        store.get_bytes(
+            reference.relative_path,
+            expected_sha256=reference.content_sha256,
+            expected_byte_count=reference.byte_count,
+        )
+        == b"one"
+    )
+
+    with pytest.raises(ValueError, match="artifact byte count mismatch"):
+        store.get_bytes(reference.relative_path, expected_byte_count=4)
+    with pytest.raises(ValueError, match="artifact hash mismatch"):
+        store.get_bytes(reference.relative_path, expected_sha256="0" * 64)
+
+
+def test_get_bytes_rejects_symlinked_source(tmp_path: Path) -> None:
+    root = tmp_path / "artifacts"
+    outside = tmp_path / "outside.txt"
+    outside.write_bytes(b"private")
+    store = LocalArtifactStore(root)
+    (root / "linked.txt").symlink_to(outside)
+
+    with pytest.raises(UnsafeArtifactPathError):
+        store.get_bytes("linked.txt")
+
+
+def test_get_bytes_reports_missing_parent_as_missing_file(tmp_path: Path) -> None:
+    store = LocalArtifactStore(tmp_path / "artifacts")
+
+    with pytest.raises(FileNotFoundError):
+        store.get_bytes("missing/item.txt")
+
+
+@pytest.mark.parametrize("operation", ("get", "put"))
+def test_artifact_store_rejects_fifo_without_blocking(tmp_path: Path, operation: str) -> None:
+    root = tmp_path / "artifacts"
+    store = LocalArtifactStore(root)
+    os.mkfifo(root / "blocked")
+    previous_handler = signal.signal(signal.SIGALRM, _raise_timeout)
+    started = time.monotonic()
+    signal.setitimer(signal.ITIMER_REAL, 0.25)
+    try:
+        with pytest.raises(UnsafeArtifactPathError):
+            if operation == "get":
+                store.get_bytes("blocked")
+            else:
+                store.put_bytes("blocked", b"data", "application/octet-stream")
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
+    assert time.monotonic() - started < 0.1
+
+
+def test_list_files_is_sorted_confined_and_rejects_symlinks(tmp_path: Path) -> None:
+    root = tmp_path / "artifacts"
+    store = LocalArtifactStore(root)
+    store.put_bytes("bundle/z.txt", b"z", "text/plain")
+    store.put_bytes("bundle/nested/a.txt", b"a", "text/plain")
+
+    assert tuple(path.as_posix() for path in store.list_files("bundle")) == (
+        "nested/a.txt",
+        "z.txt",
+    )
+    assert tuple(path.as_posix() for path in store.list_files()) == (
+        "bundle/nested/a.txt",
+        "bundle/z.txt",
+    )
+    assert store.list_files("missing") == ()
+
+    (root / "bundle/linked.txt").symlink_to(root / "bundle/z.txt")
+    with pytest.raises(UnsafeArtifactPathError):
+        store.list_files("bundle")

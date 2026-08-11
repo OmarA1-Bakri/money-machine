@@ -7,11 +7,35 @@ from uuid import UUID
 
 import typer
 
+from money_machine.application.services.product_export_service import ProductExportService
 from money_machine.cli.support import emit, fail, run, settings_or_exit
 from money_machine.persistence.database import Database
 from money_machine.persistence.unit_of_work import UnitOfWork
 
 app = typer.Typer(no_args_is_help=True)
+
+
+@app.command("export")
+def export_artifacts(
+    workflow_run_id: str = typer.Argument(...),
+    json_output: bool = typer.Option(False, "--json"),
+) -> None:
+    del json_output
+    settings = settings_or_exit()
+    try:
+        run_id = UUID(workflow_run_id)
+    except ValueError:
+        fail("INVALID_WORKFLOW_ID", "workflow_run_id must be a UUID")
+
+    async def execute() -> dict[str, object]:
+        database = Database.from_url(settings.database_url)
+        try:
+            receipt = await ProductExportService(database, settings.artifact_root).export(run_id)
+            return receipt.model_dump(mode="json")
+        finally:
+            await database.dispose()
+
+    emit(run(execute()))
 
 
 @app.command("inspect")

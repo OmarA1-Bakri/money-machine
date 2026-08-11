@@ -32,4 +32,5 @@ if ($state -ne "DRAFT_READY") {
     throw "Workflow ended in $state"
 }
 
+Invoke-MoneyMachine artifacts export $workflowId --json | Write-Output
 Invoke-MoneyMachine artifacts inspect $workflowId --json | Write-Output
