@@ -13,13 +13,15 @@
 - Baseline design: `docs/superpowers/specs/2026-08-09-first-product-vertical-slice-design.md`.
 - All behavior changes use red-green-refactor TDD; no production code before an observed failing test.
 - One integration owner controls dependency files, migrations, shared enums/events, orchestration composition, control state, and merges.
-- Parallel workers use isolated Git worktrees and non-overlapping owned paths.
+- Default to one executor. Parallel workers are optional, use isolated Git worktrees and non-overlapping owned paths, and never exceed three active lanes.
 - No Etsy, Notion, messaging, purchase, publication, customer, or provider mutation.
 - `EXTERNAL_EFFECT_MODE` remains `simulation` or `draft`; incremental spend remains exactly `0.00`.
 - No agent may edit `docs/control/` except the integration owner at final reconciliation.
 - Preserve both immutable source files and all Session 00 evidence byte-for-byte.
-- Each task ends with targeted tests, a bounded commit, implementer self-review, and independent task review.
+- Each task ends with targeted tests and a compact structured handoff. Independent review occurs once on the integrated wave, with at most one changed-scope re-review.
 - Full repository verification runs once after all integrated tasks are stable.
+- Route once per phase/wave; every lane inherits that receipt and must not reroute.
+- The same failed command may run once more only after a concrete change. Full suites run only at the final session exit unless changed bytes invalidate prior exit evidence.
 
 ---
 ## File and ownership map
@@ -958,7 +960,7 @@ Then run the first-product script once against a clean dedicated database and re
 
 - [ ] **Step 4: Verify safety and repository boundaries**
 
-Confirm immutable source hashes, zero forbidden tracked files, no secrets, no private packet/runtime artifacts, no external effects, zero spend, clean worktree, and local/remote commit equality after push.
+Confirm immutable source hashes, zero forbidden tracked files, no secrets, no private packet/runtime artifacts, no external effects, zero spend, and a clean candidate worktree. Check local/remote commit equality only after a separately authorized push.
 
 - [ ] **Step 5: Reconcile control state truthfully**
 
@@ -970,9 +972,12 @@ Record the accelerated slice as a separately named verified milestone. Keep `com
 git add docs/control docs/evidence/first-product-slice/FINAL_REVIEW.md
 git commit -m "chore(control): close first product vertical slice"
 ```
-- [ ] **Step 7: Push and clean team worktrees**
+- [ ] **Step 7: Prepare optional external handoff**
 
-Push the reviewed branch, verify remote SHA equality, remove completed linked worktrees, prune worktree metadata, and leave no active team process attached to deleted branches.
+Do not push, delete branches, remove linked worktrees, or prune worktree metadata without separate
+explicit authorization for those external or destructive actions. Record completed worktrees as
+inactive in the checkpoint/ledger and preserve their evidence. If push is separately authorized,
+verify remote SHA equality afterward.
 
 ---
 
@@ -1000,17 +1005,18 @@ Task 2 contract freeze ─────────┴─> integration checkpoint
 
 Task 4 may develop against Task 3's declared interfaces while Task 3 is in review, but it cannot merge until Task 3 is approved. Task 7 consumes the frozen Task 2 contracts and may develop with a contract-valid BuildResult fixture; it cannot merge until Task 6 is approved.
 
-## Swarm operating rules
+## Optimized execution rules
 
-- Invoke `$task-router` for every lane and persist its routing receipt.
-- Use one worktree and branch per lane.
-- Use high-throughput team execution only for non-overlapping owned paths.
+- Invoke `$task-router` once per phase/wave, persist one receipt, and pass each lane only its inherited subset.
+- Default to one executor. Use at most three lanes only for independent, non-overlapping critical-path work.
+- Use one worktree and branch per optional lane; do not create a replacement worktree when the current bound worktree is valid.
 - One integration owner alone changes shared dependency, migration-order, orchestration-composition, and control files.
-- Every lane returns commit SHA, RED evidence, GREEN evidence, static-gate evidence, changed paths, and concerns.
-- Every lane receives independent spec and code-quality review before integration.
-- Integration owner cherry-picks reviewed commits in DAG order; workers never merge themselves.
+- Every lane returns compact RED/GREEN evidence, relevant static gates, changed paths, and concerns.
+- Review the integrated wave once. Re-review only the remediation diff, at most once; unresolved findings return to integrator diagnosis.
+- Integration owner integrates in DAG order; workers never merge themselves.
 - No lane may substitute mocks for the final PostgreSQL/filesystem integration proof.
 - No lane may run provider writes or enable external effects.
+- A failed team launch falls back to one medium-effort executor, not another swarm.
 
 ## Completion signal
 
@@ -1018,4 +1024,4 @@ Task 4 may develop against Task 3's declared interfaces while Task 3 is in revie
 FIRST_PRODUCT_VERTICAL_SLICE_COMPLETE
 ```
 
-This signal is valid only with a real `DRAFT_READY` runtime manifest, exact artifact hashes, zero external effects, zero spend, final review approval, and a clean pushed commit.
+This signal is valid only with a real `DRAFT_READY` runtime manifest, exact artifact hashes, zero external effects, zero spend, final review approval, and a clean local candidate commit. Remote SHA equality is required only when a separate explicit push authorization was given.
