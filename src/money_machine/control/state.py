@@ -63,6 +63,18 @@ SESSION_EVIDENCE_KEYS: Mapping[int, frozenset[str]] = MappingProxyType(
                 "evidence_closure_commit_recorded",
             }
         ),
+        2: frozenset(
+            {
+                "fresh_bootstrap_path_documented",
+                "database_schema_and_migrations_work",
+                "seeds_are_idempotent",
+                "runtime_containers_start",
+                "ci_configuration_complete",
+                "foundation_tests_pass",
+                "control_files_and_checkpoint_current",
+                "evidence_closure_commit_recorded",
+            }
+        ),
         1: frozenset(
             {
                 "playbook_steps_mapped",

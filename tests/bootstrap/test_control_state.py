@@ -1232,3 +1232,25 @@ def test_same_file_helper_uses_inode_identity_not_spelling(tmp_path: Path) -> No
     alias.symlink_to(target, target_is_directory=True)
     assert control_state.same_file(alias, target)
     assert not control_state.same_file(tmp_path / "missing", target)
+
+
+def test_every_known_session_prompt_has_an_evidence_contract_in_order() -> None:
+    """A session cannot be activated or completed without its own evidence keys (D-0010)."""
+    contracts = control_state.SESSION_EVIDENCE_KEYS
+    assert set(contracts) <= set(control_state.SESSION_PROMPTS)
+    assert sorted(contracts) == list(range(len(contracts))), "evidence contracts must be contiguous"
+    for session, keys in contracts.items():
+        assert CLOSURE_EVIDENCE_KEY in keys, session
+        assert len(keys) >= 2, session
+    assert set(contracts[0]) == set(SESSION_00_EVIDENCE_KEYS)
+    assert set(contracts[1]) == set(SESSION_01_EVIDENCE_KEYS)
+    assert set(contracts[2]) == {
+        "fresh_bootstrap_path_documented",
+        "database_schema_and_migrations_work",
+        "seeds_are_idempotent",
+        "runtime_containers_start",
+        "ci_configuration_complete",
+        "foundation_tests_pass",
+        "control_files_and_checkpoint_current",
+        CLOSURE_EVIDENCE_KEY,
+    }

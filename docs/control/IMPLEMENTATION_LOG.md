@@ -113,3 +113,9 @@
 - The post-transition full gate failed: 45 control-state tests broke because their Session 00 fixtures deep-copy the live state, which now carries `transition_contract.completion_requires_next_session: 2`. The fixtures, not the transition, were wrong; the applied Session 01 completion is unaffected and was not rewritten.
 - Fixed by pinning the Session 00 fixture and its candidate to their own transition contract, so programme advance can no longer break session-scoped fixtures. Re-ran the canonical gate: `bash scripts/test.sh` exit 0 with Ruff clean, strict Pyright zero findings, **152 Pytest tests passed** with one filesystem-dependent skip, and Compose configuration valid.
 - Recorded rather than hidden: the earlier 152-test green predates the control-file update, so it did not bind these bytes. The lesson is that the final gate must run after the control files are written, not before.
+
+## 2026-09-07T04:36:32Z — Session 02 activation
+
+- Added Session 02's completion-evidence contract to `SESSION_EVIDENCE_KEYS` from the prompt's own exit criteria: fresh bootstrap path documented, schema and migrations work, seeds idempotent, runtime containers start, CI configuration complete, foundation tests pass, control files current, plus the evidence-closure key. A test now asserts every session's contract is contiguous and carries the closure key, so a future session cannot be activated without one.
+- Ran `money-machine-control activate`: revision 15 to 16, `current_session` 2, `session_status` incomplete, `completed_sessions` `[0, 1]` and the next-session pointer unchanged, all eight Session 02 evidence keys installed as false. `head_sha` still records the Session 01 evidence-closure commit, as the contract requires.
+- No Session 02 implementation work has started. Provider effects remain in simulation; nothing is commissioned.
