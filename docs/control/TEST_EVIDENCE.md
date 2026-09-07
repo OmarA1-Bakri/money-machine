@@ -148,8 +148,41 @@ The later state-pointer commit checkpoints this completed control state without 
 | Push equality | Local `ef4a2039d976285d295e429cebbfdd9951bd7bf4` equalled `git ls-remote` for `origin/build/full-automation` | PASS |
 | Published content boundary | Canonical tracked tree remained 375 paths with no PDF, secret, OMX/runtime evidence, browser/customer/provider payload, dependency cache, knowledge graph, or symlink | PASS |
 | CodeRabbit agents/domain/integrations | Bounded reviews completed with zero issues | PASS |
-| CodeRabbit control | Four files reviewed; one critical, one major, and one trivial issue raised in `src/money_machine/control/state.py` | OPEN |
-| CodeRabbit orchestration | Eighteen files reviewed; one trivial logging-configuration issue raised in `_foundation.py` | OPEN |
+| CodeRabbit control | Four files reviewed; one critical, one major, and one trivial issue raised in `src/money_machine/control/state.py` | FIXED IN CODE 2026-09-07 (see below); vendor re-review pending |
+| CodeRabbit orchestration | Eighteen files reviewed; one trivial logging-configuration issue raised in `_foundation.py` | FIXED IN CODE 2026-09-07 (see below); vendor re-review pending |
 | Remaining CodeRabbit scopes | Persistence, API, tests, apps, and scripts returned recoverable `rate_limit`; CLI requested a 51-52 minute wait or assigned seat/API key | BLOCKED BY CODERABBIT ACCOUNT LIMIT |
 
 Ignored NDJSON receipts are under `.omx/evidence/session-00/coderabbit-scoped/`. The review is truthfully partial: completed scopes produced four issues, while rate-limited scopes are not represented as reviewed.
+
+## 2026-09-07 — Session 01 adversarial review, remediation, and CodeRabbit disposition
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Three-lane adversarial review | `docs/control/reviews/2026-09-07-session-01-adversarial-review.md`; NOT CLEAR at review time, findings 1–13 | RECORDED |
+| Findings 1–8 remediated | Same record, remediation status table; independent re-review of the diff with its HIGH and MEDIUM items remediated | FIXED |
+| Findings 9–13 remediated | `.gitignore`/Ruff exclusions; reachability and effect-mode validators (D-0023); subprocess exit-78 tests; typed commissioning evidence; typed telemetry; `DedupeResult` audit fields | FIXED |
+| CodeRabbit critical: descriptor ownership on `fdopen` failure | `control/state.py` `_atomic_write_json` closes the raw descriptor on failure; `test_atomic_write_closes_raw_descriptor_when_fdopen_fails` | FIXED IN CODE |
+| CodeRabbit major: unbounded Git subprocess without UTF-8 | `_git` uses `timeout=GIT_TIMEOUT_SECONDS`, `encoding="utf-8"`, and maps timeout/decode errors to `ControlStateError`; `test_git_uses_bounded_utf8_subprocess`, `test_git_timeout_is_a_control_state_error`, `test_git_rejects_non_utf8_output` | FIXED IN CODE |
+| CodeRabbit trivial: validate-then-write race | `_state_transition_lock` (`O_CREAT|O_EXCL`) wraps parse, validate, Git verification, and write; lock tests | FIXED IN CODE |
+| CodeRabbit trivial: `basicConfig` in shared helper | `_foundation.unavailable` configures no logging; entry points configure it; `test_shared_unavailable_helper_does_not_configure_root_logging` | FIXED IN CODE |
+| CodeRabbit re-review | Not obtained; the account rate limit and seat assignment are unchanged | BLOCKED BY CODERABBIT ACCOUNT LIMIT |
+| Python gates after remediation | Ruff format/lint clean in repo scope, strict Pyright 0 errors, full Pytest green (see IMPLEMENTATION_LOG entry for counts) | PASS |
+| Web gates | `pnpm install --frozen-lockfile` failed with EACCES on `/mnt/d`; no `apps/` bytes changed since Session 00 green evidence | BLOCKED BY ENVIRONMENT |
+
+The `CODERABBIT_REVIEW_OPEN` blocker stays in `IMPLEMENTATION_STATE.json` until the vendor re-review of the fixes and the rate-limited scopes completes; the fixes themselves are verified by the repository's own tests.
+
+| Observed intermittent gate failure | Evidence | Verdict |
+|---|---|---|
+| Ruff 0.16.2 panic during root-scope `ruff format --check .` | One run of `bash scripts/test.sh` exited 101 with `panicked at crates/ruff_db/src/diagnostic/mod.rs:515:14: Expected a ruff source file`; four immediate reruns of the same command exited 0. Receipt: `.omx/evidence/session-01/ruff-format-panic-2026-09-07.log` (ignored). Root cause UNVERIFIED; changelog not consulted | RECORDED; gate pinned to explicit paths (D-0024) |
+
+## 2026-09-07 — Session 01 closure wave
+
+| Gate | Evidence | Verdict |
+|---|---|---|
+| Required closure reviews | Two independent specialist reviews (data model/lineage/adapter boundaries; exit criteria and operator simplicity). Three HIGH findings raised and remediated: agent-run and prompt-version lineage had no typed carrier, `NOTION_LINK_PUBLISH` contradicted the matrix, reconciliation of uncertain effects was asserted but not designed | RESOLVED |
+| Python gates | `bash scripts/test.sh`: frozen sync, Ruff format and lint, strict Pyright, Pytest, Compose configuration | see final row |
+| Web gates | `pnpm install --frozen-lockfile --package-import-method copy` succeeded after the hardlink rename failure was diagnosed as a 9p `/mnt/d` limitation; `pnpm lint` exit 0, `pnpm typecheck` exit 0, `pnpm test` 2 passed, `pnpm build` exit 0 with the nine expected routes | PASS |
+| Web build first attempt | `TurbopackInternalError … Cannot allocate memory (os error 12)` reading a Next.js runtime file under memory pressure; one rerun after memory freed exited 0. Recorded, not hidden | PASS ON RERUN |
+| Working-tree file loss and reconstruction | While correcting the integration matrix the integrator ran `git checkout -- docs/architecture/INTEGRATION_MATRIX.md`, which discarded the uncommitted Session 01 version and restored the 92-byte committed placeholder. The file was reconstructed in full from content read earlier in the same session and improved with operation codes; a test now asserts it matches the configuration. No other file was affected and no committed history was touched | RECORDED; CONTENT RESTORED AND VERIFIED BY TEST |
+
+The reconstruction is content-equivalent by review, not byte-identical to the lost version; the lost bytes were never committed and cannot be recovered. This is recorded because the repository rule to preserve user work was broken by the integrator.

@@ -108,7 +108,10 @@ def test_postgres_verifiers_require_authenticated_tcp_query() -> None:
     powershell_verifier = (ROOT / "scripts" / "verify_postgres.ps1").read_text(encoding="utf-8")
 
     for verifier in (bash_verifier, powershell_verifier):
-        assert "PGPASSWORD" in verifier
-        assert "127.0.0.1" in verifier
-        assert "SELECT 1;" in verifier
+        query_invocations = [line for line in verifier.splitlines() if "SELECT 1;" in line]
+        assert len(query_invocations) == 1
+        invocation = query_invocations[0]
+        assert "PGPASSWORD" in invocation
+        assert "127.0.0.1" in invocation
+        assert "SELECT 1;" in invocation
         assert "pg_isready" not in verifier

@@ -1,4 +1,274 @@
 version: 1
-status: foundation_only
-agents: []
-
+agents:
+  - agent_id: A01
+    name: Shop Orchestrator
+    implementation_version: 1
+    contract_version: 1
+    system_prompt_reference: agent://A01/system/v1
+    input_contracts: [JobEnvelope]
+    output_contracts: [AgentResult]
+    allowed_tools: [INTERNAL_ORCHESTRATION]
+    provider_operations: [NOTION_SHOP_HQ_WRITE]
+    allowed_side_effect_classes: [NONE, EXTERNAL_WRITE]
+    default_side_effect_class: NONE
+    allowed_retry_classes: [SAFE, IDEMPOTENT]
+    default_retry_class: SAFE
+    timeout_seconds: 300
+    model_policy: default
+    commissioning_state: DESIGNED
+    commissioning_evidence: []
+  - agent_id: A02
+    name: Account & Integration
+    implementation_version: 1
+    contract_version: 1
+    system_prompt_reference: agent://A02/system/v1
+    input_contracts: [JobEnvelope]
+    output_contracts: [AgentResult, IncidentResult]
+    allowed_tools: [PROVIDER_ADAPTER]
+    provider_operations: [ACCOUNT_PROVISIONING, NOTION_WORKSPACE_PROVISION, ETSY_SHOP_PROVISION]
+    allowed_side_effect_classes: [NONE, EXTERNAL_READ, EXTERNAL_WRITE]
+    default_side_effect_class: EXTERNAL_READ
+    allowed_retry_classes: [SAFE, IDEMPOTENT, MANUAL_RESUME]
+    default_retry_class: SAFE
+    timeout_seconds: 600
+    model_policy: default
+    commissioning_state: DESIGNED
+    commissioning_evidence: []
+  - agent_id: A03
+    name: Market Research
+    implementation_version: 1
+    contract_version: 1
+    system_prompt_reference: agent://A03/system/v1
+    input_contracts: [JobEnvelope]
+    output_contracts: [AgentResult, ResearchReport]
+    allowed_tools: [PROVIDER_ADAPTER]
+    provider_operations: [MARKET_RESEARCH_READ]
+    allowed_side_effect_classes: [NONE, EXTERNAL_READ]
+    default_side_effect_class: EXTERNAL_READ
+    allowed_retry_classes: [SAFE]
+    default_retry_class: SAFE
+    timeout_seconds: 900
+    model_policy: default
+    commissioning_state: DESIGNED
+    commissioning_evidence: []
+  - agent_id: A04
+    name: Competitor Teardown
+    implementation_version: 1
+    contract_version: 1
+    system_prompt_reference: agent://A04/system/v1
+    input_contracts: [JobEnvelope, ResearchReport]
+    output_contracts: [AgentResult, TeardownReport]
+    allowed_tools: [PROVIDER_ADAPTER]
+    provider_operations: [COMPETITOR_PURCHASE]
+    allowed_side_effect_classes: [NONE, EXTERNAL_SPEND]
+    default_side_effect_class: NONE
+    allowed_retry_classes: [SAFE, RECONCILE_FIRST]
+    default_retry_class: SAFE
+    timeout_seconds: 900
+    model_policy: default
+    commissioning_state: DESIGNED
+    commissioning_evidence: []
+  - agent_id: A05
+    name: Product Strategy
+    implementation_version: 1
+    contract_version: 1
+    system_prompt_reference: agent://A05/system/v1
+    input_contracts: [JobEnvelope, ResearchReport, TeardownReport]
+    output_contracts: [AgentResult, ProductSpec]
+    allowed_tools: [INTERNAL_ORCHESTRATION]
+    provider_operations: []
+    allowed_side_effect_classes: [NONE]
+    default_side_effect_class: NONE
+    allowed_retry_classes: [SAFE]
+    default_retry_class: SAFE
+    timeout_seconds: 600
+    model_policy: default
+    commissioning_state: DESIGNED
+    commissioning_evidence: []
+  - agent_id: A06
+    name: Catalogue Dedupe
+    implementation_version: 1
+    contract_version: 1
+    system_prompt_reference: agent://A06/system/v1
+    input_contracts: [JobEnvelope, ProductSpec]
+    output_contracts: [AgentResult, DedupeResult]
+    allowed_tools: [INTERNAL_ORCHESTRATION]
+    provider_operations: []
+    allowed_side_effect_classes: [NONE]
+    default_side_effect_class: NONE
+    allowed_retry_classes: [SAFE]
+    default_retry_class: SAFE
+    timeout_seconds: 300
+    model_policy: default
+    commissioning_state: DESIGNED
+    commissioning_evidence: []
+  - agent_id: A07
+    name: Notion Product Builder
+    implementation_version: 1
+    contract_version: 1
+    system_prompt_reference: agent://A07/system/v1
+    input_contracts: [JobEnvelope, ProductSpec]
+    output_contracts: [AgentResult, BuildResult]
+    allowed_tools: [PROVIDER_ADAPTER]
+    provider_operations: [NOTION_PRODUCT_WRITE, NOTION_PRODUCT_REPAIR]
+    allowed_side_effect_classes: [EXTERNAL_WRITE]
+    default_side_effect_class: EXTERNAL_WRITE
+    allowed_retry_classes: [IDEMPOTENT, RECONCILE_FIRST]
+    default_retry_class: IDEMPOTENT
+    timeout_seconds: 1200
+    model_policy: default
+    commissioning_state: DESIGNED
+    commissioning_evidence: []
+  - agent_id: A08
+    name: Variant Builder
+    implementation_version: 1
+    contract_version: 1
+    system_prompt_reference: agent://A08/system/v1
+    input_contracts: [JobEnvelope, BuildResult]
+    output_contracts: [AgentResult, BuildResult]
+    allowed_tools: [PROVIDER_ADAPTER]
+    provider_operations: [NOTION_VARIANT_WRITE, NOTION_LINK_PUBLISH]
+    allowed_side_effect_classes: [EXTERNAL_WRITE]
+    default_side_effect_class: EXTERNAL_WRITE
+    allowed_retry_classes: [IDEMPOTENT, RECONCILE_FIRST]
+    default_retry_class: IDEMPOTENT
+    timeout_seconds: 1200
+    model_policy: default
+    commissioning_state: DESIGNED
+    commissioning_evidence: []
+  - agent_id: A09
+    name: Product QA
+    implementation_version: 1
+    contract_version: 1
+    system_prompt_reference: agent://A09/system/v1
+    input_contracts: [JobEnvelope, BuildResult]
+    output_contracts: [AgentResult, ProductQAResult]
+    allowed_tools: [PROVIDER_ADAPTER]
+    provider_operations: [NOTION_BUILD_READ, NOTION_LINK_READ]
+    allowed_side_effect_classes: [EXTERNAL_READ]
+    default_side_effect_class: EXTERNAL_READ
+    allowed_retry_classes: [SAFE]
+    default_retry_class: SAFE
+    timeout_seconds: 600
+    model_policy: default
+    commissioning_state: DESIGNED
+    commissioning_evidence: []
+  - agent_id: A10
+    name: Merchandising
+    implementation_version: 1
+    contract_version: 1
+    system_prompt_reference: agent://A10/system/v1
+    input_contracts: [JobEnvelope, ProductSpec, BuildResult]
+    output_contracts: [AgentResult, ListingPackage]
+    allowed_tools: [INTERNAL_ORCHESTRATION]
+    provider_operations: []
+    allowed_side_effect_classes: [NONE]
+    default_side_effect_class: NONE
+    allowed_retry_classes: [SAFE]
+    default_retry_class: SAFE
+    timeout_seconds: 600
+    model_policy: default
+    commissioning_state: DESIGNED
+    commissioning_evidence: []
+  - agent_id: A11
+    name: Creative Asset
+    implementation_version: 1
+    contract_version: 1
+    system_prompt_reference: agent://A11/system/v1
+    input_contracts: [JobEnvelope, ProductSpec, BuildResult]
+    output_contracts: [AgentResult, BuildResult, ArtifactReference]
+    allowed_tools: [INTERNAL_RENDERER, PROVIDER_ADAPTER]
+    provider_operations: [NOTION_SCREENSHOT_READ]
+    allowed_side_effect_classes: [NONE, EXTERNAL_READ]
+    default_side_effect_class: NONE
+    allowed_retry_classes: [SAFE]
+    default_retry_class: SAFE
+    timeout_seconds: 1200
+    model_policy: default
+    commissioning_state: DESIGNED
+    commissioning_evidence: []
+  - agent_id: A12
+    name: Preflight
+    implementation_version: 1
+    contract_version: 1
+    system_prompt_reference: agent://A12/system/v1
+    input_contracts: [JobEnvelope, ListingPackage]
+    output_contracts: [AgentResult, PreflightResult]
+    allowed_tools: [PROVIDER_ADAPTER]
+    provider_operations: [ETSY_DRAFT_READ]
+    allowed_side_effect_classes: [EXTERNAL_READ]
+    default_side_effect_class: EXTERNAL_READ
+    allowed_retry_classes: [SAFE]
+    default_retry_class: SAFE
+    timeout_seconds: 600
+    model_policy: default
+    commissioning_state: DESIGNED
+    commissioning_evidence: []
+  - agent_id: A13
+    name: Etsy Publishing
+    implementation_version: 1
+    contract_version: 1
+    system_prompt_reference: agent://A13/system/v1
+    input_contracts: [JobEnvelope, ListingPackage, PreflightResult]
+    output_contracts: [AgentResult]
+    allowed_tools: [PROVIDER_ADAPTER]
+    provider_operations: [ETSY_DRAFT_WRITE, ETSY_PUBLISH, ETSY_POST_PUBLISH_CHECKOUT, ETSY_DEACTIVATE, ETSY_LISTING_REPAIR]
+    allowed_side_effect_classes: [EXTERNAL_WRITE, EXTERNAL_SPEND]
+    default_side_effect_class: EXTERNAL_WRITE
+    allowed_retry_classes: [IDEMPOTENT, RECONCILE_FIRST]
+    default_retry_class: RECONCILE_FIRST
+    timeout_seconds: 1200
+    model_policy: default
+    commissioning_state: DESIGNED
+    commissioning_evidence: []
+  - agent_id: A14
+    name: Analytics
+    implementation_version: 1
+    contract_version: 1
+    system_prompt_reference: agent://A14/system/v1
+    input_contracts: [JobEnvelope]
+    output_contracts: [AgentResult, MetricsSnapshot]
+    allowed_tools: [PROVIDER_ADAPTER]
+    provider_operations: [ETSY_METRICS_READ]
+    allowed_side_effect_classes: [EXTERNAL_READ]
+    default_side_effect_class: EXTERNAL_READ
+    allowed_retry_classes: [SAFE, IDEMPOTENT]
+    default_retry_class: SAFE
+    timeout_seconds: 600
+    model_policy: default
+    commissioning_state: DESIGNED
+    commissioning_evidence: []
+  - agent_id: A15
+    name: Cull & Multiply
+    implementation_version: 1
+    contract_version: 1
+    system_prompt_reference: agent://A15/system/v1
+    input_contracts: [JobEnvelope, MetricsSnapshot]
+    output_contracts: [AgentResult, PortfolioDecision, ProductSpec]
+    allowed_tools: [INTERNAL_ORCHESTRATION]
+    provider_operations: []
+    allowed_side_effect_classes: [NONE]
+    default_side_effect_class: NONE
+    allowed_retry_classes: [SAFE]
+    default_retry_class: SAFE
+    timeout_seconds: 600
+    model_policy: default
+    commissioning_state: DESIGNED
+    commissioning_evidence: []
+  - agent_id: A16
+    name: Customer Support & Repair
+    implementation_version: 1
+    contract_version: 1
+    system_prompt_reference: agent://A16/system/v1
+    input_contracts: [JobEnvelope, IncidentResult]
+    output_contracts: [AgentResult, IncidentResult]
+    allowed_tools: [INTERNAL_ORCHESTRATION, PROVIDER_ADAPTER]
+    provider_operations: [CUSTOMER_SUPPORT_READ, PROOF_DISTRIBUTION]
+    allowed_side_effect_classes: [NONE, EXTERNAL_READ, EXTERNAL_MESSAGE]
+    default_side_effect_class: NONE
+    allowed_retry_classes: [SAFE, RECONCILE_FIRST]
+    default_retry_class: SAFE
+    timeout_seconds: 900
+    model_policy: default
+    commissioning_state: DESIGNED
+    commissioning_evidence: []

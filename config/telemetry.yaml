@@ -1,4 +1,26 @@
 version: 1
 enabled: false
-allowed_events: []
-
+allowed_events:
+  - workflow_started
+  - job_started
+  - job_completed
+  - job_failed
+  - agent_run_started
+  - agent_run_completed
+  - research_completed
+  - product_qualified
+  - dedupe_failed
+  - build_completed
+  - qa_failed
+  - assets_completed
+  - draft_created
+  - publish_started
+  - publish_completed
+  - publish_failed
+  - metrics_collected
+  - winner_detected
+  - listing_culled
+  - successor_created
+  - incident_opened
+  - incident_resolved
+  - human_intervention_required

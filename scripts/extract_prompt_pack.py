@@ -112,6 +112,7 @@ def build(workbook: Path, output_dir: Path, check: bool) -> dict[str, object]:
         raise ValueError("Appendix A and Appendix B register different files")
 
     trace_files: list[dict[str, object]] = []
+    prompt_files: dict[str, bytes] = {}
     expected_names: set[str] = set()
     for entry in entries:
         name = entry["name"]
@@ -135,12 +136,23 @@ def build(workbook: Path, output_dir: Path, check: bool) -> dict[str, object]:
                 "sha256": digest,
             }
         )
+        prompt_files[name] = content
+
+    actual_markdown = {path.name for path in output_dir.glob("*.md")}
+    if unexpected_markdown := actual_markdown.difference(expected_names):
+        names = ", ".join(sorted(unexpected_markdown))
+        raise ValueError(f"output directory contains unexpected Markdown prompts: {names}")
+    if check and actual_markdown != expected_names:
+        raise ValueError("output directory contains a missing Markdown prompt")
+
+    if not check:
+        output_dir.mkdir(parents=True, exist_ok=True)
+    for name, content in prompt_files.items():
         destination = output_dir / name
         if check:
             if not destination.is_file() or destination.read_bytes() != content:
                 raise ValueError(f"{name}: generated file is missing or stale")
         else:
-            output_dir.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(content)
 
     trace: dict[str, object] = {
@@ -162,9 +174,6 @@ def build(workbook: Path, output_dir: Path, check: bool) -> dict[str, object]:
         else:
             destination.write_bytes(content)
 
-    actual_markdown = {path.name for path in output_dir.glob("*.md")}
-    if actual_markdown != expected_names:
-        raise ValueError("output directory contains a missing or unexpected Markdown prompt")
     return trace
 
 

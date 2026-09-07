@@ -1,4 +1,35 @@
 version: 1
-status: not_implemented
-rules: []
-
+research_rows:
+  minimum: 25
+  maximum: 40
+shortlisted_candidates: 5
+qualification:
+  build_threshold: 30
+  maximum_score: 40
+niche_selection:
+  primary: 1
+  backup: 1
+product_shape:
+  hubs:
+    minimum: 6
+    maximum: 8
+  colour_variants:
+    minimum: 3
+    maximum: 4
+listing_assets:
+  tags: 13
+  images: 10
+  videos: 1
+  description_sections: 8
+  quantity: 999
+  image_role: listing_image
+  video_role: listing_video
+portfolio:
+  maturity_live_days: 30
+  cull_bottom_percent: "80"
+  deep_pass_cadence: monthly
+experiments:
+  new_fronts_per_batch: 1
+dedupe:
+  rule_version: title-jaccard-v1
+  title_jaccard_threshold: "0.70"

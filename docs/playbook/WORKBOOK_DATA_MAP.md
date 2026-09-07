@@ -7,4 +7,4 @@
 | 3 | 79 | Product spec sheet | ProductSpec + Catalogue entry | ProductSpecJob / product agent | Operator supplies non-derivable creative choices; dedupe remains binding. | 05 |
 | 4 | 80 | Launch checklist | PreflightReport | PreflightJob / QA agent | All file, link, image, copy, price, and draft checks block publish on failure. | 09 |
 | 5 | 81 | Weekly loop scorecard | WeeklyMetricSnapshot + ReviewVerdict | WeeklyReviewJob / analytics agent | Provider metric access and mature/defect rules must be reconciled. | 10 |
-| 6 | 82 | First milestones | MilestoneEvent[] | MilestoneProjectionJob / orchestrator | Events must arise from verified durable evidence, not manual claims. | 10 |
+| 6 | 82 | First milestones | MilestoneEvent[] | derived by `WeeklyReviewJob` / `MonthlyDeepPassJob` analytics (no separate job) | Events must arise from verified durable evidence, not manual claims. | 10 |

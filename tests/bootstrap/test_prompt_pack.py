@@ -18,10 +18,12 @@ def digest(path: Path) -> str:
 
 
 def test_registered_sources_remain_byte_identical() -> None:
-    register = json.loads((ROOT / "docs/source/CANONICAL_SOURCE_REGISTER.json").read_text())
+    register = json.loads(
+        (ROOT / "docs/source/CANONICAL_SOURCE_REGISTER.json").read_text(encoding="utf-8")
+    )
     assert register["schema_version"] == 1
     assert not (ROOT / "docs/source/POST_RENAME_SOURCE_RECEIPT.json").exists()
-    assert "*.pdf" in (ROOT / ".gitignore").read_text().splitlines()
+    assert "*.pdf" in (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
     receipt_path = ".omx/ultragoal/source-preservation-receipt.json"
     repository = subprocess.run(
         ["git", "rev-parse", "--is-inside-work-tree"],
@@ -40,7 +42,7 @@ def test_registered_sources_remain_byte_identical() -> None:
         )
         assert ignored.stdout.strip() == receipt_path
     else:
-        assert ".omx/" in (ROOT / ".gitignore").read_text().splitlines()
+        assert ".omx/" in (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
     for source in register["sources"]:
         path = ROOT / source["path"]
         if path.is_file():
@@ -62,7 +64,7 @@ def test_prompt_pack_matches_appendix_and_is_deterministic(tmp_path: Path) -> No
     ]
     first = subprocess.run(command, check=True, capture_output=True, text=True)
     assert "verified 21 prompt files" in first.stdout
-    trace = json.loads((tmp_path / "TRACEABILITY.json").read_text())
+    trace = json.loads((tmp_path / "TRACEABILITY.json").read_text(encoding="utf-8"))
     assert trace["file_count"] == 21
     assert (
         trace["appendix_manifest_sha256"]
@@ -81,6 +83,34 @@ def test_prompt_pack_matches_appendix_and_is_deterministic(tmp_path: Path) -> No
     after = {path.name: path.read_bytes() for path in tmp_path.iterdir()}
     assert after == before
     subprocess.run([*command, "--check"], check=True, capture_output=True, text=True)
+
+
+def test_prompt_pack_rejects_unexpected_markdown_before_writing(tmp_path: Path) -> None:
+    manifest = json.loads((PROMPTS / "MANIFEST.json").read_text(encoding="utf-8"))
+    expected = tmp_path / manifest["files"][0]["name"]
+    unexpected = tmp_path / "unexpected.md"
+    expected.write_bytes(b"expected sentinel\n")
+    unexpected.write_bytes(b"unexpected sentinel\n")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/extract_prompt_pack.py"),
+            "--workbook",
+            str(WORKBOOK),
+            "--output",
+            str(tmp_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "unexpected Markdown" in result.stderr
+    assert expected.read_bytes() == b"expected sentinel\n"
+    assert unexpected.read_bytes() == b"unexpected sentinel\n"
+    assert set(tmp_path.iterdir()) == {expected, unexpected}
 
 
 def test_appendix_b_is_an_independent_canonical_register() -> None:
@@ -148,8 +178,8 @@ def test_canonical_source_verifier_reads_pdf_or_supports_clean_clone(tmp_path: P
 
 
 def test_every_appendix_file_has_one_copy_marker_pair() -> None:
-    source = WORKBOOK.read_text()
-    manifest = json.loads((PROMPTS / "MANIFEST.json").read_text())
+    source = WORKBOOK.read_text(encoding="utf-8")
+    manifest = json.loads((PROMPTS / "MANIFEST.json").read_text(encoding="utf-8"))
     assert len(manifest["files"]) == 21
     for entry in manifest["files"]:
         name = re.escape(entry["name"])
@@ -158,12 +188,14 @@ def test_every_appendix_file_has_one_copy_marker_pair() -> None:
 
 
 def test_pdf_and_required_item_coverage_are_exhaustive() -> None:
-    page_map = (ROOT / "docs/source/PDF_PAGE_COVERAGE.md").read_text()
+    page_map = (ROOT / "docs/source/PDF_PAGE_COVERAGE.md").read_text(encoding="utf-8")
     pages = [int(value) for value in re.findall(r"^\| (\d+) \|", page_map, re.MULTILINE)]
     assert pages == list(range(1, 83))
 
-    chapter_map = (ROOT / "docs/playbook/CHAPTER_TO_CAPABILITY_MAP.md").read_text()
-    observed_steps = set(re.findall(r"^\| ((?:12|13|14|15|16)\.\d+) \|", chapter_map, re.MULTILINE))
+    chapter_map = (ROOT / "docs/playbook/CHAPTER_TO_CAPABILITY_MAP.md").read_text(encoding="utf-8")
+    observed_steps = set(
+        re.findall(r"^\| ((?:12|13|14|15|16)\.\d+)(?:, [^|]+)? \|", chapter_map, re.MULTILINE)
+    )
     expected_steps = {
         *(f"12.{n}" for n in range(1, 6)),
         *(f"13.{n}" for n in range(1, 7)),
@@ -173,11 +205,27 @@ def test_pdf_and_required_item_coverage_are_exhaustive() -> None:
     }
     assert observed_steps == expected_steps
 
-    prompt_map = (ROOT / "docs/playbook/PROMPT_LIBRARY_MAP.md").read_text()
-    assert [int(value) for value in re.findall(r"^\| (\d+) \|", prompt_map, re.MULTILINE)] == list(
-        range(1, 14)
-    )
-    workbook_map = (ROOT / "docs/playbook/WORKBOOK_DATA_MAP.md").read_text()
+    prompt_map = (ROOT / "docs/playbook/PROMPT_LIBRARY_MAP.md").read_text(encoding="utf-8")
+    assert [
+        int(value) for value in re.findall(r"^\| (\d+)(?:, [^|]+)? \|", prompt_map, re.MULTILINE)
+    ] == list(range(1, 14))
+    workbook_map = (ROOT / "docs/playbook/WORKBOOK_DATA_MAP.md").read_text(encoding="utf-8")
     assert [
         int(value) for value in re.findall(r"^\| (\d+) \|", workbook_map, re.MULTILINE)
     ] == list(range(1, 7))
+
+
+def test_capability_maps_conform_to_their_declared_table_schema() -> None:
+    maps = (
+        (ROOT / "docs/playbook/CHAPTER_TO_CAPABILITY_MAP.md", 31),
+        (ROOT / "docs/playbook/PROMPT_LIBRARY_MAP.md", 13),
+    )
+    for path, expected_rows in maps:
+        table_rows = [
+            line for line in path.read_text(encoding="utf-8").splitlines() if line.startswith("|")
+        ]
+        expected_columns = len(table_rows[0].strip("|").split("|"))
+        data_rows = table_rows[2:]
+
+        assert len(data_rows) == expected_rows
+        assert all(len(row.strip("|").split("|")) == expected_columns for row in data_rows)

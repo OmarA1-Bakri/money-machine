@@ -1,5 +1,19 @@
 version: 1
 mode: simulation
+currency: USD
 external_mutations_enabled: false
-spend_enabled: false
-
+external_spend_enabled: false
+auto_publish: false
+auto_deactivate: false
+auto_multiply: false
+external_message_enabled: false
+message_monthly_cap: 0
+authorized_recipient_scopes: []
+recipient_consent_evidence_required: true
+competitor_purchase_enabled: false
+competitor_purchase_max_each: "0.00"
+competitor_purchase_monthly_cap: "0.00"
+live_checkout_test_enabled: false
+live_checkout_test_cap: "0.00"
+weekly_listing_cap: 2
+paid_tool_monthly_cap: "0.00"

@@ -1,4 +1,9 @@
 version: 1
-status: disabled
 publishing_enabled: false
-
+launch_target:
+  minimum: 2
+  maximum: 3
+initial_weekly_cap: 2
+hard_weekly_cap: 15
+rolling_window_days: 7
+count_only_reconciled_publications: true

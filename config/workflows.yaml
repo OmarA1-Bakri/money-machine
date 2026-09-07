@@ -1,4 +1,380 @@
 version: 1
-status: foundation_only
-workflows: []
-
+workflows:
+  - workflow_type: ProductLifecycleWorkflow
+    version: 1
+    entry_job_types: [ProvisioningCheckJob, ScheduleConfigurationJob]
+    jobs:
+      - job_type: ProvisioningCheckJob
+        owner_agent_id: A02
+        side_effect_class: EXTERNAL_WRITE
+        retry_class: MANUAL_RESUME
+        allowed_modes: [simulation, live]
+        output_contracts: [AgentResult, IncidentResult]
+        admitted_events: [ACCOUNT_CONNECTED, CREDENTIAL_REQUIRED]
+        successor_job_types: [EnvironmentAuditJob]
+        capability_operation: ACCOUNT_PROVISIONING
+        capability_channel: MANUAL_EXTERNAL_BLOCKER
+      - job_type: EnvironmentAuditJob
+        owner_agent_id: A02
+        side_effect_class: NONE
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, IncidentResult]
+        admitted_events: [ENVIRONMENT_AUDITED, CREDENTIAL_REQUIRED]
+        successor_job_types: [WorkspaceProvisioningJob]
+      - job_type: WorkspaceProvisioningJob
+        owner_agent_id: A02
+        side_effect_class: EXTERNAL_WRITE
+        retry_class: MANUAL_RESUME
+        allowed_modes: [simulation, live]
+        output_contracts: [AgentResult, IncidentResult]
+        admitted_events: [ACCOUNT_CONNECTED, CREDENTIAL_REQUIRED]
+        successor_job_types: [ShopProvisioningJob]
+        capability_operation: NOTION_WORKSPACE_PROVISION
+        capability_channel: MANUAL_EXTERNAL_BLOCKER
+      - job_type: ShopProvisioningJob
+        owner_agent_id: A02
+        side_effect_class: EXTERNAL_WRITE
+        retry_class: MANUAL_RESUME
+        allowed_modes: [simulation, live]
+        output_contracts: [AgentResult, IncidentResult]
+        admitted_events: [ACCOUNT_CONNECTED, CREDENTIAL_REQUIRED]
+        successor_job_types: [BootstrapRecordsJob]
+        capability_operation: ETSY_SHOP_PROVISION
+        capability_channel: MANUAL_EXTERNAL_BLOCKER
+      - job_type: BootstrapRecordsJob
+        owner_agent_id: A01
+        side_effect_class: EXTERNAL_WRITE
+        retry_class: IDEMPOTENT
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult]
+        admitted_events: [SHOP_BOOTSTRAPPED]
+        successor_job_types: [ResearchCollectionJob]
+        capability_operation: NOTION_SHOP_HQ_WRITE
+        capability_channel: DIRECT_API
+      - job_type: ResearchCollectionJob
+        owner_agent_id: A03
+        side_effect_class: EXTERNAL_READ
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, ResearchReport]
+        admitted_events: [RESEARCH_COMPLETED]
+        successor_job_types: [ShortlistJob]
+        capability_operation: MARKET_RESEARCH_READ
+        capability_channel: BROWSER
+      - job_type: ShortlistJob
+        owner_agent_id: A03
+        side_effect_class: NONE
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult]
+        admitted_events: [NICHE_SHORTLISTED]
+        successor_job_types: [QualificationJob]
+      - job_type: QualificationJob
+        owner_agent_id: A05
+        side_effect_class: NONE
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult]
+        admitted_events: [PRODUCT_QUALIFIED, PRODUCT_REJECTED]
+        successor_job_types: [NicheSelectionJob]
+      - job_type: NicheSelectionJob
+        owner_agent_id: A05
+        side_effect_class: NONE
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult]
+        admitted_events: [NICHE_SELECTED]
+        successor_job_types: [CompetitorPurchaseJob]
+      - job_type: CompetitorPurchaseJob
+        owner_agent_id: A04
+        side_effect_class: EXTERNAL_SPEND
+        retry_class: RECONCILE_FIRST
+        allowed_modes: [simulation, live]
+        output_contracts: [AgentResult]
+        admitted_events: [COMPETITOR_PURCHASED, CREDENTIAL_REQUIRED]
+        successor_job_types: [TeardownJob]
+        capability_operation: COMPETITOR_PURCHASE
+        capability_channel: BROWSER
+      - job_type: TeardownJob
+        owner_agent_id: A04
+        side_effect_class: NONE
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, TeardownReport]
+        admitted_events: [TEARDOWN_COMPLETED]
+        successor_job_types: [ProductSpecJob]
+      - job_type: ProductSpecJob
+        owner_agent_id: A05
+        side_effect_class: NONE
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, ProductSpec]
+        admitted_events: [PRODUCT_SPEC_CREATED]
+        successor_job_types: [DedupeJob]
+      - job_type: DedupeJob
+        owner_agent_id: A06
+        side_effect_class: NONE
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, DedupeResult]
+        admitted_events: [DEDUPE_PASSED, DEDUPE_FAILED]
+        successor_job_types: [ProductBuildJob, ReconceptProductJob]
+      - job_type: ReconceptProductJob
+        owner_agent_id: A05
+        side_effect_class: NONE
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, ProductSpec]
+        admitted_events: [PRODUCT_SPEC_CREATED]
+        successor_job_types: [DedupeJob]
+      - job_type: ProductBuildJob
+        owner_agent_id: A07
+        side_effect_class: EXTERNAL_WRITE
+        retry_class: IDEMPOTENT
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, BuildResult]
+        admitted_events: [BUILD_COMPLETED]
+        successor_job_types: [ProductQAJob]
+        capability_operation: NOTION_PRODUCT_WRITE
+        capability_channel: DIRECT_API
+      - job_type: ProductQAJob
+        owner_agent_id: A09
+        side_effect_class: EXTERNAL_READ
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, ProductQAResult]
+        admitted_events: [BUILD_QA_PASSED, BUILD_QA_FAILED, REPAIR_COMPLETED]
+        successor_job_types: [VariantBuildJob, BuildRepairJob]
+        capability_operation: NOTION_BUILD_READ
+        capability_channel: DIRECT_API
+      - job_type: BuildRepairJob
+        owner_agent_id: A07
+        side_effect_class: EXTERNAL_WRITE
+        retry_class: RECONCILE_FIRST
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, BuildResult]
+        admitted_events: [REPAIR_APPLIED]
+        successor_job_types: [ProductQAJob]
+        capability_operation: NOTION_PRODUCT_REPAIR
+        capability_channel: DIRECT_API
+      - job_type: VariantBuildJob
+        owner_agent_id: A08
+        side_effect_class: EXTERNAL_WRITE
+        retry_class: IDEMPOTENT
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, BuildResult]
+        admitted_events: [VARIANTS_COMPLETED]
+        successor_job_types: [VariantPublishJob]
+        capability_operation: NOTION_VARIANT_WRITE
+        capability_channel: DIRECT_API
+      - job_type: VariantPublishJob
+        owner_agent_id: A08
+        side_effect_class: EXTERNAL_WRITE
+        retry_class: RECONCILE_FIRST
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, BuildResult]
+        admitted_events: [VARIANT_LINKS_VERIFIED]
+        successor_job_types: [ScreenshotJob]
+        capability_operation: NOTION_LINK_PUBLISH
+        capability_channel: BROWSER
+      - job_type: ScreenshotJob
+        owner_agent_id: A11
+        side_effect_class: EXTERNAL_READ
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, BuildResult, ArtifactReference]
+        admitted_events: [SCREENSHOTS_CAPTURED]
+        successor_job_types: [ListingCopyJob, AssetFactoryJob, DeliveryBuildJob]
+        capability_operation: NOTION_SCREENSHOT_READ
+        capability_channel: BROWSER
+      - job_type: ListingCopyJob
+        owner_agent_id: A10
+        side_effect_class: NONE
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, ListingPackage]
+        admitted_events: [LISTING_COPY_COMPLETED]
+        successor_job_types: [PricingJob, DraftListingJob]
+      - job_type: AssetFactoryJob
+        owner_agent_id: A11
+        side_effect_class: NONE
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, BuildResult, ArtifactReference]
+        admitted_events: [ASSETS_COMPLETED]
+        successor_job_types: [DraftListingJob]
+      - job_type: DeliveryBuildJob
+        owner_agent_id: A11
+        side_effect_class: NONE
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, BuildResult, ArtifactReference]
+        admitted_events: [DELIVERY_FILES_COMPLETED]
+        successor_job_types: [PreflightJob]
+      - job_type: PricingJob
+        owner_agent_id: A10
+        side_effect_class: NONE
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, ListingPackage]
+        admitted_events: [PRICING_COMPLETED]
+        successor_job_types: [DraftListingJob]
+      - job_type: DraftListingJob
+        owner_agent_id: A13
+        side_effect_class: EXTERNAL_WRITE
+        retry_class: RECONCILE_FIRST
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, ListingPackage]
+        admitted_events: [DRAFT_CREATED]
+        successor_job_types: [PreflightJob]
+        capability_operation: ETSY_DRAFT_WRITE
+        capability_channel: DIRECT_API
+      - job_type: PreflightJob
+        owner_agent_id: A12
+        side_effect_class: EXTERNAL_READ
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, PreflightResult]
+        admitted_events: [PREFLIGHT_PASSED, PREFLIGHT_FAILED, REPAIR_COMPLETED]
+        successor_job_types: [PublishListingJob, ListingRepairJob]
+        capability_operation: ETSY_DRAFT_READ
+        capability_channel: DIRECT_API
+      - job_type: ListingRepairJob
+        owner_agent_id: A13
+        side_effect_class: EXTERNAL_WRITE
+        retry_class: RECONCILE_FIRST
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, ListingPackage]
+        admitted_events: [REPAIR_APPLIED]
+        successor_job_types: [PreflightJob]
+        capability_operation: ETSY_LISTING_REPAIR
+        capability_channel: DIRECT_API
+      - job_type: PublishListingJob
+        owner_agent_id: A13
+        side_effect_class: EXTERNAL_WRITE
+        retry_class: RECONCILE_FIRST
+        allowed_modes: [simulation, live]
+        output_contracts: [AgentResult]
+        admitted_events: [LISTING_PUBLISHED]
+        successor_job_types: [PostPublishVerificationJob]
+        capability_operation: ETSY_PUBLISH
+        capability_channel: DIRECT_API
+      - job_type: PostPublishVerificationJob
+        owner_agent_id: A13
+        side_effect_class: EXTERNAL_SPEND
+        retry_class: RECONCILE_FIRST
+        allowed_modes: [simulation, live]
+        output_contracts: [AgentResult, IncidentResult]
+        admitted_events: [POST_PUBLISH_VERIFIED, JOB_FAILED]
+        successor_job_types: [ProofDistributionJob, WeeklyReviewJob, IncidentRepairJob]
+        capability_operation: ETSY_POST_PUBLISH_CHECKOUT
+        capability_channel: BROWSER
+      - job_type: ProofDistributionJob
+        owner_agent_id: A16
+        side_effect_class: EXTERNAL_MESSAGE
+        retry_class: RECONCILE_FIRST
+        allowed_modes: [simulation, live]
+        output_contracts: [AgentResult, IncidentResult]
+        admitted_events: [PROOF_FEEDBACK_CAPTURED, CUSTOMER_ISSUE_RECEIVED]
+        successor_job_types: [IncidentRepairJob, WeeklyReviewJob]
+        capability_operation: PROOF_DISTRIBUTION
+        capability_channel: MANUAL_EXTERNAL_BLOCKER
+      - job_type: IncidentRepairJob
+        owner_agent_id: A16
+        side_effect_class: NONE
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, IncidentResult]
+        admitted_events: [REPAIR_COMPLETED, JOB_FAILED]
+        successor_job_types: [NotionRepairJob, ListingRepairJob, WeeklyReviewJob]
+      - job_type: NotionRepairJob
+        owner_agent_id: A07
+        side_effect_class: EXTERNAL_WRITE
+        retry_class: RECONCILE_FIRST
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, BuildResult]
+        admitted_events: [REPAIR_APPLIED]
+        successor_job_types: [LinkVerificationJob]
+        capability_operation: NOTION_PRODUCT_REPAIR
+        capability_channel: DIRECT_API
+      - job_type: LinkVerificationJob
+        owner_agent_id: A09
+        side_effect_class: EXTERNAL_READ
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, ProductQAResult, IncidentResult]
+        admitted_events: [VARIANT_LINKS_VERIFIED, BROKEN_LINK_DETECTED, REPAIR_COMPLETED]
+        successor_job_types: [IncidentRepairJob]
+        capability_operation: NOTION_LINK_READ
+        capability_channel: BROWSER
+      - job_type: ScheduleConfigurationJob
+        owner_agent_id: A01
+        side_effect_class: NONE
+        retry_class: IDEMPOTENT
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult]
+        admitted_events: [SCHEDULE_CONFIGURED]
+        successor_job_types: [WeeklyReviewJob, MonthlyDeepPassJob]
+      - job_type: WeeklyReviewJob
+        owner_agent_id: A14
+        side_effect_class: EXTERNAL_READ
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, MetricsSnapshot]
+        admitted_events: [METRICS_CAPTURED, LISTING_MATURED]
+        successor_job_types: [PortfolioDecisionJob, LinkVerificationJob]
+        capability_operation: ETSY_METRICS_READ
+        capability_channel: DIRECT_API
+      - job_type: PortfolioDecisionJob
+        owner_agent_id: A15
+        side_effect_class: NONE
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, PortfolioDecision]
+        admitted_events: [LISTING_HELD, LISTING_REPAIR_REQUESTED, LISTING_CULL_REQUESTED, WINNER_DETECTED]
+        successor_job_types: [IncidentRepairJob, DeactivateListingJob, SuccessorProductJob, WeeklyReviewJob]
+      - job_type: DeactivateListingJob
+        owner_agent_id: A13
+        side_effect_class: EXTERNAL_WRITE
+        retry_class: RECONCILE_FIRST
+        allowed_modes: [simulation, live]
+        output_contracts: [AgentResult]
+        admitted_events: [LISTING_CULLED]
+        successor_job_types: [BuildSlotJob]
+        capability_operation: ETSY_DEACTIVATE
+        capability_channel: DIRECT_API
+      - job_type: SuccessorProductJob
+        owner_agent_id: A15
+        side_effect_class: NONE
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, ProductSpec, PortfolioDecision]
+        admitted_events: [WINNER_DETECTED]
+        successor_job_types: [BuildSlotJob]
+      - job_type: BuildSlotJob
+        owner_agent_id: A01
+        side_effect_class: NONE
+        retry_class: IDEMPOTENT
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, ProductSpec]
+        admitted_events: [SUCCESSOR_CREATED, BUILD_SLOT_DEFERRED]
+        successor_job_types: [DedupeJob, ResearchCollectionJob]
+      - job_type: MonthlyDeepPassJob
+        owner_agent_id: A14
+        side_effect_class: EXTERNAL_READ
+        retry_class: IDEMPOTENT
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, MetricsSnapshot]
+        admitted_events: [MONTHLY_REVIEW_COMPLETED]
+        successor_job_types: [ResearchCollectionJob, BuildSlotJob, ScaleEvaluationJob]
+        capability_operation: ETSY_METRICS_READ
+        capability_channel: DIRECT_API
+      - job_type: ScaleEvaluationJob
+        owner_agent_id: A15
+        side_effect_class: NONE
+        retry_class: SAFE
+        allowed_modes: [simulation, draft, live]
+        output_contracts: [AgentResult, PortfolioDecision]
+        admitted_events: [SCALE_DECIDED]
+        successor_job_types: [BuildSlotJob, MonthlyDeepPassJob]

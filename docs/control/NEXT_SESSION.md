@@ -1,13 +1,13 @@
 # Next Session
 
-Session 00 is locally complete. Continue with `prompts/implementation/04_SESSION_01_PLAYBOOK_MAPPING_AND_ARCHITECTURE.md`.
+Session 01 is complete. Continue with `prompts/implementation/05_SESSION_02_ENGINEERING_FOUNDATION_AND_DATABASE.md`.
 
-## Session 01 entry conditions
+## Session 02 entry conditions
 
-1. Start from the committed Session 00 state-pointer checkpoint and revalidate the canonical root, immutable source hashes, branch, and control state before changing architecture or business-rule mappings.
-2. Treat the PDF as business authority and the implementation workbook/current control specifications as engineering authority; record any new contradiction in `docs/control/DECISIONS.md`.
-3. Keep provider effects in simulation/draft modes. Session 00 completion does not commission agents, authorize live mutations, publication, purchases, spend, customer messaging, or provider writes.
-4. The configured remote is the explicitly authorized public repository `https://github.com/OmarA1-Bakri/money-machine`; preserve strict-deny tracking boundaries on every subsequent push.
-5. Before architecture expansion, validate and disposition CodeRabbit's four open issues, then retry the persistence, API, tests, apps, and scripts scopes after the account limit resets or a seat/API key is assigned.
+1. Start from the committed Session 01 state-pointer checkpoint. Revalidate the canonical root, immutable source hashes, branch, and control state before changing the schema or persistence design.
+2. Activate Session 02 explicitly with `money-machine-control activate` before recording any Session 02 work; the activation transition preserves `completed_sessions` and installs that session's own evidence keys. Add Session 02's evidence contract to `SESSION_EVIDENCE_KEYS` first, or activation fails closed.
+3. Session 01 contracts are the schema input. Implement the PostgreSQL schema against the lineage chain carried by `AgentResult`, `ArtifactReference`, `EffectReference`, and the product and listing contracts; do not redesign the taxonomies without a decision record.
+4. Keep provider effects in simulation. Session 01 completion commissions no agent and authorizes no publication, purchase, spend, customer message, or provider write.
+5. Carry-forward work, each recorded in `DECISIONS.md` or the review record: the durable orchestrator must call `require_successor_spawn` on the MULTIPLY spawn path (Session 03); the decision layer must refuse unreconciled `MetricsSnapshot` inputs (Session 02); launch-sale configuration belongs to merchandising (Session 08); vendor capability for every `DIRECT_API` selection is UNVERIFIED until the owning session reads and cites the vendor reference; the CodeRabbit vendor re-review of the Session 00 fixes is still rate-limited.
 
-Session 00 evidence: immutable source identity and 82-page verification, the Appendix-validated 21-file prompt pack, frozen clean bootstrap, Ruff and strict Pyright, 53 Python tests, web lint/typecheck/2 tests/nine-route build, authenticated PostgreSQL and healthy API/web containers, fail-closed worker/scheduler exit 78 with zero restarts, implementation **APPROVE**, adversarial **CLEAR**, bootstrap `1abf0d7…`, evidence closure `50350b9…`, state pointer `ef4a203…`, and verified public push. CodeRabbit review follow-up is the first Session 01 hardening task.
+Session 01 evidence: the Chapter 12-16 and Prompt 1-13 maps with no ownerless job, eleven architecture documents with the six required diagrams, seven complete ADRs, the executable lifecycle and job tables with exhaustive rejection tests, the fifteen required Pydantic contracts under strict frozen versioned policy, playbook defaults bound into those contracts through configuration, an explicit capability channel for every provider operation with a test that holds the matrix to the configuration, thirteen adversarial findings plus three closure-review highs resolved, and a green Python, Compose and web gate.

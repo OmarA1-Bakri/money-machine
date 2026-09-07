@@ -6,8 +6,8 @@ Set-Location $RepoRoot
 
 $Commands = @(
     @("sync", "--frozen"),
-    @("run", "--frozen", "ruff", "format", "--check", "."),
-    @("run", "--frozen", "ruff", "check", "."),
+    @("run", "--frozen", "ruff", "format", "--check", "src", "tests", "scripts"),
+    @("run", "--frozen", "ruff", "check", "src", "tests", "scripts", "apps"),
     @("run", "--frozen", "pyright"),
     @("run", "--frozen", "pytest")
 )

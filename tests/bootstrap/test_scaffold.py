@@ -74,6 +74,39 @@ def test_root_private_runtime_probes_are_ignored_without_hiding_curated_paths(
     assert curated.stdout == ""
 
 
+def test_scaffold_rejects_ignored_required_files(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    script = repository / "scripts/verify_scaffold.py"
+    structure = repository / "prompts/implementation/02_CANONICAL_REPOSITORY_STRUCTURE.md"
+    script.parent.mkdir(parents=True)
+    structure.parent.mkdir(parents=True)
+    script.write_bytes((REPOSITORY_ROOT / "scripts/verify_scaffold.py").read_bytes())
+    structure.write_text("```text\n├── required.txt\n```\n", encoding="utf-8")
+    (repository / ".gitignore").write_text(
+        "*.pdf\nprivate/source/*\nrequired.txt\n",
+        encoding="utf-8",
+    )
+    (repository / "required.txt").write_text("required\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "init", "--quiet"],
+        cwd=repository,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    result = subprocess.run(
+        [sys.executable, str(script)],
+        cwd=repository,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "Git ignores required scaffold file: required.txt" in result.stderr
+
+
 def test_bootstrap_scripts_install_both_frozen_dependency_sets() -> None:
     bash_script = (REPOSITORY_ROOT / "scripts/bootstrap.sh").read_text(encoding="utf-8")
     powershell_script = (REPOSITORY_ROOT / "scripts/bootstrap.ps1").read_text(encoding="utf-8")

@@ -1,1 +1,60 @@
-"""Uncommissioned scaffold; no behavior is implemented."""
+"""Validated application configuration contracts and loading API."""
+
+from money_machine.config.loader import (
+    AUTONOMY_EXAMPLE_FILE_NAME,
+    AUTONOMY_FILE_NAME,
+    ENVIRONMENT_VARIABLE,
+    ConfigLoadError,
+    load_config_bundle,
+    load_yaml_model,
+    resolve_runtime_environment,
+)
+from money_machine.config.settings import (
+    PLAYBOOK_MACHINE_WEEKLY_CAP,
+    AgentCommissioningState,
+    AgentDefinition,
+    AgentsConfig,
+    AuthorizedRecipientScope,
+    AutonomyConfig,
+    ConfigurationBundle,
+    InclusiveIntRange,
+    ListingAssetRules,
+    ProductRulesConfig,
+    ProductShapeConfig,
+    PublishingRampConfig,
+    RuntimeEnvironment,
+    TelemetryConfig,
+    WorkflowDefinition,
+    WorkflowJobDefinition,
+    WorkflowsConfig,
+)
+from money_machine.config.validation import apply_environment_safety, validate_config_bundle
+
+__all__ = [
+    "AUTONOMY_EXAMPLE_FILE_NAME",
+    "AUTONOMY_FILE_NAME",
+    "ENVIRONMENT_VARIABLE",
+    "PLAYBOOK_MACHINE_WEEKLY_CAP",
+    "AgentCommissioningState",
+    "AgentDefinition",
+    "AgentsConfig",
+    "AuthorizedRecipientScope",
+    "AutonomyConfig",
+    "ConfigLoadError",
+    "ConfigurationBundle",
+    "InclusiveIntRange",
+    "ListingAssetRules",
+    "ProductRulesConfig",
+    "ProductShapeConfig",
+    "PublishingRampConfig",
+    "RuntimeEnvironment",
+    "TelemetryConfig",
+    "WorkflowDefinition",
+    "WorkflowJobDefinition",
+    "WorkflowsConfig",
+    "apply_environment_safety",
+    "load_config_bundle",
+    "load_yaml_model",
+    "resolve_runtime_environment",
+    "validate_config_bundle",
+]

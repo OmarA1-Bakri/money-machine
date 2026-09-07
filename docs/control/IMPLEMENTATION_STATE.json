@@ -8,9 +8,9 @@
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "evidence_closure_commit_sha": "50350b9937ad97dabf4be3762a00638d62aaa5b9",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 11,
-  "session_status": "complete",
-  "current_session": 0,
+  "state_revision": 13,
+  "session_status": "incomplete",
+  "current_session": 1,
   "completed_sessions": [
     0
   ],
@@ -23,11 +23,11 @@
   },
   "commissioned_agents": [],
   "tests": {
-    "source_registration": "passed_82_pages_and_immutable_hashes_2026-08-08",
-    "prompt_pack": "passed_21_files_2026-08-08",
-    "control_transition": "passed_35_focused_real_git_and_false_evidence_rejections_2026-08-08",
-    "canonical_scaffold": "passed_293_files_96_directories_2026-08-08",
-    "bootstrap_outer_gates": "passed_53_python_web_docker_scripts_and_clean_bootstrap_2026-08-08"
+    "canonical_python_gate": "passed_152_tests_ruff_pyright_compose_2026-09-07",
+    "domain_contracts_and_transitions": "passed_exhaustive_state_pair_and_contract_rejection_tests_2026-09-07",
+    "configuration_contracts": "passed_playbook_defaults_matrix_and_failclosed_autonomy_2026-09-07",
+    "control_transitions": "passed_activation_completion_and_path_identity_2026-09-07",
+    "web_gates": "passed_lint_typecheck_2_tests_and_nine_route_build_2026-09-07"
   },
   "environment_versions": {
     "captured_at": "2026-08-08T16:37:31Z",
@@ -56,25 +56,15 @@
     }
   ],
   "required_completion_evidence": {
-    "canonical_root_verified": true,
-    "canonical_scaffold_verified": true,
-    "sources_byte_identical": true,
-    "pdf_pages_1_through_82_mapped": true,
-    "required_playbook_items_mapped": true,
-    "prompt_pack_verified": true,
-    "git_ignore_audit_passed": true,
-    "environment_versions_recorded": true,
-    "git_evidence_semantics_verified": true,
-    "python_checks_passed": true,
-    "web_checks_passed": true,
-    "compose_postgres_healthy": true,
-    "api_health_live": true,
-    "scripts_parse": true,
-    "clean_bootstrap_passed": true,
-    "implementation_review_approved": true,
-    "adversarial_review_clear": true,
-    "bootstrap_commit_recorded": true,
-    "evidence_closure_commit_recorded": true
+    "playbook_steps_mapped": true,
+    "architecture_and_adrs_complete": true,
+    "state_event_job_enums_in_code": true,
+    "typed_contracts_pass_validation": true,
+    "configuration_encodes_playbook_defaults": true,
+    "integration_strategy_explicit": true,
+    "adversarial_review_resolved": true,
+    "control_files_and_checkpoint_current": true,
+    "evidence_closure_commit_recorded": false
   },
   "transition_contract": {
     "completion_requires_all_evidence_true": true,
@@ -89,5 +79,5 @@
   },
   "next_session": 1,
   "next_prompt": "04_SESSION_01_PLAYBOOK_MAPPING_AND_ARCHITECTURE.md",
-  "updated_at": "2026-08-08T23:36:23Z"
+  "updated_at": "2026-09-07T00:54:17Z"
 }

@@ -5,6 +5,14 @@ private/source/*
 
 # OMX, agent runtime, and local knowledge graph state
 .omx/
+# Local agent tooling (skills, caches, per-machine settings). CLAUDE.md is a root project file and is
+# deliberately neither ignored nor yet tracked; the operator decides whether to commit it.
+.opencode/
+.agents/
+.token-optimizer/
+.claude/
+opencode.json
+skills-lock.json
 # Detailed preservation/rename receipts are runtime evidence, never source documentation.
 .omx/**/*receipt*.json
 .trigger-tree/
@@ -12,6 +20,8 @@ private/source/*
 
 # Secrets and local environment
 .env
+# Operator standing authority (config/autonomy.example.yaml is the tracked template)
+config/autonomy.yaml
 .env.*
 !.env.example
 *.pem

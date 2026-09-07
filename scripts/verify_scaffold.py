@@ -78,21 +78,23 @@ def scaffold_errors(root: Path = REPOSITORY_ROOT) -> list[str]:
         if directory.is_dir() and not any(directory.iterdir()):
             errors.append(f"empty directory cannot persist in Git: {path.as_posix()}")
 
-    gitkeep_paths = sorted(
-        path / ".gitkeep" for path in required_directories if (root / path / ".gitkeep").is_file()
-    )
-    if gitkeep_paths:
+    required_git_paths = sorted(required_files.difference(IGNORED_PRIVATE_FILES))
+    if required_git_paths:
         ignored = subprocess.run(
             ["git", "check-ignore", "--no-index", "--stdin"],
             cwd=root,
             check=False,
             capture_output=True,
-            input="".join(f"{path.as_posix()}\n" for path in gitkeep_paths),
+            input="".join(f"{path.as_posix()}\n" for path in required_git_paths),
             text=True,
         )
-        errors.extend(
-            f"Git ignores scaffold marker: {path}" for path in ignored.stdout.splitlines()
-        )
+        for path in ignored.stdout.splitlines():
+            label = (
+                "Git ignores scaffold marker"
+                if Path(path).name == ".gitkeep"
+                else "Git ignores required scaffold file"
+            )
+            errors.append(f"{label}: {path}")
 
     return sorted(errors)
 
