@@ -1,0 +1,31 @@
+# The build context is the repository root. Everything a build does not need is excluded,
+# both to keep the context small and to keep private material out of the daemon and the
+# BuildKit cache. The private PDF, any .env, the operator standing authority and all
+# runtime evidence are excluded deliberately.
+.git
+.gitignore
+*.pdf
+.env
+.env.*
+!.env.example
+config/autonomy.yaml
+runtime/
+private/
+.omx/
+.opencode/
+.agents/
+.claude/
+.token-optimizer/
+node_modules
+**/node_modules
+.venv
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.ruff_cache
+.next
+**/.next
+tests/
+docs/
+prompts/**/*.json
+*.log

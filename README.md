@@ -14,9 +14,41 @@ Session 00 repository bootstrap is **incomplete** until every runtime, review, G
 
 ## Bootstrap
 
-Copy `.env.example` to `.env` for local values, then run `scripts/bootstrap.sh` on
-Linux/macOS or `scripts/bootstrap.ps1` on Windows. Live provider effects are disabled by
-default; tests use simulation only.
+From a fresh clone, in order:
+
+1. Copy `.env.example` to `.env` and set local values. Bootstrap never creates or edits
+   `.env` for you, and no credential belongs in the example file. Nothing loads `.env`
+   automatically: Compose reads it for interpolation, and a host-native command needs the
+   variables exported, for example `set -a; . ./.env; set +a`. A host-native
+   `MONEY_MACHINE_DATABASE_URL` must use `127.0.0.1`, not the Compose hostname `postgres`.
+2. Run `bash scripts/bootstrap.sh`, or `scripts/bootstrap.ps1` on Windows. It installs
+   Python and Node dependencies from the frozen lockfiles and validates the Compose files.
+   It requires `uv`, `pnpm` and Docker on the path.
+3. Start PostgreSQL with `bash scripts/verify_postgres.sh`, which waits for health and
+   proves an authenticated TCP query.
+4. Apply the schema with `uv run money-machine db upgrade`, then seed canonical
+   configuration with `uv run money-machine db seed`. Use these rather than `alembic`
+   directly: they report a typed result and a plain error instead of a driver traceback.
+   Seeding is idempotent and convergent: an unchanged second run reports nothing created
+   and nothing corrected, and a row that has drifted from the YAML authority is restored.
+5. Check the result with `uv run money-machine status`, which exits non-zero when the
+   database is unreachable, and `uv run money-machine integrations status`, which reports
+   provider configuration presence without reading any credential.
+6. Run the gates with `bash scripts/test.sh`. Database-backed tests create and drop their
+   own throwaway databases; they skip with an explicit reason when PostgreSQL is absent.
+
+Live provider effects are disabled by default and tests use simulation only. Going live is
+a separate, deliberate step documented in `docs/architecture/DEPLOYMENT.md`.
+
+### Services
+
+`docker compose up -d postgres api web` starts the operator surfaces. The API exposes
+`/health` for liveness and `/readiness`, which fails with 503 when the database is
+unreachable or unmigrated. The worker and scheduler are registered but **not
+commissioned**: each performs a read-only database connectivity check, logs the result,
+and exits 78 without claiming any job. That exit is the intended contract until the
+durable orchestrator is commissioned, which is why both set `restart: "no"` and carry no
+health check.
 
 ### PostgreSQL contract
 

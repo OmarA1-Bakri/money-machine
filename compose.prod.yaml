@@ -9,10 +9,9 @@ x-database-environment: &database-environment
 x-python-service: &python-service
   build:
     context: .
-    dockerfile: Dockerfile
+    dockerfile: infra/docker/api.Dockerfile
   environment:
     <<: *database-environment
-    EXTERNAL_ACTIONS_ENABLED: "false"
   depends_on:
     postgres:
       condition: service_healthy
@@ -47,10 +46,9 @@ services:
   web:
     build:
       context: .
-      dockerfile: Dockerfile.web
+      dockerfile: infra/docker/web.Dockerfile
     environment:
       API_BASE_URL: http://api:8000
-      EXTERNAL_ACTIONS_ENABLED: "false"
     expose:
       - "3000"
     depends_on:

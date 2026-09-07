@@ -171,3 +171,23 @@ A session prompt states what to build. It is not evidence that its own instructi
 Every session therefore runs the prompt-integrity review and corrective exercise in `docs/PROMPT_INTEGRITY_REVIEW.md` before its own first action, and records the result under `docs/control/reviews/`. The corrective addendum governs execution; the prompt remains the unamended source of record.
 
 The instruction lives in a governance document rather than inside the prompts because `prompts/implementation/*` are deterministically extracted from the workbook between copy markers and each file's SHA-256 is asserted against the workbook appendix, while the workbook and the playbook PDF are immutable root sources preserved byte-for-byte. Editing a prompt to carry its own review instruction would break extraction, fail the prompt-pack verification, and corrupt the source register. `AGENTS.md`, `CLAUDE.md`, and `docs/DEVELOPMENT-GOVERNANCE.md` section 0 carry the standing rule, and `tests/bootstrap/test_prompt_integrity.py` enforces that the record exists for the active session and every session completed under this rule. Amendments may only make a prompt more exact, safer, or more verifiable; reducing scope or relaxing a business rule or safety boundary remains the operator's decision.
+
+## D-0027 — Structural integrity is enforced by the database, not by application convention
+
+**Status:** accepted for Session 02, after two independent closure reviews returned NOT CLEAR.
+
+The reviews demonstrated, with probes, that several documented guarantees were unenforced. Each is now a database rule:
+
+- **Evidence has a home.** Thirteen Session 01 contracts require at least one evidence citation and nothing persisted them. `evidence_references` stores a citation with a constrained polymorphic owner, so a result row's evidence survives.
+- **Optimistic locking is real.** `update_versioned` compared an in-memory value and issued an unqualified UPDATE, so a lost update was reproducible. The versioned mapper now sets `version_id_col`, the emitted UPDATE carries the version predicate, and a losing writer raises.
+- **Lineage is foreign-keyed.** `product_specs`, `products` and `listing_versions` name their producing job and agent run; specifications name their research run and teardown report; listing versions name their QA verdict; `listing_version_artifacts` relates media and delivery artifacts.
+- **A verdict cannot cite what does not exist.** The JSON identifier lists on QA and dedupe results became `qa_result_artifacts` and `dedupe_comparisons` relations with foreign keys.
+- **A lineage record cannot lie.** Composite foreign keys bind `agent_runs` to its agent definition version and to its prompt version, reference and hash, and bind `preflight_results` to the exact listing-package hash it pinned.
+- **Three-valued logic cannot bypass a rule.** The decision successor checks wrap their predicate in `coalesce`, so a NULL decision no longer satisfies them.
+- **Append-only means append-only.** `events` and `receipts` carry a `BEFORE UPDATE OR DELETE` trigger that raises. Alembic does not autogenerate triggers, so the revision installs them explicitly and a test asserts they exist in the migrated database.
+- **Taxonomies agree with the contracts.** Incident, dedupe and QA vocabularies were reconciled with `IncidentResult`, `DedupeResult` and `ProductQAResult`, and a test asserts every contract value is admitted by its table.
+- Also: a `RECONCEPT` specification must cite its parent, a listing version's specification must belong to its product, structured errors must carry a code and message, artifact sizes use a 64-bit integer, currency codes are checked against ISO 4217, and `alembic check` now surfaces a table that is no longer declared rather than ignoring it.
+
+The seed became convergent as well as idempotent: a row that has drifted from the YAML authority is restored, a renamed prompt file has its reference repaired, and concurrent seeding succeeds on every process because inserts use `ON CONFLICT DO NOTHING`.
+
+On the operations side: the container health probe uses liveness, because a readiness probe would keep a fresh unmigrated stack permanently unhealthy while readiness remains the operator signal; credential-bearing URL query parameters are stripped into the secret rather than surviving into logs and responses; continuous integration runs on this branch, checks migration reversibility, and asserts the second seed run changes nothing; a build-ignore file keeps the private source, environment files and operator authority out of the build context; and production builds from the maintained image definitions.

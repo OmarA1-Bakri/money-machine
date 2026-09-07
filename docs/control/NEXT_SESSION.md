@@ -1,14 +1,29 @@
 # Next Session
 
-Session 01 is complete and **Session 02 is activated and incomplete** (state revision 16). Continue with `prompts/implementation/05_SESSION_02_ENGINEERING_FOUNDATION_AND_DATABASE.md`.
+Session 02 is complete. Continue with `prompts/implementation/06_SESSION_03_DURABLE_ORCHESTRATOR.md`.
 
-## Session 02 entry conditions
+## Session 03 entry conditions
 
-1. Start from the committed Session 01 state-pointer checkpoint. Revalidate the canonical root, immutable source hashes, branch, and control state before changing the schema or persistence design.
-2. Session 02 is already activated (revision 16) with its eight evidence keys installed as false. Do not re-activate; a second activation is rejected. Later sessions must add their own contract to `SESSION_EVIDENCE_KEYS` before activating.
-3. The prompt-integrity review for Session 02 is complete: execute the ten-point corrective addendum in `docs/control/reviews/2026-09-07-session-02-prompt-integrity.md`, not the unamended prompt. Every later session runs its own review first, per `docs/PROMPT_INTEGRITY_REVIEW.md` and D-0026.
-4. Session 01 contracts are the schema input. Implement the PostgreSQL schema against the lineage chain carried by `AgentResult`, `ArtifactReference`, `EffectReference`, and the product and listing contracts; do not redesign the taxonomies without a decision record.
-5. Keep provider effects in simulation. Session 01 completion commissions no agent and authorizes no publication, purchase, spend, customer message, or provider write.
-6. Carry-forward work, each recorded in `DECISIONS.md` or the review record: the durable orchestrator must call `require_successor_spawn` on the MULTIPLY spawn path (Session 03); the decision layer must refuse unreconciled `MetricsSnapshot` inputs (Session 02); launch-sale configuration belongs to merchandising (Session 08); vendor capability for every `DIRECT_API` selection is UNVERIFIED until the owning session reads and cites the vendor reference; the CodeRabbit vendor re-review of the Session 00 fixes is still rate-limited.
+1. Run the prompt-integrity review and corrective exercise first. It is the standing first instruction of every session prompt (`docs/PROMPT_INTEGRITY_REVIEW.md`, D-0026), and `tests/bootstrap/test_prompt_integrity.py` fails until the record exists.
+2. Add Session 03's completion-evidence keys to `SESSION_EVIDENCE_KEYS` in `src/money_machine/control/state.py`, then activate with `money-machine-control activate`. Activation fails closed without that contract.
+3. Session 03 owns job claiming. The worker and scheduler currently perform a read-only database connectivity check and exit 78 with no claim path anywhere in the source. Commissioning them is this session's work, and the exit-78 contract may only be lifted deliberately, with a decision record.
+4. The schema already carries what the orchestrator needs: `jobs` with an idempotency key, lease owner, lease expiry, heartbeat and partial indexes for the ready-and-due and lease-expiry queries; `job_dependencies`; `events` as an append-only log with a semantic dedupe key; `idempotency_records` for reservations; and `effect_attempts` for reconciliation outcomes. Use them rather than adding a parallel mechanism.
+5. Keep provider effects in simulation. Nothing is commissioned; no agent may perform a provider call.
 
-Session 01 evidence: the Chapter 12-16 and Prompt 1-13 maps with no ownerless job, eleven architecture documents with the six required diagrams, seven complete ADRs, the executable lifecycle and job tables with exhaustive rejection tests, the fifteen required Pydantic contracts under strict frozen versioned policy, playbook defaults bound into those contracts through configuration, an explicit capability channel for every provider operation with a test that holds the matrix to the configuration, thirteen adversarial findings plus three closure-review highs resolved, and a green Python, Compose and web gate.
+## Carry-forward work
+
+- Prove idempotency uniqueness under a concurrent claim path, which only exists once claiming does (Session 03).
+- Refuse an unreconciled `MetricsSnapshot` as a decision input at the decision layer (Session 02 review, deferred).
+- Wire `require_successor_spawn` into the orchestrator's MULTIPLY spawn path (Session 01 review, deferred to Session 03).
+- Install Playwright with the first browser-channel work, not before.
+- Relate listing description sections and tags as rows rather than checked JSON arrays when merchandising is built (Session 08).
+- Vendor capability for every `DIRECT_API` selection, and Etsy field-length limits, remain UNVERIFIED until the owning session reads and cites the vendor reference.
+- The CodeRabbit vendor re-review of the Session 00 fixes is still rate-limited; the blocker stays in state.
+
+## Environment notes
+
+- The shared development database `money_machine` holds another branch's schema at its own Alembic revision, and the instance carries roughly four hundred leftover test databases from other branches. Nothing on this branch touches them: database-backed tests create and drop their own throwaway databases, and `MONEY_MACHINE_TEST_ADMIN_DATABASE_URL` selects the maintenance connection.
+- `pnpm install` needs `--package-import-method copy` on this filesystem: the hardlink rename fails on the 9p `/mnt/d` mount.
+- Host port 3000 is occupied by an unrelated development server; set `WEB_PORT` to verify the web container.
+
+Session 02 evidence: 45 tables from one reviewed migration with an exact table set, a proven downgrade and re-upgrade, and no drift; database-enforced taxonomies, uniqueness, composite lineage keys and append-only triggers; an idempotent, convergent, concurrency-safe seed; typed repositories with real optimistic locking; a readiness endpoint that fails when the database does; a command line exercised as real subprocesses; five containers with the worker and scheduler still fail-closed; 370 Python tests, a green web gate, and two independent closure reviews resolved.

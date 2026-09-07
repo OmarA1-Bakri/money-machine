@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, build/full-automation]
 
 permissions:
   contents: read
@@ -11,6 +11,24 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: money_machine
+          POSTGRES_USER: money_machine
+          POSTGRES_PASSWORD: ci-validation-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U money_machine -d money_machine"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      APP_ENV: test
+      MONEY_MACHINE_TEST_ADMIN_DATABASE_URL: postgresql+asyncpg://money_machine:ci-validation-only@127.0.0.1:5432/postgres
+      MONEY_MACHINE_DATABASE_URL: postgresql+asyncpg://money_machine:ci-validation-only@127.0.0.1:5432/money_machine
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -24,8 +42,32 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: uv sync --frozen
-      - run: uv run ruff check .
+      - run: uv run ruff format --check src tests scripts migrations
+      - run: uv run ruff check src tests scripts apps migrations
       - run: uv run pyright
+      - name: Apply migrations to a fresh database
+        run: uv run alembic upgrade head
+      - name: Verify the migration matches the declared schema
+        run: uv run alembic check
+      - name: Verify the migration reverses
+        run: |
+          uv run alembic downgrade base
+          uv run alembic upgrade head
+      - name: Seed twice and assert the second run changes nothing
+        run: |
+          uv run money-machine db seed
+          second="$(uv run money-machine db seed)"
+          echo "$second"
+          python - "$second" <<'PY'
+          import json
+          import sys
+
+          report = json.loads(sys.argv[1])
+          created = report["total_created"]
+          corrected = report["total_corrected"]
+          if created or corrected:
+              raise SystemExit(f"seed is not idempotent: created={created} corrected={corrected}")
+          PY
       - run: uv run pytest
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint

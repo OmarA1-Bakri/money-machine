@@ -56,3 +56,26 @@ This is the instruction set Session 02 executes. The prompt remains the unamende
 ## What the prompt gets right
 
 Byte-faithful extraction. The 33-entity list matches the workbook exactly. Sixteen agents match the roster. The five Compose services match the architecture decision with no unapproved infrastructure. Schema conventions of UUID keys, UTC timestamps, idempotency uniqueness, immutable event and receipt records, and soft deactivation are correct and conservative. The environment example must carry names and explanations but never credentials, and secrets must never be logged. Unimplemented agents must not be marked commissioned. The ordering of schema, then persistence, then seed is correct.
+
+## Execution record and closure reviews
+
+The ten-point addendum was executed in four slices: tooling and settings; schema, migrations and persistence; seed, command line and interface; then containers, continuous integration and documentation.
+
+Two independent closure reviews were then run, as addendum item 10 requires. Both returned **NOT CLEAR**: the schema review raised two critical and seven high findings, the operations review three high. Every critical and high finding was remediated and is now pinned by a test; the record is D-0027 and `docs/control/TEST_EVIDENCE.md`. The medium and low findings were remediated in the same pass except for the items listed as deferred below.
+
+Addendum coverage:
+
+| Item | Outcome |
+|---|---|
+| 1 Preserve the fail-closed boundary | Worker and scheduler perform a read-only connectivity check, log it, and exit 78. No claim path exists anywhere in the source. Verified in containers |
+| 2 Persist the Session 01 contracts | 45 tables: the workbook's 33 plus twelve for evidence, effects, verdicts, comparisons, artifact relations and configuration identity. Lineage is foreign-keyed |
+| 3 One runtime authority | No autonomy value is seeded; `config/autonomy.yaml` is neither created nor committed; configuration identity is advisory only, by constraint |
+| 4 Real commissioning ladder | Sixteen agents seeded at `DESIGNED`; a commissioning claim without evidence is refused by the database |
+| 5 Scoped integration status | Presence booleans only. No network client is imported anywhere in the source; no credential value is read, logged or returned |
+| 6 Extend, never overwrite | Session 01 configuration untouched; continuous integration extended; the two refusal workflows unmodified; canonical paths used |
+| 7 Four bounded slices | As above |
+| 8 Hardened exit criteria | Exact table set, downgrade and re-upgrade, drift check, entity-named constraint rejections, redaction across representation, logs and responses, readiness that fails, and a second seed run asserted to change nothing |
+| 9 Standing safety | Simulation forced outside production; no provider effect; nothing private committed or built into an image |
+| 10 Two independent reviews | Completed, NOT CLEAR, remediated, re-verified |
+
+Deferred, each with a reason and an owner: Playwright installation (browser work, first browser-channel session); per-session commit-subject enforcement in the control validator (optional hardening); concurrency proof for job claiming (Session 03, which owns claiming); relating listing description sections and tags as rows rather than checked JSON arrays (Session 08, which owns merchandising); Etsy field-length limits, which remain UNVERIFIED because no vendor primary source was read this session.

@@ -39,7 +39,10 @@ services:
         - CMD
         - python
         - -c
-        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"
+        # Liveness, deliberately: readiness fails until migrations are applied, so a
+        # readiness probe here would keep a fresh stack permanently unhealthy. The
+        # operator and any orchestrator use /readiness.
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"
       interval: 5s
       timeout: 3s
       retries: 10
@@ -51,7 +54,6 @@ services:
       dockerfile: infra/docker/web.Dockerfile
     environment:
       API_BASE_URL: http://api:8000
-      EXTERNAL_ACTIONS_ENABLED: "false"
     ports:
       - "${WEB_PORT:-3000}:3000"
     depends_on:
@@ -68,6 +70,10 @@ services:
       retries: 10
       start_period: 10s
 
+  # The worker is registered but not commissioned. It performs a read-only database
+  # connectivity check, logs the result, and exits 78 without claiming any job. The exit
+  # is terminal on purpose, so `restart: "no"` and no healthcheck: a health probe would
+  # imply a long-running process. Job claiming is commissioned in Session 03.
   worker:
     build:
       context: .
@@ -79,6 +85,7 @@ services:
         condition: service_healthy
     restart: "no"
 
+  # The scheduler is registered but not commissioned, on the same contract as the worker.
   scheduler:
     build:
       context: .

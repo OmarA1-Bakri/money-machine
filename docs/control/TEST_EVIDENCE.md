@@ -188,3 +188,24 @@ The `CODERABBIT_REVIEW_OPEN` blocker stays in `IMPLEMENTATION_STATE.json` until 
 The reconstruction is content-equivalent by review, not byte-identical to the lost version; the lost bytes were never committed and cannot be recovered. This is recorded because the repository rule to preserve user work was broken by the integrator.
 
 | Post-transition regression | 45 control tests failed because Session 00 fixtures inherited the advanced live `transition_contract`; fixtures pinned to their own session contract; re-run `bash scripts/test.sh` exit 0 with 152 passed, 1 skipped | FIXED AND RE-VERIFIED 2026-09-07T01:01:06Z |
+
+## 2026-09-07T07:41:19Z — Session 02 engineering foundation
+
+| Gate | Evidence | Verdict |
+|---|---|---|
+| Prompt integrity | `docs/control/reviews/2026-09-07-session-02-prompt-integrity.md`: prompt hash verified against the workbook, one critical and five high findings, ten-point corrective addendum executed | RESOLVED |
+| Schema | 45 tables: the workbook's 33 logical entities plus twelve required by the addendum and its reviews. `alembic upgrade head` from empty creates exactly the declared set; `alembic check` reports no drift; `downgrade base` leaves only `alembic_version` with no orphan trigger, function, type, sequence or index; re-upgrade is clean | PASS |
+| Constraint efficacy | Every uniqueness, taxonomy and structural constraint asserted against the live catalogue and exercised by rejection tests, including composite lineage keys, append-only triggers, three-valued-logic closure and cross-parent consistency | PASS |
+| Seed | Idempotent, convergent and concurrency-safe: first run inserts 38 rows, second and third change nothing, a drifted agent row is restored from YAML, a renamed prompt reference is repaired, three concurrent seeds all succeed with the final state correct | PASS |
+| Persistence | Bounded pages with totals, optimistic locking that raises on a lost update, append-only event log with semantic dedupe, idempotency reservations unique under five racing writers, atomic rollback leaving no partial state | PASS |
+| Interfaces | Liveness, readiness that returns 503 when the database is unreachable or unmigrated, version, database status, workflow and job pages and details, integration status reporting presence only. No endpoint returns a credential | PASS |
+| Command line | `money-machine` distinct from `money-machine-control`; upgrade, seed twice, status, workflow list, job list, integrations status all exercised as real subprocesses; status exits 78 on a down database; production without a database URL fails closed; no command prints a traceback | PASS |
+| Containers | All five services built. PostgreSQL, API and web reach Compose health and stay healthy; migrate and double seed run inside the API image; worker and scheduler each prove an authenticated database round trip and exit 78 with restart disabled | PASS |
+| Continuous integration | Triggers on this branch, runs a PostgreSQL service, applies migrations, checks drift, proves reversibility, asserts the second seed run changes nothing, and has no `continue-on-error` or `|| true` | CONFIGURED, NOT YET EXECUTED ON A RUNNER |
+| Python gate | `bash scripts/test.sh` exit 0: frozen sync, Ruff format and lint, strict Pyright zero findings, **370 Pytest tests passed** with one filesystem-dependent skip, Compose configuration valid | PASS |
+| Web gate | `pnpm lint` 0, `pnpm typecheck` 0, `pnpm test` 2 passed, `pnpm build` 0 with the nine expected routes | PASS |
+| Closure reviews | Two independent reviews, schema/lineage/migrations and Compose/CI/secrets. Both NOT CLEAR: two critical, ten high in total. All remediated and pinned by tests; see D-0027 | RESOLVED |
+
+Environment findings recorded rather than acted on: the shared development database `money_machine` holds another branch's schema at its own revision, and the instance carries roughly four hundred leftover test databases from other branches. Neither was modified. Session 02's database-backed tests create and drop their own throwaway databases. One verification command of mine briefly pointed the running stack at that shared database; the migration aborted at revision lookup before any statement, and the database was afterwards confirmed unchanged at 53 tables and its original revision.
+
+Host port 3000 is occupied by an unrelated development server, so the web container was verified on port 3399.

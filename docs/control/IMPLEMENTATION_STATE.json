@@ -8,7 +8,7 @@
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "evidence_closure_commit_sha": "15b5df45c3a535548fe24698a590fc16c5757829",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 16,
+  "state_revision": 17,
   "session_status": "incomplete",
   "current_session": 2,
   "completed_sessions": [
@@ -16,18 +16,20 @@
     1
   ],
   "services": {
-    "api": "fresh_container_health_200_verified_2026-08-08",
-    "worker": "fresh_container_exit_78_restart_0_verified_2026-08-08",
-    "scheduler": "fresh_container_exit_78_restart_0_verified_2026-08-08",
-    "web": "fresh_container_health_and_nine_route_build_verified_2026-08-08",
-    "postgres": "fresh_container_healthy_authenticated_tcp_select_1_2026-08-08"
+    "api": "container_healthy_readiness_true_migrated_2026-09-07",
+    "worker": "container_database_check_true_then_exit_78_restart_0_2026-09-07",
+    "scheduler": "container_database_check_true_then_exit_78_restart_0_2026-09-07",
+    "web": "container_healthy_and_nine_route_build_2026-09-07",
+    "postgres": "container_healthy_45_table_schema_migrated_and_seeded_2026-09-07"
   },
   "commissioned_agents": [],
   "tests": {
-    "canonical_python_gate": "passed_152_tests_ruff_pyright_compose_2026-09-07",
-    "domain_contracts_and_transitions": "passed_exhaustive_state_pair_and_contract_rejection_tests_2026-09-07",
-    "configuration_contracts": "passed_playbook_defaults_matrix_and_failclosed_autonomy_2026-09-07",
-    "control_transitions": "passed_activation_completion_and_path_identity_2026-09-07",
+    "canonical_python_gate": "passed_370_tests_ruff_pyright_compose_2026-09-07",
+    "migrations": "passed_exact_table_set_downgrade_reupgrade_and_no_drift_2026-09-07",
+    "constraints": "passed_taxonomy_uniqueness_composite_lineage_and_append_only_2026-09-07",
+    "seed": "passed_idempotent_convergent_and_concurrent_2026-09-07",
+    "persistence": "passed_pagination_optimistic_locking_and_idempotency_races_2026-09-07",
+    "interfaces": "passed_api_readiness_failure_and_real_cli_subprocesses_2026-09-07",
     "web_gates": "passed_lint_typecheck_2_tests_and_nine_route_build_2026-09-07"
   },
   "environment_versions": {
@@ -57,14 +59,14 @@
     }
   ],
   "required_completion_evidence": {
-    "ci_configuration_complete": false,
-    "control_files_and_checkpoint_current": false,
-    "database_schema_and_migrations_work": false,
+    "ci_configuration_complete": true,
+    "control_files_and_checkpoint_current": true,
+    "database_schema_and_migrations_work": true,
     "evidence_closure_commit_recorded": false,
-    "foundation_tests_pass": false,
-    "fresh_bootstrap_path_documented": false,
-    "runtime_containers_start": false,
-    "seeds_are_idempotent": false
+    "foundation_tests_pass": true,
+    "fresh_bootstrap_path_documented": true,
+    "runtime_containers_start": true,
+    "seeds_are_idempotent": true
   },
   "transition_contract": {
     "completion_requires_all_evidence_true": true,
@@ -79,5 +81,5 @@
   },
   "next_session": 2,
   "next_prompt": "05_SESSION_02_ENGINEERING_FOUNDATION_AND_DATABASE.md",
-  "updated_at": "2026-09-07T04:36:10Z"
+  "updated_at": "2026-09-07T07:41:51Z"
 }

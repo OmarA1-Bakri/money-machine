@@ -1,13 +1,19 @@
+# Root API image. `compose.prod.yaml` builds from `infra/docker/api.Dockerfile`; this file
+# is the canonical top-level entry point and is kept identical in content so either path
+# produces a working image.
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 WORKDIR /app
 ENV PATH="/app/.venv/bin:$PATH" \
-    PYTHONUNBUFFERED=1 \
-    EXTERNAL_ACTIONS_ENABLED=false
+    PYTHONUNBUFFERED=1
 
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY src ./src
+COPY config ./config
+COPY prompts ./prompts
+COPY migrations ./migrations
+COPY alembic.ini ./alembic.ini
 RUN uv sync --frozen --no-dev
 
 EXPOSE 8000
