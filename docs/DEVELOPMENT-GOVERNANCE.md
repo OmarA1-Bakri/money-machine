@@ -8,6 +8,12 @@ This document governs engineering cadence, verification sequencing, checkpoint s
 
 Where the Master Control Prompt or an older plan requires independent code review plus adversarial workflow review for every material slice, this document supersedes that per-slice cadence. Session-specific final exit criteria remain binding.
 
+## 0. Prompt integrity precedes execution
+
+Every session begins by proving its own prompt before obeying it. Run the adversarial review and corrective exercise defined in `docs/PROMPT_INTEGRITY_REVIEW.md`: verify the prompt's hash against the workbook, review it for fidelity, safety and executability, and gameability, then produce the corrective addendum that the session actually executes. Record it at `docs/control/reviews/<date>-session-<NN>-prompt-integrity.md` and reference it in the implementation log.
+
+This gate is bounded and cheap relative to a session: three focused reviews of one document, then an addendum. It is not a planning phase and does not license scope change. No implementation action of the session may begin until every critical and high finding is resolved or explicitly deferred with a reason and an owning session.
+
 ## 1. Three governance levels
 
 ### Level 1 — bounded implementation slice

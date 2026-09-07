@@ -1,5 +1,6 @@
 # Money Machine Repository Rules
 
+- Before executing any session prompt, run the prompt-integrity review and corrective exercise in `docs/PROMPT_INTEGRITY_REVIEW.md`. It is the standing first instruction of every session prompt; the prompt files themselves are hash-verified extracts and must never be edited. Implementation starts only after the corrective addendum exists and every critical and high finding is resolved or explicitly deferred.
 - Read `docs/DEVELOPMENT-GOVERNANCE.md` before implementation; it defines mandatory routing, context, verification, review, checkpoint, and stopping discipline.
 - Treat `The-Hands-Off-Money-Machine-Playbook.pdf` as the authority for business logic and terminology, and the implementation workbook as the authority for engineering/session contracts. Record contradictions in `docs/control/DECISIONS.md`.
 - Do not add commercial revalidation gates that contradict the playbook.
