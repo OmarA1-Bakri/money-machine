@@ -137,3 +137,11 @@
 - Two independent closure reviews both returned NOT CLEAR with two critical and ten high findings between them. All were remediated and pinned by tests: evidence has a table, optimistic locking is enforced by the mapper, lineage is foreign-keyed, verdicts cannot cite what does not exist, composite keys stop a lineage record lying, append-only tables carry refusal triggers, and taxonomies agree with the contracts. Recorded as D-0027.
 - Final gates: `bash scripts/test.sh` exit 0 with **370 Pytest tests passed** and one filesystem-dependent skip; web lint, typecheck, two tests and a nine-route build all 0; canonical scaffold verification passed.
 - Recorded rather than acted on: the shared development database and roughly four hundred leftover test databases belong to other branches and were left untouched. One verification command of mine briefly pointed the stack at that shared database; the migration aborted before any statement and the database was confirmed unchanged.
+
+## 2026-09-07T07:43:45Z — Session 02 atomic completion
+
+- Implementation commit `05695fa` carries the canonical subject `feat(foundation): add database runtime and project tooling` across 74 paths with no secret, private source, runtime evidence, operator authority, tool directory or symlink.
+- Evidence-closure commit `e75b31745beef8d0368e9a21c437176edafb46a2` contains the exact still-incomplete pre-transition state at revision 18.
+- The shipped `money-machine-control apply-completion` entry point validated both commit objects, ancestry from the Session 01 closure, branch and HEAD agreement, a clean tracked tree, and the closure document's byte equality with the live state, then advanced revision 18 to 19 atomically.
+- Session 02 is locally complete: `completed_sessions` is `[0, 1, 2]`, `next_session` is 3, the canonical Session 03 prompt is selected, and all eight Session 02 evidence keys are true. The `CODERABBIT_REVIEW_OPEN` blocker is retained because the vendor re-review is still rate-limited.
+- This completed state and its four companion control documents are checkpointed by the later state-pointer commit containing this entry.
