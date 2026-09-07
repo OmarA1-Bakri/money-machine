@@ -107,3 +107,9 @@
 - The shipped `money-machine-control apply-completion` entry point validated both commit objects, ancestry from the prior closure, branch and HEAD agreement, a clean tracked tree, and the closure document's byte equality with the live state, then advanced revision 14 to 15 atomically.
 - Session 01 is locally complete: `completed_sessions` is `[0, 1]`, `next_session` is 2, the canonical Session 02 prompt is selected, and all nine Session 01 evidence keys are true. The `CODERABBIT_REVIEW_OPEN` blocker is retained because the vendor re-review is still rate-limited.
 - This completed state and its four companion control documents are checkpointed by the later state-pointer commit that contains this entry; the state does not claim that commit's own object ID.
+
+## 2026-09-07T01:01:06Z — Post-transition regression repair
+
+- The post-transition full gate failed: 45 control-state tests broke because their Session 00 fixtures deep-copy the live state, which now carries `transition_contract.completion_requires_next_session: 2`. The fixtures, not the transition, were wrong; the applied Session 01 completion is unaffected and was not rewritten.
+- Fixed by pinning the Session 00 fixture and its candidate to their own transition contract, so programme advance can no longer break session-scoped fixtures. Re-ran the canonical gate: `bash scripts/test.sh` exit 0 with Ruff clean, strict Pyright zero findings, **152 Pytest tests passed** with one filesystem-dependent skip, and Compose configuration valid.
+- Recorded rather than hidden: the earlier 152-test green predates the control-file update, so it did not bind these bytes. The lesson is that the final gate must run after the control files are written, not before.

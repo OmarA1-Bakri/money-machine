@@ -126,6 +126,11 @@ def incomplete_session_zero_fixture() -> ControlState:
         }
     )
     state["required_completion_evidence"] = dict.fromkeys(SESSION_00_EVIDENCE_KEYS, False)
+    # The live state advances with the programme; these fixtures must describe Session 00 only.
+    state["transition_contract"] = {
+        **state["transition_contract"],
+        "completion_requires_next_session": 1,
+    }
     state["blockers"] = [
         blocker for blocker in state["blockers"] if blocker["code"] != OUTER_GATES_BLOCKER
     ]
@@ -153,6 +158,10 @@ def git(repo: Path, *arguments: str, stdin: str | None = None) -> str:
 
 def completed_candidate(state: ControlState, bootstrap: str, closure: str) -> ControlState:
     candidate = copy.deepcopy(state)
+    candidate["transition_contract"] = {
+        **state["transition_contract"],
+        "completion_requires_next_session": 1,
+    }
     candidate.update(
         {
             "state_revision": state["state_revision"] + 1,

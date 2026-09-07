@@ -186,3 +186,5 @@ The `CODERABBIT_REVIEW_OPEN` blocker stays in `IMPLEMENTATION_STATE.json` until 
 | Working-tree file loss and reconstruction | While correcting the integration matrix the integrator ran `git checkout -- docs/architecture/INTEGRATION_MATRIX.md`, which discarded the uncommitted Session 01 version and restored the 92-byte committed placeholder. The file was reconstructed in full from content read earlier in the same session and improved with operation codes; a test now asserts it matches the configuration. No other file was affected and no committed history was touched | RECORDED; CONTENT RESTORED AND VERIFIED BY TEST |
 
 The reconstruction is content-equivalent by review, not byte-identical to the lost version; the lost bytes were never committed and cannot be recovered. This is recorded because the repository rule to preserve user work was broken by the integrator.
+
+| Post-transition regression | 45 control tests failed because Session 00 fixtures inherited the advanced live `transition_contract`; fixtures pinned to their own session contract; re-run `bash scripts/test.sh` exit 0 with 152 passed, 1 skipped | FIXED AND RE-VERIFIED 2026-09-07T01:01:06Z |
