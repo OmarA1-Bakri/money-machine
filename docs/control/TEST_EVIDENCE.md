@@ -209,3 +209,7 @@ The reconstruction is content-equivalent by review, not byte-identical to the lo
 Environment findings recorded rather than acted on: the shared development database `money_machine` holds another branch's schema at its own revision, and the instance carries roughly four hundred leftover test databases from other branches. Neither was modified. Session 02's database-backed tests create and drop their own throwaway databases. One verification command of mine briefly pointed the running stack at that shared database; the migration aborted at revision lookup before any statement, and the database was afterwards confirmed unchanged at 53 tables and its original revision.
 
 Host port 3000 is occupied by an unrelated development server, so the web container was verified on port 3399.
+
+## 2026-09-11 — Recovery review verification
+
+Reviewed canonical HEAD `3720653`. Fresh targeted checks: bootstrap/control/source plus foundation/operations contracts **109 passed, 1 skipped**; isolated migration/concurrency/review-remediation integrations **30 passed, no skips**; Ruff 0.16.2 clean; Pyright 1.1.411 zero errors/warnings/information; both immutable source hashes match the register. These are targeted review checks, not a new full-session exit or live commissioning. The independent findings and ordered plan are in `reviews/2026-09-11-recovery-review-and-finish-plan.md`. Three startup defects remain scheduled for the first repair wave.

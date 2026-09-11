@@ -2,6 +2,10 @@
 
 Session 02 is complete. Continue with `prompts/implementation/06_SESSION_03_DURABLE_ORCHESTRATOR.md`.
 
+## 2026-09-11 recovery review
+
+Resume from [the recovery review and finish plan](reviews/2026-09-11-recovery-review-and-finish-plan.md). The canonical branch remains `build/full-automation`; the older integration tree is a protected reuse source, including its unfinished Session08 work. Before Session03 implementation, repair the review's readiness/database-URL/production-environment findings in one focused foundation wave. Then complete Session03 prompt integrity and activation, port the existing durable orchestration behavior to the canonical schema, and prove a persisted workflow survives restart. The review does not advance session state or claim live commissioning.
+
 ## Session 03 entry conditions
 
 1. Run the prompt-integrity review and corrective exercise first. It is the standing first instruction of every session prompt (`docs/PROMPT_INTEGRITY_REVIEW.md`, D-0026), and `tests/bootstrap/test_prompt_integrity.py` fails until the record exists.

@@ -1,5 +1,12 @@
 # Implementation Log
 
+## 2026-09-11 — Recovery review and ordered delivery plan
+
+- Recovered canonical `build/full-automation` at `3720653`, Session02 complete, next Session03; preserved untracked `CLAUDE.md`. Wrote metadata-only recovery checkpoint `.omx/state/review-resume-20260911.json`.
+- Reconciled the older integration branch as reference material: 49 unique commits versus 10 canonical commits, historical Session07 closure, and protected uncommitted Session08 work. No history, source, database or old worktree was replaced.
+- Two independent read-only reviews identified current startup defects and a session-scoped reuse strategy. The durable review and plan are `docs/control/reviews/2026-09-11-recovery-review-and-finish-plan.md`; it records findings, sources, milestone acceptance and the next repair/Session03 wave.
+- Live Docker inventory showed only the project's PostgreSQL container running. Worker/scheduler remain intentionally unimplemented beyond the Session02 exit-78 boundary. No provider action, commissioning or session transition was performed.
+
 ## 2026-08-08T13:43:51Z — Session 00 source/control lane
 
 - Adopted the sole canonical root at `/mnt/d/Money Machine`; the old lowercase root is absent and `wslpath` maps the root to `D:\Money Machine`.
