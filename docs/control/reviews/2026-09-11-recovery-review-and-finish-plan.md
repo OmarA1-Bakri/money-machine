@@ -4,6 +4,10 @@ Date: 2026-09-11. Status: review and execution plan; not a session closure or co
 
 ## Decision and outcome
 
+Operator clarification, 2026-09-11: faithfully implementing `hands-off-money-machine-full-implementation-workbook.md` is the governing requirement. This plan sequences delivery; it does not replace or reduce that workbook. Preserve its business sequence, thresholds, outputs, automatic handoffs and cull/multiply loop. No commercial revalidation or substitute business model. Apply the workbook's own source precedence and its narrowly permitted provider-mechanics adaptations.
+
+Before porting business behavior, reconcile existing decisions against the workbook and its playbook authority. An entry labelled accepted is not, by itself, proof that an added business restriction was authorized. In particular, D-0014 adds cohort-size/tie handling while the workbook specifies the bottom-80-percent discipline and a publication-based maturity timer; establish source support or resolve the discrepancy explicitly before carrying those interpretations forward. This is a source-fidelity check, not a new commercial gate. Do not certify literal conformance until requirements are traced to implementation and tests/runtime evidence. Material business deviations require the operator's explicit instruction, rather than unilateral implementation judgement.
+
 Continue in `D:\Money Machine`, branch `build/full-automation`, from reviewed HEAD `37206532766d3ba0539902ba8cd434fb67c3d36a`. Preserve the September foundation and recover useful earlier implementation in bounded, session-scoped ports. Do not merge the older integration branch wholesale, restart the programme, or create another orchestration harness.
 
 The delivery target remains the complete playbook workflow and Session 15 acceptance. The first operational milestone is a durable simulation workflow running through API, worker and scheduler and recovering after process restart. That milestone is useful progress, but is not a live business system.

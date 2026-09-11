@@ -8,6 +8,8 @@ Resume from [the recovery review and finish plan](reviews/2026-09-11-recovery-re
 
 ## Session 03 entry conditions
 
+Operator clarification (2026-09-11): follow the implementation workbook faithfully; the finish plan is subordinate to it. Reconcile business-rule interpretations in existing decisions against the workbook/playbook before reuse, particularly D-0014's maturity/cull conditions. Do not substitute a commercial model, weaken outputs, or introduce commercial revalidation. Existing decision labels do not prove source fidelity or operator authorization for business changes.
+
 1. Run the prompt-integrity review and corrective exercise first. It is the standing first instruction of every session prompt (`docs/PROMPT_INTEGRITY_REVIEW.md`, D-0026), and `tests/bootstrap/test_prompt_integrity.py` fails until the record exists.
 2. Add Session 03's completion-evidence keys to `SESSION_EVIDENCE_KEYS` in `src/money_machine/control/state.py`, then activate with `money-machine-control activate`. Activation fails closed without that contract.
 3. Session 03 owns job claiming. The worker and scheduler currently perform a read-only database connectivity check and exit 78 with no claim path anywhere in the source. Commissioning them is this session's work, and the exit-78 contract may only be lifted deliberately, with a decision record.
