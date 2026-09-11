@@ -1,5 +1,11 @@
 # Implementation Log
 
+## 2026-09-11 — Startup repair wave after recovery review
+
+- Repaired migration-head/schema compatibility readiness, encoded database credentials/IPv6, and production environment selection. Compose now carries raw passwords separately; a bounded independent review identified literal-percent and surrounding-whitespace cases, both reproduced and repaired with regression coverage. Development external-URL overrides retain their credentials.
+- Final affected verification: **125 passed, no skips**, 121.37 seconds, including real isolated-database API/CLI tests and rendered Compose credential checks; formatting, Ruff and Pyright clean. Review/remediation details are in `docs/control/reviews/2026-09-11-startup-repair.md`.
+- This is a recoverable foundation repair checkpoint, not another session closure. Session02 remains complete, Session03 prompt integrity/activation is next, no agents are commissioned and worker/scheduler still exit 78. Preserved `CLAUDE.md`, historical worktrees, sources and the shared application database. No provider mutations, deployment or push.
+
 ## 2026-09-11 — Recovery review and ordered delivery plan
 
 - Recovered canonical `build/full-automation` at `3720653`, Session02 complete, next Session03; preserved untracked `CLAUDE.md`. Wrote metadata-only recovery checkpoint `.omx/state/review-resume-20260911.json`.

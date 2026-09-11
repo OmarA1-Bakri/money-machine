@@ -40,6 +40,8 @@ The integrator restored control/governance state, checked Git and Docker state, 
 
 The review did not modify production code. Findings 1–3 are the first repair wave, not silently accepted residual defects.
 
+Continuation: findings 1–3 were subsequently implemented in the startup repair wave. See [the repair record](2026-09-11-startup-repair.md) for corrected Compose carriers, the independent review findings and final verification. Findings 4–5 remain scoped to the next runtime/API work. The numbered findings above preserve the original review state.
+
 ### Why a whole-branch merge is the wrong recovery operation
 
 The two committed trees differ across 464 files (about 102,669 additions and 16,779 deletions). The canonical schema is ORM-mapped with migration root `9f46f3152a68`; the old tree uses Core tables and a `0001`–`0011` migration chain. Its 1,391-line unit of work already couples later research/product services; the canonical unit of work is 81 lines. Old `JobState` and experiment taxonomies differ from canonical `JobStatus` and `ProductLifecycleState`.

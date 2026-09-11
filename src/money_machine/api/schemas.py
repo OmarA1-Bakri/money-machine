@@ -29,6 +29,7 @@ class DatabaseStatus(ApiModel):
     url: str
     reachable: bool
     migration_revision: str | None
+    schema_current: bool = False
 
 
 class ReadinessResponse(ApiModel):

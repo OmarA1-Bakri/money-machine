@@ -73,9 +73,12 @@ def test_compose_shares_one_interpolated_database_contract() -> None:
     assert "POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_development_only}" in COMPOSE_TEXT
     assert (
         "DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://"
-        "${POSTGRES_USER:-money_machine}:${POSTGRES_PASSWORD:-local_development_only}"
+        "${POSTGRES_USER:-money_machine}"
         "@postgres:5432/${POSTGRES_DB:-money_machine}}"
     ) in COMPOSE_TEXT
+    assert (
+        "DATABASE_PASSWORD_FALLBACK: ${POSTGRES_PASSWORD:-local_development_only}" in COMPOSE_TEXT
+    )
     for service_name in DATABASE_SERVICES:
         assert "<<: *database-environment" in _service_block(service_name)
 
@@ -85,7 +88,9 @@ def test_compose_cli_resolves_custom_credentials_without_developer_env() -> None
         "POSTGRES_DB": "contract_db",
         "POSTGRES_USER": "contract_user",
         "POSTGRES_PASSWORD": "contract_password",
-        "DATABASE_URL": "postgresql+asyncpg://contract_user:contract_password@postgres:5432/contract_db",
+        "DATABASE_URL": "postgresql+asyncpg://contract_user@postgres:5432/contract_db",
+        "DATABASE_PASSWORD": "",
+        "DATABASE_PASSWORD_FALLBACK": "contract_password",
     }
     try:
         config = _compose_config(

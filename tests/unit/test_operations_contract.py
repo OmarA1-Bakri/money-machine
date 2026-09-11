@@ -8,12 +8,16 @@ branch, and a build context that carried private material.
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 from pathlib import Path
 from typing import Any, Final, cast
 
 import pytest
 import yaml
+from sqlalchemy.engine import make_url
 
+from money_machine.config.loader import resolve_runtime_environment
 from money_machine.config.runtime import (
     REDACTED,
     SECRET_QUERY_KEYS,
@@ -67,6 +71,62 @@ def test_production_images_are_built_from_the_maintained_dockerfiles() -> None:
 
     assert production["api"]["build"]["dockerfile"] == "infra/docker/api.Dockerfile"
     assert production["web"]["build"]["dockerfile"] == "infra/docker/web.Dockerfile"
+
+
+def test_production_services_select_the_production_environment() -> None:
+    """Production must not silently inherit the loader's development default."""
+    production = services(COMPOSE_PROD)
+    for name in ("api", "worker", "scheduler"):
+        environment = resolve_runtime_environment(production[name]["environment"])
+        assert environment.value == "production", name
+
+
+@pytest.mark.parametrize("password", ["literal%40value", "reserved@:/?#%value", " padded "])
+@pytest.mark.parametrize("compose_path", [COMPOSE, COMPOSE_PROD])
+@pytest.mark.parametrize("external_override", [False, True])
+def test_compose_preserves_the_postgres_password(
+    password: str, compose_path: Path, external_override: bool
+) -> None:
+    """The actual resolved Compose carrier must give the server and driver the same secret."""
+    environment = {
+        name: value
+        for name, value in os.environ.items()
+        if name not in {"DATABASE_URL", "DATABASE_PASSWORD", "POSTGRES_PASSWORD"}
+        and not name.startswith("MONEY_MACHINE_")
+    }
+    environment["POSTGRES_PASSWORD"] = password
+    environment["POSTGRES_USER"] = "operator"
+    environment["POSTGRES_DB"] = "mm"
+    if external_override:
+        environment["DATABASE_URL"] = "postgresql+asyncpg://operator:remote%40secret@remote:5432/mm"
+    result = subprocess.run(
+        [
+            "docker",
+            "compose",
+            "--env-file",
+            os.devnull,
+            "-f",
+            str(compose_path),
+            "config",
+            "--format",
+            "json",
+        ],
+        cwd=ROOT,
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=True,
+        timeout=30,
+    )
+    resolved = json.loads(result.stdout)["services"]
+    server_password = resolved["postgres"]["environment"]["POSTGRES_PASSWORD"]
+    expected_password = (
+        "remote@secret" if external_override and compose_path == COMPOSE else server_password
+    )
+    for name in ("api", "worker", "scheduler"):
+        settings = load_runtime_settings(resolved[name]["environment"])
+        assert make_url(settings.database.dsn()).password == expected_password
+        assert password not in settings.database.safe_url
 
 
 def test_every_python_image_carries_what_the_runtime_reads() -> None:

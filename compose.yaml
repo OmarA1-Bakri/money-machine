@@ -4,7 +4,9 @@ x-database-environment: &database-environment
   POSTGRES_DB: ${POSTGRES_DB:-money_machine}
   POSTGRES_USER: ${POSTGRES_USER:-money_machine}
   POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_development_only}
-  DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-money_machine}:${POSTGRES_PASSWORD:-local_development_only}@postgres:5432/${POSTGRES_DB:-money_machine}}
+  DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-money_machine}@postgres:5432/${POSTGRES_DB:-money_machine}}
+  DATABASE_PASSWORD: ${DATABASE_PASSWORD:-}
+  DATABASE_PASSWORD_FALLBACK: ${POSTGRES_PASSWORD:-local_development_only}
 
 services:
   postgres:

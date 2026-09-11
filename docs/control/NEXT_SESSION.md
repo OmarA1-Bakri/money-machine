@@ -4,7 +4,7 @@ Session 02 is complete. Continue with `prompts/implementation/06_SESSION_03_DURA
 
 ## 2026-09-11 recovery review
 
-Resume from [the recovery review and finish plan](reviews/2026-09-11-recovery-review-and-finish-plan.md). The canonical branch remains `build/full-automation`; the older integration tree is a protected reuse source, including its unfinished Session08 work. Before Session03 implementation, repair the review's readiness/database-URL/production-environment findings in one focused foundation wave. Then complete Session03 prompt integrity and activation, port the existing durable orchestration behavior to the canonical schema, and prove a persisted workflow survives restart. The review does not advance session state or claim live commissioning.
+Resume from [the recovery review and finish plan](reviews/2026-09-11-recovery-review-and-finish-plan.md). The canonical branch remains `build/full-automation`; the older integration tree is a protected reuse source, including its unfinished Session08 work. The readiness/database-URL/production-environment findings are now repaired: [startup repair record](reviews/2026-09-11-startup-repair.md), 125 affected tests passed with no skips and static checks clean. Next complete Session03 prompt integrity and activation, port the existing durable orchestration behavior to the canonical schema, and prove a persisted workflow survives restart. Neither wave advances session state or claims live commissioning.
 
 ## Session 03 entry conditions
 

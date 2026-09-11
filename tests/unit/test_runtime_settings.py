@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from urllib.parse import quote
 
 import pytest
 from pydantic import ValidationError
@@ -24,6 +25,88 @@ from money_machine.config.settings import RuntimeEnvironment
 
 SECRET_VALUE = "correct-horse-battery-staple"
 DSN = "postgresql+asyncpg://user:hunter2@db:5432/money_machine"
+
+
+@pytest.mark.parametrize("host", ["db:5432", "[::1]:5432"])
+@pytest.mark.parametrize("password", ["p@ss:/?#%", "literal%40value"])
+def test_database_url_preserves_encoded_credentials_and_ipv6(
+    host: str, password: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Driver credentials round-trip exactly once while every public form stays redacted."""
+    username = "operator@example.com"
+    encoded_user = quote(username, safe="")
+    encoded_password = quote(password, safe="")
+    url = f"postgresql+asyncpg://{encoded_user}:{encoded_password}@{host}/mm"
+    settings = DatabaseSettings(url=url)
+
+    assert settings.password is not None
+    assert settings.password.reveal() == password
+    assert settings.dsn() == url
+    assert settings.safe_url == f"postgresql+asyncpg://{encoded_user}@{host}/mm"
+    assert DatabaseSettings(url=url, password=Secret(password)).dsn() == url
+    assert DatabaseSettings(url=settings.safe_url, password=Secret(password)).dsn() == url
+
+    caplog.set_level(logging.INFO, logger="money_machine.test")
+    logging.getLogger("money_machine.test").info("settings=%s", settings)
+    public = settings.safe_url + repr(settings) + settings.model_dump_json() + caplog.text
+    assert password not in public
+    assert encoded_password not in public
+
+
+def test_query_password_remains_decoded_once() -> None:
+    """Query credentials retain their existing parsing semantics during URL rebuilding."""
+    settings = DatabaseSettings(
+        url="postgresql+asyncpg://operator%40example.com@[::1]:5432/mm?password=p%2540ss"
+    )
+    assert settings.password is not None
+    assert settings.password.reveal() == "p%40ss"
+    assert settings.dsn() == "postgresql+asyncpg://operator%40example.com:p%2540ss@[::1]:5432/mm"
+    assert "password=" not in settings.safe_url
+
+
+@pytest.mark.parametrize(
+    ("url", "explicit", "expected"),
+    [
+        ("postgresql+asyncpg://user@db/mm", None, "literal%40"),
+        ("postgresql+asyncpg://user:external@db/mm", None, "external"),
+        ("postgresql+asyncpg://user@db/mm", "explicit", "explicit"),
+    ],
+)
+def test_database_password_fallback_respects_credential_precedence(
+    url: str, explicit: str | None, expected: str
+) -> None:
+    """Compose's raw fallback applies only when the selected URL has no credential."""
+    environment = {"DATABASE_URL": url, "DATABASE_PASSWORD_FALLBACK": "literal%40"}
+    if explicit is not None:
+        environment["DATABASE_PASSWORD"] = explicit
+    settings = load_runtime_settings(environment)
+    assert settings.database.password is not None
+    assert settings.database.password.reveal() == expected
+    assert settings.database.dsn() == f"postgresql+asyncpg://user:{quote(expected, safe='')}@db/mm"
+
+
+def test_database_password_fallback_does_not_hide_explicit_conflicts() -> None:
+    """A fallback never converts contradictory operator credentials into valid settings."""
+    with pytest.raises(RuntimeSettingsError, match="supplied twice with different values"):
+        load_runtime_settings(
+            {
+                "DATABASE_URL": "postgresql+asyncpg://user:embedded@db/mm",
+                "DATABASE_PASSWORD": "explicit",
+                "DATABASE_PASSWORD_FALLBACK": "literal%40",
+            }
+        )
+
+
+@pytest.mark.parametrize("name", ["DATABASE_PASSWORD", "DATABASE_PASSWORD_FALLBACK"])
+@pytest.mark.parametrize("prefix", ["", "MONEY_MACHINE_"])
+def test_raw_database_password_preserves_surrounding_whitespace(name: str, prefix: str) -> None:
+    """Whitespace in a nonblank database password belongs to the credential."""
+    settings = load_runtime_settings(
+        {"DATABASE_URL": "postgresql+asyncpg://user@db/mm", f"{prefix}{name}": " padded "}
+    )
+    assert settings.database.password is not None
+    assert settings.database.password.reveal() == " padded "
+    assert settings.database.dsn() == "postgresql+asyncpg://user:%20padded%20@db/mm"
 
 
 def test_secret_never_renders_its_value() -> None:

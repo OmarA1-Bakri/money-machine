@@ -11,7 +11,11 @@ from money_machine.api.schemas import (
     ReadinessResponse,
     VersionResponse,
 )
-from money_machine.persistence.database import check_connectivity, current_migration_revision
+from money_machine.persistence.database import (
+    check_connectivity,
+    current_migration_revisions,
+    schema_is_current,
+)
 from money_machine.version import __version__
 
 router = APIRouter(tags=["system"])
@@ -26,16 +30,20 @@ async def health() -> HealthResponse:
 async def _database_status(state: StateDependency) -> DatabaseStatus:
     reachable = await check_connectivity(state.engine)
     revision: str | None = None
+    schema_current = False
     if reachable:
         try:
             async with state.engine.connect() as connection:
-                revision = await current_migration_revision(connection)
+                revisions = await current_migration_revisions(connection)
+                revision = revisions[0] if len(revisions) == 1 else None
+                schema_current = await schema_is_current(connection, revisions)
         except Exception:  # readiness reports, it does not raise
             revision = None
     return DatabaseStatus(
         url=state.settings.database.safe_url,
         reachable=reachable,
         migration_revision=revision,
+        schema_current=schema_current,
     )
 
 
@@ -46,11 +54,11 @@ async def readiness(
 ) -> ReadinessResponse:
     """Report readiness, proved against the database rather than assumed.
 
-    Returns 503 when the database is unreachable or unmigrated, so an orchestrator can
-    tell "alive" from "able to serve".
+    Returns 503 when the database is unreachable, at different migration heads, or
+    missing a required table/column, so liveness cannot imply compatibility.
     """
     database = await _database_status(state)
-    ready = database.reachable and database.migration_revision is not None
+    ready = database.reachable and database.schema_current
     if not ready:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return ReadinessResponse(

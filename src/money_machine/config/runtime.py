@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from typing import Annotated, Final, Literal, Self, cast
-from urllib.parse import SplitResult, parse_qsl, quote, urlsplit, urlunsplit
+from urllib.parse import SplitResult, parse_qsl, quote, unquote, urlsplit, urlunsplit
 
 from pydantic import (
     AfterValidator,
@@ -146,8 +146,10 @@ def _rebuild_url(
     query: str | None = None,
 ) -> str:
     """Reassemble a URL with, or deliberately without, a password."""
-    user = quote(parts.username or "", safe="")
+    user = quote(unquote(parts.username or ""), safe="")
     host = parts.hostname or ""
+    if ":" in host:
+        host = f"[{host}]"
     port = f":{parts.port}" if parts.port else ""
     if not user:
         authority = f"{host}{port}"
@@ -201,7 +203,7 @@ class DatabaseSettings(ConfigModel):
             return values
         parts = urlsplit(url)
         safe_query, query_secrets = _split_query(parts.query)
-        embedded = parts.password
+        embedded = None if parts.password is None else unquote(parts.password)
         if embedded is None and not query_secrets:
             return values
 
@@ -359,16 +361,16 @@ class RuntimeSettingsError(ValueError):
     """Raised when required runtime settings are missing or contradictory."""
 
 
-def _optional(environ: Mapping[str, str], name: str) -> str | None:
+def _optional(environ: Mapping[str, str], name: str, *, strip: bool = True) -> str | None:
     value = environ.get(f"{ENVIRONMENT_PREFIX}{name}") or environ.get(name)
     if value is None:
         return None
     stripped = value.strip()
-    return stripped or None
+    return (stripped if strip else value) if stripped else None
 
 
-def _optional_secret(environ: Mapping[str, str], name: str) -> Secret | None:
-    value = _optional(environ, name)
+def _optional_secret(environ: Mapping[str, str], name: str, *, strip: bool = True) -> Secret | None:
+    value = _optional(environ, name, strip=strip)
     return None if value is None else Secret(value)
 
 
@@ -407,12 +409,18 @@ def load_runtime_settings(
         for name in PROVIDER_NAMES
     )
     try:
+        database = DatabaseSettings(
+            url=url,
+            password=_optional_secret(source, "DATABASE_PASSWORD", strip=False),
+        )
+        if database.password is None:
+            database = DatabaseSettings(
+                url=database.url,
+                password=_optional_secret(source, "DATABASE_PASSWORD_FALLBACK", strip=False),
+            )
         return RuntimeSettings(
             environment=environment,
-            database=DatabaseSettings(
-                url=url,
-                password=_optional_secret(source, "DATABASE_PASSWORD"),
-            ),
+            database=database,
             api=ApiSettings(auth_token=_optional_secret(source, "API_AUTH_TOKEN")),
             providers=providers,
         )

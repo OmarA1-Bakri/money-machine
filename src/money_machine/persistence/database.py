@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from functools import cache
+from pathlib import Path
 
+from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncConnection,
@@ -15,6 +19,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from money_machine.config.runtime import DatabaseSettings
+from money_machine.persistence.tables import Base
 
 
 def create_engine(settings: DatabaseSettings) -> AsyncEngine:
@@ -65,13 +70,44 @@ async def check_connectivity(engine: AsyncEngine) -> bool:
 
 
 async def current_migration_revision(connection: AsyncConnection) -> str | None:
-    """Read the applied Alembic revision, or None when the table is absent."""
+    """Read a single applied revision; absent or ambiguous heads return None."""
+    revisions = await current_migration_revisions(connection)
+    return revisions[0] if len(revisions) == 1 else None
+
+
+async def current_migration_revisions(connection: AsyncConnection) -> tuple[str, ...]:
+    """Read every applied head without creating a missing version table."""
+    return await connection.run_sync(
+        lambda sync: MigrationContext.configure(sync).get_current_heads()
+    )
+
+
+@cache
+def expected_migration_revisions() -> frozenset[str]:
+    """Resolve the heads shipped with this checkout/image, independently of cwd."""
+    migrations = Path(__file__).resolve().parents[3] / "migrations"
+    return frozenset(ScriptDirectory(str(migrations)).get_heads())
+
+
+async def schema_is_current(connection: AsyncConnection, revisions: tuple[str, ...]) -> bool:
+    """Require matching migration heads and every mapped table/column.
+
+    This is a startup compatibility check, not a replacement for migration drift,
+    constraint and permission verification at deployment.
+    """
+    expected = expected_migration_revisions()
+    if not expected or frozenset(revisions) != expected:
+        return False
     result = await connection.execute(
         text(
-            "SELECT version_num FROM alembic_version"
-            " WHERE EXISTS (SELECT 1 FROM information_schema.tables"
-            " WHERE table_name = 'alembic_version')"
+            "SELECT table_name, column_name FROM information_schema.columns "
+            "WHERE table_schema = current_schema()"
         )
     )
-    row = result.first()
-    return None if row is None else str(row[0])
+    actual_columns = {(str(row[0]), str(row[1])) for row in result}
+    required_columns = {
+        (table.name, column.name)
+        for table in Base.metadata.tables.values()
+        for column in table.columns
+    }
+    return required_columns <= actual_columns

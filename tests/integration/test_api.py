@@ -6,6 +6,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from money_machine.api.dependencies import ApplicationState
@@ -75,6 +76,49 @@ async def test_readiness_passes_on_a_migrated_database(client: AsyncClient) -> N
     assert body["database"]["reachable"] is True
     assert body["database"]["migration_revision"] is not None
     assert body["environment"] == "test"
+
+
+@pytest.mark.parametrize(
+    "damage", ["wrong_revision", "extra_revision", "missing_table", "missing_column"]
+)
+async def test_readiness_rejects_an_incompatible_schema(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    damage: str,
+) -> None:
+    """A reachable database and a version marker do not prove runtime compatibility."""
+    statements = {
+        "wrong_revision": "UPDATE alembic_version SET version_num = 'other_branch'",
+        "extra_revision": "INSERT INTO alembic_version VALUES ('other_branch')",
+        "missing_table": "DROP TABLE config_references",
+        "missing_column": "ALTER TABLE jobs DROP COLUMN heartbeat_at",
+    }
+    async with session_factory() as session:
+        await session.execute(text(statements[damage]))
+        await session.commit()
+
+    response = await client.get("/readiness")
+
+    assert response.status_code == 503
+    assert response.json()["ready"] is False
+    assert response.json()["database"]["reachable"] is True
+
+
+async def test_readiness_rejects_an_unmigrated_database(test_database: str) -> None:
+    """No migration table is a normal not-ready state, not a server error."""
+    application = create_app()
+    state = ApplicationState.create(settings_for(test_database))
+    application.state.application = state
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=application), base_url="http://api"
+        ) as active:
+            response = await active.get("/readiness")
+        assert response.status_code == 503
+        assert response.json()["database"]["reachable"] is True
+        assert response.json()["database"]["migration_revision"] is None
+    finally:
+        await state.dispose()
 
 
 async def test_readiness_fails_when_the_database_is_unreachable(
