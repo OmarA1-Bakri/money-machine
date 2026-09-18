@@ -88,6 +88,19 @@ SESSION_EVIDENCE_KEYS: Mapping[int, frozenset[str]] = MappingProxyType(
                 "evidence_closure_commit_recorded",
             }
         ),
+        3: frozenset(
+            {
+                "orchestration_state_machine_implemented",
+                "lease_and_worker_claiming_implemented",
+                "retry_and_reconciliation_implemented",
+                "event_driven_successors_transactional",
+                "scheduler_timers_durable",
+                "worker_scheduler_fail_closed",
+                "concurrency_recovery_tests_pass",
+                "control_files_and_checkpoint_current",
+                "evidence_closure_commit_recorded",
+            }
+        ),
     }
 )
 """Each session's completion-evidence contract (D-0010). A session without an entry cannot be

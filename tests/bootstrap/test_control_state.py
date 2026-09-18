@@ -1254,3 +1254,14 @@ def test_every_known_session_prompt_has_an_evidence_contract_in_order() -> None:
         "control_files_and_checkpoint_current",
         CLOSURE_EVIDENCE_KEY,
     }
+    assert set(contracts[3]) == {
+        "orchestration_state_machine_implemented",
+        "lease_and_worker_claiming_implemented",
+        "retry_and_reconciliation_implemented",
+        "event_driven_successors_transactional",
+        "scheduler_timers_durable",
+        "worker_scheduler_fail_closed",
+        "concurrency_recovery_tests_pass",
+        "control_files_and_checkpoint_current",
+        CLOSURE_EVIDENCE_KEY,
+    }
