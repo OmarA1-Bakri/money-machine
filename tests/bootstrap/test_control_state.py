@@ -1141,11 +1141,16 @@ def test_session_two_to_three_activation_fails_closed_without_session_03_keys(
     tmp_path: Path,
 ) -> None:
     """Dedicated test: Session 2→3 activation requires exactly the Session 03 evidence keys."""
-    # Prepare a completed Session 01 (which points to Session 02)
+    # Prepare and complete Session 01 (which points to Session 02)
     prepared, _, _ = prepare_session_one_closure(tmp_path)
     assert run_transition(prepared.state_path, prepared.candidate_path).returncode == 0
 
-    # Activate Session 02
+    # Prepare Session 02 activation candidate
+    completed_01 = load_state(prepared.state_path)
+    assert completed_01["current_session"] == 1
+    assert completed_01["session_status"] == "complete"
+    assert completed_01["next_session"] == 2
+
     session_two_keys = {
         "fresh_bootstrap_path_documented",
         "database_schema_and_migrations_work",
@@ -1156,15 +1161,26 @@ def test_session_two_to_three_activation_fails_closed_without_session_03_keys(
         "control_files_and_checkpoint_current",
         CLOSURE_EVIDENCE_KEY,
     }
-    activated_02 = load_state(prepared.state_path)
-    assert activated_02["current_session"] == 2
-    activated_02["required_completion_evidence"] = dict.fromkeys(session_two_keys, False)
-    activated_02["updated_at"] = "2026-08-14T00:00:00Z"
-    write_state(prepared.state_path, activated_02)
-    git(prepared.repo, "add", "docs/control/IMPLEMENTATION_STATE.json")
-    git(prepared.repo, "commit", "-m", "chore(control): activate session 02")
+
+    # Activate Session 02
+    activation_02 = copy.deepcopy(completed_01)
+    activation_02.update(
+        {
+            "state_revision": completed_01["state_revision"] + 1,
+            "session_status": "incomplete",
+            "current_session": 2,
+            "updated_at": "2026-08-14T00:00:00Z",
+            "required_completion_evidence": dict.fromkeys(session_two_keys, False),
+        }
+    )
+    write_state(prepared.candidate_path, activation_02)
+    assert run_transition(prepared.state_path, prepared.candidate_path, "activate").returncode == 0
 
     # Mark Session 02 complete with all evidence satisfied
+    activated_02 = load_state(prepared.state_path)
+    assert activated_02["current_session"] == 2
+    assert activated_02["session_status"] == "incomplete"
+
     activated_02["required_completion_evidence"] = {
         key: key != CLOSURE_EVIDENCE_KEY for key in session_two_keys
     }
@@ -1174,6 +1190,7 @@ def test_session_two_to_three_activation_fails_closed_without_session_03_keys(
     git(prepared.repo, "commit", "-m", "docs(foundation): complete database and runtime foundation")
     closure_02 = git(prepared.repo, "rev-parse", "HEAD")
 
+    # Complete Session 02
     completed_02 = copy.deepcopy(activated_02)
     completed_02.update(
         {
@@ -1195,11 +1212,16 @@ def test_session_two_to_three_activation_fails_closed_without_session_03_keys(
     write_state(prepared.candidate_path, completed_02)
     assert run_transition(prepared.state_path, prepared.candidate_path).returncode == 0
 
-    # Now attempt to activate Session 03 with WRONG keys (missing Session 03 keys)
-    bad_activation = copy.deepcopy(load_state(prepared.state_path))
+    # Now attempt to activate Session 03 with WRONG keys (using Session 02 keys)
+    completed_02_state = load_state(prepared.state_path)
+    assert completed_02_state["current_session"] == 2
+    assert completed_02_state["session_status"] == "complete"
+    assert completed_02_state["next_session"] == 3
+
+    bad_activation = copy.deepcopy(completed_02_state)
     bad_activation.update(
         {
-            "state_revision": bad_activation["state_revision"] + 1,
+            "state_revision": completed_02_state["state_revision"] + 1,
             "session_status": "incomplete",
             "current_session": 3,
             "updated_at": "2026-08-17T00:00:00Z",
