@@ -1137,7 +1137,9 @@ def test_session_one_completes_after_activation_with_a_new_closure_commit(tmp_pa
     assert after["evidence_closure_commit_sha"] == closure
 
 
-def test_session_two_to_three_activation_fails_closed_without_session_03_keys(tmp_path: Path) -> None:
+def test_session_two_to_three_activation_fails_closed_without_session_03_keys(
+    tmp_path: Path,
+) -> None:
     """Dedicated test: Session 2→3 activation requires exactly the Session 03 evidence keys."""
     # Prepare a completed Session 01 (which points to Session 02)
     prepared, session_one_state, closure = prepare_session_one_closure(tmp_path)
