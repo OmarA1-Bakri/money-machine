@@ -1,11 +1,11 @@
 """Tests for job state machine transitions.
 
-These tests verify the canonical JobStatus state machine using fake handlers
-and deterministic test data. No live database or agent execution required.
+These tests verify the canonical JobStatus state machine using deterministic
+test data. No live database or agent execution required.
 """
 
 from datetime import datetime
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pytest
 
@@ -166,25 +166,19 @@ class TestUncertainExternalEffect:
 class TestCancellation:
     """Test job cancellation from various states."""
 
-    def test_pending_to_cancelled(
-        self, state_machine: JobStateMachine, test_job_id: UUID
-    ) -> None:
+    def test_pending_to_cancelled(self, state_machine: JobStateMachine, test_job_id: UUID) -> None:
         transition = state_machine.validate_transition(
             test_job_id, JobStatus.PENDING, JobStatus.CANCELLED, reason="user requested"
         )
         assert transition.target_status == JobStatus.CANCELLED
 
-    def test_blocked_to_cancelled(
-        self, state_machine: JobStateMachine, test_job_id: UUID
-    ) -> None:
+    def test_blocked_to_cancelled(self, state_machine: JobStateMachine, test_job_id: UUID) -> None:
         transition = state_machine.validate_transition(
             test_job_id, JobStatus.BLOCKED, JobStatus.CANCELLED, reason="user requested"
         )
         assert transition.target_status == JobStatus.CANCELLED
 
-    def test_ready_to_cancelled(
-        self, state_machine: JobStateMachine, test_job_id: UUID
-    ) -> None:
+    def test_ready_to_cancelled(self, state_machine: JobStateMachine, test_job_id: UUID) -> None:
         transition = state_machine.validate_transition(
             test_job_id, JobStatus.READY, JobStatus.CANCELLED, reason="user requested"
         )
@@ -248,9 +242,7 @@ class TestCanTransition:
         assert state_machine.can_transition(JobStatus.READY, JobStatus.RUNNING)
         assert state_machine.can_transition(JobStatus.RUNNING, JobStatus.SUCCEEDED)
 
-    def test_can_transition_returns_false_for_invalid(
-        self, state_machine: JobStateMachine
-    ) -> None:
+    def test_can_transition_returns_false_for_invalid(self, state_machine: JobStateMachine) -> None:
         assert not state_machine.can_transition(JobStatus.PENDING, JobStatus.RUNNING)
         assert not state_machine.can_transition(JobStatus.SUCCEEDED, JobStatus.RUNNING)
         assert not state_machine.can_transition(JobStatus.TERMINAL_FAILURE, JobStatus.READY)
@@ -308,7 +300,7 @@ class TestTransitionSequences:
 
     def test_happy_path_pending_to_succeeded(self, state_machine: JobStateMachine) -> None:
         """Test a successful job flow: PENDING → READY → RUNNING → SUCCEEDED."""
-        job_id = uuid4()
+        job_id = UUID("00000000-0000-0000-0000-000000000010")
 
         # PENDING → READY
         t1 = state_machine.validate_transition(job_id, JobStatus.PENDING, JobStatus.READY)
@@ -327,7 +319,7 @@ class TestTransitionSequences:
 
     def test_blocked_then_ready_path(self, state_machine: JobStateMachine) -> None:
         """Test: PENDING → BLOCKED → READY → RUNNING → SUCCEEDED."""
-        job_id = uuid4()
+        job_id = UUID("00000000-0000-0000-0000-000000000011")
 
         state_machine.validate_transition(job_id, JobStatus.PENDING, JobStatus.BLOCKED)
         state_machine.validate_transition(job_id, JobStatus.BLOCKED, JobStatus.READY)
@@ -337,7 +329,7 @@ class TestTransitionSequences:
 
     def test_retry_path(self, state_machine: JobStateMachine) -> None:
         """Test: RUNNING → FAILED → READY → RUNNING → SUCCEEDED."""
-        job_id = uuid4()
+        job_id = UUID("00000000-0000-0000-0000-000000000012")
 
         state_machine.validate_transition(job_id, JobStatus.RUNNING, JobStatus.FAILED)
         state_machine.validate_transition(job_id, JobStatus.FAILED, JobStatus.READY)
@@ -347,7 +339,7 @@ class TestTransitionSequences:
 
     def test_max_retries_path(self, state_machine: JobStateMachine) -> None:
         """Test: RUNNING → FAILED → TERMINAL_FAILURE."""
-        job_id = uuid4()
+        job_id = UUID("00000000-0000-0000-0000-000000000013")
 
         state_machine.validate_transition(job_id, JobStatus.RUNNING, JobStatus.FAILED)
         final = state_machine.validate_transition(
@@ -357,7 +349,7 @@ class TestTransitionSequences:
 
     def test_uncertain_effect_reconciled_to_success(self, state_machine: JobStateMachine) -> None:
         """Test: RUNNING → UNCERTAIN_EXTERNAL_EFFECT → SUCCEEDED."""
-        job_id = uuid4()
+        job_id = UUID("00000000-0000-0000-0000-000000000014")
 
         state_machine.validate_transition(
             job_id, JobStatus.RUNNING, JobStatus.UNCERTAIN_EXTERNAL_EFFECT
@@ -371,7 +363,7 @@ class TestTransitionSequences:
         self, state_machine: JobStateMachine
     ) -> None:
         """Test: RUNNING → UNCERTAIN_EXTERNAL_EFFECT → FAILED → READY → RUNNING → SUCCEEDED."""
-        job_id = uuid4()
+        job_id = UUID("00000000-0000-0000-0000-000000000015")
 
         state_machine.validate_transition(
             job_id, JobStatus.RUNNING, JobStatus.UNCERTAIN_EXTERNAL_EFFECT

@@ -27,11 +27,11 @@ class StateTransition:
 
 
 class JobStateMachine:
-    """Validates and applies job state transitions.
+    """Validates job state transitions.
 
     This class enforces the canonical JobStatus state machine defined in
-    transition_guard.JOB_TRANSITIONS. All transitions must pass through
-    validate_transition before being applied to the database.
+    transition_guard.JOB_TRANSITIONS. All transitions must pass validation
+    before being persisted to the database.
     """
 
     def validate_transition(
@@ -75,10 +75,12 @@ class JobStateMachine:
         Returns:
             True if the transition is allowed, False otherwise
         """
+        from money_machine.domain.errors import InvalidTransitionError
+
         try:
             require_job_transition(source, target)
             return True
-        except Exception:
+        except InvalidTransitionError:
             return False
 
     def get_allowed_transitions(self, source: JobStatus) -> frozenset[JobStatus]:
