@@ -109,6 +109,9 @@ def command_db_seed(arguments: argparse.Namespace) -> int:
                     "prompt_versions_created": report.prompt_versions_created,
                     "config_references_created": report.config_references_created,
                     "total_created": report.total_created,
+                    "agents_corrected": report.agents_corrected,
+                    "prompt_versions_corrected": report.prompt_versions_corrected,
+                    "total_corrected": report.total_corrected,
                 }
         finally:
             await engine.dispose()
