@@ -1142,7 +1142,7 @@ def test_session_two_to_three_activation_fails_closed_without_session_03_keys(
 ) -> None:
     """Dedicated test: Session 2→3 activation requires exactly the Session 03 evidence keys."""
     # Prepare a completed Session 01 (which points to Session 02)
-    prepared, session_one_state, closure = prepare_session_one_closure(tmp_path)
+    prepared, _, _ = prepare_session_one_closure(tmp_path)
     assert run_transition(prepared.state_path, prepared.candidate_path).returncode == 0
 
     # Activate Session 02
