@@ -12,13 +12,13 @@ Operator clarification (2026-09-11): follow the implementation workbook faithful
 
 1. Run the prompt-integrity review and corrective exercise first. It is the standing first instruction of every session prompt (`docs/PROMPT_INTEGRITY_REVIEW.md`, D-0026), and `tests/bootstrap/test_prompt_integrity.py` fails until the record exists.
 2. Add Session 03's completion-evidence keys to `SESSION_EVIDENCE_KEYS` in `src/money_machine/control/state.py`, then activate with `money-machine-control activate`. Activation fails closed without that contract.
-3. Session 03 owns job claiming. The worker and scheduler currently perform a read-only database connectivity check and exit 78 with no claim path anywhere in the source. Commissioning them is this session's work, and the exit-78 contract may only be lifted deliberately, with a decision record.
+3. Session 03 builds orchestration primitives (state machine, leasing, retries, reconciliation, successors, scheduler) with deterministic fake handlers. The worker and scheduler currently perform a read-only database connectivity check and exit 78 with no claim path anywhere in the source. Session 03 keeps that exit-78 boundary; Session 04 adds agent runtime, prompt loading, and commissioning evidence. Commissioning and exit-78 removal may only occur deliberately, with a decision record, in Session 04 or later.
 4. The schema already carries what the orchestrator needs: `jobs` with an idempotency key, lease owner, lease expiry, heartbeat and partial indexes for the ready-and-due and lease-expiry queries; `job_dependencies`; `events` as an append-only log with a semantic dedupe key; `idempotency_records` for reservations; and `effect_attempts` for reconciliation outcomes. Use them rather than adding a parallel mechanism.
 5. Keep provider effects in simulation. Nothing is commissioned; no agent may perform a provider call.
 
 ## Carry-forward work
 
-- Prove idempotency uniqueness under a concurrent claim path, which only exists once claiming does (Session 03).
+- Prove idempotency uniqueness under a concurrent claim path, which only exists once claiming is commissioned (Session 04).
 - Refuse an unreconciled `MetricsSnapshot` as a decision input at the decision layer (Session 02 review, deferred).
 - Wire `require_successor_spawn` into the orchestrator's MULTIPLY spawn path (Session 01 review, deferred to Session 03).
 - Install Playwright with the first browser-channel work, not before.
