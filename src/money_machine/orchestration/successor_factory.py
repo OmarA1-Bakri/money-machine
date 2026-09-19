@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 
 @lru_cache(maxsize=1)
-def load_workflows_config() -> tuple[dict[str, list[str]], "WorkflowsConfig"]:
+def load_workflows_config() -> tuple[dict[str, list[str]], WorkflowsConfig]:
     """Load WorkflowsConfig once and return both event map and full config.
 
     This is the SINGLE source of truth for YAML loading (should-fix B-2).
