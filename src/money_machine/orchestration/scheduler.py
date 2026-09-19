@@ -15,14 +15,11 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import and_, select
+from sqlalchemy import select
 
 from money_machine.domain.enums import JobStatus
 from money_machine.orchestration._foundation import uncommissioned_process
-from money_machine.orchestration.dependency_resolver import (
-    promote_pending_to_ready,
-    satisfy_dependency,
-)
+from money_machine.orchestration.dependency_resolver import promote_pending_to_ready
 from money_machine.orchestration.leases import reclaim_expired_leases
 from money_machine.persistence.tables import Job, WorkflowRun
 

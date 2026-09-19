@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 
-from money_machine.domain.enums import JobStatus, RetryClass
+from money_machine.domain.enums import JobStatus
 from money_machine.orchestration.scheduler import (
     DEFAULT_STALL_THRESHOLD,
     detect_stalled_jobs,
