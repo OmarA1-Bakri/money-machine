@@ -56,7 +56,7 @@ async def test_promote_due_jobs_success(session: AsyncSession):
     # Job 1: due now, no dependencies
     job1_id = uuid4()
     job1 = Job(
-        idempotency_key=f"test_key_{str(job1_id)}",
+        idempotency_key=f"test_key_{job1_id!s}",
         id=job1_id,
         workflow_id=workflow_id,
         job_type="job1",
@@ -75,7 +75,7 @@ async def test_promote_due_jobs_success(session: AsyncSession):
     # Job 2: due in future (should not promote)
     job2_id = uuid4()
     job2 = Job(
-        idempotency_key=f"test_key_{str(job2_id)}",
+        idempotency_key=f"test_key_{job2_id!s}",
         id=job2_id,
         workflow_id=workflow_id,
         job_type="job2",
@@ -127,7 +127,7 @@ async def test_promote_due_jobs_skips_unsatisfied_deps(session: AsyncSession):
 
     predecessor_id = uuid4()
     predecessor = Job(
-        idempotency_key=f"test_key_{str(predecessor_id)}",
+        idempotency_key=f"test_key_{predecessor_id!s}",
         id=predecessor_id,
         workflow_id=workflow_id,
         job_type="predecessor",
@@ -145,7 +145,7 @@ async def test_promote_due_jobs_skips_unsatisfied_deps(session: AsyncSession):
 
     dependent_id = uuid4()
     dependent = Job(
-        idempotency_key=f"test_key_{str(dependent_id)}",
+        idempotency_key=f"test_key_{dependent_id!s}",
         id=dependent_id,
         workflow_id=workflow_id,
         job_type="dependent",
@@ -204,7 +204,7 @@ async def test_detect_stalled_jobs(session: AsyncSession):
     # Stalled job: old heartbeat, lease not expired
     stalled_id = uuid4()
     stalled = Job(
-        idempotency_key=f"test_key_{str(stalled_id)}",
+        idempotency_key=f"test_key_{stalled_id!s}",
         id=stalled_id,
         workflow_id=workflow_id,
         job_type="stalled",
@@ -226,7 +226,7 @@ async def test_detect_stalled_jobs(session: AsyncSession):
     # Not stalled: recent heartbeat
     active_id = uuid4()
     active = Job(
-        idempotency_key=f"test_key_{str(active_id)}",
+        idempotency_key=f"test_key_{active_id!s}",
         id=active_id,
         workflow_id=workflow_id,
         job_type="active",
@@ -285,7 +285,7 @@ async def test_detect_stalled_jobs_ignores_expired_lease(session: AsyncSession):
     # Job with old heartbeat AND expired lease (not stalled, it's expired)
     expired_id = uuid4()
     expired = Job(
-        idempotency_key=f"test_key_{str(expired_id)}",
+        idempotency_key=f"test_key_{expired_id!s}",
         id=expired_id,
         workflow_id=workflow_id,
         job_type="expired",
@@ -421,7 +421,7 @@ async def test_run_scheduler_cycle_integration(session: AsyncSession):
     # PENDING job due now (will be promoted)
     pending_id = uuid4()
     pending = Job(
-        idempotency_key=f"test_key_{str(pending_id)}",
+        idempotency_key=f"test_key_{pending_id!s}",
         id=pending_id,
         workflow_id=workflow_id,
         job_type="pending",
@@ -440,7 +440,7 @@ async def test_run_scheduler_cycle_integration(session: AsyncSession):
     # RUNNING job with expired lease (will be reclaimed)
     expired_id = uuid4()
     expired = Job(
-        idempotency_key=f"test_key_{str(expired_id)}",
+        idempotency_key=f"test_key_{expired_id!s}",
         id=expired_id,
         workflow_id=workflow_id,
         job_type="expired",
@@ -462,7 +462,7 @@ async def test_run_scheduler_cycle_integration(session: AsyncSession):
     # RUNNING job stalled (will be detected)
     stalled_id = uuid4()
     stalled = Job(
-        idempotency_key=f"test_key_{str(stalled_id)}",
+        idempotency_key=f"test_key_{stalled_id!s}",
         id=stalled_id,
         workflow_id=workflow_id,
         job_type="stalled",

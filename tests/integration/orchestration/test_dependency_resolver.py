@@ -58,7 +58,7 @@ async def test_check_dependencies_satisfied_no_dependencies(session: AsyncSessio
 
     job_id = uuid4()
     job = Job(
-        idempotency_key=f"test_key_{str(job_id)}",
+        idempotency_key=f"test_key_{job_id!s}",
         id=job_id,
         workflow_id=workflow_id,
         job_type="test_job",
@@ -105,7 +105,7 @@ async def test_check_dependencies_satisfied_with_satisfied_dep(session: AsyncSes
 
     predecessor_id = uuid4()
     predecessor = Job(
-        idempotency_key=f"test_key_{str(predecessor_id)}",
+        idempotency_key=f"test_key_{predecessor_id!s}",
         id=predecessor_id,
         workflow_id=workflow_id,
         job_type="predecessor",
@@ -123,7 +123,7 @@ async def test_check_dependencies_satisfied_with_satisfied_dep(session: AsyncSes
 
     job_id = uuid4()
     job = Job(
-        idempotency_key=f"test_key_{str(job_id)}",
+        idempotency_key=f"test_key_{job_id!s}",
         id=job_id,
         workflow_id=workflow_id,
         job_type="dependent",
@@ -178,7 +178,7 @@ async def test_check_dependencies_satisfied_with_unsatisfied_dep(session: AsyncS
 
     predecessor_id = uuid4()
     predecessor = Job(
-        idempotency_key=f"test_key_{str(predecessor_id)}",
+        idempotency_key=f"test_key_{predecessor_id!s}",
         id=predecessor_id,
         workflow_id=workflow_id,
         job_type="predecessor",
@@ -196,7 +196,7 @@ async def test_check_dependencies_satisfied_with_unsatisfied_dep(session: AsyncS
 
     job_id = uuid4()
     job = Job(
-        idempotency_key=f"test_key_{str(job_id)}",
+        idempotency_key=f"test_key_{job_id!s}",
         id=job_id,
         workflow_id=workflow_id,
         job_type="dependent",
@@ -462,7 +462,7 @@ async def test_evaluate_job_readiness_all_conditions_met(session: AsyncSession):
 
     job_id = uuid4()
     job = Job(
-        idempotency_key=f"test_key_{str(job_id)}",
+        idempotency_key=f"test_key_{job_id!s}",
         id=job_id,
         workflow_id=workflow_id,
         job_type="test_job",
@@ -511,7 +511,7 @@ async def test_evaluate_job_readiness_not_time_yet(session: AsyncSession):
 
     job_id = uuid4()
     job = Job(
-        idempotency_key=f"test_key_{str(job_id)}",
+        idempotency_key=f"test_key_{job_id!s}",
         id=job_id,
         workflow_id=workflow_id,
         job_type="test_job",
@@ -560,7 +560,7 @@ async def test_promote_pending_to_ready_success(session: AsyncSession):
 
     job_id = uuid4()
     job = Job(
-        idempotency_key=f"test_key_{str(job_id)}",
+        idempotency_key=f"test_key_{job_id!s}",
         id=job_id,
         workflow_id=workflow_id,
         job_type="test_job",
@@ -612,7 +612,7 @@ async def test_promote_pending_to_ready_workflow_inactive(session: AsyncSession)
 
     job_id = uuid4()
     job = Job(
-        idempotency_key=f"test_key_{str(job_id)}",
+        idempotency_key=f"test_key_{job_id!s}",
         id=job_id,
         workflow_id=workflow_id,
         job_type="test_job",
@@ -660,7 +660,7 @@ async def test_satisfy_dependency(session: AsyncSession):
 
     predecessor_id = uuid4()
     predecessor = Job(
-        idempotency_key=f"test_key_{str(predecessor_id)}",
+        idempotency_key=f"test_key_{predecessor_id!s}",
         id=predecessor_id,
         workflow_id=workflow_id,
         job_type="predecessor",
@@ -678,7 +678,7 @@ async def test_satisfy_dependency(session: AsyncSession):
 
     dependent_id = uuid4()
     dependent = Job(
-        idempotency_key=f"test_key_{str(dependent_id)}",
+        idempotency_key=f"test_key_{dependent_id!s}",
         id=dependent_id,
         workflow_id=workflow_id,
         job_type="dependent",
@@ -738,7 +738,7 @@ async def test_propagate_dependency_failure(session: AsyncSession):
 
     failed_id = uuid4()
     failed_job = Job(
-        idempotency_key=f"test_key_{str(failed_id)}",
+        idempotency_key=f"test_key_{failed_id!s}",
         id=failed_id,
         workflow_id=workflow_id,
         job_type="failed",
@@ -756,7 +756,7 @@ async def test_propagate_dependency_failure(session: AsyncSession):
 
     dependent_id = uuid4()
     dependent = Job(
-        idempotency_key=f"test_key_{str(dependent_id)}",
+        idempotency_key=f"test_key_{dependent_id!s}",
         id=dependent_id,
         workflow_id=workflow_id,
         job_type="dependent",
