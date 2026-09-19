@@ -94,7 +94,7 @@ async def check_workflow_active(
     if workflow is None:
         return False
     # Active = completed_at is NULL
-    return workflow is None
+    return workflow.completed_at is None
 
 
 async def check_idempotency_collision(
@@ -275,7 +275,7 @@ async def propagate_dependency_failure(
     result = await session.execute(statement)
     dependent_jobs = list(result.scalars().all())
 
-    blocked_job_ids = []
+    blocked_job_ids: list[UUID] = []
     for job in dependent_jobs:
         # Validate PENDING → BLOCKED transition
         require_job_transition(JobStatus.PENDING, JobStatus.BLOCKED)

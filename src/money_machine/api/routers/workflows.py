@@ -72,8 +72,8 @@ async def start_workflow(
     return _summary(workflow)
 
 
-@router.post("/{workflow_id}/cancel", response_model=dict)
-async def cancel_workflow(workflow_id: UUID, session: SessionDependency) -> dict:
+@router.post("/{workflow_id}/cancel", response_model=dict[str, str | int | None])
+async def cancel_workflow(workflow_id: UUID, session: SessionDependency) -> dict[str, str | int | None]:
     """Cancel a workflow and block its pending jobs."""
     from datetime import UTC, datetime
 

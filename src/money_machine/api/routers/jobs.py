@@ -77,13 +77,13 @@ async def retry_job(job_id: UUID, session: SessionDependency) -> JobSummary:
         ) from error
 
 
-@router.post("/{job_id}/reconcile", response_model=dict)
+@router.post("/{job_id}/reconcile", response_model=dict[str, str | None])
 async def reconcile_job(
     job_id: UUID,
     session: SessionDependency,
     effect_state: str = Query(..., description="CONFIRMED or ABSENT"),
     provider_object_id: str | None = Query(None, description="Provider object ID if CONFIRMED"),
-) -> dict:
+) -> dict[str, str | None]:
     """Reconcile an uncertain external effect."""
     from datetime import UTC, datetime
 

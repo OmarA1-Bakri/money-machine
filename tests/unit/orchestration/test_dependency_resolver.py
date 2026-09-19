@@ -528,6 +528,7 @@ async def test_satisfy_dependency(db_session: AsyncSession):
 
     # Verify satisfied_at is set
     updated_dep = await db_session.get(JobDependency, dep.id)
+    assert updated_dep is not None
     assert updated_dep.satisfied_at == now
 
 
@@ -590,4 +591,5 @@ async def test_propagate_dependency_failure(db_session: AsyncSession):
 
     assert dependent_id in blocked
     updated = await db_session.get(Job, dependent_id)
+    assert updated is not None
     assert JobStatus(updated.status) == JobStatus.BLOCKED

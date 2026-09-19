@@ -72,7 +72,7 @@ async def promote_due_jobs(
     result = await session.execute(statement)
     pending_jobs = list(result.scalars().all())
 
-    promoted = []
+    promoted: list[Job] = []
     for job in pending_jobs:
         try:
             promoted_job = await promote_pending_to_ready(
