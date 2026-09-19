@@ -37,7 +37,7 @@ async def test_promote_due_jobs_success(session: AsyncSession):
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -56,6 +56,7 @@ async def test_promote_due_jobs_success(session: AsyncSession):
     # Job 1: due now, no dependencies
     job1_id = uuid4()
     job1 = Job(
+        idempotency_key=f"test_key_{str(job1_id)}",
         id=job1_id,
         workflow_id=workflow_id,
         job_type="job1",
@@ -74,6 +75,7 @@ async def test_promote_due_jobs_success(session: AsyncSession):
     # Job 2: due in future (should not promote)
     job2_id = uuid4()
     job2 = Job(
+        idempotency_key=f"test_key_{str(job2_id)}",
         id=job2_id,
         workflow_id=workflow_id,
         job_type="job2",
@@ -107,7 +109,7 @@ async def test_promote_due_jobs_skips_unsatisfied_deps(session: AsyncSession):
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -125,6 +127,7 @@ async def test_promote_due_jobs_skips_unsatisfied_deps(session: AsyncSession):
 
     predecessor_id = uuid4()
     predecessor = Job(
+        idempotency_key=f"test_key_{str(predecessor_id)}",
         id=predecessor_id,
         workflow_id=workflow_id,
         job_type="predecessor",
@@ -142,6 +145,7 @@ async def test_promote_due_jobs_skips_unsatisfied_deps(session: AsyncSession):
 
     dependent_id = uuid4()
     dependent = Job(
+        idempotency_key=f"test_key_{str(dependent_id)}",
         id=dependent_id,
         workflow_id=workflow_id,
         job_type="dependent",
@@ -181,7 +185,7 @@ async def test_detect_stalled_jobs(session: AsyncSession):
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -200,6 +204,7 @@ async def test_detect_stalled_jobs(session: AsyncSession):
     # Stalled job: old heartbeat, lease not expired
     stalled_id = uuid4()
     stalled = Job(
+        idempotency_key=f"test_key_{str(stalled_id)}",
         id=stalled_id,
         workflow_id=workflow_id,
         job_type="stalled",
@@ -221,6 +226,7 @@ async def test_detect_stalled_jobs(session: AsyncSession):
     # Not stalled: recent heartbeat
     active_id = uuid4()
     active = Job(
+        idempotency_key=f"test_key_{str(active_id)}",
         id=active_id,
         workflow_id=workflow_id,
         job_type="active",
@@ -260,7 +266,7 @@ async def test_detect_stalled_jobs_ignores_expired_lease(session: AsyncSession):
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -279,6 +285,7 @@ async def test_detect_stalled_jobs_ignores_expired_lease(session: AsyncSession):
     # Job with old heartbeat AND expired lease (not stalled, it's expired)
     expired_id = uuid4()
     expired = Job(
+        idempotency_key=f"test_key_{str(expired_id)}",
         id=expired_id,
         workflow_id=workflow_id,
         job_type="expired",
@@ -316,7 +323,7 @@ async def test_schedule_maturity_timer(session: AsyncSession):
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -357,7 +364,7 @@ async def test_schedule_maturity_timer_completed_workflow(session: AsyncSession)
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -395,7 +402,7 @@ async def test_run_scheduler_cycle_integration(session: AsyncSession):
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -414,6 +421,7 @@ async def test_run_scheduler_cycle_integration(session: AsyncSession):
     # PENDING job due now (will be promoted)
     pending_id = uuid4()
     pending = Job(
+        idempotency_key=f"test_key_{str(pending_id)}",
         id=pending_id,
         workflow_id=workflow_id,
         job_type="pending",
@@ -432,6 +440,7 @@ async def test_run_scheduler_cycle_integration(session: AsyncSession):
     # RUNNING job with expired lease (will be reclaimed)
     expired_id = uuid4()
     expired = Job(
+        idempotency_key=f"test_key_{str(expired_id)}",
         id=expired_id,
         workflow_id=workflow_id,
         job_type="expired",
@@ -453,6 +462,7 @@ async def test_run_scheduler_cycle_integration(session: AsyncSession):
     # RUNNING job stalled (will be detected)
     stalled_id = uuid4()
     stalled = Job(
+        idempotency_key=f"test_key_{str(stalled_id)}",
         id=stalled_id,
         workflow_id=workflow_id,
         job_type="stalled",

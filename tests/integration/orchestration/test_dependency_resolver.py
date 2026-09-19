@@ -40,7 +40,7 @@ async def test_check_dependencies_satisfied_no_dependencies(session: AsyncSessio
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -58,6 +58,7 @@ async def test_check_dependencies_satisfied_no_dependencies(session: AsyncSessio
 
     job_id = uuid4()
     job = Job(
+        idempotency_key=f"test_key_{str(job_id)}",
         id=job_id,
         workflow_id=workflow_id,
         job_type="test_job",
@@ -86,7 +87,7 @@ async def test_check_dependencies_satisfied_with_satisfied_dep(session: AsyncSes
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -104,6 +105,7 @@ async def test_check_dependencies_satisfied_with_satisfied_dep(session: AsyncSes
 
     predecessor_id = uuid4()
     predecessor = Job(
+        idempotency_key=f"test_key_{str(predecessor_id)}",
         id=predecessor_id,
         workflow_id=workflow_id,
         job_type="predecessor",
@@ -121,6 +123,7 @@ async def test_check_dependencies_satisfied_with_satisfied_dep(session: AsyncSes
 
     job_id = uuid4()
     job = Job(
+        idempotency_key=f"test_key_{str(job_id)}",
         id=job_id,
         workflow_id=workflow_id,
         job_type="dependent",
@@ -157,7 +160,7 @@ async def test_check_dependencies_satisfied_with_unsatisfied_dep(session: AsyncS
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -175,6 +178,7 @@ async def test_check_dependencies_satisfied_with_unsatisfied_dep(session: AsyncS
 
     predecessor_id = uuid4()
     predecessor = Job(
+        idempotency_key=f"test_key_{str(predecessor_id)}",
         id=predecessor_id,
         workflow_id=workflow_id,
         job_type="predecessor",
@@ -192,6 +196,7 @@ async def test_check_dependencies_satisfied_with_unsatisfied_dep(session: AsyncS
 
     job_id = uuid4()
     job = Job(
+        idempotency_key=f"test_key_{str(job_id)}",
         id=job_id,
         workflow_id=workflow_id,
         job_type="dependent",
@@ -227,7 +232,7 @@ async def test_check_workflow_active(session: AsyncSession):
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -257,7 +262,7 @@ async def test_check_workflow_inactive(session: AsyncSession):
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -301,7 +306,7 @@ async def test_check_idempotency_collision_same_job(session: AsyncSession):
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -360,7 +365,7 @@ async def test_check_idempotency_collision_different_job(session: AsyncSession):
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -438,7 +443,7 @@ async def test_evaluate_job_readiness_all_conditions_met(session: AsyncSession):
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -457,6 +462,7 @@ async def test_evaluate_job_readiness_all_conditions_met(session: AsyncSession):
 
     job_id = uuid4()
     job = Job(
+        idempotency_key=f"test_key_{str(job_id)}",
         id=job_id,
         workflow_id=workflow_id,
         job_type="test_job",
@@ -487,7 +493,7 @@ async def test_evaluate_job_readiness_not_time_yet(session: AsyncSession):
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -505,6 +511,7 @@ async def test_evaluate_job_readiness_not_time_yet(session: AsyncSession):
 
     job_id = uuid4()
     job = Job(
+        idempotency_key=f"test_key_{str(job_id)}",
         id=job_id,
         workflow_id=workflow_id,
         job_type="test_job",
@@ -535,7 +542,7 @@ async def test_promote_pending_to_ready_success(session: AsyncSession):
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -553,6 +560,7 @@ async def test_promote_pending_to_ready_success(session: AsyncSession):
 
     job_id = uuid4()
     job = Job(
+        idempotency_key=f"test_key_{str(job_id)}",
         id=job_id,
         workflow_id=workflow_id,
         job_type="test_job",
@@ -585,7 +593,7 @@ async def test_promote_pending_to_ready_workflow_inactive(session: AsyncSession)
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -604,6 +612,7 @@ async def test_promote_pending_to_ready_workflow_inactive(session: AsyncSession)
 
     job_id = uuid4()
     job = Job(
+        idempotency_key=f"test_key_{str(job_id)}",
         id=job_id,
         workflow_id=workflow_id,
         job_type="test_job",
@@ -633,7 +642,7 @@ async def test_satisfy_dependency(session: AsyncSession):
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -651,6 +660,7 @@ async def test_satisfy_dependency(session: AsyncSession):
 
     predecessor_id = uuid4()
     predecessor = Job(
+        idempotency_key=f"test_key_{str(predecessor_id)}",
         id=predecessor_id,
         workflow_id=workflow_id,
         job_type="predecessor",
@@ -668,6 +678,7 @@ async def test_satisfy_dependency(session: AsyncSession):
 
     dependent_id = uuid4()
     dependent = Job(
+        idempotency_key=f"test_key_{str(dependent_id)}",
         id=dependent_id,
         workflow_id=workflow_id,
         job_type="dependent",
@@ -709,7 +720,7 @@ async def test_propagate_dependency_failure(session: AsyncSession):
         id=shop_id,
         name="test-shop",
         provider_shop_id="test-provider-id",
-        connection_state="ACTIVE",
+        connection_state="CONNECTED",
         timezone="UTC",
     )
     session.add(shop)
@@ -727,6 +738,7 @@ async def test_propagate_dependency_failure(session: AsyncSession):
 
     failed_id = uuid4()
     failed_job = Job(
+        idempotency_key=f"test_key_{str(failed_id)}",
         id=failed_id,
         workflow_id=workflow_id,
         job_type="failed",
@@ -744,6 +756,7 @@ async def test_propagate_dependency_failure(session: AsyncSession):
 
     dependent_id = uuid4()
     dependent = Job(
+        idempotency_key=f"test_key_{str(dependent_id)}",
         id=dependent_id,
         workflow_id=workflow_id,
         job_type="dependent",
