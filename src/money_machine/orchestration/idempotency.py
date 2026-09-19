@@ -318,6 +318,22 @@ async def record_receipt(
     return receipt
 
 
+async def is_reconciliation_resolved(session: AsyncSession, *, idempotency_key: str) -> bool:
+    """Check if reconciliation has determined a terminal effect state (CONFIRMED or ABSENT).
+
+    Args:
+        session: Active database session
+        idempotency_key: The effect's unique key
+
+    Returns:
+        True if latest effect_attempt shows CONFIRMED or ABSENT, False otherwise
+    """
+    latest = await get_latest_effect_attempt(session, idempotency_key=idempotency_key)
+    if latest is None:
+        return False
+    return latest.effect_state in ("CONFIRMED", "ABSENT")
+
+
 def derive_idempotency_key(
     *,
     job_type: str,

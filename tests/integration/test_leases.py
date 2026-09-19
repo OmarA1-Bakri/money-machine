@@ -505,3 +505,44 @@ async def test_deterministic_worker_ids() -> None:
 
     # Same index produces same ID
     assert deterministic_worker_id(0) == deterministic_worker_id(0)
+
+
+async def test_reclaim_respects_retry_budget(session: AsyncSession) -> None:
+    """When reclaim bumps attempt past max_attempts, job goes to TERMINAL_FAILURE.
+
+    This is SHOULD-FIX #3: reclaim must respect retry budget, not READY forever.
+    """
+    shop = await make_shop(session)
+    workflow = await make_workflow(session, shop)
+
+    # Create job with max_attempts=2, already at attempt 1
+    await make_job(
+        session,
+        workflow,
+        status=JobStatus.READY.value,
+        scheduled_at=NOW,
+        attempt=1,
+        max_attempts=2,
+    )
+
+    # Claim the job
+    worker_id = deterministic_worker_id(0)
+    lease_duration = timedelta(minutes=5)
+    claimed = await claim_ready_job(
+        session, worker_id=worker_id, now=NOW, lease_duration=lease_duration
+    )
+    assert claimed is not None
+    assert claimed.status == JobStatus.RUNNING.value
+
+    # Lease expires
+    after_expiry = NOW + timedelta(minutes=10)
+
+    # Reclaim: RUNNING → FAILED (attempt 1 → 2) → check budget
+    # Since attempt=2 >= max_attempts=2, should go to TERMINAL_FAILURE
+    reclaimed = await reclaim_expired_leases(session, now=after_expiry, limit=50)
+
+    assert len(reclaimed) == 1
+    assert reclaimed[0].id == claimed.id
+    assert reclaimed[0].status == JobStatus.TERMINAL_FAILURE.value
+    assert reclaimed[0].attempt == 2
+    assert reclaimed[0].lease_owner is None

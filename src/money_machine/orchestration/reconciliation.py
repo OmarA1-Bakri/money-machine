@@ -237,6 +237,9 @@ async def apply_reconciliation_result(
     - FAILED (effect absent, eligible for retry evaluation)
     - BLOCKED (reconciliation budget exhausted, requires operator intervention)
 
+    Note: UNKNOWN with budget remaining keeps the job in UNCERTAIN_EXTERNAL_EFFECT.
+    This is a no-op (not a real transition) so we skip the transition guard.
+
     Args:
         session: Active database session
         job_id: The job to update
@@ -251,6 +254,12 @@ async def apply_reconciliation_result(
         raise ValueError(f"job {job_id} not found")
 
     current_status = JobStatus(job.status)
+
+    # Reject illegal UNCERTAIN→UNCERTAIN self-transition
+    if current_status == result.next_job_status == JobStatus.UNCERTAIN_EXTERNAL_EFFECT:
+        # No-op: effect is still UNKNOWN and budget remains; stay in UNCERTAIN
+        # Don't transition; caller will retry reconciliation
+        return
 
     # Validate the transition is legal
     require_job_transition(current_status, result.next_job_status)

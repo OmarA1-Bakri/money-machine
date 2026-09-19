@@ -226,9 +226,9 @@ async def reclaim_expired_leases(
 ) -> tuple[Job, ...]:
     """Find and reset jobs with expired leases.
 
-    Jobs are transitioned from RUNNING → FAILED → READY using the legal path from
-    JOB_TRANSITIONS. Lease fields are cleared. This allows another worker to claim
-    the job. Called by the scheduler or lease reaper process.
+    Jobs are transitioned from RUNNING → FAILED → READY (or TERMINAL_FAILURE if budget
+    exhausted) using the legal path from JOB_TRANSITIONS. Lease fields are cleared.
+    This allows another worker to claim the job if retry budget remains.
 
     Uses the partial index ix_jobs_lease_expiry for efficient queries.
 
@@ -238,7 +238,7 @@ async def reclaim_expired_leases(
         limit: Maximum jobs to reclaim in one call
 
     Returns:
-        Tuple of jobs that were reclaimed and reset to READY
+        Tuple of jobs that were reclaimed
     """
     # Find expired leases
     statement = (
@@ -255,7 +255,7 @@ async def reclaim_expired_leases(
     result = await session.execute(statement)
     expired_jobs = tuple(result.scalars().all())
 
-    # Reset each expired job via legal path: RUNNING → FAILED → READY
+    # Reset each expired job via legal path: RUNNING → FAILED → READY (or TERMINAL_FAILURE)
     # Bump attempt on the RUNNING → FAILED step (lease expiry is a failed attempt)
     for job in expired_jobs:
         # First transition: RUNNING → FAILED (lease expired = transient failure)
@@ -267,9 +267,15 @@ async def reclaim_expired_leases(
         job.heartbeat_at = None
         job.updated_at = now
 
-        # Second transition: FAILED → READY (eligible for retry)
-        require_job_transition(JobStatus.FAILED, JobStatus.READY)
-        job.status = JobStatus.READY.value
+        # Second transition: FAILED → READY (if budget remains) or TERMINAL_FAILURE (exhausted)
+        if job.attempt >= job.max_attempts:
+            # Retry budget exhausted; move to terminal failure
+            require_job_transition(JobStatus.FAILED, JobStatus.TERMINAL_FAILURE)
+            job.status = JobStatus.TERMINAL_FAILURE.value
+        else:
+            # Budget remains; eligible for retry
+            require_job_transition(JobStatus.FAILED, JobStatus.READY)
+            job.status = JobStatus.READY.value
 
     await session.flush()
     return expired_jobs

@@ -324,7 +324,11 @@ async def test_get_latest_effect_attempt(session: AsyncSession) -> None:
 
 @pytest.mark.asyncio
 async def test_record_receipt_append_only(session: AsyncSession) -> None:
-    """record_receipt creates an append-only receipt row."""
+    """record_receipt creates append-only receipts; mutations are blocked.
+
+    Receipts are immutable. Attempting to mutate a receipt should be rejected
+    (either by database trigger or application constraint).
+    """
     await create_test_job(session, JOB_ID_1)
     now = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
 
@@ -358,6 +362,24 @@ async def test_record_receipt_append_only(session: AsyncSession) -> None:
     db_receipt = result.scalars().one()
 
     assert db_receipt.idempotency_key == "test-key-1"
+
+    # Prove append-only: attempting to mutate the receipt should fail
+    # (database trigger blocks UPDATE on receipts table)
+    original_provider_object_id = db_receipt.provider_object_id
+    db_receipt.provider_object_id = "mutated-id"
+
+    from sqlalchemy.exc import DatabaseError
+
+    with pytest.raises(DatabaseError):  # Database will reject UPDATE
+        await session.flush()
+
+    # Rollback the failed transaction
+    await session.rollback()
+
+    # Verify the receipt was NOT mutated
+    result = await session.execute(statement)
+    db_receipt = result.scalars().one()
+    assert db_receipt.provider_object_id == original_provider_object_id
 
 
 @pytest.mark.asyncio

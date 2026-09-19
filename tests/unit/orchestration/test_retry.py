@@ -233,6 +233,39 @@ def test_must_reconcile_first_false_for_other_cases() -> None:
     assert must_reconcile_first(JobStatus.SUCCEEDED, RetryClass.RECONCILE_FIRST) is False
 
 
+def test_must_reconcile_first_false_after_reconciliation_resolved() -> None:
+    """After reconciliation resolves (ABSENT/CONFIRMED), RECONCILE_FIRST no longer blocks retry.
+
+    This proves the blocker fix: once reconciliation has determined ABSENT and moved
+    the job to FAILED, retry evaluation is allowed (budget permitting).
+    """
+    # Before reconciliation: blocks retry
+    assert (
+        must_reconcile_first(
+            JobStatus.FAILED, RetryClass.RECONCILE_FIRST, reconciliation_resolved=False
+        )
+        is True
+    )
+
+    # After reconciliation resolves: allows retry
+    assert (
+        must_reconcile_first(
+            JobStatus.FAILED, RetryClass.RECONCILE_FIRST, reconciliation_resolved=True
+        )
+        is False
+    )
+
+    # UNCERTAIN still blocks even if reconciliation_resolved=True (shouldn't happen in practice)
+    assert (
+        must_reconcile_first(
+            JobStatus.UNCERTAIN_EXTERNAL_EFFECT,
+            RetryClass.RECONCILE_FIRST,
+            reconciliation_resolved=True,
+        )
+        is True
+    )
+
+
 def test_retry_decision_is_immutable() -> None:
     """RetryDecision is a frozen dataclass."""
     now = datetime(2026, 9, 19, 0, 0, 0, tzinfo=UTC)

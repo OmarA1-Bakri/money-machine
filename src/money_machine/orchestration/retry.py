@@ -199,16 +199,19 @@ def can_retry_from_status(status: JobStatus) -> bool:
     return status == JobStatus.FAILED
 
 
-def must_reconcile_first(status: JobStatus, retry_class: RetryClass) -> bool:
+def must_reconcile_first(
+    status: JobStatus, retry_class: RetryClass, *, reconciliation_resolved: bool = False
+) -> bool:
     """Check if a job requires reconciliation before any retry.
 
     True for jobs in UNCERTAIN_EXTERNAL_EFFECT status or with RECONCILE_FIRST retry class,
-    BUT only if the job is not already in a terminal success state. Succeeded jobs don't
-    need reconciliation because they've already completed successfully.
+    BUT only if the job has not yet been reconciled. Once reconciliation has resolved
+    (determined ABSENT or CONFIRMED), RECONCILE_FIRST no longer blocks retry.
 
     Args:
         status: Current job status
         retry_class: The job's retry safety contract
+        reconciliation_resolved: True if reconciliation has determined ABSENT/CONFIRMED
 
     Returns:
         True if reconciliation is required before retry
@@ -217,9 +220,13 @@ def must_reconcile_first(status: JobStatus, retry_class: RetryClass) -> bool:
     if status == JobStatus.SUCCEEDED:
         return False
 
-    # UNCERTAIN_EXTERNAL_EFFECT always needs reconciliation
+    # UNCERTAIN_EXTERNAL_EFFECT always needs reconciliation (regardless of reconciliation_resolved)
     if status == JobStatus.UNCERTAIN_EXTERNAL_EFFECT:
         return True
 
-    # RECONCILE_FIRST class requires reconciliation (unless already succeeded above)
+    # If reconciliation already resolved (ABSENT or CONFIRMED), no longer blocks retry
+    if reconciliation_resolved:
+        return False
+
+    # RECONCILE_FIRST class requires reconciliation (unless already resolved)
     return retry_class == RetryClass.RECONCILE_FIRST
