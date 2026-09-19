@@ -4,11 +4,11 @@
   "repo_root": "/mnt/d/Money Machine",
   "windows_repo_root": "D:\\Money Machine",
   "branch": "build/full-automation",
-  "head_sha": "3f021dfc65dd7bfcd158e6d3079b1c0895867dfd",
+  "head_sha": "d19b8847ecd818d20ee599c54b80e754d85e16e6",
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "evidence_closure_commit_sha": "3f021dfc65dd7bfcd158e6d3079b1c0895867dfd",
+  "evidence_closure_commit_sha": "d19b8847ecd818d20ee599c54b80e754d85e16e6",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 20,
+  "state_revision": 21,
   "session_status": "incomplete",
   "current_session": 3,
   "completed_sessions": [
@@ -93,5 +93,5 @@
   },
   "next_session": 3,
   "next_prompt": "06_SESSION_03_DURABLE_ORCHESTRATOR.md",
-  "updated_at": "2026-09-19T22:28:00Z"
+  "updated_at": "2026-09-20T02:43:00Z"
 }
