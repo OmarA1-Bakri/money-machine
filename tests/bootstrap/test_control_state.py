@@ -284,7 +284,8 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
         assert state["next_prompt"] == control_state.SESSION_PROMPTS[session]
         evidence = state["required_completion_evidence"]
         assert evidence.keys() == control_state.SESSION_EVIDENCE_KEYS[session]
-        # evidence_closure_commit_recorded may be True (COMPLETE candidacy) or False (work in progress)
+        # evidence_closure_commit_recorded may be True (COMPLETE candidacy)
+        # or False (work in progress).
         # When True with session incomplete, it signals readiness for Verifier review
         assert isinstance(evidence[CLOSURE_EVIDENCE_KEY], bool)
     else:
