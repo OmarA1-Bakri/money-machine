@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any, Final, cast
@@ -84,6 +85,7 @@ def test_production_services_select_the_production_environment() -> None:
 @pytest.mark.parametrize("password", ["literal%40value", "reserved@:/?#%value", " padded "])
 @pytest.mark.parametrize("compose_path", [COMPOSE, COMPOSE_PROD])
 @pytest.mark.parametrize("external_override", [False, True])
+@pytest.mark.skipif(shutil.which("docker") is None, reason="docker not available")
 def test_compose_preserves_the_postgres_password(
     password: str, compose_path: Path, external_override: bool
 ) -> None:
