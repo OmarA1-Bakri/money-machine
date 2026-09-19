@@ -5,10 +5,8 @@ is in a valid (non-terminal) state.
 """
 
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 from uuid import UUID
-
-import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from money_machine.domain.enums import ProductLifecycleState
 from money_machine.orchestration.dependency_resolver import (
@@ -21,7 +19,7 @@ from money_machine.persistence.tables import Job, WorkflowRun
 class TestProductLifecycleCheck:
     """Test product lifecycle validation in dependency resolver."""
 
-    async def test_lifecycle_check_allows_active_states(self, db_session: AsyncSession) -> None:
+    async def test_lifecycle_check_allows_active_states(self) -> None:
         """Product in QUALIFIED, BUILDING, PUBLISHED states allows job execution."""
         shop_id = UUID("10000000-0000-0000-0000-000000000001")
 
@@ -37,18 +35,19 @@ class TestProductLifecycleCheck:
                 shop_id=shop_id,
                 started_at=datetime.now(UTC),
             )
-            db_session.add(workflow)
-            await db_session.flush()
+            workflow.id = UUID("10000000-0000-0000-0000-000000000001")
+
+            mock_session = AsyncMock()
+            mock_session.get.return_value = workflow
 
             result = await check_product_lifecycle_valid(
-                db_session,
+                mock_session,
                 workflow_id=workflow.id,
             )
 
             assert result is True, f"State {valid_state.value} should allow execution"
-            await db_session.rollback()
 
-    async def test_lifecycle_check_blocks_terminal_states(self, db_session: AsyncSession) -> None:
+    async def test_lifecycle_check_blocks_terminal_states(self) -> None:
         """Product in REJECTED or DEACTIVATED (terminal) blocks job execution."""
         shop_id = UUID("10000000-0000-0000-0000-000000000001")
 
@@ -60,33 +59,33 @@ class TestProductLifecycleCheck:
                 shop_id=shop_id,
                 started_at=datetime.now(UTC),
             )
-            db_session.add(workflow)
-            await db_session.flush()
+            workflow.id = UUID("10000000-0000-0000-0000-000000000001")
+
+            mock_session = AsyncMock()
+            mock_session.get.return_value = workflow
 
             result = await check_product_lifecycle_valid(
-                db_session,
+                mock_session,
                 workflow_id=workflow.id,
             )
 
             assert result is False, f"Terminal state {terminal_state.value} should block execution"
-            await db_session.rollback()
 
-    async def test_lifecycle_check_fails_on_missing_workflow(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_lifecycle_check_fails_on_missing_workflow(self) -> None:
         """Missing workflow fails lifecycle check (fail-closed)."""
         nonexistent_id = UUID("00000000-0000-0000-0000-000000000000")
 
+        mock_session = AsyncMock()
+        mock_session.get.return_value = None
+
         result = await check_product_lifecycle_valid(
-            db_session,
+            mock_session,
             workflow_id=nonexistent_id,
         )
 
         assert result is False, "Missing workflow should fail lifecycle check"
 
-    async def test_evaluate_job_readiness_includes_lifecycle_check(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_evaluate_job_readiness_includes_lifecycle_check(self) -> None:
         """evaluate_job_readiness includes product lifecycle validation."""
         shop_id = UUID("10000000-0000-0000-0000-000000000001")
         now = datetime.now(UTC)
@@ -99,8 +98,7 @@ class TestProductLifecycleCheck:
             shop_id=shop_id,
             started_at=now,
         )
-        db_session.add(workflow)
-        await db_session.flush()
+        workflow.id = UUID("10000000-0000-0000-0000-000000000001")
 
         # Create job that would otherwise be ready
         job = Job(
@@ -111,12 +109,22 @@ class TestProductLifecycleCheck:
             created_at=now,
             updated_at=now,
         )
-        db_session.add(job)
-        await db_session.flush()
+        job.id = UUID("20000000-0000-0000-0000-000000000001")
+
+        mock_session = AsyncMock()
+
+        async def mock_get(table_class: type, id: UUID) -> Job | WorkflowRun | None:
+            if table_class == Job:
+                return job
+            if table_class == WorkflowRun:
+                return workflow
+            return None
+
+        mock_session.get.side_effect = mock_get
 
         # Evaluate readiness
         is_ready, reason = await evaluate_job_readiness(
-            db_session,
+            mock_session,
             job_id=job.id,
             now=now,
         )
@@ -124,38 +132,3 @@ class TestProductLifecycleCheck:
         # Should NOT be ready due to terminal lifecycle
         assert is_ready is False
         assert "terminal" in reason.lower() or "REJECTED" in reason or "DEACTIVATED" in reason
-
-
-@pytest.fixture
-async def db_session(monkeypatch: pytest.MonkeyPatch) -> AsyncSession:
-    """Provide in-memory database session for tests."""
-    from money_machine.persistence.database import create_engine, create_session_factory
-    from money_machine.persistence.tables import Base
-
-    monkeypatch.setenv("DB_HOST", "memory")
-    monkeypatch.setenv("DB_PORT", "0")
-    monkeypatch.setenv("DB_NAME", ":memory:")
-    monkeypatch.setenv("DB_USER", "test")
-    monkeypatch.setenv("DB_PASSWORD", "test")
-
-    from money_machine.config.settings import DatabaseConfig
-
-    config = DatabaseConfig(
-        host="memory",
-        port=0,
-        name=":memory:",
-        user="test",
-        password="test",
-    )
-
-    engine = create_engine(config)
-
-    # Create tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    factory = create_session_factory(engine)
-    async with factory() as session:
-        yield session
-
-    await engine.dispose()

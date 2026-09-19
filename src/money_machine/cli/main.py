@@ -380,7 +380,7 @@ def command_workflow_inspect_graph(arguments: argparse.Namespace) -> int:
                     deps = []
 
                 # Build graph representation
-                job_map = {
+                job_map: dict[str, dict[str, Any]] = {
                     str(job.id): {
                         "id": str(job.id),
                         "job_type": job.job_type,
@@ -393,7 +393,9 @@ def command_workflow_inspect_graph(arguments: argparse.Namespace) -> int:
                 for dep in deps:
                     job_id_str = str(dep.job_id)
                     if job_id_str in job_map:
-                        job_map[job_id_str]["depends_on"].append(str(dep.depends_on_job_id))
+                        depends_on_list = job_map[job_id_str]["depends_on"]
+                        assert isinstance(depends_on_list, list)
+                        depends_on_list.append(str(dep.depends_on_job_id))
 
                 return {
                     "workflow_id": str(workflow_id),
