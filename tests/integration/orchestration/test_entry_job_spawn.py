@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from money_machine.orchestration.engine import start_workflow
-from money_machine.persistence.tables import Job
+from money_machine.persistence.tables import Job, Shop
 
 
 @pytest.mark.asyncio
@@ -24,7 +24,18 @@ async def test_start_workflow_spawns_entry_jobs(session: AsyncSession) -> None:
     [ProvisioningCheckJob, ScheduleConfigurationJob].
     Both must be created in PENDING status with correct specs.
     """
+    # Create required shop
     shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="CONNECTED",
+        timezone="UTC",
+    )
+    session.add(shop)
+    await session.flush()
+
     now = datetime.now(UTC)
 
     # Start workflow
@@ -72,7 +83,18 @@ async def test_start_workflow_spawns_entry_jobs(session: AsyncSession) -> None:
 @pytest.mark.asyncio
 async def test_start_workflow_with_invalid_type_raises_error(session: AsyncSession) -> None:
     """start_workflow raises ValueError for unknown workflow type."""
+    # Create required shop
     shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="CONNECTED",
+        timezone="UTC",
+    )
+    session.add(shop)
+    await session.flush()
+
     now = datetime.now(UTC)
 
     with pytest.raises(ValueError, match="Workflow type 'InvalidWorkflow' not found"):
@@ -92,7 +114,18 @@ async def test_entry_jobs_have_deterministic_ids(session: AsyncSession) -> None:
     This ensures idempotency: calling start_workflow twice should fail on
     duplicate key constraint, not create different job IDs.
     """
+    # Create required shop
     shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="CONNECTED",
+        timezone="UTC",
+    )
+    session.add(shop)
+    await session.flush()
+
     now = datetime.now(UTC)
 
     # Start first workflow
@@ -139,7 +172,18 @@ async def test_entry_jobs_use_yaml_spec(session: AsyncSession) -> None:
     Verify that allowed_mode, output contracts, and other metadata come from
     the canonical YAML configuration, not hardcoded defaults.
     """
+    # Create required shop
     shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="CONNECTED",
+        timezone="UTC",
+    )
+    session.add(shop)
+    await session.flush()
+
     now = datetime.now(UTC)
 
     workflow = await start_workflow(
@@ -189,7 +233,18 @@ async def test_multiple_workflows_do_not_interfere(session: AsyncSession) -> Non
 
     Proves that entry job spawn doesn't leak between workflows.
     """
+    # Create required shop
     shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="CONNECTED",
+        timezone="UTC",
+    )
+    session.add(shop)
+    await session.flush()
+
     now = datetime.now(UTC)
 
     # Start two workflows concurrently (in same session)
