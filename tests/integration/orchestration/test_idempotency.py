@@ -376,7 +376,7 @@ async def test_record_receipt_with_amount(session: AsyncSession) -> None:
         autonomy_mode="simulation",
         effect_state="CONFIRMED",
         provider_object_id="shipping-label-456",
-        amount=5.99,
+        amount=Decimal("5.99"),
         currency="USD",
         safe_detail={"tracking": "1Z999"},
         now=now,
