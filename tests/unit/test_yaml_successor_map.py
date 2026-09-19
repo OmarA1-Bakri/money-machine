@@ -350,7 +350,7 @@ class TestYamlLoadFailures:
         with (
             patch("money_machine.orchestration.successor_factory.Path.exists", return_value=True),
             patch(
-                "money_machine.orchestration.successor_factory.load_yaml_model",
+                "money_machine.config.loader.load_yaml_model",
                 side_effect=ConfigLoadError("Invalid YAML structure"),
             ),
             pytest.raises(ValueError) as exc_info,
