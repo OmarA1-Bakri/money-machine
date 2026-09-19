@@ -56,7 +56,7 @@ async def start_workflow(
     session: SessionDependency,
     workflow_type: str = Query(..., description="Workflow template name"),
     product_state: str = Query(..., description="Product lifecycle state"),
-    shop_id: UUID = Query(..., description="Shop ID for the workflow"),
+    shop_id: UUID = Query(..., description="Shop ID for the workflow"),  # noqa: B008
 ) -> WorkflowSummary:
     """Start a new workflow run."""
     from datetime import UTC, datetime
