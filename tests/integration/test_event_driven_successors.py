@@ -557,6 +557,7 @@ async def test_guard_bypass_impossible_on_multiply_path(session: AsyncSession) -
         version=1,
     )
     session.add(parent_workflow_wrong_state)
+    await session.flush()  # Flush workflow before creating job that references it
 
     parent_job_wrong_state = Job(
         id=wrong_state_job_id,
@@ -621,6 +622,7 @@ async def test_guard_bypass_impossible_on_multiply_path(session: AsyncSession) -
         version=1,
     )
     session.add(parent_workflow_valid)
+    await session.flush()  # Flush workflow before creating job that references it
 
     valid_parent_job = Job(
         id=valid_job_id,
