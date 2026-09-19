@@ -8,13 +8,14 @@
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "evidence_closure_commit_sha": "d19b8847ecd818d20ee599c54b80e754d85e16e6",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 21,
-  "session_status": "incomplete",
+  "state_revision": 22,
+  "session_status": "complete",
   "current_session": 3,
   "completed_sessions": [
     0,
     1,
-    2
+    2,
+    3
   ],
   "services": {
     "api": "container_healthy_readiness_true_migrated_2026-09-07",
@@ -60,9 +61,8 @@
     }
   ],
   "notes": {
-    "session_03_gap_close": "2026-09-19: S03 gap-close IMPLEMENTED — real dependency_resolver, scheduler library functions (promote, stalled detection, timers), operator surface (CLI + API), entry-job spawn. All library + tests complete, Exit 78 held per contract. Worker/scheduler processes remain fail-closed. Session 03 is INCOMPLETE pending Verifier workbook-exit gate.",
-    "session_03_status": "Gap-close implementation present, including entry-job spawn from workflow templates. Session remains INCOMPLETE pending Verifier workbook-exit gate. Do not advance to Session 04 until Verifier PASS.",
-    "entry_job_spawn": "2026-09-19: start_workflow now spawns template entry jobs (ProvisioningCheckJob, ScheduleConfigurationJob) from config/workflows.yaml when a workflow starts. Entry jobs created in PENDING status with complete job specs. Proving tests added."
+    "session_03_complete": "2026-09-19: Session 03 COMPLETE after Verifier FINAL PASS. All gap-close implementation validated — real dependency_resolver, scheduler library functions (promote, stalled detection, timers), operator surface (CLI + API), entry-job spawn. All library + tests proven. Exit 78 STAYS until Session 04 per contract; worker/scheduler processes remain fail-closed until commissioning.",
+    "session_03_exit_78_deferred": "Exit 78 held per Session 03 contract. Worker and scheduler entrypoints remain fail-closed with no production claim path. Commissioning and Exit 78 removal occur ONLY in Session 04 after agent runtime implementation and commissioning evidence gates pass."
   },
   "carry_forward": [
     "Prove idempotency uniqueness under concurrent claim path (Session 04 after commissioning)",
@@ -91,7 +91,7 @@
     "completion_requires_later_state_pointer_commit": true,
     "unsupported_completion_is_rejected": true
   },
-  "next_session": 3,
-  "next_prompt": "06_SESSION_03_DURABLE_ORCHESTRATOR.md",
-  "updated_at": "2026-09-20T02:43:00Z"
+  "next_session": 4,
+  "next_prompt": "07_SESSION_04_AGENT_RUNTIME_AND_COMMISSIONING.md",
+  "updated_at": "2026-09-19T22:56:00Z"
 }
