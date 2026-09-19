@@ -157,7 +157,7 @@ class TestCreateSuccessorsContract:
         Wave 4: stub returned empty tuple for all events.
         Wave 7: real YAML-driven map returns actual successors per config/workflows.yaml.
         MULTIPLY still routes through dispatch_decision/create_multiply_successor.
-        
+
         Comprehensive tests in test_yaml_successor_map.py; this test verifies
         the integration point works with the existing boundary tests.
         """
@@ -166,10 +166,10 @@ class TestCreateSuccessorsContract:
         mock_uow.events = AsyncMock()
         mock_uow.session = AsyncMock()
         added_jobs: list[object] = []
-        
+
         def track_add(obj: object) -> None:
             added_jobs.append(obj)
-        
+
         mock_uow.session.add = track_add
         mock_uow.session.flush = AsyncMock()
 
@@ -187,7 +187,7 @@ class TestCreateSuccessorsContract:
             payload={},
             occurred_at=occurred_at,
         )
-        
+
         # Wave 7: YAML map says PRODUCT_REJECTED → NicheSelectionJob
         assert len(result) == 1, "PRODUCT_REJECTED creates one successor per YAML"
         assert len(added_jobs) == 1
