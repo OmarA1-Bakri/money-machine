@@ -53,7 +53,13 @@
     "browser": "Chromium 150.0.7871.128; launchers at /snap/bin/chromium and /usr/bin/chromium-browser",
     "playwright": "not installed in the Session 00 project"
   },
-  "blockers": [],
+  "blockers": [
+    {
+      "code": "CODERABBIT_REVIEW_OPEN",
+      "scope": "Session 01 entry",
+      "detail": "Validate four CodeRabbit issues (one critical, one major, two trivial); persistence, API, tests, apps, and scripts scopes require retry after the CLI rate limit resets or a seat/API key is assigned."
+    }
+  ],
   "notes": {
     "session_03_gap_close": "2026-09-19: Implemented real dependency_resolver, scheduler library functions (promote, stalled detection, timers), and operator surface (CLI + API). All library + tests, Exit 78 held per contract. Worker/scheduler processes remain fail-closed; commissioning is Session 04. Verifier PASS expected for 'works/ready' with Exit 78.",
     "remaining_s03_work": "Session 03 workbook gaps closed. Full S03 exit criteria met for library+tests under Exit 78. Commissioning, prompt registry, and agent runtime are Session 04."
