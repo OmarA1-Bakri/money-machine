@@ -51,10 +51,11 @@ async def start_workflow(
     shop_id: UUID,
     now: datetime,
 ) -> WorkflowRun:
-    """Start a new workflow run.
+    """Start a new workflow run and spawn its entry jobs.
 
-    Creates a workflow_run record and returns it. The workflow's initial jobs
-    should be created separately (by the successor_factory or workflow template).
+    Creates a workflow_run record, spawns template entry jobs from workflows.yaml,
+    and returns the workflow. Entry jobs are created in PENDING status and scheduled
+    at the workflow start time.
 
     Args:
         session: Active database session
@@ -64,8 +65,30 @@ async def start_workflow(
         now: Current timestamp
 
     Returns:
-        The created WorkflowRun record
+        The created WorkflowRun record with entry jobs spawned
+
+    Raises:
+        ValueError: If workflow_type not found in configuration or entry jobs invalid
     """
+    from money_machine.orchestration.successor_factory import load_workflows_config
+
+    # Load workflow configuration to get entry job types
+    _event_map, workflows_config = load_workflows_config()
+
+    # Find the workflow definition
+    workflow_def = None
+    for wf in workflows_config.workflows:
+        if wf.workflow_type == workflow_type:
+            workflow_def = wf
+            break
+
+    if workflow_def is None:
+        raise ValueError(f"Workflow type '{workflow_type}' not found in configuration")
+
+    if not workflow_def.entry_job_types:
+        raise ValueError(f"Workflow '{workflow_type}' has no entry_job_types defined")
+
+    # Create workflow record
     workflow = WorkflowRun(
         workflow_type=workflow_type,
         workflow_version=1,  # Default version
@@ -78,7 +101,125 @@ async def start_workflow(
 
     session.add(workflow)
     await session.flush()
+
+    # Spawn entry jobs
+    await _spawn_entry_jobs(
+        session=session,
+        workflow_id=workflow.id,
+        workflow_type=workflow_type,
+        entry_job_types=workflow_def.entry_job_types,
+        now=now,
+    )
+
     return workflow
+
+
+async def _spawn_entry_jobs(
+    session: AsyncSession,
+    *,
+    workflow_id: UUID,
+    workflow_type: str,
+    entry_job_types: tuple[str, ...],
+    now: datetime,
+) -> list[UUID]:
+    """Spawn entry jobs for a new workflow from workflow template.
+
+    Creates Job records for each entry job type declared in the workflow configuration,
+    using job specs from workflows.yaml (owner_agent_id, side_effect_class, retry_class, etc.).
+
+    Args:
+        session: Active database session
+        workflow_id: The workflow these jobs belong to
+        workflow_type: Workflow type for validation
+        entry_job_types: List of job types to spawn (from workflow config)
+        now: Current timestamp
+
+    Returns:
+        List of created job IDs
+
+    Raises:
+        ValueError: If any entry job type not found in workflow configuration
+    """
+    from hashlib import sha256
+
+    from money_machine.orchestration.successor_factory import load_workflows_config
+
+    # Load workflow configuration
+    _event_map, workflows_config = load_workflows_config()
+
+    # Find workflow and build job spec lookup
+    workflow_def = None
+    for wf in workflows_config.workflows:
+        if wf.workflow_type == workflow_type:
+            workflow_def = wf
+            break
+
+    if workflow_def is None:
+        raise ValueError(f"Workflow type '{workflow_type}' not found")
+
+    job_specs = {job.job_type: job for job in workflow_def.jobs}
+
+    # Create each entry job
+    job_ids: list[UUID] = []
+    for job_type in entry_job_types:
+        job_spec = job_specs.get(job_type)
+        if job_spec is None:
+            raise ValueError(
+                f"Entry job type '{job_type}' not found in workflow '{workflow_type}' configuration"
+            )
+
+        # Derive deterministic job ID from workflow ID + job type
+        id_input = f"{workflow_id}:{job_type}:entry".encode()
+        job_id = UUID(sha256(id_input).hexdigest()[:32])
+
+        # Infer object_type from job type (simple heuristic)
+        object_type = _infer_object_type_for_entry_job(job_type)
+
+        # Use first allowed mode (typically simulation for safety)
+        allowed_mode = job_spec.allowed_modes[0] if job_spec.allowed_modes else "simulation"
+
+        # Use first output contract
+        output_model = job_spec.output_contracts[0] if job_spec.output_contracts else "AgentResult"
+
+        # Create job
+        job = Job(
+            id=job_id,
+            workflow_id=workflow_id,
+            job_type=job_type,
+            object_type=object_type,
+            object_id=workflow_id,  # Entry jobs operate at workflow level
+            owner_agent_id=job_spec.owner_agent_id,
+            status=JobStatus.PENDING.value,
+            input={"entry": True, "workflow_type": workflow_type},
+            success_contract={"output_model": output_model},
+            scheduled_at=now,
+            attempt=0,
+            max_attempts=3,
+            idempotency_key=f"ENTRY:{job_type}:{workflow_id}",
+            side_effect_class=job_spec.side_effect_class,
+            retry_class=job_spec.retry_class,
+            allowed_mode=allowed_mode,
+            version=1,
+        )
+
+        session.add(job)
+        job_ids.append(job_id)
+
+    await session.flush()
+    return job_ids
+
+
+def _infer_object_type_for_entry_job(job_type: str) -> str:
+    """Infer object_type for entry jobs based on job type patterns.
+
+    Entry jobs typically operate on workflow-level or shop-level objects.
+    """
+    if "Provisioning" in job_type or "Environment" in job_type:
+        return "shops"
+    elif "Schedule" in job_type or "Configuration" in job_type:
+        return "workflow_runs"
+    else:
+        return "workflow_runs"  # Default for entry jobs
 
 
 async def retry_failed_job(
