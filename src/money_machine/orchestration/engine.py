@@ -249,12 +249,8 @@ async def reconcile_uncertain_effect(
     effect.observed_at = now
 
     # Transition job status based on reconciliation outcome
-    if effect_state == "CONFIRMED":
-        # Effect was applied successfully → transition to SUCCEEDED
-        target_status = JobStatus.SUCCEEDED
-    else:  # ABSENT
-        # Effect was not applied → transition to FAILED (allows retry)
-        target_status = JobStatus.FAILED
+    # CONFIRMED → SUCCEEDED (effect was applied), ABSENT → FAILED (allows retry)
+    target_status = JobStatus.SUCCEEDED if effect_state == "CONFIRMED" else JobStatus.FAILED
 
     require_job_transition(current_status, target_status)
     job.status = target_status.value
