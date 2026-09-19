@@ -6,7 +6,7 @@
   "branch": "build/full-automation",
   "head_sha": "dfe9408f246ea2700a60fcc850fa5c49d25b6edd",
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "evidence_closure_commit_sha": "eec25fa42f1a5dba485172a74f5cb53c279ae207",
+  "evidence_closure_commit_sha": "dfe9408f246ea2700a60fcc850fa5c49d25b6edd",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "state_revision": 20,
   "session_status": "incomplete",
