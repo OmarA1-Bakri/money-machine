@@ -1,12 +1,42 @@
 # Next Session
 
-Session 02 is complete. Continue with `prompts/implementation/06_SESSION_03_DURABLE_ORCHESTRATOR.md`.
+**Session 03 remains ACTIVE** — gap-close implementation complete (2026-09-19), awaiting Verifier workbook-exit gate. All library functions and tests implemented under Exit 78. Session status: **INCOMPLETE** pending Verifier PASS. Do not advance to Session 04 until Verifier approval.
 
 ## 2026-09-11 recovery review
 
 Resume from [the recovery review and finish plan](reviews/2026-09-11-recovery-review-and-finish-plan.md). The canonical branch remains `build/full-automation`; the older integration tree is a protected reuse source, including its unfinished Session08 work. The readiness/database-URL/production-environment findings are now repaired: [startup repair record](reviews/2026-09-11-startup-repair.md), 125 affected tests passed with no skips and static checks clean. Next complete Session03 prompt integrity and activation, port the existing durable orchestration behavior to the canonical schema, and prove a persisted workflow survives restart. Neither wave advances session state or claims live commissioning.
 
-## Session 03 entry conditions
+## Session 03 Gap-Close Summary (2026-09-19)
+
+**Implemented:**
+1. Real `dependency_resolver.py` - evaluates all conditions for PENDING → READY promotion:
+   - All dependencies satisfied (succeeded)
+   - `scheduled_at <= now`
+   - Workflow still active
+   - No idempotency collision
+2. Durable scheduler library functions in `scheduler.py`:
+   - `promote_due_jobs` - promote PENDING to READY
+   - `detect_stalled_jobs` - transition stalled RUNNING jobs
+   - `schedule_maturity_timer` - durable timer for product maturity
+   - `schedule_weekly_timer` - recurring workflow triggers
+   - `run_scheduler_cycle` - complete scheduler pass
+3. Operator surface (CLI + API):
+   - `workflow start/cancel` - create and cancel workflows
+   - `job retry/reconcile` - retry failed jobs, reconcile uncertain effects
+   - `scheduler run-once` - manual scheduler cycle
+   - `worker run-once` - claim job (library only, fail-closed)
+4. Comprehensive unit tests for dependency_resolver and scheduler
+5. Control files updated with honest status
+
+**Exit 78 Held:**
+- Worker and scheduler process entrypoints remain fail-closed
+- No production claim path exists
+- All operations are library-only with deterministic fakes
+- Commissioning deferred to Session 04
+
+**CI Status:** Awaiting green CI (ruff, pyright, pytest)
+
+## Session 03 Original Entry Conditions
 
 Operator clarification (2026-09-11): follow the implementation workbook faithfully; the finish plan is subordinate to it. Reconcile business-rule interpretations in existing decisions against the workbook/playbook before reuse, particularly D-0014's maturity/cull conditions. Do not substitute a commercial model, weaken outputs, or introduce commercial revalidation. Existing decision labels do not prove source fidelity or operator authorization for business changes.
 

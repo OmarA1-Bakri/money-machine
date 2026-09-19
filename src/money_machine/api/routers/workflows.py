@@ -49,3 +49,48 @@ async def get_workflow(workflow_id: UUID, session: SessionDependency) -> Workflo
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="workflow not found")
     return _summary(row)
+
+
+@router.post("", response_model=WorkflowSummary, status_code=status.HTTP_201_CREATED)
+async def start_workflow(
+    session: SessionDependency,
+    workflow_type: str = Query(..., description="Workflow template name"),
+    product_state: str = Query(..., description="Product lifecycle state"),
+    shop_id: UUID = Query(..., description="Shop ID for the workflow"),  # noqa: B008
+) -> WorkflowSummary:
+    """Start a new workflow run."""
+    from datetime import UTC, datetime
+
+    from money_machine.orchestration.engine import start_workflow
+
+    workflow = await start_workflow(
+        session,
+        workflow_type=workflow_type,
+        product_state=product_state,
+        shop_id=shop_id,
+        now=datetime.now(UTC),
+    )
+    await session.commit()
+    return _summary(workflow)
+
+
+@router.post("/{workflow_id}/cancel", response_model=dict[str, str | int | None])
+async def cancel_workflow(
+    workflow_id: UUID, session: SessionDependency
+) -> dict[str, str | int | None]:
+    """Cancel a workflow and block its pending jobs."""
+    from datetime import UTC, datetime
+
+    from money_machine.orchestration.engine import cancel_workflow
+
+    workflow, blocked = await cancel_workflow(
+        session,
+        workflow_id=workflow_id,
+        now=datetime.now(UTC),
+    )
+    await session.commit()
+    return {
+        "id": str(workflow.id),
+        "completed_at": workflow.completed_at.isoformat() if workflow.completed_at else None,
+        "jobs_blocked": blocked,
+    }

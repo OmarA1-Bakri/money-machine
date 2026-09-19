@@ -582,3 +582,73 @@ async def test_absent_to_failed_allows_retry_after_reconciliation(session: Async
     # Retry should be allowed (budget permitting)
     assert decision.can_retry is True
     assert "resolved" in decision.reason
+
+
+@pytest.mark.asyncio
+async def test_reconcile_first_can_retry_after_absent_via_engine(session: AsyncSession) -> None:
+    """R5 proving test: RECONCILE_FIRST job can retry after ABSENT reconciliation.
+
+    Uses engine.retry_failed_job to prove the full retry path works.
+
+    Flow:
+    1. Job fails with UNCERTAIN_EXTERNAL_EFFECT (RECONCILE_FIRST)
+    2. Reconcile → ABSENT (job → FAILED)
+    3. retry_failed_job should detect resolved reconciliation and allow retry
+    """
+    from money_machine.orchestration.engine import retry_failed_job
+
+    now = datetime(2026, 9, 19, 12, 0, 0, tzinfo=UTC)
+    idempotency_key = "publish-123-attempt-1"
+
+    # Create job in UNCERTAIN_EXTERNAL_EFFECT (RECONCILE_FIRST)
+    job = await create_uncertain_job(
+        session,
+        job_id=JOB_ID_1,
+        idempotency_key=idempotency_key,
+        now=now,
+    )
+
+    # Create idempotency record
+    await reserve_idempotency_key(
+        session,
+        idempotency_key=idempotency_key,
+        job_id=JOB_ID_1,
+        operation="etsy.publish_listing",
+        side_effect_class=SideEffectClass.EXTERNAL_WRITE,
+        now=now,
+    )
+
+    # Reconcile: provider says ABSENT → job transitions to FAILED
+    reconciler = FakeReconciler(effect_state=EffectState.ABSENT, provider_object_id=None)
+    result = await reconcile_uncertain_effect(
+        session,
+        job_id=JOB_ID_1,
+        reconciler=reconciler,
+        max_reconciliation_attempts=3,
+        now=now,
+    )
+
+    assert result.effect_state == EffectState.ABSENT
+    assert result.next_job_status == JobStatus.FAILED
+
+    # Apply the result: UNCERTAIN → FAILED
+    await apply_reconciliation_result(session, job_id=JOB_ID_1, result=result, now=now)
+
+    # Verify job is now FAILED
+    await session.refresh(job)
+    assert job.status == JobStatus.FAILED.value
+    assert job.retry_class == RetryClass.RECONCILE_FIRST.value
+
+    # Now retry the job via engine.retry_failed_job
+    # This should detect that reconciliation is resolved and allow retry
+    retried_job = await retry_failed_job(
+        session,
+        job_id=JOB_ID_1,
+        now=now,
+    )
+
+    # Verify retry succeeded
+    assert retried_job.status == JobStatus.READY.value
+    # Attempt stays at 0 (will increment when claimed/executed, not when retried)
+    assert retried_job.attempt == 0
+    assert retried_job.scheduled_at is not None  # Has a scheduled time (backoff applied)
