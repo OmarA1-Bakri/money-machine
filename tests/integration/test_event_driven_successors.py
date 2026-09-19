@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from money_machine.domain.enums import DecisionType, ProductLifecycleState
 from money_machine.domain.errors import InvalidTransitionError
 from money_machine.domain.events import EventName
+from money_machine.domain.models.common import EvidenceReference
 from money_machine.domain.models.portfolio import PortfolioDecision
 from money_machine.orchestration.event_dispatcher import EventDispatcher
 from money_machine.orchestration.transition_guard import require_successor_spawn
@@ -37,6 +38,18 @@ LISTING_ID = UUID("00000000-0000-0000-0000-000000000030")
 SUCCESSOR_SPEC_ID = UUID("00000000-0000-0000-0000-000000000040")
 PARENT_JOB_ID = UUID("00000000-0000-0000-0000-000000000050")
 SNAPSHOT_ID = UUID("00000000-0000-0000-0000-000000000060")
+EVIDENCE_ID = UUID("00000000-0000-0000-0000-000000000070")
+
+# Test evidence reference
+TEST_EVIDENCE = EvidenceReference(
+    id=EVIDENCE_ID,
+    owner_type="decisions",
+    owner_id=DECISION_ID,
+    evidence_type="metrics-analysis",
+    source_reference="test://evidence",
+    safe_summary="Test evidence for decision",
+    observed_at=DECISION_TIME,
+)
 
 
 async def test_require_successor_spawn_validates_parent_state() -> None:
@@ -116,7 +129,7 @@ async def test_dispatch_multiply_creates_successor_workflow(session: AsyncSessio
         cohort_reference="2026-Q3",
         rule_version="v1.0",
         explanation="Winner detected, creating successor",
-        evidence=(),
+        evidence=(TEST_EVIDENCE,),
         successor_workflow_id=SUCCESSOR_WORKFLOW_ID,
         successor_spec_id=SUCCESSOR_SPEC_ID,
         decided_at=DECISION_TIME,
@@ -197,7 +210,7 @@ async def test_dispatch_multiply_rejects_same_workflow_id(session: AsyncSession)
         cohort_reference="2026-Q3",
         rule_version="v1.0",
         explanation="Illegal same-workflow successor",
-        evidence=(),
+        evidence=(TEST_EVIDENCE,),
         successor_workflow_id=PARENT_WORKFLOW_ID,  # Same as parent!
         successor_spec_id=SUCCESSOR_SPEC_ID,
         decided_at=DECISION_TIME,
@@ -250,7 +263,7 @@ async def test_dispatch_multiply_rejects_wrong_parent_state(session: AsyncSessio
         cohort_reference="2026-Q3",
         rule_version="v1.0",
         explanation="Premature successor",
-        evidence=(),
+        evidence=(TEST_EVIDENCE,),
         successor_workflow_id=SUCCESSOR_WORKFLOW_ID,
         successor_spec_id=SUCCESSOR_SPEC_ID,
         decided_at=DECISION_TIME,
@@ -294,7 +307,7 @@ async def test_dispatch_non_multiply_decision_creates_no_successor(session: Asyn
         cohort_reference="2026-Q3",
         rule_version="v1.0",
         explanation="Hold for more data",
-        evidence=(),
+        evidence=(TEST_EVIDENCE,),
         decided_at=DECISION_TIME,
     )
 
@@ -346,7 +359,7 @@ async def test_parent_workflow_stays_observing_after_successor_spawn(session: As
         cohort_reference="2026-Q3",
         rule_version="v1.0",
         explanation="Winner detected",
-        evidence=(),
+        evidence=(TEST_EVIDENCE,),
         successor_workflow_id=SUCCESSOR_WORKFLOW_ID,
         successor_spec_id=SUCCESSOR_SPEC_ID,
         decided_at=DECISION_TIME,
@@ -400,7 +413,7 @@ async def test_successor_workflow_starts_at_dedupe_check(session: AsyncSession) 
         cohort_reference="2026-Q3",
         rule_version="v1.0",
         explanation="Winner detected",
-        evidence=(),
+        evidence=(TEST_EVIDENCE,),
         successor_workflow_id=SUCCESSOR_WORKFLOW_ID,
         successor_spec_id=SUCCESSOR_SPEC_ID,
         decided_at=DECISION_TIME,
@@ -456,7 +469,7 @@ async def test_dispatch_event_is_idempotent(session: AsyncSession) -> None:
         cohort_reference="2026-Q3",
         rule_version="v1.0",
         explanation="Winner detected",
-        evidence=(),
+        evidence=(TEST_EVIDENCE,),
         successor_workflow_id=SUCCESSOR_WORKFLOW_ID,
         successor_spec_id=SUCCESSOR_SPEC_ID,
         decided_at=DECISION_TIME,
