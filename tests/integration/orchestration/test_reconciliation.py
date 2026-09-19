@@ -31,7 +31,7 @@ from money_machine.orchestration.reconciliation import (
     apply_reconciliation_result,
     reconcile_uncertain_effect,
 )
-from money_machine.persistence.tables import Job
+from money_machine.persistence.tables import Job, WorkflowRun
 
 # Deterministic UUIDs for tests (no uuid4)
 JOB_ID_1 = UUID("00000000-0000-0000-0000-000000000001")
@@ -48,6 +48,17 @@ async def create_uncertain_job(
     now: datetime,
 ) -> Job:
     """Helper to create a job in UNCERTAIN_EXTERNAL_EFFECT."""
+    # Create workflow run first (foreign key requirement)
+    workflow_run = WorkflowRun(
+        id=WORKFLOW_ID_1,
+        status="active",
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(workflow_run)
+    await session.flush()
+
+    # Now create the job
     job = Job(
         id=job_id,
         workflow_id=WORKFLOW_ID_1,
@@ -334,6 +345,16 @@ async def test_reconcile_raises_if_not_uncertain(session: AsyncSession) -> None:
     """reconcile_uncertain_effect raises ValueError if job is not UNCERTAIN_EXTERNAL_EFFECT."""
     now = datetime(2026, 9, 19, 2, 0, 0, tzinfo=UTC)
     idempotency_key = "test-key-1"
+
+    # Create workflow run first
+    workflow_run = WorkflowRun(
+        id=WORKFLOW_ID_1,
+        status="active",
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(workflow_run)
+    await session.flush()
 
     # Create job in FAILED status
     job = Job(
