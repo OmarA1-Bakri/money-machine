@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from money_machine.domain.enums import JobStatus
 from money_machine.orchestration.dependency_resolver import (
@@ -24,7 +25,7 @@ from money_machine.persistence.tables import IdempotencyRecord, Job, JobDependen
 
 
 @pytest.mark.asyncio
-async def test_check_dependencies_satisfied_no_dependencies(db_session):
+async def test_check_dependencies_satisfied_no_dependencies(db_session: AsyncSession):
     """Job with no dependencies is considered satisfied."""
     workflow_id = uuid4()
     workflow = WorkflowRun(
@@ -57,7 +58,7 @@ async def test_check_dependencies_satisfied_no_dependencies(db_session):
 
 
 @pytest.mark.asyncio
-async def test_check_dependencies_satisfied_with_satisfied_dep(db_session):
+async def test_check_dependencies_satisfied_with_satisfied_dep(db_session: AsyncSession):
     """Job with satisfied dependency is considered satisfied."""
     workflow_id = uuid4()
     workflow = WorkflowRun(
@@ -113,7 +114,7 @@ async def test_check_dependencies_satisfied_with_satisfied_dep(db_session):
 
 
 @pytest.mark.asyncio
-async def test_check_dependencies_satisfied_with_unsatisfied_dep(db_session):
+async def test_check_dependencies_satisfied_with_unsatisfied_dep(db_session: AsyncSession):
     """Job with unsatisfied dependency is NOT satisfied."""
     workflow_id = uuid4()
     workflow = WorkflowRun(
@@ -168,7 +169,7 @@ async def test_check_dependencies_satisfied_with_unsatisfied_dep(db_session):
 
 
 @pytest.mark.asyncio
-async def test_check_workflow_active(db_session):
+async def test_check_workflow_active(db_session: AsyncSession):
     """Active workflow (completed_at NULL) returns True."""
     workflow_id = uuid4()
     workflow = WorkflowRun(
@@ -187,7 +188,7 @@ async def test_check_workflow_active(db_session):
 
 
 @pytest.mark.asyncio
-async def test_check_workflow_inactive(db_session):
+async def test_check_workflow_inactive(db_session: AsyncSession):
     """Completed workflow returns False."""
     workflow_id = uuid4()
     workflow = WorkflowRun(
@@ -206,7 +207,7 @@ async def test_check_workflow_inactive(db_session):
 
 
 @pytest.mark.asyncio
-async def test_check_idempotency_collision_no_collision(db_session):
+async def test_check_idempotency_collision_no_collision(db_session: AsyncSession):
     """No collision when key is free."""
     job_id = uuid4()
     key = "test_key"
@@ -220,7 +221,7 @@ async def test_check_idempotency_collision_no_collision(db_session):
 
 
 @pytest.mark.asyncio
-async def test_check_idempotency_collision_same_job(db_session):
+async def test_check_idempotency_collision_same_job(db_session: AsyncSession):
     """No collision when key reserved by same job."""
     workflow_id = uuid4()
     workflow = WorkflowRun(
@@ -266,7 +267,7 @@ async def test_check_idempotency_collision_same_job(db_session):
 
 
 @pytest.mark.asyncio
-async def test_check_idempotency_collision_different_job(db_session):
+async def test_check_idempotency_collision_different_job(db_session: AsyncSession):
     """Collision when key reserved by different job."""
     workflow_id = uuid4()
     workflow = WorkflowRun(
@@ -328,7 +329,7 @@ async def test_check_idempotency_collision_different_job(db_session):
 
 
 @pytest.mark.asyncio
-async def test_evaluate_job_readiness_all_conditions_met(db_session):
+async def test_evaluate_job_readiness_all_conditions_met(db_session: AsyncSession):
     """Job is ready when all conditions are met."""
     now = datetime.now(UTC)
     workflow_id = uuid4()
@@ -364,7 +365,7 @@ async def test_evaluate_job_readiness_all_conditions_met(db_session):
 
 
 @pytest.mark.asyncio
-async def test_evaluate_job_readiness_not_time_yet(db_session):
+async def test_evaluate_job_readiness_not_time_yet(db_session: AsyncSession):
     """Job is NOT ready when scheduled_at is in the future."""
     now = datetime.now(UTC)
     workflow_id = uuid4()
@@ -399,7 +400,7 @@ async def test_evaluate_job_readiness_not_time_yet(db_session):
 
 
 @pytest.mark.asyncio
-async def test_promote_pending_to_ready_success(db_session):
+async def test_promote_pending_to_ready_success(db_session: AsyncSession):
     """Successful promotion transitions PENDING → READY."""
     now = datetime.now(UTC)
     workflow_id = uuid4()
@@ -436,7 +437,7 @@ async def test_promote_pending_to_ready_success(db_session):
 
 
 @pytest.mark.asyncio
-async def test_promote_pending_to_ready_workflow_inactive(db_session):
+async def test_promote_pending_to_ready_workflow_inactive(db_session: AsyncSession):
     """Promotion fails when workflow is completed."""
     now = datetime.now(UTC)
     workflow_id = uuid4()
@@ -471,7 +472,7 @@ async def test_promote_pending_to_ready_workflow_inactive(db_session):
 
 
 @pytest.mark.asyncio
-async def test_satisfy_dependency(db_session):
+async def test_satisfy_dependency(db_session: AsyncSession):
     """Satisfying a dependency sets satisfied_at."""
     now = datetime.now(UTC)
     workflow_id = uuid4()
@@ -531,7 +532,7 @@ async def test_satisfy_dependency(db_session):
 
 
 @pytest.mark.asyncio
-async def test_propagate_dependency_failure(db_session):
+async def test_propagate_dependency_failure(db_session: AsyncSession):
     """Terminal failure blocks dependent PENDING jobs."""
     now = datetime.now(UTC)
     workflow_id = uuid4()

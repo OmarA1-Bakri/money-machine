@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from money_machine.domain.enums import JobStatus
 from money_machine.orchestration.scheduler import (
@@ -21,7 +22,7 @@ from money_machine.persistence.tables import Job, JobDependency, WorkflowRun
 
 
 @pytest.mark.asyncio
-async def test_promote_due_jobs_success(db_session):
+async def test_promote_due_jobs_success(db_session: AsyncSession):
     """Promote PENDING jobs that are due and have satisfied dependencies."""
     now = datetime.now(UTC)
     workflow_id = uuid4()
@@ -76,7 +77,7 @@ async def test_promote_due_jobs_success(db_session):
 
 
 @pytest.mark.asyncio
-async def test_promote_due_jobs_skips_unsatisfied_deps(db_session):
+async def test_promote_due_jobs_skips_unsatisfied_deps(db_session: AsyncSession):
     """Don't promote jobs with unsatisfied dependencies."""
     now = datetime.now(UTC)
     workflow_id = uuid4()
@@ -133,7 +134,7 @@ async def test_promote_due_jobs_skips_unsatisfied_deps(db_session):
 
 
 @pytest.mark.asyncio
-async def test_detect_stalled_jobs(db_session):
+async def test_detect_stalled_jobs(db_session: AsyncSession):
     """Detect RUNNING jobs that haven't heartbeated recently."""
     now = datetime.now(UTC)
     stale_heartbeat = now - DEFAULT_STALL_THRESHOLD - timedelta(minutes=1)
@@ -197,7 +198,7 @@ async def test_detect_stalled_jobs(db_session):
 
 
 @pytest.mark.asyncio
-async def test_detect_stalled_jobs_ignores_expired_lease(db_session):
+async def test_detect_stalled_jobs_ignores_expired_lease(db_session: AsyncSession):
     """Expired leases are handled by reclaim_expired_leases, not stall detection."""
     now = datetime.now(UTC)
     stale_heartbeat = now - DEFAULT_STALL_THRESHOLD - timedelta(minutes=1)
@@ -240,7 +241,7 @@ async def test_detect_stalled_jobs_ignores_expired_lease(db_session):
 
 
 @pytest.mark.asyncio
-async def test_schedule_maturity_timer(db_session):
+async def test_schedule_maturity_timer(db_session: AsyncSession):
     """Schedule a maturity check timer for a workflow."""
     now = datetime.now(UTC)
     maturity_date = now + timedelta(days=30)
@@ -270,7 +271,7 @@ async def test_schedule_maturity_timer(db_session):
 
 
 @pytest.mark.asyncio
-async def test_schedule_maturity_timer_completed_workflow(db_session):
+async def test_schedule_maturity_timer_completed_workflow(db_session: AsyncSession):
     """Don't schedule timer for completed workflow."""
     now = datetime.now(UTC)
     maturity_date = now + timedelta(days=30)
@@ -298,7 +299,7 @@ async def test_schedule_maturity_timer_completed_workflow(db_session):
 
 
 @pytest.mark.asyncio
-async def test_run_scheduler_cycle_integration(db_session):
+async def test_run_scheduler_cycle_integration(db_session: AsyncSession):
     """Run complete scheduler cycle."""
     now = datetime.now(UTC)
 
