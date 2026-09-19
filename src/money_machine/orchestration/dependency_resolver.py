@@ -66,13 +66,7 @@ async def check_dependencies_satisfied(
     # Check if any dependency is unsatisfied (satisfied_at IS NULL)
     # If such a dependency exists, return False; otherwise True
     unsatisfied_exists = await session.scalar(
-        select(
-            exists()
-            .where(
-                JobDependency.job_id == job_id,
-                JobDependency.satisfied_at.is_(None),
-            )
-        )
+        select(exists().where(JobDependency.job_id == job_id, JobDependency.satisfied_at.is_(None)))
     )
     return not unsatisfied_exists
 
