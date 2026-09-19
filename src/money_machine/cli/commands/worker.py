@@ -1,7 +1,7 @@
 """Worker command surface.
 
-The worker is not commissioned: job claiming is Session 03. Invoking the process exits
-78 after a read-only database connectivity check.
+The worker is not commissioned: job claiming commissioned in Session 04. Invoking the
+process exits 78 after a read-only database connectivity check.
 """
 
 from money_machine.orchestration.worker import main

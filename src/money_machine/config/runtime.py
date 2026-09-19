@@ -249,7 +249,7 @@ class ApiSettings(ConfigModel):
 
 
 class WorkerSettings(ConfigModel):
-    """Worker process bounds. Job claiming is commissioned in Session 03, not here."""
+    """Worker process bounds. Exit 78 stub; job claiming commissioned in Session 04."""
 
     poll_interval_seconds: PositiveInt = 5
     lease_seconds: PositiveInt = 300
@@ -258,7 +258,7 @@ class WorkerSettings(ConfigModel):
 
 
 class SchedulerSettings(ConfigModel):
-    """Scheduler process bounds. Trigger firing is commissioned in a later session."""
+    """Scheduler process bounds. Exit 78 stub; trigger firing commissioned in Session 04."""
 
     tick_interval_seconds: PositiveInt = 60
     timezone: Literal["UTC"] = "UTC"

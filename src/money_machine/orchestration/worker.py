@@ -1,7 +1,7 @@
 """Worker process.
 
 Not commissioned. It proves database connectivity, logs the result, and exits 78 without
-claiming, leasing or transitioning any job. Job processing is commissioned in Session 03.
+claiming, leasing or transitioning any job. Exit 78 stub; job processing commissioned in Session 04.
 """
 
 import logging
