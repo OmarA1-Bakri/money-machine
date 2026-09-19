@@ -114,6 +114,19 @@ async def test_dispatch_multiply_creates_successor_workflow(session: AsyncSessio
         version=1,
     )
     session.add(parent_workflow)
+    
+    # Create parent job (required for event foreign key)
+    parent_job = Job(
+        id=PARENT_JOB_ID,
+        workflow_id=PARENT_WORKFLOW_ID,
+        job_type="PortfolioDecisionJob",
+        job_version=1,
+        status="COMPLETED",
+        product_state=ProductLifecycleState.SUCCESSOR_SPEC.value,
+        queued_at=NOW,
+        version=1,
+    )
+    session.add(parent_job)
     await session.flush()
 
     # Create MULTIPLY decision
@@ -179,57 +192,26 @@ async def test_dispatch_multiply_creates_successor_workflow(session: AsyncSessio
 
 
 async def test_dispatch_multiply_rejects_same_workflow_id(session: AsyncSession) -> None:
-    """Dispatching a MULTIPLY decision with same workflow_id as parent is rejected."""
-    uow = UnitOfWork(session)
-    dispatcher = EventDispatcher(uow)
+    """MULTIPLY decision with same workflow_id as parent is rejected at Pydantic validation."""
+    from pydantic import ValidationError
 
-    # Setup: parent workflow
-    shop = await make_shop(session)
-    parent_workflow = WorkflowRun(
-        id=PARENT_WORKFLOW_ID,
-        shop_id=shop.id,
-        workflow_type="ProductLifecycleWorkflow",
-        workflow_version=1,
-        product_state=ProductLifecycleState.SUCCESSOR_SPEC.value,
-        started_at=NOW,
-        version=1,
-    )
-    session.add(parent_workflow)
-    await session.flush()
-
-    # Create MULTIPLY decision with SAME workflow_id (illegal!)
-    decision = PortfolioDecision(
-        decision_id=DECISION_ID,
-        workflow_id=PARENT_WORKFLOW_ID,
-        product_id=PRODUCT_ID,
-        listing_id=LISTING_ID,
-        decision=DecisionType.MULTIPLY,
-        metrics_snapshot_ids=(SNAPSHOT_ID,),
-        cohort_reference="2026-Q3",
-        rule_version="v1.0",
-        explanation="Illegal same-workflow successor",
-        evidence=(TEST_EVIDENCE,),
-        successor_workflow_id=PARENT_WORKFLOW_ID,  # Same as parent!
-        successor_spec_id=SUCCESSOR_SPEC_ID,
-        decided_at=DECISION_TIME,
-    )
-
-    # Dispatch should raise InvalidTransitionError
-    with pytest.raises(InvalidTransitionError, match=r"differ from the parent"):
-        await dispatcher.dispatch_decision(
-            decision=decision,
-            parent_job_id=PARENT_JOB_ID,
-            occurred_at=DECISION_TIME,
+    # Pydantic model validation rejects same-workflow successors at construction time
+    with pytest.raises(ValidationError, match="successor workflow must differ from parent workflow"):
+        PortfolioDecision(
+            decision_id=DECISION_ID,
+            workflow_id=PARENT_WORKFLOW_ID,
+            product_id=PRODUCT_ID,
+            listing_id=LISTING_ID,
+            decision=DecisionType.MULTIPLY,
+            metrics_snapshot_ids=(SNAPSHOT_ID,),
+            cohort_reference="2026-Q3",
+            rule_version="v1.0",
+            explanation="Illegal same-workflow successor",
+            evidence=(TEST_EVIDENCE,),
+            successor_workflow_id=PARENT_WORKFLOW_ID,  # Same as parent!
+            successor_spec_id=SUCCESSOR_SPEC_ID,
+            decided_at=DECISION_TIME,
         )
-
-    # Verify parent workflow unchanged
-    await session.refresh(parent_workflow)
-    assert parent_workflow.product_state == ProductLifecycleState.SUCCESSOR_SPEC.value
-
-    # Verify no successor workflow created (parent remains the same)
-    parent_check = await session.get(WorkflowRun, PARENT_WORKFLOW_ID)
-    assert parent_check is not None
-    assert parent_check.parent_workflow_id is None  # Still the parent
 
 
 async def test_dispatch_multiply_rejects_wrong_parent_state(session: AsyncSession) -> None:
@@ -249,6 +231,19 @@ async def test_dispatch_multiply_rejects_wrong_parent_state(session: AsyncSessio
         version=1,
     )
     session.add(parent_workflow)
+    
+    # Create parent job (required for event foreign key)
+    parent_job = Job(
+        id=PARENT_JOB_ID,
+        workflow_id=PARENT_WORKFLOW_ID,
+        job_type="PortfolioDecisionJob",
+        job_version=1,
+        status="COMPLETED",
+        product_state=ProductLifecycleState.EVALUATING.value,
+        queued_at=NOW,
+        version=1,
+    )
+    session.add(parent_job)
     await session.flush()
 
     decision = PortfolioDecision(
@@ -292,6 +287,19 @@ async def test_dispatch_non_multiply_decision_creates_no_successor(session: Asyn
         version=1,
     )
     session.add(workflow)
+    
+    # Create parent job (required for event foreign key)
+    parent_job = Job(
+        id=PARENT_JOB_ID,
+        workflow_id=PARENT_WORKFLOW_ID,
+        job_type="PortfolioDecisionJob",
+        job_version=1,
+        status="COMPLETED",
+        product_state=ProductLifecycleState.EVALUATING.value,
+        queued_at=NOW,
+        version=1,
+    )
+    session.add(parent_job)
     await session.flush()
 
     # HOLD decision
@@ -345,6 +353,19 @@ async def test_parent_workflow_stays_observing_after_successor_spawn(session: As
         version=1,
     )
     session.add(parent_workflow)
+    
+    # Create parent job (required for event foreign key)
+    parent_job = Job(
+        id=PARENT_JOB_ID,
+        workflow_id=PARENT_WORKFLOW_ID,
+        job_type="PortfolioDecisionJob",
+        job_version=1,
+        status="COMPLETED",
+        product_state=ProductLifecycleState.SUCCESSOR_SPEC.value,
+        queued_at=NOW,
+        version=1,
+    )
+    session.add(parent_job)
     await session.flush()
 
     decision = PortfolioDecision(
@@ -399,6 +420,19 @@ async def test_successor_workflow_starts_at_dedupe_check(session: AsyncSession) 
         version=1,
     )
     session.add(parent_workflow)
+    
+    # Create parent job (required for event foreign key)
+    parent_job = Job(
+        id=PARENT_JOB_ID,
+        workflow_id=PARENT_WORKFLOW_ID,
+        job_type="PortfolioDecisionJob",
+        job_version=1,
+        status="COMPLETED",
+        product_state=ProductLifecycleState.SUCCESSOR_SPEC.value,
+        queued_at=NOW,
+        version=1,
+    )
+    session.add(parent_job)
     await session.flush()
 
     decision = PortfolioDecision(
@@ -455,6 +489,19 @@ async def test_dispatch_event_is_idempotent(session: AsyncSession) -> None:
         version=1,
     )
     session.add(parent_workflow)
+    
+    # Create parent job (required for event foreign key)
+    parent_job = Job(
+        id=PARENT_JOB_ID,
+        workflow_id=PARENT_WORKFLOW_ID,
+        job_type="PortfolioDecisionJob",
+        job_version=1,
+        status="COMPLETED",
+        product_state=ProductLifecycleState.SUCCESSOR_SPEC.value,
+        queued_at=NOW,
+        version=1,
+    )
+    session.add(parent_job)
     await session.flush()
 
     decision = PortfolioDecision(
