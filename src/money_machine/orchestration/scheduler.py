@@ -153,6 +153,9 @@ async def detect_stalled_jobs(
     for job in stalled_jobs:
         require_job_transition(JobStatus.RUNNING, JobStatus.FAILED)
 
+        # Capture heartbeat before clearing it for the event payload
+        last_heartbeat_iso = job.heartbeat_at.isoformat() if job.heartbeat_at is not None else None
+
         job.status = JobStatus.FAILED.value
         job.attempt += 1  # Stall counts as a failed attempt
         job.lease_owner = None
@@ -161,7 +164,6 @@ async def detect_stalled_jobs(
         job.updated_at = now
 
         # Emit JOB_STALLED event
-        last_heartbeat_iso = job.heartbeat_at.isoformat() if job.heartbeat_at is not None else None
         event = Event(
             event_name=EventName.JOB_STALLED.value,
             aggregate_type="Job",
