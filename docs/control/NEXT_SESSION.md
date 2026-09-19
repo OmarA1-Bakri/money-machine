@@ -1,6 +1,6 @@
 # Next Session
 
-Session 02 is complete. Continue with `prompts/implementation/06_SESSION_03_DURABLE_ORCHESTRATOR.md`.
+Session 03 gap-close is complete (2026-09-19). All library functions and tests implemented under Exit 78. Continue with Session 04: Agent Runtime and Roster.
 
 ## 2026-09-11 recovery review
 
