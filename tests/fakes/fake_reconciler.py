@@ -6,13 +6,7 @@ Session 04 replaces this with real provider adapters.
 
 from __future__ import annotations
 
-
-class EffectState:
-    """Mirror of reconciliation.EffectState for type compatibility."""
-
-    CONFIRMED = "CONFIRMED"
-    ABSENT = "ABSENT"
-    UNKNOWN = "UNKNOWN"
+from money_machine.orchestration.reconciliation import EffectState
 
 
 class FakeReconciler:
@@ -25,7 +19,7 @@ class FakeReconciler:
     def __init__(
         self,
         *,
-        effect_state: str = EffectState.CONFIRMED,
+        effect_state: EffectState = EffectState.CONFIRMED,
         provider_object_id: str | None = None,
     ) -> None:
         """Initialize the fake reconciler.
@@ -42,6 +36,6 @@ class FakeReconciler:
         *,
         idempotency_key: str,
         operation: str,
-    ) -> tuple[str, str | None]:
+    ) -> tuple[EffectState, str | None]:
         """Return the configured fake result."""
         return self.effect_state, self.provider_object_id

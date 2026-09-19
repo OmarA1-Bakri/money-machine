@@ -20,11 +20,12 @@ from money_machine.domain.models.portfolio import PortfolioDecision
 from money_machine.orchestration.transition_guard import require_successor_spawn
 
 if TYPE_CHECKING:
+    from money_machine.config.settings import WorkflowsConfig
     from money_machine.persistence.unit_of_work import UnitOfWork
 
 
 @lru_cache(maxsize=1)
-def load_workflows_config() -> tuple[dict[str, list[str]], object]:
+def load_workflows_config() -> tuple[dict[str, list[str]], "WorkflowsConfig"]:
     """Load WorkflowsConfig once and return both event map and full config.
 
     This is the SINGLE source of truth for YAML loading (should-fix B-2).

@@ -56,6 +56,7 @@ async def make_job(
     scheduled_at: datetime | None = None,
     attempt: int = 0,
     max_attempts: int = 3,
+    retry_class: str = "SAFE",
 ) -> Job:
     """Insert one durable job."""
     job = Job(
@@ -73,7 +74,7 @@ async def make_job(
         max_attempts=max_attempts,
         idempotency_key=idempotency_key or f"MARKET_RESEARCH_READ:{uuid4()}",
         side_effect_class="EXTERNAL_READ",
-        retry_class="SAFE",
+        retry_class=retry_class,
         allowed_mode="simulation",
         version=1,
     )

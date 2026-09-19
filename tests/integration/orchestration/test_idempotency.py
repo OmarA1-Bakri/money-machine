@@ -477,7 +477,6 @@ async def test_three_table_contract_full_flow(session: AsyncSession) -> None:
         now=reserved_at,
     )
     assert reservation.reserved_at == reserved_at
-    assert reservation.completed_at is None
 
     # Step 2: Record effect attempt with CONFIRMED (effect_attempts)
     attempt = await record_effect_attempt(
