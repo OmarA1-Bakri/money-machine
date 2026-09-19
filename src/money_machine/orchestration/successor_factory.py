@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 @lru_cache(maxsize=1)
 def load_event_successor_map() -> dict[str, list[str]]:
     """Load the event → successor job types map from workflows.yaml.
-    
+
     Returns a dict mapping event names to lists of successor job types.
     Cached for performance (config rarely changes during runtime).
     Fails closed: missing file or invalid structure raises an exception.
@@ -65,8 +65,7 @@ def load_event_successor_map() -> dict[str, list[str]]:
             raise ValueError(f"Event name must be string, got {type(event_name_raw)}")
         if not isinstance(successors_raw, list):
             raise ValueError(
-                f"Successors for {event_name_raw} must be a list, "
-                f"got {type(successors_raw)}"
+                f"Successors for {event_name_raw} must be a list, got {type(successors_raw)}"
             )
 
         successors: list[str] = []
