@@ -722,3 +722,198 @@ async def test_reclaim_expired_lease_allows_safe_retry(session: AsyncSession) ->
     )
     assert reclaimed[0].attempt == 1  # Bumped by lease expiry
     assert reclaimed[0].lease_owner is None
+
+
+async def test_reclaim_expired_leases_full_recovery_scenario(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """SF-1 Coverage: Full lease expiry recovery scenario.
+
+    AUDIT.md SF-1 Acceptance:
+    - Worker 1 claims job
+    - Lease expires (time advance)
+    - Worker 2 calls reclaim_expired_leases
+    - Job transitions to READY
+    - Worker 1 cannot heartbeat (LeaseExpiredError or LeaseNotHeldError)
+
+    This proves that expired leases are identified, cleared, and the job becomes
+    available for another worker.
+    """
+    # Setup: create a READY job in a committed transaction
+    async with session_factory() as setup_session:
+        shop = await make_shop(setup_session)
+        workflow = await make_workflow(setup_session, shop)
+        job = await make_job(
+            setup_session,
+            workflow,
+            status=JobStatus.READY.value,
+            scheduled_at=NOW,
+            retry_class="SAFE",
+        )
+        job_id = job.id
+        await setup_session.commit()
+
+    worker_1 = deterministic_worker_id(0)
+    worker_2 = deterministic_worker_id(1)
+    lease_duration = timedelta(minutes=5)
+
+    # Worker 1 claims the job
+    async with session_factory() as session_1:
+        claimed = await claim_ready_job(
+            session_1,
+            worker_id=worker_1,
+            now=NOW,
+            lease_duration=lease_duration,
+        )
+        assert claimed is not None
+        assert claimed.id == job_id
+        assert claimed.status == JobStatus.RUNNING.value
+        assert claimed.lease_owner == worker_1
+        await session_1.commit()
+
+    # Time advances, lease expires
+    after_expiry = NOW + timedelta(minutes=10)
+
+    # Worker 2 calls reclaim_expired_leases
+    async with session_factory() as reaper_session:
+        reclaimed = await reclaim_expired_leases(
+            reaper_session,
+            now=after_expiry,
+            limit=50,
+        )
+        assert len(reclaimed) == 1
+        assert reclaimed[0].id == job_id
+        assert reclaimed[0].status == JobStatus.READY.value, (
+            "Job should transition back to READY after lease expiry (RetryClass.SAFE)"
+        )
+        assert reclaimed[0].lease_owner is None, "Lease should be cleared"
+        await reaper_session.commit()
+
+    # Worker 1 attempts heartbeat (should fail because lease expired)
+    async with session_factory() as session_1_retry:
+        with pytest.raises((LeaseExpiredError, LeaseNotHeldError)):
+            await heartbeat(
+                session_1_retry,
+                job_id=job_id,
+                worker_id=worker_1,
+                now=after_expiry,
+            )
+
+    # Verify final state: job is READY and can be claimed by another worker
+    async with session_factory() as verify_session:
+        from sqlalchemy import select
+
+        stmt = select(Job).where(Job.id == job_id)
+        result = await verify_session.execute(stmt)
+        final_job = result.scalars().one()
+
+        assert final_job.status == JobStatus.READY.value
+        assert final_job.lease_owner is None
+        assert final_job.attempt == 1  # Bumped by lease expiry
+
+
+async def test_heartbeat_raises_lease_expired_error(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """SF-4 Coverage: Heartbeat raises LeaseExpiredError when lease_expires_at < now.
+
+    AUDIT.md SF-4 Acceptance:
+    - Worker claims job with a lease
+    - Time advances past lease_expires_at
+    - Worker attempts heartbeat
+    - Raises LeaseExpiredError
+
+    This proves the heartbeat function correctly detects expired leases.
+    """
+    # Setup: create a READY job
+    async with session_factory() as setup_session:
+        shop = await make_shop(setup_session)
+        workflow = await make_workflow(setup_session, shop)
+        job = await make_job(
+            setup_session,
+            workflow,
+            status=JobStatus.READY.value,
+            scheduled_at=NOW,
+        )
+        job_id = job.id
+        await setup_session.commit()
+
+    worker_id = deterministic_worker_id(0)
+    lease_duration = timedelta(minutes=5)
+
+    # Worker claims the job
+    async with session_factory() as session:
+        claimed = await claim_ready_job(
+            session,
+            worker_id=worker_id,
+            now=NOW,
+            lease_duration=lease_duration,
+        )
+        assert claimed is not None
+        assert claimed.lease_expires_at == NOW + lease_duration
+        await session.commit()
+
+    # Time advances past lease expiry
+    after_expiry = NOW + timedelta(minutes=10)
+
+    # Worker attempts heartbeat after lease expired
+    async with session_factory() as session:
+        with pytest.raises(LeaseExpiredError, match=r"Lease expired"):
+            await heartbeat(
+                session,
+                job_id=job_id,
+                worker_id=worker_id,
+                now=after_expiry,
+            )
+
+
+async def test_heartbeat_raises_lease_not_held_error(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """SF-4 Coverage: Heartbeat raises LeaseNotHeldError when worker_id mismatches.
+
+    AUDIT.md SF-4 Acceptance:
+    - Worker 1 claims job with a lease
+    - Worker 2 (different worker_id) attempts heartbeat
+    - Raises LeaseNotHeldError
+
+    This proves workers cannot heartbeat jobs they don't own.
+    """
+    # Setup: create a READY job
+    async with session_factory() as setup_session:
+        shop = await make_shop(setup_session)
+        workflow = await make_workflow(setup_session, shop)
+        job = await make_job(
+            setup_session,
+            workflow,
+            status=JobStatus.READY.value,
+            scheduled_at=NOW,
+        )
+        job_id = job.id
+        await setup_session.commit()
+
+    worker_1 = deterministic_worker_id(0)
+    worker_2 = deterministic_worker_id(1)
+    lease_duration = timedelta(minutes=5)
+
+    # Worker 1 claims the job
+    async with session_factory() as session:
+        claimed = await claim_ready_job(
+            session,
+            worker_id=worker_1,
+            now=NOW,
+            lease_duration=lease_duration,
+        )
+        assert claimed is not None
+        assert claimed.lease_owner == worker_1
+        await session.commit()
+
+    # Worker 2 attempts to heartbeat Worker 1's job
+    async with session_factory() as session:
+        with pytest.raises(LeaseNotHeldError, match=r"Worker .* does not hold lease"):
+            await heartbeat(
+                session,
+                job_id=job_id,
+                worker_id=worker_2,  # Different worker
+                now=NOW + timedelta(seconds=30),
+            )
