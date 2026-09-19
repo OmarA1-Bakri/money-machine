@@ -5,7 +5,7 @@ deterministic fake data. All UUIDs are deterministic (no uuid4).
 """
 
 from __future__ import annotations
-from uuid import UUID
+
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -429,7 +429,10 @@ async def test_schedule_maturity_timer_completed_workflow(session: AsyncSession)
 
 @pytest.mark.asyncio
 async def test_schedule_maturity_timer_fail_closed_missing_workflow(session: AsyncSession):
-    """HARDENING: schedule_maturity_timer raises ValueError if workflow doesn't exist (fail-closed)."""
+    """HARDENING: schedule_maturity_timer raises ValueError if workflow doesn't exist.
+
+    Fail-closed behavior.
+    """
     now = datetime.now(UTC)
     maturity_date = now + timedelta(days=30)
     nonexistent_workflow_id = WORKFLOW_ID_1
