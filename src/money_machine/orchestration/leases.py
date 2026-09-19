@@ -16,6 +16,7 @@ from uuid import UUID
 from sqlalchemy import select
 
 from money_machine.domain.enums import JobStatus
+from money_machine.orchestration.transition_guard import require_job_transition
 from money_machine.persistence.tables import Job
 
 if TYPE_CHECKING:
@@ -34,6 +35,17 @@ class LeaseNotHeldError(LeaseAcquisitionError):
     """Raised when attempting to release a lease not held by the worker."""
 
 
+# Legal final statuses when releasing from RUNNING (per JOB_TRANSITIONS)
+_LEGAL_RELEASE_STATUSES = frozenset(
+    {
+        JobStatus.SUCCEEDED,
+        JobStatus.FAILED,
+        JobStatus.BLOCKED,
+        JobStatus.UNCERTAIN_EXTERNAL_EFFECT,
+    }
+)
+
+
 async def claim_ready_job(
     session: AsyncSession,
     *,
@@ -42,7 +54,7 @@ async def claim_ready_job(
     lease_duration: timedelta,
     limit: int = 1,
 ) -> Job | None:
-    """Claim at most one ready job using FOR UPDATE SKIP LOCKED.
+    """Claim exactly one ready job using FOR UPDATE SKIP LOCKED.
 
     Returns the claimed job on success, or None if no job was available. The job's
     status transitions READY -> RUNNING, and lease fields are populated atomically.
@@ -56,7 +68,7 @@ async def claim_ready_job(
         worker_id: Deterministic worker identifier (e.g., "worker-1")
         now: Current timestamp for lease_expires_at and heartbeat_at
         lease_duration: How long the lease is valid before expiry
-        limit: Maximum jobs to consider (default 1)
+        limit: Maximum jobs to consider (default 1, claims the oldest)
 
     Returns:
         The claimed Job row with RUNNING status and lease fields set, or None
@@ -79,7 +91,9 @@ async def claim_ready_job(
     if job is None:
         return None
 
-    # Transition to RUNNING and set lease fields
+    # Validate and perform the READY → RUNNING transition
+    require_job_transition(JobStatus.READY, JobStatus.RUNNING)
+
     job.status = JobStatus.RUNNING.value
     job.lease_owner = worker_id
     job.lease_expires_at = now + lease_duration
@@ -141,19 +155,32 @@ async def release_lease(
 ) -> None:
     """Gracefully release a lease and transition the job to its final status.
 
-    Used when a job completes (SUCCEEDED/FAILED/TERMINAL_FAILURE) or is cancelled.
-    The lease fields are cleared and the status is updated atomically.
+    Used when a job completes (SUCCEEDED/FAILED) or is blocked. The lease fields
+    are cleared and the status is updated atomically.
+
+    Only accepts legal transitions from RUNNING per JOB_TRANSITIONS:
+    - SUCCEEDED
+    - FAILED
+    - BLOCKED
+    - UNCERTAIN_EXTERNAL_EFFECT
 
     Args:
         session: Active database session
         job_id: The job to release
         worker_id: The worker that should hold the lease
         now: Current timestamp
-        final_status: The status to transition to (e.g., SUCCEEDED, FAILED)
+        final_status: The status to transition to (must be legal from RUNNING)
 
     Raises:
         LeaseNotHeldError: If the worker doesn't hold the lease
+        InvalidTransitionError: If final_status is not legal from RUNNING
     """
+    if final_status not in _LEGAL_RELEASE_STATUSES:
+        raise ValueError(
+            f"Cannot release to {final_status}; legal from RUNNING: "
+            f"{', '.join(s.value for s in _LEGAL_RELEASE_STATUSES)}"
+        )
+
     statement = select(Job).where(Job.id == job_id).with_for_update()
 
     result = await session.execute(statement)
@@ -164,6 +191,9 @@ async def release_lease(
 
     if job.lease_owner != worker_id:
         raise LeaseNotHeldError(f"Job {job_id} is owned by {job.lease_owner}, not {worker_id}")
+
+    # Validate the RUNNING → final_status transition
+    require_job_transition(JobStatus.RUNNING, final_status)
 
     # Clear lease fields and transition to final status
     job.status = final_status.value
@@ -183,9 +213,9 @@ async def reclaim_expired_leases(
 ) -> tuple[Job, ...]:
     """Find and reset jobs with expired leases.
 
-    Jobs are transitioned from RUNNING back to READY, and lease fields are cleared.
-    This allows another worker to claim the job. Called by the scheduler or lease
-    reaper process.
+    Jobs are transitioned from RUNNING → FAILED → READY using the legal path from
+    JOB_TRANSITIONS. Lease fields are cleared. This allows another worker to claim
+    the job. Called by the scheduler or lease reaper process.
 
     Uses the partial index ix_jobs_lease_expiry for efficient queries.
 
@@ -212,13 +242,19 @@ async def reclaim_expired_leases(
     result = await session.execute(statement)
     expired_jobs = tuple(result.scalars().all())
 
-    # Reset each expired job to READY
+    # Reset each expired job via legal path: RUNNING → FAILED → READY
     for job in expired_jobs:
-        job.status = JobStatus.READY.value
+        # First transition: RUNNING → FAILED (lease expired = transient failure)
+        require_job_transition(JobStatus.RUNNING, JobStatus.FAILED)
+        job.status = JobStatus.FAILED.value
         job.lease_owner = None
         job.lease_expires_at = None
         job.heartbeat_at = None
         job.updated_at = now
+
+        # Second transition: FAILED → READY (eligible for retry)
+        require_job_transition(JobStatus.FAILED, JobStatus.READY)
+        job.status = JobStatus.READY.value
 
     await session.flush()
     return expired_jobs

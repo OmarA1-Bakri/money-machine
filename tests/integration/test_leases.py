@@ -2,13 +2,14 @@
 
 Session 03 wave 2: deterministic tests proving lease exclusivity, heartbeat updates,
 expiry handling, and graceful release. Uses throwaway databases and deterministic
-worker IDs (no random UUIDs).
+worker IDs and job IDs (no random UUIDs).
 """
 
 from __future__ import annotations
 
 import asyncio
 from datetime import timedelta
+from uuid import UUID
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -25,6 +26,13 @@ from money_machine.orchestration.leases import (
 )
 from money_machine.persistence.tables import Job
 from tests.integration.factories import NOW, make_job, make_shop, make_workflow
+
+
+def deterministic_job_id(index: int) -> UUID:
+    """Generate a deterministic UUID for job testing."""
+    # Use the index to create a predictable UUID
+    hex_str = f"{index:032x}"
+    return UUID(hex_str)
 
 
 async def test_single_worker_claims_ready_job(session: AsyncSession) -> None:
@@ -218,7 +226,7 @@ async def test_release_lease_transitions_to_succeeded(session: AsyncSession) -> 
     assert claimed is not None
     assert claimed.lease_owner == worker_id
 
-    # Release with SUCCEEDED
+    # Release with SUCCEEDED (legal from RUNNING)
     await release_lease(
         session,
         job_id=claimed.id,
@@ -261,8 +269,35 @@ async def test_release_lease_rejects_wrong_worker(session: AsyncSession) -> None
         )
 
 
-async def test_reclaim_expired_leases_resets_to_ready(session: AsyncSession) -> None:
-    """Expired leases are reclaimed and reset to READY for another worker."""
+async def test_release_lease_rejects_illegal_status(session: AsyncSession) -> None:
+    """Release to CANCELLED (illegal from RUNNING) is rejected."""
+    shop = await make_shop(session)
+    workflow = await make_workflow(session, shop)
+    await make_job(session, workflow, status=JobStatus.READY.value)
+
+    worker_id = deterministic_worker_id(0)
+
+    claimed = await claim_ready_job(
+        session,
+        worker_id=worker_id,
+        now=NOW,
+        lease_duration=timedelta(minutes=5),
+    )
+    assert claimed is not None
+
+    # CANCELLED is not legal from RUNNING
+    with pytest.raises(ValueError, match="Cannot release to CANCELLED"):
+        await release_lease(
+            session,
+            job_id=claimed.id,
+            worker_id=worker_id,
+            now=NOW,
+            final_status=JobStatus.CANCELLED,
+        )
+
+
+async def test_reclaim_uses_legal_transition_path(session: AsyncSession) -> None:
+    """Reclaim uses legal path: RUNNING → FAILED → READY."""
     shop = await make_shop(session)
     workflow = await make_workflow(session, shop)
     await make_job(session, workflow, status=JobStatus.READY.value)
@@ -289,6 +324,7 @@ async def test_reclaim_expired_leases_resets_to_ready(session: AsyncSession) -> 
     assert reclaimed[0].id == claimed.id
 
     await session.refresh(claimed)
+    # Final state is READY (via RUNNING → FAILED → READY)
     assert claimed.status == JobStatus.READY.value
     assert claimed.lease_owner is None
     assert claimed.lease_expires_at is None
@@ -337,7 +373,7 @@ async def test_worker_crash_and_reclaim_scenario(
     1. Worker 0 claims a job
     2. Worker 0 disappears (simulated by not releasing)
     3. Lease expires
-    4. Lease reaper reclaims the job
+    4. Lease reaper reclaims the job (RUNNING → FAILED → READY)
     5. Worker 1 claims and completes the job
     """
     # Setup
@@ -374,7 +410,7 @@ async def test_worker_crash_and_reclaim_scenario(
     # Time passes, lease expires
     after_expiry = NOW + timedelta(minutes=6)
 
-    # Lease reaper reclaims
+    # Lease reaper reclaims via legal path
     async with session_factory() as reaper_session:
         reclaimed = await reclaim_expired_leases(
             reaper_session,
