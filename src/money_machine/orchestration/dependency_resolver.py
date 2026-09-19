@@ -87,14 +87,12 @@ async def check_workflow_active(
     Returns:
         True if the workflow is active, False if completed
     """
-    workflow = await session.scalar(
+    # Query returns completed_at value directly (datetime | None)
+    completed_at = await session.scalar(
         select(WorkflowRun.completed_at).where(WorkflowRun.id == workflow_id)
     )
-    # If workflow not found, treat as inactive
-    if workflow is None:
-        return False
     # Active = completed_at is NULL
-    return workflow.completed_at is None
+    return completed_at is None
 
 
 async def check_idempotency_collision(

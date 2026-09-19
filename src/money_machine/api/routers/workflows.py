@@ -89,6 +89,6 @@ async def cancel_workflow(
     await session.commit()
     return {
         "id": str(workflow.id),
-        "completed_at": workflow.completed_at,
+        "completed_at": workflow.completed_at.isoformat() if workflow.completed_at else None,
         "jobs_blocked": blocked,
     }
