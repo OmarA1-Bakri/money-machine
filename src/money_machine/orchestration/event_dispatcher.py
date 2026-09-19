@@ -76,7 +76,11 @@ class EventDispatcher:
         # SUCCESSOR_CREATED must NOT spawn successors: the successor workflow already has
         # its entry job created via _create_successor_entry_job in create_multiply_successor.
         # Routing SUCCESSOR_CREATED through the event map would create a duplicate DedupeJob.
-        if event_already_existed or workflow_id is None or event_name == EventName.SUCCESSOR_CREATED:
+        if (
+            event_already_existed
+            or workflow_id is None
+            or event_name == EventName.SUCCESSOR_CREATED
+        ):
             return ()
 
         return await self.factory.create_successors(

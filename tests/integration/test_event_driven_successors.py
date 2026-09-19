@@ -1033,8 +1033,7 @@ async def test_successor_created_does_not_spawn_dedupe_job(session: AsyncSession
 
     # Assert: No new DedupeJob was created by SUCCESSOR_CREATED event
     assert count_after == count_before, (
-        f"SUCCESSOR_CREATED must NOT spawn DedupeJob. "
-        f"Before: {count_before}, After: {count_after}"
+        f"SUCCESSOR_CREATED must NOT spawn DedupeJob. Before: {count_before}, After: {count_after}"
     )
 
     # Verify SUCCESSOR_CREATED event was recorded (idempotency check passed)
