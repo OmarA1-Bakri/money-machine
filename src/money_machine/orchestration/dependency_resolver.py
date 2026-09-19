@@ -116,10 +116,8 @@ async def check_idempotency_collision(
     """
     reserved_by_other = await session.scalar(
         select(
-            exists()
-            .where(
-                IdempotencyRecord.idempotency_key == idempotency_key,
-                IdempotencyRecord.job_id != job_id,
+            exists().where(
+                IdempotencyRecord.idempotency_key == idempotency_key, IdempotencyRecord.job_id != job_id
             )
         )
     )
