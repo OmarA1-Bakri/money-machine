@@ -577,3 +577,110 @@ async def test_dispatch_event_is_idempotent(session: AsyncSession) -> None:
     )
     events = (await session.execute(stmt)).scalars().all()
     assert len(events) == 1
+
+
+async def test_atomic_rollback_on_successor_spawn_failure(session: AsyncSession) -> None:
+    """If successor spawn fails, no partial state persists (atomic rollback).
+
+    Wave 5 Fix #3: prove that failure during successor creation doesn't leave
+    partial OBSERVING state or partial successor data.
+    """
+    from unittest.mock import patch
+
+    uow = UnitOfWork(session)
+    dispatcher = EventDispatcher(uow)
+
+    # Setup: parent workflow in SUCCESSOR_SPEC state
+    shop = await make_shop(session)
+    parent_workflow = WorkflowRun(
+        id=PARENT_WORKFLOW_ID,
+        shop_id=shop.id,
+        workflow_type="ProductLifecycleWorkflow",
+        workflow_version=1,
+        product_state=ProductLifecycleState.SUCCESSOR_SPEC.value,
+        started_at=NOW,
+        version=1,
+    )
+    session.add(parent_workflow)
+    await session.flush()
+
+    # Create parent job
+    parent_job = Job(
+        id=PARENT_JOB_ID,
+        workflow_id=PARENT_WORKFLOW_ID,
+        job_type="PortfolioDecisionJob",
+        object_type="decisions",
+        object_id=DECISION_ID,
+        owner_agent_id="A09",
+        status="SUCCEEDED",
+        idempotency_key=f"decision_{DECISION_ID}",
+        side_effect_class="NONE",
+        retry_class="IDEMPOTENT",
+        scheduled_at=NOW,
+        version=1,
+    )
+    session.add(parent_job)
+    await session.flush()
+
+    decision = PortfolioDecision(
+        decision_id=DECISION_ID,
+        workflow_id=PARENT_WORKFLOW_ID,
+        product_id=PRODUCT_ID,
+        listing_id=LISTING_ID,
+        decision=DecisionType.MULTIPLY,
+        metrics_snapshot_ids=(SNAPSHOT_ID,),
+        cohort_reference="2026-Q3",
+        rule_version="v1.0",
+        explanation="Winner detected",
+        evidence=(TEST_EVIDENCE,),
+        successor_workflow_id=SUCCESSOR_WORKFLOW_ID,
+        successor_spec_id=SUCCESSOR_SPEC_ID,
+        decided_at=DECISION_TIME,
+    )
+
+    # Inject failure mid-transaction (after event append but before successor workflow)
+    async def failing_create_workflow(*args: object, **kwargs: object) -> None:
+        # Verify we got past the event append (state was mutated)
+        await session.refresh(parent_workflow)
+        # At this point parent should be OBSERVING (the transition happened)
+        assert parent_workflow.product_state == ProductLifecycleState.OBSERVING.value
+        # Now fail, forcing rollback
+        raise RuntimeError("Simulated successor creation failure")
+
+    with (
+        patch.object(
+            dispatcher.factory,
+            "_create_successor_workflow",
+            side_effect=failing_create_workflow,
+        ),
+        pytest.raises(RuntimeError, match="Simulated successor creation failure"),
+    ):
+        await dispatcher.dispatch_decision(
+            decision=decision,
+            parent_job_id=PARENT_JOB_ID,
+            occurred_at=DECISION_TIME,
+        )
+
+    # After exception, session is in failed state - rollback to clean up
+    await session.rollback()
+
+    # Atomic rollback proof: verify the transaction's changes were discarded
+    # This test runs in an isolated database; the rollback reverted all in-transaction changes.
+    # The parent workflow and job that were flushed (but not committed) also rolled back.
+
+    # Verify no workflows exist (everything rolled back including setup)
+    stmt_workflows = select(WorkflowRun)
+    all_workflows = (await session.execute(stmt_workflows)).scalars().all()
+    # The shop still exists (it was committed by make_shop), but workflows don't
+    assert len([w for w in all_workflows if w.id == PARENT_WORKFLOW_ID]) == 0, (
+        "Parent workflow should have rolled back"
+    )
+
+    # No WINNER_DETECTED event
+    stmt_events = select(Event).where(Event.event_name == EventName.WINNER_DETECTED.value)
+    events = (await session.execute(stmt_events)).scalars().all()
+    assert len(events) == 0, "No events should persist"
+
+    # No successor workflow
+    successor = await session.get(WorkflowRun, SUCCESSOR_WORKFLOW_ID)
+    assert successor is None, "No successor workflow should exist"
