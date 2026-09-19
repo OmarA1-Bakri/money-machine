@@ -1124,7 +1124,8 @@ async def test_winner_detected_recorded_before_successor_created(session: AsyncS
     )
     successor_event = (await session.execute(stmt_successor)).scalars().one()
 
-    # Assert event order: WINNER_DETECTED must be recorded before (or at same time as) SUCCESSOR_CREATED
+    # Assert event order: WINNER_DETECTED must be recorded
+    # before (or at same time as) SUCCESSOR_CREATED
     assert winner_event.recorded_at <= successor_event.recorded_at, (
         f"WINNER_DETECTED must be recorded before SUCCESSOR_CREATED. "
         f"Winner: {winner_event.recorded_at}, Successor: {successor_event.recorded_at}"

@@ -273,8 +273,8 @@ async def reclaim_expired_leases(
 
         # Check RetryClass before allowing retry:
         # - NEVER: non-retryable failure → TERMINAL_FAILURE
-        # - MANUAL_RESUME: requires operator intervention → BLOCKED (stays FAILED, no transition)
-        # - Others (SAFE, IDEMPOTENT, RECONCILE_FIRST): check budget and allow retry if budget remains
+        # - MANUAL_RESUME: requires operator intervention → BLOCKED (stays FAILED)
+        # - Others (SAFE, IDEMPOTENT, RECONCILE_FIRST): check budget, retry
 
         if retry_class == RetryClass.NEVER:
             # Non-retryable failure: always move to TERMINAL_FAILURE

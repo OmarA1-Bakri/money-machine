@@ -754,7 +754,6 @@ async def test_reclaim_expired_leases_full_recovery_scenario(
         await setup_session.commit()
 
     worker_1 = deterministic_worker_id(0)
-    worker_2 = deterministic_worker_id(1)
     lease_duration = timedelta(minutes=5)
 
     # Worker 1 claims the job

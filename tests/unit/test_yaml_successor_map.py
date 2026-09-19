@@ -347,20 +347,25 @@ class TestYamlLoadFailures:
         load_workflows_config.cache_clear()
 
         # Mock load_yaml_model to raise ConfigLoadError (malformed YAML)
-        with patch("money_machine.orchestration.successor_factory.Path.exists", return_value=True):
-            with patch(
+        with (
+            patch("money_machine.orchestration.successor_factory.Path.exists", return_value=True),
+            patch(
                 "money_machine.orchestration.successor_factory.load_yaml_model",
                 side_effect=ConfigLoadError("Invalid YAML structure"),
-            ):
-                with pytest.raises(ValueError) as exc_info:
-                    load_workflows_config()
+            ),
+            pytest.raises(ValueError) as exc_info,
+        ):
+            load_workflows_config()
 
-                error_message = str(exc_info.value)
-                assert "Failed to load workflow configuration" in error_message
-                assert "Invalid YAML structure" in error_message
+        error_message = str(exc_info.value)
+        assert "Failed to load workflow configuration" in error_message
+        assert "Invalid YAML structure" in error_message
 
     def test_yaml_cache_works(self) -> None:
-        """SF-5.3: Cache works - second call returns same dict (already tested in TestLoadEventSuccessorMap)."""
+        """SF-5.3: Cache works - second call returns same dict.
+
+        Already tested in TestLoadEventSuccessorMap.test_map_is_cached.
+        """
         # This is already covered by test_map_is_cached in TestLoadEventSuccessorMap,
         # but we document it here as part of SF-5 acceptance.
         from money_machine.orchestration.successor_factory import load_workflows_config
