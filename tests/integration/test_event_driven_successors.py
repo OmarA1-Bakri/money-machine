@@ -8,7 +8,6 @@ same-workflow re-entry.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from decimal import Decimal
 from uuid import UUID
 
 import pytest
@@ -23,7 +22,7 @@ from money_machine.orchestration.event_dispatcher import EventDispatcher
 from money_machine.orchestration.transition_guard import require_successor_spawn
 from money_machine.persistence.tables import Event, Job, WorkflowRun
 from money_machine.persistence.unit_of_work import UnitOfWork
-from tests.integration.factories import make_shop, make_workflow
+from tests.integration.factories import make_shop
 
 # Deterministic timestamps for tests
 NOW = datetime(2026, 9, 18, 15, 30, tzinfo=UTC)
@@ -88,7 +87,7 @@ async def test_require_successor_spawn_accepts_cross_workflow() -> None:
 
 
 async def test_dispatch_multiply_creates_successor_workflow(session: AsyncSession) -> None:
-    """Dispatching a MULTIPLY decision creates a new workflow and transitions parent to OBSERVING."""
+    """Dispatching a MULTIPLY decision creates new workflow, transitions parent to OBSERVING."""
     uow = UnitOfWork(session)
     dispatcher = EventDispatcher(uow)
 
@@ -473,11 +472,7 @@ async def test_dispatch_event_is_idempotent(session: AsyncSession) -> None:
     # Reset session state to simulate second dispatch
     await session.commit()
 
-    # Second dispatch with same decision
-    uow2 = UnitOfWork(session)
-    dispatcher2 = EventDispatcher(uow2)
-
-    # This should be idempotent - same dedupe key
+    # Second dispatch with same decision would be idempotent - same dedupe key
     # In a real scenario, the event append would fail on unique constraint
     # For this test, we just verify one successor workflow exists
     stmt = select(WorkflowRun).where(WorkflowRun.id == SUCCESSOR_WORKFLOW_ID)
