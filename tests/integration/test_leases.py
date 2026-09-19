@@ -546,3 +546,179 @@ async def test_reclaim_respects_retry_budget(session: AsyncSession) -> None:
     assert reclaimed[0].status == JobStatus.TERMINAL_FAILURE.value
     assert reclaimed[0].attempt == 2
     assert reclaimed[0].lease_owner is None
+
+
+async def test_reclaim_expired_lease_respects_retry_never(session: AsyncSession) -> None:
+    """A-3 Blocker Fix: Jobs with RetryClass.NEVER move to TERMINAL_FAILURE on reclaim.
+
+    When a job with retry_class=NEVER has its lease expire, reclaim_expired_leases
+    must NOT transition it to READY. Instead, it should go RUNNING → FAILED → TERMINAL_FAILURE
+    because NEVER means the failure is non-retryable.
+    """
+    from money_machine.domain.enums import RetryClass
+
+    shop = await make_shop(session)
+    workflow = await make_workflow(session, shop)
+
+    # Create job with RetryClass.NEVER, attempt=0, max_attempts=3
+    # Even with budget remaining, NEVER should block retry
+    job = Job(
+        id=deterministic_job_id(100),
+        workflow_id=workflow.id,
+        job_type="TestJob",
+        object_type="test",
+        object_id=workflow.id,
+        owner_agent_id="A99",
+        status=JobStatus.READY.value,
+        scheduled_at=NOW,
+        attempt=0,
+        max_attempts=3,
+        idempotency_key="test_never_retry",
+        side_effect_class="NONE",
+        retry_class=RetryClass.NEVER.value,  # Non-retryable!
+        allowed_mode="simulation",
+        version=1,
+    )
+    session.add(job)
+    await session.flush()
+
+    # Worker claims the job
+    worker_id = deterministic_worker_id(0)
+    lease_duration = timedelta(minutes=5)
+    claimed = await claim_ready_job(
+        session, worker_id=worker_id, now=NOW, lease_duration=lease_duration
+    )
+    assert claimed is not None
+    assert claimed.status == JobStatus.RUNNING.value
+    assert claimed.attempt == 0
+
+    # Lease expires
+    after_expiry = NOW + timedelta(minutes=10)
+
+    # Reclaim: RUNNING → FAILED (attempt 0 → 1) → TERMINAL_FAILURE (because NEVER)
+    reclaimed = await reclaim_expired_leases(session, now=after_expiry, limit=50)
+
+    assert len(reclaimed) == 1
+    assert reclaimed[0].id == job.id
+    assert reclaimed[0].status == JobStatus.TERMINAL_FAILURE.value, (
+        "RetryClass.NEVER must move job to TERMINAL_FAILURE, not READY"
+    )
+    assert reclaimed[0].attempt == 1  # Bumped by lease expiry
+    assert reclaimed[0].lease_owner is None
+
+
+async def test_reclaim_expired_lease_respects_retry_manual_resume(session: AsyncSession) -> None:
+    """A-3 Blocker Fix: Jobs with RetryClass.MANUAL_RESUME stay in FAILED on reclaim.
+
+    When a job with retry_class=MANUAL_RESUME has its lease expire, reclaim_expired_leases
+    must NOT transition it to READY. Instead, it should go RUNNING → FAILED and stay there,
+    awaiting operator intervention.
+    """
+    from money_machine.domain.enums import RetryClass
+
+    shop = await make_shop(session)
+    workflow = await make_workflow(session, shop)
+
+    # Create job with RetryClass.MANUAL_RESUME, attempt=0, max_attempts=3
+    # Even with budget remaining, MANUAL_RESUME should block automatic retry
+    job = Job(
+        id=deterministic_job_id(101),
+        workflow_id=workflow.id,
+        job_type="TestJob",
+        object_type="test",
+        object_id=workflow.id,
+        owner_agent_id="A99",
+        status=JobStatus.READY.value,
+        scheduled_at=NOW,
+        attempt=0,
+        max_attempts=3,
+        idempotency_key="test_manual_resume",
+        side_effect_class="EXTERNAL_WRITE",
+        retry_class=RetryClass.MANUAL_RESUME.value,  # Requires operator!
+        allowed_mode="live",
+        version=1,
+    )
+    session.add(job)
+    await session.flush()
+
+    # Worker claims the job
+    worker_id = deterministic_worker_id(0)
+    lease_duration = timedelta(minutes=5)
+    claimed = await claim_ready_job(
+        session, worker_id=worker_id, now=NOW, lease_duration=lease_duration
+    )
+    assert claimed is not None
+    assert claimed.status == JobStatus.RUNNING.value
+    assert claimed.attempt == 0
+
+    # Lease expires
+    after_expiry = NOW + timedelta(minutes=10)
+
+    # Reclaim: RUNNING → FAILED (attempt 0 → 1), but do NOT transition to READY
+    reclaimed = await reclaim_expired_leases(session, now=after_expiry, limit=50)
+
+    assert len(reclaimed) == 1
+    assert reclaimed[0].id == job.id
+    assert reclaimed[0].status == JobStatus.FAILED.value, (
+        "RetryClass.MANUAL_RESUME must stay in FAILED, not move to READY"
+    )
+    assert reclaimed[0].attempt == 1  # Bumped by lease expiry
+    assert reclaimed[0].lease_owner is None
+
+
+async def test_reclaim_expired_lease_allows_safe_retry(session: AsyncSession) -> None:
+    """Verify that RetryClass.SAFE jobs DO transition to READY on reclaim (control test).
+
+    This is the control test for A-3: jobs with SAFE, IDEMPOTENT, or RECONCILE_FIRST
+    should still be allowed to retry normally (as long as budget remains).
+    """
+    from money_machine.domain.enums import RetryClass
+
+    shop = await make_shop(session)
+    workflow = await make_workflow(session, shop)
+
+    # Create job with RetryClass.SAFE, attempt=0, max_attempts=3
+    # This SHOULD transition to READY after reclaim (normal behavior)
+    job = Job(
+        id=deterministic_job_id(102),
+        workflow_id=workflow.id,
+        job_type="TestJob",
+        object_type="test",
+        object_id=workflow.id,
+        owner_agent_id="A99",
+        status=JobStatus.READY.value,
+        scheduled_at=NOW,
+        attempt=0,
+        max_attempts=3,
+        idempotency_key="test_safe_retry",
+        side_effect_class="NONE",
+        retry_class=RetryClass.SAFE.value,  # Safe to retry!
+        allowed_mode="simulation",
+        version=1,
+    )
+    session.add(job)
+    await session.flush()
+
+    # Worker claims the job
+    worker_id = deterministic_worker_id(0)
+    lease_duration = timedelta(minutes=5)
+    claimed = await claim_ready_job(
+        session, worker_id=worker_id, now=NOW, lease_duration=lease_duration
+    )
+    assert claimed is not None
+    assert claimed.status == JobStatus.RUNNING.value
+    assert claimed.attempt == 0
+
+    # Lease expires
+    after_expiry = NOW + timedelta(minutes=10)
+
+    # Reclaim: RUNNING → FAILED (attempt 0 → 1) → READY (budget remains, SAFE allows retry)
+    reclaimed = await reclaim_expired_leases(session, now=after_expiry, limit=50)
+
+    assert len(reclaimed) == 1
+    assert reclaimed[0].id == job.id
+    assert reclaimed[0].status == JobStatus.READY.value, (
+        "RetryClass.SAFE should allow transition to READY when budget remains"
+    )
+    assert reclaimed[0].attempt == 1  # Bumped by lease expiry
+    assert reclaimed[0].lease_owner is None
