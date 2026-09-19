@@ -393,8 +393,7 @@ def command_workflow_inspect_graph(arguments: argparse.Namespace) -> int:
                 for dep in deps:
                     job_id_str = str(dep.job_id)
                     if job_id_str in job_map:
-                        depends_on_list = job_map[job_id_str]["depends_on"]
-                        assert isinstance(depends_on_list, list)
+                        depends_on_list: list[str] = job_map[job_id_str]["depends_on"]  # type: ignore[assignment]
                         depends_on_list.append(str(dep.depends_on_job_id))
 
                 return {
