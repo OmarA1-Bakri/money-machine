@@ -22,7 +22,7 @@ from money_machine.persistence.tables import Job, JobDependency, WorkflowRun
 
 
 @pytest.mark.asyncio
-async def test_promote_due_jobs_success(db_session: AsyncSession):
+async def test_promote_due_jobs_success(session: AsyncSession):
     """Promote PENDING jobs that are due and have satisfied dependencies."""
     now = datetime.now(UTC)
     workflow_id = uuid4()
@@ -33,7 +33,7 @@ async def test_promote_due_jobs_success(db_session: AsyncSession):
         product_state="DESIGNED",
         started_at=now,
     )
-    db_session.add(workflow)
+    session.add(workflow)
 
     # Job 1: due now, no dependencies
     job1_id = uuid4()
@@ -49,7 +49,7 @@ async def test_promote_due_jobs_success(db_session: AsyncSession):
         attempt=0,
         max_attempts=3,
     )
-    db_session.add(job1)
+    session.add(job1)
 
     # Job 2: due in future (should not promote)
     job2_id = uuid4()
@@ -65,11 +65,11 @@ async def test_promote_due_jobs_success(db_session: AsyncSession):
         attempt=0,
         max_attempts=3,
     )
-    db_session.add(job2)
+    session.add(job2)
 
-    await db_session.flush()
+    await session.flush()
 
-    promoted = await promote_due_jobs(db_session, now=now)
+    promoted = await promote_due_jobs(session, now=now)
 
     assert len(promoted) == 1
     assert promoted[0].id == job1_id
@@ -77,7 +77,7 @@ async def test_promote_due_jobs_success(db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_promote_due_jobs_skips_unsatisfied_deps(db_session: AsyncSession):
+async def test_promote_due_jobs_skips_unsatisfied_deps(session: AsyncSession):
     """Don't promote jobs with unsatisfied dependencies."""
     now = datetime.now(UTC)
     workflow_id = uuid4()
@@ -88,7 +88,7 @@ async def test_promote_due_jobs_skips_unsatisfied_deps(db_session: AsyncSession)
         product_state="DESIGNED",
         started_at=now,
     )
-    db_session.add(workflow)
+    session.add(workflow)
 
     predecessor_id = uuid4()
     predecessor = Job(
@@ -103,7 +103,7 @@ async def test_promote_due_jobs_skips_unsatisfied_deps(db_session: AsyncSession)
         attempt=0,
         max_attempts=3,
     )
-    db_session.add(predecessor)
+    session.add(predecessor)
 
     dependent_id = uuid4()
     dependent = Job(
@@ -118,23 +118,23 @@ async def test_promote_due_jobs_skips_unsatisfied_deps(db_session: AsyncSession)
         attempt=0,
         max_attempts=3,
     )
-    db_session.add(dependent)
+    session.add(dependent)
 
     dep = JobDependency(
         job_id=dependent_id,
         depends_on_job_id=predecessor_id,
         satisfied_at=None,  # Not satisfied
     )
-    db_session.add(dep)
-    await db_session.flush()
+    session.add(dep)
+    await session.flush()
 
-    promoted = await promote_due_jobs(db_session, now=now)
+    promoted = await promote_due_jobs(session, now=now)
 
     assert len(promoted) == 0  # Nothing promoted
 
 
 @pytest.mark.asyncio
-async def test_detect_stalled_jobs(db_session: AsyncSession):
+async def test_detect_stalled_jobs(session: AsyncSession):
     """Detect RUNNING jobs that haven't heartbeated recently."""
     now = datetime.now(UTC)
     stale_heartbeat = now - DEFAULT_STALL_THRESHOLD - timedelta(minutes=1)
@@ -147,7 +147,7 @@ async def test_detect_stalled_jobs(db_session: AsyncSession):
         product_state="DESIGNED",
         started_at=now - timedelta(hours=1),
     )
-    db_session.add(workflow)
+    session.add(workflow)
 
     # Stalled job: old heartbeat, lease not expired
     stalled_id = uuid4()
@@ -166,7 +166,7 @@ async def test_detect_stalled_jobs(db_session: AsyncSession):
         attempt=1,
         max_attempts=3,
     )
-    db_session.add(stalled)
+    session.add(stalled)
 
     # Not stalled: recent heartbeat
     active_id = uuid4()
@@ -185,11 +185,11 @@ async def test_detect_stalled_jobs(db_session: AsyncSession):
         attempt=1,
         max_attempts=3,
     )
-    db_session.add(active)
+    session.add(active)
 
-    await db_session.flush()
+    await session.flush()
 
-    stalled_jobs = await detect_stalled_jobs(db_session, now=now)
+    stalled_jobs = await detect_stalled_jobs(session, now=now)
 
     assert len(stalled_jobs) == 1
     assert stalled_jobs[0].id == stalled_id
@@ -198,7 +198,7 @@ async def test_detect_stalled_jobs(db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_detect_stalled_jobs_ignores_expired_lease(db_session: AsyncSession):
+async def test_detect_stalled_jobs_ignores_expired_lease(session: AsyncSession):
     """Expired leases are handled by reclaim_expired_leases, not stall detection."""
     now = datetime.now(UTC)
     stale_heartbeat = now - DEFAULT_STALL_THRESHOLD - timedelta(minutes=1)
@@ -211,7 +211,7 @@ async def test_detect_stalled_jobs_ignores_expired_lease(db_session: AsyncSessio
         product_state="DESIGNED",
         started_at=now - timedelta(hours=1),
     )
-    db_session.add(workflow)
+    session.add(workflow)
 
     # Job with old heartbeat AND expired lease (not stalled, it's expired)
     expired_id = uuid4()
@@ -230,18 +230,18 @@ async def test_detect_stalled_jobs_ignores_expired_lease(db_session: AsyncSessio
         attempt=1,
         max_attempts=3,
     )
-    db_session.add(expired)
+    session.add(expired)
 
-    await db_session.flush()
+    await session.flush()
 
-    stalled_jobs = await detect_stalled_jobs(db_session, now=now)
+    stalled_jobs = await detect_stalled_jobs(session, now=now)
 
     # Should not detect this as stalled (it's expired)
     assert len(stalled_jobs) == 0
 
 
 @pytest.mark.asyncio
-async def test_schedule_maturity_timer(db_session: AsyncSession):
+async def test_schedule_maturity_timer(session: AsyncSession):
     """Schedule a maturity check timer for a workflow."""
     now = datetime.now(UTC)
     maturity_date = now + timedelta(days=30)
@@ -254,11 +254,11 @@ async def test_schedule_maturity_timer(db_session: AsyncSession):
         product_state="DESIGNED",
         started_at=now,
     )
-    db_session.add(workflow)
-    await db_session.flush()
+    session.add(workflow)
+    await session.flush()
 
     timer_job = await schedule_maturity_timer(
-        db_session,
+        session,
         workflow_id=workflow_id,
         maturity_date=maturity_date,
         now=now,
@@ -271,7 +271,7 @@ async def test_schedule_maturity_timer(db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_schedule_maturity_timer_completed_workflow(db_session: AsyncSession):
+async def test_schedule_maturity_timer_completed_workflow(session: AsyncSession):
     """Don't schedule timer for completed workflow."""
     now = datetime.now(UTC)
     maturity_date = now + timedelta(days=30)
@@ -285,11 +285,11 @@ async def test_schedule_maturity_timer_completed_workflow(db_session: AsyncSessi
         started_at=now,
         completed_at=now,  # Completed
     )
-    db_session.add(workflow)
-    await db_session.flush()
+    session.add(workflow)
+    await session.flush()
 
     timer_job = await schedule_maturity_timer(
-        db_session,
+        session,
         workflow_id=workflow_id,
         maturity_date=maturity_date,
         now=now,
@@ -299,7 +299,7 @@ async def test_schedule_maturity_timer_completed_workflow(db_session: AsyncSessi
 
 
 @pytest.mark.asyncio
-async def test_run_scheduler_cycle_integration(db_session: AsyncSession):
+async def test_run_scheduler_cycle_integration(session: AsyncSession):
     """Run complete scheduler cycle."""
     now = datetime.now(UTC)
 
@@ -311,7 +311,7 @@ async def test_run_scheduler_cycle_integration(db_session: AsyncSession):
         product_state="DESIGNED",
         started_at=now,
     )
-    db_session.add(workflow)
+    session.add(workflow)
 
     # PENDING job due now (will be promoted)
     pending_id = uuid4()
@@ -327,7 +327,7 @@ async def test_run_scheduler_cycle_integration(db_session: AsyncSession):
         attempt=0,
         max_attempts=3,
     )
-    db_session.add(pending)
+    session.add(pending)
 
     # RUNNING job with expired lease (will be reclaimed)
     expired_id = uuid4()
@@ -346,7 +346,7 @@ async def test_run_scheduler_cycle_integration(db_session: AsyncSession):
         attempt=1,
         max_attempts=3,
     )
-    db_session.add(expired)
+    session.add(expired)
 
     # RUNNING job stalled (will be detected)
     stalled_id = uuid4()
@@ -365,11 +365,11 @@ async def test_run_scheduler_cycle_integration(db_session: AsyncSession):
         attempt=1,
         max_attempts=3,
     )
-    db_session.add(stalled)
+    session.add(stalled)
 
-    await db_session.flush()
+    await session.flush()
 
-    result = await run_scheduler_cycle(db_session, now=now)
+    result = await run_scheduler_cycle(session, now=now)
 
     assert result["promoted"] == 1
     assert result["reclaimed"] == 1

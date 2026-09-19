@@ -25,7 +25,7 @@ from money_machine.persistence.tables import IdempotencyRecord, Job, JobDependen
 
 
 @pytest.mark.asyncio
-async def test_check_dependencies_satisfied_no_dependencies(db_session: AsyncSession):
+async def test_check_dependencies_satisfied_no_dependencies(session: AsyncSession):
     """Job with no dependencies is considered satisfied."""
     workflow_id = uuid4()
     workflow = WorkflowRun(
@@ -35,7 +35,7 @@ async def test_check_dependencies_satisfied_no_dependencies(db_session: AsyncSes
         product_state="DESIGNED",
         started_at=datetime.now(UTC),
     )
-    db_session.add(workflow)
+    session.add(workflow)
 
     job_id = uuid4()
     job = Job(
@@ -50,15 +50,15 @@ async def test_check_dependencies_satisfied_no_dependencies(db_session: AsyncSes
         attempt=0,
         max_attempts=3,
     )
-    db_session.add(job)
-    await db_session.flush()
+    session.add(job)
+    await session.flush()
 
-    satisfied = await check_dependencies_satisfied(db_session, job_id=job_id)
+    satisfied = await check_dependencies_satisfied(session, job_id=job_id)
     assert satisfied is True
 
 
 @pytest.mark.asyncio
-async def test_check_dependencies_satisfied_with_satisfied_dep(db_session: AsyncSession):
+async def test_check_dependencies_satisfied_with_satisfied_dep(session: AsyncSession):
     """Job with satisfied dependency is considered satisfied."""
     workflow_id = uuid4()
     workflow = WorkflowRun(
@@ -68,7 +68,7 @@ async def test_check_dependencies_satisfied_with_satisfied_dep(db_session: Async
         product_state="DESIGNED",
         started_at=datetime.now(UTC),
     )
-    db_session.add(workflow)
+    session.add(workflow)
 
     predecessor_id = uuid4()
     predecessor = Job(
@@ -83,7 +83,7 @@ async def test_check_dependencies_satisfied_with_satisfied_dep(db_session: Async
         attempt=1,
         max_attempts=3,
     )
-    db_session.add(predecessor)
+    session.add(predecessor)
 
     job_id = uuid4()
     job = Job(
@@ -98,7 +98,7 @@ async def test_check_dependencies_satisfied_with_satisfied_dep(db_session: Async
         attempt=0,
         max_attempts=3,
     )
-    db_session.add(job)
+    session.add(job)
 
     now = datetime.now(UTC)
     dep = JobDependency(
@@ -106,15 +106,15 @@ async def test_check_dependencies_satisfied_with_satisfied_dep(db_session: Async
         depends_on_job_id=predecessor_id,
         satisfied_at=now,  # Already satisfied
     )
-    db_session.add(dep)
-    await db_session.flush()
+    session.add(dep)
+    await session.flush()
 
-    satisfied = await check_dependencies_satisfied(db_session, job_id=job_id)
+    satisfied = await check_dependencies_satisfied(session, job_id=job_id)
     assert satisfied is True
 
 
 @pytest.mark.asyncio
-async def test_check_dependencies_satisfied_with_unsatisfied_dep(db_session: AsyncSession):
+async def test_check_dependencies_satisfied_with_unsatisfied_dep(session: AsyncSession):
     """Job with unsatisfied dependency is NOT satisfied."""
     workflow_id = uuid4()
     workflow = WorkflowRun(
@@ -124,7 +124,7 @@ async def test_check_dependencies_satisfied_with_unsatisfied_dep(db_session: Asy
         product_state="DESIGNED",
         started_at=datetime.now(UTC),
     )
-    db_session.add(workflow)
+    session.add(workflow)
 
     predecessor_id = uuid4()
     predecessor = Job(
@@ -139,7 +139,7 @@ async def test_check_dependencies_satisfied_with_unsatisfied_dep(db_session: Asy
         attempt=0,
         max_attempts=3,
     )
-    db_session.add(predecessor)
+    session.add(predecessor)
 
     job_id = uuid4()
     job = Job(
@@ -154,22 +154,22 @@ async def test_check_dependencies_satisfied_with_unsatisfied_dep(db_session: Asy
         attempt=0,
         max_attempts=3,
     )
-    db_session.add(job)
+    session.add(job)
 
     dep = JobDependency(
         job_id=job_id,
         depends_on_job_id=predecessor_id,
         satisfied_at=None,  # Not satisfied
     )
-    db_session.add(dep)
-    await db_session.flush()
+    session.add(dep)
+    await session.flush()
 
-    satisfied = await check_dependencies_satisfied(db_session, job_id=job_id)
+    satisfied = await check_dependencies_satisfied(session, job_id=job_id)
     assert satisfied is False
 
 
 @pytest.mark.asyncio
-async def test_check_workflow_active(db_session: AsyncSession):
+async def test_check_workflow_active(session: AsyncSession):
     """Active workflow (completed_at NULL) returns True."""
     workflow_id = uuid4()
     workflow = WorkflowRun(
@@ -180,15 +180,15 @@ async def test_check_workflow_active(db_session: AsyncSession):
         started_at=datetime.now(UTC),
         completed_at=None,  # Active
     )
-    db_session.add(workflow)
-    await db_session.flush()
+    session.add(workflow)
+    await session.flush()
 
-    active = await check_workflow_active(db_session, workflow_id=workflow_id)
+    active = await check_workflow_active(session, workflow_id=workflow_id)
     assert active is True
 
 
 @pytest.mark.asyncio
-async def test_check_workflow_inactive(db_session: AsyncSession):
+async def test_check_workflow_inactive(session: AsyncSession):
     """Completed workflow returns False."""
     workflow_id = uuid4()
     workflow = WorkflowRun(
@@ -199,21 +199,21 @@ async def test_check_workflow_inactive(db_session: AsyncSession):
         started_at=datetime.now(UTC),
         completed_at=datetime.now(UTC),  # Completed
     )
-    db_session.add(workflow)
-    await db_session.flush()
+    session.add(workflow)
+    await session.flush()
 
-    active = await check_workflow_active(db_session, workflow_id=workflow_id)
+    active = await check_workflow_active(session, workflow_id=workflow_id)
     assert active is False
 
 
 @pytest.mark.asyncio
-async def test_check_idempotency_collision_no_collision(db_session: AsyncSession):
+async def test_check_idempotency_collision_no_collision(session: AsyncSession):
     """No collision when key is free."""
     job_id = uuid4()
     key = "test_key"
 
     collision = await check_idempotency_collision(
-        db_session,
+        session,
         job_id=job_id,
         idempotency_key=key,
     )
@@ -221,7 +221,7 @@ async def test_check_idempotency_collision_no_collision(db_session: AsyncSession
 
 
 @pytest.mark.asyncio
-async def test_check_idempotency_collision_same_job(db_session: AsyncSession):
+async def test_check_idempotency_collision_same_job(session: AsyncSession):
     """No collision when key reserved by same job."""
     workflow_id = uuid4()
     workflow = WorkflowRun(
@@ -231,7 +231,7 @@ async def test_check_idempotency_collision_same_job(db_session: AsyncSession):
         product_state="DESIGNED",
         started_at=datetime.now(UTC),
     )
-    db_session.add(workflow)
+    session.add(workflow)
 
     job_id = uuid4()
     job = Job(
@@ -247,7 +247,7 @@ async def test_check_idempotency_collision_same_job(db_session: AsyncSession):
         max_attempts=3,
         idempotency_key="test_key",
     )
-    db_session.add(job)
+    session.add(job)
 
     record = IdempotencyRecord(
         idempotency_key="test_key",
@@ -255,11 +255,11 @@ async def test_check_idempotency_collision_same_job(db_session: AsyncSession):
         operation="test_op",
         side_effect_class="EXTERNAL_WRITE",
     )
-    db_session.add(record)
-    await db_session.flush()
+    session.add(record)
+    await session.flush()
 
     collision = await check_idempotency_collision(
-        db_session,
+        session,
         job_id=job_id,
         idempotency_key="test_key",
     )
@@ -267,7 +267,7 @@ async def test_check_idempotency_collision_same_job(db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_check_idempotency_collision_different_job(db_session: AsyncSession):
+async def test_check_idempotency_collision_different_job(session: AsyncSession):
     """Collision when key reserved by different job."""
     workflow_id = uuid4()
     workflow = WorkflowRun(
@@ -277,7 +277,7 @@ async def test_check_idempotency_collision_different_job(db_session: AsyncSessio
         product_state="DESIGNED",
         started_at=datetime.now(UTC),
     )
-    db_session.add(workflow)
+    session.add(workflow)
 
     other_job_id = uuid4()
     other_job = Job(
@@ -293,7 +293,7 @@ async def test_check_idempotency_collision_different_job(db_session: AsyncSessio
         max_attempts=3,
         idempotency_key="test_key",
     )
-    db_session.add(other_job)
+    session.add(other_job)
 
     record = IdempotencyRecord(
         idempotency_key="test_key",
@@ -301,7 +301,7 @@ async def test_check_idempotency_collision_different_job(db_session: AsyncSessio
         operation="test_op",
         side_effect_class="EXTERNAL_WRITE",
     )
-    db_session.add(record)
+    session.add(record)
 
     job_id = uuid4()
     job = Job(
@@ -317,11 +317,11 @@ async def test_check_idempotency_collision_different_job(db_session: AsyncSessio
         max_attempts=3,
         idempotency_key="test_key",
     )
-    db_session.add(job)
-    await db_session.flush()
+    session.add(job)
+    await session.flush()
 
     collision = await check_idempotency_collision(
-        db_session,
+        session,
         job_id=job_id,
         idempotency_key="test_key",
     )
@@ -329,7 +329,7 @@ async def test_check_idempotency_collision_different_job(db_session: AsyncSessio
 
 
 @pytest.mark.asyncio
-async def test_evaluate_job_readiness_all_conditions_met(db_session: AsyncSession):
+async def test_evaluate_job_readiness_all_conditions_met(session: AsyncSession):
     """Job is ready when all conditions are met."""
     now = datetime.now(UTC)
     workflow_id = uuid4()
@@ -341,7 +341,7 @@ async def test_evaluate_job_readiness_all_conditions_met(db_session: AsyncSessio
         started_at=now,
         completed_at=None,
     )
-    db_session.add(workflow)
+    session.add(workflow)
 
     job_id = uuid4()
     job = Job(
@@ -356,16 +356,16 @@ async def test_evaluate_job_readiness_all_conditions_met(db_session: AsyncSessio
         attempt=0,
         max_attempts=3,
     )
-    db_session.add(job)
-    await db_session.flush()
+    session.add(job)
+    await session.flush()
 
-    is_ready, reason = await evaluate_job_readiness(db_session, job_id=job_id, now=now)
+    is_ready, reason = await evaluate_job_readiness(session, job_id=job_id, now=now)
     assert is_ready is True
     assert "satisfied" in reason.lower()
 
 
 @pytest.mark.asyncio
-async def test_evaluate_job_readiness_not_time_yet(db_session: AsyncSession):
+async def test_evaluate_job_readiness_not_time_yet(session: AsyncSession):
     """Job is NOT ready when scheduled_at is in the future."""
     now = datetime.now(UTC)
     workflow_id = uuid4()
@@ -376,7 +376,7 @@ async def test_evaluate_job_readiness_not_time_yet(db_session: AsyncSession):
         product_state="DESIGNED",
         started_at=now,
     )
-    db_session.add(workflow)
+    session.add(workflow)
 
     job_id = uuid4()
     job = Job(
@@ -391,16 +391,16 @@ async def test_evaluate_job_readiness_not_time_yet(db_session: AsyncSession):
         attempt=0,
         max_attempts=3,
     )
-    db_session.add(job)
-    await db_session.flush()
+    session.add(job)
+    await session.flush()
 
-    is_ready, reason = await evaluate_job_readiness(db_session, job_id=job_id, now=now)
+    is_ready, reason = await evaluate_job_readiness(session, job_id=job_id, now=now)
     assert is_ready is False
     assert "scheduled" in reason.lower()
 
 
 @pytest.mark.asyncio
-async def test_promote_pending_to_ready_success(db_session: AsyncSession):
+async def test_promote_pending_to_ready_success(session: AsyncSession):
     """Successful promotion transitions PENDING → READY."""
     now = datetime.now(UTC)
     workflow_id = uuid4()
@@ -411,7 +411,7 @@ async def test_promote_pending_to_ready_success(db_session: AsyncSession):
         product_state="DESIGNED",
         started_at=now,
     )
-    db_session.add(workflow)
+    session.add(workflow)
 
     job_id = uuid4()
     job = Job(
@@ -426,10 +426,10 @@ async def test_promote_pending_to_ready_success(db_session: AsyncSession):
         attempt=0,
         max_attempts=3,
     )
-    db_session.add(job)
-    await db_session.flush()
+    session.add(job)
+    await session.flush()
 
-    promoted = await promote_pending_to_ready(db_session, job_id=job_id, now=now)
+    promoted = await promote_pending_to_ready(session, job_id=job_id, now=now)
 
     assert promoted.id == job_id
     assert JobStatus(promoted.status) == JobStatus.READY
@@ -437,7 +437,7 @@ async def test_promote_pending_to_ready_success(db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_promote_pending_to_ready_workflow_inactive(db_session: AsyncSession):
+async def test_promote_pending_to_ready_workflow_inactive(session: AsyncSession):
     """Promotion fails when workflow is completed."""
     now = datetime.now(UTC)
     workflow_id = uuid4()
@@ -449,7 +449,7 @@ async def test_promote_pending_to_ready_workflow_inactive(db_session: AsyncSessi
         started_at=now,
         completed_at=now,  # Completed
     )
-    db_session.add(workflow)
+    session.add(workflow)
 
     job_id = uuid4()
     job = Job(
@@ -464,15 +464,15 @@ async def test_promote_pending_to_ready_workflow_inactive(db_session: AsyncSessi
         attempt=0,
         max_attempts=3,
     )
-    db_session.add(job)
-    await db_session.flush()
+    session.add(job)
+    await session.flush()
 
     with pytest.raises(WorkflowInactiveError):
-        await promote_pending_to_ready(db_session, job_id=job_id, now=now)
+        await promote_pending_to_ready(session, job_id=job_id, now=now)
 
 
 @pytest.mark.asyncio
-async def test_satisfy_dependency(db_session: AsyncSession):
+async def test_satisfy_dependency(session: AsyncSession):
     """Satisfying a dependency sets satisfied_at."""
     now = datetime.now(UTC)
     workflow_id = uuid4()
@@ -483,7 +483,7 @@ async def test_satisfy_dependency(db_session: AsyncSession):
         product_state="DESIGNED",
         started_at=now,
     )
-    db_session.add(workflow)
+    session.add(workflow)
 
     predecessor_id = uuid4()
     predecessor = Job(
@@ -498,7 +498,7 @@ async def test_satisfy_dependency(db_session: AsyncSession):
         attempt=1,
         max_attempts=3,
     )
-    db_session.add(predecessor)
+    session.add(predecessor)
 
     dependent_id = uuid4()
     dependent = Job(
@@ -513,27 +513,27 @@ async def test_satisfy_dependency(db_session: AsyncSession):
         attempt=0,
         max_attempts=3,
     )
-    db_session.add(dependent)
+    session.add(dependent)
 
     dep = JobDependency(
         job_id=dependent_id,
         depends_on_job_id=predecessor_id,
         satisfied_at=None,
     )
-    db_session.add(dep)
-    await db_session.flush()
+    session.add(dep)
+    await session.flush()
 
-    count = await satisfy_dependency(db_session, succeeded_job_id=predecessor_id, now=now)
+    count = await satisfy_dependency(session, succeeded_job_id=predecessor_id, now=now)
     assert count == 1
 
     # Verify satisfied_at is set
-    updated_dep = await db_session.get(JobDependency, dep.id)
+    updated_dep = await session.get(JobDependency, dep.id)
     assert updated_dep is not None
     assert updated_dep.satisfied_at == now
 
 
 @pytest.mark.asyncio
-async def test_propagate_dependency_failure(db_session: AsyncSession):
+async def test_propagate_dependency_failure(session: AsyncSession):
     """Terminal failure blocks dependent PENDING jobs."""
     now = datetime.now(UTC)
     workflow_id = uuid4()
@@ -544,7 +544,7 @@ async def test_propagate_dependency_failure(db_session: AsyncSession):
         product_state="DESIGNED",
         started_at=now,
     )
-    db_session.add(workflow)
+    session.add(workflow)
 
     failed_id = uuid4()
     failed_job = Job(
@@ -559,7 +559,7 @@ async def test_propagate_dependency_failure(db_session: AsyncSession):
         attempt=3,
         max_attempts=3,
     )
-    db_session.add(failed_job)
+    session.add(failed_job)
 
     dependent_id = uuid4()
     dependent = Job(
@@ -574,22 +574,22 @@ async def test_propagate_dependency_failure(db_session: AsyncSession):
         attempt=0,
         max_attempts=3,
     )
-    db_session.add(dependent)
+    session.add(dependent)
 
     dep = JobDependency(
         job_id=dependent_id,
         depends_on_job_id=failed_id,
     )
-    db_session.add(dep)
-    await db_session.flush()
+    session.add(dep)
+    await session.flush()
 
     blocked = await propagate_dependency_failure(
-        db_session,
+        session,
         failed_job_id=failed_id,
         now=now,
     )
 
     assert dependent_id in blocked
-    updated = await db_session.get(Job, dependent_id)
+    updated = await session.get(Job, dependent_id)
     assert updated is not None
     assert JobStatus(updated.status) == JobStatus.BLOCKED
