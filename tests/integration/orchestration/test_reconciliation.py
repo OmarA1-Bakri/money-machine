@@ -649,5 +649,6 @@ async def test_reconcile_first_can_retry_after_absent_via_engine(session: AsyncS
 
     # Verify retry succeeded
     assert retried_job.status == JobStatus.READY.value
-    assert retried_job.attempt == 1  # incremented from 0
+    # Attempt stays at 0 (will increment when claimed/executed, not when retried)
+    assert retried_job.attempt == 0
     assert retried_job.scheduled_at is not None  # Has a scheduled time (backoff applied)
