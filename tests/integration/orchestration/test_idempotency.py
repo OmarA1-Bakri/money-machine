@@ -27,12 +27,13 @@ from money_machine.orchestration.idempotency import (
     record_receipt,
     reserve_idempotency_key,
 )
-from money_machine.persistence.tables import IdempotencyRecord, Job, Receipt, WorkflowRun
+from money_machine.persistence.tables import IdempotencyRecord, Job, Receipt, Shop, WorkflowRun
 
 # Deterministic UUIDs for tests (no uuid4)
 JOB_ID_1 = UUID("00000000-0000-0000-0000-000000000001")
 JOB_ID_2 = UUID("00000000-0000-0000-0000-000000000002")
 WORKFLOW_ID_1 = UUID("10000000-0000-0000-0000-000000000001")
+SHOP_ID_1 = UUID("50000000-0000-0000-0000-000000000001")
 OBJECT_ID_1 = UUID("20000000-0000-0000-0000-000000000001")
 AGENT_RUN_ID_1 = UUID("30000000-0000-0000-0000-000000000001")
 
@@ -43,12 +44,25 @@ async def create_test_job(
     """Create a minimal test job for foreign key requirements."""
     now = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
 
-    # Create workflow run first (foreign key requirement)
+    # Create shop first (required by workflow_runs)
+    shop = Shop(
+        id=SHOP_ID_1,
+        name="test-shop",
+        connection_state="UNCONNECTED",
+        timezone="UTC",
+        active=True,
+    )
+    session.add(shop)
+    await session.flush()
+
+    # Create workflow run (required by jobs)
     workflow_run = WorkflowRun(
         id=WORKFLOW_ID_1,
-        status="active",
-        created_at=now,
-        updated_at=now,
+        shop_id=shop.id,
+        workflow_type="ProductLifecycleWorkflow",
+        workflow_version=1,
+        product_state="DISCOVERED",
+        started_at=now,
     )
     session.add(workflow_run)
     await session.flush()
