@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from sqlalchemy import select
@@ -265,7 +266,7 @@ async def record_receipt(
     autonomy_mode: str,
     effect_state: str,
     provider_object_id: str | None,
-    amount: float | None = None,
+    amount: Decimal | float | None = None,
     currency: str | None = None,
     safe_detail: dict[str, object] | None = None,
     now: datetime | None = None,
