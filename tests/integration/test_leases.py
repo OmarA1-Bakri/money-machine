@@ -209,6 +209,45 @@ async def test_heartbeat_rejects_expired_lease(session: AsyncSession) -> None:
         await heartbeat(session, job_id=claimed.id, worker_id=worker_id, now=after_expiry)
 
 
+async def test_heartbeat_extends_lease(session: AsyncSession) -> None:
+    """Heartbeat with lease_extension extends the lease_expires_at timestamp."""
+    shop = await make_shop(session)
+    workflow = await make_workflow(session, shop)
+    await make_job(session, workflow, status=JobStatus.READY.value)
+
+    worker_id = deterministic_worker_id(0)
+    initial_lease = timedelta(minutes=5)
+
+    # Claim the job
+    claimed = await claim_ready_job(
+        session,
+        worker_id=worker_id,
+        now=NOW,
+        lease_duration=initial_lease,
+    )
+    assert claimed is not None
+    original_expiry = NOW + initial_lease
+    assert claimed.lease_expires_at == original_expiry
+
+    # Heartbeat 2 minutes later with 5-minute extension
+    later = NOW + timedelta(minutes=2)
+    extension = timedelta(minutes=5)
+    await heartbeat(
+        session,
+        job_id=claimed.id,
+        worker_id=worker_id,
+        now=later,
+        lease_extension=extension,
+    )
+
+    # Refresh and verify lease was extended from 'later', not original claim time
+    await session.refresh(claimed)
+    assert claimed.heartbeat_at == later
+    expected_new_expiry = later + extension  # 2 min + 5 min = 7 min from NOW
+    assert claimed.lease_expires_at == expected_new_expiry
+    assert claimed.status == JobStatus.RUNNING.value
+
+
 async def test_release_lease_transitions_to_succeeded(session: AsyncSession) -> None:
     """Graceful release clears lease fields and transitions to final status."""
     shop = await make_shop(session)
@@ -297,10 +336,10 @@ async def test_release_lease_rejects_illegal_status(session: AsyncSession) -> No
 
 
 async def test_reclaim_uses_legal_transition_path(session: AsyncSession) -> None:
-    """Reclaim uses legal path: RUNNING → FAILED → READY."""
+    """Reclaim uses legal path: RUNNING → FAILED → READY and bumps attempt."""
     shop = await make_shop(session)
     workflow = await make_workflow(session, shop)
-    await make_job(session, workflow, status=JobStatus.READY.value)
+    job = await make_job(session, workflow, status=JobStatus.READY.value)
 
     worker_id = deterministic_worker_id(0)
     lease_duration = timedelta(minutes=5)
@@ -314,6 +353,7 @@ async def test_reclaim_uses_legal_transition_path(session: AsyncSession) -> None
     )
     assert claimed is not None
     assert claimed.status == JobStatus.RUNNING.value
+    initial_attempt = claimed.attempt
 
     # Time passes, lease expires
     after_expiry = NOW + timedelta(minutes=6)
@@ -329,6 +369,8 @@ async def test_reclaim_uses_legal_transition_path(session: AsyncSession) -> None
     assert claimed.lease_owner is None
     assert claimed.lease_expires_at is None
     assert claimed.heartbeat_at is None
+    # Lease expiry counts as a failed attempt, so attempt was bumped
+    assert claimed.attempt == initial_attempt + 1
 
 
 async def test_reclaim_respects_limit(session: AsyncSession) -> None:
