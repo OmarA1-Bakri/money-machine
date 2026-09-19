@@ -344,6 +344,123 @@ def command_job_reconcile(arguments: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def command_workflow_inspect_graph(arguments: argparse.Namespace) -> int:
+    """Show workflow job graph with dependencies (Action 9: inspect-graph)."""
+    from uuid import UUID
+
+    from money_machine.persistence.database import create_engine, create_session_factory
+
+    settings = _settings()
+
+    async def run() -> dict[str, Any]:
+        from sqlalchemy import select
+
+        from money_machine.persistence.tables import Job, JobDependency
+
+        engine = create_engine(settings.database)
+        try:
+            factory = create_session_factory(engine)
+            async with factory() as session:
+                workflow_id = UUID(arguments.workflow_id)
+
+                # Get all jobs for this workflow
+                jobs_result = await session.execute(
+                    select(Job).where(Job.workflow_id == workflow_id).order_by(Job.created_at)
+                )
+                jobs = list(jobs_result.scalars().all())
+
+                # Get all dependencies
+                job_ids = [job.id for job in jobs]
+                if job_ids:
+                    deps_result = await session.execute(
+                        select(JobDependency).where(JobDependency.job_id.in_(job_ids))
+                    )
+                    deps = list(deps_result.scalars().all())
+                else:
+                    deps = []
+
+                # Build graph representation
+                job_map = {str(job.id): {
+                    "id": str(job.id),
+                    "job_type": job.job_type,
+                    "status": job.status,
+                    "depends_on": [],
+                } for job in jobs}
+
+                for dep in deps:
+                    job_id_str = str(dep.job_id)
+                    if job_id_str in job_map:
+                        job_map[job_id_str]["depends_on"].append(str(dep.depends_on_job_id))
+
+                return {
+                    "workflow_id": str(workflow_id),
+                    "job_count": len(jobs),
+                    "dependency_count": len(deps),
+                    "jobs": list(job_map.values()),
+                }
+        finally:
+            await engine.dispose()
+
+    _print(asyncio.run(run()))
+    return EXIT_OK
+
+
+def command_job_list_stalled(arguments: argparse.Namespace) -> int:
+    """List stalled RUNNING jobs (Action 9: list-stalled)."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import select
+
+    from money_machine.domain.enums import JobStatus
+    from money_machine.persistence.database import create_engine, create_session_factory
+    from money_machine.persistence.tables import Job
+
+    settings = _settings()
+
+    async def run() -> dict[str, Any]:
+        from money_machine.orchestration.scheduler import DEFAULT_STALL_THRESHOLD
+
+        engine = create_engine(settings.database)
+        try:
+            factory = create_session_factory(engine)
+            async with factory() as session:
+                now = datetime.now(UTC)
+                stall_threshold = timedelta(seconds=arguments.threshold_seconds) if arguments.threshold_seconds else DEFAULT_STALL_THRESHOLD
+                stall_cutoff = now - stall_threshold
+
+                # Find RUNNING jobs that haven't heartbeated recently
+                # (read-only, no claim - same query as detect_stalled_jobs but without mutation)
+                statement = select(Job).where(
+                    Job.status == JobStatus.RUNNING.value,
+                    Job.heartbeat_at.is_not(None),
+                    Job.heartbeat_at < stall_cutoff,
+                    Job.lease_expires_at > now,
+                ).order_by(Job.heartbeat_at).limit(arguments.limit)
+
+                result = await session.execute(statement)
+                stalled = list(result.scalars().all())
+
+                return {
+                    "stalled_count": len(stalled),
+                    "threshold_seconds": int(stall_threshold.total_seconds()),
+                    "jobs": [
+                        {
+                            "id": str(job.id),
+                            "job_type": job.job_type,
+                            "workflow_id": str(job.workflow_id),
+                            "heartbeat_at": job.heartbeat_at.isoformat() if job.heartbeat_at else None,
+                            "lease_owner": job.lease_owner,
+                        }
+                        for job in stalled
+                    ],
+                }
+        finally:
+            await engine.dispose()
+
+    _print(asyncio.run(run()))
+    return EXIT_OK
+
+
 def command_scheduler_run_once(arguments: argparse.Namespace) -> int:
     """Run one scheduler cycle manually."""
     del arguments
@@ -415,6 +532,9 @@ def _parser() -> argparse.ArgumentParser:
     workflow_cancel = workflow_actions.add_parser("cancel", help="cancel a workflow")
     workflow_cancel.add_argument("workflow_id", help="workflow UUID to cancel")
     workflow_cancel.set_defaults(handler=command_workflow_cancel)
+    workflow_inspect = workflow_actions.add_parser("inspect-graph", help="show job graph with dependencies")
+    workflow_inspect.add_argument("workflow_id", help="workflow UUID to inspect")
+    workflow_inspect.set_defaults(handler=command_workflow_inspect_graph)
 
     job = subparsers.add_parser("job", help="manage jobs")
     job_actions = job.add_subparsers(dest="job_command", required=True)
@@ -429,6 +549,10 @@ def _parser() -> argparse.ArgumentParser:
     job_reconcile.add_argument("--effect-state", required=True, choices=["CONFIRMED", "ABSENT"])
     job_reconcile.add_argument("--provider-object-id", help="provider object ID if CONFIRMED")
     job_reconcile.set_defaults(handler=command_job_reconcile)
+    job_stalled = job_actions.add_parser("list-stalled", help="list stalled RUNNING jobs")
+    job_stalled.add_argument("--threshold-seconds", type=int, help="stall threshold in seconds (default: 300)")
+    job_stalled.add_argument("--limit", type=int, default=50, help="max jobs to return")
+    job_stalled.set_defaults(handler=command_job_list_stalled)
 
     integrations = subparsers.add_parser("integrations", help="inspect provider readiness")
     integration_actions = integrations.add_subparsers(dest="integrations_command", required=True)

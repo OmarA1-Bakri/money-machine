@@ -138,6 +138,38 @@ async def check_idempotency_collision(
     return reserved_by_other or False
 
 
+async def check_product_lifecycle_valid(
+    session: AsyncSession,
+    *,
+    workflow_id: UUID,
+) -> bool:
+    """Check if the workflow's product is in a valid lifecycle state for job execution.
+
+    A product lifecycle is valid if it's not in a terminal state where no more work should happen.
+    Terminal states (from PRODUCT_TRANSITIONS): REJECTED, DEACTIVATED.
+
+    Args:
+        session: Active database session
+        workflow_id: The workflow to check
+
+    Returns:
+        True if product lifecycle allows job execution, False if terminal/invalid
+    """
+    from money_machine.domain.enums import ProductLifecycleState
+
+    workflow = await session.get(WorkflowRun, workflow_id)
+    if workflow is None:
+        # Missing workflow fails lifecycle check
+        return False
+
+    product_state = ProductLifecycleState(workflow.product_state)
+
+    # Terminal states where no more jobs should execute
+    terminal_states = {ProductLifecycleState.REJECTED, ProductLifecycleState.DEACTIVATED}
+
+    return product_state not in terminal_states
+
+
 async def evaluate_job_readiness(
     session: AsyncSession,
     *,
@@ -150,7 +182,8 @@ async def evaluate_job_readiness(
     1. All dependencies satisfied
     2. scheduled_at <= now
     3. Workflow still active
-    4. No idempotency collision
+    4. Product lifecycle valid (not in terminal state)
+    5. No idempotency collision
 
     Args:
         session: Active database session
@@ -183,6 +216,11 @@ async def evaluate_job_readiness(
     workflow_active = await check_workflow_active(session, workflow_id=job.workflow_id)
     if not workflow_active:
         return False, "Workflow is no longer active"
+
+    # Check product lifecycle (Workbook Action 2: object-lifecycle check)
+    lifecycle_valid = await check_product_lifecycle_valid(session, workflow_id=job.workflow_id)
+    if not lifecycle_valid:
+        return False, "Product lifecycle is terminal (REJECTED or DEACTIVATED)"
 
     # Check idempotency collision
     if job.idempotency_key:
