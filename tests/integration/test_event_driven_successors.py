@@ -123,7 +123,7 @@ async def test_dispatch_multiply_creates_successor_workflow(session: AsyncSessio
         object_type="decisions",
         object_id=DECISION_ID,
         owner_agent_id="A09",  # Portfolio decision agent
-        status="COMPLETED",
+        status="SUCCEEDED",
         idempotency_key=f"decision_{DECISION_ID}",
         side_effect_class="NONE",
         retry_class="IDEMPOTENT",
@@ -246,7 +246,7 @@ async def test_dispatch_multiply_rejects_wrong_parent_state(session: AsyncSessio
         object_type="decisions",
         object_id=DECISION_ID,
         owner_agent_id="A09",
-        status="COMPLETED",
+        status="SUCCEEDED",
         idempotency_key=f"decision_{DECISION_ID}",
         side_effect_class="NONE",
         retry_class="IDEMPOTENT",
@@ -306,7 +306,7 @@ async def test_dispatch_non_multiply_decision_creates_no_successor(session: Asyn
         object_type="decisions",
         object_id=DECISION_ID,
         owner_agent_id="A09",
-        status="COMPLETED",
+        status="SUCCEEDED",
         idempotency_key=f"decision_{DECISION_ID}",
         side_effect_class="NONE",
         retry_class="IDEMPOTENT",
@@ -376,7 +376,7 @@ async def test_parent_workflow_stays_observing_after_successor_spawn(session: As
         object_type="decisions",
         object_id=DECISION_ID,
         owner_agent_id="A09",  # Portfolio decision agent
-        status="COMPLETED",
+        status="SUCCEEDED",
         idempotency_key=f"decision_{DECISION_ID}",
         side_effect_class="NONE",
         retry_class="IDEMPOTENT",
@@ -447,7 +447,7 @@ async def test_successor_workflow_starts_at_dedupe_check(session: AsyncSession) 
         object_type="decisions",
         object_id=DECISION_ID,
         owner_agent_id="A09",  # Portfolio decision agent
-        status="COMPLETED",
+        status="SUCCEEDED",
         idempotency_key=f"decision_{DECISION_ID}",
         side_effect_class="NONE",
         retry_class="IDEMPOTENT",
@@ -520,7 +520,7 @@ async def test_dispatch_event_is_idempotent(session: AsyncSession) -> None:
         object_type="decisions",
         object_id=DECISION_ID,
         owner_agent_id="A09",  # Portfolio decision agent
-        status="COMPLETED",
+        status="SUCCEEDED",
         idempotency_key=f"decision_{DECISION_ID}",
         side_effect_class="NONE",
         retry_class="IDEMPOTENT",
