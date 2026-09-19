@@ -80,9 +80,7 @@ async def test_reconcile_uncertain_effect_confirmed(session: AsyncSession) -> No
     idempotency_key = "test-key-1"
 
     # Create job
-    await create_uncertain_job(
-        session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now
-    )
+    await create_uncertain_job(session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now)
 
     # Reserve idempotency key
     await reserve_idempotency_key(
@@ -143,9 +141,7 @@ async def test_reconcile_uncertain_effect_absent(session: AsyncSession) -> None:
     idempotency_key = "test-key-1"
 
     # Create job
-    await create_uncertain_job(
-        session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now
-    )
+    await create_uncertain_job(session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now)
 
     # Reserve idempotency key
     await reserve_idempotency_key(
@@ -207,9 +203,7 @@ async def test_reconcile_uncertain_effect_unknown_stays_uncertain(
     idempotency_key = "test-key-1"
 
     # Create job
-    await create_uncertain_job(
-        session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now
-    )
+    await create_uncertain_job(session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now)
 
     # Reserve idempotency key
     await reserve_idempotency_key(
@@ -262,9 +256,7 @@ async def test_reconcile_uncertain_effect_budget_exhausted(session: AsyncSession
     idempotency_key = "test-key-1"
 
     # Create job
-    await create_uncertain_job(
-        session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now
-    )
+    await create_uncertain_job(session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now)
 
     # Reserve idempotency key
     await reserve_idempotency_key(
@@ -431,9 +423,7 @@ async def test_reconcile_raises_if_budget_exceeded(session: AsyncSession) -> Non
     idempotency_key = "test-key-1"
 
     # Create job
-    await create_uncertain_job(
-        session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now
-    )
+    await create_uncertain_job(session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now)
 
     # Reserve idempotency key
     await reserve_idempotency_key(
