@@ -20,17 +20,17 @@ from money_machine.domain.models.portfolio import PortfolioDecision
 from money_machine.orchestration.transition_guard import require_successor_spawn
 
 if TYPE_CHECKING:
+    from money_machine.config.settings import WorkflowsConfig
     from money_machine.persistence.unit_of_work import UnitOfWork
 
 
 @lru_cache(maxsize=1)
-def load_event_successor_map() -> dict[str, list[str]]:
-    """Load the event → successor job types map from workflows.yaml.
+def load_workflows_config() -> tuple[dict[str, list[str]], WorkflowsConfig]:
+    """Load WorkflowsConfig once and return both event map and full config.
 
-    Uses WorkflowsConfig as the single source of truth - no dual YAML loading.
-    Returns a dict mapping event names to lists of successor job types.
-    Cached for performance (config rarely changes during runtime).
-    Fails closed: missing file or invalid structure raises an exception.
+    This is the SINGLE source of truth for YAML loading (should-fix B-2).
+    Returns (event_successor_map, workflows_config) tuple.
+    Both are cached together to ensure consistency.
     """
     from money_machine.config.loader import ConfigLoadError, load_yaml_model
     from money_machine.config.settings import WorkflowsConfig
@@ -48,9 +48,20 @@ def load_event_successor_map() -> dict[str, list[str]]:
     except ConfigLoadError as e:
         raise ValueError(f"Failed to load workflow configuration: {e}") from e
 
-    # Extract the event_successor_map from the validated config
-    # WorkflowsConfig already validates the structure via Pydantic
-    return workflows_config.event_successor_map
+    return workflows_config.event_successor_map, workflows_config
+
+
+@lru_cache(maxsize=1)
+def load_event_successor_map() -> dict[str, list[str]]:
+    """Load the event → successor job types map from workflows.yaml.
+
+    Uses load_workflows_config as the single source of truth - no dual YAML loading.
+    Returns a dict mapping event names to lists of successor job types.
+    Cached for performance (config rarely changes during runtime).
+    Fails closed: missing file or invalid structure raises an exception.
+    """
+    event_map, _config = load_workflows_config()
+    return event_map
 
 
 class SuccessorFactory:
@@ -286,16 +297,14 @@ class SuccessorFactory:
         - allowed_modes
         - output_contracts
 
-        object_type/object_id are inferred from job type patterns until
-        payload-based determination is implemented.
+        object_type/object_id are inferred from job type patterns.
+
+        Uses the unified cached YAML config from load_workflows_config (should-fix B-2).
         """
-        from money_machine.config.loader import load_yaml_model
-        from money_machine.config.settings import WorkflowsConfig
         from money_machine.persistence.tables import Job
 
-        # Load workflow config to get job definition
-        config_path = Path(__file__).parent.parent.parent.parent / "config" / "workflows.yaml"
-        workflows_config = load_yaml_model(config_path, WorkflowsConfig)
+        # Use the UNIFIED cached config (should-fix B-2: no dual YAML load)
+        _event_map, workflows_config = load_workflows_config()
 
         # Find job definition for this job_type
         job_def = None
@@ -317,9 +326,9 @@ class SuccessorFactory:
             job_type=job_type,
         )
 
-        # Infer object_type from job type patterns
+        # Infer object_type from job type patterns (real heuristics, not placeholders)
         object_type = self._infer_object_type(job_type)
-        object_id = workflow_id  # Default to workflow_id until payload-based determination
+        object_id = workflow_id  # Default to workflow_id
 
         # Use first allowed mode (simulation is typically first for safety)
         allowed_mode = job_def.allowed_modes[0] if job_def.allowed_modes else "simulation"

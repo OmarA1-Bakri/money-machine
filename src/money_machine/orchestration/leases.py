@@ -15,7 +15,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from money_machine.domain.enums import JobStatus
+from money_machine.domain.enums import JobStatus, RetryClass
 from money_machine.orchestration.transition_guard import require_job_transition
 from money_machine.persistence.tables import Job
 
@@ -257,6 +257,7 @@ async def reclaim_expired_leases(
 
     # Reset each expired job via legal path: RUNNING → FAILED → READY (or TERMINAL_FAILURE)
     # Bump attempt on the RUNNING → FAILED step (lease expiry is a failed attempt)
+    # Respect RetryClass: NEVER and MANUAL_RESUME must NOT transition to READY
     for job in expired_jobs:
         # First transition: RUNNING → FAILED (lease expired = transient failure)
         require_job_transition(JobStatus.RUNNING, JobStatus.FAILED)
@@ -267,15 +268,34 @@ async def reclaim_expired_leases(
         job.heartbeat_at = None
         job.updated_at = now
 
-        # Second transition: FAILED → READY (if budget remains) or TERMINAL_FAILURE (exhausted)
-        if job.attempt >= job.max_attempts:
-            # Retry budget exhausted; move to terminal failure
+        # Parse the retry_class from the job
+        retry_class = RetryClass(job.retry_class)
+
+        # Check RetryClass before allowing retry:
+        # - NEVER: non-retryable failure → TERMINAL_FAILURE
+        # - MANUAL_RESUME: requires operator intervention → BLOCKED (stays FAILED)
+        # - Others (SAFE, IDEMPOTENT, RECONCILE_FIRST): check budget, retry
+
+        if retry_class == RetryClass.NEVER:
+            # Non-retryable failure: always move to TERMINAL_FAILURE
             require_job_transition(JobStatus.FAILED, JobStatus.TERMINAL_FAILURE)
             job.status = JobStatus.TERMINAL_FAILURE.value
+
+        elif retry_class == RetryClass.MANUAL_RESUME:
+            # Requires operator intervention: stay in FAILED, do NOT transition to READY
+            # (FAILED is the correct state for jobs awaiting manual intervention)
+            pass  # Stay in FAILED
+
         else:
-            # Budget remains; eligible for retry
-            require_job_transition(JobStatus.FAILED, JobStatus.READY)
-            job.status = JobStatus.READY.value
+            # SAFE, IDEMPOTENT, or RECONCILE_FIRST: check retry budget
+            if job.attempt >= job.max_attempts:
+                # Retry budget exhausted; move to terminal failure
+                require_job_transition(JobStatus.FAILED, JobStatus.TERMINAL_FAILURE)
+                job.status = JobStatus.TERMINAL_FAILURE.value
+            else:
+                # Budget remains; eligible for retry
+                require_job_transition(JobStatus.FAILED, JobStatus.READY)
+                job.status = JobStatus.READY.value
 
     await session.flush()
     return expired_jobs

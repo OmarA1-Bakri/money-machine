@@ -26,12 +26,12 @@ from money_machine.orchestration.idempotency import (
 )
 from money_machine.orchestration.reconciliation import (
     EffectState,
-    FakeReconciler,
     ReconciliationBudgetExhausted,
     apply_reconciliation_result,
     reconcile_uncertain_effect,
 )
 from money_machine.persistence.tables import Job, Shop, WorkflowRun
+from tests.fakes.fake_reconciler import FakeReconciler
 
 # Deterministic UUIDs for tests (no uuid4)
 JOB_ID_1 = UUID("00000000-0000-0000-0000-000000000001")

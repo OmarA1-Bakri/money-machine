@@ -56,9 +56,11 @@ event_successor_map:
   LISTING_CULLED: [BuildSlotJob]
   
   # Build slot and scale
-  # SUCCESSOR_CREATED → DedupeJob: successor product enters dedupe gate (per playbook p49-50, 16.3)
-  # The successor workflow spawns at DEDUPE_CHECK and the DedupeJob is the entry point
-  SUCCESSOR_CREATED: [DedupeJob]
+  # SUCCESSOR_CREATED: The successor workflow entry job (DedupeJob) is already created
+  # by create_multiply_successor → _create_successor_entry_job. Do NOT map this event
+  # to [DedupeJob] here, as that would create a duplicate DedupeJob.
+  # Event dispatcher also explicitly filters out SUCCESSOR_CREATED to prevent this footgun.
+  SUCCESSOR_CREATED: []
   BUILD_SLOT_DEFERRED: [ResearchCollectionJob]
   MONTHLY_REVIEW_COMPLETED: [ResearchCollectionJob, BuildSlotJob, ScaleEvaluationJob]
   SCALE_DECIDED: [BuildSlotJob, MonthlyDeepPassJob]

@@ -449,3 +449,65 @@ async def test_derive_idempotency_key_distinguishes_operations() -> None:
     )
 
     assert key_draft != key_publish
+
+
+@pytest.mark.asyncio
+async def test_three_table_contract_full_flow(session: AsyncSession) -> None:
+    """SF-2 Coverage: Full three-table idempotency contract.
+
+    AUDIT.md SF-2 Acceptance:
+    - Reserve idempotency key (idempotency_records)
+    - Record effect attempt with CONFIRMED (effect_attempts)
+    - Mark idempotency completed (idempotency_records.completed_at)
+
+    This proves the complete three-table flow: reservation → attempt → completion.
+    """
+    await create_test_job(session, JOB_ID_1)
+    reserved_at = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
+    attempt_at = datetime(2026, 9, 19, 1, 0, 3, tzinfo=UTC)
+    completed_at = datetime(2026, 9, 19, 1, 0, 5, tzinfo=UTC)
+
+    # Step 1: Reserve the key (idempotency_records)
+    reservation = await reserve_idempotency_key(
+        session,
+        idempotency_key="test-key-full-flow",
+        job_id=JOB_ID_1,
+        operation="etsy.create_draft",
+        side_effect_class=SideEffectClass.EXTERNAL_WRITE,
+        now=reserved_at,
+    )
+    assert reservation.reserved_at == reserved_at
+
+    # Step 2: Record effect attempt with CONFIRMED (effect_attempts)
+    attempt = await record_effect_attempt(
+        session,
+        idempotency_key="test-key-full-flow",
+        job_id=JOB_ID_1,
+        agent_run_id=AGENT_RUN_ID_1,
+        provider="etsy",
+        operation="etsy.create_draft",
+        effect_state="CONFIRMED",
+        provider_object_id="listing-456",
+        reconciliation_attempt=0,
+        now=attempt_at,
+    )
+    assert attempt.effect_state == "CONFIRMED"
+    assert attempt.provider_object_id == "listing-456"
+
+    # Step 3: Mark idempotency completed (idempotency_records.completed_at)
+    await mark_idempotency_completed(
+        session,
+        idempotency_key="test-key-full-flow",
+        now=completed_at,
+    )
+
+    # Verify completed_at is set and full chain is intact
+    record = await get_idempotency_record(session, idempotency_key="test-key-full-flow")
+    assert record is not None
+    assert record.completed_at == completed_at
+    assert record.reserved_at == reserved_at
+
+    latest_attempt = await get_latest_effect_attempt(session, idempotency_key="test-key-full-flow")
+    assert latest_attempt is not None
+    assert latest_attempt.effect_state == "CONFIRMED"
+    assert latest_attempt.provider_object_id == "listing-456"

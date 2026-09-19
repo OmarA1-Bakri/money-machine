@@ -308,6 +308,81 @@ class TestFailClosedBehavior:
         assert "Known events:" in error_message
 
 
+class TestYamlLoadFailures:
+    """SF-5 Coverage: YAML load failure scenarios.
+
+    AUDIT.md SF-5 Acceptance:
+    - Missing workflows.yaml raises FileNotFoundError with helpful message
+    - Invalid YAML raises ValueError
+    - Cache works (second call returns same dict)
+    """
+
+    def test_missing_yaml_raises_file_not_found_error(self) -> None:
+        """SF-5.1: Missing workflows.yaml raises FileNotFoundError with helpful message."""
+        from unittest.mock import patch
+
+        from money_machine.orchestration.successor_factory import load_workflows_config
+
+        # Clear the cache to ensure fresh load
+        load_workflows_config.cache_clear()
+
+        # Mock Path.exists to return False (file missing)
+        with patch("money_machine.orchestration.successor_factory.Path.exists", return_value=False):
+            with pytest.raises(FileNotFoundError) as exc_info:
+                load_workflows_config()
+
+            error_message = str(exc_info.value)
+            assert "Workflow configuration not found" in error_message
+            assert "workflows.yaml" in error_message
+            assert "Cannot determine event successors" in error_message
+
+    def test_invalid_yaml_raises_value_error(self) -> None:
+        """SF-5.2: Invalid YAML raises ValueError with helpful message."""
+        from unittest.mock import patch
+
+        from money_machine.config.loader import ConfigLoadError
+        from money_machine.orchestration.successor_factory import load_workflows_config
+
+        # Clear the cache to ensure fresh load
+        load_workflows_config.cache_clear()
+
+        # Mock load_yaml_model to raise ConfigLoadError (malformed YAML)
+        with (
+            patch("money_machine.orchestration.successor_factory.Path.exists", return_value=True),
+            patch(
+                "money_machine.config.loader.load_yaml_model",
+                side_effect=ConfigLoadError("Invalid YAML structure"),
+            ),
+            pytest.raises(ValueError) as exc_info,
+        ):
+            load_workflows_config()
+
+        error_message = str(exc_info.value)
+        assert "Failed to load workflow configuration" in error_message
+        assert "Invalid YAML structure" in error_message
+
+    def test_yaml_cache_works(self) -> None:
+        """SF-5.3: Cache works - second call returns same dict.
+
+        Already tested in TestLoadEventSuccessorMap.test_map_is_cached.
+        """
+        # This is already covered by test_map_is_cached in TestLoadEventSuccessorMap,
+        # but we document it here as part of SF-5 acceptance.
+        from money_machine.orchestration.successor_factory import load_workflows_config
+
+        # Clear cache to start fresh
+        load_workflows_config.cache_clear()
+
+        # First call
+        result1 = load_workflows_config()
+
+        # Second call should return cached instance (same object)
+        result2 = load_workflows_config()
+
+        assert result1 is result2, "Cache should return same object instance"
+        assert id(result1) == id(result2), "Memory addresses should match (cached)"
+
+
 class TestDispatchIdempotency:
     """Test that idempotent dispatch doesn't re-create successor jobs."""
 
