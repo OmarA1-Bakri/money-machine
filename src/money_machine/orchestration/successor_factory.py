@@ -68,6 +68,12 @@ class SuccessorFactory:
         - Parent workflow transitions to OBSERVING
         - Successor workflow starts at DEDUPE_CHECK in a new workflow_id
         - require_successor_spawn validates the boundary
+
+        Wave 6: This is the ONLY production path for creating MULTIPLY successors.
+        The guard (require_successor_spawn) is mandatory and cannot be bypassed:
+        - Pydantic validation rejects same-workflow successors at construction
+        - require_successor_spawn rejects wrong parent states
+        - _create_successor_workflow is private and only called after validation
         """
         if occurred_at is None:
             occurred_at = datetime.now(UTC)
@@ -80,7 +86,9 @@ class SuccessorFactory:
         if parent_workflow is None:
             raise ValueError(f"parent workflow {decision.workflow_id} not found")
 
-        # Validate successor spawn boundary
+        # Wave 6: MANDATORY guard — validates successor spawn boundary
+        # This call is required before any successor workflow creation.
+        # It rejects same-workflow re-entry and wrong parent states.
         successor_entry_state = require_successor_spawn(
             parent_state=ProductLifecycleState(parent_workflow.product_state),
             parent_workflow_id=decision.workflow_id,

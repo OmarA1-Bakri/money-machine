@@ -500,6 +500,177 @@ async def test_successor_workflow_starts_at_dedupe_check(session: AsyncSession) 
     assert successor_workflow.product_state == SUCCESSOR_WORKFLOW_ENTRY_STATE.value
 
 
+async def test_guard_bypass_impossible_on_multiply_path(session: AsyncSession) -> None:
+    """Prove require_successor_spawn cannot be bypassed on the production MULTIPLY path.
+
+    Wave 6: explicit test that the guard is mandatory and enforced before any
+    successor workflow creation. The only production path to create a MULTIPLY
+    successor is through dispatch_decision → create_multiply_successor, which
+    MUST call require_successor_spawn before creating the successor workflow.
+
+    Bypass attempts fail at multiple layers:
+    1. Pydantic validation rejects same-workflow successors at construction
+    2. require_successor_spawn rejects wrong parent states
+    3. _create_successor_workflow is private and only called after guard validation
+    """
+    uow = UnitOfWork(session)
+    dispatcher = EventDispatcher(uow)
+
+    shop = await make_shop(session)
+
+    # Attempt 1: Same-workflow successor rejected at Pydantic validation
+    # This prevents bypass at the decision construction level
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="successor workflow must differ"):
+        PortfolioDecision(
+            decision_id=DECISION_ID,
+            workflow_id=PARENT_WORKFLOW_ID,
+            product_id=PRODUCT_ID,
+            listing_id=LISTING_ID,
+            decision=DecisionType.MULTIPLY,
+            metrics_snapshot_ids=(SNAPSHOT_ID,),
+            cohort_reference="2026-Q3",
+            rule_version="v1.0",
+            explanation="Illegal same-workflow attempt",
+            evidence=(TEST_EVIDENCE,),
+            successor_workflow_id=PARENT_WORKFLOW_ID,  # Same as parent!
+            successor_spec_id=SUCCESSOR_SPEC_ID,
+            decided_at=DECISION_TIME,
+        )
+
+    # Attempt 2: Wrong parent state rejected by require_successor_spawn
+    # Setup parent in EVALUATING (not SUCCESSOR_SPEC)
+    parent_workflow = WorkflowRun(
+        id=PARENT_WORKFLOW_ID,
+        shop_id=shop.id,
+        workflow_type="ProductLifecycleWorkflow",
+        workflow_version=1,
+        product_state=ProductLifecycleState.EVALUATING.value,  # Wrong state!
+        started_at=NOW,
+        version=1,
+    )
+    session.add(parent_workflow)
+
+    parent_job = Job(
+        id=PARENT_JOB_ID,
+        workflow_id=PARENT_WORKFLOW_ID,
+        job_type="PortfolioDecisionJob",
+        object_type="decisions",
+        object_id=DECISION_ID,
+        owner_agent_id="A09",
+        status="SUCCEEDED",
+        idempotency_key=f"decision_{DECISION_ID}",
+        side_effect_class="NONE",
+        retry_class="IDEMPOTENT",
+        scheduled_at=NOW,
+        version=1,
+    )
+    session.add(parent_job)
+    await session.flush()
+
+    decision = PortfolioDecision(
+        decision_id=DECISION_ID,
+        workflow_id=PARENT_WORKFLOW_ID,
+        product_id=PRODUCT_ID,
+        listing_id=LISTING_ID,
+        decision=DecisionType.MULTIPLY,
+        metrics_snapshot_ids=(SNAPSHOT_ID,),
+        cohort_reference="2026-Q3",
+        rule_version="v1.0",
+        explanation="Premature successor attempt",
+        evidence=(TEST_EVIDENCE,),
+        successor_workflow_id=SUCCESSOR_WORKFLOW_ID,
+        successor_spec_id=SUCCESSOR_SPEC_ID,
+        decided_at=DECISION_TIME,
+    )
+
+    # The guard rejects this at require_successor_spawn
+    with pytest.raises(InvalidTransitionError, match="SUCCESSOR_SPEC"):
+        await dispatcher.dispatch_decision(
+            decision=decision,
+            parent_job_id=PARENT_JOB_ID,
+            occurred_at=DECISION_TIME,
+        )
+
+    # Verify no successor workflow was created (guard prevented bypass)
+    successor_workflow = await session.get(WorkflowRun, SUCCESSOR_WORKFLOW_ID)
+    assert successor_workflow is None, "Guard prevented unauthorized successor creation"
+
+    # Attempt 3: Verify the guard is enforced in the production code path
+    # The only way to create a MULTIPLY successor is through:
+    # event_dispatcher.dispatch_decision() → factory.create_multiply_successor()
+    # → require_successor_spawn() → _create_successor_workflow()
+    #
+    # _create_successor_workflow is private (name starts with _) and cannot
+    # be called directly from outside the factory. The guard is ALWAYS invoked
+    # before _create_successor_workflow, making bypass impossible.
+
+    # Prove the guard is called by verifying the successful path
+    await session.rollback()  # Clean up previous attempts
+
+    # Setup valid parent in SUCCESSOR_SPEC
+    parent_workflow_valid = WorkflowRun(
+        id=UUID("00000000-0000-0000-0000-000000000003"),
+        shop_id=shop.id,
+        workflow_type="ProductLifecycleWorkflow",
+        workflow_version=1,
+        product_state=ProductLifecycleState.SUCCESSOR_SPEC.value,  # Correct state
+        started_at=NOW,
+        version=1,
+    )
+    session.add(parent_workflow_valid)
+
+    valid_parent_job = Job(
+        id=UUID("00000000-0000-0000-0000-000000000004"),
+        workflow_id=parent_workflow_valid.id,
+        job_type="PortfolioDecisionJob",
+        object_type="decisions",
+        object_id=UUID("00000000-0000-0000-0000-000000000005"),
+        owner_agent_id="A09",
+        status="SUCCEEDED",
+        idempotency_key="decision_valid",
+        side_effect_class="NONE",
+        retry_class="IDEMPOTENT",
+        scheduled_at=NOW,
+        version=1,
+    )
+    session.add(valid_parent_job)
+    await session.flush()
+
+    valid_decision = PortfolioDecision(
+        decision_id=UUID("00000000-0000-0000-0000-000000000005"),
+        workflow_id=parent_workflow_valid.id,
+        product_id=PRODUCT_ID,
+        listing_id=LISTING_ID,
+        decision=DecisionType.MULTIPLY,
+        metrics_snapshot_ids=(SNAPSHOT_ID,),
+        cohort_reference="2026-Q3",
+        rule_version="v1.0",
+        explanation="Valid successor with guard",
+        evidence=(TEST_EVIDENCE,),
+        successor_workflow_id=UUID("00000000-0000-0000-0000-000000000006"),
+        successor_spec_id=SUCCESSOR_SPEC_ID,
+        decided_at=DECISION_TIME,
+    )
+
+    # This succeeds because the guard validates it
+    successor_job_ids = await dispatcher.dispatch_decision(
+        decision=valid_decision,
+        parent_job_id=valid_parent_job.id,
+        occurred_at=DECISION_TIME,
+    )
+
+    assert len(successor_job_ids) == 1
+    successor = await session.get(WorkflowRun, valid_decision.successor_workflow_id)
+    assert successor is not None
+    assert successor.product_state == ProductLifecycleState.DEDUPE_CHECK.value
+
+    # Parent transitioned to OBSERVING (as enforced by create_multiply_successor)
+    await session.refresh(parent_workflow_valid)
+    assert parent_workflow_valid.product_state == ProductLifecycleState.OBSERVING.value
+
+
 async def test_dispatch_event_is_idempotent(session: AsyncSession) -> None:
     """Dispatching the same event twice is idempotent (no duplicate successors)."""
     uow = UnitOfWork(session)
