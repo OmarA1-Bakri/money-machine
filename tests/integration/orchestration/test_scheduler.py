@@ -29,7 +29,7 @@ from money_machine.persistence.tables import (
 
 
 @pytest.mark.asyncio
-async def test_promote_due_jobs_success(session: AsyncSession, Shop):
+async def test_promote_due_jobs_success(session: AsyncSession):
     """Promote PENDING jobs that are due and have satisfied dependencies."""
     now = datetime.now(UTC)
     shop_id = uuid4()
