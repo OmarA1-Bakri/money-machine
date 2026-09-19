@@ -540,9 +540,15 @@ async def test_guard_bypass_impossible_on_multiply_path(session: AsyncSession) -
         )
 
     # Attempt 2: Wrong parent state rejected by require_successor_spawn
+    # Use distinct IDs to avoid conflicts with other test scenarios
+    wrong_state_workflow_id = UUID("10000000-0000-0000-0000-000000000001")
+    wrong_state_job_id = UUID("10000000-0000-0000-0000-000000000002")
+    wrong_state_decision_id = UUID("10000000-0000-0000-0000-000000000003")
+    wrong_state_successor_id = UUID("10000000-0000-0000-0000-000000000004")
+
     # Setup parent in EVALUATING (not SUCCESSOR_SPEC)
-    parent_workflow = WorkflowRun(
-        id=PARENT_WORKFLOW_ID,
+    parent_workflow_wrong_state = WorkflowRun(
+        id=wrong_state_workflow_id,
         shop_id=shop.id,
         workflow_type="ProductLifecycleWorkflow",
         workflow_version=1,
@@ -550,28 +556,28 @@ async def test_guard_bypass_impossible_on_multiply_path(session: AsyncSession) -
         started_at=NOW,
         version=1,
     )
-    session.add(parent_workflow)
+    session.add(parent_workflow_wrong_state)
 
-    parent_job = Job(
-        id=PARENT_JOB_ID,
-        workflow_id=PARENT_WORKFLOW_ID,
+    parent_job_wrong_state = Job(
+        id=wrong_state_job_id,
+        workflow_id=wrong_state_workflow_id,
         job_type="PortfolioDecisionJob",
         object_type="decisions",
-        object_id=DECISION_ID,
+        object_id=wrong_state_decision_id,
         owner_agent_id="A09",
         status="SUCCEEDED",
-        idempotency_key=f"decision_{DECISION_ID}",
+        idempotency_key=f"decision_{wrong_state_decision_id}",
         side_effect_class="NONE",
         retry_class="IDEMPOTENT",
         scheduled_at=NOW,
         version=1,
     )
-    session.add(parent_job)
+    session.add(parent_job_wrong_state)
     await session.flush()
 
-    decision = PortfolioDecision(
-        decision_id=DECISION_ID,
-        workflow_id=PARENT_WORKFLOW_ID,
+    decision_wrong_state = PortfolioDecision(
+        decision_id=wrong_state_decision_id,
+        workflow_id=wrong_state_workflow_id,
         product_id=PRODUCT_ID,
         listing_id=LISTING_ID,
         decision=DecisionType.MULTIPLY,
@@ -580,7 +586,7 @@ async def test_guard_bypass_impossible_on_multiply_path(session: AsyncSession) -
         rule_version="v1.0",
         explanation="Premature successor attempt",
         evidence=(TEST_EVIDENCE,),
-        successor_workflow_id=SUCCESSOR_WORKFLOW_ID,
+        successor_workflow_id=wrong_state_successor_id,
         successor_spec_id=SUCCESSOR_SPEC_ID,
         decided_at=DECISION_TIME,
     )
@@ -588,30 +594,25 @@ async def test_guard_bypass_impossible_on_multiply_path(session: AsyncSession) -
     # The guard rejects this at require_successor_spawn
     with pytest.raises(InvalidTransitionError, match="SUCCESSOR_SPEC"):
         await dispatcher.dispatch_decision(
-            decision=decision,
-            parent_job_id=PARENT_JOB_ID,
+            decision=decision_wrong_state,
+            parent_job_id=wrong_state_job_id,
             occurred_at=DECISION_TIME,
         )
 
     # Verify no successor workflow was created (guard prevented bypass)
-    successor_workflow = await session.get(WorkflowRun, SUCCESSOR_WORKFLOW_ID)
-    assert successor_workflow is None, "Guard prevented unauthorized successor creation"
+    no_successor = await session.get(WorkflowRun, wrong_state_successor_id)
+    assert no_successor is None, "Guard prevented unauthorized successor creation"
 
-    # Attempt 3: Verify the guard is enforced in the production code path
-    # The only way to create a MULTIPLY successor is through:
-    # event_dispatcher.dispatch_decision() → factory.create_multiply_successor()
-    # → require_successor_spawn() → _create_successor_workflow()
-    #
-    # _create_successor_workflow is private (name starts with _) and cannot
-    # be called directly from outside the factory. The guard is ALWAYS invoked
-    # before _create_successor_workflow, making bypass impossible.
-
-    # Prove the guard is called by verifying the successful path
-    await session.rollback()  # Clean up previous attempts
+    # Attempt 3: Verify the guard enforces the successful path
+    # Use distinct IDs for the valid scenario
+    valid_workflow_id = UUID("20000000-0000-0000-0000-000000000001")
+    valid_job_id = UUID("20000000-0000-0000-0000-000000000002")
+    valid_decision_id = UUID("20000000-0000-0000-0000-000000000003")
+    valid_successor_id = UUID("20000000-0000-0000-0000-000000000004")
 
     # Setup valid parent in SUCCESSOR_SPEC
     parent_workflow_valid = WorkflowRun(
-        id=UUID("00000000-0000-0000-0000-000000000003"),
+        id=valid_workflow_id,
         shop_id=shop.id,
         workflow_type="ProductLifecycleWorkflow",
         workflow_version=1,
@@ -622,14 +623,14 @@ async def test_guard_bypass_impossible_on_multiply_path(session: AsyncSession) -
     session.add(parent_workflow_valid)
 
     valid_parent_job = Job(
-        id=UUID("00000000-0000-0000-0000-000000000004"),
-        workflow_id=parent_workflow_valid.id,
+        id=valid_job_id,
+        workflow_id=valid_workflow_id,
         job_type="PortfolioDecisionJob",
         object_type="decisions",
-        object_id=UUID("00000000-0000-0000-0000-000000000005"),
+        object_id=valid_decision_id,
         owner_agent_id="A09",
         status="SUCCEEDED",
-        idempotency_key="decision_valid",
+        idempotency_key=f"decision_{valid_decision_id}",
         side_effect_class="NONE",
         retry_class="IDEMPOTENT",
         scheduled_at=NOW,
@@ -639,8 +640,8 @@ async def test_guard_bypass_impossible_on_multiply_path(session: AsyncSession) -
     await session.flush()
 
     valid_decision = PortfolioDecision(
-        decision_id=UUID("00000000-0000-0000-0000-000000000005"),
-        workflow_id=parent_workflow_valid.id,
+        decision_id=valid_decision_id,
+        workflow_id=valid_workflow_id,
         product_id=PRODUCT_ID,
         listing_id=LISTING_ID,
         decision=DecisionType.MULTIPLY,
@@ -649,7 +650,7 @@ async def test_guard_bypass_impossible_on_multiply_path(session: AsyncSession) -
         rule_version="v1.0",
         explanation="Valid successor with guard",
         evidence=(TEST_EVIDENCE,),
-        successor_workflow_id=UUID("00000000-0000-0000-0000-000000000006"),
+        successor_workflow_id=valid_successor_id,
         successor_spec_id=SUCCESSOR_SPEC_ID,
         decided_at=DECISION_TIME,
     )
@@ -657,12 +658,12 @@ async def test_guard_bypass_impossible_on_multiply_path(session: AsyncSession) -
     # This succeeds because the guard validates it
     successor_job_ids = await dispatcher.dispatch_decision(
         decision=valid_decision,
-        parent_job_id=valid_parent_job.id,
+        parent_job_id=valid_job_id,
         occurred_at=DECISION_TIME,
     )
 
     assert len(successor_job_ids) == 1
-    successor = await session.get(WorkflowRun, valid_decision.successor_workflow_id)
+    successor = await session.get(WorkflowRun, valid_successor_id)
     assert successor is not None
     assert successor.product_state == ProductLifecycleState.DEDUPE_CHECK.value
 
