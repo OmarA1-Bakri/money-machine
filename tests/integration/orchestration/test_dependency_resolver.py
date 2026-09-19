@@ -51,10 +51,12 @@ async def test_check_dependencies_satisfied_no_dependencies(session: AsyncSessio
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=datetime.now(UTC),
     )
     session.add(workflow)
+    await session.flush()
+
 
     job_id = uuid4()
     job = Job(
@@ -98,10 +100,12 @@ async def test_check_dependencies_satisfied_with_satisfied_dep(session: AsyncSes
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=datetime.now(UTC),
     )
     session.add(workflow)
+    await session.flush()
+
 
     predecessor_id = uuid4()
     predecessor = Job(
@@ -171,10 +175,12 @@ async def test_check_dependencies_satisfied_with_unsatisfied_dep(session: AsyncS
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=datetime.now(UTC),
     )
     session.add(workflow)
+    await session.flush()
+
 
     predecessor_id = uuid4()
     predecessor = Job(
@@ -243,7 +249,7 @@ async def test_check_workflow_active(session: AsyncSession):
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=datetime.now(UTC),
         completed_at=None,  # Active
     )
@@ -273,7 +279,7 @@ async def test_check_workflow_inactive(session: AsyncSession):
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=datetime.now(UTC),
         completed_at=datetime.now(UTC),  # Completed
     )
@@ -317,10 +323,12 @@ async def test_check_idempotency_collision_same_job(session: AsyncSession):
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=datetime.now(UTC),
     )
     session.add(workflow)
+    await session.flush()
+
 
     job_id = uuid4()
     job = Job(
@@ -376,10 +384,12 @@ async def test_check_idempotency_collision_different_job(session: AsyncSession):
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=datetime.now(UTC),
     )
     session.add(workflow)
+    await session.flush()
+
 
     other_job_id = uuid4()
     other_job = Job(
@@ -454,11 +464,13 @@ async def test_evaluate_job_readiness_all_conditions_met(session: AsyncSession):
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=now,
         completed_at=None,
     )
     session.add(workflow)
+    await session.flush()
+
 
     job_id = uuid4()
     job = Job(
@@ -504,10 +516,12 @@ async def test_evaluate_job_readiness_not_time_yet(session: AsyncSession):
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=now,
     )
     session.add(workflow)
+    await session.flush()
+
 
     job_id = uuid4()
     job = Job(
@@ -553,10 +567,12 @@ async def test_promote_pending_to_ready_success(session: AsyncSession):
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=now,
     )
     session.add(workflow)
+    await session.flush()
+
 
     job_id = uuid4()
     job = Job(
@@ -604,11 +620,13 @@ async def test_promote_pending_to_ready_workflow_inactive(session: AsyncSession)
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=now,
         completed_at=now,  # Completed
     )
     session.add(workflow)
+    await session.flush()
+
 
     job_id = uuid4()
     job = Job(
@@ -653,10 +671,12 @@ async def test_satisfy_dependency(session: AsyncSession):
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=now,
     )
     session.add(workflow)
+    await session.flush()
+
 
     predecessor_id = uuid4()
     predecessor = Job(
@@ -731,10 +751,12 @@ async def test_propagate_dependency_failure(session: AsyncSession):
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=now,
     )
     session.add(workflow)
+    await session.flush()
+
 
     failed_id = uuid4()
     failed_job = Job(

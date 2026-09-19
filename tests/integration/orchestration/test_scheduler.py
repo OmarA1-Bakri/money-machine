@@ -48,7 +48,7 @@ async def test_promote_due_jobs_success(session: AsyncSession):
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=now,
     )
     session.add(workflow)
@@ -120,10 +120,12 @@ async def test_promote_due_jobs_skips_unsatisfied_deps(session: AsyncSession):
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=now,
     )
     session.add(workflow)
+    await session.flush()
+
 
     predecessor_id = uuid4()
     predecessor = Job(
@@ -196,7 +198,7 @@ async def test_detect_stalled_jobs(session: AsyncSession):
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=now - timedelta(hours=1),
     )
     session.add(workflow)
@@ -277,7 +279,7 @@ async def test_detect_stalled_jobs_ignores_expired_lease(session: AsyncSession):
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=now - timedelta(hours=1),
     )
     session.add(workflow)
@@ -334,7 +336,7 @@ async def test_schedule_maturity_timer(session: AsyncSession):
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=now,
     )
     session.add(workflow)
@@ -375,7 +377,7 @@ async def test_schedule_maturity_timer_completed_workflow(session: AsyncSession)
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=now,
         completed_at=now,  # Completed
     )
@@ -413,7 +415,7 @@ async def test_run_scheduler_cycle_integration(session: AsyncSession):
         shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
-        product_state="DESIGNED",
+        product_state="DISCOVERED",
         started_at=now,
     )
     session.add(workflow)
