@@ -114,7 +114,7 @@ async def test_dispatch_multiply_creates_successor_workflow(session: AsyncSessio
         version=1,
     )
     session.add(parent_workflow)
-    
+
     # Create parent job (required for event foreign key)
     parent_job = Job(
         id=PARENT_JOB_ID,
@@ -196,7 +196,9 @@ async def test_dispatch_multiply_rejects_same_workflow_id(session: AsyncSession)
     from pydantic import ValidationError
 
     # Pydantic model validation rejects same-workflow successors at construction time
-    with pytest.raises(ValidationError, match="successor workflow must differ from parent workflow"):
+    with pytest.raises(
+        ValidationError, match="successor workflow must differ from parent workflow"
+    ):
         PortfolioDecision(
             decision_id=DECISION_ID,
             workflow_id=PARENT_WORKFLOW_ID,
@@ -231,7 +233,7 @@ async def test_dispatch_multiply_rejects_wrong_parent_state(session: AsyncSessio
         version=1,
     )
     session.add(parent_workflow)
-    
+
     # Create parent job (required for event foreign key)
     parent_job = Job(
         id=PARENT_JOB_ID,
@@ -287,7 +289,7 @@ async def test_dispatch_non_multiply_decision_creates_no_successor(session: Asyn
         version=1,
     )
     session.add(workflow)
-    
+
     # Create parent job (required for event foreign key)
     parent_job = Job(
         id=PARENT_JOB_ID,
@@ -353,7 +355,7 @@ async def test_parent_workflow_stays_observing_after_successor_spawn(session: As
         version=1,
     )
     session.add(parent_workflow)
-    
+
     # Create parent job (required for event foreign key)
     parent_job = Job(
         id=PARENT_JOB_ID,
@@ -420,7 +422,7 @@ async def test_successor_workflow_starts_at_dedupe_check(session: AsyncSession) 
         version=1,
     )
     session.add(parent_workflow)
-    
+
     # Create parent job (required for event foreign key)
     parent_job = Job(
         id=PARENT_JOB_ID,
@@ -489,7 +491,7 @@ async def test_dispatch_event_is_idempotent(session: AsyncSession) -> None:
         version=1,
     )
     session.add(parent_workflow)
-    
+
     # Create parent job (required for event foreign key)
     parent_job = Job(
         id=PARENT_JOB_ID,
