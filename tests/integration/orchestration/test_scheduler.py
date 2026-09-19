@@ -20,7 +20,12 @@ from money_machine.orchestration.scheduler import (
     run_scheduler_cycle,
     schedule_maturity_timer,
 )
-from money_machine.persistence.tables import Job, JobDependency, WorkflowRun, Shop
+from money_machine.persistence.tables import (
+    Job,
+    JobDependency,
+    Shop,
+    WorkflowRun,
+)
 
 
 @pytest.mark.asyncio

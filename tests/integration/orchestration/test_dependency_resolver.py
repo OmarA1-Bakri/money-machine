@@ -23,7 +23,13 @@ from money_machine.orchestration.dependency_resolver import (
     propagate_dependency_failure,
     satisfy_dependency,
 )
-from money_machine.persistence.tables import IdempotencyRecord, Job, JobDependency, Shop, WorkflowRun
+from money_machine.persistence.tables import (
+    IdempotencyRecord,
+    Job,
+    JobDependency,
+    Shop,
+    WorkflowRun,
+)
 
 
 @pytest.mark.asyncio
