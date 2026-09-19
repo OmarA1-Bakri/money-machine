@@ -658,8 +658,11 @@ async def test_atomic_rollback_on_successor_spawn_failure(session: AsyncSession)
 
     # Atomic rollback proof: parent workflow still in SUCCESSOR_SPEC (not OBSERVING)
     await session.rollback()  # Explicit rollback after failed transaction
-    await session.refresh(parent_workflow)
-    assert parent_workflow.product_state == ProductLifecycleState.SUCCESSOR_SPEC.value, (
+
+    # Re-fetch parent workflow after rollback (refresh would fail on detached object)
+    parent_workflow_after = await session.get(WorkflowRun, PARENT_WORKFLOW_ID)
+    assert parent_workflow_after is not None, "Parent workflow should still exist"
+    assert parent_workflow_after.product_state == ProductLifecycleState.SUCCESSOR_SPEC.value, (
         "Parent should roll back to SUCCESSOR_SPEC after successor spawn failure"
     )
 
