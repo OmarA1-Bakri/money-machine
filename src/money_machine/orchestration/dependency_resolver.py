@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import and_, exists, select
+from sqlalchemy import exists, select
 
 from money_machine.domain.enums import JobStatus
 from money_machine.orchestration.transition_guard import require_job_transition

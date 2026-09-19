@@ -18,10 +18,6 @@ from uuid import UUID
 from sqlalchemy import select
 
 from money_machine.domain.enums import JobStatus, RetryClass
-from money_machine.orchestration.dependency_resolver import (
-    propagate_dependency_failure,
-    satisfy_dependency,
-)
 from money_machine.orchestration.retry import evaluate_retry
 from money_machine.orchestration.scheduler import run_scheduler_cycle
 from money_machine.orchestration.transition_guard import require_job_transition
