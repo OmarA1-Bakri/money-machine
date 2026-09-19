@@ -577,3 +577,97 @@ async def test_dispatch_event_is_idempotent(session: AsyncSession) -> None:
     )
     events = (await session.execute(stmt)).scalars().all()
     assert len(events) == 1
+
+
+async def test_atomic_rollback_on_successor_spawn_failure(session: AsyncSession) -> None:
+    """If successor spawn fails, parent state + events + jobs all roll back atomically.
+
+    Wave 5 Fix #3: prove that failure after parent result/event but before successor
+    create leaves no partial OBSERVING state and no successor.
+    """
+    from unittest.mock import patch
+
+    uow = UnitOfWork(session)
+    dispatcher = EventDispatcher(uow)
+
+    # Setup: parent workflow in SUCCESSOR_SPEC state
+    shop = await make_shop(session)
+    parent_workflow = WorkflowRun(
+        id=PARENT_WORKFLOW_ID,
+        shop_id=shop.id,
+        workflow_type="ProductLifecycleWorkflow",
+        workflow_version=1,
+        product_state=ProductLifecycleState.SUCCESSOR_SPEC.value,
+        started_at=NOW,
+        version=1,
+    )
+    session.add(parent_workflow)
+    await session.flush()
+
+    # Create parent job
+    parent_job = Job(
+        id=PARENT_JOB_ID,
+        workflow_id=PARENT_WORKFLOW_ID,
+        job_type="PortfolioDecisionJob",
+        object_type="decisions",
+        object_id=DECISION_ID,
+        owner_agent_id="A09",
+        status="SUCCEEDED",
+        idempotency_key=f"decision_{DECISION_ID}",
+        side_effect_class="NONE",
+        retry_class="IDEMPOTENT",
+        scheduled_at=NOW,
+        version=1,
+    )
+    session.add(parent_job)
+    await session.flush()
+
+    decision = PortfolioDecision(
+        decision_id=DECISION_ID,
+        workflow_id=PARENT_WORKFLOW_ID,
+        product_id=PRODUCT_ID,
+        listing_id=LISTING_ID,
+        decision=DecisionType.MULTIPLY,
+        metrics_snapshot_ids=(SNAPSHOT_ID,),
+        cohort_reference="2026-Q3",
+        rule_version="v1.0",
+        explanation="Winner detected",
+        evidence=(TEST_EVIDENCE,),
+        successor_workflow_id=SUCCESSOR_WORKFLOW_ID,
+        successor_spec_id=SUCCESSOR_SPEC_ID,
+        decided_at=DECISION_TIME,
+    )
+
+    # Inject failure after parent transition but before successor workflow creation
+    def failing_create_workflow(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("Simulated successor creation failure")
+
+    with (
+        patch.object(
+            dispatcher.factory,
+            "_create_successor_workflow",
+            side_effect=failing_create_workflow,
+        ),
+        pytest.raises(RuntimeError, match="Simulated successor creation failure"),
+    ):
+        await dispatcher.dispatch_decision(
+            decision=decision,
+            parent_job_id=PARENT_JOB_ID,
+            occurred_at=DECISION_TIME,
+        )
+
+    # Atomic rollback proof: parent workflow still in SUCCESSOR_SPEC (not OBSERVING)
+    await session.rollback()  # Explicit rollback after failed transaction
+    await session.refresh(parent_workflow)
+    assert parent_workflow.product_state == ProductLifecycleState.SUCCESSOR_SPEC.value, (
+        "Parent should roll back to SUCCESSOR_SPEC after successor spawn failure"
+    )
+
+    # No WINNER_DETECTED event recorded
+    stmt = select(Event).where(Event.event_name == EventName.WINNER_DETECTED.value)
+    events = (await session.execute(stmt)).scalars().all()
+    assert len(events) == 0, "Event should not persist after rollback"
+
+    # No successor workflow created
+    successor_workflow = await session.get(WorkflowRun, SUCCESSOR_WORKFLOW_ID)
+    assert successor_workflow is None, "Successor workflow should not exist after rollback"

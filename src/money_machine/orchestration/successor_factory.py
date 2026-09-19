@@ -7,8 +7,9 @@ enforcing the winner/successor boundary for MULTIPLY decisions.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from hashlib import sha256
 from typing import TYPE_CHECKING
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from money_machine.domain.enums import DecisionType, ProductLifecycleState
 from money_machine.domain.events import EventName
@@ -34,22 +35,24 @@ class SuccessorFactory:
         payload: dict[str, object] | None = None,
         occurred_at: datetime | None = None,
     ) -> tuple[UUID, ...]:
-        """Create successor jobs for a workflow event.
+        """Create successor jobs for a workflow event (deferred extension point).
 
-        Returns the IDs of created successor jobs.
+        CONTRACT (Wave 4):
+        - WINNER_DETECTED is routed through dispatch_decision/create_multiply_successor.
+        - All other events currently produce no successors (empty tuple).
+        - Future: load event → successor mappings from config/workflows.yaml.
+
+        See tests/unit/test_successor_boundary.py::test_create_successors_contract_no_jobs
+        for the explicit contract test proving the current "no successors" behavior.
+
+        Returns the IDs of created successor jobs (empty tuple for now).
         """
         if occurred_at is None:
             occurred_at = datetime.now(UTC)
 
-        # For now, only handle WINNER_DETECTED explicitly
-        # Other event-to-successor mappings would be added here
-        if event_name == EventName.WINNER_DETECTED:
-            # WINNER_DETECTED is handled by dispatch_decision, not here
-            return ()
-
-        # Placeholder for other event-to-successor mappings
-        # In a full implementation, this would read from config/workflows.yaml
-        # and create the appropriate successor jobs based on the event
+        # WINNER_DETECTED is handled by dispatch_decision/create_multiply_successor.
+        # Other events route here but produce no successors in Wave 4.
+        # Future Wave: load admitted_events → successor_job_types from YAML config.
         return ()
 
     async def create_multiply_successor(
@@ -84,8 +87,14 @@ class SuccessorFactory:
             successor_workflow_id=decision.successor_workflow_id,  # type: ignore[arg-type]
         )
 
-        # Transition parent workflow to OBSERVING
-        parent_workflow.product_state = ProductLifecycleState.OBSERVING.value
+        # Transition parent workflow to OBSERVING (guarded)
+        from money_machine.orchestration.transition_guard import require_product_transition
+
+        current_state = ProductLifecycleState(parent_workflow.product_state)
+        target_state = ProductLifecycleState.OBSERVING
+        require_product_transition(current_state, target_state)
+
+        parent_workflow.product_state = target_state.value
         parent_workflow.version += 1
         await self.uow.session.flush()
 
@@ -168,7 +177,8 @@ class SuccessorFactory:
         """
         from money_machine.persistence.tables import Job
 
-        job_id = uuid4()
+        # Derive job ID deterministically from workflow and spec IDs
+        job_id = self._derive_job_id(successor_workflow_id, successor_spec_id, "DedupeJob")
         job = Job(
             id=job_id,
             workflow_id=successor_workflow_id,
@@ -191,3 +201,16 @@ class SuccessorFactory:
         self.uow.session.add(job)
         await self.uow.session.flush()
         return job_id
+
+    @staticmethod
+    def _derive_job_id(workflow_id: UUID, spec_id: UUID, job_type: str) -> UUID:
+        """Derive a deterministic job ID from workflow, spec, and job type.
+
+        This ensures tests can assert exact job IDs without randomness.
+        """
+        # Create a stable hash from the inputs
+        hash_input = f"{workflow_id}:{spec_id}:{job_type}".encode()
+        hash_digest = sha256(hash_input).digest()[:16]
+
+        # Convert to UUID (version 5-style deterministic UUID)
+        return UUID(bytes=hash_digest)

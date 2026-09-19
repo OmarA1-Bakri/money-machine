@@ -13,6 +13,7 @@ from uuid import UUID
 from money_machine.domain.events import EventName
 from money_machine.domain.models.portfolio import PortfolioDecision
 from money_machine.orchestration.successor_factory import SuccessorFactory
+from money_machine.persistence.repositories.events import EventAppendError
 
 if TYPE_CHECKING:
     from money_machine.persistence.unit_of_work import UnitOfWork
@@ -57,7 +58,7 @@ class EventDispatcher:
                 dedupe_key=dedupe_key,
                 occurred_at=occurred_at,
             )
-        except Exception:
+        except EventAppendError:
             # Event already exists - this is idempotent dispatch
             existing = await self.uow.events.by_dedupe_key(dedupe_key)
             if existing is None:
@@ -112,7 +113,7 @@ class EventDispatcher:
                 dedupe_key=dedupe_key,
                 occurred_at=occurred_at,
             )
-        except Exception:
+        except EventAppendError:
             existing = await self.uow.events.by_dedupe_key(dedupe_key)
             if existing is None:
                 raise
