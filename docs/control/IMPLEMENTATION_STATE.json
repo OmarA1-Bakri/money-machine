@@ -9,7 +9,7 @@
   "evidence_closure_commit_sha": "eec25fa",
   "last_verified_commit": "eec25fa",
   "state_revision": 20,
-  "session_status": "gap_close_complete_library_only",
+  "session_status": "complete",
   "current_session": 3,
   "completed_sessions": [
     0,

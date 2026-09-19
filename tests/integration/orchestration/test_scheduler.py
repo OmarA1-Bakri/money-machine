@@ -52,6 +52,7 @@ async def test_promote_due_jobs_success(session: AsyncSession):
         started_at=now,
     )
     session.add(workflow)
+    await session.flush()
 
     # Job 1: due now, no dependencies
     job1_id = uuid4()
@@ -143,6 +144,7 @@ async def test_promote_due_jobs_skips_unsatisfied_deps(session: AsyncSession):
         max_attempts=3,
     )
     session.add(predecessor)
+    await session.flush()
 
     dependent_id = uuid4()
     dependent = Job(
@@ -161,6 +163,7 @@ async def test_promote_due_jobs_skips_unsatisfied_deps(session: AsyncSession):
         max_attempts=3,
     )
     session.add(dependent)
+    await session.flush()
 
     dep = JobDependency(
         job_id=dependent_id,
@@ -201,6 +204,7 @@ async def test_detect_stalled_jobs(session: AsyncSession):
         started_at=now - timedelta(hours=1),
     )
     session.add(workflow)
+    await session.flush()
 
     # Stalled job: old heartbeat, lease not expired
     stalled_id = uuid4()
@@ -282,6 +286,7 @@ async def test_detect_stalled_jobs_ignores_expired_lease(session: AsyncSession):
         started_at=now - timedelta(hours=1),
     )
     session.add(workflow)
+    await session.flush()
 
     # Job with old heartbeat AND expired lease (not stalled, it's expired)
     expired_id = uuid4()
@@ -418,6 +423,7 @@ async def test_run_scheduler_cycle_integration(session: AsyncSession):
         started_at=now,
     )
     session.add(workflow)
+    await session.flush()
 
     # PENDING job due now (will be promoted)
     pending_id = uuid4()

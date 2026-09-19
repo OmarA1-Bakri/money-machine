@@ -191,11 +191,13 @@ async def schedule_maturity_timer(
     job = Job(
         workflow_id=workflow_id,
         job_type="maturity_check",
+        object_type="workflow_runs",  # Timer is checking the workflow itself
+        object_id=workflow_id,
         status=JobStatus.PENDING.value,
         scheduled_at=maturity_date,
         attempt=0,
         max_attempts=3,
-        owner_agent_id="SYSTEM",  # System-generated timer
+        owner_agent_id="A01",  # System scheduler agent
         side_effect_class="NONE",
         retry_class="SAFE",
         created_at=now,

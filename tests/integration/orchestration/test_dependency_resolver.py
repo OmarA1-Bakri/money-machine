@@ -214,6 +214,7 @@ async def test_check_dependencies_satisfied_with_unsatisfied_dep(session: AsyncS
         max_attempts=3,
     )
     session.add(job)
+    await session.flush()
 
     dep = JobDependency(
         job_id=job_id,
@@ -343,6 +344,7 @@ async def test_check_idempotency_collision_same_job(session: AsyncSession):
         idempotency_key="test_key",
     )
     session.add(job)
+    await session.flush()
 
     record = IdempotencyRecord(
         idempotency_key="test_key",
@@ -403,6 +405,7 @@ async def test_check_idempotency_collision_different_job(session: AsyncSession):
         idempotency_key="test_key",
     )
     session.add(other_job)
+    await session.flush()
 
     record = IdempotencyRecord(
         idempotency_key="test_key",
@@ -685,6 +688,7 @@ async def test_satisfy_dependency(session: AsyncSession):
         max_attempts=3,
     )
     session.add(predecessor)
+    await session.flush()
 
     dependent_id = uuid4()
     dependent = Job(
@@ -703,6 +707,7 @@ async def test_satisfy_dependency(session: AsyncSession):
         max_attempts=3,
     )
     session.add(dependent)
+    await session.flush()
 
     dep = JobDependency(
         job_id=dependent_id,
@@ -764,6 +769,7 @@ async def test_propagate_dependency_failure(session: AsyncSession):
         max_attempts=3,
     )
     session.add(failed_job)
+    await session.flush()
 
     dependent_id = uuid4()
     dependent = Job(
@@ -782,6 +788,7 @@ async def test_propagate_dependency_failure(session: AsyncSession):
         max_attempts=3,
     )
     session.add(dependent)
+    await session.flush()
 
     dep = JobDependency(
         job_id=dependent_id,
