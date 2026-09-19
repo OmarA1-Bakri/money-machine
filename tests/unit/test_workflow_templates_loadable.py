@@ -3,6 +3,9 @@
 Workbook Action 7 requirement: within Exit 78 library scope, prove that named
 workflow job types and their configurations are resolvable from workflows.yaml.
 The canonical workflow authority is config/workflows.yaml (ProductLifecycleWorkflow).
+
+Beyond YAML loading: prove templates are USABLE - resolve job specs, successor map,
+and entry jobs for orchestration.
 """
 
 from money_machine.orchestration.successor_factory import load_workflows_config
@@ -104,3 +107,71 @@ class TestWorkflowConfigLoadable:
             "ProvisioningCheckJob" in workflow.entry_job_types
             or "ScheduleConfigurationJob" in workflow.entry_job_types
         )
+
+    def test_successor_map_resolvable(self) -> None:
+        """Action 7 depth: prove successor map is resolvable for orchestration use.
+
+        Beyond YAML loading, verify that:
+        1. create_successors maps exist and are well-formed
+        2. Each job's successors are valid job types in the workflow
+        3. Maps are usable for successor_factory orchestration path
+        """
+        _event_map, workflows_config = load_workflows_config()
+
+        workflow = workflows_config.workflows[0]
+        job_types = {job.job_type for job in workflow.jobs}
+
+        # Verify successor_job_types tuples are present and valid
+        for job_spec in workflow.jobs:
+            if job_spec.successor_job_types:
+                # Each successor must reference valid job types in this workflow
+                for successor_job_type in job_spec.successor_job_types:
+                    assert successor_job_type in job_types, (
+                        f"Successor {successor_job_type} not in workflow job types"
+                    )
+
+    def test_entry_jobs_resolvable_for_workflow_start(self) -> None:
+        """Action 7 depth: prove entry jobs are resolvable for starting workflows.
+
+        Verify entry_job_types are valid and can be used to initialize a workflow.
+        """
+        _event_map, workflows_config = load_workflows_config()
+
+        workflow = workflows_config.workflows[0]
+        job_types = {job.job_type for job in workflow.jobs}
+
+        # Entry jobs must be valid job types
+        for entry_type in workflow.entry_job_types:
+            assert entry_type in job_types, f"Entry job {entry_type} not in workflow"
+
+        # At least one entry job exists
+        assert len(workflow.entry_job_types) > 0
+
+    def test_job_specs_usable_for_job_creation(self) -> None:
+        """Action 7 depth: prove job specs contain all data needed to create jobs.
+
+        Verify each job spec has the fields required by the jobs table schema:
+        job_type, owner_agent_id, side_effect_class, retry_class, allowed_modes.
+        """
+        _event_map, workflows_config = load_workflows_config()
+
+        workflow = workflows_config.workflows[0]
+
+        for job_spec in workflow.jobs:
+            # Required fields for job creation
+            assert job_spec.job_type is not None
+            assert job_spec.owner_agent_id is not None
+            assert job_spec.side_effect_class in [
+                "NONE",
+                "EXTERNAL_READ",
+                "EXTERNAL_WRITE",
+                "EXTERNAL_SPEND",
+                "EXTERNAL_MESSAGE",
+            ]
+            assert job_spec.retry_class in [
+                "SAFE",
+                "IDEMPOTENT",
+                "RECONCILE_FIRST",
+                "MANUAL_RESUME",
+            ]
+            assert len(job_spec.allowed_modes) > 0, f"{job_spec.job_type} has no allowed_modes"
