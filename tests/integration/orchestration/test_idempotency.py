@@ -44,28 +44,32 @@ async def create_test_job(
     """Create a minimal test job for foreign key requirements."""
     now = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
 
-    # Create shop first (required by workflow_runs)
-    shop = Shop(
-        id=SHOP_ID_1,
-        name="test-shop",
-        connection_state="UNCONNECTED",
-        timezone="UTC",
-        active=True,
-    )
-    session.add(shop)
-    await session.flush()
+    # Check if shop already exists (to avoid duplicate key violations across tests)
+    shop = await session.get(Shop, SHOP_ID_1)
+    if not shop:
+        shop = Shop(
+            id=SHOP_ID_1,
+            name="test-shop",
+            connection_state="UNCONNECTED",
+            timezone="UTC",
+            active=True,
+        )
+        session.add(shop)
+        await session.flush()
 
-    # Create workflow run (required by jobs)
-    workflow_run = WorkflowRun(
-        id=WORKFLOW_ID_1,
-        shop_id=shop.id,
-        workflow_type="ProductLifecycleWorkflow",
-        workflow_version=1,
-        product_state="DISCOVERED",
-        started_at=now,
-    )
-    session.add(workflow_run)
-    await session.flush()
+    # Check if workflow run already exists
+    workflow_run = await session.get(WorkflowRun, WORKFLOW_ID_1)
+    if not workflow_run:
+        workflow_run = WorkflowRun(
+            id=WORKFLOW_ID_1,
+            shop_id=SHOP_ID_1,
+            workflow_type="ProductLifecycleWorkflow",
+            workflow_version=1,
+            product_state="DISCOVERED",
+            started_at=now,
+        )
+        session.add(workflow_run)
+        await session.flush()
 
     # Now create the job with all required fields
     job = Job(
