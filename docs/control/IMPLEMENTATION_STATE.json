@@ -9,13 +9,12 @@
   "evidence_closure_commit_sha": "eec25fa42f1a5dba485172a74f5cb53c279ae207",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "state_revision": 20,
-  "session_status": "complete",
+  "session_status": "incomplete",
   "current_session": 3,
   "completed_sessions": [
     0,
     1,
-    2,
-    3
+    2
   ],
   "services": {
     "api": "container_healthy_readiness_true_migrated_2026-09-07",
@@ -61,8 +60,8 @@
     }
   ],
   "notes": {
-    "session_03_gap_close": "2026-09-19: Implemented real dependency_resolver, scheduler library functions (promote, stalled detection, timers), and operator surface (CLI + API). All library + tests, Exit 78 held per contract. Worker/scheduler processes remain fail-closed; commissioning is Session 04. Verifier PASS expected for 'works/ready' with Exit 78.",
-    "remaining_s03_work": "Session 03 workbook gaps closed. Full S03 exit criteria met for library+tests under Exit 78. Commissioning, prompt registry, and agent runtime are Session 04."
+    "session_03_gap_close": "2026-09-19: S03 gap-close IMPLEMENTED — real dependency_resolver, scheduler library functions (promote, stalled detection, timers), operator surface (CLI + API). All library + tests complete, Exit 78 held per contract. Worker/scheduler processes remain fail-closed; commissioning is Session 04.",
+    "session_03_status": "Gap-close implementation complete. Session remains INCOMPLETE pending Verifier workbook-exit gate. Do not advance to Session 04 until Verifier PASS."
   },
   "carry_forward": [
     "Prove idempotency uniqueness under concurrent claim path (Session 04 after commissioning)",
@@ -92,7 +91,7 @@
     "completion_requires_later_state_pointer_commit": true,
     "unsupported_completion_is_rejected": true
   },
-  "next_session": 4,
-  "next_prompt": "07_SESSION_04_AGENT_RUNTIME_AND_ROSTER.md",
-  "updated_at": "2026-09-19T15:00:00Z"
+  "next_session": 3,
+  "next_prompt": "06_SESSION_03_DURABLE_ORCHESTRATOR.md",
+  "updated_at": "2026-09-19T17:06:00Z"
 }
