@@ -11,6 +11,7 @@ import pytest
 
 from money_machine.domain.enums import JobStatus
 from money_machine.orchestration.dependency_resolver import (
+    WorkflowInactiveError,
     check_dependencies_satisfied,
     check_idempotency_collision,
     check_workflow_active,
