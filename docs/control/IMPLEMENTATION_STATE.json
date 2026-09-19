@@ -4,9 +4,9 @@
   "repo_root": "/mnt/d/Money Machine",
   "windows_repo_root": "D:\\Money Machine",
   "branch": "build/full-automation",
-  "head_sha": "dfe9408f246ea2700a60fcc850fa5c49d25b6edd",
+  "head_sha": "4425e437404d5598d121df5d9ba7960db45b4142",
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "evidence_closure_commit_sha": "dfe9408f246ea2700a60fcc850fa5c49d25b6edd",
+  "evidence_closure_commit_sha": "4425e437404d5598d121df5d9ba7960db45b4142",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "state_revision": 20,
   "session_status": "incomplete",
@@ -60,8 +60,9 @@
     }
   ],
   "notes": {
-    "session_03_gap_close": "2026-09-19: S03 gap-close IMPLEMENTED — real dependency_resolver, scheduler library functions (promote, stalled detection, timers), operator surface (CLI + API). All library + tests complete, Exit 78 held per contract. Worker/scheduler processes remain fail-closed. Session 03 is INCOMPLETE pending Verifier workbook-exit gate.",
-    "session_03_status": "Gap-close implementation present. Session remains INCOMPLETE pending Verifier workbook-exit gate. Do not advance to Session 04 until Verifier PASS."
+    "session_03_gap_close": "2026-09-19: S03 gap-close IMPLEMENTED — real dependency_resolver, scheduler library functions (promote, stalled detection, timers), operator surface (CLI + API), entry-job spawn. All library + tests complete, Exit 78 held per contract. Worker/scheduler processes remain fail-closed. Session 03 is INCOMPLETE pending Verifier workbook-exit gate.",
+    "session_03_status": "Gap-close implementation present, including entry-job spawn from workflow templates. Session remains INCOMPLETE pending Verifier workbook-exit gate. Do not advance to Session 04 until Verifier PASS.",
+    "entry_job_spawn": "2026-09-19: start_workflow now spawns template entry jobs (ProvisioningCheckJob, ScheduleConfigurationJob) from config/workflows.yaml when a workflow starts. Entry jobs created in PENDING status with complete job specs. Proving tests added."
   },
   "carry_forward": [
     "Prove idempotency uniqueness under concurrent claim path (Session 04 after commissioning)",
