@@ -635,6 +635,7 @@ class WorkflowsConfig(ConfigModel):
     """Configured workflow definitions."""
 
     version: Literal[1]
+    event_successor_map: dict[str, list[str]]
     workflows: Annotated[
         tuple[WorkflowDefinition, ...],
         BeforeValidator(_parse_yaml_tuple),

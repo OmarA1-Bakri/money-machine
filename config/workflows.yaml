@@ -1,4 +1,81 @@
 version: 1
+
+# Event to successor job type mappings
+# This map determines which successor jobs are created when a specific event is emitted.
+# Each event can map to zero or more successor job types.
+event_successor_map:
+  # Provisioning and bootstrap
+  ACCOUNT_CONNECTED: [EnvironmentAuditJob]
+  ENVIRONMENT_AUDITED: [WorkspaceProvisioningJob]
+  SHOP_BOOTSTRAPPED: [ResearchCollectionJob]
+  
+  # Research and qualification
+  RESEARCH_COMPLETED: [ShortlistJob]
+  NICHE_SHORTLISTED: [QualificationJob]
+  PRODUCT_QUALIFIED: [NicheSelectionJob]
+  PRODUCT_REJECTED: [NicheSelectionJob]
+  NICHE_SELECTED: [CompetitorPurchaseJob]
+  
+  # Teardown and spec
+  COMPETITOR_PURCHASED: [TeardownJob]
+  TEARDOWN_COMPLETED: [ProductSpecJob]
+  PRODUCT_SPEC_CREATED: [DedupeJob]
+  
+  # Dedupe branching
+  DEDUPE_PASSED: [ProductBuildJob]
+  DEDUPE_FAILED: [ReconceptProductJob]
+  
+  # Build and QA
+  BUILD_COMPLETED: [ProductQAJob]
+  BUILD_QA_PASSED: [VariantBuildJob]
+  BUILD_QA_FAILED: [BuildRepairJob]
+  VARIANTS_COMPLETED: [VariantPublishJob]
+  VARIANT_LINKS_VERIFIED: [ScreenshotJob]
+  
+  # Merchandising (parallel successors)
+  SCREENSHOTS_CAPTURED: [ListingCopyJob, AssetFactoryJob, DeliveryBuildJob]
+  LISTING_COPY_COMPLETED: [PricingJob, DraftListingJob]
+  ASSETS_COMPLETED: [DraftListingJob]
+  DELIVERY_FILES_COMPLETED: [PreflightJob]
+  PRICING_COMPLETED: [DraftListingJob]
+  
+  # Publishing
+  DRAFT_CREATED: [PreflightJob]
+  PREFLIGHT_PASSED: [PublishListingJob]
+  PREFLIGHT_FAILED: [ListingRepairJob]
+  LISTING_PUBLISHED: [PostPublishVerificationJob]
+  POST_PUBLISH_VERIFIED: [ProofDistributionJob]
+  
+  # Lifecycle and monitoring
+  SCHEDULE_CONFIGURED: [WeeklyReviewJob, MonthlyDeepPassJob]
+  METRICS_CAPTURED: [PortfolioDecisionJob]
+  LISTING_MATURED: [PortfolioDecisionJob]
+  LISTING_HELD: [WeeklyReviewJob]
+  LISTING_REPAIR_REQUESTED: [IncidentRepairJob]
+  LISTING_CULL_REQUESTED: [DeactivateListingJob]
+  LISTING_CULLED: [BuildSlotJob]
+  
+  # Build slot and scale
+  # SUCCESSOR_CREATED → DedupeJob: successor product enters dedupe gate (per playbook p49-50, 16.3)
+  # The successor workflow spawns at DEDUPE_CHECK and the DedupeJob is the entry point
+  SUCCESSOR_CREATED: [DedupeJob]
+  BUILD_SLOT_DEFERRED: [ResearchCollectionJob]
+  MONTHLY_REVIEW_COMPLETED: [ResearchCollectionJob, BuildSlotJob, ScaleEvaluationJob]
+  SCALE_DECIDED: [BuildSlotJob, MonthlyDeepPassJob]
+  
+  # Repair and incidents (context-sensitive)
+  REPAIR_APPLIED: [ProductQAJob]  # From BuildRepairJob → ProductQAJob
+  REPAIR_COMPLETED: [PreflightJob]  # From ListingRepairJob → PreflightJob or IncidentRepairJob closures
+  PROOF_FEEDBACK_CAPTURED: [WeeklyReviewJob]
+  CUSTOMER_ISSUE_RECEIVED: [IncidentRepairJob]
+  BROKEN_LINK_DETECTED: [IncidentRepairJob]
+  JOB_FAILED: [IncidentRepairJob]
+  
+  # Events with no automated successors (handled specially or block workflow)
+  CREDENTIAL_REQUIRED: []
+  WINNER_DETECTED: []  # Handled via dispatch_decision/create_multiply_successor
+  JOB_STALLED: []  # Lease recovery signal, handled by scheduler
+
 workflows:
   - workflow_type: ProductLifecycleWorkflow
     version: 1
