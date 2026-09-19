@@ -2,7 +2,7 @@
 
 **Session 03 is COMPLETE** (2026-09-19) — gap-close implementation validated and closed by Verifier FINAL PASS. Exit 78 remains in place per Session 03 contract; commissioning and Exit 78 removal deferred to Session 04.
 
-**Next: Session 04** — Agent Runtime and Commissioning. Session 04 will implement agent runtime, prompt loading, and commissioning evidence gates. Only after Session 04 completion may commissioning occur and Exit 78 be removed.
+**Next: Session 04** — Agent Runtime and Roster. Session 04 will implement agent runtime, prompt loading, and roster evidence gates. Only after Session 04 completion may commissioning occur and Exit 78 be removed.
 
 ## Session 03 Completion Summary
 
