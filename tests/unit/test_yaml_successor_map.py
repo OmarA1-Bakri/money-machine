@@ -321,9 +321,9 @@ class TestDispatchIdempotency:
         mock_uow.events = AsyncMock()
 
         # Track how many times create_successors is called
-        create_successors_calls = []
+        create_successors_calls: list[dict[str, object]] = []
 
-        async def mock_create_successors(**kwargs):
+        async def mock_create_successors(**kwargs: object) -> tuple[UUID, ...]:
             create_successors_calls.append(kwargs)
             return (UUID("10000000-0000-0000-0000-000000000001"),)
 
