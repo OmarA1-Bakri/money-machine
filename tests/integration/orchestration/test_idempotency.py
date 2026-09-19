@@ -356,24 +356,24 @@ async def test_record_receipt_append_only(session: AsyncSession) -> None:
     assert receipt.provider_object_id == "listing-123"
     assert receipt.safe_detail == {"status": "draft"}
 
-    # Verify row exists in database
+    # Commit the receipt so it persists in database
+    await session.commit()
+
+    # Now try to mutate it in a fresh transaction
     statement = select(Receipt).where(Receipt.idempotency_key == "test-key-1")
     result = await session.execute(statement)
     db_receipt = result.scalars().one()
 
-    assert db_receipt.idempotency_key == "test-key-1"
-
-    # Prove append-only: attempting to mutate the receipt should fail
-    # (database trigger blocks UPDATE on receipts table)
     original_provider_object_id = db_receipt.provider_object_id
     db_receipt.provider_object_id = "mutated-id"
 
-    from sqlalchemy.exc import DatabaseError
+    from sqlalchemy.exc import IntegrityError
 
-    with pytest.raises(DatabaseError):  # Database will reject UPDATE
+    # Prove append-only: database trigger should reject UPDATE
+    with pytest.raises(IntegrityError, match=r"relation.*append-only"):
         await session.flush()
 
-    # Rollback the failed transaction
+    # Rollback the failed update
     await session.rollback()
 
     # Verify the receipt was NOT mutated
