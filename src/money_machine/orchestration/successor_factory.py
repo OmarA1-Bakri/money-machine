@@ -277,19 +277,38 @@ class SuccessorFactory:
         job_type: str,
         occurred_at: datetime,
     ) -> UUID:
-        """Create a single successor job (Wave 7: placeholder implementation).
+        """Create a single successor job with real job spec from workflows.yaml.
 
-        In a full implementation, this would:
-        - Look up the job definition from workflows.yaml
-        - Determine object_type and object_id from the parent job or event payload
-        - Set appropriate owner_agent_id, side_effect_class, retry_class, etc.
-        - Create the Job row with all required fields
+        Loads the job definition from workflow configuration to get proper:
+        - owner_agent_id
+        - side_effect_class
+        - retry_class
+        - allowed_modes
+        - output_contracts
 
-        For Wave 7, we create a minimal placeholder that proves the mapping works.
-        The job details will be filled in by later waves when job creation is
-        fully integrated with the workflow configuration.
+        object_type/object_id are inferred from job type patterns until
+        payload-based determination is implemented.
         """
+        from money_machine.config.loader import load_yaml_model
+        from money_machine.config.settings import WorkflowsConfig
         from money_machine.persistence.tables import Job
+
+        # Load workflow config to get job definition
+        config_path = Path(__file__).parent.parent.parent.parent / "config" / "workflows.yaml"
+        workflows_config = load_yaml_model(config_path, WorkflowsConfig)
+
+        # Find job definition for this job_type
+        job_def = None
+        for workflow in workflows_config.workflows:
+            for job in workflow.jobs:
+                if job.job_type == job_type:
+                    job_def = job
+                    break
+            if job_def:
+                break
+
+        if job_def is None:
+            raise ValueError(f"Job type '{job_type}' not found in workflow configuration")
 
         # Derive deterministic job ID
         job_id = self._derive_successor_job_id(
@@ -298,30 +317,83 @@ class SuccessorFactory:
             job_type=job_type,
         )
 
-        # Placeholder: create minimal job to prove the successor map works
-        # Future: load full job spec from workflows.yaml
+        # Infer object_type from job type patterns
+        object_type = self._infer_object_type(job_type)
+        object_id = workflow_id  # Default to workflow_id until payload-based determination
+
+        # Use first allowed mode (simulation is typically first for safety)
+        allowed_mode = job_def.allowed_modes[0] if job_def.allowed_modes else "simulation"
+
+        # Use first output contract if available
+        output_model = job_def.output_contracts[0] if job_def.output_contracts else "AgentResult"
+
+        # Create real job with specs from workflow config
         job = Job(
             id=job_id,
             workflow_id=workflow_id,
             job_type=job_type,
-            object_type="placeholder",  # Will be determined from workflow config
-            object_id=workflow_id,  # Placeholder
-            owner_agent_id="A01",  # Will be from workflow config
+            object_type=object_type,
+            object_id=object_id,
+            owner_agent_id=job_def.owner_agent_id,
             status="PENDING",
             input={"parent_job_id": str(parent_job_id) if parent_job_id else None},
-            success_contract={"output_model": "AgentResult"},
+            success_contract={"output_model": output_model},
             scheduled_at=occurred_at,
             attempt=0,
             max_attempts=3,
             idempotency_key=f"{job_type}:{workflow_id}:{parent_job_id or 'none'}",
-            side_effect_class="NONE",
-            retry_class="SAFE",
-            allowed_mode="simulation",
+            side_effect_class=job_def.side_effect_class,
+            retry_class=job_def.retry_class,
+            allowed_mode=allowed_mode,
             version=1,
         )
         self.uow.session.add(job)
         await self.uow.session.flush()
         return job_id
+
+    @staticmethod
+    def _infer_object_type(job_type: str) -> str:
+        """Infer object_type from job_type based on domain patterns.
+
+        Until payload-based determination is implemented, use job type patterns
+        to infer the most likely object type.
+        """
+        job_type_lower = job_type.lower()
+
+        # Dedupe and spec jobs work with product_specs
+        if "dedupe" in job_type_lower or "spec" in job_type_lower or "niche" in job_type_lower:
+            return "product_specs"
+
+        # Build and QA jobs work with products
+        if "build" in job_type_lower or "qa" in job_type_lower or "variant" in job_type_lower:
+            return "products"
+
+        # Decision and evaluation jobs work with decisions
+        if (
+            "decision" in job_type_lower
+            or "evaluation" in job_type_lower
+            or "slot" in job_type_lower
+        ):
+            return "decisions"
+
+        # Research and collection jobs work with research_runs
+        if "research" in job_type_lower or "collection" in job_type_lower:
+            return "research_runs"
+
+        # Listing, copy, asset jobs work with listing_versions
+        if "listing" in job_type_lower or "copy" in job_type_lower or "asset" in job_type_lower:
+            return "listing_versions"
+
+        # Incident and repair jobs work with incidents
+        if "incident" in job_type_lower or "repair" in job_type_lower:
+            return "incidents"
+
+        # Metrics and review jobs work with metrics_snapshots
+        if "metric" in job_type_lower or "review" in job_type_lower:
+            return "metrics_snapshots"
+
+        # Default to workflow_runs for orchestration/provisioning jobs
+        return "workflow_runs"
 
     @staticmethod
     def _derive_successor_job_id(

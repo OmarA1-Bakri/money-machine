@@ -48,6 +48,7 @@ class EventDispatcher:
         dedupe_key = self._dedupe_key(event_name, aggregate_id, workflow_id, job_id)
 
         # Append event to log (idempotent via dedupe key)
+        event_already_existed = False
         try:
             await self.uow.events.append(
                 event_name=event_name,
@@ -64,11 +65,14 @@ class EventDispatcher:
             existing = await self.uow.events.by_dedupe_key(dedupe_key)
             if existing is None:
                 raise
-            # Event exists, continue to successor creation
-            pass
+            # Event already existed - do not create successors again
+            # (would cause PK collision with deterministic IDs)
+            event_already_existed = True
 
-        # Create successors if this event triggers any
-        if workflow_id is None:
+        # Only create successors if this is a NEW event
+        # Idempotent dispatch (event_already_existed=True) skips successor creation
+        # to avoid PK collisions with deterministic job IDs
+        if event_already_existed or workflow_id is None:
             return ()
 
         return await self.factory.create_successors(

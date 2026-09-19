@@ -306,3 +306,68 @@ class TestFailClosedBehavior:
         assert "UNKNOWN_FUTURE_EVENT" in error_message
         assert "not found in event_successor_map" in error_message
         assert "Known events:" in error_message
+
+
+class TestDispatchIdempotency:
+    """Test that idempotent dispatch doesn't re-create successor jobs."""
+
+    async def test_idempotent_dispatch_creates_successors_once(self) -> None:
+        """Dispatching same event twice creates successors only on first dispatch."""
+        from money_machine.orchestration.event_dispatcher import EventDispatcher
+        from money_machine.persistence.repositories.events import EventAppendError
+
+        mock_uow = MagicMock()
+        mock_uow.session = AsyncMock()
+        mock_uow.events = AsyncMock()
+
+        # Track how many times create_successors is called
+        create_successors_calls = []
+
+        async def mock_create_successors(**kwargs):
+            create_successors_calls.append(kwargs)
+            return (UUID("10000000-0000-0000-0000-000000000001"),)
+
+        dispatcher = EventDispatcher(mock_uow)
+        # Replace factory's create_successors with our mock
+        dispatcher.factory.create_successors = mock_create_successors
+
+        workflow_id = UUID("00000000-0000-0000-0000-000000000001")
+        job_id = UUID("00000000-0000-0000-0000-000000000002")
+        aggregate_id = UUID("00000000-0000-0000-0000-000000000003")
+
+        # First dispatch: event is new, successors created
+        mock_uow.events.append = AsyncMock()
+        result_1 = await dispatcher.dispatch(
+            event_name=EventName.DEDUPE_PASSED,
+            aggregate_type="product_specs",
+            aggregate_id=aggregate_id,
+            workflow_id=workflow_id,
+            job_id=job_id,
+            occurred_at=datetime(2026, 9, 19, 12, 0, tzinfo=UTC),
+        )
+
+        assert len(create_successors_calls) == 1, "First dispatch should create successors"
+        assert result_1 == (UUID("10000000-0000-0000-0000-000000000001"),)
+
+        # Second dispatch: event already exists (EventAppendError)
+        # Mock by_dedupe_key to return existing event
+        mock_existing_event = MagicMock()
+        mock_uow.events.by_dedupe_key = AsyncMock(return_value=mock_existing_event)
+
+        # Mock append to raise EventAppendError (duplicate)
+        mock_uow.events.append = AsyncMock(side_effect=EventAppendError("Duplicate"))
+
+        result_2 = await dispatcher.dispatch(
+            event_name=EventName.DEDUPE_PASSED,
+            aggregate_type="product_specs",
+            aggregate_id=aggregate_id,
+            workflow_id=workflow_id,
+            job_id=job_id,
+            occurred_at=datetime(2026, 9, 19, 12, 0, tzinfo=UTC),
+        )
+
+        # Successors should NOT be created again (still 1 call)
+        assert len(create_successors_calls) == 1, (
+            "Idempotent dispatch should not create successors again"
+        )
+        assert result_2 == (), "Idempotent dispatch returns empty tuple"
