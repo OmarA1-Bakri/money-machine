@@ -170,9 +170,7 @@ async def detect_stalled_jobs(
             payload={
                 "job_type": job.job_type,
                 "stall_threshold_seconds": int(stall_threshold.total_seconds()),
-                "last_heartbeat_at": (
-                    job.heartbeat_at.isoformat() if job.heartbeat_at else None
-                ),
+                "last_heartbeat_at": (job.heartbeat_at.isoformat() if job.heartbeat_at else None),
             },
             dedupe_key=f"job_stalled:{job.id}:{now.isoformat()}",
             occurred_at=now,

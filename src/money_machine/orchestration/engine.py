@@ -227,9 +227,7 @@ async def reconcile_uncertain_effect(
     # Job must be in UNCERTAIN_EXTERNAL_EFFECT status
     current_status = JobStatus(job.status)
     if current_status != JobStatus.UNCERTAIN_EXTERNAL_EFFECT:
-        raise EngineError(
-            f"Job {job_id} is {current_status}, expected UNCERTAIN_EXTERNAL_EFFECT"
-        )
+        raise EngineError(f"Job {job_id} is {current_status}, expected UNCERTAIN_EXTERNAL_EFFECT")
 
     # Find the most recent effect attempt for this job
     statement = (
