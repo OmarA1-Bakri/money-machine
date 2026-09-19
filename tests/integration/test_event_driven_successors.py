@@ -42,13 +42,11 @@ EVIDENCE_ID = UUID("00000000-0000-0000-0000-000000000070")
 
 # Test evidence reference
 TEST_EVIDENCE = EvidenceReference(
-    id=EVIDENCE_ID,
-    owner_type="decisions",
-    owner_id=DECISION_ID,
+    evidence_id=EVIDENCE_ID,
     evidence_type="metrics-analysis",
     source_reference="test://evidence",
-    safe_summary="Test evidence for decision",
     observed_at=DECISION_TIME,
+    safe_summary="Test evidence for decision",
 )
 
 
