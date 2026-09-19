@@ -4,6 +4,8 @@ Tests the scheduler module's promote, detect stalled, and timer functions with
 deterministic fake data.
 """
 
+from __future__ import annotations
+
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 

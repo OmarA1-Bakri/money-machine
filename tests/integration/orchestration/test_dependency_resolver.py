@@ -4,6 +4,8 @@ Tests the dependency_resolver module's evaluation and promotion functions with
 deterministic fake data. No external dependencies.
 """
 
+from __future__ import annotations
+
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
