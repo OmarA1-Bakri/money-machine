@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from functools import lru_cache
 from hashlib import sha256
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 import yaml
@@ -47,7 +47,7 @@ def load_event_successor_map() -> dict[str, list[str]]:
     if not isinstance(config, dict):
         raise ValueError("workflows.yaml must contain a dict at root")
 
-    event_map_raw = config.get("event_successor_map")
+    event_map_raw = cast(Any, config.get("event_successor_map"))  # type: ignore[reportUnknownMemberType]
     if event_map_raw is None:
         raise ValueError(
             "workflows.yaml missing required 'event_successor_map' section. "
@@ -60,22 +60,23 @@ def load_event_successor_map() -> dict[str, list[str]]:
     # Validate structure and build typed result
     event_map: dict[str, list[str]] = {}
 
-    for event_name_raw, successors_raw in event_map_raw.items():
+    for event_name_raw, successors_raw in cast(dict[Any, Any], event_map_raw).items():
         if not isinstance(event_name_raw, str):
             raise ValueError(f"Event name must be string, got {type(event_name_raw)}")
+
         if not isinstance(successors_raw, list):
             raise ValueError(
                 f"Successors for {event_name_raw} must be a list, got {type(successors_raw)}"
             )
 
         successors: list[str] = []
-        for job_type in successors_raw:
-            if not isinstance(job_type, str):
+        for job_type_raw in successors_raw:  # type: ignore[reportUnknownVariableType]
+            if not isinstance(job_type_raw, str):
                 raise ValueError(
                     f"Job type in successors for {event_name_raw} must be string, "
-                    f"got {type(job_type)}"
+                    f"got {type(job_type_raw)}"  # type: ignore[reportUnknownArgumentType]
                 )
-            successors.append(job_type)
+            successors.append(job_type_raw)
 
         event_map[event_name_raw] = successors
 

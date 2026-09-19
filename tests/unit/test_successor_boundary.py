@@ -20,6 +20,7 @@ from money_machine.orchestration.transition_guard import (
     SUCCESSOR_WORKFLOW_ENTRY_STATE,
     require_successor_spawn,
 )
+from money_machine.persistence.tables import Job
 
 PARENT_ID = UUID("00000000-0000-0000-0000-000000000001")
 SUCCESSOR_ID = UUID("00000000-0000-0000-0000-000000000002")
@@ -165,9 +166,9 @@ class TestCreateSuccessorsContract:
         mock_uow = MagicMock()
         mock_uow.events = AsyncMock()
         mock_uow.session = AsyncMock()
-        added_jobs: list[object] = []
+        added_jobs: list[Job] = []
 
-        def track_add(obj: object) -> None:
+        def track_add(obj: Job) -> None:
             added_jobs.append(obj)
 
         mock_uow.session.add = track_add

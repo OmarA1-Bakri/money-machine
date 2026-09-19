@@ -12,6 +12,7 @@ from money_machine.orchestration.successor_factory import (
     SuccessorFactory,
     load_event_successor_map,
 )
+from money_machine.persistence.tables import Job
 
 
 class TestLoadEventSuccessorMap:
@@ -67,9 +68,9 @@ class TestYamlDrivenSuccessors:
         """create_successors reads event → successor mappings from YAML and creates jobs."""
         mock_uow = MagicMock()
         mock_uow.session = AsyncMock()
-        added_jobs: list[object] = []
+        added_jobs: list[Job] = []
 
-        def track_add(obj: object) -> None:
+        def track_add(obj: Job) -> None:
             added_jobs.append(obj)
 
         mock_uow.session.add = track_add
@@ -101,9 +102,9 @@ class TestYamlDrivenSuccessors:
         """Events with multiple successors create all of them."""
         mock_uow = MagicMock()
         mock_uow.session = AsyncMock()
-        added_jobs: list[object] = []
+        added_jobs: list[Job] = []
 
-        def track_add(obj: object) -> None:
+        def track_add(obj: Job) -> None:
             added_jobs.append(obj)
 
         mock_uow.session.add = track_add
@@ -132,9 +133,9 @@ class TestYamlDrivenSuccessors:
         """DEDUPE_FAILED creates ReconceptProductJob, not ProductBuildJob."""
         mock_uow = MagicMock()
         mock_uow.session = AsyncMock()
-        added_jobs: list[object] = []
+        added_jobs: list[Job] = []
 
-        def track_add(obj: object) -> None:
+        def track_add(obj: Job) -> None:
             added_jobs.append(obj)
 
         mock_uow.session.add = track_add
@@ -189,13 +190,13 @@ class TestYamlDrivenSuccessors:
         """Successor job IDs are deterministic (no random UUIDs)."""
         mock_uow = MagicMock()
         mock_uow.session = AsyncMock()
-        added_jobs_1: list[object] = []
-        added_jobs_2: list[object] = []
+        added_jobs_1: list[Job] = []
+        added_jobs_2: list[Job] = []
 
-        def track_add_1(obj: object) -> None:
+        def track_add_1(obj: Job) -> None:
             added_jobs_1.append(obj)
 
-        def track_add_2(obj: object) -> None:
+        def track_add_2(obj: Job) -> None:
             added_jobs_2.append(obj)
 
         factory = SuccessorFactory(mock_uow)
