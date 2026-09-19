@@ -586,7 +586,9 @@ async def test_absent_to_failed_allows_retry_after_reconciliation(session: Async
 
 @pytest.mark.asyncio
 async def test_reconcile_first_can_retry_after_absent_via_engine(session: AsyncSession) -> None:
-    """R5 proving test: RECONCILE_FIRST job can retry after ABSENT reconciliation via engine.retry_failed_job.
+    """R5 proving test: RECONCILE_FIRST job can retry after ABSENT reconciliation.
+
+    Uses engine.retry_failed_job to prove the full retry path works.
 
     Flow:
     1. Job fails with UNCERTAIN_EXTERNAL_EFFECT (RECONCILE_FIRST)
