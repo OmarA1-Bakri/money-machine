@@ -65,14 +65,15 @@
     "CodeRabbit vendor re-review remains rate-limited"
   ],
   "required_completion_evidence": {
-    "ci_configuration_complete": true,
+    "orchestration_state_machine_implemented": true,
+    "lease_and_worker_claiming_implemented": true,
+    "retry_and_reconciliation_implemented": true,
+    "event_driven_successors_transactional": true,
+    "scheduler_timers_durable": true,
+    "worker_scheduler_fail_closed": true,
+    "concurrency_recovery_tests_pass": true,
     "control_files_and_checkpoint_current": true,
-    "database_schema_and_migrations_work": true,
-    "evidence_closure_commit_recorded": true,
-    "foundation_tests_pass": true,
-    "fresh_bootstrap_path_documented": true,
-    "runtime_containers_start": true,
-    "seeds_are_idempotent": true
+    "evidence_closure_commit_recorded": true
   },
   "transition_contract": {
     "completion_requires_all_evidence_true": true,
