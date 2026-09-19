@@ -121,11 +121,11 @@ class TestWorkflowConfigLoadable:
         workflow = workflows_config.workflows[0]
         job_types = {job.job_type for job in workflow.jobs}
 
-        # Verify create_successors maps are present and valid
+        # Verify successor_job_types tuples are present and valid
         for job_spec in workflow.jobs:
-            if job_spec.create_successors:
-                # Each successor map value must reference valid job types
-                for successor_job_type in job_spec.create_successors.values():
+            if job_spec.successor_job_types:
+                # Each successor must reference valid job types in this workflow
+                for successor_job_type in job_spec.successor_job_types:
                     assert successor_job_type in job_types, (
                         f"Successor {successor_job_type} not in workflow job types"
                     )

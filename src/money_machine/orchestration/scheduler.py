@@ -229,9 +229,10 @@ async def schedule_maturity_timer(
     if workflow.completed_at is not None:
         return None  # Workflow complete, no timer needed
 
-    # HARDENED: require real shop_id (NOT NULL constraint)
-    if workflow.shop_id is None:
-        raise ValueError(f"Workflow {workflow_id} has no shop_id (required for maturity timer)")
+    # HARDENED: require real shop_id (NOT NULL constraint enforced by schema)
+    assert workflow.shop_id is not None, (
+        f"Workflow {workflow_id} has no shop_id (schema constraint)"
+    )
 
     # Create a PENDING job scheduled for the maturity date
     # Status transition: NONE → PENDING (validated by guard if we add it)
