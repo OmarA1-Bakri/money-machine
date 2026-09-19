@@ -125,7 +125,7 @@ async def test_dispatch_multiply_creates_successor_workflow(session: AsyncSessio
         owner_agent_id="A09",  # Portfolio decision agent
         status="COMPLETED",
         idempotency_key=f"decision_{DECISION_ID}",
-        side_effect_class="RETRIABLE_REMOTE",
+        side_effect_class="NONE",
         retry_class="IDEMPOTENT",
         scheduled_at=NOW,
         version=1,
@@ -248,7 +248,7 @@ async def test_dispatch_multiply_rejects_wrong_parent_state(session: AsyncSessio
         owner_agent_id="A09",
         status="COMPLETED",
         idempotency_key=f"decision_{DECISION_ID}",
-        side_effect_class="RETRIABLE_REMOTE",
+        side_effect_class="NONE",
         retry_class="IDEMPOTENT",
         scheduled_at=NOW,
         version=1,
@@ -308,7 +308,7 @@ async def test_dispatch_non_multiply_decision_creates_no_successor(session: Asyn
         owner_agent_id="A09",
         status="COMPLETED",
         idempotency_key=f"decision_{DECISION_ID}",
-        side_effect_class="RETRIABLE_REMOTE",
+        side_effect_class="NONE",
         retry_class="IDEMPOTENT",
         scheduled_at=NOW,
         version=1,
@@ -378,7 +378,7 @@ async def test_parent_workflow_stays_observing_after_successor_spawn(session: As
         owner_agent_id="A09",  # Portfolio decision agent
         status="COMPLETED",
         idempotency_key=f"decision_{DECISION_ID}",
-        side_effect_class="RETRIABLE_REMOTE",
+        side_effect_class="NONE",
         retry_class="IDEMPOTENT",
         scheduled_at=NOW,
         version=1,
@@ -449,7 +449,7 @@ async def test_successor_workflow_starts_at_dedupe_check(session: AsyncSession) 
         owner_agent_id="A09",  # Portfolio decision agent
         status="COMPLETED",
         idempotency_key=f"decision_{DECISION_ID}",
-        side_effect_class="RETRIABLE_REMOTE",
+        side_effect_class="NONE",
         retry_class="IDEMPOTENT",
         scheduled_at=NOW,
         version=1,
@@ -522,7 +522,7 @@ async def test_dispatch_event_is_idempotent(session: AsyncSession) -> None:
         owner_agent_id="A09",  # Portfolio decision agent
         status="COMPLETED",
         idempotency_key=f"decision_{DECISION_ID}",
-        side_effect_class="RETRIABLE_REMOTE",
+        side_effect_class="NONE",
         retry_class="IDEMPOTENT",
         scheduled_at=NOW,
         version=1,
