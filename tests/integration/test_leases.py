@@ -304,7 +304,7 @@ async def test_reclaim_respects_limit(session: AsyncSession) -> None:
     lease_duration = timedelta(minutes=5)
 
     # Create 5 expired jobs
-    jobs = []
+    jobs: list[Job] = []
     for _ in range(5):
         await make_job(session, workflow, status=JobStatus.READY.value)
         claimed = await claim_ready_job(
@@ -313,6 +313,7 @@ async def test_reclaim_respects_limit(session: AsyncSession) -> None:
             now=NOW,
             lease_duration=lease_duration,
         )
+        assert claimed is not None
         jobs.append(claimed)
 
     after_expiry = NOW + timedelta(minutes=6)
