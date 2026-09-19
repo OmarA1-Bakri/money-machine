@@ -476,7 +476,7 @@ async def test_dispatch_event_is_idempotent(session: AsyncSession) -> None:
     # Second dispatch with same decision
     uow2 = UnitOfWork(session)
     dispatcher2 = EventDispatcher(uow2)
-    
+
     # This should be idempotent - same dedupe key
     # In a real scenario, the event append would fail on unique constraint
     # For this test, we just verify one successor workflow exists
