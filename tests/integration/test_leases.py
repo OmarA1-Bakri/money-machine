@@ -209,6 +209,45 @@ async def test_heartbeat_rejects_expired_lease(session: AsyncSession) -> None:
         await heartbeat(session, job_id=claimed.id, worker_id=worker_id, now=after_expiry)
 
 
+async def test_heartbeat_extends_lease(session: AsyncSession) -> None:
+    """Heartbeat with lease_extension extends the lease_expires_at timestamp."""
+    shop = await make_shop(session)
+    workflow = await make_workflow(session, shop)
+    await make_job(session, workflow, status=JobStatus.READY.value)
+
+    worker_id = deterministic_worker_id(0)
+    initial_lease = timedelta(minutes=5)
+
+    # Claim the job
+    claimed = await claim_ready_job(
+        session,
+        worker_id=worker_id,
+        now=NOW,
+        lease_duration=initial_lease,
+    )
+    assert claimed is not None
+    original_expiry = NOW + initial_lease
+    assert claimed.lease_expires_at == original_expiry
+
+    # Heartbeat 2 minutes later with 5-minute extension
+    later = NOW + timedelta(minutes=2)
+    extension = timedelta(minutes=5)
+    await heartbeat(
+        session,
+        job_id=claimed.id,
+        worker_id=worker_id,
+        now=later,
+        lease_extension=extension,
+    )
+
+    # Refresh and verify lease was extended from 'later', not original claim time
+    await session.refresh(claimed)
+    assert claimed.heartbeat_at == later
+    expected_new_expiry = later + extension  # 2 min + 5 min = 7 min from NOW
+    assert claimed.lease_expires_at == expected_new_expiry
+    assert claimed.status == JobStatus.RUNNING.value
+
+
 async def test_release_lease_transitions_to_succeeded(session: AsyncSession) -> None:
     """Graceful release clears lease fields and transitions to final status."""
     shop = await make_shop(session)
@@ -297,7 +336,7 @@ async def test_release_lease_rejects_illegal_status(session: AsyncSession) -> No
 
 
 async def test_reclaim_uses_legal_transition_path(session: AsyncSession) -> None:
-    """Reclaim uses legal path: RUNNING → FAILED → READY."""
+    """Reclaim uses legal path: RUNNING → FAILED → READY and bumps attempt."""
     shop = await make_shop(session)
     workflow = await make_workflow(session, shop)
     await make_job(session, workflow, status=JobStatus.READY.value)
@@ -314,6 +353,7 @@ async def test_reclaim_uses_legal_transition_path(session: AsyncSession) -> None
     )
     assert claimed is not None
     assert claimed.status == JobStatus.RUNNING.value
+    initial_attempt = claimed.attempt
 
     # Time passes, lease expires
     after_expiry = NOW + timedelta(minutes=6)
@@ -329,6 +369,8 @@ async def test_reclaim_uses_legal_transition_path(session: AsyncSession) -> None
     assert claimed.lease_owner is None
     assert claimed.lease_expires_at is None
     assert claimed.heartbeat_at is None
+    # Lease expiry counts as a failed attempt, so attempt was bumped
+    assert claimed.attempt == initial_attempt + 1
 
 
 async def test_reclaim_respects_limit(session: AsyncSession) -> None:
@@ -463,3 +505,44 @@ async def test_deterministic_worker_ids() -> None:
 
     # Same index produces same ID
     assert deterministic_worker_id(0) == deterministic_worker_id(0)
+
+
+async def test_reclaim_respects_retry_budget(session: AsyncSession) -> None:
+    """When reclaim bumps attempt past max_attempts, job goes to TERMINAL_FAILURE.
+
+    This is SHOULD-FIX #3: reclaim must respect retry budget, not READY forever.
+    """
+    shop = await make_shop(session)
+    workflow = await make_workflow(session, shop)
+
+    # Create job with max_attempts=2, already at attempt 1
+    await make_job(
+        session,
+        workflow,
+        status=JobStatus.READY.value,
+        scheduled_at=NOW,
+        attempt=1,
+        max_attempts=2,
+    )
+
+    # Claim the job
+    worker_id = deterministic_worker_id(0)
+    lease_duration = timedelta(minutes=5)
+    claimed = await claim_ready_job(
+        session, worker_id=worker_id, now=NOW, lease_duration=lease_duration
+    )
+    assert claimed is not None
+    assert claimed.status == JobStatus.RUNNING.value
+
+    # Lease expires
+    after_expiry = NOW + timedelta(minutes=10)
+
+    # Reclaim: RUNNING → FAILED (attempt 1 → 2) → check budget
+    # Since attempt=2 >= max_attempts=2, should go to TERMINAL_FAILURE
+    reclaimed = await reclaim_expired_leases(session, now=after_expiry, limit=50)
+
+    assert len(reclaimed) == 1
+    assert reclaimed[0].id == claimed.id
+    assert reclaimed[0].status == JobStatus.TERMINAL_FAILURE.value
+    assert reclaimed[0].attempt == 2
+    assert reclaimed[0].lease_owner is None

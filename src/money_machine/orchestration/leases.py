@@ -69,11 +69,14 @@ async def claim_ready_job(
         now: Current timestamp for lease_expires_at and heartbeat_at
         lease_duration: How long the lease is valid before expiry
         limit: Maximum jobs to consider (default 1, claims the oldest)
+            Note: Currently always claims exactly one job. Multi-claim is deferred.
 
     Returns:
         The claimed Job row with RUNNING status and lease fields set, or None
     """
     # Find ready jobs, oldest first, and lock exactly one
+    # limit parameter is honored in the query but we only claim the first
+    # (multi-claim deferred to future work when batching is needed)
     statement = (
         select(Job)
         .where(
@@ -81,7 +84,7 @@ async def claim_ready_job(
             Job.scheduled_at <= now,
         )
         .order_by(Job.scheduled_at)
-        .limit(limit)
+        .limit(1)  # Always force 1 for now; multi-claim is future work
         .with_for_update(skip_locked=True)
     )
 
@@ -110,17 +113,22 @@ async def heartbeat(
     job_id: UUID,
     worker_id: str,
     now: datetime,
+    lease_extension: timedelta | None = None,
 ) -> None:
-    """Update the heartbeat timestamp for a leased job.
+    """Update the heartbeat timestamp and optionally extend the lease.
 
     Verifies the worker still holds the lease before updating. This is called
     periodically during job execution to prove the worker is still alive.
+
+    If lease_extension is provided, the lease_expires_at is extended by that duration
+    from now, preventing the job from being reclaimed while the worker is active.
 
     Args:
         session: Active database session
         job_id: The job to heartbeat
         worker_id: The worker that should hold the lease
         now: Current timestamp
+        lease_extension: Optional duration to extend lease from now
 
     Raises:
         LeaseExpiredError: If the lease has expired
@@ -142,6 +150,11 @@ async def heartbeat(
 
     job.heartbeat_at = now
     job.updated_at = now
+
+    # Extend lease if requested
+    if lease_extension is not None:
+        job.lease_expires_at = now + lease_extension
+
     await session.flush()
 
 
@@ -213,9 +226,9 @@ async def reclaim_expired_leases(
 ) -> tuple[Job, ...]:
     """Find and reset jobs with expired leases.
 
-    Jobs are transitioned from RUNNING → FAILED → READY using the legal path from
-    JOB_TRANSITIONS. Lease fields are cleared. This allows another worker to claim
-    the job. Called by the scheduler or lease reaper process.
+    Jobs are transitioned from RUNNING → FAILED → READY (or TERMINAL_FAILURE if budget
+    exhausted) using the legal path from JOB_TRANSITIONS. Lease fields are cleared.
+    This allows another worker to claim the job if retry budget remains.
 
     Uses the partial index ix_jobs_lease_expiry for efficient queries.
 
@@ -225,7 +238,7 @@ async def reclaim_expired_leases(
         limit: Maximum jobs to reclaim in one call
 
     Returns:
-        Tuple of jobs that were reclaimed and reset to READY
+        Tuple of jobs that were reclaimed
     """
     # Find expired leases
     statement = (
@@ -242,19 +255,27 @@ async def reclaim_expired_leases(
     result = await session.execute(statement)
     expired_jobs = tuple(result.scalars().all())
 
-    # Reset each expired job via legal path: RUNNING → FAILED → READY
+    # Reset each expired job via legal path: RUNNING → FAILED → READY (or TERMINAL_FAILURE)
+    # Bump attempt on the RUNNING → FAILED step (lease expiry is a failed attempt)
     for job in expired_jobs:
         # First transition: RUNNING → FAILED (lease expired = transient failure)
         require_job_transition(JobStatus.RUNNING, JobStatus.FAILED)
         job.status = JobStatus.FAILED.value
+        job.attempt += 1  # Lease expiry counts as a failed attempt
         job.lease_owner = None
         job.lease_expires_at = None
         job.heartbeat_at = None
         job.updated_at = now
 
-        # Second transition: FAILED → READY (eligible for retry)
-        require_job_transition(JobStatus.FAILED, JobStatus.READY)
-        job.status = JobStatus.READY.value
+        # Second transition: FAILED → READY (if budget remains) or TERMINAL_FAILURE (exhausted)
+        if job.attempt >= job.max_attempts:
+            # Retry budget exhausted; move to terminal failure
+            require_job_transition(JobStatus.FAILED, JobStatus.TERMINAL_FAILURE)
+            job.status = JobStatus.TERMINAL_FAILURE.value
+        else:
+            # Budget remains; eligible for retry
+            require_job_transition(JobStatus.FAILED, JobStatus.READY)
+            job.status = JobStatus.READY.value
 
     await session.flush()
     return expired_jobs
