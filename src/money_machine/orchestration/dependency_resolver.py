@@ -63,10 +63,23 @@ async def check_dependencies_satisfied(
         True if all dependencies are satisfied (or there are no dependencies),
         False otherwise
     """
-    # Check if any dependency is unsatisfied (satisfied_at IS NULL)
+    # Check if any dependency is unsatisfied:
+    # - satisfied_at IS NULL, OR
+    # - predecessor job status != SUCCEEDED
     # If such a dependency exists, return False; otherwise True
     unsatisfied_exists = await session.scalar(
-        select(exists().where(JobDependency.job_id == job_id, JobDependency.satisfied_at.is_(None)))
+        select(
+            exists().where(
+                JobDependency.job_id == job_id,
+                JobDependency.satisfied_at.is_(None)
+                | (
+                    select(Job.status)
+                    .where(Job.id == JobDependency.depends_on_job_id)
+                    .scalar_subquery()
+                    != JobStatus.SUCCEEDED.value
+                ),
+            )
+        )
     )
     return not unsatisfied_exists
 
@@ -78,21 +91,23 @@ async def check_workflow_active(
 ) -> bool:
     """Check if a workflow is still active.
 
-    A workflow is active if it has not yet completed (completed_at IS NULL).
+    A workflow is active if it exists AND has not yet completed (completed_at IS NULL).
+    Missing workflows are NOT considered active.
 
     Args:
         session: Active database session
         workflow_id: The workflow to check
 
     Returns:
-        True if the workflow is active, False if completed
+        True if the workflow exists and is active, False if completed or missing
     """
-    # Query returns completed_at value directly (datetime | None)
-    completed_at = await session.scalar(
-        select(WorkflowRun.completed_at).where(WorkflowRun.id == workflow_id)
-    )
-    # Active = completed_at is NULL
-    return completed_at is None
+    # Get the workflow record to distinguish missing vs. completed
+    workflow = await session.get(WorkflowRun, workflow_id)
+    if workflow is None:
+        # Missing workflow is NOT active
+        return False
+    # Active = workflow exists and completed_at is NULL
+    return workflow.completed_at is None
 
 
 async def check_idempotency_collision(

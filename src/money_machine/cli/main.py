@@ -371,38 +371,14 @@ def command_scheduler_run_once(arguments: argparse.Namespace) -> int:
 
 
 def command_worker_run_once(arguments: argparse.Namespace) -> int:
-    """Claim and inspect one job (library only, no execution - fail-closed)."""
-    from money_machine.orchestration.engine import run_worker_once
-    from money_machine.persistence.database import create_engine, create_session_factory
+    """Worker run-once command - fail-closed (Exit 78).
 
-    settings = _settings()
+    This command is registered but not commissioned. It would claim production work,
+    violating the Exit 78 constraint. Session 04+ may commission worker execution.
+    """
+    from money_machine.orchestration._foundation import uncommissioned_process
 
-    async def run() -> dict[str, Any]:
-        from datetime import UTC, datetime
-
-        engine = create_engine(settings.database)
-        try:
-            factory = create_session_factory(engine)
-            async with factory() as session:
-                job = await run_worker_once(
-                    session,
-                    worker_id=arguments.worker_id or "cli-worker-0",
-                    now=datetime.now(UTC),
-                )
-                await session.commit()
-                if job:
-                    return {
-                        "claimed": True,
-                        "id": str(job.id),
-                        "job_type": job.job_type,
-                        "status": job.status,
-                    }
-                return {"claimed": False}
-        finally:
-            await engine.dispose()
-
-    _print(asyncio.run(run()))
-    return EXIT_OK
+    return uncommissioned_process("worker run-once")
 
 
 Handler = Callable[[argparse.Namespace], int]

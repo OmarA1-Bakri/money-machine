@@ -112,6 +112,7 @@ async def detect_stalled_jobs(
 
     Stalled jobs transition RUNNING → FAILED with a specific reason, then follow
     the normal retry path (FAILED → READY or TERMINAL_FAILURE) based on retry class.
+    Emits JOB_STALLED event for each stalled job.
 
     Args:
         session: Active database session
@@ -122,6 +123,10 @@ async def detect_stalled_jobs(
     Returns:
         Tuple of jobs that were transitioned from stalled state
     """
+    from money_machine.domain.events import EventName
+    from money_machine.orchestration.transition_guard import require_job_transition
+    from money_machine.persistence.tables import Event
+
     stall_cutoff = now - stall_threshold
 
     # Find RUNNING jobs that haven't heartbeated recently
@@ -143,15 +148,36 @@ async def detect_stalled_jobs(
     result = await session.execute(statement)
     stalled_jobs = tuple(result.scalars().all())
 
-    # Transition stalled jobs to FAILED
+    # Transition stalled jobs to FAILED using proper transition guard
     # (They'll be retried by the next promote_due_jobs pass if budget remains)
     for job in stalled_jobs:
+        require_job_transition(JobStatus.RUNNING, JobStatus.FAILED)
+
         job.status = JobStatus.FAILED.value
         job.attempt += 1  # Stall counts as a failed attempt
         job.lease_owner = None
         job.lease_expires_at = None
         job.heartbeat_at = None
         job.updated_at = now
+
+        # Emit JOB_STALLED event
+        event = Event(
+            event_name=EventName.JOB_STALLED.value,
+            aggregate_type="Job",
+            aggregate_id=job.id,
+            workflow_id=job.workflow_id,
+            job_id=job.id,
+            payload={
+                "job_type": job.job_type,
+                "stall_threshold_seconds": int(stall_threshold.total_seconds()),
+                "last_heartbeat_at": (
+                    job.heartbeat_at.isoformat() if job.heartbeat_at else None
+                ),
+            },
+            dedupe_key=f"job_stalled:{job.id}:{now.isoformat()}",
+            occurred_at=now,
+        )
+        session.add(event)
 
     await session.flush()
     return stalled_jobs
@@ -213,6 +239,7 @@ async def schedule_maturity_timer(
 async def schedule_weekly_timer(
     session: AsyncSession,
     *,
+    shop_id: UUID,
     trigger_key: str,
     next_fire_at: datetime,
     cron_expression: str = "0 9 * * 1",  # Monday 9 AM UTC
@@ -225,6 +252,7 @@ async def schedule_weekly_timer(
 
     Args:
         session: Active database session
+        shop_id: The shop this trigger belongs to (required, NOT NULL)
         trigger_key: Unique key for this trigger (e.g., "weekly_review_shop_123")
         next_fire_at: When the trigger should next fire
         cron_expression: Cron expression for the schedule
@@ -242,11 +270,9 @@ async def schedule_weekly_timer(
         existing.next_fire_at = next_fire_at
         existing.updated_at = now  # type: ignore[attr-defined]
     else:
-        # Create new trigger
-        # For this implementation, we'll use a placeholder shop_id
-        # Real implementation would determine the correct shop
+        # Create new trigger with real shop_id
         trigger = ScheduledTrigger(
-            shop_id=UUID("00000000-0000-0000-0000-000000000000"),  # Placeholder
+            shop_id=shop_id,
             trigger_kind="WEEKLY_REVIEW",
             trigger_key=trigger_key,
             cron_expression=cron_expression,

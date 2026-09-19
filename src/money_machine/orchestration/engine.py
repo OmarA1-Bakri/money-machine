@@ -48,6 +48,7 @@ async def start_workflow(
     *,
     workflow_type: str,
     product_state: str,
+    shop_id: UUID,
     now: datetime,
 ) -> WorkflowRun:
     """Start a new workflow run.
@@ -59,6 +60,7 @@ async def start_workflow(
         session: Active database session
         workflow_type: The workflow template name
         product_state: Product lifecycle state this workflow operates on
+        shop_id: The shop this workflow belongs to (required, NOT NULL)
         now: Current timestamp
 
     Returns:
@@ -68,6 +70,7 @@ async def start_workflow(
         workflow_type=workflow_type,
         workflow_version=1,  # Default version
         product_state=product_state,
+        shop_id=shop_id,
         parent_workflow_id=None,
         started_at=now,
         completed_at=None,
@@ -141,7 +144,7 @@ async def cancel_workflow(
     """Cancel a workflow and all its pending/ready jobs.
 
     Marks the workflow as completed and transitions all PENDING/READY jobs to
-    BLOCKED (they will not execute).
+    CANCELLED (they will not execute).
 
     Args:
         session: Active database session
@@ -149,7 +152,7 @@ async def cancel_workflow(
         now: Current timestamp
 
     Returns:
-        Tuple of (workflow, num_jobs_blocked)
+        Tuple of (workflow, num_jobs_cancelled)
 
     Raises:
         WorkflowNotFoundError: If workflow doesn't exist
@@ -161,7 +164,7 @@ async def cancel_workflow(
     # Mark workflow complete
     workflow.completed_at = now
 
-    # Block all PENDING and READY jobs
+    # Cancel all PENDING and READY jobs (both can transition to CANCELLED)
     statement = (
         select(Job)
         .where(
@@ -176,8 +179,8 @@ async def cancel_workflow(
 
     for job in jobs:
         current_status = JobStatus(job.status)
-        require_job_transition(current_status, JobStatus.BLOCKED)
-        job.status = JobStatus.BLOCKED.value
+        require_job_transition(current_status, JobStatus.CANCELLED)
+        job.status = JobStatus.CANCELLED.value
         job.updated_at = now
 
     await session.flush()
@@ -195,7 +198,9 @@ async def reconcile_uncertain_effect(
     """Reconcile an uncertain external effect after manual verification.
 
     Updates the effect_attempt record with the reconciliation outcome (CONFIRMED, ABSENT)
-    and allows the job to retry if needed.
+    and transitions the job status accordingly:
+    - CONFIRMED → SUCCEEDED (effect was applied successfully)
+    - ABSENT → FAILED (effect was not applied, job can retry)
 
     Args:
         session: Active database session
@@ -214,6 +219,18 @@ async def reconcile_uncertain_effect(
     if effect_state not in ("CONFIRMED", "ABSENT"):
         raise EngineError(f"effect_state must be CONFIRMED or ABSENT, got {effect_state}")
 
+    # Get the job
+    job = await session.get(Job, job_id, with_for_update=True)
+    if job is None:
+        raise JobNotFoundError(f"Job {job_id} not found")
+
+    # Job must be in UNCERTAIN_EXTERNAL_EFFECT status
+    current_status = JobStatus(job.status)
+    if current_status != JobStatus.UNCERTAIN_EXTERNAL_EFFECT:
+        raise EngineError(
+            f"Job {job_id} is {current_status}, expected UNCERTAIN_EXTERNAL_EFFECT"
+        )
+
     # Find the most recent effect attempt for this job
     statement = (
         select(EffectAttempt)
@@ -228,10 +245,22 @@ async def reconcile_uncertain_effect(
     if effect is None:
         raise EngineError(f"No effect attempt found for job {job_id}")
 
-    # Update with reconciliation outcome
+    # Update effect record with reconciliation outcome
     effect.effect_state = effect_state
     effect.provider_object_id = provider_object_id
     effect.observed_at = now
+
+    # Transition job status based on reconciliation outcome
+    if effect_state == "CONFIRMED":
+        # Effect was applied successfully → transition to SUCCEEDED
+        target_status = JobStatus.SUCCEEDED
+    else:  # ABSENT
+        # Effect was not applied → transition to FAILED (allows retry)
+        target_status = JobStatus.FAILED
+
+    require_job_transition(current_status, target_status)
+    job.status = target_status.value
+    job.updated_at = now
 
     await session.flush()
     return effect
