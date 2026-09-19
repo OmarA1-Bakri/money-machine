@@ -75,7 +75,7 @@ async def test_start_workflow_spawns_entry_jobs(session: AsyncSession) -> None:
     assert schedule_job.status == "PENDING"
     assert schedule_job.owner_agent_id == "A01"
     assert schedule_job.side_effect_class == "NONE"
-    assert schedule_job.retry_class == "SAFE"
+    assert schedule_job.retry_class == "IDEMPOTENT"
     assert schedule_job.scheduled_at == now
     assert schedule_job.idempotency_key.startswith("ENTRY:ScheduleConfigurationJob:")
 
