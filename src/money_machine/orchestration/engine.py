@@ -92,6 +92,9 @@ async def retry_failed_job(
     Evaluates retry eligibility using the retry policy, then transitions
     FAILED → READY with updated scheduled_at per the backoff calculation.
 
+    For RECONCILE_FIRST jobs: checks if reconciliation resolved the uncertain
+    effect (ABSENT or CONFIRMED). If resolved, allows retry like IDEMPOTENT.
+
     Args:
         session: Active database session
         job_id: The FAILED job to retry
@@ -104,6 +107,10 @@ async def retry_failed_job(
         JobNotFoundError: If the job doesn't exist
         InvalidRetryError: If the job cannot be retried
     """
+    from sqlalchemy import select
+
+    from money_machine.persistence.tables import EffectAttempt
+
     job = await session.get(Job, job_id, with_for_update=True)
     if job is None:
         raise JobNotFoundError(f"Job {job_id} not found")
@@ -112,6 +119,23 @@ async def retry_failed_job(
     if current_status != JobStatus.FAILED:
         raise InvalidRetryError(f"Job is {current_status}, not FAILED")
 
+    # Check if reconciliation has resolved (for RECONCILE_FIRST jobs)
+    reconciliation_resolved = False
+    if RetryClass(job.retry_class) == RetryClass.RECONCILE_FIRST:
+        # Look for the most recent effect attempt
+        statement = (
+            select(EffectAttempt)
+            .where(EffectAttempt.job_id == job_id)
+            .order_by(EffectAttempt.reconciliation_attempt.desc())
+            .limit(1)
+        )
+        result = await session.execute(statement)
+        effect = result.scalars().first()
+
+        # Reconciliation is resolved if effect_state is CONFIRMED or ABSENT
+        if effect and effect.effect_state in ("CONFIRMED", "ABSENT"):
+            reconciliation_resolved = True
+
     # Evaluate retry eligibility
     retry_class = RetryClass(job.retry_class)
     decision = evaluate_retry(
@@ -119,6 +143,7 @@ async def retry_failed_job(
         current_attempt=job.attempt,
         max_attempts=job.max_attempts,
         now=now,
+        reconciliation_resolved=reconciliation_resolved,
     )
 
     if not decision.can_retry:
