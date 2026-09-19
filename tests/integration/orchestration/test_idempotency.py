@@ -13,11 +13,10 @@ from decimal import Decimal
 from uuid import UUID
 
 import pytest
-from money_machine.persistence.enums import JobStatus, RetryClass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from money_machine.domain.enums import SideEffectClass
+from money_machine.domain.enums import JobStatus, RetryClass, SideEffectClass
 from money_machine.orchestration.idempotency import (
     IdempotencyKeyReservedError,
     derive_idempotency_key,
