@@ -78,7 +78,7 @@
     "worker_scheduler_fail_closed": true,
     "concurrency_recovery_tests_pass": true,
     "control_files_and_checkpoint_current": true,
-    "evidence_closure_commit_recorded": true
+    "evidence_closure_commit_recorded": false
   },
   "transition_contract": {
     "completion_requires_all_evidence_true": true,
