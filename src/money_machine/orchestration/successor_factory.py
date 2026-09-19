@@ -69,11 +69,11 @@ class SuccessorFactory:
         - Successor workflow starts at DEDUPE_CHECK in a new workflow_id
         - require_successor_spawn validates the boundary
 
-        Wave 6: This is the ONLY production path for creating MULTIPLY successors.
-        The guard (require_successor_spawn) is mandatory and cannot be bypassed:
+        Wave 6: The guard (require_successor_spawn) is enforced inside
+        _create_successor_workflow, so any path that creates a successor workflow
+        MUST pass guard validation. Enforcement layers:
         - Pydantic validation rejects same-workflow successors at construction
-        - require_successor_spawn rejects wrong parent states
-        - _create_successor_workflow is private and only called after validation
+        - _create_successor_workflow calls require_successor_spawn internally
         """
         if occurred_at is None:
             occurred_at = datetime.now(UTC)
@@ -85,15 +85,6 @@ class SuccessorFactory:
         parent_workflow = await self.uow.workflows.get(decision.workflow_id)
         if parent_workflow is None:
             raise ValueError(f"parent workflow {decision.workflow_id} not found")
-
-        # Wave 6: MANDATORY guard — validates successor spawn boundary
-        # This call is required before any successor workflow creation.
-        # It rejects same-workflow re-entry and wrong parent states.
-        successor_entry_state = require_successor_spawn(
-            parent_state=ProductLifecycleState(parent_workflow.product_state),
-            parent_workflow_id=decision.workflow_id,
-            successor_workflow_id=decision.successor_workflow_id,  # type: ignore[arg-type]
-        )
 
         # Transition parent workflow to OBSERVING (guarded)
         from money_machine.orchestration.transition_guard import require_product_transition
@@ -107,12 +98,13 @@ class SuccessorFactory:
         await self.uow.session.flush()
 
         # Create successor workflow
+        # Wave 6: Guard is enforced inside _create_successor_workflow
         successor_workflow_id = await self._create_successor_workflow(
             parent_workflow_id=decision.workflow_id,
+            parent_state=current_state,
             parent_decision_id=decision.decision_id,
             successor_workflow_id=decision.successor_workflow_id,  # type: ignore[arg-type]
             shop_id=parent_workflow.shop_id,
-            successor_state=successor_entry_state,
         )
 
         # Create the initial successor job (BuildSlotJob -> DedupeJob path)
@@ -148,12 +140,25 @@ class SuccessorFactory:
         self,
         *,
         parent_workflow_id: UUID,
+        parent_state: ProductLifecycleState,
         parent_decision_id: UUID,
         successor_workflow_id: UUID,
         shop_id: UUID,
-        successor_state: ProductLifecycleState,
     ) -> UUID:
-        """Create a new workflow row for the successor and return its ID."""
+        """Create a new workflow row for the successor and return its ID.
+
+        Wave 6: This helper ALWAYS calls require_successor_spawn before creating
+        the successor workflow, so even a direct call to this private method
+        cannot bypass the guard. The guard is the enforcement mechanism, not privacy.
+        """
+        # Wave 6: MANDATORY guard enforced at helper level
+        # Validates parent state and cross-workflow boundary
+        successor_entry_state = require_successor_spawn(
+            parent_state=parent_state,
+            parent_workflow_id=parent_workflow_id,
+            successor_workflow_id=successor_workflow_id,
+        )
+
         from money_machine.persistence.tables import WorkflowRun
 
         workflow = WorkflowRun(
@@ -161,7 +166,7 @@ class SuccessorFactory:
             shop_id=shop_id,
             workflow_type="ProductLifecycleWorkflow",
             workflow_version=1,
-            product_state=successor_state.value,
+            product_state=successor_entry_state.value,
             parent_workflow_id=parent_workflow_id,
             parent_decision_id=parent_decision_id,
             started_at=datetime.now(UTC),
