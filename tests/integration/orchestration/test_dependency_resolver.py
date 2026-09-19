@@ -57,7 +57,6 @@ async def test_check_dependencies_satisfied_no_dependencies(session: AsyncSessio
     session.add(workflow)
     await session.flush()
 
-
     job_id = uuid4()
     job = Job(
         idempotency_key=f"test_key_{job_id!s}",
@@ -105,7 +104,6 @@ async def test_check_dependencies_satisfied_with_satisfied_dep(session: AsyncSes
     )
     session.add(workflow)
     await session.flush()
-
 
     predecessor_id = uuid4()
     predecessor = Job(
@@ -180,7 +178,6 @@ async def test_check_dependencies_satisfied_with_unsatisfied_dep(session: AsyncS
     )
     session.add(workflow)
     await session.flush()
-
 
     predecessor_id = uuid4()
     predecessor = Job(
@@ -329,7 +326,6 @@ async def test_check_idempotency_collision_same_job(session: AsyncSession):
     session.add(workflow)
     await session.flush()
 
-
     job_id = uuid4()
     job = Job(
         id=job_id,
@@ -389,7 +385,6 @@ async def test_check_idempotency_collision_different_job(session: AsyncSession):
     )
     session.add(workflow)
     await session.flush()
-
 
     other_job_id = uuid4()
     other_job = Job(
@@ -471,7 +466,6 @@ async def test_evaluate_job_readiness_all_conditions_met(session: AsyncSession):
     session.add(workflow)
     await session.flush()
 
-
     job_id = uuid4()
     job = Job(
         idempotency_key=f"test_key_{job_id!s}",
@@ -522,7 +516,6 @@ async def test_evaluate_job_readiness_not_time_yet(session: AsyncSession):
     session.add(workflow)
     await session.flush()
 
-
     job_id = uuid4()
     job = Job(
         idempotency_key=f"test_key_{job_id!s}",
@@ -572,7 +565,6 @@ async def test_promote_pending_to_ready_success(session: AsyncSession):
     )
     session.add(workflow)
     await session.flush()
-
 
     job_id = uuid4()
     job = Job(
@@ -627,7 +619,6 @@ async def test_promote_pending_to_ready_workflow_inactive(session: AsyncSession)
     session.add(workflow)
     await session.flush()
 
-
     job_id = uuid4()
     job = Job(
         idempotency_key=f"test_key_{job_id!s}",
@@ -676,7 +667,6 @@ async def test_satisfy_dependency(session: AsyncSession):
     )
     session.add(workflow)
     await session.flush()
-
 
     predecessor_id = uuid4()
     predecessor = Job(
@@ -756,7 +746,6 @@ async def test_propagate_dependency_failure(session: AsyncSession):
     )
     session.add(workflow)
     await session.flush()
-
 
     failed_id = uuid4()
     failed_job = Job(

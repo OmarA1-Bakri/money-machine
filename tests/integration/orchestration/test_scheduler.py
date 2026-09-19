@@ -126,7 +126,6 @@ async def test_promote_due_jobs_skips_unsatisfied_deps(session: AsyncSession):
     session.add(workflow)
     await session.flush()
 
-
     predecessor_id = uuid4()
     predecessor = Job(
         idempotency_key=f"test_key_{predecessor_id!s}",
