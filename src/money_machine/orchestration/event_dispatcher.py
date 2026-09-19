@@ -94,39 +94,39 @@ class EventDispatcher:
             occurred_at = datetime.now(UTC)
 
         # For MULTIPLY decisions, create the successor workflow and jobs FIRST
-        # Wave 6: Emit WINNER_DETECTED only AFTER successful successor creation
-        # This prevents orphan events when guard validation fails
+        # Wave 6: Emit WINNER_DETECTED only AFTER successful successor validation
+        # This prevents orphan events when guard rejects (raises exception)
         successor_job_ids = await self.factory.create_multiply_successor(
             decision=decision,
             parent_job_id=parent_job_id,
             occurred_at=occurred_at,
         )
 
-        # Only emit WINNER_DETECTED if successor creation succeeded
-        if successor_job_ids:
-            event_name = EventName.WINNER_DETECTED
-            dedupe_key = self._dedupe_key(
-                event_name,
-                decision.decision_id,
-                decision.workflow_id,
-                parent_job_id,
-            )
+        # If we reach here, validation succeeded (even if no successor for non-MULTIPLY)
+        # Emit WINNER_DETECTED for all decisions that pass validation
+        event_name = EventName.WINNER_DETECTED
+        dedupe_key = self._dedupe_key(
+            event_name,
+            decision.decision_id,
+            decision.workflow_id,
+            parent_job_id,
+        )
 
-            try:
-                await self.uow.events.append(
-                    event_name=event_name,
-                    aggregate_type="decisions",
-                    aggregate_id=decision.decision_id,
-                    workflow_id=decision.workflow_id,
-                    job_id=parent_job_id,
-                    payload={"decision": decision.decision.value},
-                    dedupe_key=dedupe_key,
-                    occurred_at=occurred_at,
-                )
-            except EventAppendError:
-                existing = await self.uow.events.by_dedupe_key(dedupe_key)
-                if existing is None:
-                    raise
+        try:
+            await self.uow.events.append(
+                event_name=event_name,
+                aggregate_type="decisions",
+                aggregate_id=decision.decision_id,
+                workflow_id=decision.workflow_id,
+                job_id=parent_job_id,
+                payload={"decision": decision.decision.value},
+                dedupe_key=dedupe_key,
+                occurred_at=occurred_at,
+            )
+        except EventAppendError:
+            existing = await self.uow.events.by_dedupe_key(dedupe_key)
+            if existing is None:
+                raise
 
         return successor_job_ids
 
