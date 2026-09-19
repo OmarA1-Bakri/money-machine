@@ -16,8 +16,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from money_machine.domain.enums import JobStatus, RetryClass, SideEffectClass
 from money_machine.orchestration.idempotency import (
@@ -32,32 +31,13 @@ from money_machine.orchestration.reconciliation import (
     apply_reconciliation_result,
     reconcile_uncertain_effect,
 )
-from money_machine.persistence.tables import Base, Job
+from money_machine.persistence.tables import Job
 
 # Deterministic UUIDs for tests (no uuid4)
 JOB_ID_1 = UUID("00000000-0000-0000-0000-000000000001")
 WORKFLOW_ID_1 = UUID("10000000-0000-0000-0000-000000000001")
 OBJECT_ID_1 = UUID("20000000-0000-0000-0000-000000000001")
 AGENT_RUN_ID_1 = UUID("30000000-0000-0000-0000-000000000001")
-
-
-@pytest.fixture
-async def db_session(test_database: str) -> AsyncSession:
-    """Create tables and return a session for one test."""
-    engine = create_async_engine(test_database, echo=False)
-
-    # Create all tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    # Create session
-    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    session = async_session()
-
-    yield session
-
-    await session.close()
-    await engine.dispose()
 
 
 async def create_uncertain_job(
@@ -94,19 +74,19 @@ async def create_uncertain_job(
 
 
 @pytest.mark.asyncio
-async def test_reconcile_uncertain_effect_confirmed(db_session: AsyncSession) -> None:
+async def test_reconcile_uncertain_effect_confirmed(session: AsyncSession) -> None:
     """Reconcile UNCERTAIN_EXTERNAL_EFFECT job to SUCCEEDED when effect is CONFIRMED."""
     now = datetime(2026, 9, 19, 2, 0, 0, tzinfo=UTC)
     idempotency_key = "test-key-1"
 
     # Create job
-    job = await create_uncertain_job(
-        db_session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now
+    await create_uncertain_job(
+        session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now
     )
 
     # Reserve idempotency key
     await reserve_idempotency_key(
-        db_session,
+        session,
         idempotency_key=idempotency_key,
         job_id=JOB_ID_1,
         operation="etsy.create_draft",
@@ -116,7 +96,7 @@ async def test_reconcile_uncertain_effect_confirmed(db_session: AsyncSession) ->
 
     # Record initial uncertain effect
     await record_effect_attempt(
-        db_session,
+        session,
         idempotency_key=idempotency_key,
         job_id=JOB_ID_1,
         agent_run_id=AGENT_RUN_ID_1,
@@ -135,7 +115,7 @@ async def test_reconcile_uncertain_effect_confirmed(db_session: AsyncSession) ->
     )
 
     result = await reconcile_uncertain_effect(
-        db_session,
+        session,
         job_id=JOB_ID_1,
         reconciler=reconciler,
         max_reconciliation_attempts=3,
@@ -149,7 +129,7 @@ async def test_reconcile_uncertain_effect_confirmed(db_session: AsyncSession) ->
     assert "CONFIRMED" in result.reason
 
     # Verify effect_attempts row was created
-    latest = await get_latest_effect_attempt(db_session, idempotency_key=idempotency_key)
+    latest = await get_latest_effect_attempt(session, idempotency_key=idempotency_key)
     assert latest is not None
     assert latest.reconciliation_attempt == 1
     assert latest.effect_state == "CONFIRMED"
@@ -157,19 +137,19 @@ async def test_reconcile_uncertain_effect_confirmed(db_session: AsyncSession) ->
 
 
 @pytest.mark.asyncio
-async def test_reconcile_uncertain_effect_absent(db_session: AsyncSession) -> None:
+async def test_reconcile_uncertain_effect_absent(session: AsyncSession) -> None:
     """Reconcile UNCERTAIN_EXTERNAL_EFFECT job to FAILED when effect is ABSENT."""
     now = datetime(2026, 9, 19, 2, 0, 0, tzinfo=UTC)
     idempotency_key = "test-key-1"
 
     # Create job
     await create_uncertain_job(
-        db_session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now
+        session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now
     )
 
     # Reserve idempotency key
     await reserve_idempotency_key(
-        db_session,
+        session,
         idempotency_key=idempotency_key,
         job_id=JOB_ID_1,
         operation="etsy.create_draft",
@@ -179,7 +159,7 @@ async def test_reconcile_uncertain_effect_absent(db_session: AsyncSession) -> No
 
     # Record initial uncertain effect
     await record_effect_attempt(
-        db_session,
+        session,
         idempotency_key=idempotency_key,
         job_id=JOB_ID_1,
         agent_run_id=AGENT_RUN_ID_1,
@@ -198,7 +178,7 @@ async def test_reconcile_uncertain_effect_absent(db_session: AsyncSession) -> No
     )
 
     result = await reconcile_uncertain_effect(
-        db_session,
+        session,
         job_id=JOB_ID_1,
         reconciler=reconciler,
         max_reconciliation_attempts=3,
@@ -212,7 +192,7 @@ async def test_reconcile_uncertain_effect_absent(db_session: AsyncSession) -> No
     assert "ABSENT" in result.reason
 
     # Verify effect_attempts row
-    latest = await get_latest_effect_attempt(db_session, idempotency_key=idempotency_key)
+    latest = await get_latest_effect_attempt(session, idempotency_key=idempotency_key)
     assert latest is not None
     assert latest.effect_state == "ABSENT"
     assert latest.provider_object_id is None
@@ -220,7 +200,7 @@ async def test_reconcile_uncertain_effect_absent(db_session: AsyncSession) -> No
 
 @pytest.mark.asyncio
 async def test_reconcile_uncertain_effect_unknown_stays_uncertain(
-    db_session: AsyncSession,
+    session: AsyncSession,
 ) -> None:
     """Reconcile UNCERTAIN_EXTERNAL_EFFECT stays uncertain if budget remains."""
     now = datetime(2026, 9, 19, 2, 0, 0, tzinfo=UTC)
@@ -228,12 +208,12 @@ async def test_reconcile_uncertain_effect_unknown_stays_uncertain(
 
     # Create job
     await create_uncertain_job(
-        db_session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now
+        session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now
     )
 
     # Reserve idempotency key
     await reserve_idempotency_key(
-        db_session,
+        session,
         idempotency_key=idempotency_key,
         job_id=JOB_ID_1,
         operation="etsy.create_draft",
@@ -243,7 +223,7 @@ async def test_reconcile_uncertain_effect_unknown_stays_uncertain(
 
     # Record initial uncertain effect
     await record_effect_attempt(
-        db_session,
+        session,
         idempotency_key=idempotency_key,
         job_id=JOB_ID_1,
         agent_run_id=AGENT_RUN_ID_1,
@@ -262,7 +242,7 @@ async def test_reconcile_uncertain_effect_unknown_stays_uncertain(
     )
 
     result = await reconcile_uncertain_effect(
-        db_session,
+        session,
         job_id=JOB_ID_1,
         reconciler=reconciler,
         max_reconciliation_attempts=3,
@@ -276,19 +256,19 @@ async def test_reconcile_uncertain_effect_unknown_stays_uncertain(
 
 
 @pytest.mark.asyncio
-async def test_reconcile_uncertain_effect_budget_exhausted(db_session: AsyncSession) -> None:
+async def test_reconcile_uncertain_effect_budget_exhausted(session: AsyncSession) -> None:
     """Reconcile moves to BLOCKED when reconciliation budget is exhausted."""
     now = datetime(2026, 9, 19, 2, 0, 0, tzinfo=UTC)
     idempotency_key = "test-key-1"
 
     # Create job
     await create_uncertain_job(
-        db_session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now
+        session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now
     )
 
     # Reserve idempotency key
     await reserve_idempotency_key(
-        db_session,
+        session,
         idempotency_key=idempotency_key,
         job_id=JOB_ID_1,
         operation="etsy.create_draft",
@@ -298,7 +278,7 @@ async def test_reconcile_uncertain_effect_budget_exhausted(db_session: AsyncSess
 
     # Record initial uncertain effect
     await record_effect_attempt(
-        db_session,
+        session,
         idempotency_key=idempotency_key,
         job_id=JOB_ID_1,
         agent_run_id=AGENT_RUN_ID_1,
@@ -312,7 +292,7 @@ async def test_reconcile_uncertain_effect_budget_exhausted(db_session: AsyncSess
 
     # Reconcile twice more to reach attempt 2
     await record_effect_attempt(
-        db_session,
+        session,
         idempotency_key=idempotency_key,
         job_id=JOB_ID_1,
         agent_run_id=None,
@@ -325,7 +305,7 @@ async def test_reconcile_uncertain_effect_budget_exhausted(db_session: AsyncSess
     )
 
     await record_effect_attempt(
-        db_session,
+        session,
         idempotency_key=idempotency_key,
         job_id=JOB_ID_1,
         agent_run_id=None,
@@ -344,7 +324,7 @@ async def test_reconcile_uncertain_effect_budget_exhausted(db_session: AsyncSess
     )
 
     result = await reconcile_uncertain_effect(
-        db_session,
+        session,
         job_id=JOB_ID_1,
         reconciler=reconciler,
         max_reconciliation_attempts=3,
@@ -358,7 +338,7 @@ async def test_reconcile_uncertain_effect_budget_exhausted(db_session: AsyncSess
 
 
 @pytest.mark.asyncio
-async def test_reconcile_raises_if_not_uncertain(db_session: AsyncSession) -> None:
+async def test_reconcile_raises_if_not_uncertain(session: AsyncSession) -> None:
     """reconcile_uncertain_effect raises ValueError if job is not UNCERTAIN_EXTERNAL_EFFECT."""
     now = datetime(2026, 9, 19, 2, 0, 0, tzinfo=UTC)
     idempotency_key = "test-key-1"
@@ -384,12 +364,12 @@ async def test_reconcile_raises_if_not_uncertain(db_session: AsyncSession) -> No
         created_at=now,
         updated_at=now,
     )
-    db_session.add(job)
-    await db_session.flush()
+    session.add(job)
+    await session.flush()
 
     # Reserve idempotency key
     await reserve_idempotency_key(
-        db_session,
+        session,
         idempotency_key=idempotency_key,
         job_id=JOB_ID_1,
         operation="etsy.create_draft",
@@ -401,7 +381,7 @@ async def test_reconcile_raises_if_not_uncertain(db_session: AsyncSession) -> No
 
     with pytest.raises(ValueError, match="expected UNCERTAIN_EXTERNAL_EFFECT"):
         await reconcile_uncertain_effect(
-            db_session,
+            session,
             job_id=JOB_ID_1,
             reconciler=reconciler,
             now=now,
@@ -409,14 +389,14 @@ async def test_reconcile_raises_if_not_uncertain(db_session: AsyncSession) -> No
 
 
 @pytest.mark.asyncio
-async def test_apply_reconciliation_result_transitions_job(db_session: AsyncSession) -> None:
+async def test_apply_reconciliation_result_transitions_job(session: AsyncSession) -> None:
     """apply_reconciliation_result transitions job to determined status."""
     now = datetime(2026, 9, 19, 2, 0, 0, tzinfo=UTC)
     idempotency_key = "test-key-1"
 
     # Create job
     job = await create_uncertain_job(
-        db_session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now
+        session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now
     )
 
     assert job.status == JobStatus.UNCERTAIN_EXTERNAL_EFFECT.value
@@ -433,31 +413,31 @@ async def test_apply_reconciliation_result_transitions_job(db_session: AsyncSess
     )
 
     await apply_reconciliation_result(
-        db_session,
+        session,
         job_id=JOB_ID_1,
         result=result,
         now=now,
     )
 
     # Verify job status changed
-    await db_session.refresh(job)
+    await session.refresh(job)
     assert job.status == JobStatus.SUCCEEDED.value
 
 
 @pytest.mark.asyncio
-async def test_reconcile_raises_if_budget_exceeded(db_session: AsyncSession) -> None:
+async def test_reconcile_raises_if_budget_exceeded(session: AsyncSession) -> None:
     """reconcile_uncertain_effect raises ReconciliationBudgetExhausted if attempts > max."""
     now = datetime(2026, 9, 19, 2, 0, 0, tzinfo=UTC)
     idempotency_key = "test-key-1"
 
     # Create job
     await create_uncertain_job(
-        db_session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now
+        session, job_id=JOB_ID_1, idempotency_key=idempotency_key, now=now
     )
 
     # Reserve idempotency key
     await reserve_idempotency_key(
-        db_session,
+        session,
         idempotency_key=idempotency_key,
         job_id=JOB_ID_1,
         operation="etsy.create_draft",
@@ -468,7 +448,7 @@ async def test_reconcile_raises_if_budget_exceeded(db_session: AsyncSession) -> 
     # Exhaust the budget (attempts 0, 1, 2, 3)
     for attempt in range(4):
         await record_effect_attempt(
-            db_session,
+            session,
             idempotency_key=idempotency_key,
             job_id=JOB_ID_1,
             agent_run_id=AGENT_RUN_ID_1 if attempt == 0 else None,
@@ -485,7 +465,7 @@ async def test_reconcile_raises_if_budget_exceeded(db_session: AsyncSession) -> 
 
     with pytest.raises(ReconciliationBudgetExhausted, match="reconciliation budget exhausted"):
         await reconcile_uncertain_effect(
-            db_session,
+            session,
             job_id=JOB_ID_1,
             reconciler=reconciler,
             max_reconciliation_attempts=3,

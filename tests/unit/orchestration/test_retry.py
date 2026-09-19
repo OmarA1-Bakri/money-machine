@@ -190,7 +190,7 @@ def test_evaluate_retry_raises_on_exhausted_budget() -> None:
     """evaluate_retry raises ValueError if current_attempt >= max_attempts."""
     now = datetime(2026, 9, 19, 0, 0, 0, tzinfo=UTC)
 
-    with pytest.raises(ValueError, match="current_attempt.*>= max_attempts"):
+    with pytest.raises(ValueError, match=r"current_attempt.*>= max_attempts"):
         evaluate_retry(
             retry_class=RetryClass.SAFE,
             current_attempt=3,

@@ -339,7 +339,7 @@ async def test_reclaim_uses_legal_transition_path(session: AsyncSession) -> None
     """Reclaim uses legal path: RUNNING → FAILED → READY and bumps attempt."""
     shop = await make_shop(session)
     workflow = await make_workflow(session, shop)
-    job = await make_job(session, workflow, status=JobStatus.READY.value)
+    await make_job(session, workflow, status=JobStatus.READY.value)
 
     worker_id = deterministic_worker_id(0)
     lease_duration = timedelta(minutes=5)

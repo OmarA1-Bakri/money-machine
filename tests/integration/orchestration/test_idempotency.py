@@ -14,8 +14,7 @@ from uuid import UUID
 
 import pytest
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from money_machine.domain.enums import SideEffectClass
 from money_machine.orchestration.idempotency import (
@@ -28,7 +27,7 @@ from money_machine.orchestration.idempotency import (
     record_receipt,
     reserve_idempotency_key,
 )
-from money_machine.persistence.tables import Base, EffectAttempt, IdempotencyRecord, Receipt
+from money_machine.persistence.tables import IdempotencyRecord, Receipt
 
 # Deterministic UUIDs for tests (no uuid4)
 JOB_ID_1 = UUID("00000000-0000-0000-0000-000000000001")
@@ -38,32 +37,13 @@ OBJECT_ID_1 = UUID("20000000-0000-0000-0000-000000000001")
 AGENT_RUN_ID_1 = UUID("30000000-0000-0000-0000-000000000001")
 
 
-@pytest.fixture
-async def db_session(test_database: str) -> AsyncSession:
-    """Create tables and return a session for one test."""
-    engine = create_async_engine(test_database, echo=False)
-
-    # Create all tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    # Create session
-    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    session = async_session()
-
-    yield session
-
-    await session.close()
-    await engine.dispose()
-
-
 @pytest.mark.asyncio
-async def test_reserve_idempotency_key_success(db_session: AsyncSession) -> None:
+async def test_reserve_idempotency_key_success(session: AsyncSession) -> None:
     """reserve_idempotency_key creates a row with the given key."""
     now = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
 
     reservation = await reserve_idempotency_key(
-        db_session,
+        session,
         idempotency_key="test-key-1",
         job_id=JOB_ID_1,
         operation="etsy.create_draft",
@@ -76,10 +56,8 @@ async def test_reserve_idempotency_key_success(db_session: AsyncSession) -> None
     assert reservation.reserved_at == now
 
     # Verify row exists in database
-    statement = select(IdempotencyRecord).where(
-        IdempotencyRecord.idempotency_key == "test-key-1"
-    )
-    result = await db_session.execute(statement)
+    statement = select(IdempotencyRecord).where(IdempotencyRecord.idempotency_key == "test-key-1")
+    result = await session.execute(statement)
     record = result.scalars().one()
 
     assert record.idempotency_key == "test-key-1"
@@ -91,13 +69,13 @@ async def test_reserve_idempotency_key_success(db_session: AsyncSession) -> None
 
 
 @pytest.mark.asyncio
-async def test_reserve_idempotency_key_raises_on_duplicate(db_session: AsyncSession) -> None:
+async def test_reserve_idempotency_key_raises_on_duplicate(session: AsyncSession) -> None:
     """reserve_idempotency_key raises IdempotencyKeyReservedError if key already exists."""
     now = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
 
     # First reservation succeeds
     await reserve_idempotency_key(
-        db_session,
+        session,
         idempotency_key="test-key-1",
         job_id=JOB_ID_1,
         operation="etsy.create_draft",
@@ -106,9 +84,9 @@ async def test_reserve_idempotency_key_raises_on_duplicate(db_session: AsyncSess
     )
 
     # Second reservation fails
-    with pytest.raises(IdempotencyKeyReservedError, match="test-key-1.*already reserved"):
+    with pytest.raises(IdempotencyKeyReservedError, match=r"test-key-1.*already reserved"):
         await reserve_idempotency_key(
-            db_session,
+            session,
             idempotency_key="test-key-1",
             job_id=JOB_ID_2,
             operation="etsy.create_draft",
@@ -118,14 +96,14 @@ async def test_reserve_idempotency_key_raises_on_duplicate(db_session: AsyncSess
 
 
 @pytest.mark.asyncio
-async def test_mark_idempotency_completed(db_session: AsyncSession) -> None:
+async def test_mark_idempotency_completed(session: AsyncSession) -> None:
     """mark_idempotency_completed sets completed_at timestamp."""
     reserved_at = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
     completed_at = datetime(2026, 9, 19, 1, 0, 5, tzinfo=UTC)
 
     # Reserve the key
     await reserve_idempotency_key(
-        db_session,
+        session,
         idempotency_key="test-key-1",
         job_id=JOB_ID_1,
         operation="etsy.create_draft",
@@ -135,31 +113,31 @@ async def test_mark_idempotency_completed(db_session: AsyncSession) -> None:
 
     # Mark as completed
     await mark_idempotency_completed(
-        db_session,
+        session,
         idempotency_key="test-key-1",
         now=completed_at,
     )
 
     # Verify completed_at is set
-    record = await get_idempotency_record(db_session, idempotency_key="test-key-1")
+    record = await get_idempotency_record(session, idempotency_key="test-key-1")
     assert record is not None
     assert record.completed_at == completed_at
 
 
 @pytest.mark.asyncio
-async def test_get_idempotency_record_not_found(db_session: AsyncSession) -> None:
+async def test_get_idempotency_record_not_found(session: AsyncSession) -> None:
     """get_idempotency_record returns None if key doesn't exist."""
-    record = await get_idempotency_record(db_session, idempotency_key="nonexistent")
+    record = await get_idempotency_record(session, idempotency_key="nonexistent")
     assert record is None
 
 
 @pytest.mark.asyncio
-async def test_record_effect_attempt_initial(db_session: AsyncSession) -> None:
+async def test_record_effect_attempt_initial(session: AsyncSession) -> None:
     """record_effect_attempt creates initial effect_attempts row."""
     now = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
 
     attempt = await record_effect_attempt(
-        db_session,
+        session,
         idempotency_key="test-key-1",
         job_id=JOB_ID_1,
         agent_run_id=AGENT_RUN_ID_1,
@@ -183,14 +161,14 @@ async def test_record_effect_attempt_initial(db_session: AsyncSession) -> None:
 
 
 @pytest.mark.asyncio
-async def test_record_effect_attempt_reconciliation(db_session: AsyncSession) -> None:
+async def test_record_effect_attempt_reconciliation(session: AsyncSession) -> None:
     """record_effect_attempt increments reconciliation_attempt on subsequent calls."""
     now1 = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
     now2 = datetime(2026, 9, 19, 1, 0, 5, tzinfo=UTC)
 
     # Initial attempt
     await record_effect_attempt(
-        db_session,
+        session,
         idempotency_key="test-key-1",
         job_id=JOB_ID_1,
         agent_run_id=AGENT_RUN_ID_1,
@@ -204,7 +182,7 @@ async def test_record_effect_attempt_reconciliation(db_session: AsyncSession) ->
 
     # Reconciliation attempt
     attempt2 = await record_effect_attempt(
-        db_session,
+        session,
         idempotency_key="test-key-1",
         job_id=JOB_ID_1,
         agent_run_id=None,  # Reconciliation is not an agent execution
@@ -223,7 +201,7 @@ async def test_record_effect_attempt_reconciliation(db_session: AsyncSession) ->
 
 
 @pytest.mark.asyncio
-async def test_get_latest_effect_attempt(db_session: AsyncSession) -> None:
+async def test_get_latest_effect_attempt(session: AsyncSession) -> None:
     """get_latest_effect_attempt returns the row with highest reconciliation_attempt."""
     now1 = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
     now2 = datetime(2026, 9, 19, 1, 0, 5, tzinfo=UTC)
@@ -231,7 +209,7 @@ async def test_get_latest_effect_attempt(db_session: AsyncSession) -> None:
 
     # Create three attempts
     await record_effect_attempt(
-        db_session,
+        session,
         idempotency_key="test-key-1",
         job_id=JOB_ID_1,
         agent_run_id=AGENT_RUN_ID_1,
@@ -244,7 +222,7 @@ async def test_get_latest_effect_attempt(db_session: AsyncSession) -> None:
     )
 
     await record_effect_attempt(
-        db_session,
+        session,
         idempotency_key="test-key-1",
         job_id=JOB_ID_1,
         agent_run_id=None,
@@ -257,7 +235,7 @@ async def test_get_latest_effect_attempt(db_session: AsyncSession) -> None:
     )
 
     await record_effect_attempt(
-        db_session,
+        session,
         idempotency_key="test-key-1",
         job_id=JOB_ID_1,
         agent_run_id=None,
@@ -270,7 +248,7 @@ async def test_get_latest_effect_attempt(db_session: AsyncSession) -> None:
     )
 
     # get_latest_effect_attempt returns the one with reconciliation_attempt=2
-    latest = await get_latest_effect_attempt(db_session, idempotency_key="test-key-1")
+    latest = await get_latest_effect_attempt(session, idempotency_key="test-key-1")
     assert latest is not None
     assert latest.reconciliation_attempt == 2
     assert latest.effect_state == "CONFIRMED"
@@ -278,12 +256,12 @@ async def test_get_latest_effect_attempt(db_session: AsyncSession) -> None:
 
 
 @pytest.mark.asyncio
-async def test_record_receipt_append_only(db_session: AsyncSession) -> None:
+async def test_record_receipt_append_only(session: AsyncSession) -> None:
     """record_receipt creates an append-only receipt row."""
     now = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
 
     receipt = await record_receipt(
-        db_session,
+        session,
         job_id=JOB_ID_1,
         idempotency_key="test-key-1",
         provider="etsy",
@@ -308,19 +286,19 @@ async def test_record_receipt_append_only(db_session: AsyncSession) -> None:
 
     # Verify row exists in database
     statement = select(Receipt).where(Receipt.idempotency_key == "test-key-1")
-    result = await db_session.execute(statement)
+    result = await session.execute(statement)
     db_receipt = result.scalars().one()
 
     assert db_receipt.idempotency_key == "test-key-1"
 
 
 @pytest.mark.asyncio
-async def test_record_receipt_with_amount(db_session: AsyncSession) -> None:
+async def test_record_receipt_with_amount(session: AsyncSession) -> None:
     """record_receipt handles EXTERNAL_SPEND with amount and currency."""
     now = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
 
     receipt = await record_receipt(
-        db_session,
+        session,
         job_id=JOB_ID_1,
         idempotency_key="test-key-1",
         provider="etsy",

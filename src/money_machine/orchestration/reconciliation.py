@@ -149,29 +149,18 @@ async def reconcile_uncertain_effect(
         raise ValueError(f"job {job_id} not found")
 
     if job.status != JobStatus.UNCERTAIN_EXTERNAL_EFFECT.value:
-        raise ValueError(
-            f"job {job_id} is {job.status}, expected UNCERTAIN_EXTERNAL_EFFECT"
-        )
+        raise ValueError(f"job {job_id} is {job.status}, expected UNCERTAIN_EXTERNAL_EFFECT")
 
     # Fetch the idempotency record
-    idempotency_record = await get_idempotency_record(
-        session, idempotency_key=job.idempotency_key
-    )
+    idempotency_record = await get_idempotency_record(session, idempotency_key=job.idempotency_key)
     if idempotency_record is None:
-        raise ValueError(
-            f"no idempotency record for job {job_id} key {job.idempotency_key!r}"
-        )
+        raise ValueError(f"no idempotency record for job {job_id} key {job.idempotency_key!r}")
 
     # Fetch the latest effect attempt
-    latest_attempt = await get_latest_effect_attempt(
-        session, idempotency_key=job.idempotency_key
-    )
+    latest_attempt = await get_latest_effect_attempt(session, idempotency_key=job.idempotency_key)
 
-    if latest_attempt is None:
-        # No effect_attempts row exists yet; this is the first reconciliation
-        current_reconciliation = 0
-    else:
-        current_reconciliation = latest_attempt.reconciliation_attempt
+    # No effect_attempts row exists yet if None; this is the first reconciliation
+    current_reconciliation = 0 if latest_attempt is None else latest_attempt.reconciliation_attempt
 
     # Check if budget is exhausted
     next_reconciliation = current_reconciliation + 1
@@ -218,9 +207,7 @@ async def reconcile_uncertain_effect(
             if next_reconciliation >= max_reconciliation_attempts:
                 # Budget exhausted; move to BLOCKED and open an incident
                 next_status = JobStatus.BLOCKED
-                reason = (
-                    f"reconciliation budget exhausted after {next_reconciliation} attempts"
-                )
+                reason = f"reconciliation budget exhausted after {next_reconciliation} attempts"
             else:
                 # Budget remaining; stay in UNCERTAIN_EXTERNAL_EFFECT
                 # (caller will retry reconciliation)

@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 from money_machine.domain.enums import JobStatus, RetryClass
 
 if TYPE_CHECKING:
-    from uuid import UUID
+    pass
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -30,7 +30,7 @@ class RetryDecision:
     """
 
     can_retry: bool
-    """True if the job should transition FAILED → READY; False if it should go to TERMINAL_FAILURE."""
+    """True if job should transition FAILED → READY; False for TERMINAL_FAILURE."""
 
     next_attempt: int
     """The attempt number for the next execution (current attempt + 1)."""
