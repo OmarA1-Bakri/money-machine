@@ -1,8 +1,10 @@
 # Next Session
 
-**Session 03 remains ACTIVE** — gap-close implementation present (2026-09-19), awaiting Verifier workbook-exit gate. All library functions and tests implemented under Exit 78. Session status: **INCOMPLETE** pending Verifier PASS. Do not advance to Session 04 until Verifier approval.
+**Session 03 is COMPLETE** (2026-09-19) — gap-close implementation validated and closed by Verifier FINAL PASS. Exit 78 remains in place per Session 03 contract; commissioning and Exit 78 removal deferred to Session 04.
 
-## 2026-09-11 recovery review
+**Next: Session 04** — Agent Runtime and Roster. Session 04 will implement agent runtime, prompt loading, and roster evidence gates. Only after Session 04 completion may commissioning occur and Exit 78 be removed.
+
+## Session 03 Completion Summary
 
 Resume from [the recovery review and finish plan](reviews/2026-09-11-recovery-review-and-finish-plan.md). The canonical branch remains `build/full-automation`; the older integration tree is a protected reuse source, including its unfinished Session08 work. The readiness/database-URL/production-environment findings are now repaired: [startup repair record](reviews/2026-09-11-startup-repair.md), 125 affected tests passed with no skips and static checks clean. Next complete Session03 prompt integrity and activation, port the existing durable orchestration behavior to the canonical schema, and prove a persisted workflow survives restart. Neither wave advances session state or claims live commissioning.
 
