@@ -55,13 +55,15 @@ def evaluate_retry(
     backoff_multiplier: float = 2.0,
     max_delay_seconds: float = 300.0,
     now: datetime | None = None,
+    reconciliation_resolved: bool = False,
 ) -> RetryDecision:
     """Evaluate whether a failed job may retry and when it should run.
 
     Implements the Session 03 addendum's retry mapping:
     - SAFE: Always retry (read-only, no external effects)
     - IDEMPOTENT: Retry (external write that's safe to repeat)
-    - RECONCILE_FIRST: Do not retry here; reconciliation is required first
+    - RECONCILE_FIRST: Do not retry while UNCERTAIN; after reconciliation resolves
+      (ABSENT or CONFIRMED), allow retry like IDEMPOTENT
     - MANUAL_RESUME: Do not retry; operator intervention required
     - NEVER: Do not retry; non-retryable failure
 
@@ -75,6 +77,7 @@ def evaluate_retry(
         backoff_multiplier: Exponential growth factor (typically 2.0)
         max_delay_seconds: Cap on the backoff delay
         now: Current timestamp (defaults to datetime.now(UTC))
+        reconciliation_resolved: True if reconciliation determined ABSENT/CONFIRMED
 
     Returns:
         RetryDecision with can_retry, next_attempt, scheduled_at, and reason
@@ -134,13 +137,28 @@ def evaluate_retry(
             )
 
         case RetryClass.RECONCILE_FIRST:
-            # RECONCILE_FIRST = uncertain external effect, reconciliation required
-            return RetryDecision(
-                can_retry=False,
-                next_attempt=next_attempt,
-                scheduled_at=None,
-                reason="RECONCILE_FIRST: reconciliation required before retry",
-            )
+            # RECONCILE_FIRST: reconciliation required before retry
+            # BUT: if reconciliation has already resolved (ABSENT/CONFIRMED), allow retry
+            if reconciliation_resolved:
+                # Reconciliation determined state; retry like IDEMPOTENT
+                delay = _calculate_backoff(
+                    current_attempt, base_delay_seconds, backoff_multiplier, max_delay_seconds
+                )
+                scheduled_at = now + timedelta(seconds=delay)
+                return RetryDecision(
+                    can_retry=True,
+                    next_attempt=next_attempt,
+                    scheduled_at=scheduled_at,
+                    reason=f"RECONCILE_FIRST resolved, retry after {delay:.1f}s backoff",
+                )
+            else:
+                # Still UNCERTAIN or reconciliation not yet run
+                return RetryDecision(
+                    can_retry=False,
+                    next_attempt=next_attempt,
+                    scheduled_at=None,
+                    reason="RECONCILE_FIRST: reconciliation required before retry",
+                )
 
         case RetryClass.MANUAL_RESUME:
             # MANUAL_RESUME = operator intervention required

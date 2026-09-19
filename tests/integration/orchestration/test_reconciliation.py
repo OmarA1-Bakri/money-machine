@@ -570,16 +570,15 @@ async def test_absent_to_failed_allows_retry_after_reconciliation(session: Async
     )
     assert requires_reconcile is False
 
-    # Now evaluate_retry should work (not blocked by RECONCILE_FIRST)
-    # Note: evaluate_retry doesn't know about reconciliation_resolved, so we prove the
-    # logic works by checking must_reconcile_first separately. Worker would call
-    # is_reconciliation_resolved first, then pass it to must_reconcile_first.
+    # Now evaluate_retry with RECONCILE_FIRST and reconciliation_resolved=True should allow retry
     decision = evaluate_retry(
-        retry_class=RetryClass.SAFE,  # Simulate SAFE for retry evaluation
+        retry_class=RetryClass.RECONCILE_FIRST,  # Keep original retry class (no SAFE swap)
         current_attempt=job.attempt,
         max_attempts=job.max_attempts,
+        reconciliation_resolved=True,  # Pass resolved flag to evaluate_retry
         now=now,
     )
 
     # Retry should be allowed (budget permitting)
     assert decision.can_retry is True
+    assert "resolved" in decision.reason

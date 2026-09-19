@@ -96,7 +96,7 @@ def test_evaluate_retry_idempotent_retries_with_backoff() -> None:
 
 
 def test_evaluate_retry_reconcile_first_does_not_retry() -> None:
-    """RECONCILE_FIRST jobs must be reconciled before any retry."""
+    """RECONCILE_FIRST jobs must be reconciled before any retry (when not yet resolved)."""
     now = datetime(2026, 9, 19, 0, 0, 0, tzinfo=UTC)
 
     decision = evaluate_retry(
@@ -105,6 +105,7 @@ def test_evaluate_retry_reconcile_first_does_not_retry() -> None:
         max_attempts=3,
         base_delay_seconds=2.0,
         backoff_multiplier=2.0,
+        reconciliation_resolved=False,  # Not yet resolved
         now=now,
     )
 
@@ -112,6 +113,26 @@ def test_evaluate_retry_reconcile_first_does_not_retry() -> None:
     assert decision.next_attempt == 1
     assert decision.scheduled_at is None
     assert "RECONCILE_FIRST: reconciliation required before retry" in decision.reason
+
+
+def test_evaluate_retry_reconcile_first_allows_retry_after_resolved() -> None:
+    """RECONCILE_FIRST jobs retry after reconciliation resolves (ABSENT/CONFIRMED)."""
+    now = datetime(2026, 9, 19, 0, 0, 0, tzinfo=UTC)
+
+    decision = evaluate_retry(
+        retry_class=RetryClass.RECONCILE_FIRST,
+        current_attempt=0,
+        max_attempts=3,
+        base_delay_seconds=2.0,
+        backoff_multiplier=2.0,
+        reconciliation_resolved=True,  # Reconciliation determined ABSENT or CONFIRMED
+        now=now,
+    )
+
+    assert decision.can_retry is True
+    assert decision.next_attempt == 1
+    assert decision.scheduled_at == now + timedelta(seconds=2.0)
+    assert "RECONCILE_FIRST resolved, retry after 2.0s backoff" in decision.reason
 
 
 def test_evaluate_retry_manual_resume_does_not_retry() -> None:
