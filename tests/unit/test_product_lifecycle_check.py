@@ -87,6 +87,8 @@ class TestProductLifecycleCheck:
 
     async def test_evaluate_job_readiness_includes_lifecycle_check(self) -> None:
         """evaluate_job_readiness includes product lifecycle validation."""
+        from unittest.mock import patch
+
         shop_id = UUID("10000000-0000-0000-0000-000000000001")
         now = datetime.now(UTC)
 
@@ -121,13 +123,29 @@ class TestProductLifecycleCheck:
             return None
 
         mock_session.get.side_effect = mock_get
+        mock_session.scalar.return_value = False  # No unsatisfied dependencies
 
-        # Evaluate readiness
-        is_ready, reason = await evaluate_job_readiness(
-            mock_session,
-            job_id=job.id,
-            now=now,
-        )
+        # Mock the intermediate checks to pass so we get to the lifecycle check
+        with (
+            patch(
+                "money_machine.orchestration.dependency_resolver.check_dependencies_satisfied",
+                return_value=True,
+            ),
+            patch(
+                "money_machine.orchestration.dependency_resolver.check_workflow_active",
+                return_value=True,
+            ),
+            patch(
+                "money_machine.orchestration.dependency_resolver.check_idempotency_collision",
+                return_value=False,
+            ),
+        ):
+            # Evaluate readiness
+            is_ready, reason = await evaluate_job_readiness(
+                mock_session,
+                job_id=job.id,
+                now=now,
+            )
 
         # Should NOT be ready due to terminal lifecycle
         assert is_ready is False
