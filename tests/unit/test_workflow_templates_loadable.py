@@ -77,8 +77,19 @@ class TestWorkflowConfigLoadable:
         # Check a few key jobs have complete specs
         research_job = next(j for j in workflow.jobs if j.job_type == "ResearchCollectionJob")
         assert research_job.owner_agent_id == "A03"
-        assert research_job.side_effect_class in ["NONE", "EXTERNAL_READ", "EXTERNAL_WRITE", "EXTERNAL_SPEND", "EXTERNAL_MESSAGE"]
-        assert research_job.retry_class in ["SAFE", "IDEMPOTENT", "RECONCILE_FIRST", "MANUAL_RESUME"]
+        assert research_job.side_effect_class in [
+            "NONE",
+            "EXTERNAL_READ",
+            "EXTERNAL_WRITE",
+            "EXTERNAL_SPEND",
+            "EXTERNAL_MESSAGE",
+        ]
+        assert research_job.retry_class in [
+            "SAFE",
+            "IDEMPOTENT",
+            "RECONCILE_FIRST",
+            "MANUAL_RESUME",
+        ]
         assert len(research_job.allowed_modes) > 0
         assert len(research_job.output_contracts) > 0
         assert len(research_job.admitted_events) > 0
@@ -89,4 +100,7 @@ class TestWorkflowConfigLoadable:
 
         workflow = workflows_config.workflows[0]
         assert len(workflow.entry_job_types) > 0
-        assert "ProvisioningCheckJob" in workflow.entry_job_types or "ScheduleConfigurationJob" in workflow.entry_job_types
+        assert (
+            "ProvisioningCheckJob" in workflow.entry_job_types
+            or "ScheduleConfigurationJob" in workflow.entry_job_types
+        )

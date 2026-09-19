@@ -380,12 +380,15 @@ def command_workflow_inspect_graph(arguments: argparse.Namespace) -> int:
                     deps = []
 
                 # Build graph representation
-                job_map = {str(job.id): {
-                    "id": str(job.id),
-                    "job_type": job.job_type,
-                    "status": job.status,
-                    "depends_on": [],
-                } for job in jobs}
+                job_map = {
+                    str(job.id): {
+                        "id": str(job.id),
+                        "job_type": job.job_type,
+                        "status": job.status,
+                        "depends_on": [],
+                    }
+                    for job in jobs
+                }
 
                 for dep in deps:
                     job_id_str = str(dep.job_id)
@@ -425,17 +428,26 @@ def command_job_list_stalled(arguments: argparse.Namespace) -> int:
             factory = create_session_factory(engine)
             async with factory() as session:
                 now = datetime.now(UTC)
-                stall_threshold = timedelta(seconds=arguments.threshold_seconds) if arguments.threshold_seconds else DEFAULT_STALL_THRESHOLD
+                stall_threshold = (
+                    timedelta(seconds=arguments.threshold_seconds)
+                    if arguments.threshold_seconds
+                    else DEFAULT_STALL_THRESHOLD
+                )
                 stall_cutoff = now - stall_threshold
 
                 # Find RUNNING jobs that haven't heartbeated recently
                 # (read-only, no claim - same query as detect_stalled_jobs but without mutation)
-                statement = select(Job).where(
-                    Job.status == JobStatus.RUNNING.value,
-                    Job.heartbeat_at.is_not(None),
-                    Job.heartbeat_at < stall_cutoff,
-                    Job.lease_expires_at > now,
-                ).order_by(Job.heartbeat_at).limit(arguments.limit)
+                statement = (
+                    select(Job)
+                    .where(
+                        Job.status == JobStatus.RUNNING.value,
+                        Job.heartbeat_at.is_not(None),
+                        Job.heartbeat_at < stall_cutoff,
+                        Job.lease_expires_at > now,
+                    )
+                    .order_by(Job.heartbeat_at)
+                    .limit(arguments.limit)
+                )
 
                 result = await session.execute(statement)
                 stalled = list(result.scalars().all())
@@ -448,7 +460,9 @@ def command_job_list_stalled(arguments: argparse.Namespace) -> int:
                             "id": str(job.id),
                             "job_type": job.job_type,
                             "workflow_id": str(job.workflow_id),
-                            "heartbeat_at": job.heartbeat_at.isoformat() if job.heartbeat_at else None,
+                            "heartbeat_at": job.heartbeat_at.isoformat()
+                            if job.heartbeat_at
+                            else None,
                             "lease_owner": job.lease_owner,
                         }
                         for job in stalled
@@ -532,7 +546,9 @@ def _parser() -> argparse.ArgumentParser:
     workflow_cancel = workflow_actions.add_parser("cancel", help="cancel a workflow")
     workflow_cancel.add_argument("workflow_id", help="workflow UUID to cancel")
     workflow_cancel.set_defaults(handler=command_workflow_cancel)
-    workflow_inspect = workflow_actions.add_parser("inspect-graph", help="show job graph with dependencies")
+    workflow_inspect = workflow_actions.add_parser(
+        "inspect-graph", help="show job graph with dependencies"
+    )
     workflow_inspect.add_argument("workflow_id", help="workflow UUID to inspect")
     workflow_inspect.set_defaults(handler=command_workflow_inspect_graph)
 
@@ -550,7 +566,9 @@ def _parser() -> argparse.ArgumentParser:
     job_reconcile.add_argument("--provider-object-id", help="provider object ID if CONFIRMED")
     job_reconcile.set_defaults(handler=command_job_reconcile)
     job_stalled = job_actions.add_parser("list-stalled", help="list stalled RUNNING jobs")
-    job_stalled.add_argument("--threshold-seconds", type=int, help="stall threshold in seconds (default: 300)")
+    job_stalled.add_argument(
+        "--threshold-seconds", type=int, help="stall threshold in seconds (default: 300)"
+    )
     job_stalled.add_argument("--limit", type=int, default=50, help="max jobs to return")
     job_stalled.set_defaults(handler=command_job_list_stalled)
 

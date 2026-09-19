@@ -71,7 +71,9 @@ class TestProductLifecycleCheck:
             assert result is False, f"Terminal state {terminal_state.value} should block execution"
             await db_session.rollback()
 
-    async def test_lifecycle_check_fails_on_missing_workflow(self, db_session: AsyncSession) -> None:
+    async def test_lifecycle_check_fails_on_missing_workflow(
+        self, db_session: AsyncSession
+    ) -> None:
         """Missing workflow fails lifecycle check (fail-closed)."""
         nonexistent_id = UUID("00000000-0000-0000-0000-000000000000")
 
@@ -82,7 +84,9 @@ class TestProductLifecycleCheck:
 
         assert result is False, "Missing workflow should fail lifecycle check"
 
-    async def test_evaluate_job_readiness_includes_lifecycle_check(self, db_session: AsyncSession) -> None:
+    async def test_evaluate_job_readiness_includes_lifecycle_check(
+        self, db_session: AsyncSession
+    ) -> None:
         """evaluate_job_readiness includes product lifecycle validation."""
         shop_id = UUID("10000000-0000-0000-0000-000000000001")
         now = datetime.now(UTC)
