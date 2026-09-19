@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from money_machine.domain.enums import DecisionType
 from money_machine.domain.events import EventName
 from money_machine.domain.models.portfolio import PortfolioDecision
 from money_machine.orchestration.successor_factory import SuccessorFactory
@@ -127,6 +128,35 @@ class EventDispatcher:
             existing = await self.uow.events.by_dedupe_key(dedupe_key)
             if existing is None:
                 raise
+
+        # Wave 7: Emit SUCCESSOR_CREATED after WINNER_DETECTED (correct order)
+        # Only for MULTIPLY decisions that actually created a successor
+        if decision.decision == DecisionType.MULTIPLY and successor_job_ids:
+            successor_job_id = successor_job_ids[0]
+            successor_dedupe_key = (
+                f"SUCCESSOR_CREATED:{decision.decision_id}:"
+                f"{decision.successor_workflow_id}:{successor_job_id}"
+            )
+
+            try:
+                await self.uow.events.append(
+                    event_name=EventName.SUCCESSOR_CREATED,
+                    aggregate_type="product_specs",
+                    aggregate_id=decision.successor_spec_id,  # type: ignore[arg-type]
+                    workflow_id=decision.successor_workflow_id,  # type: ignore[arg-type]
+                    job_id=successor_job_id,
+                    payload={
+                        "parent_workflow_id": str(decision.workflow_id),
+                        "parent_decision_id": str(decision.decision_id),
+                    },
+                    dedupe_key=successor_dedupe_key,
+                    occurred_at=occurred_at,
+                )
+            except EventAppendError:
+                # Idempotent: successor already created, check for existing event
+                existing_successor = await self.uow.events.by_dedupe_key(successor_dedupe_key)
+                if existing_successor is None:
+                    raise
 
         return successor_job_ids
 

@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
+import pytest
+
 from money_machine.domain.events import EventName
 from money_machine.orchestration.successor_factory import (
     SuccessorFactory,
@@ -274,3 +276,33 @@ class TestFailClosedBehavior:
 
         # If a future event is added to EventName but not the map,
         # create_successors will raise ValueError per the implementation
+
+    async def test_unknown_event_raises_value_error(self) -> None:
+        """Inject an unknown event to prove fail-closed ValueError."""
+        from unittest.mock import MagicMock
+
+        mock_uow = MagicMock()
+        mock_uow.session = AsyncMock()
+        factory = SuccessorFactory(mock_uow)
+
+        # Create a fake EventName that's not in the map
+        fake_event = MagicMock()
+        fake_event.value = "UNKNOWN_FUTURE_EVENT"
+
+        workflow_id = UUID("00000000-0000-0000-0000-000000000001")
+        parent_job_id = UUID("00000000-0000-0000-0000-000000000002")
+        occurred_at = datetime(2026, 9, 19, 12, 0, tzinfo=UTC)
+
+        # Should raise ValueError with helpful message
+        with pytest.raises(ValueError) as exc_info:
+            await factory.create_successors(
+                event_name=fake_event,
+                workflow_id=workflow_id,
+                parent_job_id=parent_job_id,
+                occurred_at=occurred_at,
+            )
+
+        error_message = str(exc_info.value)
+        assert "UNKNOWN_FUTURE_EVENT" in error_message
+        assert "not found in event_successor_map" in error_message
+        assert "Known events:" in error_message

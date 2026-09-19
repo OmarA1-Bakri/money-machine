@@ -11,10 +11,8 @@ from datetime import UTC, datetime
 from functools import lru_cache
 from hashlib import sha256
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 from uuid import UUID
-
-import yaml
 
 from money_machine.domain.enums import DecisionType, ProductLifecycleState
 from money_machine.domain.events import EventName
@@ -29,10 +27,14 @@ if TYPE_CHECKING:
 def load_event_successor_map() -> dict[str, list[str]]:
     """Load the event → successor job types map from workflows.yaml.
 
+    Uses WorkflowsConfig as the single source of truth - no dual YAML loading.
     Returns a dict mapping event names to lists of successor job types.
     Cached for performance (config rarely changes during runtime).
     Fails closed: missing file or invalid structure raises an exception.
     """
+    from money_machine.config.loader import ConfigLoadError, load_yaml_model
+    from money_machine.config.settings import WorkflowsConfig
+
     # Navigate from src/money_machine/orchestration/ up to repo root, then to config/
     config_path = Path(__file__).parent.parent.parent.parent / "config" / "workflows.yaml"
 
@@ -41,46 +43,14 @@ def load_event_successor_map() -> dict[str, list[str]]:
             f"Workflow configuration not found at {config_path}. Cannot determine event successors."
         )
 
-    with config_path.open("r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
+    try:
+        workflows_config = load_yaml_model(config_path, WorkflowsConfig)
+    except ConfigLoadError as e:
+        raise ValueError(f"Failed to load workflow configuration: {e}") from e
 
-    if not isinstance(config, dict):
-        raise ValueError("workflows.yaml must contain a dict at root")
-
-    event_map_raw = cast(Any, config.get("event_successor_map"))  # type: ignore[reportUnknownMemberType]
-    if event_map_raw is None:
-        raise ValueError(
-            "workflows.yaml missing required 'event_successor_map' section. "
-            "Cannot determine event successors."
-        )
-
-    if not isinstance(event_map_raw, dict):
-        raise ValueError("event_successor_map must be a dict")
-
-    # Validate structure and build typed result
-    event_map: dict[str, list[str]] = {}
-
-    for event_name_raw, successors_raw in cast(dict[Any, Any], event_map_raw).items():
-        if not isinstance(event_name_raw, str):
-            raise ValueError(f"Event name must be string, got {type(event_name_raw)}")
-
-        if not isinstance(successors_raw, list):
-            raise ValueError(
-                f"Successors for {event_name_raw} must be a list, got {type(successors_raw)}"
-            )
-
-        successors: list[str] = []
-        for job_type_raw in successors_raw:  # type: ignore[reportUnknownVariableType]
-            if not isinstance(job_type_raw, str):
-                raise ValueError(
-                    f"Job type in successors for {event_name_raw} must be string, "
-                    f"got {type(job_type_raw)}"  # type: ignore[reportUnknownArgumentType]
-                )
-            successors.append(job_type_raw)
-
-        event_map[event_name_raw] = successors
-
-    return event_map
+    # Extract the event_successor_map from the validated config
+    # WorkflowsConfig already validates the structure via Pydantic
+    return workflows_config.event_successor_map
 
 
 class SuccessorFactory:
@@ -214,24 +184,9 @@ class SuccessorFactory:
             occurred_at=occurred_at,
         )
 
-        # Emit SUCCESSOR_CREATED event
-        dedupe_key = (
-            f"SUCCESSOR_CREATED:{decision.decision_id}:{successor_workflow_id}:{successor_job_id}"
-        )
-        await self.uow.events.append(
-            event_name=EventName.SUCCESSOR_CREATED,
-            aggregate_type="product_specs",
-            aggregate_id=decision.successor_spec_id,  # type: ignore[arg-type]
-            workflow_id=successor_workflow_id,
-            job_id=successor_job_id,
-            payload={
-                "parent_workflow_id": str(decision.workflow_id),
-                "parent_decision_id": str(decision.decision_id),
-            },
-            dedupe_key=dedupe_key,
-            occurred_at=occurred_at,
-        )
-
+        # Wave 7: SUCCESSOR_CREATED emission moved to dispatch_decision
+        # to ensure correct event order: WINNER_DETECTED → SUCCESSOR_CREATED
+        # Return both job_id and workflow_id so dispatch can emit the event
         return (successor_job_id,)
 
     async def _create_successor_workflow(
@@ -281,10 +236,11 @@ class SuccessorFactory:
         successor_spec_id: UUID,
         occurred_at: datetime,
     ) -> UUID:
-        """Create the initial job for the successor workflow.
+        """Create the initial DedupeJob for the successor workflow.
 
-        In a full implementation, this would be a DedupeJob created by BuildSlotJob.
-        For Wave 4, we create a placeholder job to prove the boundary works.
+        This creates a real DedupeJob that will be picked up by the appropriate
+        agent (A06 Catalogue Dedupe). The job is fully specified with all required
+        fields per the job schema.
         """
         from money_machine.persistence.tables import Job
 
