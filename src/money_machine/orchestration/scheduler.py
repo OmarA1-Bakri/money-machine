@@ -22,9 +22,7 @@ from sqlalchemy import select
 from money_machine.domain.enums import JobStatus
 from money_machine.orchestration._foundation import uncommissioned_process
 from money_machine.orchestration.dependency_resolver import (
-    DependencyNotSatisfiedError,
-    IdempotencyCollisionError,
-    WorkflowInactiveError,
+    DependencyResolutionError,
     promote_pending_to_ready,
 )
 from money_machine.orchestration.leases import reclaim_expired_leases
@@ -88,13 +86,9 @@ async def promote_due_jobs(
                 now=now,
             )
             promoted.append(promoted_job)
-        except (
-            DependencyNotSatisfiedError,
-            WorkflowInactiveError,
-            IdempotencyCollisionError,
-        ) as error:
-            # Expected promotion failures: dependencies not met, workflow inactive, or collision
-            # Log but continue processing other jobs
+        except DependencyResolutionError as error:
+            # Expected promotion failures: dependencies not met, workflow inactive,
+            # collision, or lifecycle. Log but continue processing other jobs.
             logging.debug(
                 "Could not promote job %s: %s: %s",
                 job.id,

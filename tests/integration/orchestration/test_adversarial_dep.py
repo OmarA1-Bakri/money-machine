@@ -1,12 +1,14 @@
 """Adversarial test for dependency resolution.
 
 Tests that satisfied_at set but predecessor ≠ SUCCEEDED must NOT promote to READY.
+
+All UUIDs are deterministic (no uuid4) for reproducibility.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import UUID
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +19,12 @@ from money_machine.orchestration.dependency_resolver import (
     evaluate_job_readiness,
 )
 from money_machine.persistence.tables import Job, JobDependency, Shop, WorkflowRun
+
+# Deterministic UUIDs for reproducible tests
+SHOP_ID = UUID("00000000-0000-0000-0000-000000000001")
+WORKFLOW_ID = UUID("00000000-0000-0000-0000-000000000002")
+PREDECESSOR_ID = UUID("00000000-0000-0000-0000-000000000003")
+JOB_ID = UUID("00000000-0000-0000-0000-000000000004")
 
 
 @pytest.mark.asyncio
@@ -29,9 +37,8 @@ async def test_adversarial_satisfied_at_set_but_predecessor_not_succeeded(sessio
 
     If satisfied_at is set but predecessor is FAILED/BLOCKED/etc, promotion must be rejected.
     """
-    shop_id = uuid4()
     shop = Shop(
-        id=shop_id,
+        id=SHOP_ID,
         name="test-shop",
         provider_shop_id="test-provider-id",
         connection_state="CONNECTED",
@@ -39,10 +46,9 @@ async def test_adversarial_satisfied_at_set_but_predecessor_not_succeeded(sessio
     )
     session.add(shop)
 
-    workflow_id = uuid4()
     workflow = WorkflowRun(
-        id=workflow_id,
-        shop_id=shop_id,
+        id=WORKFLOW_ID,
+        shop_id=SHOP_ID,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DISCOVERED",
@@ -52,14 +58,13 @@ async def test_adversarial_satisfied_at_set_but_predecessor_not_succeeded(sessio
     await session.flush()
 
     # Predecessor in FAILED status (not SUCCEEDED)
-    predecessor_id = uuid4()
     predecessor = Job(
-        idempotency_key=f"test_key_{predecessor_id!s}",
-        id=predecessor_id,
-        workflow_id=workflow_id,
+        idempotency_key=f"test_key_{PREDECESSOR_ID!s}",
+        id=PREDECESSOR_ID,
+        workflow_id=WORKFLOW_ID,
         job_type="predecessor",
         object_type="workflow_runs",
-        object_id=workflow_id,
+        object_id=WORKFLOW_ID,
         status=JobStatus.FAILED.value,  # NOT SUCCEEDED
         scheduled_at=datetime.now(UTC),
         owner_agent_id="A01",
@@ -70,14 +75,13 @@ async def test_adversarial_satisfied_at_set_but_predecessor_not_succeeded(sessio
     )
     session.add(predecessor)
 
-    job_id = uuid4()
     job = Job(
-        idempotency_key=f"test_key_{job_id!s}",
-        id=job_id,
-        workflow_id=workflow_id,
+        idempotency_key=f"test_key_{JOB_ID!s}",
+        id=JOB_ID,
+        workflow_id=WORKFLOW_ID,
         job_type="dependent",
         object_type="workflow_runs",
-        object_id=workflow_id,
+        object_id=WORKFLOW_ID,
         status=JobStatus.PENDING.value,
         scheduled_at=datetime.now(UTC),
         owner_agent_id="A01",
@@ -93,8 +97,8 @@ async def test_adversarial_satisfied_at_set_but_predecessor_not_succeeded(sessio
     # ADVERSARIAL: satisfied_at is set (maliciously or by bug)
     # BUT predecessor status is FAILED, not SUCCEEDED
     dep = JobDependency(
-        job_id=job_id,
-        depends_on_job_id=predecessor_id,
+        job_id=JOB_ID,
+        depends_on_job_id=PREDECESSOR_ID,
         satisfied_at=now,  # Satisfied claimed!
     )
     session.add(dep)
@@ -102,10 +106,10 @@ async def test_adversarial_satisfied_at_set_but_predecessor_not_succeeded(sessio
 
     # check_dependencies_satisfied should return False
     # because predecessor is FAILED, not SUCCEEDED
-    satisfied = await check_dependencies_satisfied(session, job_id=job_id)
+    satisfied = await check_dependencies_satisfied(session, job_id=JOB_ID)
     assert satisfied is False, "Dependencies must NOT be satisfied when predecessor != SUCCEEDED"
 
     # Attempting to promote should fail
-    is_ready, reason = await evaluate_job_readiness(session, job_id=job_id, now=now)
+    is_ready, reason = await evaluate_job_readiness(session, job_id=JOB_ID, now=now)
     assert is_ready is False
     assert "dependencies" in reason.lower() or "not satisfied" in reason.lower()
