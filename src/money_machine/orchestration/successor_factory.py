@@ -69,11 +69,12 @@ class SuccessorFactory:
         - Successor workflow starts at DEDUPE_CHECK in a new workflow_id
         - require_successor_spawn validates the boundary
 
-        Wave 6: The guard (require_successor_spawn) is enforced inside
-        _create_successor_workflow, so any path that creates a successor workflow
-        MUST pass guard validation. Enforcement layers:
+        Wave 6: Defense in depth — guard enforced at TWO layers:
+        1. Early check before helper call (fail-fast, prevents helper invocation)
+        2. Guard inside _create_successor_workflow (prevents direct helper bypass)
+
+        Additional validation:
         - Pydantic validation rejects same-workflow successors at construction
-        - _create_successor_workflow calls require_successor_spawn internally
         """
         if occurred_at is None:
             occurred_at = datetime.now(UTC)
@@ -86,10 +87,18 @@ class SuccessorFactory:
         if parent_workflow is None:
             raise ValueError(f"parent workflow {decision.workflow_id} not found")
 
+        # Wave 6: Defense in depth — validate at caller AND helper
+        # Early check rejects before helper call (fail-fast)
+        current_state = ProductLifecycleState(parent_workflow.product_state)
+        _successor_entry_state = require_successor_spawn(
+            parent_state=current_state,
+            parent_workflow_id=decision.workflow_id,
+            successor_workflow_id=decision.successor_workflow_id,  # type: ignore[arg-type]
+        )
+
         # Transition parent workflow to OBSERVING (guarded)
         from money_machine.orchestration.transition_guard import require_product_transition
 
-        current_state = ProductLifecycleState(parent_workflow.product_state)
         target_state = ProductLifecycleState.OBSERVING
         require_product_transition(current_state, target_state)
 
@@ -98,7 +107,7 @@ class SuccessorFactory:
         await self.uow.session.flush()
 
         # Create successor workflow
-        # Wave 6: Guard is enforced inside _create_successor_workflow
+        # Wave 6: Guard also enforced inside _create_successor_workflow (defense in depth)
         successor_workflow_id = await self._create_successor_workflow(
             parent_workflow_id=decision.workflow_id,
             parent_state=current_state,
