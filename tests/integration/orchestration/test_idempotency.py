@@ -13,10 +13,11 @@ from decimal import Decimal
 from uuid import UUID
 
 import pytest
+from money_machine.persistence.enums import JobStatus, RetryClass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from money_machine.domain.enums import JobStatus, SideEffectClass
+from money_machine.domain.enums import SideEffectClass
 from money_machine.orchestration.idempotency import (
     IdempotencyKeyReservedError,
     derive_idempotency_key,
@@ -67,12 +68,24 @@ async def create_test_job(
     session.add(workflow_run)
     await session.flush()
 
-    # Now create the job
+    # Now create the job with all required fields
     job = Job(
         id=job_id,
-        status=status.value,
-        attempt=0,
         workflow_id=WORKFLOW_ID_1,
+        job_type="PublishListingJob",
+        object_type="EtsyListing",
+        object_id=OBJECT_ID_1,
+        owner_agent_id="A01",
+        status=status.value,
+        input={},
+        success_contract={},
+        scheduled_at=now,
+        attempt=0,
+        max_attempts=3,
+        idempotency_key=f"test-key-{job_id}",
+        side_effect_class=SideEffectClass.EXTERNAL_WRITE.value,
+        retry_class=RetryClass.SAFE.value,
+        allowed_mode="simulation",
         created_at=now,
         updated_at=now,
     )
