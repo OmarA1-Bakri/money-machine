@@ -16,7 +16,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from money_machine.domain.enums import SideEffectClass
+from money_machine.domain.enums import JobStatus, SideEffectClass
 from money_machine.orchestration.idempotency import (
     IdempotencyKeyReservedError,
     derive_idempotency_key,
@@ -27,7 +27,7 @@ from money_machine.orchestration.idempotency import (
     record_receipt,
     reserve_idempotency_key,
 )
-from money_machine.persistence.tables import IdempotencyRecord, Receipt
+from money_machine.persistence.tables import IdempotencyRecord, Job, Receipt
 
 # Deterministic UUIDs for tests (no uuid4)
 JOB_ID_1 = UUID("00000000-0000-0000-0000-000000000001")
@@ -37,9 +37,28 @@ OBJECT_ID_1 = UUID("20000000-0000-0000-0000-000000000001")
 AGENT_RUN_ID_1 = UUID("30000000-0000-0000-0000-000000000001")
 
 
+async def create_test_job(
+    session: AsyncSession, job_id: UUID, status: JobStatus = JobStatus.PENDING
+) -> Job:
+    """Create a minimal test job for foreign key requirements."""
+    now = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
+    job = Job(
+        id=job_id,
+        status=status.value,
+        attempt=0,
+        workflow_id=WORKFLOW_ID_1,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(job)
+    await session.flush()
+    return job
+
+
 @pytest.mark.asyncio
 async def test_reserve_idempotency_key_success(session: AsyncSession) -> None:
     """reserve_idempotency_key creates a row with the given key."""
+    await create_test_job(session, JOB_ID_1)
     now = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
 
     reservation = await reserve_idempotency_key(
@@ -71,6 +90,8 @@ async def test_reserve_idempotency_key_success(session: AsyncSession) -> None:
 @pytest.mark.asyncio
 async def test_reserve_idempotency_key_raises_on_duplicate(session: AsyncSession) -> None:
     """reserve_idempotency_key raises IdempotencyKeyReservedError if key already exists."""
+    await create_test_job(session, JOB_ID_1)
+    await create_test_job(session, JOB_ID_2)
     now = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
 
     # First reservation succeeds
@@ -98,6 +119,7 @@ async def test_reserve_idempotency_key_raises_on_duplicate(session: AsyncSession
 @pytest.mark.asyncio
 async def test_mark_idempotency_completed(session: AsyncSession) -> None:
     """mark_idempotency_completed sets completed_at timestamp."""
+    await create_test_job(session, JOB_ID_1)
     reserved_at = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
     completed_at = datetime(2026, 9, 19, 1, 0, 5, tzinfo=UTC)
 
@@ -134,6 +156,7 @@ async def test_get_idempotency_record_not_found(session: AsyncSession) -> None:
 @pytest.mark.asyncio
 async def test_record_effect_attempt_initial(session: AsyncSession) -> None:
     """record_effect_attempt creates initial effect_attempts row."""
+    await create_test_job(session, JOB_ID_1)
     now = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
 
     attempt = await record_effect_attempt(
@@ -163,6 +186,7 @@ async def test_record_effect_attempt_initial(session: AsyncSession) -> None:
 @pytest.mark.asyncio
 async def test_record_effect_attempt_reconciliation(session: AsyncSession) -> None:
     """record_effect_attempt increments reconciliation_attempt on subsequent calls."""
+    await create_test_job(session, JOB_ID_1)
     now1 = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
     now2 = datetime(2026, 9, 19, 1, 0, 5, tzinfo=UTC)
 
@@ -203,6 +227,7 @@ async def test_record_effect_attempt_reconciliation(session: AsyncSession) -> No
 @pytest.mark.asyncio
 async def test_get_latest_effect_attempt(session: AsyncSession) -> None:
     """get_latest_effect_attempt returns the row with highest reconciliation_attempt."""
+    await create_test_job(session, JOB_ID_1)
     now1 = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
     now2 = datetime(2026, 9, 19, 1, 0, 5, tzinfo=UTC)
     now3 = datetime(2026, 9, 19, 1, 0, 10, tzinfo=UTC)
@@ -258,6 +283,7 @@ async def test_get_latest_effect_attempt(session: AsyncSession) -> None:
 @pytest.mark.asyncio
 async def test_record_receipt_append_only(session: AsyncSession) -> None:
     """record_receipt creates an append-only receipt row."""
+    await create_test_job(session, JOB_ID_1)
     now = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
 
     receipt = await record_receipt(
@@ -295,6 +321,7 @@ async def test_record_receipt_append_only(session: AsyncSession) -> None:
 @pytest.mark.asyncio
 async def test_record_receipt_with_amount(session: AsyncSession) -> None:
     """record_receipt handles EXTERNAL_SPEND with amount and currency."""
+    await create_test_job(session, JOB_ID_1)
     now = datetime(2026, 9, 19, 1, 0, 0, tzinfo=UTC)
 
     receipt = await record_receipt(
