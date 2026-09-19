@@ -20,16 +20,27 @@ from money_machine.orchestration.scheduler import (
     run_scheduler_cycle,
     schedule_maturity_timer,
 )
-from money_machine.persistence.tables import Job, JobDependency, WorkflowRun
+from money_machine.persistence.tables import Job, JobDependency, WorkflowRun, Shop
 
 
 @pytest.mark.asyncio
-async def test_promote_due_jobs_success(session: AsyncSession):
+async def test_promote_due_jobs_success(session: AsyncSession, Shop):
     """Promote PENDING jobs that are due and have satisfied dependencies."""
     now = datetime.now(UTC)
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -43,6 +54,8 @@ async def test_promote_due_jobs_success(session: AsyncSession):
         id=job1_id,
         workflow_id=workflow_id,
         job_type="job1",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.PENDING.value,
         scheduled_at=now - timedelta(seconds=1),  # Past
         owner_agent_id="A01",
@@ -59,6 +72,8 @@ async def test_promote_due_jobs_success(session: AsyncSession):
         id=job2_id,
         workflow_id=workflow_id,
         job_type="job2",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.PENDING.value,
         scheduled_at=now + timedelta(hours=1),  # Future
         owner_agent_id="A01",
@@ -82,9 +97,20 @@ async def test_promote_due_jobs_success(session: AsyncSession):
 async def test_promote_due_jobs_skips_unsatisfied_deps(session: AsyncSession):
     """Don't promote jobs with unsatisfied dependencies."""
     now = datetime.now(UTC)
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -97,6 +123,8 @@ async def test_promote_due_jobs_skips_unsatisfied_deps(session: AsyncSession):
         id=predecessor_id,
         workflow_id=workflow_id,
         job_type="predecessor",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.READY.value,  # Not succeeded yet
         scheduled_at=now,
         owner_agent_id="A01",
@@ -112,6 +140,8 @@ async def test_promote_due_jobs_skips_unsatisfied_deps(session: AsyncSession):
         id=dependent_id,
         workflow_id=workflow_id,
         job_type="dependent",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.PENDING.value,
         scheduled_at=now,  # Due now
         owner_agent_id="A01",
@@ -141,9 +171,20 @@ async def test_detect_stalled_jobs(session: AsyncSession):
     now = datetime.now(UTC)
     stale_heartbeat = now - DEFAULT_STALL_THRESHOLD - timedelta(minutes=1)
 
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -157,6 +198,8 @@ async def test_detect_stalled_jobs(session: AsyncSession):
         id=stalled_id,
         workflow_id=workflow_id,
         job_type="stalled",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.RUNNING.value,
         scheduled_at=now - timedelta(hours=1),
         lease_owner="worker-0",
@@ -176,6 +219,8 @@ async def test_detect_stalled_jobs(session: AsyncSession):
         id=active_id,
         workflow_id=workflow_id,
         job_type="active",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.RUNNING.value,
         scheduled_at=now - timedelta(hours=1),
         lease_owner="worker-1",
@@ -205,9 +250,20 @@ async def test_detect_stalled_jobs_ignores_expired_lease(session: AsyncSession):
     now = datetime.now(UTC)
     stale_heartbeat = now - DEFAULT_STALL_THRESHOLD - timedelta(minutes=1)
 
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -221,6 +277,8 @@ async def test_detect_stalled_jobs_ignores_expired_lease(session: AsyncSession):
         id=expired_id,
         workflow_id=workflow_id,
         job_type="expired",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.RUNNING.value,
         scheduled_at=now - timedelta(hours=1),
         lease_owner="worker-0",
@@ -248,9 +306,20 @@ async def test_schedule_maturity_timer(session: AsyncSession):
     now = datetime.now(UTC)
     maturity_date = now + timedelta(days=30)
 
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -278,9 +347,20 @@ async def test_schedule_maturity_timer_completed_workflow(session: AsyncSession)
     now = datetime.now(UTC)
     maturity_date = now + timedelta(days=30)
 
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -305,9 +385,20 @@ async def test_run_scheduler_cycle_integration(session: AsyncSession):
     """Run complete scheduler cycle."""
     now = datetime.now(UTC)
 
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -321,6 +412,8 @@ async def test_run_scheduler_cycle_integration(session: AsyncSession):
         id=pending_id,
         workflow_id=workflow_id,
         job_type="pending",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.PENDING.value,
         scheduled_at=now,
         owner_agent_id="A01",
@@ -337,6 +430,8 @@ async def test_run_scheduler_cycle_integration(session: AsyncSession):
         id=expired_id,
         workflow_id=workflow_id,
         job_type="expired",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.RUNNING.value,
         scheduled_at=now - timedelta(hours=1),
         lease_owner="worker-0",
@@ -356,6 +451,8 @@ async def test_run_scheduler_cycle_integration(session: AsyncSession):
         id=stalled_id,
         workflow_id=workflow_id,
         job_type="stalled",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.RUNNING.value,
         scheduled_at=now - timedelta(hours=1),
         lease_owner="worker-1",

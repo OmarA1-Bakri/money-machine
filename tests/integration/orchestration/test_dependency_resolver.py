@@ -23,15 +23,26 @@ from money_machine.orchestration.dependency_resolver import (
     propagate_dependency_failure,
     satisfy_dependency,
 )
-from money_machine.persistence.tables import IdempotencyRecord, Job, JobDependency, WorkflowRun
+from money_machine.persistence.tables import IdempotencyRecord, Job, JobDependency, Shop, WorkflowRun
 
 
 @pytest.mark.asyncio
 async def test_check_dependencies_satisfied_no_dependencies(session: AsyncSession):
     """Job with no dependencies is considered satisfied."""
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -44,6 +55,8 @@ async def test_check_dependencies_satisfied_no_dependencies(session: AsyncSessio
         id=job_id,
         workflow_id=workflow_id,
         job_type="test_job",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.PENDING.value,
         scheduled_at=datetime.now(UTC),
         owner_agent_id="A01",
@@ -62,9 +75,20 @@ async def test_check_dependencies_satisfied_no_dependencies(session: AsyncSessio
 @pytest.mark.asyncio
 async def test_check_dependencies_satisfied_with_satisfied_dep(session: AsyncSession):
     """Job with satisfied dependency is considered satisfied."""
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -77,6 +101,8 @@ async def test_check_dependencies_satisfied_with_satisfied_dep(session: AsyncSes
         id=predecessor_id,
         workflow_id=workflow_id,
         job_type="predecessor",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.SUCCEEDED.value,
         scheduled_at=datetime.now(UTC),
         owner_agent_id="A01",
@@ -92,6 +118,8 @@ async def test_check_dependencies_satisfied_with_satisfied_dep(session: AsyncSes
         id=job_id,
         workflow_id=workflow_id,
         job_type="dependent",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.PENDING.value,
         scheduled_at=datetime.now(UTC),
         owner_agent_id="A01",
@@ -118,9 +146,20 @@ async def test_check_dependencies_satisfied_with_satisfied_dep(session: AsyncSes
 @pytest.mark.asyncio
 async def test_check_dependencies_satisfied_with_unsatisfied_dep(session: AsyncSession):
     """Job with unsatisfied dependency is NOT satisfied."""
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -133,6 +172,8 @@ async def test_check_dependencies_satisfied_with_unsatisfied_dep(session: AsyncS
         id=predecessor_id,
         workflow_id=workflow_id,
         job_type="predecessor",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.READY.value,  # Not succeeded yet
         scheduled_at=datetime.now(UTC),
         owner_agent_id="A01",
@@ -148,6 +189,8 @@ async def test_check_dependencies_satisfied_with_unsatisfied_dep(session: AsyncS
         id=job_id,
         workflow_id=workflow_id,
         job_type="dependent",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.PENDING.value,
         scheduled_at=datetime.now(UTC),
         owner_agent_id="A01",
@@ -173,9 +216,20 @@ async def test_check_dependencies_satisfied_with_unsatisfied_dep(session: AsyncS
 @pytest.mark.asyncio
 async def test_check_workflow_active(session: AsyncSession):
     """Active workflow (completed_at NULL) returns True."""
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -192,9 +246,20 @@ async def test_check_workflow_active(session: AsyncSession):
 @pytest.mark.asyncio
 async def test_check_workflow_inactive(session: AsyncSession):
     """Completed workflow returns False."""
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -225,9 +290,20 @@ async def test_check_idempotency_collision_no_collision(session: AsyncSession):
 @pytest.mark.asyncio
 async def test_check_idempotency_collision_same_job(session: AsyncSession):
     """No collision when key reserved by same job."""
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -240,6 +316,8 @@ async def test_check_idempotency_collision_same_job(session: AsyncSession):
         id=job_id,
         workflow_id=workflow_id,
         job_type="test_job",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.PENDING.value,
         scheduled_at=datetime.now(UTC),
         owner_agent_id="A01",
@@ -271,9 +349,20 @@ async def test_check_idempotency_collision_same_job(session: AsyncSession):
 @pytest.mark.asyncio
 async def test_check_idempotency_collision_different_job(session: AsyncSession):
     """Collision when key reserved by different job."""
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -286,6 +375,8 @@ async def test_check_idempotency_collision_different_job(session: AsyncSession):
         id=other_job_id,
         workflow_id=workflow_id,
         job_type="other_job",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.RUNNING.value,
         scheduled_at=datetime.now(UTC),
         owner_agent_id="A01",
@@ -310,6 +401,8 @@ async def test_check_idempotency_collision_different_job(session: AsyncSession):
         id=job_id,
         workflow_id=workflow_id,
         job_type="new_job",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.PENDING.value,
         scheduled_at=datetime.now(UTC),
         owner_agent_id="A01",
@@ -334,9 +427,20 @@ async def test_check_idempotency_collision_different_job(session: AsyncSession):
 async def test_evaluate_job_readiness_all_conditions_met(session: AsyncSession):
     """Job is ready when all conditions are met."""
     now = datetime.now(UTC)
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -350,6 +454,8 @@ async def test_evaluate_job_readiness_all_conditions_met(session: AsyncSession):
         id=job_id,
         workflow_id=workflow_id,
         job_type="test_job",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.PENDING.value,
         scheduled_at=now - timedelta(seconds=1),  # Past
         owner_agent_id="A01",
@@ -370,9 +476,20 @@ async def test_evaluate_job_readiness_all_conditions_met(session: AsyncSession):
 async def test_evaluate_job_readiness_not_time_yet(session: AsyncSession):
     """Job is NOT ready when scheduled_at is in the future."""
     now = datetime.now(UTC)
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -385,6 +502,8 @@ async def test_evaluate_job_readiness_not_time_yet(session: AsyncSession):
         id=job_id,
         workflow_id=workflow_id,
         job_type="test_job",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.PENDING.value,
         scheduled_at=now + timedelta(hours=1),  # Future
         owner_agent_id="A01",
@@ -405,9 +524,20 @@ async def test_evaluate_job_readiness_not_time_yet(session: AsyncSession):
 async def test_promote_pending_to_ready_success(session: AsyncSession):
     """Successful promotion transitions PENDING → READY."""
     now = datetime.now(UTC)
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -420,6 +550,8 @@ async def test_promote_pending_to_ready_success(session: AsyncSession):
         id=job_id,
         workflow_id=workflow_id,
         job_type="test_job",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.PENDING.value,
         scheduled_at=now,
         owner_agent_id="A01",
@@ -442,9 +574,20 @@ async def test_promote_pending_to_ready_success(session: AsyncSession):
 async def test_promote_pending_to_ready_workflow_inactive(session: AsyncSession):
     """Promotion fails when workflow is completed."""
     now = datetime.now(UTC)
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -458,6 +601,8 @@ async def test_promote_pending_to_ready_workflow_inactive(session: AsyncSession)
         id=job_id,
         workflow_id=workflow_id,
         job_type="test_job",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.PENDING.value,
         scheduled_at=now,
         owner_agent_id="A01",
@@ -477,9 +622,20 @@ async def test_promote_pending_to_ready_workflow_inactive(session: AsyncSession)
 async def test_satisfy_dependency(session: AsyncSession):
     """Satisfying a dependency sets satisfied_at."""
     now = datetime.now(UTC)
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -492,6 +648,8 @@ async def test_satisfy_dependency(session: AsyncSession):
         id=predecessor_id,
         workflow_id=workflow_id,
         job_type="predecessor",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.SUCCEEDED.value,
         scheduled_at=now,
         owner_agent_id="A01",
@@ -507,6 +665,8 @@ async def test_satisfy_dependency(session: AsyncSession):
         id=dependent_id,
         workflow_id=workflow_id,
         job_type="dependent",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.PENDING.value,
         scheduled_at=now,
         owner_agent_id="A01",
@@ -538,9 +698,20 @@ async def test_satisfy_dependency(session: AsyncSession):
 async def test_propagate_dependency_failure(session: AsyncSession):
     """Terminal failure blocks dependent PENDING jobs."""
     now = datetime.now(UTC)
+    shop_id = uuid4()
+    shop = Shop(
+        id=shop_id,
+        name="test-shop",
+        provider_shop_id="test-provider-id",
+        connection_state="ACTIVE",
+        timezone="UTC",
+    )
+    session.add(shop)
+
     workflow_id = uuid4()
     workflow = WorkflowRun(
         id=workflow_id,
+        shop_id=shop_id,
         workflow_type="test_workflow",
         workflow_version=1,
         product_state="DESIGNED",
@@ -553,6 +724,8 @@ async def test_propagate_dependency_failure(session: AsyncSession):
         id=failed_id,
         workflow_id=workflow_id,
         job_type="failed",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.TERMINAL_FAILURE.value,
         scheduled_at=now,
         owner_agent_id="A01",
@@ -568,6 +741,8 @@ async def test_propagate_dependency_failure(session: AsyncSession):
         id=dependent_id,
         workflow_id=workflow_id,
         job_type="dependent",
+        object_type="workflow_runs",
+        object_id=workflow_id,
         status=JobStatus.PENDING.value,
         scheduled_at=now,
         owner_agent_id="A01",
