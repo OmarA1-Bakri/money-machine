@@ -106,6 +106,23 @@ SESSION_EVIDENCE_KEYS: Mapping[int, frozenset[str]] = MappingProxyType(
                 "evidence_closure_commit_recorded",
             }
         ),
+        4: frozenset(
+            {
+                # Session 04: agent runtime, prompt registry, and complete roster.
+                # Worker/scheduler STAY fail-closed (exit 78); Exit 78 removal requires decision
+                # record + commissioning evidence gate (post-Session-04).
+                # A01/A02 promoted to TESTED; A03-A16 registered at DESIGNED with contract tests
+                # proving uncommissioned agents refuse production execution.
+                "provider_abstraction_implemented",
+                "prompt_registry_and_hashes_implemented",
+                "agent_runner_integrated_with_jobs",
+                "sixteen_agents_registered",
+                "uncommissioned_agents_documented",
+                "contract_and_runtime_tests_pass",
+                "control_files_and_checkpoint_current",
+                "evidence_closure_commit_recorded",
+            }
+        ),
     }
 )
 """Each session's completion-evidence contract (D-0010). A session without an entry cannot be

@@ -8,9 +8,9 @@
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "evidence_closure_commit_sha": "d19b8847ecd818d20ee599c54b80e754d85e16e6",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 22,
-  "session_status": "complete",
-  "current_session": 3,
+  "state_revision": 23,
+  "session_status": "incomplete",
+  "current_session": 4,
   "completed_sessions": [
     0,
     1,
@@ -61,7 +61,7 @@
     }
   ],
   "notes": {
-    "session_03_complete": "2026-09-19: Session 03 COMPLETE after Verifier FINAL PASS. All gap-close implementation validated — real dependency_resolver, scheduler library functions (promote, stalled detection, timers), operator surface (CLI + API), entry-job spawn. All library + tests proven. Exit 78 STAYS until Session 04 per contract; worker/scheduler processes remain fail-closed until commissioning.",
+    "session_03_complete": "2026-09-19: Session 03 COMPLETE after Verifier FINAL PASS. All gap-close implementation validated \u2014 real dependency_resolver, scheduler library functions (promote, stalled detection, timers), operator surface (CLI + API), entry-job spawn. All library + tests proven. Exit 78 STAYS until Session 04 per contract; worker/scheduler processes remain fail-closed until commissioning.",
     "session_03_exit_78_deferred": "Exit 78 held per Session 03 contract. Worker and scheduler entrypoints remain fail-closed with no production claim path. Commissioning and Exit 78 removal occur ONLY in Session 04 after agent runtime implementation and commissioning evidence gates pass."
   },
   "carry_forward": [
@@ -70,15 +70,14 @@
     "CodeRabbit vendor re-review remains rate-limited"
   ],
   "required_completion_evidence": {
-    "orchestration_state_machine_implemented": true,
-    "lease_and_worker_claiming_implemented": true,
-    "retry_and_reconciliation_implemented": true,
-    "event_driven_successors_transactional": true,
-    "scheduler_timers_durable": true,
-    "worker_scheduler_fail_closed": true,
-    "concurrency_recovery_tests_pass": true,
-    "control_files_and_checkpoint_current": true,
-    "evidence_closure_commit_recorded": true
+    "contract_and_runtime_tests_pass": false,
+    "agent_runner_integrated_with_jobs": false,
+    "provider_abstraction_implemented": false,
+    "prompt_registry_and_hashes_implemented": false,
+    "uncommissioned_agents_documented": false,
+    "evidence_closure_commit_recorded": false,
+    "control_files_and_checkpoint_current": false,
+    "sixteen_agents_registered": false
   },
   "transition_contract": {
     "completion_requires_all_evidence_true": true,
@@ -93,5 +92,5 @@
   },
   "next_session": 4,
   "next_prompt": "07_SESSION_04_AGENT_RUNTIME_AND_ROSTER.md",
-  "updated_at": "2026-09-19T22:56:00Z"
+  "updated_at": "2026-09-19T23:49:00Z"
 }
