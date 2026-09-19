@@ -652,3 +652,145 @@ async def test_reconcile_first_can_retry_after_absent_via_engine(session: AsyncS
     # Attempt stays at 0 (will increment when claimed/executed, not when retried)
     assert retried_job.attempt == 0
     assert retried_job.scheduled_at is not None  # Has a scheduled time (backoff applied)
+
+
+@pytest.mark.asyncio
+async def test_engine_reconcile_uncertain_effect_e2e(session: AsyncSession) -> None:
+    """E2E test: engine.reconcile_uncertain_effect operator path.
+
+    Proves the full reconciliation path through engine:
+    1. Create UNCERTAIN_EXTERNAL_EFFECT job with effect_attempt
+    2. Call engine.reconcile_uncertain_effect (operator surface)
+    3. Verify job transitions to determined state (SUCCEEDED or FAILED)
+    4. Verify effect_attempt record updated
+    """
+    from money_machine.orchestration.engine import reconcile_uncertain_effect as engine_reconcile
+
+    now = datetime(2026, 9, 19, 15, 0, 0, tzinfo=UTC)
+    idempotency_key = "listing-456-publish-attempt"
+
+    # Create job in UNCERTAIN_EXTERNAL_EFFECT
+    job = await create_uncertain_job(
+        session,
+        job_id=JOB_ID_1,
+        idempotency_key=idempotency_key,
+        now=now,
+    )
+
+    # Create idempotency record
+    await reserve_idempotency_key(
+        session,
+        idempotency_key=idempotency_key,
+        job_id=JOB_ID_1,
+        operation="etsy.publish_listing",
+        side_effect_class=SideEffectClass.EXTERNAL_WRITE,
+        now=now,
+    )
+
+    # Record initial uncertain effect
+    await record_effect_attempt(
+        session,
+        idempotency_key=idempotency_key,
+        job_id=JOB_ID_1,
+        agent_run_id=AGENT_RUN_ID_1,
+        provider="etsy",
+        operation="etsy.publish_listing",
+        effect_state="UNKNOWN",
+        provider_object_id=None,
+        reconciliation_attempt=0,
+        now=now,
+    )
+
+    # Operator determines effect was CONFIRMED after manual verification
+    effect_attempt = await engine_reconcile(
+        session,
+        job_id=JOB_ID_1,
+        effect_state="CONFIRMED",
+        provider_object_id="listing-etsy-789",
+        now=now,
+    )
+
+    # Verify effect_attempt updated
+    assert effect_attempt.effect_state == "CONFIRMED"
+    assert effect_attempt.provider_object_id == "listing-etsy-789"
+    assert effect_attempt.reconciliation_attempt == 1
+
+    # Verify job transitioned to SUCCEEDED
+    await session.refresh(job)
+    assert job.status == JobStatus.SUCCEEDED.value
+
+    # Prove engine path recorded the outcome
+    latest = await get_latest_effect_attempt(session, idempotency_key=idempotency_key)
+    assert latest is not None
+    assert latest.effect_state == "CONFIRMED"
+    assert latest.provider_object_id == "listing-etsy-789"
+
+
+@pytest.mark.asyncio
+async def test_engine_reconcile_absent_to_failed_e2e(session: AsyncSession) -> None:
+    """E2E test: engine.reconcile_uncertain_effect with ABSENT outcome.
+
+    Proves reconciliation with ABSENT transitions job to FAILED and
+    allows subsequent retry through engine.retry_failed_job.
+    """
+    from money_machine.orchestration.engine import (
+        reconcile_uncertain_effect as engine_reconcile,
+        retry_failed_job,
+    )
+
+    now = datetime(2026, 9, 19, 16, 0, 0, tzinfo=UTC)
+    idempotency_key = "listing-999-draft-attempt"
+
+    # Create job in UNCERTAIN_EXTERNAL_EFFECT
+    job = await create_uncertain_job(
+        session,
+        job_id=JOB_ID_1,
+        idempotency_key=idempotency_key,
+        now=now,
+    )
+
+    # Create idempotency record
+    await reserve_idempotency_key(
+        session,
+        idempotency_key=idempotency_key,
+        job_id=JOB_ID_1,
+        operation="etsy.create_draft",
+        side_effect_class=SideEffectClass.EXTERNAL_WRITE,
+        now=now,
+    )
+
+    # Record initial uncertain effect
+    await record_effect_attempt(
+        session,
+        idempotency_key=idempotency_key,
+        job_id=JOB_ID_1,
+        agent_run_id=AGENT_RUN_ID_1,
+        provider="etsy",
+        operation="etsy.create_draft",
+        effect_state="UNKNOWN",
+        provider_object_id=None,
+        reconciliation_attempt=0,
+        now=now,
+    )
+
+    # Operator determines effect was ABSENT (not applied)
+    effect_attempt = await engine_reconcile(
+        session,
+        job_id=JOB_ID_1,
+        effect_state="ABSENT",
+        provider_object_id=None,
+        now=now,
+    )
+
+    # Verify effect_attempt updated
+    assert effect_attempt.effect_state == "ABSENT"
+    assert effect_attempt.provider_object_id is None
+    assert effect_attempt.reconciliation_attempt == 1
+
+    # Verify job transitioned to FAILED
+    await session.refresh(job)
+    assert job.status == JobStatus.FAILED.value
+
+    # Prove retry is now allowed (reconciliation resolved)
+    retried_job = await retry_failed_job(session, job_id=JOB_ID_1, now=now)
+    assert retried_job.status == JobStatus.READY.value

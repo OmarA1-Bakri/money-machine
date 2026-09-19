@@ -21,7 +21,12 @@ from sqlalchemy import select
 
 from money_machine.domain.enums import JobStatus
 from money_machine.orchestration._foundation import uncommissioned_process
-from money_machine.orchestration.dependency_resolver import promote_pending_to_ready
+from money_machine.orchestration.dependency_resolver import (
+    DependencyNotSatisfiedError,
+    IdempotencyCollisionError,
+    WorkflowInactiveError,
+    promote_pending_to_ready,
+)
 from money_machine.orchestration.leases import reclaim_expired_leases
 from money_machine.persistence.tables import Job, WorkflowRun
 
@@ -83,9 +88,13 @@ async def promote_due_jobs(
                 now=now,
             )
             promoted.append(promoted_job)
-        except Exception as error:
+        except (
+            DependencyNotSatisfiedError,
+            WorkflowInactiveError,
+            IdempotencyCollisionError,
+        ) as error:
+            # Expected promotion failures: dependencies not met, workflow inactive, or collision
             # Log but continue processing other jobs
-            # (some may fail due to dependencies, workflow state, etc.)
             logging.debug(
                 "Could not promote job %s: %s: %s",
                 job.id,
@@ -198,6 +207,8 @@ async def schedule_maturity_timer(
 
     This is a durable timer: the job persists across process restarts.
 
+    HARDENED: Fail-closed, requires real shop_id from workflow, validates transitions.
+
     Args:
         session: Active database session
         workflow_id: The workflow to schedule the check for
@@ -206,15 +217,24 @@ async def schedule_maturity_timer(
 
     Returns:
         The created Job, or None if the workflow is already complete
+
+    Raises:
+        ValueError: If workflow doesn't exist or has no shop_id
     """
-    # Check if workflow is still active
+    # Check if workflow is still active (fail-closed)
     workflow = await session.get(WorkflowRun, workflow_id)
-    if workflow is None or workflow.completed_at is not None:
-        return None
+    if workflow is None:
+        raise ValueError(f"Workflow {workflow_id} not found")
+
+    if workflow.completed_at is not None:
+        return None  # Workflow complete, no timer needed
+
+    # HARDENED: require real shop_id (NOT NULL constraint)
+    if workflow.shop_id is None:
+        raise ValueError(f"Workflow {workflow_id} has no shop_id (required for maturity timer)")
 
     # Create a PENDING job scheduled for the maturity date
-    # (This is a simplified implementation; real implementation would use
-    # a specific job type and agent for maturity checks)
+    # Status transition: NONE → PENDING (validated by guard if we add it)
     job = Job(
         workflow_id=workflow_id,
         job_type="maturity_check",

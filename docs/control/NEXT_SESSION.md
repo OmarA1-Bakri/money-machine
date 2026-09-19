@@ -1,6 +1,6 @@
 # Next Session
 
-**Session 03 remains ACTIVE** — gap-close implementation complete (2026-09-19), awaiting Verifier workbook-exit gate. All library functions and tests implemented under Exit 78. Session status: **INCOMPLETE** pending Verifier PASS. Do not advance to Session 04 until Verifier approval.
+**Session 03 remains ACTIVE** — gap-close implementation present (2026-09-19), awaiting Verifier workbook-exit gate. All library functions and tests implemented under Exit 78. Session status: **INCOMPLETE** pending Verifier PASS. Do not advance to Session 04 until Verifier approval.
 
 ## 2026-09-11 recovery review
 

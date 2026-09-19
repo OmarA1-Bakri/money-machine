@@ -265,7 +265,7 @@ def command_workflow_cancel(arguments: argparse.Namespace) -> int:
                 return {
                     "id": str(workflow.id),
                     "completed_at": workflow.completed_at,
-                    "jobs_blocked": blocked,
+                    "cancelled_count": blocked,
                 }
         finally:
             await engine.dispose()
