@@ -125,7 +125,7 @@ async def retry_failed_job(
     require_job_transition(JobStatus.FAILED, JobStatus.READY)
 
     job.status = JobStatus.READY.value
-    job.scheduled_at = decision.scheduled_at
+    job.scheduled_at = decision.scheduled_at  # type: ignore[assignment]
     job.updated_at = now
 
     await session.flush()
