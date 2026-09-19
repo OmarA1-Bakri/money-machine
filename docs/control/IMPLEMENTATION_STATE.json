@@ -14,7 +14,8 @@
   "completed_sessions": [
     0,
     1,
-    2
+    2,
+    3
   ],
   "services": {
     "api": "container_healthy_readiness_true_migrated_2026-09-07",

@@ -402,13 +402,13 @@ async def test_check_idempotency_collision_different_job(session: AsyncSession):
         retry_class="IDEMPOTENT",
         attempt=1,
         max_attempts=3,
-        idempotency_key="test_key",
+        idempotency_key="other_job_key",  # Unique key for this job
     )
     session.add(other_job)
     await session.flush()
 
     record = IdempotencyRecord(
-        idempotency_key="test_key",
+        idempotency_key="test_key",  # Reserve "test_key" for other_job
         job_id=other_job_id,
         operation="test_op",
         side_effect_class="EXTERNAL_WRITE",
@@ -429,7 +429,7 @@ async def test_check_idempotency_collision_different_job(session: AsyncSession):
         retry_class="IDEMPOTENT",
         attempt=0,
         max_attempts=3,
-        idempotency_key="test_key",
+        idempotency_key="new_job_key",  # Unique key for this job
     )
     session.add(job)
     await session.flush()

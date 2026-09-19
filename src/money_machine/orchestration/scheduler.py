@@ -193,6 +193,7 @@ async def schedule_maturity_timer(
         job_type="maturity_check",
         object_type="workflow_runs",  # Timer is checking the workflow itself
         object_id=workflow_id,
+        idempotency_key=f"MATURITY_CHECK:{workflow_id}",
         status=JobStatus.PENDING.value,
         scheduled_at=maturity_date,
         attempt=0,
