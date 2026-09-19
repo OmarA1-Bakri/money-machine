@@ -161,6 +161,7 @@ async def detect_stalled_jobs(
         job.updated_at = now
 
         # Emit JOB_STALLED event
+        last_heartbeat_iso = job.heartbeat_at.isoformat() if job.heartbeat_at is not None else None
         event = Event(
             event_name=EventName.JOB_STALLED.value,
             aggregate_type="Job",
@@ -170,7 +171,7 @@ async def detect_stalled_jobs(
             payload={
                 "job_type": job.job_type,
                 "stall_threshold_seconds": int(stall_threshold.total_seconds()),
-                "last_heartbeat_at": (job.heartbeat_at.isoformat() if job.heartbeat_at else None),
+                "last_heartbeat_at": last_heartbeat_iso,
             },
             dedupe_key=f"job_stalled:{job.id}:{now.isoformat()}",
             occurred_at=now,

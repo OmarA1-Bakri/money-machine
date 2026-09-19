@@ -213,6 +213,7 @@ def command_workflow_start(arguments: argparse.Namespace) -> int:
 
     async def run() -> dict[str, Any]:
         from datetime import UTC, datetime
+        from uuid import UUID
 
         engine = create_engine(settings.database)
         try:
@@ -222,6 +223,7 @@ def command_workflow_start(arguments: argparse.Namespace) -> int:
                     session,
                     workflow_type=arguments.workflow_type,
                     product_state=arguments.product_state,
+                    shop_id=UUID(arguments.shop_id),
                     now=datetime.now(UTC),
                 )
                 await session.commit()
@@ -408,6 +410,7 @@ def _parser() -> argparse.ArgumentParser:
     workflow_start = workflow_actions.add_parser("start", help="start a new workflow")
     workflow_start.add_argument("--workflow-type", required=True, help="workflow template name")
     workflow_start.add_argument("--product-state", required=True, help="product lifecycle state")
+    workflow_start.add_argument("--shop-id", required=True, help="shop UUID for the workflow")
     workflow_start.set_defaults(handler=command_workflow_start)
     workflow_cancel = workflow_actions.add_parser("cancel", help="cancel a workflow")
     workflow_cancel.add_argument("workflow_id", help="workflow UUID to cancel")
