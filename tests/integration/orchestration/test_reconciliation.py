@@ -713,7 +713,9 @@ async def test_engine_reconcile_uncertain_effect_e2e(session: AsyncSession) -> N
     # Verify effect_attempt updated
     assert effect_attempt.effect_state == "CONFIRMED"
     assert effect_attempt.provider_object_id == "listing-etsy-789"
-    assert effect_attempt.reconciliation_attempt == 1
+    # reconciliation_attempt tracks automated queries, not manual operator reconciliation
+    # So it should remain 0 (no automated queries were made)
+    assert effect_attempt.reconciliation_attempt == 0
 
     # Verify job transitioned to SUCCEEDED
     await session.refresh(job)
@@ -787,7 +789,8 @@ async def test_engine_reconcile_absent_to_failed_e2e(session: AsyncSession) -> N
     # Verify effect_attempt updated
     assert effect_attempt.effect_state == "ABSENT"
     assert effect_attempt.provider_object_id is None
-    assert effect_attempt.reconciliation_attempt == 1
+    # reconciliation_attempt tracks automated queries, not manual operator reconciliation
+    assert effect_attempt.reconciliation_attempt == 0
 
     # Verify job transitioned to FAILED
     await session.refresh(job)
