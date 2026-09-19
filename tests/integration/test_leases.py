@@ -568,7 +568,7 @@ async def test_reclaim_expired_lease_respects_retry_never(session: AsyncSession)
         job_type="TestJob",
         object_type="test",
         object_id=workflow.id,
-        owner_agent_id="A99",
+        owner_agent_id="A09",
         status=JobStatus.READY.value,
         scheduled_at=NOW,
         attempt=0,
@@ -627,7 +627,7 @@ async def test_reclaim_expired_lease_respects_retry_manual_resume(session: Async
         job_type="TestJob",
         object_type="test",
         object_id=workflow.id,
-        owner_agent_id="A99",
+        owner_agent_id="A09",
         status=JobStatus.READY.value,
         scheduled_at=NOW,
         attempt=0,
@@ -685,7 +685,7 @@ async def test_reclaim_expired_lease_allows_safe_retry(session: AsyncSession) ->
         job_type="TestJob",
         object_type="test",
         object_id=workflow.id,
-        owner_agent_id="A99",
+        owner_agent_id="A09",
         status=JobStatus.READY.value,
         scheduled_at=NOW,
         attempt=0,
@@ -857,7 +857,7 @@ async def test_heartbeat_raises_lease_expired_error(
 
     # Worker attempts heartbeat after lease expired
     async with session_factory() as session:
-        with pytest.raises(LeaseExpiredError, match=r"Lease expired"):
+        with pytest.raises(LeaseExpiredError, match=r"expired at"):
             await heartbeat(
                 session,
                 job_id=job_id,
@@ -909,7 +909,7 @@ async def test_heartbeat_raises_lease_not_held_error(
 
     # Worker 2 attempts to heartbeat Worker 1's job
     async with session_factory() as session:
-        with pytest.raises(LeaseNotHeldError, match=r"Worker .* does not hold lease"):
+        with pytest.raises(LeaseNotHeldError, match=r"is owned by"):
             await heartbeat(
                 session,
                 job_id=job_id,
