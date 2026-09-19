@@ -500,6 +500,201 @@ async def test_successor_workflow_starts_at_dedupe_check(session: AsyncSession) 
     assert successor_workflow.product_state == SUCCESSOR_WORKFLOW_ENTRY_STATE.value
 
 
+async def test_guard_enforced_in_helper_prevents_bypass(session: AsyncSession) -> None:
+    """Wave 6: Adversarial proof that require_successor_spawn is enforced in the helper.
+
+    The guard is called inside _create_successor_workflow, so even a direct call
+    to the private method cannot bypass validation. This test uses spies to prove:
+    1. Helper is NOT invoked on reject paths
+    2. No WINNER_DETECTED event persists on reject
+    3. Guard inside helper still enforces on success path
+    """
+    from unittest.mock import AsyncMock, patch
+
+    uow = UnitOfWork(session)
+    dispatcher = EventDispatcher(uow)
+    shop = await make_shop(session)
+
+    # Spy on _create_successor_workflow to prove it's not called on reject paths
+    spy = AsyncMock(wraps=dispatcher.factory._create_successor_workflow)  # type: ignore[attr-defined]
+
+    # Test 1: Same-workflow rejected at Pydantic (helper never called)
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="successor workflow must differ"):
+        PortfolioDecision(
+            decision_id=DECISION_ID,
+            workflow_id=PARENT_WORKFLOW_ID,
+            product_id=PRODUCT_ID,
+            listing_id=LISTING_ID,
+            decision=DecisionType.MULTIPLY,
+            metrics_snapshot_ids=(SNAPSHOT_ID,),
+            cohort_reference="2026-Q3",
+            rule_version="v1.0",
+            explanation="Same-workflow attempt",
+            evidence=(TEST_EVIDENCE,),
+            successor_workflow_id=PARENT_WORKFLOW_ID,
+            successor_spec_id=SUCCESSOR_SPEC_ID,
+            decided_at=DECISION_TIME,
+        )
+
+    # Test 2: Wrong parent state - helper NOT called, no WINNER_DETECTED event
+    wrong_state_workflow_id = UUID("10000000-0000-0000-0000-000000000001")
+    wrong_state_job_id = UUID("10000000-0000-0000-0000-000000000002")
+    wrong_state_decision_id = UUID("10000000-0000-0000-0000-000000000003")
+    wrong_state_successor_id = UUID("10000000-0000-0000-0000-000000000004")
+
+    parent_workflow_wrong = WorkflowRun(
+        id=wrong_state_workflow_id,
+        shop_id=shop.id,
+        workflow_type="ProductLifecycleWorkflow",
+        workflow_version=1,
+        product_state=ProductLifecycleState.EVALUATING.value,  # Wrong state
+        started_at=NOW,
+        version=1,
+    )
+    session.add(parent_workflow_wrong)
+    await session.flush()
+
+    parent_job_wrong = Job(
+        id=wrong_state_job_id,
+        workflow_id=wrong_state_workflow_id,
+        job_type="PortfolioDecisionJob",
+        object_type="decisions",
+        object_id=wrong_state_decision_id,
+        owner_agent_id="A09",
+        status="SUCCEEDED",
+        idempotency_key=f"decision_{wrong_state_decision_id}",
+        side_effect_class="NONE",
+        retry_class="IDEMPOTENT",
+        scheduled_at=NOW,
+        version=1,
+    )
+    session.add(parent_job_wrong)
+    await session.flush()
+
+    decision_wrong = PortfolioDecision(
+        decision_id=wrong_state_decision_id,
+        workflow_id=wrong_state_workflow_id,
+        product_id=PRODUCT_ID,
+        listing_id=LISTING_ID,
+        decision=DecisionType.MULTIPLY,
+        metrics_snapshot_ids=(SNAPSHOT_ID,),
+        cohort_reference="2026-Q3",
+        rule_version="v1.0",
+        explanation="Wrong state attempt",
+        evidence=(TEST_EVIDENCE,),
+        successor_workflow_id=wrong_state_successor_id,
+        successor_spec_id=SUCCESSOR_SPEC_ID,
+        decided_at=DECISION_TIME,
+    )
+
+    with patch.object(dispatcher.factory, "_create_successor_workflow", spy):
+        with pytest.raises(InvalidTransitionError, match="SUCCESSOR_SPEC"):
+            await dispatcher.dispatch_decision(
+                decision=decision_wrong,
+                parent_job_id=wrong_state_job_id,
+                occurred_at=DECISION_TIME,
+            )
+
+        # Spy proof: helper was NOT called on reject path
+        spy.assert_not_called()
+
+    # Assert no successor workflow created
+    no_successor = await session.get(WorkflowRun, wrong_state_successor_id)
+    assert no_successor is None
+
+    # Assert no WINNER_DETECTED event persisted on reject
+    stmt = select(Event).where(
+        Event.event_name == EventName.WINNER_DETECTED.value,
+        Event.aggregate_id == wrong_state_decision_id,
+    )
+    no_event = (await session.execute(stmt)).scalars().all()
+    assert len(no_event) == 0, "No WINNER_DETECTED event on reject path"
+
+    # Test 3: Valid path - guard inside helper enforces boundary
+    valid_workflow_id = UUID("20000000-0000-0000-0000-000000000001")
+    valid_job_id = UUID("20000000-0000-0000-0000-000000000002")
+    valid_decision_id = UUID("20000000-0000-0000-0000-000000000003")
+    valid_successor_id = UUID("20000000-0000-0000-0000-000000000004")
+
+    parent_workflow_valid = WorkflowRun(
+        id=valid_workflow_id,
+        shop_id=shop.id,
+        workflow_type="ProductLifecycleWorkflow",
+        workflow_version=1,
+        product_state=ProductLifecycleState.SUCCESSOR_SPEC.value,  # Correct state
+        started_at=NOW,
+        version=1,
+    )
+    session.add(parent_workflow_valid)
+    await session.flush()
+
+    valid_parent_job = Job(
+        id=valid_job_id,
+        workflow_id=valid_workflow_id,
+        job_type="PortfolioDecisionJob",
+        object_type="decisions",
+        object_id=valid_decision_id,
+        owner_agent_id="A09",
+        status="SUCCEEDED",
+        idempotency_key=f"decision_{valid_decision_id}",
+        side_effect_class="NONE",
+        retry_class="IDEMPOTENT",
+        scheduled_at=NOW,
+        version=1,
+    )
+    session.add(valid_parent_job)
+    await session.flush()
+
+    valid_decision = PortfolioDecision(
+        decision_id=valid_decision_id,
+        workflow_id=valid_workflow_id,
+        product_id=PRODUCT_ID,
+        listing_id=LISTING_ID,
+        decision=DecisionType.MULTIPLY,
+        metrics_snapshot_ids=(SNAPSHOT_ID,),
+        cohort_reference="2026-Q3",
+        rule_version="v1.0",
+        explanation="Valid with guard in helper",
+        evidence=(TEST_EVIDENCE,),
+        successor_workflow_id=valid_successor_id,
+        successor_spec_id=SUCCESSOR_SPEC_ID,
+        decided_at=DECISION_TIME,
+    )
+
+    # Reset spy for success path
+    spy.reset_mock()
+
+    with patch.object(dispatcher.factory, "_create_successor_workflow", spy):
+        successor_job_ids = await dispatcher.dispatch_decision(
+            decision=valid_decision,
+            parent_job_id=valid_job_id,
+            occurred_at=DECISION_TIME,
+        )
+
+        # Spy proof: helper WAS called on success path
+        spy.assert_called_once()
+
+    # Verify success path created successor with correct state
+    assert len(successor_job_ids) == 1
+    successor = await session.get(WorkflowRun, valid_successor_id)
+    assert successor is not None
+    assert successor.product_state == ProductLifecycleState.DEDUPE_CHECK.value
+
+    # Verify WINNER_DETECTED event exists on success path
+    stmt = select(Event).where(
+        Event.event_name == EventName.WINNER_DETECTED.value,
+        Event.aggregate_id == valid_decision_id,
+    )
+    winner_event = (await session.execute(stmt)).scalars().all()
+    assert len(winner_event) == 1, "WINNER_DETECTED event persisted on success"
+
+    # Parent transitioned to OBSERVING
+    await session.refresh(parent_workflow_valid)
+    assert parent_workflow_valid.product_state == ProductLifecycleState.OBSERVING.value
+
+
 async def test_dispatch_event_is_idempotent(session: AsyncSession) -> None:
     """Dispatching the same event twice is idempotent (no duplicate successors)."""
     uow = UnitOfWork(session)

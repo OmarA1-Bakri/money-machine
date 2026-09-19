@@ -93,7 +93,17 @@ class EventDispatcher:
         if occurred_at is None:
             occurred_at = datetime.now(UTC)
 
-        # Append decision event
+        # For MULTIPLY decisions, create the successor workflow and jobs FIRST
+        # Wave 6: Emit WINNER_DETECTED only AFTER successful successor validation
+        # This prevents orphan events when guard rejects (raises exception)
+        successor_job_ids = await self.factory.create_multiply_successor(
+            decision=decision,
+            parent_job_id=parent_job_id,
+            occurred_at=occurred_at,
+        )
+
+        # If we reach here, validation succeeded (even if no successor for non-MULTIPLY)
+        # Emit WINNER_DETECTED for all decisions that pass validation
         event_name = EventName.WINNER_DETECTED
         dedupe_key = self._dedupe_key(
             event_name,
@@ -118,12 +128,7 @@ class EventDispatcher:
             if existing is None:
                 raise
 
-        # For MULTIPLY decisions, create the successor workflow and jobs
-        return await self.factory.create_multiply_successor(
-            decision=decision,
-            parent_job_id=parent_job_id,
-            occurred_at=occurred_at,
-        )
+        return successor_job_ids
 
     @staticmethod
     def _dedupe_key(

@@ -68,6 +68,13 @@ class SuccessorFactory:
         - Parent workflow transitions to OBSERVING
         - Successor workflow starts at DEDUPE_CHECK in a new workflow_id
         - require_successor_spawn validates the boundary
+
+        Wave 6: Defense in depth — guard enforced at TWO layers:
+        1. Early check before helper call (fail-fast, prevents helper invocation)
+        2. Guard inside _create_successor_workflow (prevents direct helper bypass)
+
+        Additional validation:
+        - Pydantic validation rejects same-workflow successors at construction
         """
         if occurred_at is None:
             occurred_at = datetime.now(UTC)
@@ -80,9 +87,11 @@ class SuccessorFactory:
         if parent_workflow is None:
             raise ValueError(f"parent workflow {decision.workflow_id} not found")
 
-        # Validate successor spawn boundary
-        successor_entry_state = require_successor_spawn(
-            parent_state=ProductLifecycleState(parent_workflow.product_state),
+        # Wave 6: Defense in depth — validate at caller AND helper
+        # Early check rejects before helper call (fail-fast)
+        current_state = ProductLifecycleState(parent_workflow.product_state)
+        _successor_entry_state = require_successor_spawn(
+            parent_state=current_state,
             parent_workflow_id=decision.workflow_id,
             successor_workflow_id=decision.successor_workflow_id,  # type: ignore[arg-type]
         )
@@ -90,7 +99,6 @@ class SuccessorFactory:
         # Transition parent workflow to OBSERVING (guarded)
         from money_machine.orchestration.transition_guard import require_product_transition
 
-        current_state = ProductLifecycleState(parent_workflow.product_state)
         target_state = ProductLifecycleState.OBSERVING
         require_product_transition(current_state, target_state)
 
@@ -99,12 +107,13 @@ class SuccessorFactory:
         await self.uow.session.flush()
 
         # Create successor workflow
+        # Wave 6: Guard also enforced inside _create_successor_workflow (defense in depth)
         successor_workflow_id = await self._create_successor_workflow(
             parent_workflow_id=decision.workflow_id,
+            parent_state=current_state,
             parent_decision_id=decision.decision_id,
             successor_workflow_id=decision.successor_workflow_id,  # type: ignore[arg-type]
             shop_id=parent_workflow.shop_id,
-            successor_state=successor_entry_state,
         )
 
         # Create the initial successor job (BuildSlotJob -> DedupeJob path)
@@ -140,12 +149,25 @@ class SuccessorFactory:
         self,
         *,
         parent_workflow_id: UUID,
+        parent_state: ProductLifecycleState,
         parent_decision_id: UUID,
         successor_workflow_id: UUID,
         shop_id: UUID,
-        successor_state: ProductLifecycleState,
     ) -> UUID:
-        """Create a new workflow row for the successor and return its ID."""
+        """Create a new workflow row for the successor and return its ID.
+
+        Wave 6: This helper ALWAYS calls require_successor_spawn before creating
+        the successor workflow, so even a direct call to this private method
+        cannot bypass the guard. The guard is the enforcement mechanism, not privacy.
+        """
+        # Wave 6: MANDATORY guard enforced at helper level
+        # Validates parent state and cross-workflow boundary
+        successor_entry_state = require_successor_spawn(
+            parent_state=parent_state,
+            parent_workflow_id=parent_workflow_id,
+            successor_workflow_id=successor_workflow_id,
+        )
+
         from money_machine.persistence.tables import WorkflowRun
 
         workflow = WorkflowRun(
@@ -153,7 +175,7 @@ class SuccessorFactory:
             shop_id=shop_id,
             workflow_type="ProductLifecycleWorkflow",
             workflow_version=1,
-            product_state=successor_state.value,
+            product_state=successor_entry_state.value,
             parent_workflow_id=parent_workflow_id,
             parent_decision_id=parent_decision_id,
             started_at=datetime.now(UTC),
