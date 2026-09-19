@@ -215,9 +215,10 @@ async def test_dispatch_multiply_rejects_same_workflow_id(session: AsyncSession)
     await session.refresh(parent_workflow)
     assert parent_workflow.product_state == ProductLifecycleState.SUCCESSOR_SPEC.value
 
-    # Verify no successor workflow created
-    successor_workflow = await session.get(WorkflowRun, PARENT_WORKFLOW_ID)
-    assert successor_workflow.parent_workflow_id is None  # Still the parent
+    # Verify no successor workflow created (parent remains the same)
+    parent_check = await session.get(WorkflowRun, PARENT_WORKFLOW_ID)
+    assert parent_check is not None
+    assert parent_check.parent_workflow_id is None  # Still the parent
 
 
 async def test_dispatch_multiply_rejects_wrong_parent_state(session: AsyncSession) -> None:

@@ -90,7 +90,7 @@ class SuccessorFactory:
         await self.uow.session.flush()
 
         # Create successor workflow
-        successor_workflow = await self._create_successor_workflow(
+        successor_workflow_id = await self._create_successor_workflow(
             parent_workflow_id=decision.workflow_id,
             parent_decision_id=decision.decision_id,
             successor_workflow_id=decision.successor_workflow_id,  # type: ignore[arg-type]
@@ -102,20 +102,20 @@ class SuccessorFactory:
         # In a full implementation, this would create the appropriate entry job
         # based on the workflow configuration
         successor_job_id = await self._create_successor_entry_job(
-            successor_workflow_id=successor_workflow.id,
+            successor_workflow_id=successor_workflow_id,
             successor_spec_id=decision.successor_spec_id,  # type: ignore[arg-type]
             occurred_at=occurred_at,
         )
 
         # Emit SUCCESSOR_CREATED event
         dedupe_key = (
-            f"SUCCESSOR_CREATED:{decision.decision_id}:{successor_workflow.id}:{successor_job_id}"
+            f"SUCCESSOR_CREATED:{decision.decision_id}:{successor_workflow_id}:{successor_job_id}"
         )
         await self.uow.events.append(
             event_name=EventName.SUCCESSOR_CREATED,
             aggregate_type="product_specs",
             aggregate_id=decision.successor_spec_id,  # type: ignore[arg-type]
-            workflow_id=successor_workflow.id,
+            workflow_id=successor_workflow_id,
             job_id=successor_job_id,
             payload={
                 "parent_workflow_id": str(decision.workflow_id),
@@ -135,8 +135,8 @@ class SuccessorFactory:
         successor_workflow_id: UUID,
         shop_id: UUID,
         successor_state: ProductLifecycleState,
-    ) -> object:
-        """Create a new workflow row for the successor."""
+    ) -> UUID:
+        """Create a new workflow row for the successor and return its ID."""
         from money_machine.persistence.tables import WorkflowRun
 
         workflow = WorkflowRun(
@@ -152,7 +152,7 @@ class SuccessorFactory:
         )
         self.uow.session.add(workflow)
         await self.uow.session.flush()
-        return workflow
+        return workflow.id
 
     async def _create_successor_entry_job(
         self,
