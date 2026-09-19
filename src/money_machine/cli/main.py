@@ -204,6 +204,317 @@ def command_integrations_status(arguments: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def command_workflow_start(arguments: argparse.Namespace) -> int:
+    """Start a new workflow run."""
+    from money_machine.orchestration.engine import start_workflow
+    from money_machine.persistence.database import create_engine, create_session_factory
+
+    settings = _settings()
+
+    async def run() -> dict[str, Any]:
+        from datetime import UTC, datetime
+        from uuid import UUID
+
+        engine = create_engine(settings.database)
+        try:
+            factory = create_session_factory(engine)
+            async with factory() as session:
+                workflow = await start_workflow(
+                    session,
+                    workflow_type=arguments.workflow_type,
+                    product_state=arguments.product_state,
+                    shop_id=UUID(arguments.shop_id),
+                    now=datetime.now(UTC),
+                )
+                await session.commit()
+                return {
+                    "id": str(workflow.id),
+                    "workflow_type": workflow.workflow_type,
+                    "product_state": workflow.product_state,
+                    "started_at": workflow.started_at,
+                }
+        finally:
+            await engine.dispose()
+
+    _print(asyncio.run(run()))
+    return EXIT_OK
+
+
+def command_workflow_cancel(arguments: argparse.Namespace) -> int:
+    """Cancel a workflow and block its pending jobs."""
+    from uuid import UUID
+
+    from money_machine.orchestration.engine import cancel_workflow
+    from money_machine.persistence.database import create_engine, create_session_factory
+
+    settings = _settings()
+
+    async def run() -> dict[str, Any]:
+        from datetime import UTC, datetime
+
+        engine = create_engine(settings.database)
+        try:
+            factory = create_session_factory(engine)
+            async with factory() as session:
+                workflow, blocked = await cancel_workflow(
+                    session,
+                    workflow_id=UUID(arguments.workflow_id),
+                    now=datetime.now(UTC),
+                )
+                await session.commit()
+                return {
+                    "id": str(workflow.id),
+                    "completed_at": workflow.completed_at,
+                    "jobs_blocked": blocked,
+                }
+        finally:
+            await engine.dispose()
+
+    _print(asyncio.run(run()))
+    return EXIT_OK
+
+
+def command_job_retry(arguments: argparse.Namespace) -> int:
+    """Retry a failed job."""
+    from uuid import UUID
+
+    from money_machine.orchestration.engine import retry_failed_job
+    from money_machine.persistence.database import create_engine, create_session_factory
+
+    settings = _settings()
+
+    async def run() -> dict[str, Any]:
+        from datetime import UTC, datetime
+
+        engine = create_engine(settings.database)
+        try:
+            factory = create_session_factory(engine)
+            async with factory() as session:
+                job = await retry_failed_job(
+                    session,
+                    job_id=UUID(arguments.job_id),
+                    now=datetime.now(UTC),
+                )
+                await session.commit()
+                return {
+                    "id": str(job.id),
+                    "status": job.status,
+                    "scheduled_at": job.scheduled_at,
+                }
+        finally:
+            await engine.dispose()
+
+    _print(asyncio.run(run()))
+    return EXIT_OK
+
+
+def command_job_reconcile(arguments: argparse.Namespace) -> int:
+    """Reconcile an uncertain external effect."""
+    from uuid import UUID
+
+    from money_machine.orchestration.engine import reconcile_uncertain_effect
+    from money_machine.persistence.database import create_engine, create_session_factory
+
+    settings = _settings()
+
+    async def run() -> dict[str, Any]:
+        from datetime import UTC, datetime
+
+        engine = create_engine(settings.database)
+        try:
+            factory = create_session_factory(engine)
+            async with factory() as session:
+                effect = await reconcile_uncertain_effect(
+                    session,
+                    job_id=UUID(arguments.job_id),
+                    effect_state=arguments.effect_state,
+                    provider_object_id=arguments.provider_object_id,
+                    now=datetime.now(UTC),
+                )
+                await session.commit()
+                return {
+                    "id": str(effect.id),
+                    "effect_state": effect.effect_state,
+                    "provider_object_id": effect.provider_object_id,
+                }
+        finally:
+            await engine.dispose()
+
+    _print(asyncio.run(run()))
+    return EXIT_OK
+
+
+def command_workflow_inspect_graph(arguments: argparse.Namespace) -> int:
+    """Show workflow job graph with dependencies (Action 9: inspect-graph)."""
+    from uuid import UUID
+
+    from money_machine.persistence.database import create_engine, create_session_factory
+
+    settings = _settings()
+
+    async def run() -> dict[str, Any]:
+        from sqlalchemy import select
+
+        from money_machine.persistence.tables import Job, JobDependency
+
+        engine = create_engine(settings.database)
+        try:
+            factory = create_session_factory(engine)
+            async with factory() as session:
+                workflow_id = UUID(arguments.workflow_id)
+
+                # Get all jobs for this workflow
+                jobs_result = await session.execute(
+                    select(Job).where(Job.workflow_id == workflow_id).order_by(Job.created_at)
+                )
+                jobs = list(jobs_result.scalars().all())
+
+                # Get all dependencies
+                job_ids = [job.id for job in jobs]
+                if job_ids:
+                    deps_result = await session.execute(
+                        select(JobDependency).where(JobDependency.job_id.in_(job_ids))
+                    )
+                    deps = list(deps_result.scalars().all())
+                else:
+                    deps = []
+
+                # Build graph representation
+                job_map: dict[str, dict[str, Any]] = {
+                    str(job.id): {
+                        "id": str(job.id),
+                        "job_type": job.job_type,
+                        "status": job.status,
+                        "depends_on": [],
+                    }
+                    for job in jobs
+                }
+
+                for dep in deps:
+                    job_id_str = str(dep.job_id)
+                    if job_id_str in job_map:
+                        depends_on_list: list[str] = job_map[job_id_str]["depends_on"]  # type: ignore[assignment]
+                        depends_on_list.append(str(dep.depends_on_job_id))
+
+                return {
+                    "workflow_id": str(workflow_id),
+                    "job_count": len(jobs),
+                    "dependency_count": len(deps),
+                    "jobs": list(job_map.values()),
+                }
+        finally:
+            await engine.dispose()
+
+    _print(asyncio.run(run()))
+    return EXIT_OK
+
+
+def command_job_list_stalled(arguments: argparse.Namespace) -> int:
+    """List stalled RUNNING jobs (Action 9: list-stalled)."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import select
+
+    from money_machine.domain.enums import JobStatus
+    from money_machine.persistence.database import create_engine, create_session_factory
+    from money_machine.persistence.tables import Job
+
+    settings = _settings()
+
+    async def run() -> dict[str, Any]:
+        from money_machine.orchestration.scheduler import DEFAULT_STALL_THRESHOLD
+
+        engine = create_engine(settings.database)
+        try:
+            factory = create_session_factory(engine)
+            async with factory() as session:
+                now = datetime.now(UTC)
+                stall_threshold = (
+                    timedelta(seconds=arguments.threshold_seconds)
+                    if arguments.threshold_seconds
+                    else DEFAULT_STALL_THRESHOLD
+                )
+                stall_cutoff = now - stall_threshold
+
+                # Find RUNNING jobs that haven't heartbeated recently
+                # (read-only, no claim - same query as detect_stalled_jobs but without mutation)
+                statement = (
+                    select(Job)
+                    .where(
+                        Job.status == JobStatus.RUNNING.value,
+                        Job.heartbeat_at.is_not(None),
+                        Job.heartbeat_at < stall_cutoff,
+                        Job.lease_expires_at > now,
+                    )
+                    .order_by(Job.heartbeat_at)
+                    .limit(arguments.limit)
+                )
+
+                result = await session.execute(statement)
+                stalled = list(result.scalars().all())
+
+                return {
+                    "stalled_count": len(stalled),
+                    "threshold_seconds": int(stall_threshold.total_seconds()),
+                    "jobs": [
+                        {
+                            "id": str(job.id),
+                            "job_type": job.job_type,
+                            "workflow_id": str(job.workflow_id),
+                            "heartbeat_at": job.heartbeat_at.isoformat()
+                            if job.heartbeat_at
+                            else None,
+                            "lease_owner": job.lease_owner,
+                        }
+                        for job in stalled
+                    ],
+                }
+        finally:
+            await engine.dispose()
+
+    _print(asyncio.run(run()))
+    return EXIT_OK
+
+
+def command_scheduler_run_once(arguments: argparse.Namespace) -> int:
+    """Run one scheduler cycle manually."""
+    del arguments
+    from money_machine.orchestration.engine import run_scheduler_once
+    from money_machine.persistence.database import create_engine, create_session_factory
+
+    settings = _settings()
+
+    async def run() -> dict[str, Any]:
+        from datetime import UTC, datetime
+
+        engine = create_engine(settings.database)
+        try:
+            factory = create_session_factory(engine)
+            async with factory() as session:
+                result = await run_scheduler_once(
+                    session,
+                    now=datetime.now(UTC),
+                )
+                await session.commit()
+                return result
+        finally:
+            await engine.dispose()
+
+    _print(asyncio.run(run()))
+    return EXIT_OK
+
+
+def command_worker_run_once(arguments: argparse.Namespace) -> int:
+    """Worker run-once command - fail-closed (Exit 78).
+
+    This command is registered but not commissioned. It would claim production work,
+    violating the Exit 78 constraint. Session 04+ may commission worker execution.
+    """
+    from money_machine.orchestration._foundation import uncommissioned_process
+
+    return uncommissioned_process("worker run-once")
+
+
 Handler = Callable[[argparse.Namespace], int]
 
 
@@ -223,17 +534,44 @@ def _parser() -> argparse.ArgumentParser:
     status = subparsers.add_parser("status", help="report process and database status")
     status.set_defaults(handler=command_status)
 
-    workflow = subparsers.add_parser("workflow", help="inspect workflows")
+    workflow = subparsers.add_parser("workflow", help="manage workflows")
     workflow_actions = workflow.add_subparsers(dest="workflow_command", required=True)
     workflow_list = workflow_actions.add_parser("list", help="list workflows")
     workflow_list.add_argument("--limit", type=int, default=50)
     workflow_list.set_defaults(handler=command_workflow_list)
+    workflow_start = workflow_actions.add_parser("start", help="start a new workflow")
+    workflow_start.add_argument("--workflow-type", required=True, help="workflow template name")
+    workflow_start.add_argument("--product-state", required=True, help="product lifecycle state")
+    workflow_start.add_argument("--shop-id", required=True, help="shop UUID for the workflow")
+    workflow_start.set_defaults(handler=command_workflow_start)
+    workflow_cancel = workflow_actions.add_parser("cancel", help="cancel a workflow")
+    workflow_cancel.add_argument("workflow_id", help="workflow UUID to cancel")
+    workflow_cancel.set_defaults(handler=command_workflow_cancel)
+    workflow_inspect = workflow_actions.add_parser(
+        "inspect-graph", help="show job graph with dependencies"
+    )
+    workflow_inspect.add_argument("workflow_id", help="workflow UUID to inspect")
+    workflow_inspect.set_defaults(handler=command_workflow_inspect_graph)
 
-    job = subparsers.add_parser("job", help="inspect jobs")
+    job = subparsers.add_parser("job", help="manage jobs")
     job_actions = job.add_subparsers(dest="job_command", required=True)
     job_list = job_actions.add_parser("list", help="list jobs")
     job_list.add_argument("--limit", type=int, default=50)
     job_list.set_defaults(handler=command_job_list)
+    job_retry = job_actions.add_parser("retry", help="retry a failed job")
+    job_retry.add_argument("job_id", help="job UUID to retry")
+    job_retry.set_defaults(handler=command_job_retry)
+    job_reconcile = job_actions.add_parser("reconcile", help="reconcile uncertain effect")
+    job_reconcile.add_argument("job_id", help="job UUID to reconcile")
+    job_reconcile.add_argument("--effect-state", required=True, choices=["CONFIRMED", "ABSENT"])
+    job_reconcile.add_argument("--provider-object-id", help="provider object ID if CONFIRMED")
+    job_reconcile.set_defaults(handler=command_job_reconcile)
+    job_stalled = job_actions.add_parser("list-stalled", help="list stalled RUNNING jobs")
+    job_stalled.add_argument(
+        "--threshold-seconds", type=int, help="stall threshold in seconds (default: 300)"
+    )
+    job_stalled.add_argument("--limit", type=int, default=50, help="max jobs to return")
+    job_stalled.set_defaults(handler=command_job_list_stalled)
 
     integrations = subparsers.add_parser("integrations", help="inspect provider readiness")
     integration_actions = integrations.add_subparsers(dest="integrations_command", required=True)
@@ -242,6 +580,21 @@ def _parser() -> argparse.ArgumentParser:
         help="report configured or not configured, without reading any credential",
     )
     integrations_status.set_defaults(handler=command_integrations_status)
+
+    scheduler = subparsers.add_parser("scheduler", help="scheduler operations")
+    scheduler_actions = scheduler.add_subparsers(dest="scheduler_command", required=True)
+    scheduler_run = scheduler_actions.add_parser("run-once", help="run one scheduler cycle")
+    scheduler_run.set_defaults(handler=command_scheduler_run_once)
+
+    worker = subparsers.add_parser("worker", help="worker operations (library only, fail-closed)")
+    worker_actions = worker.add_subparsers(dest="worker_command", required=True)
+    worker_run = worker_actions.add_parser(
+        "run-once",
+        help="claim one job (no execution, library test only)",
+    )
+    worker_run.add_argument("--worker-id", help="worker identifier (default: cli-worker-0)")
+    worker_run.set_defaults(handler=command_worker_run_once)
+
     return parser
 
 
