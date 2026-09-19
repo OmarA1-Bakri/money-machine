@@ -2,14 +2,19 @@
 
 Session 03 Wave 4: create successor jobs transactionally with parent results,
 enforcing the winner/successor boundary for MULTIPLY decisions.
+Session 03 Wave 7: YAML-driven event → successor job type mapping.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from functools import lru_cache
 from hashlib import sha256
+from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import UUID
+
+import yaml
 
 from money_machine.domain.enums import DecisionType, ProductLifecycleState
 from money_machine.domain.events import EventName
@@ -18,6 +23,64 @@ from money_machine.orchestration.transition_guard import require_successor_spawn
 
 if TYPE_CHECKING:
     from money_machine.persistence.unit_of_work import UnitOfWork
+
+
+@lru_cache(maxsize=1)
+def load_event_successor_map() -> dict[str, list[str]]:
+    """Load the event → successor job types map from workflows.yaml.
+    
+    Returns a dict mapping event names to lists of successor job types.
+    Cached for performance (config rarely changes during runtime).
+    Fails closed: missing file or invalid structure raises an exception.
+    """
+    # Navigate from src/money_machine/orchestration/ up to repo root, then to config/
+    config_path = Path(__file__).parent.parent.parent.parent / "config" / "workflows.yaml"
+
+    if not config_path.exists():
+        raise FileNotFoundError(
+            f"Workflow configuration not found at {config_path}. Cannot determine event successors."
+        )
+
+    with config_path.open("r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    if not isinstance(config, dict):
+        raise ValueError("workflows.yaml must contain a dict at root")
+
+    event_map_raw = config.get("event_successor_map")
+    if event_map_raw is None:
+        raise ValueError(
+            "workflows.yaml missing required 'event_successor_map' section. "
+            "Cannot determine event successors."
+        )
+
+    if not isinstance(event_map_raw, dict):
+        raise ValueError("event_successor_map must be a dict")
+
+    # Validate structure and build typed result
+    event_map: dict[str, list[str]] = {}
+
+    for event_name_raw, successors_raw in event_map_raw.items():
+        if not isinstance(event_name_raw, str):
+            raise ValueError(f"Event name must be string, got {type(event_name_raw)}")
+        if not isinstance(successors_raw, list):
+            raise ValueError(
+                f"Successors for {event_name_raw} must be a list, "
+                f"got {type(successors_raw)}"
+            )
+
+        successors: list[str] = []
+        for job_type in successors_raw:
+            if not isinstance(job_type, str):
+                raise ValueError(
+                    f"Job type in successors for {event_name_raw} must be string, "
+                    f"got {type(job_type)}"
+                )
+            successors.append(job_type)
+
+        event_map[event_name_raw] = successors
+
+    return event_map
 
 
 class SuccessorFactory:
@@ -35,25 +98,51 @@ class SuccessorFactory:
         payload: dict[str, object] | None = None,
         occurred_at: datetime | None = None,
     ) -> tuple[UUID, ...]:
-        """Create successor jobs for a workflow event (deferred extension point).
+        """Create successor jobs for a workflow event.
 
-        CONTRACT (Wave 4):
-        - WINNER_DETECTED is routed through dispatch_decision/create_multiply_successor.
-        - All other events currently produce no successors (empty tuple).
-        - Future: load event → successor mappings from config/workflows.yaml.
+        CONTRACT (Wave 7):
+        - Loads event → successor mappings from config/workflows.yaml
+        - WINNER_DETECTED is still routed through dispatch_decision/create_multiply_successor
+        - Unknown events (not in the map) fail closed with ValueError
+        - Events mapped to empty list return empty tuple (no successors)
+        - Creates all successor job types listed for the event
 
-        See tests/unit/test_successor_boundary.py::test_create_successors_contract_no_jobs
-        for the explicit contract test proving the current "no successors" behavior.
-
-        Returns the IDs of created successor jobs (empty tuple for now).
+        Returns the IDs of created successor jobs.
+        Raises ValueError if event is unknown (fail closed).
         """
         if occurred_at is None:
             occurred_at = datetime.now(UTC)
 
-        # WINNER_DETECTED is handled by dispatch_decision/create_multiply_successor.
-        # Other events route here but produce no successors in Wave 4.
-        # Future Wave: load admitted_events → successor_job_types from YAML config.
-        return ()
+        # Load the event successor map
+        successor_map = load_event_successor_map()
+
+        # Fail closed: unknown events are rejected
+        event_key = event_name.value
+        if event_key not in successor_map:
+            raise ValueError(
+                f"Unknown event '{event_key}' not found in event_successor_map. "
+                f"Cannot determine successors. Known events: {sorted(successor_map.keys())}"
+            )
+
+        successor_job_types = successor_map[event_key]
+
+        # Empty list means no successors (valid, return empty tuple)
+        if not successor_job_types:
+            return ()
+
+        # Create all successor jobs for this event
+        created_job_ids: list[UUID] = []
+
+        for job_type in successor_job_types:
+            job_id = await self._create_successor_job(
+                workflow_id=workflow_id,
+                parent_job_id=parent_job_id,
+                job_type=job_type,
+                occurred_at=occurred_at,
+            )
+            created_job_ids.append(job_id)
+
+        return tuple(created_job_ids)
 
     async def create_multiply_successor(
         self,
@@ -224,11 +313,83 @@ class SuccessorFactory:
         await self.uow.session.flush()
         return job_id
 
+    async def _create_successor_job(
+        self,
+        *,
+        workflow_id: UUID,
+        parent_job_id: UUID | None,
+        job_type: str,
+        occurred_at: datetime,
+    ) -> UUID:
+        """Create a single successor job (Wave 7: placeholder implementation).
+
+        In a full implementation, this would:
+        - Look up the job definition from workflows.yaml
+        - Determine object_type and object_id from the parent job or event payload
+        - Set appropriate owner_agent_id, side_effect_class, retry_class, etc.
+        - Create the Job row with all required fields
+
+        For Wave 7, we create a minimal placeholder that proves the mapping works.
+        The job details will be filled in by later waves when job creation is
+        fully integrated with the workflow configuration.
+        """
+        from money_machine.persistence.tables import Job
+
+        # Derive deterministic job ID
+        job_id = self._derive_successor_job_id(
+            workflow_id=workflow_id,
+            parent_job_id=parent_job_id,
+            job_type=job_type,
+        )
+
+        # Placeholder: create minimal job to prove the successor map works
+        # Future: load full job spec from workflows.yaml
+        job = Job(
+            id=job_id,
+            workflow_id=workflow_id,
+            job_type=job_type,
+            object_type="placeholder",  # Will be determined from workflow config
+            object_id=workflow_id,  # Placeholder
+            owner_agent_id="A01",  # Will be from workflow config
+            status="PENDING",
+            input={"parent_job_id": str(parent_job_id) if parent_job_id else None},
+            success_contract={"output_model": "AgentResult"},
+            scheduled_at=occurred_at,
+            attempt=0,
+            max_attempts=3,
+            idempotency_key=f"{job_type}:{workflow_id}:{parent_job_id or 'none'}",
+            side_effect_class="NONE",
+            retry_class="SAFE",
+            allowed_mode="simulation",
+            version=1,
+        )
+        self.uow.session.add(job)
+        await self.uow.session.flush()
+        return job_id
+
+    @staticmethod
+    def _derive_successor_job_id(
+        *,
+        workflow_id: UUID,
+        parent_job_id: UUID | None,
+        job_type: str,
+    ) -> UUID:
+        """Derive a deterministic job ID for a successor job.
+
+        Uses workflow ID, parent job ID, and job type to create a stable hash.
+        This ensures tests can assert exact job IDs without randomness.
+        """
+        parent_str = str(parent_job_id) if parent_job_id else "none"
+        hash_input = f"{workflow_id}:{parent_str}:{job_type}".encode()
+        hash_digest = sha256(hash_input).digest()[:16]
+        return UUID(bytes=hash_digest)
+
     @staticmethod
     def _derive_job_id(workflow_id: UUID, spec_id: UUID, job_type: str) -> UUID:
         """Derive a deterministic job ID from workflow, spec, and job type.
 
         This ensures tests can assert exact job IDs without randomness.
+        (Legacy method for create_multiply_successor path)
         """
         # Create a stable hash from the inputs
         hash_input = f"{workflow_id}:{spec_id}:{job_type}".encode()
