@@ -100,6 +100,11 @@ class A05ProductStrategy(BaseAgent):
             )
 
         except Exception as e:
+            # Log the full exception for debugging
+            import traceback
+            print(f"PRODUCT_STRATEGY_FAILED: {e}")
+            print(f"Traceback: {traceback.format_exc()}")
+            
             error = ContractError(
                 code="PRODUCT_STRATEGY_FAILED",
                 message=str(e),
