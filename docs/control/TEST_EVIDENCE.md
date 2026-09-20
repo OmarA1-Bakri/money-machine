@@ -231,3 +231,32 @@ Reviewed canonical HEAD `3720653`. Fresh targeted checks: bootstrap/control/sour
 | Session 04 closure | Agent runner, roster, contract/runtime integration, commissioning | Evidence keys remain false except provider abstraction, prompt registry, and control-current | NOT PROVEN |
 
 These results close only the W1–W3 and Phase A slices plus control continuity. Session 04 exit criteria, independent reviews, and closure commit sequence remain open. No live provider calls, no Notion/Etsy mutations, and no Exit 78 lift are claimed.
+
+## 2026-09-20 — Session 04 W4–W8 (control tip-sync @ `d9eb8e28`)
+
+| Wave | Claim | Evidence | Verdict |
+|---|---|---|---|
+| W4 AgentRunner | Registry, BaseAgent, run receipts, commissioning gates (library) | `tests/unit/test_agent_runner.py` **3 passed**; `tests/integration/test_agent_runner.py` **2 passed**; CI green on `b87c547` | PASS (library only) |
+| W5 ToolRegistry + roster | Sixteen agents in `config/agents.yaml`, tool permissions, A01/A02 implementations | `tests/unit/test_tool_registry.py` **8 passed**; CI green on `827272b` | PASS |
+| W6 review subagent | Bounded multi-invocation review, artifact-only, fail-closed mutate | `tests/unit/test_review_subagent.py` **11 passed**; CI green on `d9eb8e2` | PASS |
+| W7 observability | `agent_runs`/artifacts/tool_calls tables, structured logs, PostHog-shaped offline queue | `tests/unit/test_agent_run_observability.py` **5 passed**; `tests/integration/test_agent_run_observability.py` **2 passed**; CI green on `4ee63ce` | PASS |
+| W8 roster contracts | Parametrized A01–A16 contract tests; DESIGNED agents refuse production | `tests/unit/test_roster_contracts.py` **135 passed**; CI green on `44d554f` | PASS |
+| Orchestrator runtime integration | Lease → execute → persist → event → successor flow | Not implemented in W4–W8 lanes | NOT PROVEN |
+| Control continuity | State shape valid for incomplete Session 04 with partial evidence | `tests/bootstrap/test_control_state.py` **61 passed, 12 skipped** after tip-sync | PASS |
+| Exit 78 boundary | Worker/scheduler entrypoints unchanged; no production claim path | No worker/scheduler or commissioning edits in W4–W8 lanes | HELD |
+| Session 04 closure | Orchestrator runtime integration, exit reviews, closure commit | Four of eight evidence keys remain false | NOT PROVEN |
+
+These results close W4–W8 library and contract slices plus control continuity. Orchestrator-lease → successor runtime integration, independent exit reviews, and closure commit sequence remain open. No live provider calls, no Notion/Etsy mutations, and no Exit 78 lift are claimed.
+
+## 2026-09-20 — Session 04 Lane C runtime integration (control tip-bump @ `744cc36b`)
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Lane C runtime integration | Lease → run → persist → event → successor library path; DESIGNED agent fail-closed after lease; worker/scheduler entrypoints remain Exit 78 | `tests/integration/test_runtime_integration.py` **2 passed, 2 skipped**; CI green on `744cc36` | PASS |
+| W8 roster contracts (carried) | Parametrized A01–A16 contract tests | `tests/unit/test_roster_contracts.py` **135 passed** | PASS |
+| `contract_and_runtime_tests_pass` | Contract + runtime suites green on tip | Combined local run **137 passed, 2 skipped** | PASS |
+| `agent_runner_integrated_with_jobs` | Production orchestrator wire to durable jobs | Lane A not delivered; library tests alone insufficient | NOT PROVEN |
+| Exit 78 boundary | Process entrypoints fail-closed | `test_process_entrypoints_remain_exit_78` parametrized worker/scheduler | HELD |
+| Session 04 closure | Orchestrator wire, exit reviews, closure commit | Two of eight evidence keys remain false | NOT PROVEN |
+
+Lane C closes the contract-and-runtime test evidence key. `agent_runner_integrated_with_jobs` remains open pending Lane A orchestrator wire. No live provider calls, no Notion/Etsy mutations, and no Exit 78 lift are claimed.
