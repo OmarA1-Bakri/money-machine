@@ -5,8 +5,6 @@ Tests store_evaluation/get_evaluation round-trip with database.
 
 from __future__ import annotations
 
-from uuid import uuid4
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from money_machine.integrations.jev import (
