@@ -110,6 +110,8 @@ class CatalogueDedupeAgent(BaseAgent):
         existing_specs: list[ProductSpec] = []
         if existing_specs_data and isinstance(existing_specs_data, list):
             for spec_data in existing_specs_data:
+                if not isinstance(spec_data, dict):
+                    continue
                 with contextlib.suppress(Exception):
                     # Skip invalid specs (shouldn't happen but be defensive)
                     existing_specs.append(ProductSpec.model_validate(spec_data))
