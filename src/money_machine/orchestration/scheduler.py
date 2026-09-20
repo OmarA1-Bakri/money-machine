@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 from uuid import UUID
 
 from sqlalchemy import select
@@ -27,6 +27,8 @@ from money_machine.orchestration.dependency_resolver import (
 )
 from money_machine.orchestration.leases import reclaim_expired_leases
 from money_machine.persistence.tables import Job, WorkflowRun
+
+LOGGER: Final = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -353,12 +355,23 @@ async def run_scheduler_cycle(
 
 
 def main() -> int:
-    """Refuse to claim scheduler capability before it is commissioned.
+    """Scheduler entrypoint — remains fail-closed (Wave 9 out of scope).
 
-    Session 03: library functions are implemented and tested, but the process
-    entrypoint remains fail-closed (Exit 78) until Session 04 commissioning.
+    Wave 9 lifts Exit 78 for the WORKER (claim → execute → persist → event → successor).
+    Scheduler cycle (promote due jobs, detect stalled jobs, rebalance) is out of scope.
+
+    Scheduler remains fail-closed until a future wave implements the schedule cycle.
+    Exit 78 is NOT lifted for scheduler in Wave 9.
     """
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+
+    LOGGER.info(
+        "Scheduler cycle not implemented (Wave 9 scope: worker path only); "
+        "scheduler exits 78 (fail-closed, no jobs processed)"
+    )
     return uncommissioned_process("scheduler")
 
 

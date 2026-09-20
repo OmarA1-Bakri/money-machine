@@ -248,15 +248,22 @@ async def test_owning_job_remains_singular(provider: FakeLLMProvider) -> None:
 
 
 def test_exit_78_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Worker and scheduler entrypoints remain fail-closed (Exit 78)."""
+    """Scheduler remains fail-closed; worker exits 78 when commissioning gates fail."""
 
     def no_check(service: str) -> bool | None:
         del service
         return None
 
+    def gates_fail() -> bool:
+        return False
+
     monkeypatch.setattr(
         "money_machine.orchestration._foundation.report_database_connectivity",
         no_check,
+    )
+    monkeypatch.setattr(
+        "money_machine.orchestration.worker._check_commissioning_gates",
+        gates_fail,
     )
     assert worker_main() == EXIT_UNAVAILABLE
     assert scheduler_main() == EXIT_UNAVAILABLE

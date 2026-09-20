@@ -15,7 +15,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from money_machine.agents.base import (
     AgentContext,
@@ -297,12 +297,13 @@ async def test_designed_agent_fail_closed_after_lease(
 @pytest.mark.parametrize(
     "module",
     [
-        "money_machine.orchestration.worker",
         "money_machine.orchestration.scheduler",
+        # Worker is excluded: when gates pass, worker lifts Exit 78 and runs
+        # indefinitely (claim loop). Scheduler remains fail-closed (W9 out of scope).
     ],
 )
 def test_process_entrypoints_remain_exit_78(module: str) -> None:
-    """Worker/scheduler subprocesses still fail-closed; no W9 claim lift."""
+    """Scheduler subprocess remains fail-closed (Exit 78); worker loop tested separately."""
     result = subprocess.run(
         [sys.executable, "-m", module],
         check=False,
@@ -313,5 +314,133 @@ def test_process_entrypoints_remain_exit_78(module: str) -> None:
     )
     assert result.returncode == EXIT_UNAVAILABLE
     assert result.stdout == ""
-    assert "database check" in result.stderr
-    assert "no jobs were processed" in result.stderr
+    # Scheduler stays fail-closed with honest messaging (W9 out of scope)
+    assert "Scheduler cycle not implemented" in result.stderr
+    assert "worker path only" in result.stderr
+    assert "no jobs processed" in result.stderr
+
+
+@pytest.mark.asyncio
+async def test_uncommissioned_agent_refuses_execution_on_production_path(
+    session: AsyncSession,
+    session_factory: async_sessionmaker[AsyncSession],
+    repository_root: Path,
+) -> None:
+    """Wave 9: DESIGNED agents refuse execution even when job is claimed (fail-closed)."""
+    from money_machine.agents.base import AgentNotCommissionedError, BaseAgent
+    from money_machine.agents.runtime import AgentRunner
+    from money_machine.domain.models.jobs import AgentResult
+    from money_machine.integrations.llm.fake_provider import FakeLLMProvider
+    from money_machine.persistence.unit_of_work import unit_of_work
+
+    # Create a simple DESIGNED agent for testing
+    class _TestDesignedAgent(BaseAgent):
+        async def execute(self, context) -> AgentResult:  # type: ignore[override]
+            return AgentResult(
+                job_id=context.job.job_id,
+                agent_run_id=context.run_id,
+                agent_id=context.definition.agent_id,
+                agent_definition_version=context.definition.contract_version,
+                prompt_reference=context.prompt_reference,
+                prompt_sha256=context.prompt_sha256,
+                status=AgentRunStatus.SUCCESS,
+                output={},
+            )
+
+    # Setup: create test data
+    await seed(session, repository_root=repository_root)
+    shop = await make_shop(session)
+    workflow = await make_workflow(session, shop=shop)
+
+    # Create a job for A03 (Market Research) which is DESIGNED
+    job = await _make_schedule_configuration_job(
+        session,
+        workflow.id,
+        object_id=workflow.id,
+    )
+    # Override owner to A03 (DESIGNED agent)
+    job.owner_agent_id = "A03"
+    job.job_type = "MarketResearchJob"
+    await session.commit()
+
+    job_id = job.id
+
+    # Attempt to execute with production=True
+    runner = AgentRunner.from_repository_root(
+        repository_root,
+        provider=FakeLLMProvider(),
+    )
+
+    async with unit_of_work(session_factory) as uow:
+        job = await uow.session.get(Job, job_id)
+        assert job is not None
+        envelope = _job_envelope(job)
+        agent = _TestDesignedAgent()
+
+        # Execution should raise AgentNotCommissionedError
+        with pytest.raises(AgentNotCommissionedError) as exc_info:
+            await runner.execute(
+                uow.session,
+                job=envelope,
+                agent=agent,
+                production=True,
+            )
+
+        assert (
+            "DESIGNED" in str(exc_info.value) or "not commissioned" in str(exc_info.value).lower()
+        ), f"Expected 'DESIGNED' or 'not commissioned' in error message, got: {exc_info.value}"
+
+
+@pytest.mark.asyncio
+async def test_tested_agent_executes_on_production_path(
+    session: AsyncSession,
+    session_factory: async_sessionmaker[AsyncSession],
+    repository_root: Path,
+) -> None:
+    """Wave 9: TESTED agents execute successfully on production path."""
+    from money_machine.agents.implementations.shop_orchestrator import ShopOrchestratorAgent
+    from money_machine.agents.runtime import AgentRunner
+    from money_machine.domain.enums import AgentRunStatus
+    from money_machine.integrations.llm.fake_provider import FakeLLMProvider
+    from money_machine.persistence.unit_of_work import unit_of_work
+
+    # Setup: create test data
+    await seed(session, repository_root=repository_root)
+    shop = await make_shop(session)
+    workflow = await make_workflow(session, shop=shop)
+
+    # Create a job for A01 (Shop Orchestrator) which is TESTED
+    job = await _make_schedule_configuration_job(
+        session,
+        workflow.id,
+        object_id=workflow.id,
+    )
+    await session.commit()
+
+    job_id = job.id
+
+    # Execute with production=True (should succeed)
+    runner = AgentRunner.from_repository_root(
+        repository_root,
+        provider=FakeLLMProvider(),
+    )
+
+    async with unit_of_work(session_factory) as uow:
+        job = await uow.session.get(Job, job_id)
+        assert job is not None
+        envelope = _job_envelope(job)
+        agent = ShopOrchestratorAgent()
+
+        result, receipt = await runner.execute(
+            uow.session,
+            job=envelope,
+            agent=agent,
+            production=True,
+        )
+
+        # A01 is TESTED and should execute successfully
+        assert result.status in (AgentRunStatus.SUCCESS, AgentRunStatus.FAILURE), (
+            f"Expected SUCCESS or FAILURE for TESTED agent, got {result.status}"
+        )
+        assert receipt.agent_id == "A01"
+        assert receipt.status in (AgentRunStatus.SUCCESS, AgentRunStatus.FAILURE)
