@@ -89,7 +89,7 @@ def _check_commissioning_gates() -> bool:
 
         # Gate: Prompt files exist for TESTED/COMMISSIONED agents
         # Prompt path: prompts/agents/<agent_id>/<system_prompt_reference>.md
-        agents_with_missing_prompts = []
+        agents_with_missing_prompts: list[str] = []
         prompts_dir = repo_root / "prompts" / "agents"
         for agent_def in tested_or_commissioned:
             prompt_file = (
