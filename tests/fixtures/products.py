@@ -243,8 +243,7 @@ def create_fixture_research_report(
             ResearchObservation(
                 observation_id=obs_id,
                 source_reference=(
-                    f"https://www.etsy.com/listing/{1234567890 + i}/"
-                    f"fixture-listing-{i}"
+                    f"https://www.etsy.com/listing/{1234567890 + i}/fixture-listing-{i}"
                 ),
                 observed_at=datetime.now(UTC),
                 title=f"Fixture Digital Planner {i + 1}",
@@ -260,8 +259,7 @@ def create_fixture_research_report(
                         evidence_id=obs_id,
                         evidence_kind="FIXTURE_RESEARCH",
                         reference=(
-                            "tests/fixtures/products.py::"
-                            f"create_fixture_research_report obs {i}"
+                            f"tests/fixtures/products.py::create_fixture_research_report obs {i}"
                         ),
                     ),
                 ),
