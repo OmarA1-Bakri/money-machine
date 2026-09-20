@@ -52,7 +52,7 @@ class ResearchReport:
 
 @dataclass(frozen=True)
 class CandidateProfile:
-    """One shortlisted identity×category candidate with evidence."""
+    """One shortlisted identityxcategory candidate with evidence."""
 
     identity: str
     base_category: str

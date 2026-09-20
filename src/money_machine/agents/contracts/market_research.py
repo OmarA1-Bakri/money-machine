@@ -23,7 +23,7 @@ async def execute_market_research(
     Execute A03 Market Research Agent.
 
     Collects 25-40 market observations from fixture adapter,
-    generates shortlist of 5 identity×category candidates.
+    generates shortlist of 5 identityxcategory candidates.
 
     Args:
         workflow_id: Workflow this research belongs to

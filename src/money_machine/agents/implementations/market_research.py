@@ -292,7 +292,7 @@ class MarketResearchAgent:
         2. Young-and-fast shop presence
         3. Price band diversity
         """
-        # Group by identity × category
+        # Group by identity x category
         niche_category_groups: dict[tuple[str, str], list[ListingObservation]] = defaultdict(list)
 
         for obs in listing_observations:
@@ -307,7 +307,7 @@ class MarketResearchAgent:
 
         cutoff_date = datetime.now(UTC) - timedelta(days=young_shop_age_days)
 
-        # Score each niche × category combination
+        # Score each niche x category combination
         candidate_scores: list[tuple[CandidateProfile, float]] = []
 
         for (identity, category), observations in niche_category_groups.items():
@@ -392,8 +392,8 @@ class MarketResearchAgent:
 
             await uow.commit()
 
-        total_niches = len({identity for identity, _ in niche_category_groups.keys()})
-        total_categories = len({category for _, category in niche_category_groups.keys()})
+        total_niches = len({identity for identity, _ in niche_category_groups})
+        total_categories = len({category for _, category in niche_category_groups})
 
         return ShortlistAnalysis(
             research_run_id=research_run_id,

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from decimal import Decimal
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -14,7 +13,7 @@ from money_machine.integrations.etsy.fixture_adapter import FixtureEtsyAdapter
 from money_machine.integrations.etsy.interface import EtsyResearchAdapter
 from money_machine.persistence.database import AsyncSessionLocal
 from money_machine.persistence.repositories.research import ResearchRunRepository
-from money_machine.persistence.tables import Job, ResearchRun, WorkflowRun
+from money_machine.persistence.tables import Job, WorkflowRun
 from money_machine.persistence.unit_of_work import UnitOfWork
 
 
@@ -124,7 +123,7 @@ async def test_shortlist_produces_5_candidates(test_workflow, test_database):
     - Exactly 5 ProductCandidate rows
     - Non-empty identity and base_category
     - Evidence linkage (each appears in observations)
-    - Distinct identity×category combinations
+    - Distinct identityxcategory combinations
     - Risk notes present
     """
     workflow, job = test_workflow
@@ -149,10 +148,10 @@ async def test_shortlist_produces_5_candidates(test_workflow, test_database):
         assert candidate.identity, f"Candidate {candidate.id} missing identity"
         assert candidate.base_category, f"Candidate {candidate.id} missing base_category"
 
-    # All identity×category combinations are distinct
+    # All identityxcategory combinations are distinct
     combinations = [(c.identity, c.base_category) for c in candidates]
     assert len(combinations) == len(set(combinations)), (
-        "Candidates have duplicate identity×category combinations"
+        "Candidates have duplicate identityxcategory combinations"
     )
 
     # Each candidate identity appears in report observations
@@ -171,7 +170,7 @@ async def test_research_persists_to_database(test_workflow, test_database):
     workflow, job = test_workflow
 
     async with UnitOfWork() as uow:
-        report = await execute_market_research(workflow.id, job, uow)
+        _ = await execute_market_research(workflow.id, job, uow)
 
     # Verify ResearchRun was persisted
     async with UnitOfWork() as uow:
@@ -350,7 +349,7 @@ async def test_risk_notes_generated(test_workflow, test_database):
     workflow, job = test_workflow
 
     async with UnitOfWork() as uow:
-        report = await execute_market_research(workflow.id, job, uow)
+        _ = await execute_market_research(workflow.id, job, uow)
 
         async with AsyncSessionLocal() as session:
             from sqlalchemy import select
@@ -372,7 +371,7 @@ async def test_observation_count_matches_report(test_workflow, test_database):
     workflow, job = test_workflow
 
     async with UnitOfWork() as uow:
-        report = await execute_market_research(workflow.id, job, uow)
+        _ = await execute_market_research(workflow.id, job, uow)
 
         async with AsyncSessionLocal() as session:
             from sqlalchemy import select
