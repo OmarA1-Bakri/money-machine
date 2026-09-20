@@ -209,18 +209,22 @@ async def test_lease_run_persist_event_and_successor_flow(
     assert stored_run.status == AgentRunStatus.SUCCESS.value
 
     events = (
-        await session.execute(
-            select(Event).where(
-                Event.event_name == EventName.SCHEDULE_CONFIGURED.value,
-                Event.job_id == job.id,
+        (
+            await session.execute(
+                select(Event).where(
+                    Event.event_name == EventName.SCHEDULE_CONFIGURED.value,
+                    Event.job_id == job.id,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(events) == 1
 
     successors = (
-        await session.execute(select(Job).where(Job.id.in_(successor_ids)))
-    ).scalars().all()
+        (await session.execute(select(Job).where(Job.id.in_(successor_ids)))).scalars().all()
+    )
     successor_types = {row.job_type for row in successors}
     assert successor_types == {"WeeklyReviewJob", "MonthlyDeepPassJob"}
     assert all(row.status == JobStatus.PENDING.value for row in successors)
@@ -268,21 +272,25 @@ async def test_designed_agent_fail_closed_after_lease(
         )
 
     runs = (
-        await session.execute(select(AgentRun).where(AgentRun.job_id == job.id))
-    ).scalars().all()
+        (await session.execute(select(AgentRun).where(AgentRun.job_id == job.id))).scalars().all()
+    )
     assert runs == []
 
     events = (await session.execute(select(Event).where(Event.job_id == job.id))).scalars().all()
     assert events == []
 
     successors = (
-        await session.execute(
-            select(Job).where(
-                Job.workflow_id == workflow.id,
-                Job.id != job.id,
+        (
+            await session.execute(
+                select(Job).where(
+                    Job.workflow_id == workflow.id,
+                    Job.id != job.id,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert successors == []
 
 
