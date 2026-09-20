@@ -369,8 +369,7 @@ async def test_uncommissioned_agent_refuses_execution_on_production_path(
             )
 
         assert (
-            "DESIGNED" in str(exc_info.value)
-            or "not commissioned" in str(exc_info.value).lower()
+            "DESIGNED" in str(exc_info.value) or "not commissioned" in str(exc_info.value).lower()
         ), f"Expected 'DESIGNED' or 'not commissioned' in error message, got: {exc_info.value}"
 
 

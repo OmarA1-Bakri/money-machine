@@ -144,8 +144,6 @@ async def test_idempotent_reclaim_prevents_duplicate_events(
     await session.commit()
 
     job_id = job.id
-            workflow_id = workflow.id
-
     workflow_id = workflow.id
 
     # Worker 1 claims and executes, then lease expires before event emission

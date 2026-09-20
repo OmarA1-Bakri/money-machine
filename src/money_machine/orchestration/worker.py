@@ -31,7 +31,11 @@ from money_machine.orchestration.leases import (
     heartbeat,
     release_lease,
 )
-from money_machine.persistence.database import check_connectivity, create_engine, create_session_factory
+from money_machine.persistence.database import (
+    check_connectivity,
+    create_engine,
+    create_session_factory,
+)
 from money_machine.persistence.tables import Job
 from money_machine.persistence.unit_of_work import UnitOfWork, unit_of_work
 
