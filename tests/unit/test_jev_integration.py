@@ -434,3 +434,46 @@ class TestJevGatewayClient:
 
         with pytest.raises(JevClientError, match="Unexpected Jev Gateway response structure"):
             await client.evaluate(packet, timeout=5.0)
+
+    @respx.mock
+    async def test_fail_closed_on_missing_answer_keys(
+        self, client: JevGatewayClient, packet: DecisionPacket, mock_gateway_url: str
+    ) -> None:
+        """Client fails closed when response is missing expected answer keys."""
+        # Response missing "has_blockers" key
+        mock_response = {
+            "decision_type": "preflight_blockers_present",
+            "answers": {},  # Empty answers - missing "has_blockers"
+            "model_id": "jev-1.0",
+            "latency_ms": 100,
+        }
+
+        respx.post(f"{mock_gateway_url}/evaluate").mock(
+            return_value=httpx.Response(200, json=mock_response)
+        )
+
+        with pytest.raises(JevClientError, match="missing answer keys"):
+            await client.evaluate(packet, timeout=5.0)
+
+    @respx.mock
+    async def test_fail_closed_on_extra_answer_keys(
+        self, client: JevGatewayClient, packet: DecisionPacket, mock_gateway_url: str
+    ) -> None:
+        """Client fails closed when response has unexpected extra answer keys."""
+        # Response has extra "unexpected_key"
+        mock_response = {
+            "decision_type": "preflight_blockers_present",
+            "answers": {
+                "has_blockers": False,
+                "unexpected_key": True,  # Extra key not in questions
+            },
+            "model_id": "jev-1.0",
+            "latency_ms": 100,
+        }
+
+        respx.post(f"{mock_gateway_url}/evaluate").mock(
+            return_value=httpx.Response(200, json=mock_response)
+        )
+
+        with pytest.raises(JevClientError, match="unexpected answer keys"):
+            await client.evaluate(packet, timeout=5.0)

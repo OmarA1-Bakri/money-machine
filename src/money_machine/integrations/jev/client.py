@@ -166,9 +166,29 @@ class JevGatewayClient(JevClient):
             # Build DecisionResult from response
             # Expect: {"decision_type": "...", "answers": {...}, "model_id": "..."}
             try:
+                decision_type = result_data["decision_type"]
+                answers = result_data["answers"]
+
+                # Validate answer keys match packet questions (fail-closed)
+                expected_keys = {q.question_id for q in packet.questions}
+                answer_keys = set(answers.keys())
+
+                missing_keys = expected_keys - answer_keys
+                extra_keys = answer_keys - expected_keys
+
+                if missing_keys:
+                    raise JevClientError(
+                        f"Jev Gateway response missing answer keys: {sorted(missing_keys)}"
+                    )
+
+                if extra_keys:
+                    raise JevClientError(
+                        f"Jev Gateway response has unexpected answer keys: {sorted(extra_keys)}"
+                    )
+
                 return DecisionResult(
-                    decision_type=result_data["decision_type"],
-                    answers=result_data["answers"],
+                    decision_type=decision_type,
+                    answers=answers,
                     model_id=result_data.get("model_id", "unknown"),
                     latency_ms=result_data.get("latency_ms", latency_ms),
                     metadata=result_data.get("metadata", {}),

@@ -1574,67 +1574,6 @@ def upgrade() -> None:
     )
     op.create_index(op.f("ix_decisions_workflow_id"), "decisions", ["workflow_id"], unique=False)
     op.create_table(
-        "jev_evaluations",
-        sa.Column("decision_id", sa.UUID(), nullable=True),
-        sa.Column("decision_type", sa.String(length=100), nullable=False),
-        sa.Column(
-            "packet",
-            postgresql.JSONB(none_as_null=True, astext_type=sa.Text()).with_variant(
-                sa.JSON(none_as_null=True), "sqlite"
-            ),
-            nullable=False,
-        ),
-        sa.Column(
-            "answers",
-            postgresql.JSONB(none_as_null=True, astext_type=sa.Text()).with_variant(
-                sa.JSON(none_as_null=True), "sqlite"
-            ),
-            nullable=False,
-        ),
-        sa.Column(
-            "derived",
-            postgresql.JSONB(none_as_null=True, astext_type=sa.Text()).with_variant(
-                sa.JSON(none_as_null=True), "sqlite"
-            ),
-            nullable=True,
-        ),
-        sa.Column("model_id", sa.String(length=100), nullable=False),
-        sa.Column("latency_ms", sa.Integer(), nullable=False),
-        sa.Column(
-            "evaluated_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
-            nullable=False,
-        ),
-        sa.Column("id", sa.UUID(), server_default=sa.text("gen_random_uuid()"), nullable=False),
-        sa.CheckConstraint("latency_ms >= 0", name=op.f("ck_jev_evaluations_latency_non_negative")),
-        sa.CheckConstraint(
-            "jsonb_typeof(packet) = 'object'",
-            name=op.f("ck_jev_evaluations_packet_is_object"),
-        ),
-        sa.CheckConstraint(
-            "jsonb_typeof(answers) = 'object'",
-            name=op.f("ck_jev_evaluations_answers_is_object"),
-        ),
-        sa.CheckConstraint(
-            "derived IS NULL OR jsonb_typeof(derived) = 'object'",
-            name=op.f("ck_jev_evaluations_derived_is_object_or_null"),
-        ),
-        sa.ForeignKeyConstraint(
-            ["decision_id"],
-            ["decisions.id"],
-            name=op.f("fk_jev_evaluations_decision_id_decisions"),
-            ondelete="SET NULL",
-        ),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_jev_evaluations")),
-    )
-    op.create_index(
-        op.f("ix_jev_evaluations_decision_id"),
-        "jev_evaluations",
-        ["decision_id"],
-        unique=False,
-    )
-    op.create_table(
         "dedupe_results",
         sa.Column("workflow_id", sa.UUID(), nullable=False),
         sa.Column("spec_id", sa.UUID(), nullable=False),
@@ -2602,8 +2541,6 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_decisions_product_id"), table_name="decisions")
     op.drop_index(op.f("ix_decisions_listing_id"), table_name="decisions")
     op.drop_index(op.f("ix_decisions_job_id"), table_name="decisions")
-    op.drop_index(op.f("ix_jev_evaluations_decision_id"), table_name="jev_evaluations")
-    op.drop_table("jev_evaluations")
     op.drop_table("decisions")
     op.drop_index(op.f("ix_product_specs_workflow_id"), table_name="product_specs")
     op.drop_index(op.f("ix_product_specs_teardown_report_id"), table_name="product_specs")
