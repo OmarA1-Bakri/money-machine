@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-import pytest
+from money_machine.persistence.session import UnitOfWork
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from money_machine.integrations.jev import (
@@ -19,7 +19,6 @@ from money_machine.integrations.jev import (
 )
 from money_machine.integrations.jev.persistence import get_evaluation, store_evaluation
 from money_machine.integrations.jev.shadow import shadow_evaluate_decision
-from money_machine.persistence.session import UnitOfWork
 
 
 class TestPersistence:
@@ -164,7 +163,7 @@ class TestShadowEvaluation:
     async def test_shadow_evaluate_does_not_raise_on_jev_error(
         self, async_session: AsyncSession
     ) -> None:
-        """Shadow evaluation catches Jev errors and does not block workflow (fail-soft in shadow)."""
+        """Shadow evaluation catches Jev errors, does not block workflow (fail-soft)."""
         uow = UnitOfWork(async_session)
 
         fake_jev = FakeJevProvider()
