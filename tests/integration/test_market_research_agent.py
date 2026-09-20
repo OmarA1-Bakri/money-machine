@@ -90,10 +90,10 @@ async def test_market_research_produces_25_40_observations(
     test_workflow, test_database, session_factory
 ):
     """
-    Anti-stub test: Assert 25-40 observations with real data.
+    Anti-stub test: Assert 25-40 observations with real data (hard bounds).
 
     Validates:
-    - At least 25 MarketListingObservation rows
+    - Exactly 25-40 MarketListingObservation rows (hard floor and ceiling)
     - Non-null title and source_reference
     - At least 5 distinct identity_niche values
     - At least 10 rows with price > 0
@@ -105,9 +105,10 @@ async def test_market_research_produces_25_40_observations(
         uow = UnitOfWork(session)
         report = await execute_market_research(workflow.id, job, uow)
 
-    # At least 25 listing observations
-    assert len(report.listing_observations) >= 25, (
-        f"Expected at least 25 observations, got {len(report.listing_observations)}"
+    # Exactly 25-40 listing observations (hard bounds)
+    obs_count = len(report.listing_observations)
+    assert 25 <= obs_count <= 40, (
+        f"Expected 25-40 observations (hard bounds), got {obs_count}"
     )
 
     # All observations have required fields

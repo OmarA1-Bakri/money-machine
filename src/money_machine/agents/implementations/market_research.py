@@ -176,6 +176,19 @@ class MarketResearchAgent:
 
         logger.info(f"Collected {len(all_listing_results)} unique observations")
 
+        # Enforce hard 25-40 bounds (fail-closed)
+        observation_count = len(all_listing_results)
+        if observation_count < 25:
+            raise ValueError(
+                f"Failed to collect minimum 25 observations (got {observation_count}). "
+                "Cannot proceed with insufficient market data."
+            )
+        if observation_count > 40:
+            raise ValueError(
+                f"Collected {observation_count} observations, exceeding maximum 40. "
+                "Cannot proceed with over-sampled market data."
+            )
+
         # Persist observations
         listing_observations: list[ListingObservation] = []
         shop_observations: list[ShopObservation] = []
