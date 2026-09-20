@@ -1,5 +1,17 @@
 # Implementation Log
 
+## 2026-09-20 — Session 05 Lane 1: Etsy research adapters
+
+- **Session 05 minimal activation** (revision 28→29): `current_session` advanced to 5, `session_status` set to incomplete, ten Session 05 evidence keys installed all-false per state.py contract addition.
+- **Etsy fixture adapter** implemented as primary safe-for-CI research data source; loads synthetic observations from `tests/fixtures/etsy_search_results.json`. Captures all required workbook fields: search phrase, rank, title, prices, shop signals (sales/age), badges, urgency signals, review count, identity niche, base category, URL, evidence timestamp.
+- **Browser and API adapter stubs** created with explicit `NotImplementedError` - no external calls, no browser launches, no API keys consumed. Safe boundaries preserved.
+- **Config-driven seed phrases**: `config/research.yaml` defines the ten playbook seed phrases (digital planner, printable wall art, custom pet portrait, wedding invitation template, vintage logo design, social media templates, budget spreadsheet, meal planner printable, business card template, resume template). Not hardcoded in business logic.
+- **Synthetic fixture data**: 30 observations per seed phrase (300 total), demonstrating thin evidence principle - some optional fields (anchor_price_cents, shop_sales_count, shop_age_years, review_count) are None where appropriate; all required fields present.
+- **Comprehensive tests** in `tests/integrations/etsy/test_research_adapter.py`: fixture adapter field validation, target_count compliance, stub NotImplementedError safety, config loading, fixture-config key matching, thin evidence verification, real fixture integration. Tests written; CI run pending environment setup.
+- **Prompt integrity review** recorded at `docs/control/reviews/2026-09-20-session-05-lane-1-etsy-adapters.md` - lane-scoped review of Session 05 Section 1 only; agent logic (A03-A06), workflow linking, and commissioning deferred to L2-L4.
+- **Control update**: `etsy_adapters_implemented` evidence key flipped TRUE; remaining S05 keys FALSE. Worker Exit 78 conditional lift preserved (no regression). Commit `02211ff`.
+- **OUT OF SCOPE** (as specified): paid Etsy purchase, live teardown, A03/A05/A06 agent implementations, Scheduler Exit 78 lift, Session 06 work.
+
 ## 2026-09-11 — Startup repair wave after recovery review
 
 - Repaired migration-head/schema compatibility readiness, encoded database credentials/IPv6, and production environment selection. Compose now carries raw passwords separately; a bounded independent review identified literal-percent and surrounding-whitespace cases, both reproduced and repaired with regression coverage. Development external-URL overrides retain their credentials.

@@ -8,9 +8,9 @@
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "evidence_closure_commit_sha": "14da7fe6e7893e79d6993720ae9413343931bfb0",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 28,
-  "session_status": "complete",
-  "current_session": 4,
+  "state_revision": 29,
+  "session_status": "incomplete",
+  "current_session": 5,
   "completed_sessions": [
     0,
     1,
@@ -75,7 +75,8 @@
     "session_04_w8": "2026-09-20: W8 complete (@ 44d554f). Parametrized roster contract tests A01–A16 (135 tests); fail-closed uncommissioned refusal for DESIGNED agents; A01/A02 TESTED paths proven.",
     "session_04_lane_c": "2026-09-20: Lane C complete (@ 744cc36). Fail-closed runtime integration tests: lease → run → persist → event → successor library path; process entrypoints remain Exit 78; 2 passed, 2 skipped in CI.",
     "session_04_w9": "2026-09-20: W9 complete (@ 14da7fe). Exit 78 lift for WORKER (conditionally, behind D-0028 commissioning gates). Production claim path: claim READY jobs → AgentRunner.execute() → persist → emit events → spawn successors. Scheduler remains Exit 78 (out of W9 scope). Concurrent claim safety tests (idempotency, double-execution prevention, reconciliation). Uncommissioned agents (DESIGNED) refuse execution. 7-gate commissioning check: runtime settings, agent registry, tool registry, prompt integrity, AgentRunner functional, lease/claim available.",
-    "session_04_status": "Session 04 COMPLETE (W10 control flip @ tip 14da7fe). W1–W9, Phase A, Lane C delivered agent runtime and roster. All eight evidence keys TRUE. Exit 78: worker lifted conditionally (D-0028 gates), scheduler held. Parked #31 SFs as nits (structural gates, stale docstrings) — non-blocking. No S05 features, no live Notion/Etsy."
+    "session_04_status": "Session 04 COMPLETE (W10 control flip @ tip 14da7fe). W1–W9, Phase A, Lane C delivered agent runtime and roster. All eight evidence keys TRUE. Exit 78: worker lifted conditionally (D-0028 gates), scheduler held. Parked #31 SFs as nits (structural gates, stale docstrings) — non-blocking. No S05 features, no live Notion/Etsy.",
+    "session_05_l1": "2026-09-20: S05 L1 started (@ 02211ff). Minimal S05 activation (revision 28→29); Etsy fixture adapter, browser/API stubs, config with ten seed phrases, comprehensive tests; etsy_adapters_implemented=TRUE."
   },
   "carry_forward": [
     "Prove idempotency uniqueness under concurrent claim path (after commissioning gate)",
@@ -86,14 +87,16 @@
     "Session 04 formal closure: final exit reviews (if required), closure commit sequence (if triggered)"
   ],
   "required_completion_evidence": {
-    "provider_abstraction_implemented": true,
-    "prompt_registry_and_hashes_implemented": true,
-    "agent_runner_integrated_with_jobs": true,
-    "sixteen_agents_registered": true,
-    "uncommissioned_agents_documented": true,
-    "contract_and_runtime_tests_pass": true,
-    "control_files_and_checkpoint_current": true,
-    "evidence_closure_commit_recorded": true
+    "etsy_adapters_implemented": true,
+    "research_agent_implemented": false,
+    "shortlist_analysis_implemented": false,
+    "scoring_agent_implemented": false,
+    "teardown_workflow_implemented": false,
+    "product_spec_generation_implemented": false,
+    "dedupe_agent_implemented": false,
+    "workflow_linking_complete": false,
+    "control_files_and_checkpoint_current": false,
+    "evidence_closure_commit_recorded": false
   },
   "transition_contract": {
     "completion_requires_all_evidence_true": true,
@@ -108,5 +111,5 @@
   },
   "next_session": 5,
   "next_prompt": "08_SESSION_05_MARKET_RESEARCH_TO_PRODUCT_SPEC.md",
-  "updated_at": "2026-09-20T19:08:00Z"
+  "updated_at": "2026-09-20T20:20:00Z"
 }
