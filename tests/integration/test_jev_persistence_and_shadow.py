@@ -182,9 +182,7 @@ class TestShadowEvaluation:
         # Verify Jev was attempted
         assert fake_jev.get_call_count("test_decision") == 1
 
-    async def test_shadow_evaluate_with_decision_id_link(
-        self, async_session: AsyncSession
-    ) -> None:
+    async def test_shadow_evaluate_with_decision_id_link(self, async_session: AsyncSession) -> None:
         """Shadow evaluation can link to a decision record via foreign key."""
         uow = UnitOfWork(async_session)
 

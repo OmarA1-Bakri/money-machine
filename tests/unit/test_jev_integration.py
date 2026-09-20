@@ -380,7 +380,9 @@ class TestJevGatewayClient:
         self, client: JevGatewayClient, packet: DecisionPacket, mock_gateway_url: str
     ) -> None:
         """Client raises JevTimeoutError on timeout."""
-        respx.post(f"{mock_gateway_url}/evaluate").mock(side_effect=httpx.TimeoutException("timeout"))
+        respx.post(f"{mock_gateway_url}/evaluate").mock(
+            side_effect=httpx.TimeoutException("timeout")
+        )
 
         with pytest.raises(JevTimeoutError, match="Jev Gateway timed out after"):
             await client.evaluate(packet, timeout=1.0)
