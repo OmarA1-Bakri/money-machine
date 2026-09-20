@@ -142,7 +142,6 @@ class EtsyFixtureAdapter:
             ValueError: If fixture data is malformed
         """
         import json
-        from typing import cast
 
         # Default fixture path relative to repo root
         if self.fixture_path is None:
