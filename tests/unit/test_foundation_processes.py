@@ -12,14 +12,20 @@ from money_machine.orchestration.worker import main as worker_main
 
 
 def test_unimplemented_processes_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Both entry points exit 78 even when the database check cannot run."""
+    """Scheduler exits 78 when database check cannot run. Worker gates also fail without config."""
 
     def no_check(service: str) -> bool | None:
         del service
         return None
 
-    monkeypatch.setattr(_foundation, "report_database_connectivity", no_check)
+    # Mock commissioning gates to fail (simulates missing config)
+    def gates_fail() -> bool:
+        return False
 
+    monkeypatch.setattr(_foundation, "report_database_connectivity", no_check)
+    monkeypatch.setattr(worker, "_check_commissioning_gates", gates_fail)
+
+    # Both fail when commissioning gates fail (no valid config)
     assert worker_main() == EXIT_UNAVAILABLE
     assert scheduler_main() == EXIT_UNAVAILABLE
 
