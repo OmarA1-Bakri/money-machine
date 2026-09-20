@@ -5,6 +5,7 @@ Per D-0017 and Session 05 Lane 4 scope: simulation only, no copying.
 """
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from hashlib import sha256
 from uuid import UUID, uuid4
 
@@ -26,11 +27,6 @@ def create_fixture_product_shape_rules() -> ProductShapeRules:
         hubs_maximum=8,
         colour_variants_minimum=3,
         colour_variants_maximum=4,
-        tags_count=13,
-        images_count=10,
-        video_count=1,
-        description_sections_count=8,
-        default_quantity=999,
     )
 
 
@@ -104,8 +100,10 @@ def create_fixture_product_spec(
     evidence = (
         EvidenceReference(
             evidence_id=spec_id,
-            evidence_kind="FIXTURE_GENERATED",
-            reference="tests/fixtures/products.py::create_fixture_product_spec",
+            evidence_type="FIXTURE_GENERATED",
+            source_reference="tests/fixtures/products.py::create_fixture_product_spec",
+            observed_at=datetime.now(UTC),
+            safe_summary="Fixture-generated ProductSpec for testing",
         ),
     )
 
@@ -125,8 +123,8 @@ def create_fixture_product_spec(
         buyer_problem=buyer_problem,
         title=title,
         tier=tier,
-        real_price=real_price,
-        anchor_price=anchor_price,
+        real_price=Decimal(str(real_price)),
+        anchor_price=Decimal(str(anchor_price)),
         currency="USD",
         hubs=hubs,
         colour_variants=colour_variants,
@@ -191,8 +189,10 @@ def create_fixture_teardown_report(
     evidence = (
         EvidenceReference(
             evidence_id=report_id,
-            evidence_kind="FIXTURE_TEARDOWN",
-            reference="tests/fixtures/products.py::create_fixture_teardown_report (simulation)",
+            evidence_type="FIXTURE_TEARDOWN",
+            source_reference="tests/fixtures/products.py::create_fixture_teardown_report",
+            observed_at=datetime.now(UTC),
+            safe_summary="Fixture-generated TeardownReport (simulation)",
         ),
     )
 
@@ -257,10 +257,10 @@ def create_fixture_research_report(
                 evidence=(
                     EvidenceReference(
                         evidence_id=obs_id,
-                        evidence_kind="FIXTURE_RESEARCH",
-                        reference=(
-                            f"tests/fixtures/products.py::create_fixture_research_report obs {i}"
-                        ),
+                        evidence_type="FIXTURE_RESEARCH",
+                        source_reference="tests/fixtures/products.py::create_fixture_research_report",
+                        observed_at=datetime.now(UTC),
+                        safe_summary=f"Fixture research observation {i}",
                     ),
                 ),
             )

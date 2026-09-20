@@ -11,6 +11,8 @@ or TOO_CLOSE (requires collision evidence).
 
 import re
 import unicodedata
+from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Final
 from uuid import UUID
 
@@ -142,12 +144,14 @@ def check_dedupe(
                 DedupeCollision(
                     other_spec_id=existing_spec.spec_id,
                     reason="EXACT_IDENTITY_CATEGORY",
-                    similarity=1.0,
+                    similarity=Decimal("1.0"),
                     evidence=(
                         EvidenceReference(
                             evidence_id=candidate_spec.spec_id,
-                            evidence_kind="SPEC_IDENTITY_CATEGORY",
-                            reference=(
+                            evidence_type="DEDUPE_CHECK",
+                            source_reference="SPEC_IDENTITY_CATEGORY",
+                            observed_at=datetime.now(UTC),
+                            safe_summary=(
                                 f"identity={candidate_spec.identity}, "
                                 f"category={candidate_spec.base_category}"
                             ),
@@ -167,12 +171,14 @@ def check_dedupe(
                 DedupeCollision(
                     other_spec_id=existing_spec.spec_id,
                     reason="TITLE_SIMILARITY",
-                    similarity=similarity,
+                    similarity=Decimal(str(similarity)),
                     evidence=(
                         EvidenceReference(
                             evidence_id=candidate_spec.spec_id,
-                            evidence_kind="TITLE_TOKENS",
-                            reference=(
+                            evidence_type="DEDUPE_CHECK",
+                            source_reference="TITLE_TOKENS",
+                            observed_at=datetime.now(UTC),
+                            safe_summary=(
                                 f"candidate={candidate_normalized}, "
                                 f"existing={existing_normalized}, "
                                 f"jaccard={similarity:.3f}"
@@ -189,12 +195,14 @@ def check_dedupe(
                 DedupeCollision(
                     other_spec_id=existing_spec.spec_id,
                     reason="CONCEPT_FINGERPRINT",
-                    similarity=1.0,
+                    similarity=Decimal("1.0"),
                     evidence=(
                         EvidenceReference(
                             evidence_id=candidate_spec.spec_id,
-                            evidence_kind="CONCEPT_FINGERPRINT",
-                            reference=f"fingerprint={candidate_spec.concept_fingerprint}",
+                            evidence_type="DEDUPE_CHECK",
+                            source_reference="CONCEPT_FINGERPRINT",
+                            observed_at=datetime.now(UTC),
+                            safe_summary=f"fingerprint={candidate_spec.concept_fingerprint}",
                         ),
                     ),
                 )
@@ -229,7 +237,7 @@ def check_dedupe(
         rule_version=rule_version,
         normalized_title=candidate_normalized,
         concept_fingerprint=candidate_spec.concept_fingerprint,
-        title_similarity_threshold=JACCARD_THRESHOLD,
+        title_similarity_threshold=Decimal(str(JACCARD_THRESHOLD)),
         compared_spec_ids=tuple(compared_spec_ids),
         collisions=tuple(collisions),
         differentiation_evidence=differentiation_evidence,
