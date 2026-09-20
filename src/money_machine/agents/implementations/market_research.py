@@ -63,7 +63,7 @@ class MarketResearchAgent:
             config_path: Path to research.yaml config (defaults to config/research.yaml)
         """
         self.adapter = adapter or FixtureEtsyAdapter()
-        self.config_path = config_path or (Path(__file__).parents[3] / "config" / "research.yaml")
+        self.config_path = config_path or (Path(__file__).parents[4] / "config" / "research.yaml")
         self._config = self._load_config()
 
     def _load_config(self) -> dict[str, Any]:
