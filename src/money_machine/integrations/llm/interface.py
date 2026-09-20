@@ -74,19 +74,22 @@ class LLMProvider(ABC):
     ) -> StructuredLLMResponse[T]:
         """Request a structured JSON completion from the LLM provider.
 
+        Retries apply to transport/timeout errors only. Validation errors fail-close immediately.
+
         Args:
             messages: Chat messages in OpenAI format [{"role": "...", "content": "..."}]
             response_model: Pydantic model defining the expected response schema
             model: Optional model override (uses provider default if None)
             prompt_version: Optional prompt version for metadata tracking
             timeout: Timeout in seconds (uses DEFAULT_TIMEOUT_SECONDS if None)
-            max_retries: Max retries for transient failures (uses DEFAULT_MAX_RETRIES if None)
+            max_retries: Max retries for transport/timeout failures
+                (uses DEFAULT_MAX_RETRIES if None)
 
         Returns:
             StructuredLLMResponse containing parsed content and metadata
 
         Raises:
-            LLMTimeoutError: If the call exceeds the timeout
-            LLMValidationError: If the response fails schema validation (fail-closed)
-            LLMProviderError: For other provider-specific errors
+            LLMTimeoutError: If the call exceeds the timeout (after retry budget)
+            LLMValidationError: If the response fails schema validation (fail-closed, no retry)
+            LLMProviderError: For other provider-specific errors (after retry budget)
         """

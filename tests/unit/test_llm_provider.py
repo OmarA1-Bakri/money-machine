@@ -7,7 +7,9 @@ structured output validation, timeout/retry behavior, and metadata capture.
 from __future__ import annotations
 
 from decimal import Decimal
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from pydantic import BaseModel, Field
 
@@ -16,6 +18,7 @@ from money_machine.integrations.llm import (
     LLMProviderError,
     LLMTimeoutError,
     LLMValidationError,
+    OpenAIProvider,
     pydantic_to_json_schema,
     validate_structured_output,
 )
@@ -235,69 +238,189 @@ class TestOpenAIProviderConfiguration:
         """Provider raises error if API key not provided."""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
-        from money_machine.integrations.llm import OpenAIProvider
-
         with pytest.raises(LLMProviderError, match="OPENAI_API_KEY"):
             OpenAIProvider()
 
     def test_reads_api_key_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Provider reads API key from environment."""
-        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-
-        from money_machine.integrations.llm import OpenAIProvider
+        monkeypatch.setenv("OPENAI_API_KEY", "test-env-key")
 
         provider = OpenAIProvider()
-        # Test via a method call rather than accessing protected member
-        assert hasattr(provider, "_api_key")
+        assert provider._api_key == "test-env-key"  # pyright: ignore[reportPrivateUsage]
 
     def test_api_key_parameter_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """API key parameter overrides environment."""
         monkeypatch.setenv("OPENAI_API_KEY", "env-key")
 
-        from money_machine.integrations.llm import OpenAIProvider
-
         provider = OpenAIProvider(api_key="param-key")
-        # Test via a method call rather than accessing protected member
-        assert hasattr(provider, "_api_key")
+        assert provider._api_key == "param-key"  # pyright: ignore[reportPrivateUsage]
 
     def test_default_base_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Provider uses default OpenAI base URL."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
-        from money_machine.integrations.llm import OpenAIProvider
-
         provider = OpenAIProvider()
-        # Test via a method call rather than accessing protected member
-        assert hasattr(provider, "_base_url")
+        assert provider._base_url == "https://api.openai.com/v1"  # pyright: ignore[reportPrivateUsage]
 
     def test_base_url_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Provider reads base URL from environment."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         monkeypatch.setenv("OPENAI_BASE_URL", "https://custom.api.com/v1")
 
-        from money_machine.integrations.llm import OpenAIProvider
-
         provider = OpenAIProvider()
-        # Test via a method call rather than accessing protected member
-        assert hasattr(provider, "_base_url")
+        assert provider._base_url == "https://custom.api.com/v1"  # pyright: ignore[reportPrivateUsage]
 
     def test_base_url_parameter_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Base URL parameter overrides environment."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         monkeypatch.setenv("OPENAI_BASE_URL", "https://env.api.com/v1")
 
-        from money_machine.integrations.llm import OpenAIProvider
-
         provider = OpenAIProvider(base_url="https://param.api.com/v1")
-        # Test via a method call rather than accessing protected member
-        assert hasattr(provider, "_base_url")
+        assert provider._base_url == "https://param.api.com/v1"  # pyright: ignore[reportPrivateUsage]
 
     def test_default_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Provider uses default model."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
-        from money_machine.integrations.llm import OpenAIProvider
-
         provider = OpenAIProvider()
-        # Test via a method call rather than accessing protected member
-        assert hasattr(provider, "_default_model")
+        assert provider._default_model == "gpt-4o"  # pyright: ignore[reportPrivateUsage]
+
+
+class TestOpenAIProviderBehavioral:
+    """Behavioral tests for OpenAIProvider with mocked HTTP transport."""
+
+    @pytest.fixture
+    def provider(self, monkeypatch: pytest.MonkeyPatch) -> OpenAIProvider:
+        """Create provider with test API key."""
+        monkeypatch.setenv("OPENAI_API_KEY", "test-api-key")
+        return OpenAIProvider()
+
+    async def test_happy_path_returns_validated_response(self, provider: OpenAIProvider) -> None:
+        """Mocked 200 JSON matching schema returns validated result with metadata."""
+        mock_response = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": '{"name": "Alice", "age": 30}'}}],
+            "usage": {
+                "prompt_tokens": 15,
+                "completion_tokens": 25,
+                "total_tokens": 40,
+            },
+        }
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.post.return_value = mock_response
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            messages = [{"role": "user", "content": "Get user info"}]
+            result = await provider.complete_structured(
+                messages, SimpleResponse, prompt_version="v1.0"
+            )
+
+        assert result.content.name == "Alice"
+        assert result.content.age == 30
+        assert result.metadata.model_name == "gpt-4o"
+        assert result.metadata.prompt_version == "v1.0"
+        assert result.metadata.prompt_tokens == 15
+        assert result.metadata.completion_tokens == 25
+        assert result.metadata.total_tokens == 40
+        assert result.metadata.cost_usd is None
+
+    async def test_timeout_after_retry_budget_exhausted(self, provider: OpenAIProvider) -> None:
+        """Mocked transport timeout raises LLMTimeoutError after retry budget."""
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.post.side_effect = httpx.TimeoutException("Request timeout")
+
+        with (
+            patch("httpx.AsyncClient", return_value=mock_client),
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
+            messages = [{"role": "user", "content": "Test"}]
+            with pytest.raises(
+                LLMTimeoutError,
+                match=r"Request timed out after .* \(attempt 4/4\)",
+            ):
+                await provider.complete_structured(
+                    messages, SimpleResponse, timeout=1.0, max_retries=3
+                )
+
+        # Should have tried 4 times total (initial + 3 retries)
+        assert mock_client.post.call_count == 4
+
+    async def test_transport_retry_succeeds_on_second_attempt(
+        self, provider: OpenAIProvider
+    ) -> None:
+        """First call transport failure, second succeeds — proves retry on transport."""
+        mock_response_success = MagicMock(spec=httpx.Response)
+        mock_response_success.status_code = 200
+        mock_response_success.json.return_value = {
+            "choices": [{"message": {"content": '{"name": "Bob", "age": 25}'}}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
+        }
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        # First call fails with transport error, second succeeds
+        mock_client.post.side_effect = [
+            httpx.RequestError("Connection failed"),
+            mock_response_success,
+        ]
+
+        with (
+            patch("httpx.AsyncClient", return_value=mock_client),
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
+            messages = [{"role": "user", "content": "Test"}]
+            result = await provider.complete_structured(messages, SimpleResponse, max_retries=3)
+
+        assert result.content.name == "Bob"
+        assert result.content.age == 25
+        # Should have called twice (first failed, second succeeded)
+        assert mock_client.post.call_count == 2
+
+    async def test_malformed_api_response_raises_provider_error(
+        self, provider: OpenAIProvider
+    ) -> None:
+        """Bad API envelope (KeyError) wrapped as LLMProviderError."""
+        mock_response = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"bad": "structure"}  # Missing 'choices'
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.post.return_value = mock_response
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            messages = [{"role": "user", "content": "Test"}]
+            with pytest.raises(LLMProviderError, match="Unexpected API response structure"):
+                await provider.complete_structured(messages, SimpleResponse)
+
+    async def test_validation_error_fails_immediately_no_retry(
+        self, provider: OpenAIProvider
+    ) -> None:
+        """Validation failure fail-closes immediately (no retry)."""
+        mock_response = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": '{"name": "Invalid", "age": "not-int"}'}}],
+            "usage": {},
+        }
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.post.return_value = mock_response
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            messages = [{"role": "user", "content": "Test"}]
+            with pytest.raises(LLMValidationError, match="failed schema validation"):
+                await provider.complete_structured(messages, SimpleResponse, max_retries=3)
+
+        # Should only call once (no retry on validation error)
+        assert mock_client.post.call_count == 1

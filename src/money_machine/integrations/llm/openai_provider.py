@@ -78,6 +78,8 @@ class OpenAIProvider(LLMProvider):
     ) -> StructuredLLMResponse[T]:
         """Request a structured JSON completion from OpenAI Chat Completions API.
 
+        Retries on transport/timeout errors only. Validation errors fail-close immediately.
+
         See LLMProvider.complete_structured for full documentation.
         """
         model_name = model or self._default_model
@@ -106,10 +108,15 @@ class OpenAIProvider(LLMProvider):
             try:
                 response_data = await self._make_request(request_payload, timeout_seconds)
 
-                # Extract response content
-                raw_content = response_data["choices"][0]["message"]["content"]
+                # Extract response content (wrap KeyError as provider error)
+                try:
+                    raw_content = response_data["choices"][0]["message"]["content"]
+                except (KeyError, IndexError, TypeError) as error:
+                    raise LLMProviderError(
+                        f"Unexpected API response structure: {error!s}"
+                    ) from error
 
-                # Validate against schema (fail-closed)
+                # Validate against schema (fail-closed, no retry)
                 parsed_content = validate_structured_output(raw_content, response_model)
 
                 # Extract metadata
@@ -120,7 +127,7 @@ class OpenAIProvider(LLMProvider):
                     prompt_tokens=usage.get("prompt_tokens"),
                     completion_tokens=usage.get("completion_tokens"),
                     total_tokens=usage.get("total_tokens"),
-                    cost_usd=None,  # Cost calculation can be added based on model pricing
+                    cost_usd=None,  # None when provider doesn't return pricing
                 )
 
                 return StructuredLLMResponse(content=parsed_content, metadata=metadata)
