@@ -18,13 +18,18 @@ from money_machine.agents.base import (
 from money_machine.agents.prompt_store import PromptStore
 from money_machine.agents.registry import AgentRegistry
 from money_machine.agents.runtime import AgentRunner
-from money_machine.config.settings import AgentCommissioningState
+from money_machine.config.settings import AgentCommissioningState, TelemetryConfig
 from money_machine.domain.enums import AgentRunStatus, JobStatus, RetryClass, SideEffectClass
+from money_machine.domain.events import TelemetryEventName
 from money_machine.domain.models.common import SuccessContract
 from money_machine.domain.models.jobs import AgentResult, JobEnvelope
 from money_machine.integrations.llm.fake_provider import FakeLLMProvider
+from money_machine.integrations.posthog.client import PostHogClient
+from money_machine.observability.agent_runs import AgentRunObserver
+from money_machine.observability.logging import StructuredLogSink
 from money_machine.persistence.seed import seed
 from money_machine.persistence.tables import AgentRun
+from money_machine.persistence.unit_of_work import UnitOfWork
 from tests.integration.factories import NOW, make_job, make_shop, make_workflow
 
 
@@ -169,3 +174,149 @@ async def test_runner_fail_closed_for_uncommissioned_production_job(
     statement = select(AgentRun).where(AgentRun.job_id == job.id)
     runs = (await session.execute(statement)).scalars().all()
     assert runs == []
+
+
+@pytest.mark.asyncio
+async def test_runner_observer_emits_structured_logs_and_persists_fields(
+    session: AsyncSession,
+    repository_root: Path,
+) -> None:
+    """Runner begin/finalize paths route through AgentRunObserver."""
+    await seed(session, repository_root=repository_root)
+    await session.flush()
+
+    shop = await make_shop(session)
+    workflow = await make_workflow(session, shop)
+    job = await make_job(
+        session,
+        workflow,
+        status="READY",
+        idempotency_key=f"BOOTSTRAP:{uuid4()}",
+    )
+    job.owner_agent_id = "A01"
+    await session.flush()
+
+    telemetry = PostHogClient(
+        config=TelemetryConfig(
+            version=1,
+            enabled=True,
+            allowed_events=(
+                TelemetryEventName.AGENT_RUN_STARTED,
+                TelemetryEventName.AGENT_RUN_COMPLETED,
+            ),
+        )
+    )
+    log_sink = StructuredLogSink(capture=True)
+    observer = AgentRunObserver(
+        uow=UnitOfWork(session),
+        telemetry=telemetry,
+        log_sink=log_sink,
+    )
+    base_registry = AgentRegistry.from_yaml(repository_root)
+    runner = AgentRunner(
+        registry=_tested_registry(base_registry),
+        prompt_store=PromptStore(repository_root),
+        provider=FakeLLMProvider(default_model="fake-model-1"),
+        observer=observer,
+    )
+
+    envelope = _job_envelope(job.id, workflow.id, workflow.id)
+    result, receipt = await runner.execute(
+        session,
+        job=envelope,
+        agent=_StaticSuccessAgent(),
+        production=True,
+    )
+
+    assert result.status is AgentRunStatus.SUCCESS
+    assert receipt.run_id == result.agent_run_id
+
+    stored = (
+        await session.execute(select(AgentRun).where(AgentRun.id == receipt.run_id))
+    ).scalar_one()
+    assert stored.run_number == 1
+    assert stored.model == "fake-model-1"
+    assert stored.input_hash is not None
+    assert len(stored.input_hash) == 64
+
+    assert any(record["event_type"] == "agent_run_started" for record in log_sink.records)
+    assert any(record["event_type"] == "agent_run_completed" for record in log_sink.records)
+
+    queued = telemetry.drain()
+    assert [event["event"] for event in queued] == [
+        "agent_run_started",
+        "agent_run_completed",
+    ]
+
+
+class _FailingAgent(BaseAgent):
+    async def execute(self, context: AgentContext) -> AgentResult:
+        raise RuntimeError("simulated agent failure")
+
+
+@pytest.mark.asyncio
+async def test_runner_observer_finalizes_failed_execution(
+    session: AsyncSession,
+    repository_root: Path,
+) -> None:
+    """Exception paths still finalize through the observer."""
+    await seed(session, repository_root=repository_root)
+    await session.flush()
+
+    shop = await make_shop(session)
+    workflow = await make_workflow(session, shop)
+    job = await make_job(
+        session,
+        workflow,
+        status="READY",
+        idempotency_key=f"BOOTSTRAP:{uuid4()}",
+    )
+    job.owner_agent_id = "A01"
+    await session.flush()
+
+    log_sink = StructuredLogSink(capture=True)
+    observer = AgentRunObserver(
+        uow=UnitOfWork(session),
+        telemetry=PostHogClient(
+            config=TelemetryConfig(
+                version=1,
+                enabled=False,
+                allowed_events=(
+                    TelemetryEventName.AGENT_RUN_STARTED,
+                    TelemetryEventName.AGENT_RUN_COMPLETED,
+                ),
+            )
+        ),
+        log_sink=log_sink,
+    )
+    base_registry = AgentRegistry.from_yaml(repository_root)
+    runner = AgentRunner(
+        registry=_tested_registry(base_registry),
+        prompt_store=PromptStore(repository_root),
+        provider=FakeLLMProvider(),
+        observer=observer,
+    )
+
+    envelope = _job_envelope(job.id, workflow.id, workflow.id)
+    result, receipt = await runner.execute(
+        session,
+        job=envelope,
+        agent=_FailingAgent(),
+        production=True,
+    )
+
+    assert result.status is AgentRunStatus.FAILURE
+    assert result.error is not None
+    assert result.error.code == "AGENT_EXECUTION_FAILED"
+    assert receipt.status is AgentRunStatus.FAILURE
+
+    stored = (
+        await session.execute(select(AgentRun).where(AgentRun.id == receipt.run_id))
+    ).scalar_one()
+    assert stored.status == "FAILURE"
+    assert stored.error is not None
+    assert stored.error["code"] == "AGENT_EXECUTION_FAILED"
+    assert any(
+        record["event_type"] == "agent_run_completed" and record["level"] == "ERROR"
+        for record in log_sink.records
+    )

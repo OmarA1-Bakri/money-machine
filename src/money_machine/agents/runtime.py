@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
 from typing import Any, Final
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,17 +30,23 @@ from money_machine.agents.prompt_store import PromptStore
 from money_machine.agents.registry import AgentRegistry
 from money_machine.agents.review_subagent import ReviewSubagentBounds, ReviewSubagentCoordinator
 from money_machine.agents.tool_registry import ToolRegistry
+from money_machine.config.settings import TelemetryConfig
 from money_machine.domain.enums import AgentRunStatus
+from money_machine.domain.events import TelemetryEventName
 from money_machine.domain.models.common import ContractError
 from money_machine.domain.models.jobs import AgentResult, JobEnvelope
 from money_machine.integrations.llm.interface import LLMCallMetadata, LLMProvider
+from money_machine.integrations.posthog.client import PostHogClient
+from money_machine.observability.agent_runs import AgentRunObserver
+from money_machine.observability.correlation import CorrelationContext
+from money_machine.observability.logging import StructuredLogSink
 from money_machine.persistence.repositories.agents import (
     AgentDefinitionRepository,
-    AgentRunRepository,
     PromptVersionRepository,
 )
 from money_machine.persistence.tables import AgentDefinition as AgentDefinitionRow
 from money_machine.persistence.tables import AgentRun, PromptVersion
+from money_machine.persistence.unit_of_work import UnitOfWork
 
 LOGGER: Final = logging.getLogger(__name__)
 
@@ -75,11 +81,13 @@ class AgentRunner:
         prompt_store: PromptStore,
         provider: LLMProvider,
         tool_registry: ToolRegistry | None = None,
+        observer: AgentRunObserver | None = None,
     ) -> None:
         self._registry = registry
         self._prompt_store = prompt_store
         self._provider = provider
         self._tool_registry = tool_registry or ToolRegistry.canonical()
+        self._observer = observer
 
     @classmethod
     def from_repository_root(
@@ -135,7 +143,27 @@ class AgentRunner:
             prompt_version_label,
             expected_hash=prompt_version.sha256,
         )
-        run_id = uuid4()
+        observer = self._observer_for(session)
+        correlation = CorrelationContext(
+            job_id=job.job_id,
+            agent_id=definition.agent_id,
+            workflow_id=job.workflow_id,
+            job_type=job.job_type,
+            attempt=job.attempt,
+        )
+        observation_context = observer.begin_run(
+            correlation=correlation,
+            agent_definition_id=db_definition.id,
+            agent_definition_version=db_definition.contract_version,
+            prompt_version_id=prompt_version.id,
+            prompt_reference=prompt_version.prompt_reference,
+            prompt_sha256=prompt_version.sha256,
+            run_number=await observer.next_run_number(job.job_id),
+            model=_provider_model_name(self._provider),
+            input_payload=dict(job.input),
+        )
+        observation_context.started_at = started_at
+        run_id = observation_context.run_id
         review_coordinator = ReviewSubagentCoordinator(
             job_id=job.job_id,
             owning_run_id=run_id,
@@ -171,18 +199,14 @@ class AgentRunner:
                 message=str(error),
                 retryable=False,
             )
-            receipt = await self._persist_run(
-                session,
-                run_id=run_id,
-                job=job,
-                definition=db_definition,
-                prompt_version=prompt_version,
+            run = await observer.finalize_run(
+                observation_context,
                 status=AgentRunStatus.FAILURE,
                 output={},
                 error=contract_error,
-                started_at=started_at,
                 completed_at=completed_at,
             )
+            receipt = _receipt_from_run(run, error=contract_error)
             failure = AgentResult(
                 job_id=job.job_id,
                 agent_run_id=run_id,
@@ -214,18 +238,14 @@ class AgentRunner:
         completed_at = datetime.now(tz=UTC)
         if completed_at < started_at:
             completed_at = started_at
-        receipt = await self._persist_run(
-            session,
-            run_id=run_id,
-            job=job,
-            definition=db_definition,
-            prompt_version=prompt_version,
+        run = await observer.finalize_run(
+            observation_context,
             status=result.status,
             output=dict(result.output),
             error=result.error,
-            started_at=started_at,
             completed_at=completed_at,
         )
+        receipt = _receipt_from_run(run, error=result.error)
         return result, receipt
 
     async def _load_database_definition(
@@ -257,58 +277,64 @@ class AgentRunner:
             raise AgentRegistryError(msg)
         return row
 
-    async def _persist_run(
-        self,
-        session: AsyncSession,
-        *,
-        run_id: UUID,
-        job: JobEnvelope,
-        definition: AgentDefinitionRow,
-        prompt_version: PromptVersion,
-        status: AgentRunStatus,
-        output: dict[str, Any],
-        error: ContractError | None,
-        started_at: datetime,
-        completed_at: datetime,
-        metadata: LLMCallMetadata | None = None,
-    ) -> AgentRunReceipt:
-        error_payload = None if error is None else error.model_dump(mode="json")
-        run = AgentRun(
-            id=run_id,
-            job_id=job.job_id,
-            agent_definition_id=definition.id,
-            agent_id=definition.agent_id,
-            agent_definition_version=definition.contract_version,
-            prompt_version_id=prompt_version.id,
-            prompt_reference=prompt_version.prompt_reference,
-            prompt_sha256=prompt_version.sha256,
-            status=status.value,
-            output=output,
-            error=error_payload,
-            started_at=started_at,
-            completed_at=completed_at,
-        )
-        AgentRunRepository(session).add(run)
-        await session.flush()
-        return AgentRunReceipt(
-            run_id=run_id,
-            job_id=job.job_id,
-            agent_id=definition.agent_id,
-            agent_definition_id=definition.id,
-            agent_definition_version=definition.contract_version,
-            prompt_version_id=prompt_version.id,
-            prompt_reference=prompt_version.prompt_reference,
-            prompt_sha256=prompt_version.sha256,
-            status=status,
-            output=output,
-            error=error,
-            started_at=started_at,
-            completed_at=completed_at,
-            metadata=metadata,
-        )
+    def _observer_for(self, session: AsyncSession) -> AgentRunObserver:
+        if self._observer is not None:
+            return self._observer
+        return _default_observer(session)
 
 
 def input_hash(job: JobEnvelope) -> str:
     """Return a stable SHA-256 digest of job input for receipt metadata."""
     payload = job.model_dump_json()
     return sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _default_observer(session: AsyncSession) -> AgentRunObserver:
+    """Build the standard run observer for one database session."""
+    return AgentRunObserver(
+        uow=UnitOfWork(session),
+        telemetry=PostHogClient(
+            config=TelemetryConfig(
+                version=1,
+                enabled=False,
+                allowed_events=(
+                    TelemetryEventName.AGENT_RUN_STARTED,
+                    TelemetryEventName.AGENT_RUN_COMPLETED,
+                ),
+            )
+        ),
+        log_sink=StructuredLogSink(),
+    )
+
+
+def _provider_model_name(provider: LLMProvider) -> str | None:
+    """Return a provider default model name when one is exposed."""
+    default_model = getattr(provider, "_default_model", None)
+    if isinstance(default_model, str):
+        return default_model
+    return None
+
+
+def _receipt_from_run(
+    run: AgentRun,
+    *,
+    error: ContractError | None,
+    metadata: LLMCallMetadata | None = None,
+) -> AgentRunReceipt:
+    """Map one persisted agent run row to the runner receipt contract."""
+    return AgentRunReceipt(
+        run_id=run.id,
+        job_id=run.job_id,
+        agent_id=run.agent_id,
+        agent_definition_id=run.agent_definition_id,
+        agent_definition_version=run.agent_definition_version,
+        prompt_version_id=run.prompt_version_id,
+        prompt_reference=run.prompt_reference,
+        prompt_sha256=run.prompt_sha256,
+        status=AgentRunStatus(run.status),
+        output=run.output,
+        error=error,
+        started_at=run.started_at,
+        completed_at=run.completed_at,
+        metadata=metadata,
+    )
