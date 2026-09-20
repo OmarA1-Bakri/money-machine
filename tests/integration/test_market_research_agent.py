@@ -7,7 +7,6 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-
 from sqlalchemy import select
 
 from money_machine.agents.contracts.market_research import execute_market_research
