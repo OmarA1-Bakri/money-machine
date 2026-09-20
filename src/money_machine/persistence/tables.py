@@ -1334,13 +1334,13 @@ class JevEvaluation(Identified):
     __tablename__ = "jev_evaluations"
 
     decision_id: Mapped[UUID | None] = ref("decisions.id", ondelete="SET NULL", nullable=True)
-    decision_type: Mapped[str] = text_column(length=100, index=True)
+    decision_type: Mapped[str] = text_column(length=100)
     packet: Mapped[dict[str, Any]] = mapped_column(JsonB, nullable=False)
     answers: Mapped[dict[str, Any]] = mapped_column(JsonB, nullable=False)
     derived: Mapped[dict[str, Any] | None] = mapped_column(JsonB, nullable=True)
     model_id: Mapped[str] = text_column(length=100)
     latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
-    evaluated_at: Mapped[datetime] = moment(default_now=True, index=True)
+    evaluated_at: Mapped[datetime] = moment(default_now=True)
 
     __table_args__ = (
         CheckConstraint("latency_ms >= 0", name="latency_non_negative"),

@@ -81,8 +81,9 @@ class DecisionRegistry:
 
         # Type narrowing after isinstance check
         yaml_data: dict[str, Any] = data
+        decisions_list: list[Any] = yaml_data["decisions"]
 
-        for decision_data in yaml_data["decisions"]:
+        for decision_data in decisions_list:
             try:
                 # Parse questions
                 questions: list[Question] = []

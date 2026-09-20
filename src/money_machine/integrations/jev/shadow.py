@@ -64,15 +64,14 @@ async def shadow_evaluate_decision(
         result = await jev_client.evaluate(packet, timeout=5.0)
 
         # Persist evaluation result
-        async with uow.session() as session:
-            await store_evaluation(
-                session=session,
-                packet=packet,
-                result=result,
-                decision_id=decision_db_id,
-                derived={"shadow_mode": True, "source": "dispatch_decision"},
-            )
-            await session.commit()
+        await store_evaluation(
+            session=uow.session,
+            packet=packet,
+            result=result,
+            decision_id=decision_db_id,
+            derived={"shadow_mode": True, "source": "dispatch_decision"},
+        )
+        await uow.session.commit()
 
         logger.info(
             "Shadow Jev evaluation logged",
