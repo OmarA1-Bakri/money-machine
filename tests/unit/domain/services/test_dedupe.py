@@ -217,7 +217,7 @@ class TestCheckDedupe:
         assert collision.reason == "TITLE_SIMILARITY"
         assert collision.other_spec_id == existing.spec_id
         assert collision.similarity >= Decimal(str(JACCARD_THRESHOLD))
-        assert float(collision.similarity) == pytest.approx(expected_similarity, abs=0.01)
+        assert float(collision.similarity) == pytest.approx(expected_similarity, abs=0.01)  # type: ignore[arg-type]
 
     def test_dedupe_pass_title_below_threshold(self):
         """PASS when title similarity < 0.70 threshold."""
