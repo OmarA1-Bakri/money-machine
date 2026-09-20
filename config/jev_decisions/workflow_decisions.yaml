@@ -1,0 +1,121 @@
+version: 1
+decisions:
+  - name: successor_spawn_count
+    description: Determine how many successor workflows to spawn for MULTIPLY
+    questions:
+      - question_id: spawn_count
+        question_type: score
+        prompt: How many successors should be spawned?
+        levels:
+          - level: zero
+            description: No successors; do not multiply
+          - level: one
+            description: Single successor (linear continuation)
+          - level: multiple
+            description: Multiple successors (fan-out multiply)
+      - question_id: within_limits
+        question_type: noul
+        prompt: Is the spawn count within system limits?
+    auto_gates:
+      below_threshold_action: ASK_OMAR
+      threshold_question: within_limits
+      threshold_value: false
+    authority_tier: automated
+
+  - name: shop_mode_simulation_ok
+    description: Verify simulation mode is appropriate for shop operations
+    questions:
+      - question_id: is_simulation_safe
+        question_type: noul
+        prompt: Is it safe to run this operation in simulation mode?
+      - question_id: simulation_risk
+        question_type: score
+        prompt: What is the risk level of simulation mode?
+        levels:
+          - level: safe
+            description: No real provider effects; fully simulated
+          - level: partial
+            description: Some read-only provider calls in simulation
+          - level: unsafe
+            description: Would cause real provider mutations in simulation
+    auto_gates:
+      below_threshold_action: ASK_OMAR
+      threshold_question: is_simulation_safe
+      threshold_value: false
+    authority_tier: automated
+
+  - name: deep_pass_scope_narrow
+    description: Ensure deep pass review scope remains narrow and focused
+    questions:
+      - question_id: scope_is_narrow
+        question_type: noul
+        prompt: Is the deep pass scope appropriately narrow?
+      - question_id: scope_size
+        question_type: score
+        prompt: What is the scope size?
+        levels:
+          - level: narrow
+            description: Reviewing 1-5 items; well-scoped
+          - level: moderate
+            description: Reviewing 6-15 items; acceptable scope
+          - level: too_broad
+            description: Reviewing 16+ items; scope too wide
+    auto_gates:
+      below_threshold_action: ASK_OMAR
+      threshold_question: scope_is_narrow
+      threshold_value: false
+    authority_tier: automated
+
+  - name: uncommissioned_block_live
+    description: Block uncommissioned agents from live execution
+    questions:
+      - question_id: is_commissioned
+        question_type: noul
+        prompt: Is this agent in COMMISSIONED state?
+      - question_id: commissioning_state
+        question_type: choice
+        prompt: What is the current commissioning state?
+        choices: [DESIGNED, IMPLEMENTED, TESTED, COMMISSIONED, SUSPENDED]
+    auto_gates:
+      below_threshold_action: ASK_OMAR
+      threshold_question: is_commissioned
+      threshold_value: false
+    authority_tier: safety_gate
+
+  - name: metrics_snapshot_stale_reject
+    description: Reject decisions based on stale metrics snapshots
+    questions:
+      - question_id: metrics_fresh
+        question_type: noul
+        prompt: Are metrics within acceptable freshness window?
+      - question_id: staleness_level
+        question_type: score
+        prompt: What is the staleness level of metrics?
+        levels:
+          - level: fresh
+            description: Metrics within last 24 hours
+          - level: acceptable
+            description: Metrics 24-72 hours old
+          - level: stale
+            description: Metrics older than 72 hours
+    auto_gates:
+      below_threshold_action: ASK_OMAR
+      threshold_question: metrics_fresh
+      threshold_value: false
+    authority_tier: automated
+
+  - name: reconcile_absent_fail
+    description: Handle reconciliation when expected external effect is absent
+    questions:
+      - question_id: effect_present
+        question_type: noul
+        prompt: Is the expected external effect present?
+      - question_id: absence_reason
+        question_type: choice
+        prompt: Why is the effect absent?
+        choices: [never_executed, provider_deleted, transient_unavailable, wrong_scope]
+    auto_gates:
+      below_threshold_action: ASK_OMAR
+      threshold_question: effect_present
+      threshold_value: false
+    authority_tier: automated
