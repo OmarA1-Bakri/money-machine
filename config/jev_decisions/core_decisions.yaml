@@ -1,0 +1,115 @@
+version: 1
+decisions:
+  - name: preflight_blockers_present
+    description: Check if preflight blockers are present before workflow execution
+    questions:
+      - question_id: has_blockers
+        question_type: noul
+        prompt: Are there any blocking conditions that prevent workflow execution?
+      - question_id: blocker_severity
+        question_type: score
+        prompt: If blockers exist, what is their severity?
+        levels:
+          - level: none
+            description: No blockers detected; safe to proceed
+          - level: recoverable
+            description: Blockers exist but can be auto-remediated
+          - level: blocking
+            description: Hard blockers requiring operator intervention
+    auto_gates:
+      below_threshold_action: ASK_OMAR
+      threshold_question: has_blockers
+      threshold_value: true
+    authority_tier: automated
+
+  - name: shadow_mode_jev_only_log
+    description: Shadow-mode decision that only logs (never mutates)
+    questions:
+      - question_id: should_log
+        question_type: noul
+        prompt: Should this decision be logged for shadow analysis?
+      - question_id: log_level
+        question_type: choice
+        prompt: What log level should be used?
+        choices: [debug, info, warning]
+    auto_gates:
+      below_threshold_action: ASK_OMAR
+      threshold_question: should_log
+      threshold_value: false
+    authority_tier: shadow_only
+
+  - name: winner_confidence_gate
+    description: Evaluate confidence in portfolio winner selection
+    questions:
+      - question_id: meets_confidence
+        question_type: noul
+        prompt: Does the winner meet minimum confidence threshold?
+      - question_id: confidence_score
+        question_type: score
+        prompt: What is the confidence level in this winner?
+        levels:
+          - level: low
+            description: Confidence below 60%; high risk of wrong decision
+          - level: medium
+            description: Confidence 60-85%; acceptable risk
+          - level: high
+            description: Confidence above 85%; strong signal
+    auto_gates:
+      below_threshold_action: ASK_OMAR
+      threshold_question: meets_confidence
+      threshold_value: false
+    authority_tier: automated
+
+  - name: operator_ask_omar_needed
+    description: Determine if operator (ASK_OMAR) intervention required
+    questions:
+      - question_id: needs_operator
+        question_type: noul
+        prompt: Does this decision require operator intervention?
+      - question_id: reason
+        question_type: choice
+        prompt: Why is operator intervention needed?
+        choices: [high_risk, ambiguous_context, policy_exception, safety_gate]
+    auto_gates:
+      below_threshold_action: ASK_OMAR
+      threshold_question: needs_operator
+      threshold_value: true
+    authority_tier: operator_required
+
+  - name: keep_as_draft
+    description: Decide whether to keep listing as draft or proceed to active
+    questions:
+      - question_id: should_stay_draft
+        question_type: noul
+        prompt: Should this listing remain in draft state?
+      - question_id: draft_reason
+        question_type: choice
+        prompt: If draft, what is the primary reason?
+        choices: [incomplete_assets, qa_fail, policy_hold, manual_review]
+    auto_gates:
+      below_threshold_action: ASK_OMAR
+      threshold_question: should_stay_draft
+      threshold_value: true
+    authority_tier: automated
+
+  - name: retry_class_idempotent
+    description: Classify operation retry safety for idempotent operations
+    questions:
+      - question_id: is_idempotent
+        question_type: noul
+        prompt: Is this operation truly idempotent (safe to retry)?
+      - question_id: retry_safety
+        question_type: score
+        prompt: What is the retry safety level?
+        levels:
+          - level: safe
+            description: No side effects; always safe to retry
+          - level: idempotent
+            description: Side effects exist but operation is idempotent
+          - level: manual
+            description: Requires manual reconciliation before retry
+    auto_gates:
+      below_threshold_action: ASK_OMAR
+      threshold_question: is_idempotent
+      threshold_value: false
+    authority_tier: automated

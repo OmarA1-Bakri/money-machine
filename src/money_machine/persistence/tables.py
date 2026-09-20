@@ -164,6 +164,7 @@ WORKBOOK_ENTITIES: Final = (
 ADDENDUM_ENTITIES: Final = (
     "config_references",
     "evidence_references",
+    "jev_evaluations",
     "qa_result_artifacts",
     "dedupe_comparisons",
     "listing_version_artifacts",
@@ -1322,6 +1323,35 @@ class DecisionEvidence(Identified):
     observed_at: Mapped[datetime] = moment()
 
     __table_args__ = (UniqueConstraint("decision_id", "source_reference"),)
+
+
+class JevEvaluation(Identified):
+    """A Jev decision engine evaluation result.
+
+    Records packet, answers, derived results, latency, and model from Jev Gateway evaluate
+    calls. May link to a Decision for decision-evidence lineage.
+    """
+
+    __tablename__ = "jev_evaluations"
+
+    decision_id: Mapped[UUID | None] = ref("decisions.id", ondelete="SET NULL", nullable=True)
+    decision_type: Mapped[str] = text_column(length=100)
+    packet: Mapped[dict[str, Any]] = mapped_column(JsonB, nullable=False)
+    answers: Mapped[dict[str, Any]] = mapped_column(JsonB, nullable=False)
+    derived: Mapped[dict[str, Any] | None] = mapped_column(JsonB, nullable=True)
+    model_id: Mapped[str] = text_column(length=100)
+    latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    evaluated_at: Mapped[datetime] = moment(default_now=True)
+
+    __table_args__ = (
+        CheckConstraint("latency_ms >= 0", name="latency_non_negative"),
+        CheckConstraint("jsonb_typeof(packet) = 'object'", name="packet_is_object"),
+        CheckConstraint("jsonb_typeof(answers) = 'object'", name="answers_is_object"),
+        CheckConstraint(
+            "derived IS NULL OR jsonb_typeof(derived) = 'object'",
+            name="derived_is_object_or_null",
+        ),
+    )
 
 
 class Incident(Identified):
