@@ -8,13 +8,19 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Final, Self
+from typing import TYPE_CHECKING, Any, Final, Self
 from uuid import UUID
 
 from money_machine.config.settings import AgentCommissioningState
 from money_machine.config.settings import AgentDefinition as ConfigAgentDefinition
 from money_machine.domain.models.jobs import AgentResult, JobEnvelope
 from money_machine.integrations.llm.interface import LLMProvider
+
+if TYPE_CHECKING:
+    from money_machine.agents.review_subagent import (
+        ReviewSubagentArtifact,
+        ReviewSubagentRequest,
+    )
 
 EXECUTABLE_COMMISSIONING_STATES: Final[frozenset[AgentCommissioningState]] = frozenset(
     {
@@ -98,6 +104,7 @@ class AgentContext:
     provider: LLMProvider
     run_at: datetime
     tool_registry: object | None = None  # L2: ToolRegistry for invoke_tool()
+    review_coordinator: object | None = None  # W6: ReviewSubagentCoordinator
 
     @property
     def agent_run_id(self) -> UUID:
@@ -119,6 +126,29 @@ class AgentContext:
             agent_id=self.definition.agent_id,
             **kwargs,
         )
+
+    async def request_review(
+        self,
+        request: ReviewSubagentRequest,
+    ) -> ReviewSubagentArtifact:
+        """Request one bounded review subagent from the owning run."""
+        from money_machine.agents.review_subagent import ReviewSubagentCoordinator
+
+        if self.review_coordinator is None:
+            raise AgentRuntimeError("ReviewSubagentCoordinator not available in context")
+        if not isinstance(self.review_coordinator, ReviewSubagentCoordinator):
+            raise AgentRuntimeError("Invalid review_coordinator type")
+        return await self.review_coordinator.request_review(request)
+
+    def invoke_review_tool(self, tool_id: str, **kwargs: object) -> Any:
+        """Invoke a read-only tool from a bounded review subagent."""
+        from money_machine.agents.review_subagent import ReviewSubagentCoordinator
+
+        if self.review_coordinator is None:
+            raise AgentRuntimeError("ReviewSubagentCoordinator not available in context")
+        if not isinstance(self.review_coordinator, ReviewSubagentCoordinator):
+            raise AgentRuntimeError("Invalid review_coordinator type")
+        return self.review_coordinator.invoke_review_tool(tool_id, **kwargs)
 
 
 class BaseAgent(ABC):

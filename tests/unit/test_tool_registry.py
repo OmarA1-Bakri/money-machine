@@ -85,6 +85,21 @@ def test_a01_cannot_call_etsy_tools() -> None:
         registry.invoke("etsy.read_listing", allowed_tools=a01_tools, agent_id="A01")
 
 
+def test_invoke_for_review_allows_read_only_tools() -> None:
+    registry = ToolRegistry.canonical()
+    a03_tools = frozenset(
+        {
+            "etsy.read_listing",
+            "etsy.search_listings",
+            "browser.navigate",
+            "storage.write_blob",
+        }
+    )
+    registry.invoke_for_review("etsy.read_listing", allowed_tools=a03_tools, agent_id="A03")
+    with pytest.raises(ToolPermissionError, match="cannot invoke write tool"):
+        registry.invoke_for_review("storage.write_blob", allowed_tools=a03_tools, agent_id="A03")
+
+
 def test_a02_can_check_providers_but_not_publish() -> None:
     registry = ToolRegistry.canonical()
     a02_tools = frozenset(
