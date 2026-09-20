@@ -411,11 +411,11 @@ async def test_observation_count_matches_report(test_workflow, test_database):
             actual_count = len(list(obs_result.scalars().all()))
 
     assert research_run.observation_count == actual_count, (
-        f"ResearchRun.observation_count ({research_run.observation_count}) " \
-    )
+        f"ResearchRun.observation_count ({research_run.observation_count}) "
         f"doesn't match actual observations ({actual_count})"
+    )
 
     assert research_run.observation_count == len(report.listing_observations), (
-        f"ResearchRun.observation_count ({research_run.observation_count}) " \
-    )
+        f"ResearchRun.observation_count ({research_run.observation_count}) "
         f"doesn't match report observations ({len(report.listing_observations)})"
+    )
