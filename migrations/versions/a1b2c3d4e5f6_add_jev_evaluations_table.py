@@ -85,23 +85,9 @@ def upgrade() -> None:
         ["decision_id"],
         unique=False,
     )
-    op.create_index(
-        op.f("ix_jev_evaluations_decision_type"),
-        "jev_evaluations",
-        ["decision_type"],
-        unique=False,
-    )
-    op.create_index(
-        op.f("ix_jev_evaluations_evaluated_at"),
-        "jev_evaluations",
-        ["evaluated_at"],
-        unique=False,
-    )
 
 
 def downgrade() -> None:
     """Revert the revision."""
-    op.drop_index(op.f("ix_jev_evaluations_evaluated_at"), table_name="jev_evaluations")
-    op.drop_index(op.f("ix_jev_evaluations_decision_type"), table_name="jev_evaluations")
     op.drop_index(op.f("ix_jev_evaluations_decision_id"), table_name="jev_evaluations")
     op.drop_table("jev_evaluations")
