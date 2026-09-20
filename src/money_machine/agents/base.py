@@ -155,3 +155,10 @@ def assert_production_executable(definition: AgentDefinition) -> None:
         "production execution requires TESTED or COMMISSIONED"
     )
     raise AgentNotCommissionedError(msg)
+
+
+def assert_agent_may_execute(definition: AgentDefinition, *, production: bool) -> None:
+    """L2 alias: Fail closed when a production job targets an unready agent."""
+    if not production:
+        return
+    assert_production_executable(definition)

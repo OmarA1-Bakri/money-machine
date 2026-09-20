@@ -74,3 +74,14 @@ class AgentRegistry:
 
         module = importlib.import_module(module_path)
         return getattr(module, class_name)()
+
+    def validate_tool_allowlists(self, known_tool_ids: frozenset[str]) -> None:
+        """L2: Validate that all agent allowlists reference only known tools."""
+        for definition in self.roster():
+            unknown = set(definition.allowed_tools) - known_tool_ids
+            if unknown:
+                msg = (
+                    f"agent {definition.agent_id} references unknown tools: "
+                    f"{sorted(unknown)}"
+                )
+                raise AgentRegistryError(msg)

@@ -55,10 +55,12 @@ def test_unknown_tool_raises_not_found() -> None:
 
 
 def test_custom_tool_registration() -> None:
+    from typing import Any
+
     registry = ToolRegistry()
     registry.register(
         ToolDefinition("custom.read", SideEffectClass.EXTERNAL_READ, "custom"),
-        lambda **_kwargs: {"ok": True},
+        lambda **_kwargs: {"ok": True},  # type: ignore[no-untyped-def]
     )
     result = registry.invoke(
         "custom.read",
