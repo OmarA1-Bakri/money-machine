@@ -125,7 +125,8 @@ class JevGatewayClient(JevClient):
                 # Final attempt failed
                 if isinstance(e, httpx.TimeoutException):
                     raise JevTimeoutError(
-                        f"Jev Gateway timed out after {timeout_seconds}s (attempt {attempt}/{max_attempts})"
+                        f"Jev Gateway timed out after {timeout_seconds}s "
+                        f"(attempt {attempt}/{max_attempts})"
                     ) from e
                 raise JevClientError(
                     f"Jev Gateway request failed (attempt {attempt}/{max_attempts}): {e}"
