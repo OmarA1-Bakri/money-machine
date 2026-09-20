@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -82,7 +82,9 @@ async def test_fixture_adapter_returns_40_plus_listings():
 
 
 @pytest.mark.asyncio
-async def test_market_research_produces_25_40_observations(test_workflow, test_database):
+async def test_market_research_produces_25_40_observations(
+    test_workflow, test_database, session_factory
+):
     """
     Anti-stub test: Assert 25-40 observations with real data.
 
@@ -174,7 +176,7 @@ async def test_shortlist_produces_5_candidates(test_workflow, test_database, ses
 
 
 @pytest.mark.asyncio
-async def test_research_persists_to_database(test_workflow, test_database):
+async def test_research_persists_to_database(test_workflow, test_database, session_factory):
     """Test that ResearchRun is created and marked complete."""
     workflow, job = test_workflow
 
@@ -229,7 +231,9 @@ async def test_nullable_fields_preserved(test_workflow, test_database, session_f
 
 
 @pytest.mark.asyncio
-async def test_duplicate_source_reference_handling(test_workflow, test_database):
+async def test_duplicate_source_reference_handling(
+    test_workflow, test_database, session_factory
+):
     """
     Test that duplicate source references within one run are deduplicated.
 
@@ -250,7 +254,7 @@ async def test_duplicate_source_reference_handling(test_workflow, test_database)
 
 
 @pytest.mark.asyncio
-async def test_uncommissioned_non_fixture_adapter_raises(test_workflow):
+async def test_uncommissioned_non_fixture_adapter_raises(test_workflow, session_factory):
     """Test that non-fixture adapters are rejected while uncommissioned."""
     workflow, job = test_workflow
 
@@ -323,7 +327,7 @@ async def test_young_and_fast_shop_detection(test_workflow, test_database, sessi
 
 
 @pytest.mark.asyncio
-async def test_price_bands_extracted(test_workflow, test_database):
+async def test_price_bands_extracted(test_workflow, test_database, session_factory):
     """Test that price ranges are calculated for each candidate."""
     workflow, job = test_workflow
 
