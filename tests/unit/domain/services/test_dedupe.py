@@ -277,7 +277,10 @@ class TestCheckDedupe:
         assert len(result.collisions) >= 1
         # Check that at least one collision exists (either reason is valid here)
         collision_reasons = {c.reason for c in result.collisions}
-        assert "EXACT_IDENTITY_CATEGORY" in collision_reasons or "CONCEPT_FINGERPRINT" in collision_reasons
+        assert (
+            "EXACT_IDENTITY_CATEGORY" in collision_reasons
+            or "CONCEPT_FINGERPRINT" in collision_reasons
+        )
 
     def test_dedupe_multiple_collisions(self):
         """TOO_CLOSE with multiple existing specs creating collisions."""
