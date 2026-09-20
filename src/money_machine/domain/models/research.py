@@ -49,7 +49,7 @@ class ResearchReport:
     shop_count: int
     listing_observations: list[ListingObservation]
     shop_observations: list[ShopObservation]
-    shortlist: "ShortlistAnalysis"
+    shortlist: ShortlistAnalysis
     completed_at: datetime
 
 
