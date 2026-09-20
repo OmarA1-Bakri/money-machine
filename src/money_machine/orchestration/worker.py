@@ -14,8 +14,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
-from sqlalchemy import select
-
 from money_machine.agents.base import AgentNotCommissionedError
 from money_machine.agents.registry import AgentRegistry
 from money_machine.agents.runtime import AgentRunner

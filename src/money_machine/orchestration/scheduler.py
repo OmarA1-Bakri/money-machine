@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 from uuid import UUID
 
 from sqlalchemy import select
@@ -27,6 +27,8 @@ from money_machine.orchestration.dependency_resolver import (
 )
 from money_machine.orchestration.leases import reclaim_expired_leases
 from money_machine.persistence.tables import Job, WorkflowRun
+
+LOGGER: Final = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -365,10 +367,11 @@ def main() -> int:
     )
 
     # Check commissioning evidence gates (same as worker)
+    from pathlib import Path
+
     from money_machine.agents.registry import AgentRegistry
     from money_machine.config.runtime import RuntimeSettingsError, load_runtime_settings
     from money_machine.domain.enums import AgentCommissioningState
-    from pathlib import Path
 
     try:
         # Load runtime settings to verify configuration
