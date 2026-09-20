@@ -146,7 +146,7 @@ class MarketResearchAgent:
 
         async with uow:
             research_run_repo = ResearchRunRepository(uow.session)
-            research_run = await research_run_repo.create(research_run)
+            research_run = research_run_repo.add(research_run)
             await uow.commit()
 
         # Collect observations from all seed phrases
@@ -391,7 +391,7 @@ class MarketResearchAgent:
                     selection=None,
                     created_at=datetime.now(UTC),
                 )
-                await candidate_repo.create(db_candidate)
+                candidate_repo.add(db_candidate)
 
             await uow.commit()
 
