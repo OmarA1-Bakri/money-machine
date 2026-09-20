@@ -135,7 +135,6 @@ async def test_shortlist_produces_5_candidates(test_workflow, test_database, ses
 
         # Verify candidates were persisted
         async with session_factory() as session:
-
             from money_machine.persistence.tables import ProductCandidate
 
             stmt = select(ProductCandidate).where(ProductCandidate.workflow_id == workflow.id)
@@ -210,7 +209,6 @@ async def test_nullable_fields_preserved(test_workflow, test_database, session_f
     # Some fixtures don't have anchor prices - verify they're NULL not zero
     if null_anchor_prices:
         async with session_factory() as session:
-
             from money_machine.persistence.tables import MarketListingObservation
 
             stmt = select(MarketListingObservation).where(
