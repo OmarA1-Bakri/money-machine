@@ -62,8 +62,12 @@ class AgentRegistry:
 
         # Map agent IDs to their implementations
         implementations: dict[str, str] = {
-            "A01": "money_machine.agents.implementations.shop_orchestrator.ShopOrchestratorAgent",
-            "A02": "money_machine.agents.implementations.account_integration.AccountIntegrationAgent",
+            "A01": (
+                "money_machine.agents.implementations.shop_orchestrator.ShopOrchestratorAgent"
+            ),
+            "A02": (
+                "money_machine.agents.implementations.account_integration.AccountIntegrationAgent"
+            ),
         }
 
         if agent_id not in implementations:
