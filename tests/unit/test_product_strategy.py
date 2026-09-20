@@ -191,7 +191,7 @@ class TestA05ProductStrategyScoring:
 
         # Check ranking order
         scores = [c["total_score"] for c in output["scored_candidates"]]  # type: ignore[index]
-        assert scores == sorted(scores, reverse=True), "Candidates should be ranked by score"
+        assert scores == sorted(scores, reverse=True), "Candidates should be ranked by score"  # type: ignore[arg-type]
 
         # Check ranks are sequential
         ranks = [c["rank"] for c in output["scored_candidates"]]  # type: ignore[index]
