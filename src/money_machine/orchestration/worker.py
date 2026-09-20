@@ -114,8 +114,9 @@ def _check_commissioning_gates() -> bool:
                 )
 
                 if not prompt_file.exists():
+                    relative_path = prompt_file.relative_to(repo_root)
                     agents_with_prompt_failures.append(
-                        f"{agent_def.agent_id}: file not found at {prompt_file.relative_to(repo_root)}"
+                        f"{agent_def.agent_id}: file not found at {relative_path}"
                     )
                     continue
 
