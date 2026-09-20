@@ -40,7 +40,7 @@ async def test_workflow(test_database):
             updated_at=datetime.now(UTC),
         )
         session.add(workflow)
-        
+
         job = Job(
             id=uuid4(),
             workflow_id=workflow.id,
@@ -51,11 +51,11 @@ async def test_workflow(test_database):
             updated_at=datetime.now(UTC),
         )
         session.add(job)
-        
+
         await session.commit()
         await session.refresh(workflow)
         await session.refresh(job)
-        
+
         yield workflow, job
 
 
@@ -63,10 +63,10 @@ async def test_workflow(test_database):
 async def test_fixture_adapter_returns_40_plus_listings():
     """Test that fixture adapter has sufficient data."""
     adapter = FixtureEtsyAdapter()
-    
+
     # Test with a broad query
     results = await adapter.search_listings("planner", max_results=50)
-    
+
     assert len(results) >= 40, f"Expected at least 40 fixtures, got {len(results)}"
     assert all(r.title for r in results), "All fixtures must have titles"
     assert all(r.source_reference for r in results), "All fixtures must have source references"
@@ -76,7 +76,7 @@ async def test_fixture_adapter_returns_40_plus_listings():
 async def test_market_research_produces_25_40_observations(test_workflow, test_database):
     """
     Anti-stub test: Assert 25-40 observations with real data.
-    
+
     Validates:
     - At least 25 MarketListingObservation rows
     - Non-null title and source_reference
@@ -85,39 +85,41 @@ async def test_market_research_produces_25_40_observations(test_workflow, test_d
     - At least 5 MarketShopObservation rows
     """
     workflow, job = test_workflow
-    
+
     async with UnitOfWork() as uow:
         report = await execute_market_research(workflow.id, job, uow)
-    
+
     # At least 25 listing observations
-    assert len(report.listing_observations) >= 25, \
+    assert len(report.listing_observations) >= 25, (
         f"Expected at least 25 observations, got {len(report.listing_observations)}"
-    
+    )
+
     # All observations have required fields
     for obs in report.listing_observations:
         assert obs.title, f"Observation {obs.source_reference} missing title"
         assert obs.source_reference, "Observation missing source_reference"
-    
+
     # At least 5 distinct identity niches (proves diversity)
     niches = {obs.identity_niche for obs in report.listing_observations if obs.identity_niche}
-    assert len(niches) >= 5, \
-        f"Expected at least 5 distinct niches, got {len(niches)}: {niches}"
-    
+    assert len(niches) >= 5, f"Expected at least 5 distinct niches, got {len(niches)}: {niches}"
+
     # At least 10 rows with price > 0 (proves real data, not stubs)
     priced_obs = [obs for obs in report.listing_observations if obs.price and obs.price > 0]
-    assert len(priced_obs) >= 10, \
+    assert len(priced_obs) >= 10, (
         f"Expected at least 10 observations with price > 0, got {len(priced_obs)}"
-    
+    )
+
     # At least 5 shop observations
-    assert len(report.shop_observations) >= 5, \
+    assert len(report.shop_observations) >= 5, (
         f"Expected at least 5 shop observations, got {len(report.shop_observations)}"
+    )
 
 
 @pytest.mark.asyncio
 async def test_shortlist_produces_5_candidates(test_workflow, test_database):
     """
     Anti-stub test: Assert exactly 5 candidates with complete data.
-    
+
     Validates:
     - Exactly 5 ProductCandidate rows
     - Non-empty identity and base_category

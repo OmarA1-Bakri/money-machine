@@ -72,7 +72,9 @@ class MarketResearchAgent:
             config = yaml.safe_load(file)
 
         if not config or "research" not in config:
-            raise ValueError(f"Invalid research config: missing 'research' key in {self.config_path}")
+            raise ValueError(
+                f"Invalid research config: missing 'research' key in {self.config_path}"
+            )
 
         return config["research"]
 
