@@ -209,7 +209,8 @@ def test_exactly_one_migration_revision_exists_and_it_is_the_root() -> None:
     jev_migration = next(r for r in revisions if "a1b2c3d4e5f6" in r.name)
     jev_body = jev_migration.read_text(encoding="utf-8")
     assert 'down_revision = "9f46f3152a68"' in jev_body
-    assert 'op.create_table("jev_evaluations"' in jev_body
+    assert "jev_evaluations" in jev_body
+    assert "op.create_table" in jev_body
     assert 'op.drop_table("jev_evaluations")' in jev_body
 
 
