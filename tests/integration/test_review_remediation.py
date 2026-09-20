@@ -255,7 +255,7 @@ async def test_seed_converges_a_drifted_row(session: AsyncSession, repository_ro
     )
     agent.name = "TAMPERED"
     agent.timeout_seconds = 1
-    agent.commissioning_state = "TESTED"
+    agent.commissioning_state = "DESIGNED"  # L2: tamper to wrong state (A01 should be TESTED)
     await session.commit()
 
     report = await seed(session, repository_root=repository_root)
@@ -270,7 +270,7 @@ async def test_seed_converges_a_drifted_row(session: AsyncSession, repository_ro
         .one()
     )
     assert restored.name == "Shop Orchestrator"
-    assert restored.commissioning_state == "DESIGNED"
+    assert restored.commissioning_state == "TESTED"  # L2: A01 is TESTED
     assert restored.timeout_seconds == 300
 
 

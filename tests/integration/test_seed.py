@@ -35,7 +35,10 @@ async def test_seed_inserts_the_canonical_configuration(
 
     agents = (await session.execute(select(AgentDefinition))).scalars().all()
     assert {row.agent_id for row in agents} == {f"A{number:02d}" for number in range(1, 17)}
-    assert {row.commissioning_state for row in agents} == {"DESIGNED"}
+    # L2: A01/A02 are TESTED, A03-A16 are DESIGNED
+    assert {row.commissioning_state for row in agents} == {"DESIGNED", "TESTED"}
+    tested_agents = {row.agent_id for row in agents if row.commissioning_state == "TESTED"}
+    assert tested_agents == {"A01", "A02"}
     assert all(row.commissioning_evidence == [] for row in agents)
 
 
