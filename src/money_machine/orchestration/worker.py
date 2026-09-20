@@ -373,9 +373,7 @@ def main() -> int:
         return unavailable("worker")
 
     # Gates pass: lift Exit 78 and run production claim loop
-    LOGGER.info(
-        "Commissioning evidence gates PASS; worker lifts Exit 78 and starts claim loop"
-    )
+    LOGGER.info("Commissioning evidence gates PASS; worker lifts Exit 78 and starts claim loop")
     try:
         asyncio.run(_worker_loop())
         return 0
