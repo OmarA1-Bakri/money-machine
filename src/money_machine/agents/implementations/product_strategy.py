@@ -35,20 +35,20 @@ class A05ProductStrategy(BaseAgent):
         """Score candidates and generate ProductSpec for qualified primary."""
         try:
             strategy_input = ProductStrategyInput.model_validate(input_data)
-            
+
             # Score all candidates
             scored = self._score_candidates(strategy_input)
-            
+
             # Rank by total score
             ranked = sorted(scored, key=lambda c: c.total_score, reverse=True)
-            
+
             # Select primary and backup
             primary, backup = self._select_candidates(ranked, strategy_input.scoring_threshold)
-            
+
             # Determine qualification outcome
             qualified = primary.passed_threshold
             outcome = "QUALIFIED" if qualified else "REJECTED"
-            
+
             # Generate ProductSpec if qualified
             product_spec = None
             if qualified:
@@ -57,12 +57,12 @@ class A05ProductStrategy(BaseAgent):
                     strategy_input.workflow_id,
                     strategy_input.job_id,
                     uuid4(),  # agent_run_id placeholder
-                    strategy_input.research_run_id
+                    strategy_input.research_run_id,
                 )
-            
+
             # Collect evidence
             evidence = self._collect_evidence(scored, strategy_input)
-            
+
             result = ProductStrategyResult(
                 agent_run_id=uuid4(),  # Will be set by AgentRunner
                 agent_id="A05",
@@ -81,9 +81,9 @@ class A05ProductStrategy(BaseAgent):
                 evidence=evidence,
                 completed_at=datetime.now(UTC),
             )
-            
+
             return result.model_dump()
-            
+
         except Exception as e:
             error = ContractError(
                 code="PRODUCT_STRATEGY_FAILED",
@@ -108,22 +108,20 @@ class A05ProductStrategy(BaseAgent):
                 completed_at=datetime.now(UTC),
             ).model_dump()
 
-    def _score_candidates(
-        self, strategy_input: ProductStrategyInput
-    ) -> list[ScoredCandidate]:
+    def _score_candidates(self, strategy_input: ProductStrategyInput) -> list[ScoredCandidate]:
         """Score each candidate across four dimensions."""
         scored = []
-        
+
         for candidate in strategy_input.candidates:
             # Score each dimension (simplified stub logic)
             impulse_score = self._score_impulse_priced(candidate)
             tangible_score = self._score_tangible(candidate)
             honest_promise_score = self._score_honest_promise(candidate)
             trendy_score = self._score_trendy_but_tricky(candidate)
-            
+
             total = impulse_score + tangible_score + honest_promise_score + trendy_score
             passed = total >= strategy_input.scoring_threshold
-            
+
             scoring = (
                 ScoringReasoning(
                     dimension="impulse_priced",
@@ -150,7 +148,7 @@ class A05ProductStrategy(BaseAgent):
                     evidence_refs=("trend_data",),
                 ),
             )
-            
+
             # Update candidate with scores
             scored_candidate_dict = candidate.model_dump()
             scored_candidate_dict["impulse_priced_score"] = impulse_score
@@ -158,9 +156,9 @@ class A05ProductStrategy(BaseAgent):
             scored_candidate_dict["honest_promise_score"] = honest_promise_score
             scored_candidate_dict["trendy_but_tricky_score"] = trendy_score
             scored_candidate_dict["total_score"] = total
-            
+
             updated_candidate = ProductCandidate.model_validate(scored_candidate_dict)
-            
+
             scored.append(
                 ScoredCandidate(
                     candidate=updated_candidate,
@@ -171,7 +169,7 @@ class A05ProductStrategy(BaseAgent):
                     selection="REJECTED",  # Will be updated in select phase
                 )
             )
-        
+
         return scored
 
     def _score_impulse_priced(self, candidate: ProductCandidate) -> int:
@@ -214,21 +212,21 @@ class A05ProductStrategy(BaseAgent):
                 rank=i,
                 selection="REJECTED",
             )
-        
+
         # Select primary (highest scoring)
         primary_data = ranked[0].model_dump()
         primary_data["selection"] = "PRIMARY"
         primary = ScoredCandidate.model_validate(primary_data)
-        
+
         # Select backup (second highest, if exists and passes threshold)
         backup = None
         if len(ranked) > 1 and ranked[1].passed_threshold:
             backup_data = ranked[1].model_dump()
             backup_data["selection"] = "BACKUP"
             backup = ScoredCandidate.model_validate(backup_data)
-        
+
         # Update remaining as REJECTED (already set in loop above)
-        
+
         return primary, backup
 
     def _generate_product_spec(
@@ -243,7 +241,7 @@ class A05ProductStrategy(BaseAgent):
         # Generate concept fingerprint
         concept_data = f"{candidate.identity}:{candidate.base_category}"
         fingerprint = hashlib.sha256(concept_data.encode()).hexdigest()
-        
+
         # Stub ProductSpec generation (would be more sophisticated in production)
         spec = ProductSpec(
             spec_id=uuid4(),
@@ -297,7 +295,7 @@ class A05ProductStrategy(BaseAgent):
             ),
             created_at=datetime.now(UTC),
         )
-        
+
         return spec
 
     def _collect_evidence(
@@ -305,7 +303,7 @@ class A05ProductStrategy(BaseAgent):
     ) -> tuple[EvidenceReference, ...]:
         """Collect evidence references from scoring."""
         evidence = []
-        
+
         for candidate in scored:
             evidence.append(
                 EvidenceReference(
@@ -319,7 +317,7 @@ class A05ProductStrategy(BaseAgent):
                     safe_summary=f"{candidate.candidate.identity}: {candidate.total_score}/40",
                 )
             )
-        
+
         return tuple(evidence)
 
     def _compute_prompt_hash(self) -> str:

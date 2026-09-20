@@ -44,18 +44,14 @@ def create_candidate(
 QUALIFIED_CANDIDATE = create_candidate(
     identity="Digital Planner Template",
     category="Productivity",
-    risks=(
-        CandidateRisk(risk="Market saturation", severity="LOW"),
-    ),
+    risks=(CandidateRisk(risk="Market saturation", severity="LOW"),),
 )
 
 # Medium-scoring candidate (edge case around threshold)
 THRESHOLD_CANDIDATE = create_candidate(
     identity="Basic Budget Tracker",
     category="Finance",
-    risks=(
-        CandidateRisk(risk="Limited differentiation", severity="MEDIUM"),
-    ),
+    risks=(CandidateRisk(risk="Limited differentiation", severity="MEDIUM"),),
 )
 
 # Low-scoring candidate (should fail threshold)
@@ -72,9 +68,7 @@ REJECTED_CANDIDATE = create_candidate(
 BACKUP_CANDIDATE = create_candidate(
     identity="Simple Task Manager",
     category="Productivity",
-    risks=(
-        CandidateRisk(risk="Competition", severity="LOW"),
-    ),
+    risks=(CandidateRisk(risk="Competition", severity="LOW"),),
 )
 
 # Complete shortlist with 5 candidates
