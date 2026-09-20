@@ -134,10 +134,11 @@ async def test_a02_implementation_executes_provisioning_check(registry: AgentReg
     result = await implementation.execute(context)
     assert result.agent_id == "A02"
     assert result.status.value == "SUCCESS"
-    assert "openai" in result.output
-    assert "anthropic" in result.output
-    assert "notion" in result.output
-    assert "etsy" in result.output
+    providers = result.output.get("providers", {})
+    assert "openai" in providers
+    assert "anthropic" in providers
+    assert "notion" in providers
+    assert "etsy" in providers
 
 
 @pytest.mark.asyncio
