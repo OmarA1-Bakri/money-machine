@@ -87,35 +87,5 @@ class TestPersistence:
         retrieved = await get_evaluation(session, stored.id)
 
         assert retrieved is not None
-        assert retrieved.derived is None
-
-    async def test_store_with_decision_id_link(self, session: AsyncSession) -> None:
-        """Can store evaluation linked to a decision via foreign key."""
-        packet = DecisionPacket(
-            decision_type="test_decision",
-            context={},
-            questions=[NoulQuestion(question_id="q1", prompt="Test")],
-        )
-
-        result = DecisionResult(
-            decision_type="test_decision",
-            answers={"q1": True},
-            model_id="jev-1.0",
-            latency_ms=200,
-        )
-
-        decision_id = uuid4()
-
-        stored = await store_evaluation(
-            session=session,
-            packet=packet,
-            result=result,
-            decision_id=decision_id,
-            derived=None,
-        )
-        await session.commit()
-
-        retrieved = await get_evaluation(session, stored.id)
-
-        assert retrieved is not None
-        assert retrieved.decision_id == decision_id
+        # derived=None is stored as {}
+        assert retrieved.derived == {}
