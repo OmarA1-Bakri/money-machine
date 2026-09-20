@@ -77,27 +77,32 @@ Allowed: provider.check
     config_dir = root / "config"
     config_dir.mkdir()
 
-    # Create minimal agents.yaml (needed by seed)
-    agents_yaml = """version: 1
-agents:
-  - agent_id: A01
-    name: Shop Orchestrator
-    implementation_version: 1
-    contract_version: 1
-    system_prompt_reference: agent://A01/system/v1
-    input_contracts: [JobEnvelope]
-    output_contracts: [AgentResult]
-    allowed_tools: [INTERNAL_ORCHESTRATION]
-    provider_operations: []
-    allowed_side_effect_classes: [NONE]
-    default_side_effect_class: NONE
-    allowed_retry_classes: [SAFE]
-    default_retry_class: SAFE
-    timeout_seconds: 300
-    model_policy: default
-    commissioning_state: DESIGNED
-    commissioning_evidence: []
-"""
+    # Create minimal agents.yaml with 16 agents (schema requirement)
+    agents_yaml_lines = ["version: 1", "agents:"]
+    for i in range(1, 17):
+        agent_num = f"A{i:02d}"
+        agents_yaml_lines.extend(
+            [
+                f"  - agent_id: {agent_num}",
+                f"    name: Agent {agent_num}",
+                "    implementation_version: 1",
+                "    contract_version: 1",
+                f"    system_prompt_reference: agent://{agent_num}/system/v1",
+                "    input_contracts: [JobEnvelope]",
+                "    output_contracts: [AgentResult]",
+                "    allowed_tools: [INTERNAL_ORCHESTRATION]",
+                "    provider_operations: []",
+                "    allowed_side_effect_classes: [NONE]",
+                "    default_side_effect_class: NONE",
+                "    allowed_retry_classes: [SAFE]",
+                "    default_retry_class: SAFE",
+                "    timeout_seconds: 300",
+                "    model_policy: default",
+                "    commissioning_state: DESIGNED",
+                "    commissioning_evidence: []",
+            ]
+        )
+    agents_yaml = "\n".join(agents_yaml_lines) + "\n"
     (config_dir / "agents.yaml").write_text(agents_yaml, encoding="utf-8")
 
     # Create empty implementation prompts directory (needed by seed)

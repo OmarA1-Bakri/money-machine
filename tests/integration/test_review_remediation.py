@@ -327,7 +327,7 @@ async def test_concurrent_seeding_converges_without_error(
             await check.execute(select(func.count()).select_from(PromptVersion))
         ).scalar_one()
     assert agents == 16
-    assert prompts == 16
+    assert prompts == 18  # 16 impl + A01 + A02 agent prompts
 
 
 async def test_an_orphan_table_is_reported_as_drift(
