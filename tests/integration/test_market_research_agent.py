@@ -431,5 +431,6 @@ async def test_young_fast_shops_detected_in_shortlist(
     # At least one candidate should have young-and-fast shops
     young_fast_counts = [c.young_fast_shop_count for c in report.shortlist.candidates]
     assert any(count > 0 for count in young_fast_counts), (
-        f"Expected at least one candidate with young-and-fast shops, got counts: {young_fast_counts}"
+        f"Expected at least one candidate with young-and-fast shops, "
+        f"got counts: {young_fast_counts}"
     )
