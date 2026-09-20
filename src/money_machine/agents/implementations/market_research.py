@@ -7,7 +7,7 @@ from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import yaml
@@ -20,7 +20,10 @@ from money_machine.domain.models.research import (
     ShortlistAnalysis,
 )
 from money_machine.integrations.etsy.fixture_adapter import FixtureEtsyAdapter
-from money_machine.integrations.etsy.interface import EtsyResearchAdapter
+from money_machine.integrations.etsy.interface import (
+    EtsyListingSearchResult,
+    EtsyResearchAdapter,
+)
 from money_machine.persistence.repositories.research import (
     ProductCandidateRepository,
     ResearchRunRepository,
@@ -63,7 +66,7 @@ class MarketResearchAgent:
         self.config_path = config_path or Path("config/research.yaml")
         self._config = self._load_config()
 
-    def _load_config(self) -> dict:
+    def _load_config(self) -> dict[str, Any]:
         """Load research configuration from YAML."""
         if not self.config_path.exists():
             raise ValueError(f"Research config not found: {self.config_path}")
@@ -85,7 +88,7 @@ class MarketResearchAgent:
         Raises:
             ValueError: If no seed phrases are configured
         """
-        seed_phrases = self._config.get("seed_phrases", [])
+        seed_phrases: list[str] = self._config.get("seed_phrases", [])
         if not seed_phrases:
             raise ValueError("No seed phrases configured for market research")
 
@@ -120,9 +123,9 @@ class MarketResearchAgent:
             )
 
         seed_phrases = self._validate_seed_phrases()
-        target_count = self._config.get("target_observation_count", 30)
-        max_per_query = self._config.get("max_results_per_query", 50)
-        source_policy_version = self._config.get("source_policy_version", "v1.0")
+        target_count: int = self._config.get("target_observation_count", 30)
+        max_per_query: int = self._config.get("max_results_per_query", 50)
+        source_policy_version: str = self._config.get("source_policy_version", "v1.0")
 
         logger.info(
             f"Starting market research for workflow {workflow_id} "
@@ -147,8 +150,8 @@ class MarketResearchAgent:
             await uow.commit()
 
         # Collect observations from all seed phrases
-        all_listing_results = []
-        seen_references = set()
+        all_listing_results: list[EtsyListingSearchResult] = []
+        seen_references: set[str] = set()
 
         for phrase in seed_phrases:
             try:
