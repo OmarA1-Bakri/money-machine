@@ -12,7 +12,6 @@ from money_machine.agents.contracts.market_research import execute_market_resear
 from money_machine.agents.implementations.market_research import MarketResearchAgent
 from money_machine.integrations.etsy.fixture_adapter import FixtureEtsyAdapter
 from money_machine.integrations.etsy.interface import EtsyResearchAdapter
-from money_machine.persistence.database import AsyncSessionLocal
 from money_machine.persistence.repositories.research import ResearchRunRepository
 from money_machine.persistence.tables import Job, WorkflowRun
 from money_machine.persistence.unit_of_work import UnitOfWork
@@ -27,9 +26,9 @@ class NonFixtureAdapter(EtsyResearchAdapter):
 
 
 @pytest.fixture
-async def test_workflow(test_database):
+async def test_workflow(session_factory):
     """Create a test workflow for research."""
-    async with AsyncSessionLocal() as session:
+    async with session_factory() as session:
         workflow = WorkflowRun(
             id=uuid4(),
             commission_id=uuid4(),
@@ -116,7 +115,7 @@ async def test_market_research_produces_25_40_observations(test_workflow, test_d
 
 
 @pytest.mark.asyncio
-async def test_shortlist_produces_5_candidates(test_workflow, test_database):
+async def test_shortlist_produces_5_candidates(test_workflow, test_database, session_factory):
     """
     Anti-stub test: Assert exactly 5 candidates with complete data.
 
@@ -133,7 +132,7 @@ async def test_shortlist_produces_5_candidates(test_workflow, test_database):
         report = await execute_market_research(workflow.id, job, uow)
 
         # Verify candidates were persisted
-        async with AsyncSessionLocal() as session:
+        async with session_factory() as session:
             from sqlalchemy import select
 
             from money_machine.persistence.tables import ProductCandidate
@@ -190,7 +189,7 @@ async def test_research_persists_to_database(test_workflow, test_database):
 
 
 @pytest.mark.asyncio
-async def test_nullable_fields_preserved(test_workflow, test_database):
+async def test_nullable_fields_preserved(test_workflow, test_database, session_factory):
     """
     Test that missing fixture data is stored as NULL, not fabricated.
 
@@ -206,7 +205,7 @@ async def test_nullable_fields_preserved(test_workflow, test_database):
 
     # Some fixtures don't have anchor prices - verify they're NULL not zero
     if null_anchor_prices:
-        async with AsyncSessionLocal() as session:
+        async with session_factory() as session:
             from sqlalchemy import select
 
             from money_machine.persistence.tables import MarketListingObservation
@@ -289,7 +288,7 @@ async def test_empty_seed_phrases_raises():
 
 
 @pytest.mark.asyncio
-async def test_young_and_fast_shop_detection(test_workflow, test_database):
+async def test_young_and_fast_shop_detection(test_workflow, test_database, session_factory):
     """Test that young-and-fast shops are identified in shortlist analysis."""
     workflow, job = test_workflow
 
@@ -298,7 +297,7 @@ async def test_young_and_fast_shop_detection(test_workflow, test_database):
 
     # At least some fixtures should have young-and-fast shops
     # (based on fixture data: shops with < 365 days age and > 400 sales)
-    async with AsyncSessionLocal() as session:
+    async with session_factory() as session:
         from datetime import timedelta
 
         from sqlalchemy import select
@@ -350,14 +349,14 @@ async def test_price_bands_extracted(test_workflow, test_database):
 
 
 @pytest.mark.asyncio
-async def test_risk_notes_generated(test_workflow, test_database):
+async def test_risk_notes_generated(test_workflow, test_database, session_factory):
     """Test that risk notes are generated for each candidate."""
     workflow, job = test_workflow
 
     async with UnitOfWork() as uow:
         _ = await execute_market_research(workflow.id, job, uow)
 
-        async with AsyncSessionLocal() as session:
+        async with session_factory() as session:
             from sqlalchemy import select
 
             from money_machine.persistence.tables import ProductCandidate
@@ -373,14 +372,14 @@ async def test_risk_notes_generated(test_workflow, test_database):
 
 
 @pytest.mark.asyncio
-async def test_observation_count_matches_report(test_workflow, test_database):
+async def test_observation_count_matches_report(test_workflow, test_database, session_factory):
     """Test that ResearchRun.observation_count matches actual observations."""
     workflow, job = test_workflow
 
     async with UnitOfWork() as uow:
         report = await execute_market_research(workflow.id, job, uow)
 
-        async with AsyncSessionLocal() as session:
+        async with session_factory() as session:
             from sqlalchemy import select
 
             from money_machine.persistence.tables import MarketListingObservation, ResearchRun

@@ -37,7 +37,7 @@ class FixtureEtsyAdapter(EtsyResearchAdapter):
         query_lower = query.lower()
         query_words = set(query_lower.split())
 
-        results = []
+        results: list[EtsyListingSearchResult] = []
         for fixture in self._fixtures:
             title_words = set(fixture.title.lower().split())
             niche_words = set((fixture.identity_niche or "").lower().split())

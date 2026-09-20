@@ -177,7 +177,7 @@ class MarketResearchAgent:
         # Persist observations
         listing_observations: list[ListingObservation] = []
         shop_observations: list[ShopObservation] = []
-        shop_references_seen = set()
+        shop_references_seen: set[str] = set()
 
         async with uow:
             for result in all_listing_results:
