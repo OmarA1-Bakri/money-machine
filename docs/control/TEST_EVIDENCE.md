@@ -1,5 +1,30 @@
 # Test Evidence
 
+## 2026-09-20 — Session 05 Lane 1: Etsy adapter tests written
+
+**Test suite**: `tests/integrations/etsy/test_research_adapter.py` (pending CI run)
+
+Test coverage:
+- `TestEtsyFixtureAdapter`: fixture path returns all required fields, respects target_count, raises KeyError for missing phrase, raises FileNotFoundError for missing file
+- `TestEtsyBrowserAdapter`: stub raises NotImplementedError (safe, no browser launch)
+- `TestEtsyAPIAdapter`: stub raises NotImplementedError (safe, no API calls)
+- `TestGetResearchAdapter`: factory returns correct adapter instance per mode, rejects invalid mode
+- `TestResearchConfigIntegration`: config loads exactly 10 seed phrases (not hardcoded), seed phrases match fixture keys
+- `TestRealFixtureData`: real fixtures have 25-40 rows per phrase, demonstrate thin evidence (20%+ None for optional fields), all required fields present
+- `TestEtsyFixtureAdapterWithRealData`: adapter successfully loads real fixture file, parses 25-30 observations correctly
+
+**Expected CI run**: pytest with fixture data; no external calls, no environment dependencies.
+
+**Status**: Tests written and committed; CI run deferred to GitHub Actions.
+
+## 2026-09-19 — Session 03 final full regression (Verifier FINAL PASS)
+
+| Test Suite | Result | Duration | Evidence |
+|---|---|---|---|
+| `tests/orchestration/` full suite | **76 passed** | 5.25s | State machine transitions, retry cycles, lease reclaim, concurrency, dependency resolution, promote/stalled timers |
+| Real isolated-database regression | **34 passed** | 10.14s | Deterministic lease/heartbeat/expire, recovery, entry spawn, create-entry/promote/stalled CLI with real containers |
+| Full Python canonical gate | **370 passed** | 76.43s | Ruff clean (277 files), strict Pyright (zero findings), all orchestration/persistence/domain tests green |
+
 ## 2026-08-08T13:43:51Z — Evidence registered, outer run pending
 
 | Claim | Evidence | Verdict |

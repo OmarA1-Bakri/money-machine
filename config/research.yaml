@@ -1,0 +1,21 @@
+# Etsy Market Research Configuration
+#
+# Seed search phrases from The Hands-Off Money Machine Playbook Chapter 12.
+# These phrases target high-volume, low-competition digital product niches.
+
+research:
+  seed_phrases:
+    - "digital planner"
+    - "printable wall art"
+    - "custom pet portrait"
+    - "wedding invitation template"
+    - "vintage logo design"
+    - "social media templates"
+    - "budget spreadsheet"
+    - "meal planner printable"
+    - "business card template"
+    - "resume template"
+  
+  target_observations_per_phrase: 30
+  max_observations_total: 400
+  min_observations_for_analysis: 25
