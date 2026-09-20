@@ -1,8 +1,8 @@
 # Next Session
 
-**Session 04 is IN PROGRESS** (2026-09-20) — agent runtime and roster. Exit 78 remains in place per Session 03/04 contracts; worker and scheduler process entrypoints stay fail-closed with no production claim path.
+**Session 04 is CLOSURE-READY** (2026-09-20, W10 control flip @ `14da7fe`) — agent runtime complete, Exit 78 lifted for worker (conditionally, behind D-0028 commissioning gates), scheduler remains fail-closed.
 
-## Session 04 progress (post-Lane C @ `744cc36b`)
+## Session 04 completion status (post-W10 @ `14da7fe`)
 
 | Wave | Status | Commit | Evidence key(s) |
 |---|---|---|---|
@@ -16,18 +16,51 @@
 | W7 — agent-run observability | **COMPLETE** | `4ee63ce` | logs + PostHog-shaped offline queue |
 | W8 — roster contract tests A01–A16 | **COMPLETE** | `44d554f` | `uncommissioned_agents_documented` = true |
 | Lane C — runtime integration tests | **COMPLETE** | `744cc36` | `contract_and_runtime_tests_pass` = true |
-| Remainder — orchestrator wire + exit | **OPEN** | — | `agent_runner_integrated_with_jobs`, `evidence_closure_commit_recorded` false |
+| **W9 — Exit 78 lift (worker) + claim path** | **COMPLETE** | **`14da7fe`** | **`agent_runner_integrated_with_jobs` = true** |
+| W10 — control flip to closure-ready | **COMPLETE** | — | `control_files_and_checkpoint_current` = true |
 
-**Exit 78 held.** No worker claiming, no commissioning, no live Notion/Etsy. Lane C proves the library lease → run → persist → event → successor path only; `agent_runner_integrated_with_jobs` requires the orchestrator wire (Lane A), not tests alone.
+**Seven of eight evidence keys TRUE.** One remains FALSE: `evidence_closure_commit_recorded` (set only by the final Session 04 closure commit, if triggered).
 
-## Next work (Session 04 remainder)
+**Exit 78 status:**
+- **Worker:** LIFTED conditionally (D-0028 commissioning gates). Claims READY jobs, executes via AgentRunner, persists results, emits events, creates successors. Uncommissioned agents (DESIGNED) refuse execution.
+- **Scheduler:** HELD (W9 out of scope). Cycle (promote due jobs, detect stalled jobs, rebalance) remains fail-closed, deferred to future work.
 
-Per `docs/control/reviews/2026-09-20-session-04-prompt-integrity.md` addendum slices still open:
+**Parked #31 SFs (non-blocking):** Structural gates (env-specific, not code defects), stale test docstrings (cosmetic). Noted as carry-forward improvement opportunities.
 
-1. **Agent runner integrated with durable jobs** — Lane A orchestrator wire connecting production job path to `AgentRunner` (library runtime-integration tests alone do not earn this key).
-2. **Session 04 exit** — two independent reviews, all eight evidence keys true, closure commit sequence. Exit 78 removal remains a **post-session gate** (decision record + commissioning evidence), not Session 04 closure.
+## Session 04 formal closure (optional next step)
 
-## Session 03 completion (reference)
+Session 04 MAY be formally closed if/when triggered:
+1. Final exit reviews (if required by session prompt or programme contract)
+2. Closure commit sequence: implementation commit → evidence-closure commit → completion transition → state-pointer commit
+3. Set `evidence_closure_commit_recorded` = true
+4. Advance `completed_sessions` to `[0, 1, 2, 3, 4]`
+5. Set `next_session` to 5
+
+Session 04 closure is NOT required before starting Session 05 features. The seven true evidence keys establish that W1–W9 + Phase A delivered the Session 04 contract: provider abstraction, prompt registry, agent runtime, sixteen-agent roster, contract/runtime tests, and production claim path.
+
+## Next session: Session 05 — Domain Agent Implementation
+
+Session 05 scope (when triggered):
+- Research agent (A03): niche research, candidate generation, qualification scoring
+- Concept agent (A04): concept definition, differentiation, design specification
+- Notion Build agent (A05): workspace setup, database schema, draft pages
+- Variant agent (A06): colour/hub expansion, SKU generation
+- Merchandising agent (A10): description copy, SEO tags, pricing strategy
+- QA agent (A11): build artifact validation, preflight checks
+- Publisher agent (A12): Etsy draft creation, publication, link verification
+- Analytics agent (A14): metrics collection, performance analysis
+
+Session 05 will promote domain agents from DESIGNED to TESTED with:
+- Agent-specific prompts (v1)
+- Integration tests (real database, fake providers)
+- Contract tests (prompt integrity, tool permissions, commissioning refusal)
+- Commissioning evidence gates per D-0028
+- No live Notion/Etsy mutations until commissioning approval
+
+Session 05 does NOT include:
+- Scheduler Exit 78 lift (deferred; promote/stalled-detection/rebalance cycle scope)
+- Live production claims
+- Commissioning approval to COMMISSIONED state (requires operator decision record)
 
 Session 03 closed 2026-09-19 after Verifier FINAL PASS (#17). Gap-close implementation validated: real `dependency_resolver`, scheduler library functions, operator surface (CLI + API), entry-job spawn. Worker/scheduler processes remain fail-closed until commissioning gates pass.
 

@@ -184,3 +184,31 @@
 - `contract_and_runtime_tests_pass` set true: Lane C `tests/integration/test_runtime_integration.py` present on tip (lease → run → persist → event → successor library path; **2 passed, 2 skipped** locally) plus W8 roster contracts (**135 passed**).
 - `agent_runner_integrated_with_jobs` remains false — Lane A orchestrator wire not delivered; library runtime tests alone do not earn production job integration.
 - Exit 78 unchanged. Session 04 remains `incomplete`; `completed_sessions` unchanged at `[0, 1, 2, 3]`.
+
+## 2026-09-20 — Session 04 W9: Exit 78 lift (worker) + production claim path (@ `14da7fe`)
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| W9 scope | Exit 78 lift for WORKER (conditionally, behind D-0028 commissioning gates). Production claim path: claim READY jobs → AgentRunner.execute() → persist → emit events → spawn successors. Scheduler remains Exit 78 (W9 out of scope) | Merge commit `14da7fe` | PASS |
+| Worker claim loop | `src/money_machine/orchestration/worker.py` 471 lines; production claim cycle with commissioning gate check, lease acquisition (`FOR UPDATE SKIP LOCKED`), AgentRunner invocation, result persistence, event emission, successor creation | 7 integration/unit tests | PASS |
+| Commissioning gates (D-0028) | Seven-gate evidence check: (1) runtime settings valid, (2) agent registry loads, (3) at least one TESTED/COMMISSIONED agent, (4) tool registry loads, (5) prompt integrity (file exists, hash match, sections present, no secrets), (6) AgentRunner functional, (7) lease/claim functions available. Returns true only if ALL gates pass | `_check_commissioning_gates()` in worker.py | PASS |
+| Uncommissioned fail-closed | Agents in state DESIGNED refuse execution; worker checks `commissioning_state` before invoking AgentRunner; raises `AgentNotCommissionedError` and fails job with event `AGENT_NOT_COMMISSIONED` | `test_foundation_processes.py` +81 lines | PASS |
+| Concurrent claim safety | Idempotent re-claim: two workers claim same job concurrently; exactly one succeeds with `READY → RUNNING → SUCCESS`, second gets lease collision and finds job complete. Double-execution prevention: `FOR UPDATE SKIP LOCKED` ensures only one worker acquires lease. Reconciliation: crash after execute but before event → lease expires → re-claim → idempotency keys prevent duplicate effects | `tests/integration/test_concurrent_claims.py` 339 lines | PASS |
+| Runtime integration | Worker claim path integration: claim → execute → persist → event → successor; deterministic fake provider; real database transactions | `tests/integration/test_runtime_integration.py` +139 lines | PASS |
+| Scheduler unchanged | Scheduler entrypoint remains `uncommissioned_process("scheduler")` → Exit 78. Cycle (promote due jobs, detect stalled jobs, rebalance) deferred | `scheduler.py` main() docstring | HELD |
+| Exit 78 status | Worker: lifted conditionally (D-0028 gates). Scheduler: held (W9 out of scope) | D-0028 in DECISIONS.md | RECORDED |
+| `agent_runner_integrated_with_jobs` | Production claim path delivered; not just library tests | W9 evidence @ `14da7fe` | EARNED TRUE |
+
+W9 closes `agent_runner_integrated_with_jobs` evidence key. Seven of eight Session 04 evidence keys are now true. Scheduler Exit 78 remains; W9 scope was worker claim path only. No live provider calls, no Notion/Etsy mutations claimed.
+
+## 2026-09-20 — Session 04 W10: Control flip to closure-ready (post-W9 @ `14da7fe`)
+
+Parallel control lane only (`docs/control/*`). No feature code, no scheduler Exit 78 lift, no S05 features, no live Notion/Etsy.
+
+- Updated `IMPLEMENTATION_STATE.json` to repository tip `14da7fe6e7893e79d6993720ae9413343931bfb0` (post-W9 on `build/full-automation`). State revision 26 → 27.
+- Evidence keys updated to match W9 delivery: `agent_runner_integrated_with_jobs` set TRUE after W9 production claim path (worker claim → execute → persist → event → successor). Seven of eight keys now TRUE; `evidence_closure_commit_recorded` remains FALSE (set only by final closure commit).
+- Exit 78 status recorded honestly: worker lifted conditionally (D-0028 commissioning gates), scheduler held (W9 out of scope).
+- Parked #31 SFs noted as carry-forward nits (structural gates env-specific, stale test docstrings cosmetic) — non-blocking for closure.
+- Updated `head_sha` and `evidence_closure_commit_sha` to `14da7fe`.
+- Session 04 status: CLOSURE-READY. W1–W9, Phase A, Lane C complete. No S05 features, no scheduler Exit 78 lift, no live production/Notion/Etsy claimed.
+- W10 control flip review recorded at `docs/control/reviews/2026-09-20-session-04-wave-10-control-flip.md`.
