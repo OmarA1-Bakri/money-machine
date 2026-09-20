@@ -98,7 +98,7 @@ class A05ProductStrategy(BaseAgent):
                 prompt_reference=context.prompt_reference,
                 prompt_sha256=context.prompt_sha256,
                 status=AgentRunStatus.SUCCESS,
-                output=cast(JsonObject, result.model_dump()),
+                output=cast(JsonObject, result.model_dump(mode="json")),
                 evidence=evidence,
             )
 
