@@ -92,7 +92,9 @@ def _check_commissioning_gates() -> bool:
         agents_with_missing_prompts = []
         prompts_dir = repo_root / "prompts" / "agents"
         for agent_def in tested_or_commissioned:
-            prompt_file = prompts_dir / agent_def.agent_id / f"{agent_def.system_prompt_reference}.md"
+            prompt_file = (
+                prompts_dir / agent_def.agent_id / f"{agent_def.system_prompt_reference}.md"
+            )
             if not prompt_file.exists():
                 agents_with_missing_prompts.append(
                     f"{agent_def.agent_id} (expected: {prompt_file.relative_to(repo_root)})"
