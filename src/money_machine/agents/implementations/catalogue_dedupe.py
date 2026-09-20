@@ -114,7 +114,7 @@ class CatalogueDedupeAgent(BaseAgent):
                     continue
                 with contextlib.suppress(Exception):
                     # Skip invalid specs (shouldn't happen but be defensive)
-                    existing_specs.append(ProductSpec.model_validate(spec_data))
+                    existing_specs.append(ProductSpec.model_validate(spec_data))  # type: ignore[arg-type]
 
         # Run dedupe check
         dedupe_result = check_dedupe(
