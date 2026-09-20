@@ -23,7 +23,7 @@ from money_machine.domain.enums import JobStatus
 from money_machine.domain.errors import InvalidTransitionError
 from money_machine.domain.models.jobs import AgentResult, JobEnvelope
 from money_machine.integrations.llm.fake_provider import FakeLLMProvider
-from money_machine.orchestration._foundation import EXIT_UNAVAILABLE, unavailable
+from money_machine.orchestration._foundation import unavailable
 from money_machine.orchestration.event_dispatcher import EventDispatcher
 from money_machine.orchestration.leases import (
     claim_ready_job,
