@@ -161,28 +161,28 @@ async def test_idempotent_reclaim_prevents_duplicate_events(
             assert claimed is not None
             assert claimed.id == job_id
 
-            # Simulate execution completing but event not emitted
-            # (worker crashed before event dispatch)
-            await release_lease(
-                uow.session,
-                job_id=job_id,
-                worker_id=worker1_id,
-                final_status=JobStatus.SUCCEEDED,
-                now=now,
-            )
+        # Simulate execution completing but event not emitted
+        # (worker crashed before event dispatch)
+        await release_lease(
+            uow.session,
+            job_id=job_id,
+            worker_id=worker1_id,
+            final_status=JobStatus.SUCCEEDED,
+            now=now,
+        )
         # DO NOT emit event yet — simulate crash
         await uow.commit()
 
     # Check event count before re-claim
     async with unit_of_work(session_factory) as uow:
-            event_count_before = await uow.session.scalar(
-                select(Event)
-                .where(
-                    Event.workflow_id == workflow_id,
-                    Event.job_id == job_id,
-                )
-                .count()
+        event_count_before = await uow.session.scalar(
+            select(Event)
+            .where(
+                Event.workflow_id == workflow_id,
+                Event.job_id == job_id,
             )
+            .count()
+        )
         # No events yet (crashed before emit)
         assert event_count_before == 0 or event_count_before is None
 
@@ -191,58 +191,58 @@ async def test_idempotent_reclaim_prevents_duplicate_events(
     later = now + timedelta(minutes=10)
 
     async with unit_of_work(session_factory) as uow:
-            # Reset job to READY for re-claim test
-            job = await uow.session.get(Job, job_id)
-            job.status = JobStatus.READY.value
-            job.lease_owner = None
-            job.lease_expires_at = None
+        # Reset job to READY for re-claim test
+        job = await uow.session.get(Job, job_id)
+        job.status = JobStatus.READY.value
+        job.lease_owner = None
+        job.lease_expires_at = None
         job.heartbeat_at = None
         await uow.commit()
 
     async with unit_of_work(session_factory) as uow:
-            claimed = await claim_ready_job(
-                uow.session,
-                worker_id=worker2_id,
-                now=later,
-                lease_duration=lease_duration,
-            )
-            assert claimed is not None
-            assert claimed.id == job_id
+        claimed = await claim_ready_job(
+            uow.session,
+            worker_id=worker2_id,
+            now=later,
+            lease_duration=lease_duration,
+        )
+        assert claimed is not None
+        assert claimed.id == job_id
 
-            # Release and emit event with deterministic dedupe key
-            await release_lease(
-                uow.session,
-                job_id=job_id,
-                worker_id=worker2_id,
-                final_status=JobStatus.SUCCEEDED,
-                now=later,
-            )
+        # Release and emit event with deterministic dedupe key
+        await release_lease(
+            uow.session,
+            job_id=job_id,
+            worker_id=worker2_id,
+            final_status=JobStatus.SUCCEEDED,
+            now=later,
+        )
 
-            # Emit event with dedupe key (idempotent)
-            dedupe_key = f"job_success:{job_id}:{idempotency_key}"
-            event = Event(
-                event_name=EventName.JOB_SUCCEEDED.value,
-                aggregate_type="Job",
-                aggregate_id=job_id,
-                workflow_id=workflow_id,
-                job_id=job_id,
-                payload={},
-                dedupe_key=dedupe_key,
-                occurred_at=later,
-            )
+        # Emit event with dedupe key (idempotent)
+        dedupe_key = f"job_success:{job_id}:{idempotency_key}"
+        event = Event(
+            event_name=EventName.JOB_SUCCEEDED.value,
+            aggregate_type="Job",
+            aggregate_id=job_id,
+            workflow_id=workflow_id,
+            job_id=job_id,
+            payload={},
+            dedupe_key=dedupe_key,
+            occurred_at=later,
+        )
         uow.session.add(event)
         await uow.commit()
 
     # Verify exactly one event exists
     async with unit_of_work(session_factory) as uow:
-            event_count_after = await uow.session.scalar(
-                select(Event)
-                .where(
-                    Event.workflow_id == workflow_id,
-                    Event.job_id == job_id,
-                )
-                .count()
+        event_count_after = await uow.session.scalar(
+            select(Event)
+            .where(
+                Event.workflow_id == workflow_id,
+                Event.job_id == job_id,
             )
+            .count()
+        )
         assert event_count_after == 1, (
             f"Expected exactly 1 event (idempotent), got {event_count_after}"
         )
@@ -280,46 +280,46 @@ async def test_double_execution_prevented_by_for_update_skip_locked(
 
     async def execute_worker1():
         async with unit_of_work(session_factory) as uow1:
-                claimed = await claim_ready_job(
+            claimed = await claim_ready_job(
+                uow1.session,
+                worker_id=worker1_id,
+                now=now,
+                lease_duration=lease_duration,
+            )
+            if claimed:
+                execution_count.append(1)
+                # Simulate execution
+                await asyncio.sleep(0.1)
+                await release_lease(
                     uow1.session,
+                    job_id=claimed.id,
                     worker_id=worker1_id,
+                    final_status=JobStatus.SUCCEEDED,
                     now=now,
-                    lease_duration=lease_duration,
                 )
-                if claimed:
-                    execution_count.append(1)
-                    # Simulate execution
-                    await asyncio.sleep(0.1)
-                    await release_lease(
-                        uow1.session,
-                        job_id=claimed.id,
-                        worker_id=worker1_id,
-                        final_status=JobStatus.SUCCEEDED,
-                        now=now,
-                    )
-            await uow1.commit()
+                await uow1.commit()
         return claimed
 
     async def execute_worker2():
         async with unit_of_work(session_factory) as uow2:
-                claimed = await claim_ready_job(
+            claimed = await claim_ready_job(
+                uow2.session,
+                worker_id=worker2_id,
+                now=now,
+                lease_duration=lease_duration,
+            )
+            if claimed:
+                execution_count.append(2)
+                # Simulate execution
+                await asyncio.sleep(0.1)
+                await release_lease(
                     uow2.session,
+                    job_id=claimed.id,
                     worker_id=worker2_id,
+                    final_status=JobStatus.SUCCEEDED,
                     now=now,
-                    lease_duration=lease_duration,
                 )
-                if claimed:
-                    execution_count.append(2)
-                    # Simulate execution
-                    await asyncio.sleep(0.1)
-                    await release_lease(
-                        uow2.session,
-                        job_id=claimed.id,
-                        worker_id=worker2_id,
-                        final_status=JobStatus.SUCCEEDED,
-                        now=now,
-                    )
-                    await uow2.commit()
+                await uow2.commit()
             return claimed
 
     # Run both workers concurrently
