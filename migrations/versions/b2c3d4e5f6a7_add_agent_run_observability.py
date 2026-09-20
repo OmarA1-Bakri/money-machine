@@ -19,10 +19,9 @@ depends_on = None
 
 def upgrade() -> None:
     """Extend agent_runs with observability fields and add agent_tool_calls."""
-    op.add_column(
-        "agent_runs",
-        sa.Column("run_number", sa.Integer(), server_default="1", nullable=False),
-    )
+    op.add_column("agent_runs", sa.Column("run_number", sa.Integer(), nullable=True))
+    op.execute("UPDATE agent_runs SET run_number = 1 WHERE run_number IS NULL")
+    op.alter_column("agent_runs", "run_number", nullable=False)
     op.add_column("agent_runs", sa.Column("model", sa.String(length=100), nullable=True))
     op.add_column("agent_runs", sa.Column("input_hash", sa.String(length=64), nullable=True))
     op.add_column("agent_runs", sa.Column("token_count", sa.Integer(), nullable=True))
