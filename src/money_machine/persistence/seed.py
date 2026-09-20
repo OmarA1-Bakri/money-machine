@@ -205,7 +205,7 @@ async def _seed_prompt_versions(
     """Seed both implementation prompts and agent prompts."""
     created = 0
     corrected = 0
-    
+
     # Seed implementation prompts (session prompts)
     impl_prompts = sorted((repository_root / "prompts/implementation").glob(PROMPT_GLOB))
     for prompt in impl_prompts:
@@ -236,7 +236,7 @@ async def _seed_prompt_versions(
             existing.source_path = source_path
             existing.prompt_reference = reference
             corrected += 1
-    
+
     # Seed agent prompts from prompts/agents/<agent-id>/<version>.md
     agents_dir = repository_root / "prompts" / "agents"
     if agents_dir.exists():
@@ -271,7 +271,11 @@ async def _seed_prompt_versions(
                 if inserted:
                     continue
                 existing = (
-                    (await session.execute(select(PromptVersion).where(PromptVersion.sha256 == digest)))
+                    (
+                        await session.execute(
+                            select(PromptVersion).where(PromptVersion.sha256 == digest)
+                        )
+                    )
                     .scalars()
                     .one()
                 )
@@ -279,7 +283,7 @@ async def _seed_prompt_versions(
                     existing.source_path = source_path
                     existing.prompt_reference = reference
                     corrected += 1
-    
+
     return created, corrected
 
 

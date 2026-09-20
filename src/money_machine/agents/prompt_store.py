@@ -125,9 +125,7 @@ class PromptStore:
         Raises:
             PromptValidationError: If any required section is missing.
         """
-        missing_sections = [
-            section for section in REQUIRED_SECTIONS if section not in content
-        ]
+        missing_sections = [section for section in REQUIRED_SECTIONS if section not in content]
 
         if missing_sections:
             msg = (

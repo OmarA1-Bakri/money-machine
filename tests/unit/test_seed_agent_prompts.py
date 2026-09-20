@@ -123,9 +123,7 @@ async def test_seed_agent_prompts(
     # Verify A01 prompt was seeded
     a01_prompt = (
         await db_session.execute(
-            select(PromptVersion).where(
-                PromptVersion.prompt_reference == "agent://A01/system/v1"
-            )
+            select(PromptVersion).where(PromptVersion.prompt_reference == "agent://A01/system/v1")
         )
     ).scalar_one_or_none()
 
@@ -137,9 +135,7 @@ async def test_seed_agent_prompts(
     # Verify A02 prompt was seeded
     a02_prompt = (
         await db_session.execute(
-            select(PromptVersion).where(
-                PromptVersion.prompt_reference == "agent://A02/system/v1"
-            )
+            select(PromptVersion).where(PromptVersion.prompt_reference == "agent://A02/system/v1")
         )
     ).scalar_one_or_none()
 
@@ -170,12 +166,14 @@ async def test_seed_agent_prompts_idempotent(
 
     # Verify count hasn't changed
     count = (
-        await db_session.execute(
-            select(PromptVersion).where(
-                PromptVersion.prompt_reference.like("agent://%")
+        (
+            await db_session.execute(
+                select(PromptVersion).where(PromptVersion.prompt_reference.like("agent://%"))
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     assert len(count) == created_first
 
@@ -193,9 +191,7 @@ async def test_seed_corrects_drifted_agent_prompts(
     # Manually drift the source_path
     a01_prompt = (
         await db_session.execute(
-            select(PromptVersion).where(
-                PromptVersion.prompt_reference == "agent://A01/system/v1"
-            )
+            select(PromptVersion).where(PromptVersion.prompt_reference == "agent://A01/system/v1")
         )
     ).scalar_one()
 
@@ -211,9 +207,7 @@ async def test_seed_corrects_drifted_agent_prompts(
     # Verify correction
     corrected = (
         await db_session.execute(
-            select(PromptVersion).where(
-                PromptVersion.prompt_reference == "agent://A01/system/v1"
-            )
+            select(PromptVersion).where(PromptVersion.prompt_reference == "agent://A01/system/v1")
         )
     ).scalar_one()
 
@@ -238,9 +232,7 @@ async def test_seed_agent_prompts_hash_matches_file(
     # Verify hash in database matches file
     a01_prompt = (
         await db_session.execute(
-            select(PromptVersion).where(
-                PromptVersion.prompt_reference == "agent://A01/system/v1"
-            )
+            select(PromptVersion).where(PromptVersion.prompt_reference == "agent://A01/system/v1")
         )
     ).scalar_one()
 
@@ -310,17 +302,13 @@ Allowed: v2
     # Verify both versions were seeded
     v1_prompt = (
         await db_session.execute(
-            select(PromptVersion).where(
-                PromptVersion.prompt_reference == "agent://A01/system/v1"
-            )
+            select(PromptVersion).where(PromptVersion.prompt_reference == "agent://A01/system/v1")
         )
     ).scalar_one()
 
     v2_prompt = (
         await db_session.execute(
-            select(PromptVersion).where(
-                PromptVersion.prompt_reference == "agent://A01/system/v2"
-            )
+            select(PromptVersion).where(PromptVersion.prompt_reference == "agent://A01/system/v2")
         )
     ).scalar_one()
 

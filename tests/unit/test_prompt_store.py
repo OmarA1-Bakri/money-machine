@@ -155,9 +155,7 @@ def test_load_file_not_found(prompts_root: Path) -> None:
         store.load("A99", "v1", expected_hash=None)
 
 
-def test_load_missing_required_section(
-    prompts_root: Path, prompt_missing_section: str
-) -> None:
+def test_load_missing_required_section(prompts_root: Path, prompt_missing_section: str) -> None:
     """Load fails when required section is missing."""
     agent_dir = prompts_root / "prompts" / "agents" / "A01"
     agent_dir.mkdir(parents=True, exist_ok=True)
