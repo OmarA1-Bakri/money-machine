@@ -10,14 +10,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Protocol, TypedDict
+from typing import NotRequired, Protocol, TypedDict
 
 from pydantic import BaseModel, Field
-
-try:
-    from typing import NotRequired
-except ImportError:
-    from typing_extensions import NotRequired
 
 
 class EtsyObservationDict(TypedDict):
