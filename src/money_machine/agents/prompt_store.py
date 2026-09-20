@@ -21,18 +21,16 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Final
 
-from money_machine.domain.errors import ContractError
 
-
-class PromptIntegrityError(ContractError):
+class PromptIntegrityError(ValueError):
     """Raised when a prompt's SHA-256 hash does not match the stored hash."""
 
 
-class PromptValidationError(ContractError):
+class PromptValidationError(ValueError):
     """Raised when a prompt is missing required sections."""
 
 
-class PromptSecretError(ContractError):
+class PromptSecretError(ValueError):
     """Raised when a prompt contains embedded secrets."""
 
 
