@@ -243,9 +243,9 @@ class TestOpenAIProviderConfiguration:
     def test_reads_api_key_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Provider reads API key from environment."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-        
+
         from money_machine.integrations.llm import OpenAIProvider
-        
+
         provider = OpenAIProvider()
         # Test via a method call rather than accessing protected member
         assert hasattr(provider, "_api_key")
@@ -253,9 +253,9 @@ class TestOpenAIProviderConfiguration:
     def test_api_key_parameter_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """API key parameter overrides environment."""
         monkeypatch.setenv("OPENAI_API_KEY", "env-key")
-        
+
         from money_machine.integrations.llm import OpenAIProvider
-        
+
         provider = OpenAIProvider(api_key="param-key")
         # Test via a method call rather than accessing protected member
         assert hasattr(provider, "_api_key")
@@ -263,9 +263,9 @@ class TestOpenAIProviderConfiguration:
     def test_default_base_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Provider uses default OpenAI base URL."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-        
+
         from money_machine.integrations.llm import OpenAIProvider
-        
+
         provider = OpenAIProvider()
         # Test via a method call rather than accessing protected member
         assert hasattr(provider, "_base_url")
@@ -274,9 +274,9 @@ class TestOpenAIProviderConfiguration:
         """Provider reads base URL from environment."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         monkeypatch.setenv("OPENAI_BASE_URL", "https://custom.api.com/v1")
-        
+
         from money_machine.integrations.llm import OpenAIProvider
-        
+
         provider = OpenAIProvider()
         # Test via a method call rather than accessing protected member
         assert hasattr(provider, "_base_url")
@@ -285,9 +285,9 @@ class TestOpenAIProviderConfiguration:
         """Base URL parameter overrides environment."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         monkeypatch.setenv("OPENAI_BASE_URL", "https://env.api.com/v1")
-        
+
         from money_machine.integrations.llm import OpenAIProvider
-        
+
         provider = OpenAIProvider(base_url="https://param.api.com/v1")
         # Test via a method call rather than accessing protected member
         assert hasattr(provider, "_base_url")
@@ -295,9 +295,9 @@ class TestOpenAIProviderConfiguration:
     def test_default_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Provider uses default model."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-        
+
         from money_machine.integrations.llm import OpenAIProvider
-        
+
         provider = OpenAIProvider()
         # Test via a method call rather than accessing protected member
         assert hasattr(provider, "_default_model")

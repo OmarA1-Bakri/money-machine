@@ -61,7 +61,7 @@ def pydantic_to_json_schema(model: type[BaseModel]) -> dict[str, Any]:
                     # Inline the definition
                     resolved = cast(dict[str, Any], definitions[def_name])
                     return resolve_refs(dict(resolved), definitions)
-        
+
         # Recursively resolve in nested structures
         for key, value in list(obj.items()):
             if isinstance(value, dict):
