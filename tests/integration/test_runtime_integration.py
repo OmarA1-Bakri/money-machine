@@ -336,7 +336,7 @@ async def test_uncommissioned_agent_refuses_execution_on_production_path(
             await seed(uow.session)
             shop = await make_shop(uow.session)
             workflow = await make_workflow(uow.session, shop_id=shop.id)
-            
+
             # Create a job for A03 (Market Research) which is DESIGNED
             job = await _make_schedule_configuration_job(
                 uow.session,
@@ -369,10 +369,10 @@ async def test_uncommissioned_agent_refuses_execution_on_production_path(
                     production=True,
                 )
 
-            assert "DESIGNED" in str(exc_info.value) or \
-                   "not commissioned" in str(exc_info.value).lower(), (
-                f"Expected 'DESIGNED' or 'not commissioned' in error message, got: {exc_info.value}"
-            )
+            assert (
+                "DESIGNED" in str(exc_info.value)
+                or "not commissioned" in str(exc_info.value).lower()
+            ), f"Expected 'DESIGNED' or 'not commissioned' in error message, got: {exc_info.value}"
 
     finally:
         await engine.dispose()
@@ -397,7 +397,7 @@ async def test_tested_agent_executes_on_production_path(
             await seed(uow.session)
             shop = await make_shop(uow.session)
             workflow = await make_workflow(uow.session, shop_id=shop.id)
-            
+
             # Create a job for A01 (Shop Orchestrator) which is TESTED
             job = await _make_schedule_configuration_job(
                 uow.session,

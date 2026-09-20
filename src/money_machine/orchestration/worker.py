@@ -125,21 +125,21 @@ async def _execute_job_with_runner(
     try:
         # Convert Job row to JobEnvelope
         envelope = _job_envelope(job)
-        
+
         # Load agent implementation
         definition = runner.definition_for_job(envelope)
-        
+
         # Import the agent class dynamically
         from money_machine.agents.implementations import (
             account_integration,
             shop_orchestrator,
         )
-        
+
         agent_map = {
             "A01": shop_orchestrator.ShopOrchestratorAgent,
             "A02": account_integration.AccountIntegrationAgent,
         }
-        
+
         agent_class = agent_map.get(definition.agent_id)
         if agent_class is None:
             LOGGER.error(
@@ -152,9 +152,9 @@ async def _execute_job_with_runner(
             job.updated_at = now
             await uow.commit()
             return None
-        
+
         agent = agent_class()
-        
+
         # Execute via AgentRunner (handles commissioning state check internally)
         result, receipt = await runner.execute(
             uow.session,
@@ -163,7 +163,7 @@ async def _execute_job_with_runner(
             production=True,
             run_at=now,
         )
-        
+
         # Heartbeat the lease to prevent expiry during execution
         await heartbeat_lease(
             uow.session,
@@ -171,10 +171,10 @@ async def _execute_job_with_runner(
             worker_id=worker_id,
             now=now,
         )
-        
+
         # Determine final status from result
         from money_machine.domain.enums import AgentRunStatus
-        
+
         if result.status == AgentRunStatus.SUCCESS:
             final_status = JobStatus.SUCCEEDED
         elif result.status == AgentRunStatus.FAILURE:
@@ -182,7 +182,7 @@ async def _execute_job_with_runner(
         else:
             # BLOCKED or other non-terminal status
             final_status = JobStatus.BLOCKED
-        
+
         # Release lease with final status
         await release_lease(
             uow.session,
@@ -191,7 +191,7 @@ async def _execute_job_with_runner(
             final_status=final_status,
             now=now,
         )
-        
+
         # Emit events from agent result
         if result.emitted_events:
             dispatcher = EventDispatcher(uow)
@@ -205,9 +205,9 @@ async def _execute_job_with_runner(
                     payload=dict(result.output),
                     occurred_at=now,
                 )
-        
+
         await uow.commit()
-        
+
         LOGGER.info(
             "Job %s completed with status %s (agent %s, run %s)",
             job.id,
@@ -215,9 +215,9 @@ async def _execute_job_with_runner(
             definition.agent_id,
             receipt.run_id,
         )
-        
+
         return result
-        
+
     except AgentNotCommissionedError as error:
         LOGGER.error(
             "Agent not commissioned for job %s: %s; failing job",
@@ -236,7 +236,7 @@ async def _execute_job_with_runner(
         )
         await uow.commit()
         return None
-        
+
     except TransitionError as error:
         LOGGER.error(
             "Job transition error for job %s: %s",
@@ -245,7 +245,7 @@ async def _execute_job_with_runner(
         )
         await uow.rollback()
         return None
-        
+
     except Exception as error:
         LOGGER.exception(
             "Unexpected error executing job %s: %s",
@@ -260,27 +260,27 @@ async def _worker_loop() -> None:
     """Main worker loop: claim jobs, execute via AgentRunner, emit events, create successors."""
     settings = load_runtime_settings()
     engine = create_engine(settings.database)
-    
+
     # Verify database connectivity
     if not await check_connectivity(engine):
         LOGGER.error("Database unreachable; cannot start worker")
         return
-    
+
     LOGGER.info("Database connectivity verified; starting worker loop")
-    
+
     # Initialize AgentRunner with FakeLLMProvider (Wave 9 determinism)
     repo_root = Path(__file__).parent.parent.parent.parent
     runner = AgentRunner.from_repository_root(
         repo_root,
         provider=FakeLLMProvider(),
     )
-    
+
     worker_id = deterministic_worker_id(1)
-    
+
     try:
         while True:
             now = datetime.now(UTC)
-            
+
             # Create a new session for each claim attempt
             async with UnitOfWork.from_engine(engine) as uow:
                 # Claim one READY job
@@ -290,12 +290,12 @@ async def _worker_loop() -> None:
                     now=now,
                     lease_duration=LEASE_DURATION,
                 )
-                
+
                 if job is None:
                     # No jobs available; wait and retry
                     await asyncio.sleep(CLAIM_POLL_INTERVAL.total_seconds())
                     continue
-                
+
                 LOGGER.info(
                     "Claimed job %s (type %s, agent %s, attempt %d/%d)",
                     job.id,
@@ -304,7 +304,7 @@ async def _worker_loop() -> None:
                     job.attempt,
                     job.max_attempts,
                 )
-                
+
                 # Execute job with runner
                 await _execute_job_with_runner(
                     runner,
@@ -323,15 +323,15 @@ def main() -> int:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    
+
     # Check commissioning evidence gates
     if not _check_commissioning_gates():
         LOGGER.error("Commissioning gates failed; worker exits 78 (fail-closed)")
         return unavailable("worker")
-    
+
     # Gates pass: run production claim loop
     LOGGER.info("Commissioning gates pass; starting production worker")
-    
+
     try:
         asyncio.run(_worker_loop())
         return 0

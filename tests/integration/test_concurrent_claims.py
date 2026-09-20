@@ -188,10 +188,12 @@ async def test_idempotent_reclaim_prevents_duplicate_events(
         # Check event count before re-claim
         async with UnitOfWork.from_engine(engine) as uow:
             event_count_before = await uow.session.scalar(
-                select(Event).where(
+                select(Event)
+                .where(
                     Event.workflow_id == workflow_id,
                     Event.job_id == job_id,
-                ).count()
+                )
+                .count()
             )
             # No events yet (crashed before emit)
             assert event_count_before == 0 or event_count_before is None
@@ -246,10 +248,12 @@ async def test_idempotent_reclaim_prevents_duplicate_events(
         # Verify exactly one event exists
         async with UnitOfWork.from_engine(engine) as uow:
             event_count_after = await uow.session.scalar(
-                select(Event).where(
+                select(Event)
+                .where(
                     Event.workflow_id == workflow_id,
                     Event.job_id == job_id,
-                ).count()
+                )
+                .count()
             )
             assert event_count_after == 1, (
                 f"Expected exactly 1 event (idempotent), got {event_count_after}"
