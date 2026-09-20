@@ -148,7 +148,10 @@ def check_dedupe(
                         EvidenceReference(
                             evidence_id=candidate_spec.spec_id,
                             evidence_kind="SPEC_IDENTITY_CATEGORY",
-                            reference=f"identity={candidate_spec.identity}, category={candidate_spec.base_category}",
+                            reference=(
+                                f"identity={candidate_spec.identity}, "
+                                f"category={candidate_spec.base_category}"
+                            ),
                         ),
                     ),
                 )
@@ -170,7 +173,11 @@ def check_dedupe(
                         EvidenceReference(
                             evidence_id=candidate_spec.spec_id,
                             evidence_kind="TITLE_TOKENS",
-                            reference=f"candidate={candidate_normalized}, existing={existing_normalized}, jaccard={similarity:.3f}",
+                            reference=(
+                                f"candidate={candidate_normalized}, "
+                                f"existing={existing_normalized}, "
+                                f"jaccard={similarity:.3f}"
+                            ),
                         ),
                     ),
                 )

@@ -8,13 +8,10 @@ Tests prove workflow linkage per Lane 4 scope:
 Contract: Session 05 Lane 4 — A06 Catalogue Dedupe + workflow link proving
 """
 
-from datetime import datetime, timezone
 from uuid import uuid4
 
-import pytest
-
 from money_machine.domain.enums import BranchOutcome
-from money_machine.domain.models.products import DedupeResult, ProductSpec
+from money_machine.domain.models.products import ProductSpec
 from money_machine.domain.services.dedupe import check_dedupe
 from tests.fixtures.products import (
     create_fixture_product_spec,

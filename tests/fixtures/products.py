@@ -4,7 +4,7 @@ These fixtures support testing without real competitor IP or live external data.
 Per D-0017 and Session 05 Lane 4 scope: simulation only, no copying.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from hashlib import sha256
 from uuid import UUID, uuid4
 
@@ -134,7 +134,7 @@ def create_fixture_product_spec(
         experiment_plan="Test color variants and hub prominence on conversions",
         concept_fingerprint=concept_fingerprint,
         source_evidence=evidence,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
 
@@ -206,7 +206,7 @@ def create_fixture_teardown_report(
         mechanics=mechanics,
         copied_protected_content=False,  # NEVER TRUE per D-0002, Lane 4 scope
         source_evidence=evidence,
-        completed_at=datetime.now(timezone.utc),
+        completed_at=datetime.now(UTC),
     )
 
 
@@ -242,8 +242,11 @@ def create_fixture_research_report(
         observations.append(
             ResearchObservation(
                 observation_id=obs_id,
-                source_reference=f"https://www.etsy.com/listing/{1234567890 + i}/fixture-listing-{i}",
-                observed_at=datetime.now(timezone.utc),
+                source_reference=(
+                    f"https://www.etsy.com/listing/{1234567890 + i}/"
+                    f"fixture-listing-{i}"
+                ),
+                observed_at=datetime.now(UTC),
                 title=f"Fixture Digital Planner {i + 1}",
                 shop_reference=f"FixtureShop{i % 10}",
                 facts={
@@ -256,7 +259,10 @@ def create_fixture_research_report(
                     EvidenceReference(
                         evidence_id=obs_id,
                         evidence_kind="FIXTURE_RESEARCH",
-                        reference=f"tests/fixtures/products.py::create_fixture_research_report obs {i}",
+                        reference=(
+                            "tests/fixtures/products.py::"
+                            f"create_fixture_research_report obs {i}"
+                        ),
                     ),
                 ),
             )
@@ -273,5 +279,5 @@ def create_fixture_research_report(
             "price_range": {"min": 7.99, "max": 7.99 + (observation_count * 0.50)},
             "young_fast_shops": observation_count // 3,
         },
-        completed_at=datetime.now(timezone.utc),
+        completed_at=datetime.now(UTC),
     )

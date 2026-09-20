@@ -11,6 +11,7 @@ Emits DEDUPE_PASSED or DEDUPE_FAILED event for workflow branching.
 
 from __future__ import annotations
 
+import contextlib
 from uuid import UUID
 
 from money_machine.agents.base import AgentContext, BaseAgent
@@ -19,7 +20,7 @@ from money_machine.domain.events import EventName
 from money_machine.domain.models._base import JsonObject
 from money_machine.domain.models.common import EvidenceReference
 from money_machine.domain.models.jobs import AgentResult
-from money_machine.domain.models.products import DedupeResult, ProductSpec
+from money_machine.domain.models.products import ProductSpec
 from money_machine.domain.services.dedupe import check_dedupe
 
 
@@ -95,11 +96,9 @@ class CatalogueDedupeAgent(BaseAgent):
         existing_specs: list[ProductSpec] = []
         if existing_specs_data and isinstance(existing_specs_data, list):
             for spec_data in existing_specs_data:
-                try:
-                    existing_specs.append(ProductSpec.model_validate(spec_data))
-                except Exception:
+                with contextlib.suppress(Exception):
                     # Skip invalid specs (shouldn't happen but be defensive)
-                    pass
+                    existing_specs.append(ProductSpec.model_validate(spec_data))
 
         # Run dedupe check
         dedupe_result = check_dedupe(
@@ -158,7 +157,10 @@ class CatalogueDedupeAgent(BaseAgent):
                 output={},
                 error={
                     "code": "INVALID_OUTCOME",
-                    "message": f"DedupeResult outcome must be PASS or TOO_CLOSE, got {dedupe_result.outcome}",
+                    "message": (
+                        f"DedupeResult outcome must be PASS or TOO_CLOSE, "
+                        f"got {dedupe_result.outcome}"
+                    ),
                 },
             )
 
