@@ -48,25 +48,29 @@ def _check_commissioning_gates() -> bool:
     """Check commissioning evidence gates per D-0028.
 
     Verifies ALL of:
-    1. Agent definition loaded with TESTED/COMMISSIONED state
-    2. Prompt file exists at declared prompt_path
-    3. Tool registry loads successfully
-    4. Runtime settings valid (database config)
+    1. Runtime settings valid (database config)
+    2. Agent registry loads (config valid, tools resolve)
+    3. At least one agent is TESTED/COMMISSIONED
+    4. Prompt integrity: file exists, hash computable, sections present, no secrets
 
     Returns True if at least one agent passes ALL gates.
     Returns False if gates fail, causing worker to exit 78.
     """
-    try:
-        # Gate: Runtime settings valid (database config)
-        _ = load_runtime_settings()
-        LOGGER.debug("Gate 1/4: Runtime settings loaded")
+    import hashlib
 
-        # Gate: Agent registry loads (config valid, tools resolve)
+    from money_machine.agents.prompt_store import PromptStore
+
+    try:
+        # Gate 1: Runtime settings valid (database config)
+        _ = load_runtime_settings()
+        LOGGER.debug("Gate 1/5: Runtime settings loaded")
+
+        # Gate 2: Agent registry loads (config valid, tools resolve)
         repo_root = Path(__file__).parent.parent.parent.parent
         registry = AgentRegistry.from_yaml(repo_root)
-        LOGGER.debug("Gate 2/4: Agent registry loaded with %d agents", len(list(registry.roster())))
+        LOGGER.debug("Gate 2/5: Agent registry loaded with %d agents", len(list(registry.roster())))
 
-        # Gate: At least one agent is TESTED/COMMISSIONED
+        # Gate 3: At least one agent is TESTED/COMMISSIONED
         tested_or_commissioned = [
             defn
             for defn in registry.roster()
@@ -79,35 +83,77 @@ def _check_commissioning_gates() -> bool:
 
         if not tested_or_commissioned:
             LOGGER.error(
-                "Gate 3/4 FAILED: No TESTED or COMMISSIONED agents found; Exit 78 held. "
+                "Gate 3/5 FAILED: No TESTED or COMMISSIONED agents found; Exit 78 held. "
                 "Found %d agents total, all in state DESIGNED or earlier.",
                 len(list(registry.roster())),
             )
             return False
 
-        LOGGER.debug("Gate 3/4: Found %d TESTED/COMMISSIONED agents", len(tested_or_commissioned))
+        LOGGER.debug("Gate 3/5: Found %d TESTED/COMMISSIONED agents", len(tested_or_commissioned))
 
-        # Gate: Prompt files exist for TESTED/COMMISSIONED agents
-        # Prompt path: prompts/agents/<agent_id>/<system_prompt_reference>.md
-        agents_with_missing_prompts: list[str] = []
-        prompts_dir = repo_root / "prompts" / "agents"
+        # Gate 4: Tool registry loads successfully
+        from money_machine.tools.registry import ToolRegistry
+
+        tool_registry = ToolRegistry.canonical()
+        LOGGER.debug("Gate 4/5: Tool registry loaded with %d tools", len(tool_registry.all_tools()))
+
+        # Gate 5: Prompt integrity for TESTED/COMMISSIONED agents
+        # Per D-0028: file exists, SHA-256 computable, required sections present, no secrets
+        prompt_store = PromptStore(repo_root)
+        agents_with_prompt_failures: list[str] = []
+
         for agent_def in tested_or_commissioned:
-            prompt_file = (
-                prompts_dir / agent_def.agent_id / f"{agent_def.system_prompt_reference}.md"
-            )
-            if not prompt_file.exists():
-                agents_with_missing_prompts.append(
-                    f"{agent_def.agent_id} (expected: {prompt_file.relative_to(repo_root)})"
+            try:
+                # Compute hash from file
+                prompt_file = (
+                    repo_root
+                    / "prompts"
+                    / "agents"
+                    / agent_def.agent_id
+                    / f"{agent_def.system_prompt_reference}.md"
                 )
 
-        if agents_with_missing_prompts:
+                if not prompt_file.exists():
+                    agents_with_prompt_failures.append(
+                        f"{agent_def.agent_id}: file not found at {prompt_file.relative_to(repo_root)}"
+                    )
+                    continue
+
+                # Compute SHA-256 hash
+                digest = hashlib.sha256()
+                with prompt_file.open("rb") as source:
+                    for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                        digest.update(chunk)
+                computed_hash = digest.hexdigest()
+
+                # Verify prompt integrity: sections present, no secrets
+                # PromptStore.load() will validate sections and check for secrets
+                _ = prompt_store.load(
+                    agent_def.agent_id,
+                    agent_def.system_prompt_reference,
+                    expected_hash=computed_hash,
+                )
+
+                LOGGER.debug(
+                    "Prompt integrity verified for %s: %s (hash %s...)",
+                    agent_def.agent_id,
+                    agent_def.system_prompt_reference,
+                    computed_hash[:8],
+                )
+
+            except Exception as prompt_error:
+                agents_with_prompt_failures.append(
+                    f"{agent_def.agent_id}: {type(prompt_error).__name__}: {prompt_error}"
+                )
+
+        if agents_with_prompt_failures:
             LOGGER.error(
-                "Gate 4/4 FAILED: Prompt files missing for TESTED/COMMISSIONED agents: %s",
-                ", ".join(agents_with_missing_prompts),
+                "Gate 5/5 FAILED: Prompt integrity failures for TESTED/COMMISSIONED agents:\n%s",
+                "\n".join(f"  - {failure}" for failure in agents_with_prompt_failures),
             )
             return False
 
-        LOGGER.debug("Gate 4/4: All prompt files exist for TESTED/COMMISSIONED agents")
+        LOGGER.debug("Gate 5/5: All prompts verified (integrity + sections + no secrets)")
 
         # All gates pass
         LOGGER.info(
