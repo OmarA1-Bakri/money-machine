@@ -6,7 +6,7 @@ Loads decision definitions from YAML config files.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -79,8 +79,8 @@ class DecisionRegistry:
         if not isinstance(data, dict) or "decisions" not in data:
             raise ValueError(f"{yaml_file} must contain 'decisions' key")
 
-        # Type narrowing after isinstance check
-        yaml_data: dict[str, Any] = data
+        # Type narrowing after isinstance check - use cast to satisfy pyright
+        yaml_data = cast(dict[str, Any], data)
         decisions_list: list[Any] = yaml_data["decisions"]
 
         for decision_data in decisions_list:
