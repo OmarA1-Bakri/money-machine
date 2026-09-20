@@ -23,7 +23,7 @@ async def store_evaluation(
     packet: DecisionPacket,
     result: DecisionResult,
     decision_id: UUID | None = None,
-    derived: dict | None = None,
+    derived: dict[str, Any] | None = None,
 ) -> JevEvaluation:
     """Store a Jev evaluation result.
 

@@ -79,12 +79,15 @@ class DecisionRegistry:
         if not isinstance(data, dict) or "decisions" not in data:
             raise ValueError(f"{yaml_file} must contain 'decisions' key")
 
-        for decision_data in data["decisions"]:
+        # Type narrowing after isinstance check
+        yaml_data: dict[str, Any] = data
+
+        for decision_data in yaml_data["decisions"]:
             try:
                 # Parse questions
-                questions = []
+                questions: list[Question] = []
                 for q in decision_data["questions"]:
-                    q_type = q["question_type"]
+                    q_type: str = q["question_type"]
                     if q_type == "noul":
                         questions.append(NoulQuestion(**q))
                     elif q_type == "choice":
