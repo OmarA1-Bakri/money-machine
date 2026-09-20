@@ -82,7 +82,9 @@ async def test_fixture_adapter_returns_40_plus_listings():
 
 
 @pytest.mark.asyncio
-async def test_market_research_produces_25_40_observations(test_workflow, test_database, session_factory):
+async def test_market_research_produces_25_40_observations(
+    test_workflow, test_database, session_factory
+):
     """
     Anti-stub test: Assert 25-40 observations with real data.
 
