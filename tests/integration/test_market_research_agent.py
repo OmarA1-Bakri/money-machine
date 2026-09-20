@@ -27,7 +27,6 @@ class NonFixtureAdapter(EtsyResearchAdapter):
 
 
 @pytest.fixture
-
 async def test_workflow(test_database):
     """Create a test workflow for research."""
     async with AsyncSessionLocal() as session:
@@ -61,7 +60,6 @@ async def test_workflow(test_database):
 
 
 @pytest.mark.asyncio
-
 async def test_fixture_adapter_returns_40_plus_listings():
     """Test that fixture adapter has sufficient data."""
     adapter = FixtureEtsyAdapter()
@@ -75,7 +73,6 @@ async def test_fixture_adapter_returns_40_plus_listings():
 
 
 @pytest.mark.asyncio
-
 async def test_market_research_produces_25_40_observations(test_workflow, test_database):
     """
     Anti-stub test: Assert 25-40 observations with real data.
@@ -119,7 +116,6 @@ async def test_market_research_produces_25_40_observations(test_workflow, test_d
 
 
 @pytest.mark.asyncio
-
 async def test_shortlist_produces_5_candidates(test_workflow, test_database):
     """
     Anti-stub test: Assert exactly 5 candidates with complete data.
@@ -146,9 +142,7 @@ async def test_shortlist_produces_5_candidates(test_workflow, test_database):
             candidates = list(result.scalars().all())
 
     # Exactly 5 candidates (or up to 5 if fewer niches)
-    assert 1 <= len(candidates) <= 5, (
-        f"Expected 1-5 candidates, got {len(candidates)}"
-    )
+    assert 1 <= len(candidates) <= 5, f"Expected 1-5 candidates, got {len(candidates)}"
 
     # Each has non-empty identity and category
     for candidate in candidates:
@@ -172,7 +166,6 @@ async def test_shortlist_produces_5_candidates(test_workflow, test_database):
 
 
 @pytest.mark.asyncio
-
 async def test_research_persists_to_database(test_workflow, test_database):
     """Test that ResearchRun is created and marked complete."""
     workflow, job = test_workflow
@@ -196,7 +189,6 @@ async def test_research_persists_to_database(test_workflow, test_database):
 
 
 @pytest.mark.asyncio
-
 async def test_nullable_fields_preserved(test_workflow, test_database):
     """
     Test that missing fixture data is stored as NULL, not fabricated.
@@ -229,7 +221,6 @@ async def test_nullable_fields_preserved(test_workflow, test_database):
 
 
 @pytest.mark.asyncio
-
 async def test_duplicate_source_reference_handling(test_workflow, test_database):
     """
     Test that duplicate source references within one run are deduplicated.
@@ -250,7 +241,6 @@ async def test_duplicate_source_reference_handling(test_workflow, test_database)
 
 
 @pytest.mark.asyncio
-
 async def test_uncommissioned_non_fixture_adapter_raises(test_workflow):
     """Test that non-fixture adapters are rejected while uncommissioned."""
     workflow, job = test_workflow
@@ -264,7 +254,6 @@ async def test_uncommissioned_non_fixture_adapter_raises(test_workflow):
 
 
 @pytest.mark.asyncio
-
 async def test_empty_seed_phrases_raises():
     """Test that missing seed phrases fail fast with clear error."""
     # Create temporary config without seed phrases
@@ -297,7 +286,6 @@ async def test_empty_seed_phrases_raises():
 
 
 @pytest.mark.asyncio
-
 async def test_young_and_fast_shop_detection(test_workflow, test_database):
     """Test that young-and-fast shops are identified in shortlist analysis."""
     workflow, job = test_workflow
@@ -316,19 +304,16 @@ async def test_young_and_fast_shop_detection(test_workflow, test_database):
         stmt = select(MarketShopObservation).where(
             MarketShopObservation.research_run_id == report.research_run_id,
             MarketShopObservation.shop_opened_on >= cutoff,
-            MarketShopObservation.shop_sales >= 400
+            MarketShopObservation.shop_sales >= 400,
         )
         result = await session.execute(stmt)
         young_fast_shops = list(result.scalars().all())
 
         # Fixture data includes young-and-fast shops
-        assert len(young_fast_shops) > 0, (
-        "Expected to find young-and-fast shops in fixture data"
-    )
+        assert len(young_fast_shops) > 0, "Expected to find young-and-fast shops in fixture data"
 
 
 @pytest.mark.asyncio
-
 async def test_price_bands_extracted(test_workflow, test_database):
     """Test that price ranges are calculated for each candidate."""
     workflow, job = test_workflow
@@ -338,6 +323,7 @@ async def test_price_bands_extracted(test_workflow, test_database):
 
     # Group observations by identity to verify price diversity
     from collections import defaultdict
+
     niche_prices = defaultdict(list)
 
     for obs in report.listing_observations:
@@ -351,19 +337,14 @@ async def test_price_bands_extracted(test_workflow, test_database):
         if len(prices) >= 2
     }
 
-    assert len(price_ranges) > 0, (
-        "Expected at least one niche with price diversity"
-    )
+    assert len(price_ranges) > 0, "Expected at least one niche with price diversity"
 
     # Verify range exists (min < max)
     for niche, (min_price, max_price) in price_ranges.items():
-        assert min_price <= max_price, (
-        f"Invalid price range for {niche}: {min_price} > {max_price}"
-    )
+        assert min_price <= max_price, f"Invalid price range for {niche}: {min_price} > {max_price}"
 
 
 @pytest.mark.asyncio
-
 async def test_risk_notes_generated(test_workflow, test_database):
     """Test that risk notes are generated for each candidate."""
     workflow, job = test_workflow
@@ -386,7 +367,6 @@ async def test_risk_notes_generated(test_workflow, test_database):
 
 
 @pytest.mark.asyncio
-
 async def test_observation_count_matches_report(test_workflow, test_database):
     """Test that ResearchRun.observation_count matches actual observations."""
     workflow, job = test_workflow
