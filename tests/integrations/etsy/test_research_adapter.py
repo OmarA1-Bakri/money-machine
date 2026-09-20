@@ -253,11 +253,11 @@ class TestEtsyFixtureAdapterWithRealData:
     def test_adapter_loads_real_fixtures(self):
         """Adapter must successfully load real fixture file."""
         adapter = EtsyFixtureAdapter()  # Uses default path
-        
+
         # Should be able to load at least one seed phrase
         observations = adapter.search("digital planner", target_count=30)
         assert 25 <= len(observations) <= 30
-        
+
         # All observations must parse correctly
         for obs in observations:
             assert isinstance(obs, EtsyResearchObservation)
