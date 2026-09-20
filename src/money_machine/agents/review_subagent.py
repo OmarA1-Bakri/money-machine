@@ -120,10 +120,7 @@ class ReviewSubagentCoordinator:
             prompt_version=f"review:{request.specialist_role}",
         )
         token_count = response.metadata.total_tokens
-        if (
-            token_count is not None
-            and token_count > self.bounds.max_tokens_per_review
-        ):
+        if token_count is not None and token_count > self.bounds.max_tokens_per_review:
             msg = (
                 f"review token budget exceeded for job {self.job_id}: "
                 f"{token_count} > {self.bounds.max_tokens_per_review}"
@@ -159,4 +156,3 @@ class ReviewSubagentCoordinator:
     def review_count(self) -> int:
         """Number of review subagents invoked for this owning run."""
         return self._review_count
-
