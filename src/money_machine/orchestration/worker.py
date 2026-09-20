@@ -58,7 +58,7 @@ def _check_commissioning_gates() -> bool:
     """
     try:
         # Gate: Runtime settings valid (database config)
-        settings = load_runtime_settings()
+        _ = load_runtime_settings()
         LOGGER.debug("Gate 1/4: Runtime settings loaded")
 
         # Gate: Agent registry loads (config valid, tools resolve)
