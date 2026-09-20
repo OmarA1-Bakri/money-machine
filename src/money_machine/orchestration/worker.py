@@ -92,7 +92,7 @@ def _check_commissioning_gates() -> bool:
         LOGGER.debug("Gate 3/5: Found %d TESTED/COMMISSIONED agents", len(tested_or_commissioned))
 
         # Gate 4: Tool registry loads successfully
-        from money_machine.tools.registry import ToolRegistry
+        from money_machine.agents.tool_registry import ToolRegistry
 
         tool_registry = ToolRegistry.canonical()
         LOGGER.debug("Gate 4/5: Tool registry loaded with %d tools", len(tool_registry.all_tools()))
