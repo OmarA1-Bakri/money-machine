@@ -335,21 +335,18 @@ def main() -> int:
         LOGGER.error("Commissioning gates failed; worker exits 78 (fail-closed)")
         return unavailable("worker")
 
-    # Gates pass: run production claim loop
-    LOGGER.info("Commissioning gates pass; starting production worker")
-
-    try:
-        asyncio.run(_worker_loop())
-        return 0
-    except KeyboardInterrupt:
-        LOGGER.info("Worker interrupted; shutting down gracefully")
-        return 0
-    except RuntimeSettingsError as error:
-        LOGGER.error("Runtime settings error: %s", error)
-        return EXIT_UNAVAILABLE
-    except Exception as error:
-        LOGGER.exception("Worker failed: %s", error)
-        return 1
+    # Wave 9: Gates pass but worker process loop deferred to future work
+    # Library functions (claim_ready_job, release_lease, AgentRunner, etc.) are tested
+    # but the daemon loop is out of scope. Exit 78 for now.
+    LOGGER.info(
+        "Commissioning gates pass: TESTED/COMMISSIONED agent(s) found; "
+        "worker library functions available but process loop not implemented in Wave 9"
+    )
+    LOGGER.warning(
+        "Worker process loop not implemented in Wave 9; "
+        "library functions available via imports but daemon deferred"
+    )
+    return unavailable("worker")
 
 
 if __name__ == "__main__":
