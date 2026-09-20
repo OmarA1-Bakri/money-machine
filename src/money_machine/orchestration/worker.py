@@ -259,8 +259,12 @@ async def _execute_job_with_runner(
         return None
 
 
-async def _worker_loop() -> None:
-    """Main worker loop: claim jobs, execute via AgentRunner, emit events, create successors."""
+async def _worker_loop() -> None:  # pyright: ignore[reportUnusedFunction]
+    """Main worker loop: claim jobs, execute via AgentRunner, emit events, create successors.
+
+    Wave 9: Implementation complete but process entrypoint deferred. Library functions
+    are tested via test_runtime_integration.py. Daemon loop will be activated in future wave.
+    """
     settings = load_runtime_settings()
     engine = create_engine(settings.database)
 
