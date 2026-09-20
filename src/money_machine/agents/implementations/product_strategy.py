@@ -13,9 +13,10 @@ import hashlib
 import json
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import cast
 from uuid import UUID, uuid4
 
-from money_machine.agents.base import BaseAgent
+from money_machine.agents.base import AgentContext, BaseAgent
 from money_machine.agents.contracts.product_strategy import (
     ProductStrategyInput,
     ProductStrategyResult,
@@ -23,7 +24,9 @@ from money_machine.agents.contracts.product_strategy import (
     ScoringReasoning,
 )
 from money_machine.domain.enums import AgentRunStatus
+from money_machine.domain.models._base import JsonObject
 from money_machine.domain.models.common import ContractError, EvidenceReference
+from money_machine.domain.models.jobs import AgentResult
 from money_machine.domain.models.product_spec import ColourToken, Hub, ProductSpec
 from money_machine.domain.models.research import ProductCandidate
 
@@ -31,10 +34,12 @@ from money_machine.domain.models.research import ProductCandidate
 class A05ProductStrategy(BaseAgent):
     """Low-Ticket scorer and ProductSpec generator."""
 
-    def execute(self, input_data: dict) -> dict:
+    agent_id = "A05"
+
+    async def execute(self, context: AgentContext) -> AgentResult:
         """Score candidates and generate ProductSpec for qualified primary."""
         try:
-            strategy_input = ProductStrategyInput.model_validate(input_data)
+            strategy_input = ProductStrategyInput.model_validate(context.job.input)
 
             # Score all candidates
             scored = self._score_candidates(strategy_input)
@@ -56,7 +61,7 @@ class A05ProductStrategy(BaseAgent):
                     primary.candidate,
                     strategy_input.workflow_id,
                     strategy_input.job_id,
-                    uuid4(),  # agent_run_id placeholder
+                    context.agent_run_id,
                     strategy_input.research_run_id,
                 )
 
@@ -64,11 +69,11 @@ class A05ProductStrategy(BaseAgent):
             evidence = self._collect_evidence(scored, strategy_input)
 
             result = ProductStrategyResult(
-                agent_run_id=uuid4(),  # Will be set by AgentRunner
-                agent_id="A05",
-                agent_definition_version=1,
-                prompt_reference="prompts/agents/a05_product_strategy_v1.md",
-                prompt_sha256=self._compute_prompt_hash(),
+                agent_run_id=context.agent_run_id,
+                agent_id=self.agent_id,
+                agent_definition_version=context.definition.contract_version,
+                prompt_reference=context.prompt_reference,
+                prompt_sha256=context.prompt_sha256,
                 status=AgentRunStatus.SUCCESS,
                 job_id=strategy_input.job_id,
                 workflow_id=strategy_input.workflow_id,
@@ -82,7 +87,17 @@ class A05ProductStrategy(BaseAgent):
                 completed_at=datetime.now(UTC),
             )
 
-            return result.model_dump()
+            return AgentResult(
+                job_id=context.job.job_id,
+                agent_run_id=context.agent_run_id,
+                agent_id=self.agent_id,
+                agent_definition_version=context.definition.contract_version,
+                prompt_reference=context.prompt_reference,
+                prompt_sha256=context.prompt_sha256,
+                status=AgentRunStatus.SUCCESS,
+                output=cast(JsonObject, result.model_dump()),
+                evidence=evidence,
+            )
 
         except Exception as e:
             error = ContractError(
@@ -90,23 +105,41 @@ class A05ProductStrategy(BaseAgent):
                 message=str(e),
                 retryable=False,
             )
-            return ProductStrategyResult(
-                agent_run_id=uuid4(),
-                agent_id="A05",
-                agent_definition_version=1,
-                prompt_reference="prompts/agents/a05_product_strategy_v1.md",
-                prompt_sha256=self._compute_prompt_hash(),
+            
+            # Extract job metadata from context or use defaults
+            job_id = context.job.job_id
+            workflow_id = getattr(context.job.input.get("workflow_id"), "hex", str(uuid4())) if isinstance(context.job.input.get("workflow_id"), UUID) else str(uuid4())
+            research_run_id = getattr(context.job.input.get("research_run_id"), "hex", str(uuid4())) if isinstance(context.job.input.get("research_run_id"), UUID) else str(uuid4())
+            
+            result = ProductStrategyResult(
+                agent_run_id=context.agent_run_id,
+                agent_id=self.agent_id,
+                agent_definition_version=context.definition.contract_version,
+                prompt_reference=context.prompt_reference,
+                prompt_sha256=context.prompt_sha256,
                 status=AgentRunStatus.FAILURE,
-                job_id=input_data.get("job_id", uuid4()),
-                workflow_id=input_data.get("workflow_id", uuid4()),
-                research_run_id=input_data.get("research_run_id", uuid4()),
+                job_id=UUID(workflow_id) if workflow_id else uuid4(),
+                workflow_id=UUID(workflow_id) if workflow_id else uuid4(),
+                research_run_id=UUID(research_run_id) if research_run_id else uuid4(),
                 scored_candidates=(),
                 primary_candidate=None,  # type: ignore
                 qualification_outcome="REJECTED",
                 evidence=(),
                 error=error,
                 completed_at=datetime.now(UTC),
-            ).model_dump()
+            )
+            
+            return AgentResult(
+                job_id=job_id,
+                agent_run_id=context.agent_run_id,
+                agent_id=self.agent_id,
+                agent_definition_version=context.definition.contract_version,
+                prompt_reference=context.prompt_reference,
+                prompt_sha256=context.prompt_sha256,
+                status=AgentRunStatus.FAILURE,
+                output=cast(JsonObject, result.model_dump()),
+                error=error,
+            )
 
     def _score_candidates(self, strategy_input: ProductStrategyInput) -> list[ScoredCandidate]:
         """Score each candidate across four dimensions."""
@@ -319,8 +352,3 @@ class A05ProductStrategy(BaseAgent):
             )
 
         return tuple(evidence)
-
-    def _compute_prompt_hash(self) -> str:
-        """Compute SHA-256 of the agent prompt."""
-        # Stub: would read actual prompt file
-        return hashlib.sha256(b"A05 Product Strategy v1 prompt content").hexdigest()
