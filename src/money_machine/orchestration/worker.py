@@ -121,18 +121,30 @@ def _check_commissioning_gates() -> bool:
 
         # Gate 7: Prompt integrity for TESTED/COMMISSIONED agents
         # Per D-0028: file exists, SHA-256 computable, required sections present, no secrets
+        from money_machine.agents.base import parse_system_prompt_reference
+
         prompt_store = PromptStore(repo_root)
         agents_with_prompt_failures: list[str] = []
 
         for agent_def in tested_or_commissioned:
             try:
-                # Compute hash from file
+                # Parse system_prompt_reference to get agent_id and version
+                # e.g. "agent://A01/system/v1" -> ("A01", "v1")
+                prompt_agent_id, prompt_version = parse_system_prompt_reference(
+                    agent_def.system_prompt_reference
+                )
+
+                # Verify agent_id matches
+                if prompt_agent_id != agent_def.agent_id:
+                    agents_with_prompt_failures.append(
+                        f"{agent_def.agent_id}: prompt reference agent mismatch "
+                        f"(expected {agent_def.agent_id}, got {prompt_agent_id})"
+                    )
+                    continue
+
+                # Construct prompt file path using parsed version
                 prompt_file = (
-                    repo_root
-                    / "prompts"
-                    / "agents"
-                    / agent_def.agent_id
-                    / f"{agent_def.system_prompt_reference}.md"
+                    repo_root / "prompts" / "agents" / agent_def.agent_id / f"{prompt_version}.md"
                 )
 
                 if not prompt_file.exists():
@@ -152,15 +164,15 @@ def _check_commissioning_gates() -> bool:
                 # Verify prompt integrity: sections present, no secrets
                 # PromptStore.load() will validate sections and check for secrets
                 _ = prompt_store.load(
-                    agent_def.agent_id,
-                    agent_def.system_prompt_reference,
+                    prompt_agent_id,
+                    prompt_version,
                     expected_hash=computed_hash,
                 )
 
                 LOGGER.debug(
                     "Prompt integrity verified for %s: %s (hash %s...)",
                     agent_def.agent_id,
-                    agent_def.system_prompt_reference,
+                    prompt_version,
                     computed_hash[:8],
                 )
 
