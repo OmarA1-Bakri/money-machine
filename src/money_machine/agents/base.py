@@ -8,7 +8,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Final, Self
+from typing import Any, Final, Self
 from uuid import UUID
 
 from money_machine.config.settings import AgentCommissioningState
@@ -30,6 +30,10 @@ class AgentRuntimeError(Exception):
 
 class AgentNotCommissionedError(AgentRuntimeError):
     """Raised when a production job targets an agent that is not executable."""
+
+
+class AgentNotImplementedError(AgentRuntimeError):
+    """Raised when no implementation exists for a registered agent (L2)."""
 
 
 class AgentRegistryError(AgentRuntimeError):
@@ -100,7 +104,7 @@ class AgentContext:
         """Alias for L2 compatibility."""
         return self.run_id
 
-    def invoke_tool(self, tool_id: str, **kwargs: object) -> object:
+    def invoke_tool(self, tool_id: str, **kwargs: object) -> Any:  # noqa: ANN401
         """L2: Invoke a tool through the registry with allowlist enforcement."""
         if self.tool_registry is None:
             raise AgentRuntimeError("ToolRegistry not available in context")
