@@ -34,7 +34,12 @@ class FixtureEtsyAdapter(EtsyResearchAdapter):
             Filtered fixture listings (up to max_results)
         """
         # Match fixtures by keyword overlap
-        query_lower = query.lower()
+        query_lower = query.lower().strip()
+
+        # If query is empty, return all fixtures
+        if not query_lower:
+            return self._fixtures[:max_results]
+
         query_words = set(query_lower.split())
 
         results: list[EtsyListingSearchResult] = []

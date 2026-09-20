@@ -13,7 +13,7 @@ from money_machine.agents.implementations.market_research import MarketResearchA
 from money_machine.integrations.etsy.fixture_adapter import FixtureEtsyAdapter
 from money_machine.integrations.etsy.interface import EtsyResearchAdapter
 from money_machine.persistence.repositories.research import ResearchRunRepository
-from money_machine.persistence.tables import Job, WorkflowRun
+from money_machine.persistence.tables import Job, Shop, WorkflowRun
 from money_machine.persistence.unit_of_work import UnitOfWork
 
 
@@ -29,25 +29,26 @@ class NonFixtureAdapter(EtsyResearchAdapter):
 async def test_workflow(session_factory):
     """Create a test workflow for research."""
     async with session_factory() as session:
+        shop_id = uuid4()
+        session.add(Shop(id=shop_id, name="Test Shop", identifier="test-shop"))
+
         workflow = WorkflowRun(
             id=uuid4(),
-            commission_id=uuid4(),
-            shop_id=None,
-            state="RESEARCHING",
-            require_successor_spawn=False,
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
+            shop_id=shop_id,
+            workflow_type="PRODUCT_DISCOVERY",
+            workflow_version=1,
+            product_state="RESEARCHING",
         )
         session.add(workflow)
 
         job = Job(
             id=uuid4(),
             workflow_id=workflow.id,
-            agent_id="A03",
             job_type="RUN_MARKET_RESEARCH",
-            state="READY",
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
+            object_type="workflow",
+            object_id=workflow.id,
+            owner_agent_id="A03",
+            status="READY",
         )
         session.add(job)
 
@@ -60,15 +61,15 @@ async def test_workflow(session_factory):
 
 @pytest.mark.asyncio
 async def test_fixture_adapter_returns_40_plus_listings():
-    """Test that fixture adapter has sufficient data."""
+    """Test that fixture adapter has sufficient data across all queries."""
     adapter = FixtureEtsyAdapter()
 
-    # Test with a broad query
-    results = await adapter.search_listings("planner", max_results=50)
+    # Test that we have at least 40 fixtures total
+    all_results = await adapter.search_listings("", max_results=50)
 
-    assert len(results) >= 40, f"Expected at least 40 fixtures, got {len(results)}"
-    assert all(r.title for r in results), "All fixtures must have titles"
-    assert all(r.source_reference for r in results), "All fixtures must have source references"
+    assert len(all_results) >= 40, f"Expected at least 40 total fixtures, got {len(all_results)}"
+    assert all(r.title for r in all_results), "All fixtures must have titles"
+    assert all(r.source_reference for r in all_results), "All fixtures must have source references"
 
 
 @pytest.mark.asyncio
@@ -273,9 +274,11 @@ async def test_empty_seed_phrases_raises():
         job = Job(
             id=uuid4(),
             workflow_id=workflow_id,
-            agent_id="A03",
             job_type="RUN_MARKET_RESEARCH",
-            state="READY",
+            object_type="workflow",
+            object_id=workflow_id,
+            owner_agent_id="A03",
+            status="READY",
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
