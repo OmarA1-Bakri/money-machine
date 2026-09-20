@@ -107,9 +107,7 @@ async def test_market_research_produces_25_40_observations(
 
     # Exactly 25-40 listing observations (hard bounds)
     obs_count = len(report.listing_observations)
-    assert 25 <= obs_count <= 40, (
-        f"Expected 25-40 observations (hard bounds), got {obs_count}"
-    )
+    assert 25 <= obs_count <= 40, f"Expected 25-40 observations (hard bounds), got {obs_count}"
 
     # All observations have required fields
     for obs in report.listing_observations:
