@@ -89,14 +89,14 @@ class EtsyResearchAdapter(Protocol):
 
 class EtsyFixtureAdapter:
     """Loads synthetic Etsy search results from test fixtures.
-    
+
     Safe for CI; no external calls. Primary adapter for development and testing.
     Fixture data must be at tests/fixtures/etsy_search_results.json.
     """
 
     def __init__(self, fixture_path: Path | None = None) -> None:
         """Initialize fixture adapter.
-        
+
         Args:
             fixture_path: Path to fixture JSON file. Defaults to
                 tests/fixtures/etsy_search_results.json relative to repo root.
@@ -109,14 +109,14 @@ class EtsyFixtureAdapter:
         target_count: int = 30,
     ) -> list[EtsyResearchObservation]:
         """Load observations from fixture file.
-        
+
         Args:
             phrase: Search phrase to look up in fixtures
             target_count: Maximum observations to return
-            
+
         Returns:
             List of synthetic observations for the phrase
-            
+
         Raises:
             FileNotFoundError: If fixture file doesn't exist
             KeyError: If phrase not found in fixtures
@@ -134,9 +134,7 @@ class EtsyFixtureAdapter:
                     break
                 current = current.parent
             else:
-                raise FileNotFoundError(
-                    "Could not find repo root; provide fixture_path explicitly"
-                )
+                raise FileNotFoundError("Could not find repo root; provide fixture_path explicitly")
 
         if not self.fixture_path.exists():
             raise FileNotFoundError(f"Fixture file not found: {self.fixture_path}")
