@@ -415,3 +415,21 @@ async def test_observation_count_matches_report(test_workflow, test_database, se
         f"ResearchRun.observation_count ({research_run.observation_count}) "
         f"doesn't match report observations ({len(report.listing_observations)})"
     )
+
+
+@pytest.mark.asyncio
+async def test_young_fast_shops_detected_in_shortlist(
+    test_workflow, test_database, session_factory
+):
+    """Test that young-and-fast shops are correctly linked to shortlist candidates."""
+    workflow, job = test_workflow
+
+    async with session_factory() as session:
+        uow = UnitOfWork(session)
+        report = await execute_market_research(workflow.id, job, uow)
+
+    # At least one candidate should have young-and-fast shops
+    young_fast_counts = [c.young_fast_shop_count for c in report.shortlist.candidates]
+    assert any(
+        count > 0 for count in young_fast_counts
+    ), f"Expected at least one candidate with young-and-fast shops, got counts: {young_fast_counts}"

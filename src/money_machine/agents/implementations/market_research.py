@@ -193,6 +193,7 @@ class MarketResearchAgent:
                     identity_niche=result.identity_niche,
                     base_category=result.base_category,
                     facts={
+                        "shop_reference": result.shop_reference,
                         "badges": result.badges,
                         "urgency_signals": result.urgency_signals,
                         "review_count": result.review_count,
@@ -323,8 +324,10 @@ class MarketResearchAgent:
 
             # Count shops and young-fast shops
             shop_refs = {
-                obs.source_reference.split("/")[-1] for obs in observations
-            }  # Simplified shop extraction
+                obs.facts.get("shop_reference")
+                for obs in observations
+                if isinstance(obs.facts.get("shop_reference"), str)
+            }
             shops = [shop_lookup.get(ref) for ref in shop_refs if ref in shop_lookup]
             shop_count = len([s for s in shops if s is not None])
 
