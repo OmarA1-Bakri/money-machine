@@ -1,11 +1,14 @@
 """Unit tests for Jev integration client, models, and registry.
 
-Tests JevClient interface, FakeJevProvider, DecisionRegistry, and shadow hooks.
+Tests JevClient interface, FakeJevProvider, DecisionRegistry, and real client behavior
+with httpx mocking (mirrors W2 OpenAIProvider bar).
 """
 
 from __future__ import annotations
 
+import httpx
 import pytest
+import respx
 from pydantic import ValidationError
 
 from money_machine.integrations.jev import (
@@ -15,6 +18,7 @@ from money_machine.integrations.jev import (
     DecisionResult,
     FakeJevProvider,
     JevClientError,
+    JevGatewayClient,
     JevTimeoutError,
     NoulQuestion,
     ScoreLevel,
@@ -322,3 +326,109 @@ class TestDecisionRegistry:
         registry = DecisionRegistry()
 
         assert len(registry) == 12
+
+
+class TestJevGatewayClient:
+    """Tests for real JevGatewayClient with httpx mocking (mirrors W2 OpenAIProvider bar)."""
+
+    @pytest.fixture
+    def mock_gateway_url(self) -> str:
+        """Mock Jev Gateway URL."""
+        return "https://jev-gateway.test"
+
+    @pytest.fixture
+    def client(self, mock_gateway_url: str) -> JevGatewayClient:
+        """Create a real client pointing at mock URL."""
+        return JevGatewayClient(base_url=mock_gateway_url, api_key="test-key")
+
+    @pytest.fixture
+    def packet(self) -> DecisionPacket:
+        """Sample decision packet."""
+        return DecisionPacket(
+            decision_type="preflight_blockers_present",
+            context={"workflow_id": "test-123"},
+            questions=[
+                NoulQuestion(question_id="has_blockers", prompt="Any blockers?"),
+            ],
+        )
+
+    @respx.mock
+    async def test_happy_path_structured_response(
+        self, client: JevGatewayClient, packet: DecisionPacket, mock_gateway_url: str
+    ) -> None:
+        """Happy path: client sends request and parses structured response."""
+        mock_response = {
+            "decision_type": "preflight_blockers_present",
+            "answers": {"has_blockers": False},
+            "model_id": "jev-production-1.2",
+            "latency_ms": 250,
+        }
+
+        respx.post(f"{mock_gateway_url}/evaluate").mock(
+            return_value=httpx.Response(200, json=mock_response)
+        )
+
+        result = await client.evaluate(packet, timeout=5.0)
+
+        assert result.decision_type == "preflight_blockers_present"
+        assert result.answers == {"has_blockers": False}
+        assert result.model_id == "jev-production-1.2"
+        assert result.latency_ms == 250
+
+    @respx.mock
+    async def test_timeout_behavior(
+        self, client: JevGatewayClient, packet: DecisionPacket, mock_gateway_url: str
+    ) -> None:
+        """Client raises JevTimeoutError on timeout."""
+        respx.post(f"{mock_gateway_url}/evaluate").mock(side_effect=httpx.TimeoutException("timeout"))
+
+        with pytest.raises(JevTimeoutError, match="Jev Gateway timed out after"):
+            await client.evaluate(packet, timeout=1.0)
+
+    @respx.mock
+    async def test_retry_on_transient_failure(
+        self, client: JevGatewayClient, packet: DecisionPacket, mock_gateway_url: str
+    ) -> None:
+        """Client retries on transient failures (503)."""
+        mock_response = {
+            "decision_type": "preflight_blockers_present",
+            "answers": {"has_blockers": False},
+            "model_id": "jev-1.0",
+            "latency_ms": 100,
+        }
+
+        # First attempt: 503, second attempt: success
+        route = respx.post(f"{mock_gateway_url}/evaluate")
+        route.side_effect = [
+            httpx.Response(503, text="Service Unavailable"),
+            httpx.Response(200, json=mock_response),
+        ]
+
+        result = await client.evaluate(packet, timeout=5.0)
+
+        assert result.answers == {"has_blockers": False}
+        assert len(route.calls) == 2  # Verify retry happened
+
+    @respx.mock
+    async def test_fail_closed_on_provider_down(
+        self, client: JevGatewayClient, packet: DecisionPacket, mock_gateway_url: str
+    ) -> None:
+        """Client fails closed (raises error) when provider consistently down."""
+        respx.post(f"{mock_gateway_url}/evaluate").mock(
+            return_value=httpx.Response(500, text="Internal Server Error")
+        )
+
+        with pytest.raises(JevClientError, match="Jev Gateway request failed"):
+            await client.evaluate(packet, timeout=5.0)
+
+    @respx.mock
+    async def test_fail_closed_on_malformed_response(
+        self, client: JevGatewayClient, packet: DecisionPacket, mock_gateway_url: str
+    ) -> None:
+        """Client fails closed on malformed JSON (no silent success)."""
+        respx.post(f"{mock_gateway_url}/evaluate").mock(
+            return_value=httpx.Response(200, json={"invalid": "response"})
+        )
+
+        with pytest.raises(JevClientError, match="Jev Gateway request failed"):
+            await client.evaluate(packet, timeout=5.0)
