@@ -223,7 +223,7 @@ async def test_idempotent_reclaim_prevents_duplicate_events(
         # Emit event with dedupe key (idempotent)
         dedupe_key = f"job_success:{job_id}:{idempotency_key}"
         event = Event(
-            event_name=EventName.JOB_SUCCEEDED.value,
+            event_name=EventName.RESEARCH_COMPLETED.value,
             aggregate_type="Job",
             aggregate_id=job_id,
             workflow_id=workflow_id,
