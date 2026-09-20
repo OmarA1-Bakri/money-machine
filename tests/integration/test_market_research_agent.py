@@ -29,7 +29,6 @@ class NonFixtureAdapter(EtsyResearchAdapter):
 async def test_workflow(session_factory):
     """Create a test workflow for research."""
     async with session_factory() as session:
-        shop_id = uuid4()
         session.add(Shop(id=shop_id, name="Test Shop", provider_shop_id="test-shop-123"))
 
         workflow = WorkflowRun(
@@ -136,7 +135,6 @@ async def test_shortlist_produces_5_candidates(test_workflow, test_database, ses
 
         # Verify candidates were persisted
         async with session_factory() as session:
-            from sqlalchemy import select
 
             from money_machine.persistence.tables import ProductCandidate
 
@@ -212,7 +210,6 @@ async def test_nullable_fields_preserved(test_workflow, test_database, session_f
     # Some fixtures don't have anchor prices - verify they're NULL not zero
     if null_anchor_prices:
         async with session_factory() as session:
-            from sqlalchemy import select
 
             from money_machine.persistence.tables import MarketListingObservation
 
@@ -289,7 +286,7 @@ async def test_empty_seed_phrases_raises():
         )
 
         async with session_factory() as session:
-        uow = UnitOfWork(session)
+            uow = UnitOfWork(session)
             with pytest.raises(ValueError, match="No seed phrases configured"):
                 await agent.execute(workflow_id, job, uow)
     finally:
@@ -308,7 +305,6 @@ async def test_young_and_fast_shop_detection(test_workflow, test_database, sessi
     # At least some fixtures should have young-and-fast shops
     # (based on fixture data: shops with < 365 days age and > 400 sales)
     async with session_factory() as session:
-        from datetime import timedelta
 
         from sqlalchemy import select
 
@@ -369,7 +365,6 @@ async def test_risk_notes_generated(test_workflow, test_database, session_factor
         _ = await execute_market_research(workflow.id, job, uow)
 
         async with session_factory() as session:
-            from sqlalchemy import select
 
             from money_machine.persistence.tables import ProductCandidate
 
@@ -393,7 +388,6 @@ async def test_observation_count_matches_report(test_workflow, test_database, se
         report = await execute_market_research(workflow.id, job, uow)
 
         async with session_factory() as session:
-            from sqlalchemy import select
 
             from money_machine.persistence.tables import MarketListingObservation, ResearchRun
 
