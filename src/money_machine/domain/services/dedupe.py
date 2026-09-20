@@ -135,8 +135,10 @@ def check_dedupe(
         existing_identity_norm = existing_spec.identity.casefold().strip()
         existing_category_norm = existing_spec.base_category.casefold().strip()
 
-        if (candidate_identity_norm == existing_identity_norm and
-            candidate_category_norm == existing_category_norm):
+        if (
+            candidate_identity_norm == existing_identity_norm
+            and candidate_category_norm == existing_category_norm
+        ):
             collisions.append(
                 DedupeCollision(
                     other_spec_id=existing_spec.spec_id,
