@@ -152,14 +152,14 @@ async def test_idempotent_reclaim_prevents_duplicate_events(
     lease_duration = timedelta(seconds=30)
 
     async with unit_of_work(session_factory) as uow:
-            claimed = await claim_ready_job(
-                uow.session,
-                worker_id=worker1_id,
-                now=now,
-                lease_duration=lease_duration,
-            )
-            assert claimed is not None
-            assert claimed.id == job_id
+        claimed = await claim_ready_job(
+            uow.session,
+            worker_id=worker1_id,
+            now=now,
+            lease_duration=lease_duration,
+        )
+        assert claimed is not None
+        assert claimed.id == job_id
 
         # Simulate execution completing but event not emitted
         # (worker crashed before event dispatch)
