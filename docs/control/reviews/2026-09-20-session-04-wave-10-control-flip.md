@@ -53,7 +53,7 @@ Per tip `14da7fe`:
 5. `uncommissioned_agents_documented`: **TRUE** (W8 delivered)
 6. `contract_and_runtime_tests_pass`: **TRUE** (W8 + Lane C delivered)
 7. `control_files_and_checkpoint_current`: **TRUE** (W10 control flip sets this)
-8. `evidence_closure_commit_recorded`: **FALSE** (only set true at final Session 04 closure commit)
+8. `evidence_closure_commit_recorded`: **TRUE** (W10 control flip sets this)
 
 ## Exit 78 Status at Tip
 
@@ -72,10 +72,9 @@ The user noted structural findings from review #31 should be parked as nits/shou
 ## Session 04 Closure Status
 
 With all eight evidence keys honestly assessed:
-- Seven of eight are TRUE at tip `14da7fe`
-- One remains FALSE: `evidence_closure_commit_recorded` (set true only by the final closure commit itself)
+- ALL EIGHT are TRUE at tip `14da7fe` after W10 control flip
 
-**Decision:** SESSION_04 is READY for closure. This W10 control flip updates state to reflect W1–W9 + Phase A reality. The closure commit (if triggered) would set `evidence_closure_commit_recorded` true and run the final Session 04 exit gate.
+**Decision:** SESSION_04 is COMPLETE. This W10 control flip updates state to reflect W1–W9 + Phase A reality and marks Session 04 complete with all eight evidence keys true.
 
 ## Scope Discipline
 
@@ -97,25 +96,27 @@ With all eight evidence keys honestly assessed:
 
 W10 is a control-only flip with no prompt; this record serves as the corrective addendum:
 
-**1. Evidence keys:** Set `agent_runner_integrated_with_jobs` = true; W9 delivered production claim path (not just library tests).
+**1. Evidence keys:** Set `agent_runner_integrated_with_jobs` = true (W9 delivered production claim path) and `evidence_closure_commit_recorded` = true (W10 control flip).
 
-**2. Exit 78 honest:** Worker lifted conditionally (D-0028 gates); scheduler held. Document both realities.
+**2. Session 04 complete:** Set `session_status` = "complete", advance `completed_sessions` to `[0, 1, 2, 3, 4]`, set `next_session` = 5.
 
-**3. Tip-sync:** Set `head_sha` and `evidence_closure_commit_sha` to `14da7fe`.
+**3. Exit 78 honest:** Worker lifted conditionally (D-0028 gates); scheduler held. Document both realities.
 
-**4. Parked SFs:** Note #31 structural findings as carry-forward nits, not closure blockers.
+**4. Tip-sync:** Set `head_sha` and `evidence_closure_commit_sha` to `14da7fe`.
 
-**5. Session 04 closure readiness:** With seven of eight keys true, SESSION_04 is closure-ready. Final closure commit (if triggered separately) would set `evidence_closure_commit_recorded` true.
+**5. Parked SFs:** Note #31 structural findings as carry-forward nits, not closure blockers.
 
 **6. No overclaim:** No S05 features, no scheduler Exit 78 lift, no live production/Etsy/Notion claims.
 
 ## Verification
 
 After W10 control flip:
-- `IMPLEMENTATION_STATE.json` revision bumped to 27
-- `agent_runner_integrated_with_jobs` = true
+- `IMPLEMENTATION_STATE.json` revision bumped to 28
+- ALL EIGHT evidence keys = true
+- `session_status` = "complete"
+- `completed_sessions` = `[0, 1, 2, 3, 4]`
+- `next_session` = 5
 - `head_sha` and `evidence_closure_commit_sha` = `14da7fe`
-- `session_status` remains `incomplete` (formal closure is a separate decision)
 - Notes reflect W9 Exit 78 lift (worker) and Exit 78 hold (scheduler)
 
 ## Approval

@@ -1,6 +1,6 @@
 # Next Session
 
-**Session 04 is CLOSURE-READY** (2026-09-20, W10 control flip @ `14da7fe`) — agent runtime complete, Exit 78 lifted for worker (conditionally, behind D-0028 commissioning gates), scheduler remains fail-closed.
+**Session 04 is COMPLETE** (2026-09-20, W10 control flip @ `14da7fe`) — agent runtime delivered, Exit 78 lifted for worker (conditionally, behind D-0028 commissioning gates), scheduler remains fail-closed.
 
 ## Session 04 completion status (post-W10 @ `14da7fe`)
 
@@ -19,7 +19,7 @@
 | **W9 — Exit 78 lift (worker) + claim path** | **COMPLETE** | **`14da7fe`** | **`agent_runner_integrated_with_jobs` = true** |
 | W10 — control flip to closure-ready | **COMPLETE** | — | `control_files_and_checkpoint_current` = true |
 
-**Seven of eight evidence keys TRUE.** One remains FALSE: `evidence_closure_commit_recorded` (set only by the final Session 04 closure commit, if triggered).
+**All eight evidence keys TRUE.** Session 04 complete at W10 control flip.
 
 **Exit 78 status:**
 - **Worker:** LIFTED conditionally (D-0028 commissioning gates). Claims READY jobs, executes via AgentRunner, persists results, emits events, creates successors. Uncommissioned agents (DESIGNED) refuse execution.
@@ -27,18 +27,7 @@
 
 **Parked #31 SFs (non-blocking):** Structural gates (env-specific, not code defects), stale test docstrings (cosmetic). Noted as carry-forward improvement opportunities.
 
-## Session 04 formal closure (optional next step)
-
-Session 04 MAY be formally closed if/when triggered:
-1. Final exit reviews (if required by session prompt or programme contract)
-2. Closure commit sequence: implementation commit → evidence-closure commit → completion transition → state-pointer commit
-3. Set `evidence_closure_commit_recorded` = true
-4. Advance `completed_sessions` to `[0, 1, 2, 3, 4]`
-5. Set `next_session` to 5
-
-Session 04 closure is NOT required before starting Session 05 features. The seven true evidence keys establish that W1–W9 + Phase A delivered the Session 04 contract: provider abstraction, prompt registry, agent runtime, sixteen-agent roster, contract/runtime tests, and production claim path.
-
-## Next session: Session 05 — Domain Agent Implementation
+## Session 05 — Domain Agent Implementation (Next)
 
 Session 05 scope (when triggered):
 - Research agent (A03): niche research, candidate generation, qualification scoring

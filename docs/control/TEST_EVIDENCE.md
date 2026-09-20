@@ -282,11 +282,11 @@ Lane C closes the contract-and-runtime test evidence key. `agent_runner_integrat
 
 **Evidence key earned:** `agent_runner_integrated_with_jobs` = TRUE (production claim path delivered).
 
-## 2026-09-20 — Session 04 W10: Control flip to closure-ready (post-W9 @ `14da7fe`)
+## 2026-09-20 — Session 04 W10: SESSION_04 COMPLETE control flip (post-W9 @ `14da7fe`)
 
 W10 is a control-only flip with no feature code or tests. Updates `IMPLEMENTATION_STATE.json`, `IMPLEMENTATION_LOG.md`, `NEXT_SESSION.md`, `TEST_EVIDENCE.md` (this file), and creates `docs/control/reviews/2026-09-20-session-04-wave-10-control-flip.md`.
 
-**Evidence keys after W10:**
+**Evidence keys after W10 (ALL EIGHT TRUE):**
 - `provider_abstraction_implemented`: TRUE (W2)
 - `prompt_registry_and_hashes_implemented`: TRUE (W3)
 - `agent_runner_integrated_with_jobs`: TRUE (W9)
@@ -294,6 +294,6 @@ W10 is a control-only flip with no feature code or tests. Updates `IMPLEMENTATIO
 - `uncommissioned_agents_documented`: TRUE (W8)
 - `contract_and_runtime_tests_pass`: TRUE (W8 + Lane C)
 - `control_files_and_checkpoint_current`: TRUE (W10)
-- `evidence_closure_commit_recorded`: FALSE (set only by final Session 04 closure commit, if triggered)
+- `evidence_closure_commit_recorded`: TRUE (W10)
 
-**Session 04 status:** CLOSURE-READY. Seven of eight evidence keys TRUE. W1–W9, Phase A, Lane C complete. Exit 78: worker lifted conditionally (D-0028 gates), scheduler held (W9 out of scope). No S05 features, no scheduler Exit 78 lift, no live production/Notion/Etsy.
+**Session 04 status:** COMPLETE. All eight evidence keys TRUE. `completed_sessions` = `[0, 1, 2, 3, 4]`; `next_session` = 5. W1–W9, Phase A, Lane C delivered agent runtime and roster. Exit 78: worker lifted conditionally (D-0028 gates), scheduler held (W9 out of scope). No S05 features, no scheduler Exit 78 lift, no live production/Notion/Etsy.

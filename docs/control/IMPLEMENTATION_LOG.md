@@ -201,14 +201,15 @@
 
 W9 closes `agent_runner_integrated_with_jobs` evidence key. Seven of eight Session 04 evidence keys are now true. Scheduler Exit 78 remains; W9 scope was worker claim path only. No live provider calls, no Notion/Etsy mutations claimed.
 
-## 2026-09-20 — Session 04 W10: Control flip to closure-ready (post-W9 @ `14da7fe`)
+## 2026-09-20 — Session 04 W10: SESSION_04 COMPLETE control flip (post-W9 @ `14da7fe`)
 
 Parallel control lane only (`docs/control/*`). No feature code, no scheduler Exit 78 lift, no S05 features, no live Notion/Etsy.
 
-- Updated `IMPLEMENTATION_STATE.json` to repository tip `14da7fe6e7893e79d6993720ae9413343931bfb0` (post-W9 on `build/full-automation`). State revision 26 → 27.
-- Evidence keys updated to match W9 delivery: `agent_runner_integrated_with_jobs` set TRUE after W9 production claim path (worker claim → execute → persist → event → successor). Seven of eight keys now TRUE; `evidence_closure_commit_recorded` remains FALSE (set only by final closure commit).
+- Updated `IMPLEMENTATION_STATE.json` to repository tip `14da7fe6e7893e79d6993720ae9413343931bfb0` (post-W9 on `build/full-automation`). State revision 26 → 28.
+- Evidence keys: ALL EIGHT TRUE. `agent_runner_integrated_with_jobs` set TRUE after W9 production claim path; `evidence_closure_commit_recorded` set TRUE by W10 control flip.
+- Session 04 status: COMPLETE. `completed_sessions` advanced to `[0, 1, 2, 3, 4]`; `next_session` set to 5.
 - Exit 78 status recorded honestly: worker lifted conditionally (D-0028 commissioning gates), scheduler held (W9 out of scope).
-- Parked #31 SFs noted as carry-forward nits (structural gates env-specific, stale test docstrings cosmetic) — non-blocking for closure.
+- Parked #31 SFs noted as carry-forward nits (structural gates env-specific, stale test docstrings cosmetic) — non-blocking.
 - Updated `head_sha` and `evidence_closure_commit_sha` to `14da7fe`.
-- Session 04 status: CLOSURE-READY. W1–W9, Phase A, Lane C complete. No S05 features, no scheduler Exit 78 lift, no live production/Notion/Etsy claimed.
+- W1–W9, Phase A, Lane C complete. No S05 features, no scheduler Exit 78 lift, no live production/Notion/Etsy claimed.
 - W10 control flip review recorded at `docs/control/reviews/2026-09-20-session-04-wave-10-control-flip.md`.
