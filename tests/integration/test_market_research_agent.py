@@ -59,6 +59,7 @@ async def test_workflow(session_factory):
             owner_agent_id="A03",
             status="READY",
             scheduled_at=datetime.now(UTC),
+            idempotency_key=str(uuid4()),
         )
         session.add(job)
 
@@ -291,6 +292,7 @@ async def test_empty_seed_phrases_raises(session_factory):
             owner_agent_id="A03",
             status="READY",
             scheduled_at=datetime.now(UTC),
+            idempotency_key=str(uuid4()),
         )
 
         async with session_factory() as session:
