@@ -2,7 +2,6 @@ version: 1
 research:
   # Seed phrases from playbook for initial market research
   seed_phrases:
-    - planner stickers
     - teacher appreciation gifts
     - mindfulness journal
     - workout tracker printable
