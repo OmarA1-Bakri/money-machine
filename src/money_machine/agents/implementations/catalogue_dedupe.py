@@ -109,12 +109,12 @@ class CatalogueDedupeAgent(BaseAgent):
         # Parse existing specs
         existing_specs: list[ProductSpec] = []
         if existing_specs_data and isinstance(existing_specs_data, list):
-            for spec_data in existing_specs_data:
+            for spec_data in existing_specs_data:  # type: ignore[misc]
                 if not isinstance(spec_data, dict):
                     continue
                 with contextlib.suppress(Exception):
                     # Skip invalid specs (shouldn't happen but be defensive)
-                    existing_specs.append(ProductSpec.model_validate(spec_data))  # type: ignore[arg-type]
+                    existing_specs.append(ProductSpec.model_validate(spec_data))
 
         # Run dedupe check
         dedupe_result = check_dedupe(
