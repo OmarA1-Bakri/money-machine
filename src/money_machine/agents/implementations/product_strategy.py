@@ -41,7 +41,7 @@ class A05ProductStrategy(BaseAgent):
         try:
             # Use TypeAdapter to properly deserialize from JSON
             from pydantic import TypeAdapter
-            
+
             adapter = TypeAdapter(ProductStrategyInput)
             strategy_input = adapter.validate_python(context.job.input)
 
