@@ -305,7 +305,6 @@ async def test_young_and_fast_shop_detection(test_workflow, test_database, sessi
     # At least some fixtures should have young-and-fast shops
     # (based on fixture data: shops with < 365 days age and > 400 sales)
     async with session_factory() as session:
-
         from sqlalchemy import select
 
         from money_machine.persistence.tables import MarketShopObservation
@@ -365,7 +364,6 @@ async def test_risk_notes_generated(test_workflow, test_database, session_factor
         _ = await execute_market_research(workflow.id, job, uow)
 
         async with session_factory() as session:
-
             from money_machine.persistence.tables import ProductCandidate
 
             stmt = select(ProductCandidate).where(ProductCandidate.workflow_id == workflow.id)
@@ -388,7 +386,6 @@ async def test_observation_count_matches_report(test_workflow, test_database, se
         report = await execute_market_research(workflow.id, job, uow)
 
         async with session_factory() as session:
-
             from money_machine.persistence.tables import MarketListingObservation, ResearchRun
 
             # Get ResearchRun
