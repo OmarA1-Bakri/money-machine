@@ -1,7 +1,8 @@
 """Agent runner orchestration and durable run receipts.
 
-Contract: Session 04 L1 — AgentRunner core lane (W4). Exit 78 and the production
-claim path remain out of scope; this module executes agents only when invoked directly.
+Contract: Session 04 L1/W6 — AgentRunner core lane (W4) with bounded review
+subagent coordination (W6). Exit 78 and the production claim path remain out of scope;
+this module executes agents only when invoked directly.
 """
 
 from __future__ import annotations
@@ -27,6 +28,8 @@ from money_machine.agents.base import (
 )
 from money_machine.agents.prompt_store import PromptStore
 from money_machine.agents.registry import AgentRegistry
+from money_machine.agents.review_subagent import ReviewSubagentBounds, ReviewSubagentCoordinator
+from money_machine.agents.tool_registry import ToolRegistry
 from money_machine.domain.enums import AgentRunStatus
 from money_machine.domain.models.common import ContractError
 from money_machine.domain.models.jobs import AgentResult, JobEnvelope
@@ -71,10 +74,12 @@ class AgentRunner:
         registry: AgentRegistry,
         prompt_store: PromptStore,
         provider: LLMProvider,
+        tool_registry: ToolRegistry | None = None,
     ) -> None:
         self._registry = registry
         self._prompt_store = prompt_store
         self._provider = provider
+        self._tool_registry = tool_registry or ToolRegistry.canonical()
 
     @classmethod
     def from_repository_root(
@@ -131,6 +136,15 @@ class AgentRunner:
             expected_hash=prompt_version.sha256,
         )
         run_id = uuid4()
+        review_coordinator = ReviewSubagentCoordinator(
+            job_id=job.job_id,
+            owning_run_id=run_id,
+            agent_id=definition.agent_id,
+            allowed_tools=frozenset(definition.allowed_tools),
+            provider=self._provider,
+            tool_registry=self._tool_registry,
+            bounds=ReviewSubagentBounds.from_definition(definition),
+        )
         context = AgentContext(
             job=job,
             definition=definition,
@@ -141,6 +155,8 @@ class AgentRunner:
             prompt_version=prompt_version.version,
             provider=self._provider,
             run_at=started_at,
+            tool_registry=self._tool_registry,
+            review_coordinator=review_coordinator,
         )
         try:
             result = await agent.execute(context)

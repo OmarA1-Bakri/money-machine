@@ -17,6 +17,25 @@ from money_machine.domain.enums import SideEffectClass
 
 ToolHandler = Callable[..., Mapping[str, Any]]
 
+# Read-only orchestration and diagnostics tools permitted during review subagents.
+REVIEW_ALLOWED_NONE_TOOLS: Final[frozenset[str]] = frozenset(
+    {
+        "workflow.inspect",
+        "configuration.read",
+        "database.read",
+        "provider.check_openai",
+        "provider.check_anthropic",
+        "provider.check_notion",
+        "provider.check_etsy",
+    }
+)
+REVIEW_PERMITTED_SIDE_EFFECTS: Final[frozenset[SideEffectClass]] = frozenset(
+    {
+        SideEffectClass.NONE,
+        SideEffectClass.EXTERNAL_READ,
+    }
+)
+
 
 class ToolPermissionError(PermissionError):
     """Raised when an agent invokes a tool outside its allowlist."""
@@ -227,3 +246,51 @@ class ToolRegistry:
             **result,
             "side_effect_class": definition.side_effect_class.value,
         }
+
+    def invoke_for_review(
+        self,
+        tool_id: str,
+        *,
+        allowed_tools: frozenset[str],
+        agent_id: str,
+        **kwargs: Any,
+    ) -> Mapping[str, Any]:
+        """Invoke a tool from a bounded review subagent.
+
+        Review subagents may only use read-only tools. Mutating or job-spawning tools
+        fail closed even when present on the owning agent allowlist.
+
+        Raises:
+            ToolPermissionError: When ``tool_id`` is not allowed for review.
+            ToolNotFoundError: When ``tool_id`` is not registered.
+        """
+        if tool_id not in allowed_tools:
+            msg = (
+                f"Agent {agent_id} is not allowed to invoke tool '{tool_id}' during review. "
+                f"Allowed: {sorted(allowed_tools)}"
+            )
+            raise ToolPermissionError(msg)
+
+        definition = self.get(tool_id)
+        if definition.side_effect_class not in REVIEW_PERMITTED_SIDE_EFFECTS:
+            msg = (
+                f"Review subagent for agent {agent_id} cannot invoke mutating tool "
+                f"'{tool_id}' (side_effect_class={definition.side_effect_class.value})"
+            )
+            raise ToolPermissionError(msg)
+        if (
+            definition.side_effect_class is SideEffectClass.NONE
+            and tool_id not in REVIEW_ALLOWED_NONE_TOOLS
+        ):
+            msg = (
+                f"Review subagent for agent {agent_id} cannot invoke write tool "
+                f"'{tool_id}' during review"
+            )
+            raise ToolPermissionError(msg)
+
+        return self.invoke(
+            tool_id,
+            allowed_tools=allowed_tools,
+            agent_id=agent_id,
+            **kwargs,
+        )
