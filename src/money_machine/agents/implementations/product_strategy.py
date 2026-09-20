@@ -199,7 +199,7 @@ class A05ProductStrategy(BaseAgent):
                     scoring=scoring,
                     total_score=total,
                     passed_threshold=passed,
-                    rank=0,  # Will be set after sorting
+                    rank=1,  # Temporary; will be updated after ranking
                     selection="REJECTED",  # Will be updated in select phase
                 )
             )
