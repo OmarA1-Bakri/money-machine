@@ -7,7 +7,13 @@ agents:
     system_prompt_reference: agent://A01/system/v1
     input_contracts: [JobEnvelope]
     output_contracts: [AgentResult]
-    allowed_tools: [INTERNAL_ORCHESTRATION]
+    allowed_tools:
+      - job.create
+      - workflow.inspect
+      - job.retry
+      - configuration.read
+      - database.read
+      - database.write_orchestration
     provider_operations: [NOTION_SHOP_HQ_WRITE]
     allowed_side_effect_classes: [NONE, EXTERNAL_WRITE]
     default_side_effect_class: NONE
@@ -15,7 +21,7 @@ agents:
     default_retry_class: SAFE
     timeout_seconds: 300
     model_policy: default
-    commissioning_state: DESIGNED
+    commissioning_state: TESTED
     commissioning_evidence: []
   - agent_id: A02
     name: Account & Integration
@@ -24,7 +30,16 @@ agents:
     system_prompt_reference: agent://A02/system/v1
     input_contracts: [JobEnvelope]
     output_contracts: [AgentResult, IncidentResult]
-    allowed_tools: [PROVIDER_ADAPTER]
+    allowed_tools:
+      - provider.check_openai
+      - provider.check_anthropic
+      - provider.check_notion
+      - provider.check_etsy
+      - provider.provision_workspace
+      - database.read
+      - database.write_accounts
+      - configuration.read
+      - incident.create
     provider_operations: [ACCOUNT_PROVISIONING, NOTION_WORKSPACE_PROVISION, ETSY_SHOP_PROVISION]
     allowed_side_effect_classes: [NONE, EXTERNAL_READ, EXTERNAL_WRITE]
     default_side_effect_class: EXTERNAL_READ
@@ -32,7 +47,7 @@ agents:
     default_retry_class: SAFE
     timeout_seconds: 600
     model_policy: default
-    commissioning_state: DESIGNED
+    commissioning_state: TESTED
     commissioning_evidence: []
   - agent_id: A03
     name: Market Research
@@ -41,7 +56,11 @@ agents:
     system_prompt_reference: agent://A03/system/v1
     input_contracts: [JobEnvelope]
     output_contracts: [AgentResult, ResearchReport]
-    allowed_tools: [PROVIDER_ADAPTER]
+    allowed_tools:
+      - etsy.read_listing
+      - etsy.search_listings
+      - browser.navigate
+      - storage.write_blob
     provider_operations: [MARKET_RESEARCH_READ]
     allowed_side_effect_classes: [NONE, EXTERNAL_READ]
     default_side_effect_class: EXTERNAL_READ
@@ -58,7 +77,11 @@ agents:
     system_prompt_reference: agent://A04/system/v1
     input_contracts: [JobEnvelope, ResearchReport]
     output_contracts: [AgentResult, TeardownReport]
-    allowed_tools: [PROVIDER_ADAPTER]
+    allowed_tools:
+      - etsy.read_listing
+      - browser.navigate
+      - storage.write_blob
+      - etsy.purchase_listing
     provider_operations: [COMPETITOR_PURCHASE]
     allowed_side_effect_classes: [NONE, EXTERNAL_SPEND]
     default_side_effect_class: NONE
@@ -75,7 +98,9 @@ agents:
     system_prompt_reference: agent://A05/system/v1
     input_contracts: [JobEnvelope, ResearchReport, TeardownReport]
     output_contracts: [AgentResult, ProductSpec]
-    allowed_tools: [INTERNAL_ORCHESTRATION]
+    allowed_tools:
+      - configuration.read
+      - database.read
     provider_operations: []
     allowed_side_effect_classes: [NONE]
     default_side_effect_class: NONE
@@ -92,7 +117,9 @@ agents:
     system_prompt_reference: agent://A06/system/v1
     input_contracts: [JobEnvelope, ProductSpec]
     output_contracts: [AgentResult, DedupeResult]
-    allowed_tools: [INTERNAL_ORCHESTRATION]
+    allowed_tools:
+      - configuration.read
+      - database.read
     provider_operations: []
     allowed_side_effect_classes: [NONE]
     default_side_effect_class: NONE
@@ -109,7 +136,10 @@ agents:
     system_prompt_reference: agent://A07/system/v1
     input_contracts: [JobEnvelope, ProductSpec]
     output_contracts: [AgentResult, BuildResult]
-    allowed_tools: [PROVIDER_ADAPTER]
+    allowed_tools:
+      - notion.create_page
+      - notion.upload_asset
+      - storage.write_blob
     provider_operations: [NOTION_PRODUCT_WRITE, NOTION_PRODUCT_REPAIR]
     allowed_side_effect_classes: [EXTERNAL_WRITE]
     default_side_effect_class: EXTERNAL_WRITE
@@ -126,7 +156,11 @@ agents:
     system_prompt_reference: agent://A08/system/v1
     input_contracts: [JobEnvelope, BuildResult]
     output_contracts: [AgentResult, BuildResult]
-    allowed_tools: [PROVIDER_ADAPTER]
+    allowed_tools:
+      - notion.create_page
+      - notion.update_page
+      - notion.link_publish
+      - storage.write_blob
     provider_operations: [NOTION_VARIANT_WRITE, NOTION_LINK_PUBLISH]
     allowed_side_effect_classes: [EXTERNAL_WRITE]
     default_side_effect_class: EXTERNAL_WRITE
@@ -143,7 +177,9 @@ agents:
     system_prompt_reference: agent://A09/system/v1
     input_contracts: [JobEnvelope, BuildResult]
     output_contracts: [AgentResult, ProductQAResult]
-    allowed_tools: [PROVIDER_ADAPTER]
+    allowed_tools:
+      - notion.read_page
+      - notion.read_links
     provider_operations: [NOTION_BUILD_READ, NOTION_LINK_READ]
     allowed_side_effect_classes: [EXTERNAL_READ]
     default_side_effect_class: EXTERNAL_READ
@@ -160,7 +196,9 @@ agents:
     system_prompt_reference: agent://A10/system/v1
     input_contracts: [JobEnvelope, ProductSpec, BuildResult]
     output_contracts: [AgentResult, ListingPackage]
-    allowed_tools: [INTERNAL_ORCHESTRATION]
+    allowed_tools:
+      - configuration.read
+      - database.read
     provider_operations: []
     allowed_side_effect_classes: [NONE]
     default_side_effect_class: NONE
@@ -177,7 +215,11 @@ agents:
     system_prompt_reference: agent://A11/system/v1
     input_contracts: [JobEnvelope, ProductSpec, BuildResult]
     output_contracts: [AgentResult, BuildResult, ArtifactReference]
-    allowed_tools: [INTERNAL_RENDERER, PROVIDER_ADAPTER]
+    allowed_tools:
+      - renderer.generate_asset
+      - notion.read_page
+      - browser.navigate
+      - storage.write_blob
     provider_operations: [NOTION_SCREENSHOT_READ]
     allowed_side_effect_classes: [NONE, EXTERNAL_READ]
     default_side_effect_class: NONE
@@ -194,7 +236,8 @@ agents:
     system_prompt_reference: agent://A12/system/v1
     input_contracts: [JobEnvelope, ListingPackage]
     output_contracts: [AgentResult, PreflightResult]
-    allowed_tools: [PROVIDER_ADAPTER]
+    allowed_tools:
+      - etsy.read_draft
     provider_operations: [ETSY_DRAFT_READ]
     allowed_side_effect_classes: [EXTERNAL_READ]
     default_side_effect_class: EXTERNAL_READ
@@ -211,7 +254,11 @@ agents:
     system_prompt_reference: agent://A13/system/v1
     input_contracts: [JobEnvelope, ListingPackage, PreflightResult]
     output_contracts: [AgentResult]
-    allowed_tools: [PROVIDER_ADAPTER]
+    allowed_tools:
+      - etsy.publish_listing
+      - etsy.update_listing
+      - etsy.deactivate_listing
+      - etsy.upload_media
     provider_operations: [ETSY_DRAFT_WRITE, ETSY_PUBLISH, ETSY_POST_PUBLISH_CHECKOUT, ETSY_DEACTIVATE, ETSY_LISTING_REPAIR]
     allowed_side_effect_classes: [EXTERNAL_WRITE, EXTERNAL_SPEND]
     default_side_effect_class: EXTERNAL_WRITE
@@ -228,7 +275,9 @@ agents:
     system_prompt_reference: agent://A14/system/v1
     input_contracts: [JobEnvelope]
     output_contracts: [AgentResult, MetricsSnapshot]
-    allowed_tools: [PROVIDER_ADAPTER]
+    allowed_tools:
+      - etsy.read_shop_stats
+      - etsy.list_transactions
     provider_operations: [ETSY_METRICS_READ]
     allowed_side_effect_classes: [EXTERNAL_READ]
     default_side_effect_class: EXTERNAL_READ
@@ -245,7 +294,10 @@ agents:
     system_prompt_reference: agent://A15/system/v1
     input_contracts: [JobEnvelope, MetricsSnapshot]
     output_contracts: [AgentResult, PortfolioDecision, ProductSpec]
-    allowed_tools: [INTERNAL_ORCHESTRATION]
+    allowed_tools:
+      - configuration.read
+      - database.read
+      - job.create
     provider_operations: []
     allowed_side_effect_classes: [NONE]
     default_side_effect_class: NONE
@@ -262,7 +314,13 @@ agents:
     system_prompt_reference: agent://A16/system/v1
     input_contracts: [JobEnvelope, IncidentResult]
     output_contracts: [AgentResult, IncidentResult]
-    allowed_tools: [INTERNAL_ORCHESTRATION, PROVIDER_ADAPTER]
+    allowed_tools:
+      - etsy.read_messages
+      - etsy.send_message
+      - notion.update_page
+      - etsy.update_listing
+      - incident.create
+      - database.read
     provider_operations: [CUSTOMER_SUPPORT_READ, PROOF_DISTRIBUTION]
     allowed_side_effect_classes: [NONE, EXTERNAL_READ, EXTERNAL_MESSAGE]
     default_side_effect_class: NONE

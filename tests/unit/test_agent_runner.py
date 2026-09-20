@@ -39,7 +39,7 @@ def test_parse_system_prompt_reference() -> None:
 
 def test_uncommissioned_agent_fails_closed(repository_root: Path) -> None:
     registry = AgentRegistry.from_yaml(repository_root)
-    definition = registry.get("A01")
+    definition = registry.get("A03")  # L2: Use A03 (DESIGNED) instead of A01 (TESTED)
     assert definition.commissioning_state is AgentCommissioningState.DESIGNED
     with pytest.raises(AgentNotCommissionedError, match="production execution requires"):
         assert_production_executable(definition)
@@ -92,6 +92,8 @@ def test_runner_assert_production_executable(repository_root: Path) -> None:
         repository_root,
         provider=FakeLLMProvider(),
     )
-    definition = runner.definition_for_job(_job_for("A01"))
+    definition = runner.definition_for_job(
+        _job_for("A03")
+    )  # L2: Use A03 (DESIGNED) instead of A01 (TESTED)
     with pytest.raises(AgentNotCommissionedError):
         runner.assert_production_executable(definition)

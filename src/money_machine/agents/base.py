@@ -8,7 +8,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Final, Self
+from typing import Any, Final, Self
 from uuid import UUID
 
 from money_machine.config.settings import AgentCommissioningState
@@ -30,6 +30,10 @@ class AgentRuntimeError(Exception):
 
 class AgentNotCommissionedError(AgentRuntimeError):
     """Raised when a production job targets an agent that is not executable."""
+
+
+class AgentNotImplementedError(AgentRuntimeError):
+    """Raised when no implementation exists for a registered agent (L2)."""
 
 
 class AgentRegistryError(AgentRuntimeError):
@@ -93,6 +97,28 @@ class AgentContext:
     prompt_version: int
     provider: LLMProvider
     run_at: datetime
+    tool_registry: object | None = None  # L2: ToolRegistry for invoke_tool()
+
+    @property
+    def agent_run_id(self) -> UUID:
+        """Alias for L2 compatibility."""
+        return self.run_id
+
+    def invoke_tool(self, tool_id: str, **kwargs: object) -> Any:
+        """L2: Invoke a tool through the registry with allowlist enforcement."""
+        if self.tool_registry is None:
+            raise AgentRuntimeError("ToolRegistry not available in context")
+        # Import here to avoid circular dependency
+        from money_machine.agents.tool_registry import ToolRegistry
+
+        if not isinstance(self.tool_registry, ToolRegistry):
+            raise AgentRuntimeError("Invalid tool_registry type")
+        return self.tool_registry.invoke(
+            tool_id,
+            allowed_tools=frozenset(self.definition.allowed_tools),
+            agent_id=self.definition.agent_id,
+            **kwargs,
+        )
 
 
 class BaseAgent(ABC):
@@ -129,3 +155,10 @@ def assert_production_executable(definition: AgentDefinition) -> None:
         "production execution requires TESTED or COMMISSIONED"
     )
     raise AgentNotCommissionedError(msg)
+
+
+def assert_agent_may_execute(definition: AgentDefinition, *, production: bool) -> None:
+    """L2 alias: Fail closed when a production job targets an unready agent."""
+    if not production:
+        return
+    assert_production_executable(definition)
