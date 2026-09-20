@@ -42,11 +42,11 @@ class A05ProductStrategy(BaseAgent):
             # Parse input, allowing string UUIDs to be converted
             input_data = context.job.input
             if isinstance(input_data.get("job_id"), str):
-                input_data["job_id"] = UUID(input_data["job_id"])
+                input_data["job_id"] = UUID(input_data["job_id"])  # type: ignore[assignment]
             if isinstance(input_data.get("workflow_id"), str):
-                input_data["workflow_id"] = UUID(input_data["workflow_id"])
+                input_data["workflow_id"] = UUID(input_data["workflow_id"])  # type: ignore[assignment]
             if isinstance(input_data.get("research_run_id"), str):
-                input_data["research_run_id"] = UUID(input_data["research_run_id"])
+                input_data["research_run_id"] = UUID(input_data["research_run_id"])  # type: ignore[assignment]
 
             strategy_input = ProductStrategyInput.model_validate(input_data)
 
