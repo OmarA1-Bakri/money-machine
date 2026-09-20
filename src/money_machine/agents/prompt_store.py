@@ -62,50 +62,66 @@ class PromptStore:
         Args:
             repository_root: Path to the repository root containing `prompts/agents/`.
         """
+        self._repository_root = repository_root
         self._prompts_dir = repository_root / "prompts" / "agents"
 
     def load(
         self,
         agent_id: str,
         version: str,
-        expected_hash: str | None = None,
+        expected_hash: str,
     ) -> str:
         """Load an agent prompt and verify its integrity.
 
         Args:
             agent_id: The agent identifier (e.g., "A01", "A02").
             version: The prompt version (e.g., "v1").
-            expected_hash: Optional SHA-256 hash to verify against.
-                          If None, verification is skipped (use in tests only).
+            expected_hash: Required SHA-256 hash to verify against.
+                          Hash verification always runs (fail-closed).
 
         Returns:
             The prompt content as a string.
 
         Raises:
+            ValueError: If agent_id or version contains path traversal attempts.
             FileNotFoundError: If the prompt file does not exist.
             PromptIntegrityError: If the SHA-256 hash does not match expected_hash.
             PromptValidationError: If required sections are missing.
             PromptSecretError: If the prompt contains embedded secrets.
         """
+        # Sanitize inputs to prevent directory traversal
+        self._validate_path_component(agent_id, "agent_id")
+        self._validate_path_component(version, "version")
+
         # Construct path: prompts/agents/<agent-id>/<version>.md
         prompt_path = self._prompts_dir / agent_id / f"{version}.md"
 
-        if not prompt_path.is_file():
-            msg = f"Prompt not found: {prompt_path}"
+        # Resolve and verify path is within prompts/agents (prevent traversal)
+        try:
+            resolved_path = prompt_path.resolve()
+            resolved_prompts_dir = self._prompts_dir.resolve()
+            if not resolved_path.is_relative_to(resolved_prompts_dir):
+                msg = f"Path traversal attempt detected: {agent_id}/{version}"
+                raise ValueError(msg)
+        except (OSError, ValueError) as error:
+            msg = f"Invalid path for {agent_id}/{version}: {error}"
+            raise ValueError(msg) from error
+
+        if not resolved_path.is_file():
+            msg = f"Prompt not found: {agent_id}/{version}"
             raise FileNotFoundError(msg)
 
         # Read the prompt content
-        content = prompt_path.read_text(encoding="utf-8")
+        content = resolved_path.read_text(encoding="utf-8")
 
-        # Verify hash if expected_hash is provided
-        if expected_hash is not None:
-            actual_hash = sha256(content.encode("utf-8")).hexdigest()
-            if actual_hash != expected_hash:
-                msg = (
-                    f"Prompt hash mismatch for {agent_id}/{version}: "
-                    f"expected {expected_hash}, got {actual_hash}"
-                )
-                raise PromptIntegrityError(msg)
+        # Always verify hash (fail-closed integrity)
+        actual_hash = sha256(content.encode("utf-8")).hexdigest()
+        if actual_hash != expected_hash:
+            msg = (
+                f"Prompt hash mismatch for {agent_id}/{version}: "
+                f"expected {expected_hash}, got {actual_hash}"
+            )
+            raise PromptIntegrityError(msg)
 
         # Validate required sections
         self._validate_sections(content, agent_id, version)
@@ -114,6 +130,32 @@ class PromptStore:
         self._check_secrets(content, agent_id, version)
 
         return content
+
+    def _validate_path_component(self, component: str, name: str) -> None:
+        """Validate a path component to prevent directory traversal.
+
+        Args:
+            component: The path component to validate (agent_id or version).
+            name: The parameter name for error messages.
+
+        Raises:
+            ValueError: If the component contains dangerous patterns.
+        """
+        if not component:
+            msg = f"{name} cannot be empty"
+            raise ValueError(msg)
+
+        # Reject path traversal attempts
+        dangerous_patterns = ["..", "/", "\\", "\0", "~"]
+        for pattern in dangerous_patterns:
+            if pattern in component:
+                msg = f"{name} contains forbidden pattern '{pattern}': {component}"
+                raise ValueError(msg)
+
+        # Reject absolute paths (starting with / or drive letter on Windows)
+        if component.startswith("/") or (len(component) > 1 and component[1] == ":"):
+            msg = f"{name} cannot be an absolute path: {component}"
+            raise ValueError(msg)
 
     def _validate_sections(self, content: str, agent_id: str, version: str) -> None:
         """Validate that all required sections are present.
