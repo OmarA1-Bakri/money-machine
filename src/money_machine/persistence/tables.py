@@ -164,6 +164,7 @@ WORKBOOK_ENTITIES: Final = (
 ADDENDUM_ENTITIES: Final = (
     "config_references",
     "evidence_references",
+    "jev_evaluations",
     "qa_result_artifacts",
     "dedupe_comparisons",
     "listing_version_artifacts",

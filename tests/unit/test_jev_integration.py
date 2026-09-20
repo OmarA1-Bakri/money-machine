@@ -289,7 +289,7 @@ class TestDecisionRegistry:
 
         assert decision.name == "preflight_blockers_present"
         assert len(decision.questions) > 0
-        assert "auto_gates" in decision.auto_gates
+        assert "threshold_question" in decision.auto_gates
         assert decision.authority_tier in [
             "automated",
             "operator_required",
