@@ -290,7 +290,12 @@ class TestDecisionRegistry:
         assert decision.name == "preflight_blockers_present"
         assert len(decision.questions) > 0
         assert "auto_gates" in decision.auto_gates
-        assert decision.authority_tier in ["automated", "operator_required", "safety_gate", "shadow_only"]
+        assert decision.authority_tier in [
+            "automated",
+            "operator_required",
+            "safety_gate",
+            "shadow_only",
+        ]
 
     def test_get_unknown_decision_raises_keyerror(self) -> None:
         """Getting unknown decision type raises KeyError."""
@@ -310,9 +315,7 @@ class TestDecisionRegistry:
 
         # All questions should be valid types
         for question in decision.questions:
-            assert isinstance(
-                question, (NoulQuestion, ChoiceQuestion, ScoreQuestion)
-            )
+            assert isinstance(question, (NoulQuestion, ChoiceQuestion, ScoreQuestion))
 
     def test_registry_length(self) -> None:
         """Registry reports correct length."""

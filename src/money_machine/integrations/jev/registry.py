@@ -12,7 +12,12 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from money_machine.integrations.jev.models import ChoiceQuestion, NoulQuestion, Question, ScoreQuestion
+from money_machine.integrations.jev.models import (
+    ChoiceQuestion,
+    NoulQuestion,
+    Question,
+    ScoreQuestion,
+)
 
 
 class DecisionDefinition(BaseModel):
@@ -26,7 +31,9 @@ class DecisionDefinition(BaseModel):
     auto_gates: dict[str, Any] = Field(
         description="Auto gate configuration (threshold_question, threshold_value, below_threshold_action)"
     )
-    authority_tier: str = Field(description="Authority tier (automated/operator_required/safety_gate/shadow_only)")
+    authority_tier: str = Field(
+        description="Authority tier (automated/operator_required/safety_gate/shadow_only)"
+    )
 
 
 class DecisionRegistry:
