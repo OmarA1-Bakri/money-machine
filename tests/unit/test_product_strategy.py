@@ -95,11 +95,11 @@ class TestA05ProductStrategyScoring:
 
         assert result.status == AgentRunStatus.SUCCESS
         output = result.output
-        assert output["qualification_outcome"] == "QUALIFIED"
-        assert output["primary_candidate"]["total_score"] >= 30
-        assert output["primary_candidate"]["passed_threshold"] is True
-        assert output["primary_candidate"]["selection"] == "PRIMARY"
-        assert output["product_spec"] is not None
+        assert output["qualification_outcome"] == "QUALIFIED"  # type: ignore[index]
+        assert output["primary_candidate"]["total_score"] >= 30  # type: ignore[index]
+        assert output["primary_candidate"]["passed_threshold"] is True  # type: ignore[index]
+        assert output["primary_candidate"]["selection"] == "PRIMARY"  # type: ignore[index]
+        assert output["product_spec"] is not None  # type: ignore[index]
 
     @pytest.mark.asyncio
     async def test_rejected_candidate_fails_threshold(self):
@@ -119,10 +119,10 @@ class TestA05ProductStrategyScoring:
 
         assert result.status == AgentRunStatus.SUCCESS
         output = result.output
-        assert output["qualification_outcome"] == "REJECTED"
-        assert output["primary_candidate"]["total_score"] < 30
-        assert output["primary_candidate"]["passed_threshold"] is False
-        assert output["product_spec"] is None
+        assert output["qualification_outcome"] == "REJECTED"  # type: ignore[index]
+        assert output["primary_candidate"]["total_score"] < 30  # type: ignore[index]
+        assert output["primary_candidate"]["passed_threshold"] is False  # type: ignore[index]
+        assert output["product_spec"] is None  # type: ignore[index]
 
     @pytest.mark.asyncio
     async def test_primary_and_backup_selection(self):
@@ -142,11 +142,11 @@ class TestA05ProductStrategyScoring:
 
         assert result.status == AgentRunStatus.SUCCESS
         output = result.output
-        assert output["primary_candidate"]["rank"] == 1
-        assert output["primary_candidate"]["selection"] == "PRIMARY"
-        assert output["backup_candidate"] is not None
-        assert output["backup_candidate"]["rank"] == 2
-        assert output["backup_candidate"]["selection"] == "BACKUP"
+        assert output["primary_candidate"]["rank"] == 1  # type: ignore[index]
+        assert output["primary_candidate"]["selection"] == "PRIMARY"  # type: ignore[index]
+        assert output["backup_candidate"] is not None  # type: ignore[index]
+        assert output["backup_candidate"]["rank"] == 2  # type: ignore[index]
+        assert output["backup_candidate"]["selection"] == "BACKUP"  # type: ignore[index]
 
     @pytest.mark.asyncio
     async def test_no_backup_if_second_fails_threshold(self):
@@ -166,8 +166,8 @@ class TestA05ProductStrategyScoring:
 
         assert result.status == AgentRunStatus.SUCCESS
         output = result.output
-        assert output["primary_candidate"]["selection"] == "PRIMARY"
-        assert output["backup_candidate"] is None
+        assert output["primary_candidate"]["selection"] == "PRIMARY"  # type: ignore[index]
+        assert output["backup_candidate"] is None  # type: ignore[index]
 
     @pytest.mark.asyncio
     async def test_complete_shortlist_ranking(self):
@@ -187,7 +187,7 @@ class TestA05ProductStrategyScoring:
 
         assert result.status == AgentRunStatus.SUCCESS
         output = result.output
-        assert len(output["scored_candidates"]) == 5
+        assert len(output["scored_candidates"]) == 5  # type: ignore[arg-type]
 
         # Check ranking order
         scores = [c["total_score"] for c in output["scored_candidates"]]  # type: ignore[index]
@@ -315,13 +315,13 @@ class TestA05ProductStrategyScoring:
 
         # If score is exactly 30, it should qualify
         if total_score == 30:
-            assert output["qualification_outcome"] == "QUALIFIED"
-            assert primary["passed_threshold"] is True
+            assert output["qualification_outcome"] == "QUALIFIED"  # type: ignore[index]
+            assert primary["passed_threshold"] is True  # type: ignore[index]
 
         # If score is 29, it should reject
         if total_score == 29:
-            assert output["qualification_outcome"] == "REJECTED"
-            assert primary["passed_threshold"] is False
+            assert output["qualification_outcome"] == "REJECTED"  # type: ignore[index]
+            assert primary["passed_threshold"] is False  # type: ignore[index]
 
     @pytest.mark.asyncio
     async def test_error_handling(self):
@@ -379,7 +379,7 @@ class TestA05ProductStrategyScoring:
         assert result.error is not None
         assert result.error.code == "PRODUCT_STRATEGY_FAILED"
         output = result.output
-        assert output["qualification_outcome"] == "REJECTED"
+        assert output["qualification_outcome"] == "REJECTED"  # type: ignore[index]
 
 
 if __name__ == "__main__":
