@@ -277,8 +277,11 @@ class MarketResearchAgent:
             source_policy_version=source_policy_version,
             query_terms=seed_phrases,
             observation_count=len(listing_observations),
+            listing_count=len(listing_observations),
+            shop_count=len(shop_observations),
             listing_observations=listing_observations,
             shop_observations=shop_observations,
+            shortlist=shortlist,
             completed_at=research_run.completed_at,  # type: ignore[arg-type]
         )
 
@@ -325,11 +328,12 @@ class MarketResearchAgent:
             price_range = (min(prices), max(prices))
 
             # Count shops and young-fast shops
-            shop_refs = {
-                obs.facts.get("shop_reference")
-                for obs in observations
-                if isinstance(obs.facts.get("shop_reference"), str)
-            }
+            shop_refs: set[str] = set()
+            for obs in observations:
+                shop_ref = obs.facts.get("shop_reference")
+                if isinstance(shop_ref, str):
+                    shop_refs.add(shop_ref)
+
             shops = [shop_lookup.get(ref) for ref in shop_refs if ref in shop_lookup]
             shop_count = len([s for s in shops if s is not None])
 

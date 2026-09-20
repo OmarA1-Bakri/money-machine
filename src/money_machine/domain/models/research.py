@@ -45,8 +45,11 @@ class ResearchReport:
     source_policy_version: str
     query_terms: list[str]
     observation_count: int
+    listing_count: int
+    shop_count: int
     listing_observations: list[ListingObservation]
     shop_observations: list[ShopObservation]
+    shortlist: "ShortlistAnalysis"
     completed_at: datetime
 
 
