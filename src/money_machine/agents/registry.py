@@ -47,3 +47,31 @@ class AgentRegistry:
     def roster(self) -> tuple[AgentDefinition, ...]:
         """Return the full roster in agent-id order."""
         return tuple(self._agents[agent_id] for agent_id in sorted(self._agents))
+
+    def get_definition(self, agent_id: str) -> AgentDefinition:
+        """L2 alias: Return one agent definition or fail closed."""
+        return self.get(agent_id)
+
+    def all_definitions(self) -> tuple[AgentDefinition, ...]:
+        """L2: Return all agent definitions in agent-id order."""
+        return self.roster()
+
+    def get_implementation(self, agent_id: str):  # type: ignore[no-untyped-def]
+        """L2: Return agent implementation or raise AgentNotImplementedError."""
+        from money_machine.agents.base import AgentNotImplementedError
+
+        definition = self.get(agent_id)
+        # Map agent IDs to their implementations
+        implementations: dict[str, str] = {
+            "A01": "money_machine.agents.implementations.shop_orchestrator.ShopOrchestrator",
+            "A02": "money_machine.agents.implementations.account_integration.AccountIntegration",
+        }
+
+        if agent_id not in implementations:
+            raise AgentNotImplementedError(f"Agent {agent_id} has no implementation")
+
+        module_path, class_name = implementations[agent_id].rsplit(".", 1)
+        import importlib
+
+        module = importlib.import_module(module_path)
+        return getattr(module, class_name)()
