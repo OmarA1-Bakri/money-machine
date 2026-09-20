@@ -62,9 +62,7 @@ def _tested_registry(base: AgentRegistry) -> AgentRegistry:
             ),
             commissioning_evidence=definition.commissioning_evidence,
         )
-        for agent_id, definition in {
-            item.agent_id: item for item in base.roster()
-        }.items()
+        for agent_id, definition in {item.agent_id: item for item in base.roster()}.items()
     }
     return AgentRegistry(tested)
 
