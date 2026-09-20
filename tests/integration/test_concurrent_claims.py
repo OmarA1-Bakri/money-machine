@@ -10,11 +10,12 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
+from pathlib import Path
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from money_machine.domain.enums import JobStatus, RetryClass, SideEffectClass
 from money_machine.domain.events import EventName
@@ -31,7 +32,7 @@ from tests.integration.factories import NOW, make_shop, make_workflow
 async def _make_ready_job(
     session: AsyncSession,
     *,
-    workflow_id,
+    workflow_id: UUID,
     idempotency_key: str,
 ) -> Job:
     """Create a READY job for claiming."""
@@ -62,8 +63,8 @@ async def _make_ready_job(
 @pytest.mark.asyncio
 async def test_concurrent_claim_skip_locked(
     session: AsyncSession,
-    session_factory,
-    repository_root,
+    session_factory: async_sessionmaker[AsyncSession],
+    repository_root: Path,
 ) -> None:
     """Two workers claiming concurrently: exactly one acquires, the other skips."""
     from money_machine.persistence.unit_of_work import unit_of_work
@@ -125,8 +126,8 @@ async def test_concurrent_claim_skip_locked(
 @pytest.mark.asyncio
 async def test_idempotent_reclaim_prevents_duplicate_events(
     session: AsyncSession,
-    session_factory,
-    repository_root,
+    session_factory: async_sessionmaker[AsyncSession],
+    repository_root: Path,
 ) -> None:
     """If a lease expires and another worker re-claims, idempotency prevents duplicate events."""
     from money_machine.persistence.unit_of_work import unit_of_work
@@ -193,6 +194,7 @@ async def test_idempotent_reclaim_prevents_duplicate_events(
     async with unit_of_work(session_factory) as uow:
         # Reset job to READY for re-claim test
         job = await uow.session.get(Job, job_id)
+        assert job is not None
         job.status = JobStatus.READY.value
         job.lease_owner = None
         job.lease_expires_at = None
@@ -251,8 +253,8 @@ async def test_idempotent_reclaim_prevents_duplicate_events(
 @pytest.mark.asyncio
 async def test_double_execution_prevented_by_for_update_skip_locked(
     session: AsyncSession,
-    session_factory,
-    repository_root,
+    session_factory: async_sessionmaker[AsyncSession],
+    repository_root: Path,
 ) -> None:
     """FOR UPDATE SKIP LOCKED prevents two workers from executing the same job."""
     from money_machine.persistence.unit_of_work import unit_of_work

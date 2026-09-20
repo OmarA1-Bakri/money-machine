@@ -15,7 +15,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from money_machine.agents.base import (
     AgentContext,
@@ -320,7 +320,7 @@ def test_process_entrypoints_remain_exit_78(module: str) -> None:
 @pytest.mark.asyncio
 async def test_uncommissioned_agent_refuses_execution_on_production_path(
     session: AsyncSession,
-    session_factory,
+    session_factory: async_sessionmaker[AsyncSession],
     repository_root: Path,
 ) -> None:
     """Wave 9: DESIGNED agents refuse execution even when job is claimed (fail-closed)."""
@@ -376,7 +376,7 @@ async def test_uncommissioned_agent_refuses_execution_on_production_path(
 @pytest.mark.asyncio
 async def test_tested_agent_executes_on_production_path(
     session: AsyncSession,
-    session_factory,
+    session_factory: async_sessionmaker[AsyncSession],
     repository_root: Path,
 ) -> None:
     """Wave 9: TESTED agents execute successfully on production path."""
