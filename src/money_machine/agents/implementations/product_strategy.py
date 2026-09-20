@@ -39,11 +39,10 @@ class A05ProductStrategy(BaseAgent):
     async def execute(self, context: AgentContext) -> AgentResult:
         """Score candidates and generate ProductSpec for qualified primary."""
         try:
-            # Use TypeAdapter to properly deserialize from JSON
-            from pydantic import TypeAdapter
-
-            adapter = TypeAdapter(ProductStrategyInput)
-            strategy_input = adapter.validate_python(context.job.input)
+            # Validate input with coercion enabled (allows string -> UUID conversion)
+            strategy_input = ProductStrategyInput.model_validate(
+                context.job.input, from_attributes=False, strict=False
+            )
 
             # Score all candidates
             scored = self._score_candidates(strategy_input)
