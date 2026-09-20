@@ -147,7 +147,7 @@ def test_real_entry_points_exit_78_after_a_connectivity_check(module: str) -> No
 
 def test_commissioning_gates_pass_for_tested_agents():
     """Prove gates return True for A01/A02 with real roster/prompts."""
-    from money_machine.orchestration.worker import _check_commissioning_gates
+    from money_machine.orchestration.worker import _check_commissioning_gates  # pyright: ignore[reportPrivateUsage]
 
     # Gates should pass when A01/A02 are TESTED with valid prompts
     result = _check_commissioning_gates()
@@ -162,7 +162,7 @@ def test_worker_enters_claim_loop_when_gates_pass(monkeypatch: pytest.MonkeyPatc
     from money_machine.orchestration._foundation import EXIT_UNAVAILABLE
 
     # Track whether worker loop was called
-    loop_called = []
+    loop_called: list[bool] = []  # Explicit type annotation for pyright
 
     async def mock_loop():
         loop_called.append(True)
@@ -170,7 +170,7 @@ def test_worker_enters_claim_loop_when_gates_pass(monkeypatch: pytest.MonkeyPatc
         return
 
     # Gates pass (use real check)
-    assert worker._check_commissioning_gates() is True
+    assert worker._check_commissioning_gates() is True  # pyright: ignore[reportPrivateUsage]
 
     # Mock the worker loop to prevent infinite execution
     monkeypatch.setattr(worker, "_worker_loop", mock_loop)
