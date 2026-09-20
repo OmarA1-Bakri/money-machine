@@ -70,7 +70,7 @@ class A05ProductStrategy(BaseAgent):
 
             result = ProductStrategyResult(
                 agent_run_id=context.agent_run_id,
-                agent_id=self.agent_id,
+                agent_id="A05",
                 agent_definition_version=context.definition.contract_version,
                 prompt_reference=context.prompt_reference,
                 prompt_sha256=context.prompt_sha256,
@@ -90,7 +90,7 @@ class A05ProductStrategy(BaseAgent):
             return AgentResult(
                 job_id=context.job.job_id,
                 agent_run_id=context.agent_run_id,
-                agent_id=self.agent_id,
+                agent_id="A05",
                 agent_definition_version=context.definition.contract_version,
                 prompt_reference=context.prompt_reference,
                 prompt_sha256=context.prompt_sha256,
@@ -121,7 +121,7 @@ class A05ProductStrategy(BaseAgent):
 
             result = ProductStrategyResult(
                 agent_run_id=context.agent_run_id,
-                agent_id=self.agent_id,
+                agent_id="A05",
                 agent_definition_version=context.definition.contract_version,
                 prompt_reference=context.prompt_reference,
                 prompt_sha256=context.prompt_sha256,
@@ -140,7 +140,7 @@ class A05ProductStrategy(BaseAgent):
             return AgentResult(
                 job_id=job_id,
                 agent_run_id=context.agent_run_id,
-                agent_id=self.agent_id,
+                agent_id="A05",
                 agent_definition_version=context.definition.contract_version,
                 prompt_reference=context.prompt_reference,
                 prompt_sha256=context.prompt_sha256,
@@ -151,7 +151,7 @@ class A05ProductStrategy(BaseAgent):
 
     def _score_candidates(self, strategy_input: ProductStrategyInput) -> list[ScoredCandidate]:
         """Score each candidate across four dimensions."""
-        scored = []
+        scored: list[ScoredCandidate] = []
 
         for candidate in strategy_input.candidates:
             # Score each dimension (simplified stub logic)
@@ -343,7 +343,7 @@ class A05ProductStrategy(BaseAgent):
         self, scored: list[ScoredCandidate], strategy_input: ProductStrategyInput
     ) -> tuple[EvidenceReference, ...]:
         """Collect evidence references from scoring."""
-        evidence = []
+        evidence: list[EvidenceReference] = []
 
         for candidate in scored:
             evidence.append(
