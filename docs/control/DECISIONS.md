@@ -191,3 +191,108 @@ The reviews demonstrated, with probes, that several documented guarantees were u
 The seed became convergent as well as idempotent: a row that has drifted from the YAML authority is restored, a renamed prompt file has its reference repaired, and concurrent seeding succeeds on every process because inserts use `ON CONFLICT DO NOTHING`.
 
 On the operations side: the container health probe uses liveness, because a readiness probe would keep a fresh unmigrated stack permanently unhealthy while readiness remains the operator signal; credential-bearing URL query parameters are stripped into the secret rather than surviving into logs and responses; continuous integration runs on this branch, checks migration reversibility, and asserts the second seed run changes nothing; a build-ignore file keeps the private source, environment files and operator authority out of the build context; and production builds from the maintained image definitions.
+
+## D-0028 — Exit 78 lift with commissioning evidence gates (Wave 9)
+
+**Status:** accepted for Session 04 Wave 9 (SERIAL), 2026-09-20.
+
+### Context
+
+Exit 78 (`EXIT_UNAVAILABLE = 78`) is the fail-closed boundary that prevents worker and scheduler processes from claiming and executing production jobs. Session 02 implemented the database foundation, Session 03 delivered orchestration library functions (leases, dependency resolution, event dispatch, successor creation), and Session 04 delivered the agent runtime (provider abstraction, prompt store, agent registry, runner, tool permissions, observability). Lane C (completed at `744cc36b`) proved the library integration path: lease → execute → persist → event → successor with deterministic fake providers and TESTED agent state only.
+
+Worker and scheduler entrypoints have remained fail-closed since Session 02:
+- `worker.main()` → `uncommissioned_process("worker")` → `EXIT_UNAVAILABLE`
+- `scheduler.main()` → `uncommissioned_process("scheduler")` → `EXIT_UNAVAILABLE`
+
+Both processes prove database connectivity and log the result, then exit 78 without claiming any job. This was the contract from Session 02's corrective addendum point 1 and Session 03's addendum point 4.
+
+Wave 9 lifts Exit 78 conditionally: worker and scheduler will claim and execute jobs ONLY when commissioning evidence gates pass for the target agent. Uncommissioned agents (state = `DESIGNED`) remain fail-closed and refuse execution.
+
+### Commissioning evidence requirements
+
+An agent may be claimed and executed on the production worker path if and only if:
+
+1. **Agent definition loaded:** Agent row exists in the `agents` table with `commissioning_state` set to `TESTED` or `COMMISSIONED`.
+2. **Contract tests pass:** All eight contract tests for that agent pass (prompt exists, schema imports, config validates, tools resolve, side-effect class declared, fake provider produces valid result, malformed output fails closed, uncommissioned agent refuses production).
+3. **Runtime integration tests pass:** The lease → execute → persist → event → successor flow completes successfully for that agent with deterministic fake provider, real lease acquisition (`FOR UPDATE SKIP LOCKED`), real database transactions, and real event emission.
+4. **Prompt integrity proven:** Agent's prompt file exists at the declared `prompt_path`, SHA-256 matches the stored hash in `prompt_versions` table, required sections are present, and no runtime secrets are embedded.
+5. **Tool permissions enforced:** `AgentRunner` enforces the agent's `allowed_tools` allowlist at runtime; disallowed tool calls raise `ToolPermissionError` and fail the job.
+
+Session 04 Wave 8 delivered contract tests for all sixteen agents (A01–A16) proving items 2–5 above for the implemented agents (A01, A02) and item 2 partial evidence for the remaining DESIGNED agents. Lane C delivered runtime integration tests proving item 3 for the library path.
+
+Wave 9 connects the production claim path: worker process claims READY jobs, invokes `AgentRunner.execute()`, persists `AgentResult`, emits events, and spawns successor jobs. The worker checks agent commissioning state before execution; if `commissioning_state = DESIGNED`, the worker refuses execution and fails the job with `AgentNotCommissionedError`.
+
+### Exit 78 lift conditions
+
+Worker and scheduler entrypoints lift Exit 78 when ALL of:
+
+- Session 04 contract tests pass (all 135+ tests including A01–A16 roster contracts)
+- Lane C runtime integration tests pass (lease → execute → persist → event → successor)
+- Wave 9 runtime integration tests pass (concurrent claim, idempotency, commissioning gates)
+- At least one agent (A01 or A02) is in state `TESTED` with all five commissioning evidence items satisfied
+
+If any of these conditions fail, worker and scheduler continue to exit 78.
+
+### Controlled rollout path
+
+1. **Wave 9 initial:** Lift Exit 78 conditionally. Worker claims jobs ONLY for agents in state `TESTED` or `COMMISSIONED`. A01 Shop Orchestrator and A02 Account & Integration diagnostics are the only agents eligible. All other agents (A03–A16) remain at `DESIGNED` and refuse execution.
+2. **Post-Wave 9:** Operator reviews A01/A02 execution logs, observability data, and runtime metrics. Decision record in `docs/control/DECISIONS.md` records approval or identifies blockers.
+3. **Future waves (S05–S11):** Domain-specific agents (research, concept, Notion build, variant, QA, merchandising, assets, draft, publisher, analytics, support) are implemented with prompts, integration tests, and commissioning evidence, then promoted to `TESTED` individually.
+4. **Commissioning to `COMMISSIONED`:** Requires operator-approved decision record citing: passing integration tests, prompt hash verification, tool permission enforcement, structured output validation, cost/usage metrics within budget, and at least one successful end-to-end workflow execution (research → … → publish → analytics) in simulation mode.
+
+### Concurrent claim safety
+
+Wave 9 proves concurrent claim safety with tests:
+
+- **Idempotent re-claim:** If a lease expires and another worker re-claims the same job, idempotency keys prevent duplicate effects. Test: two workers claim the same idempotency-keyed job concurrently; exactly one succeeds with `READY → RUNNING → SUCCESS`; the second gets a lease collision and finds the job already complete.
+- **Double-execution prevention:** `FOR UPDATE SKIP LOCKED` lease acquisition ensures only one worker can claim a READY job. Test: two workers claim concurrently; exactly one acquires the lease, the other skips and finds no READY job.
+- **Reconciliation:** If a worker crashes after executing but before emitting events, lease expiry allows retry. Idempotency keys prevent duplicate external effects. Test: claim → execute → kill before event → lease expires → re-claim → event + successor created exactly once.
+
+### Fail-closed enforcement
+
+Uncommissioned agents remain fail-closed:
+
+- `AgentRunner.execute()` checks `agent_definition.commissioning_state` before invoking the agent.
+- If state = `DESIGNED`, raise `AgentNotCommissionedError` and fail the job with event `AGENT_NOT_COMMISSIONED`.
+- Contract tests prove this for all sixteen agents.
+
+### Rollback procedure
+
+If Exit 78 lift causes production issues:
+
+1. Revert the commit that lifted Exit 78 (worker/scheduler return to `uncommissioned_process()` path).
+2. Redeploy worker and scheduler containers; they exit 78 immediately.
+3. Investigate logs, agent runs, events, and cost metrics to identify root cause.
+4. File incident in `docs/control/DECISIONS.md` with reproduction, root cause, and remediation plan.
+5. Exit 78 remains until remediation is complete and verified.
+
+### Evidence location
+
+- Contract tests: `tests/unit/test_roster_contracts.py` (135 tests parametrized A01–A16)
+- Runtime integration tests (library): `tests/integration/test_runtime_integration.py` (Lane C)
+- Runtime integration tests (production claim path): `tests/integration/test_runtime_integration.py` (Wave 9 additions)
+- Concurrent claim + idempotency tests: `tests/integration/test_concurrent_claims.py` (Wave 9 new file)
+- Commissioning state enforcement: `tests/unit/test_agent_runner.py` (existing + Wave 9 additions)
+- Worker/scheduler claim path: `src/money_machine/orchestration/worker.py`, `src/money_machine/orchestration/scheduler.py` (Wave 9 edits)
+
+### Session 04 closure relationship
+
+Exit 78 lift is Wave 9 scope within Session 04, but Session 04 closure does not require Exit 78 to be lifted. The eight Session 04 evidence keys are:
+1. `provider_abstraction_implemented` (W2) ✓
+2. `prompt_registry_and_hashes_implemented` (W3) ✓
+3. `agent_runner_integrated_with_jobs` (Lane A orchestrator wire) — OPEN
+4. `sixteen_agents_registered` (W5) ✓
+5. `uncommissioned_agents_documented` (W8) ✓
+6. `contract_and_runtime_tests_pass` (W8 + Lane C) ✓
+7. `control_files_and_checkpoint_current` (tip-sync) ✓
+8. `evidence_closure_commit_recorded` — OPEN
+
+Wave 9 is a bounded slice within Session 04 that conditionally lifts Exit 78 with commissioning gates. Session 04 may close with Exit 78 either lifted (Wave 9 complete) or held (Wave 9 incomplete), as long as all eight evidence keys are true. The decision to lift Exit 78 is captured here; the Session 04 closure decision is separate.
+
+### Related decisions
+
+- D-0003 (Session state is fail-closed) — Exit 78 is a production-blocking fail-closed boundary until commissioning evidence passes
+- D-0026 (Prompt integrity as standing gate) — Agent prompts must pass hash verification before execution
+- Session 02 addendum point 1 — "Job claiming is commissioned in Session 03" (later superseded by Session 03 addendum)
+- Session 03 addendum point 4 — "commissioning evidence, agent promotion to COMMISSIONED, and removal of exit 78 are Session 04's scope"
+- Session 04 addendum point 1 — "Exit 78 stays until decision record + commissioning evidence gate"
