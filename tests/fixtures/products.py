@@ -65,10 +65,10 @@ def create_fixture_product_spec(
     parent_spec_id: UUID | None = None,
 ) -> ProductSpec:
     """Create a fixture ProductSpec for testing.
-    
+
     Generates valid ProductSpec with reasonable defaults that pass validation.
     Supports ORIGINAL, RECONCEPT lineage kinds.
-    
+
     Args:
         spec_id: Spec UUID (generates new if None)
         workflow_id: Workflow UUID (generates new if None)
@@ -85,7 +85,7 @@ def create_fixture_product_spec(
         features: Tuple of features
         lineage_kind: ORIGINAL or RECONCEPT
         parent_spec_id: Parent spec UUID (required for RECONCEPT)
-        
+
     Returns:
         Valid ProductSpec instance
     """
@@ -95,11 +95,11 @@ def create_fixture_product_spec(
         workflow_id = uuid4()
     if product_id is None:
         product_id = uuid4()
-    
+
     # Generate concept fingerprint from identity + category + buyer_problem
     concept_parts = f"{identity}|{base_category}|{buyer_problem}"
     concept_fingerprint = sha256(concept_parts.encode()).hexdigest()
-    
+
     # Evidence reference
     evidence = (
         EvidenceReference(
@@ -108,7 +108,7 @@ def create_fixture_product_spec(
             reference="tests/fixtures/products.py::create_fixture_product_spec",
         ),
     )
-    
+
     return ProductSpec(
         spec_id=spec_id,
         workflow_id=workflow_id,
@@ -167,10 +167,10 @@ def create_fixture_teardown_report(
     ),
 ) -> TeardownReport:
     """Create a fixture TeardownReport for testing (structure-only, no competitor IP).
-    
+
     Generates valid TeardownReport with realistic structure observations
     but NO actual competitor content copying. Per Lane 4 scope: simulation only.
-    
+
     Args:
         report_id: Report UUID (generates new if None)
         workflow_id: Workflow UUID (generates new if None)
@@ -178,7 +178,7 @@ def create_fixture_teardown_report(
         structure_components: List of structural components observed
         buyer_journey: Buyer journey steps observed
         mechanics: Product mechanics/features observed
-        
+
     Returns:
         Valid TeardownReport instance
     """
@@ -186,7 +186,7 @@ def create_fixture_teardown_report(
         report_id = uuid4()
     if workflow_id is None:
         workflow_id = uuid4()
-    
+
     # Evidence reference (fixture-generated, no real purchase)
     evidence = (
         EvidenceReference(
@@ -195,7 +195,7 @@ def create_fixture_teardown_report(
             reference="tests/fixtures/products.py::create_fixture_teardown_report (simulation)",
         ),
     )
-    
+
     return TeardownReport(
         report_id=report_id,
         workflow_id=workflow_id,
@@ -218,15 +218,15 @@ def create_fixture_research_report(
     observation_count: int = 30,
 ) -> ResearchReport:
     """Create a fixture ResearchReport for testing workflow linkage.
-    
+
     Generates valid ResearchReport with realistic observations for 25-40 row grid.
-    
+
     Args:
         report_id: Report UUID (generates new if None)
         workflow_id: Workflow UUID (generates new if None)
         query_terms: Search query terms used
         observation_count: Number of observations (25-40 per workbook)
-        
+
     Returns:
         Valid ResearchReport instance
     """
@@ -234,7 +234,7 @@ def create_fixture_research_report(
         report_id = uuid4()
     if workflow_id is None:
         workflow_id = uuid4()
-    
+
     # Generate fixture observations
     observations: list[ResearchObservation] = []
     for i in range(observation_count):
@@ -261,7 +261,7 @@ def create_fixture_research_report(
                 ),
             )
         )
-    
+
     return ResearchReport(
         report_id=report_id,
         workflow_id=workflow_id,

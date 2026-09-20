@@ -104,13 +104,13 @@ class TestCheckDedupe:
             base_category="Planners & Organizers",
             title="Ultimate 2027 Digital Planner",
         )
-        
+
         result = check_dedupe(
             candidate_spec=candidate,
             existing_specs=[],
             rule_version="1.0.0",
         )
-        
+
         assert result.outcome is BranchOutcome.PASS
         assert len(result.collisions) == 0
         assert len(result.compared_spec_ids) == 0
@@ -124,20 +124,20 @@ class TestCheckDedupe:
             base_category="Planners & Organizers",
             title="Ultimate 2027 Digital Planner",
         )
-        
+
         existing = create_fixture_product_spec(
             spec_id=uuid4(),
             identity="Fitness Tracker",
             base_category="Health & Wellness",
             title="Complete Workout Log System",
         )
-        
+
         result = check_dedupe(
             candidate_spec=candidate,
             existing_specs=[existing],
             rule_version="1.0.0",
         )
-        
+
         assert result.outcome is BranchOutcome.PASS
         assert len(result.collisions) == 0
         assert len(result.compared_spec_ids) == 1
@@ -155,20 +155,20 @@ class TestCheckDedupe:
             base_category="Planners & Organizers",
             title="Ultimate 2027 Digital Planner",
         )
-        
+
         existing = create_fixture_product_spec(
             spec_id=uuid4(),
             identity="Modern Digital Planner",  # SAME identity
             base_category="Planners & Organizers",  # SAME category
             title="Different Title Here",  # Different title doesn't matter
         )
-        
+
         result = check_dedupe(
             candidate_spec=candidate,
             existing_specs=[existing],
             rule_version="1.0.0",
         )
-        
+
         assert result.outcome is BranchOutcome.TOO_CLOSE
         assert len(result.collisions) == 1
         collision = result.collisions[0]
@@ -185,7 +185,7 @@ class TestCheckDedupe:
             base_category="Planners & Organizers",
             title="Ultimate Digital Planner Bundle 2027 Edition",
         )
-        
+
         # Very similar title (many overlapping words)
         existing = create_fixture_product_spec(
             spec_id=uuid4(),
@@ -193,21 +193,21 @@ class TestCheckDedupe:
             base_category="Planners & Organizers",
             title="Ultimate Digital Planner Bundle 2027",  # High Jaccard overlap
         )
-        
+
         # Calculate expected Jaccard
         candidate_tokens = tokenize_title(normalize_title(candidate.title))
         existing_tokens = tokenize_title(normalize_title(existing.title))
         expected_similarity = calculate_jaccard_similarity(candidate_tokens, existing_tokens)
-        
+
         # Verify we're above threshold for this test
         assert expected_similarity >= JACCARD_THRESHOLD
-        
+
         result = check_dedupe(
             candidate_spec=candidate,
             existing_specs=[existing],
             rule_version="1.0.0",
         )
-        
+
         assert result.outcome is BranchOutcome.TOO_CLOSE
         assert len(result.collisions) == 1
         collision = result.collisions[0]
@@ -223,7 +223,7 @@ class TestCheckDedupe:
             base_category="Planners & Organizers",
             title="Ultimate 2027 Digital Planner Bundle Complete",
         )
-        
+
         # Somewhat similar but below threshold
         existing = create_fixture_product_spec(
             spec_id=uuid4(),
@@ -231,13 +231,13 @@ class TestCheckDedupe:
             base_category="Health & Wellness",
             title="Fitness Workout Log",  # Few overlapping words
         )
-        
+
         result = check_dedupe(
             candidate_spec=candidate,
             existing_specs=[existing],
             rule_version="1.0.0",
         )
-        
+
         # Should pass (different identity/category, title similarity < threshold)
         assert result.outcome is BranchOutcome.PASS
         assert len(result.collisions) == 0
@@ -250,7 +250,7 @@ class TestCheckDedupe:
             buyer_problem="Stay organized with a reusable digital planning system",
             title="Title One",
         )
-        
+
         # Different title but SAME identity + category + buyer_problem
         # → same concept fingerprint
         existing = create_fixture_product_spec(
@@ -260,16 +260,16 @@ class TestCheckDedupe:
             buyer_problem="Stay organized with a reusable digital planning system",  # SAME
             title="Completely Different Title Here",  # Different title
         )
-        
+
         # Verify concept fingerprints match (same inputs)
         assert candidate.concept_fingerprint == existing.concept_fingerprint
-        
+
         result = check_dedupe(
             candidate_spec=candidate,
             existing_specs=[existing],
             rule_version="1.0.0",
         )
-        
+
         assert result.outcome is BranchOutcome.TOO_CLOSE
         # May have TWO collisions: EXACT_IDENTITY_CATEGORY and CONCEPT_FINGERPRINT
         # Or just EXACT_IDENTITY_CATEGORY if that rule fires first (implementation dependent)
@@ -286,27 +286,27 @@ class TestCheckDedupe:
             base_category="Planners & Organizers",
             title="Ultimate Digital Planner",
         )
-        
+
         existing_1 = create_fixture_product_spec(
             spec_id=uuid4(),
             identity="Digital Planner",  # Collision 1: exact identity+category
             base_category="Planners & Organizers",
             title="Different Title",
         )
-        
+
         existing_2 = create_fixture_product_spec(
             spec_id=uuid4(),
             identity="Other Identity",
             base_category="Other Category",
             title="Ultimate Digital Planner Bundle",  # Collision 2: title similarity
         )
-        
+
         result = check_dedupe(
             candidate_spec=candidate,
             existing_specs=[existing_1, existing_2],
             rule_version="1.0.0",
         )
-        
+
         assert result.outcome is BranchOutcome.TOO_CLOSE
         # Should have at least 2 collisions (one per existing spec)
         assert len(result.collisions) >= 2
@@ -317,13 +317,13 @@ class TestCheckDedupe:
     def test_dedupe_result_validation(self):
         """Verify DedupeResult validation rules are enforced."""
         candidate = create_fixture_product_spec()
-        
+
         result = check_dedupe(
             candidate_spec=candidate,
             existing_specs=[],
             rule_version="1.0.0",
         )
-        
+
         # Should pass all DedupeResult validations
         assert result.spec_id == candidate.spec_id
         assert result.workflow_id == candidate.workflow_id
