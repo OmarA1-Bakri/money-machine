@@ -18,7 +18,6 @@ from money_machine.domain.enums import BranchOutcome
 from money_machine.domain.models.common import EvidenceReference
 from money_machine.domain.models.products import DedupeCollision, DedupeResult, ProductSpec
 
-
 JACCARD_THRESHOLD: Final[float] = 0.70
 """D-0013: Configured Jaccard threshold for title similarity."""
 

@@ -23,7 +23,6 @@ from money_machine.domain.models.jobs import AgentResult
 from money_machine.domain.models.products import ProductSpec
 from money_machine.domain.services.dedupe import check_dedupe
 
-
 DEDUPE_RULE_VERSION = "1.0.0-D0013"
 """Dedupe rule version identifier per D-0013 decision."""
 
