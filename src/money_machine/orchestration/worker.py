@@ -17,7 +17,7 @@ from typing import Final
 from money_machine.agents.base import AgentNotCommissionedError
 from money_machine.agents.registry import AgentRegistry
 from money_machine.agents.runtime import AgentRunner
-from money_machine.config.runtime import RuntimeSettingsError, load_runtime_settings
+from money_machine.config.runtime import load_runtime_settings
 from money_machine.config.settings import AgentCommissioningState
 from money_machine.domain.enums import JobStatus
 from money_machine.domain.errors import InvalidTransitionError
