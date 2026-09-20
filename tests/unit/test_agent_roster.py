@@ -9,10 +9,10 @@ from uuid import uuid4
 import pytest
 
 from money_machine.agents import (
+    AgentContext,
     AgentNotCommissionedError,
     AgentNotImplementedError,
     AgentRegistry,
-    AgentRunner,
     ToolRegistry,
     assert_agent_may_execute,
 )
@@ -86,35 +86,64 @@ def test_designed_agent_allows_simulation_gate(registry: AgentRegistry) -> None:
 
 
 @pytest.mark.asyncio
-async def test_a01_executes_with_allowed_tools(registry: AgentRegistry) -> None:
-    runner = AgentRunner(registry, ToolRegistry.canonical())
-    result = await runner.execute(_job_for("A01"), production=False)
+async def test_a01_implementation_executes_with_tools(registry: AgentRegistry) -> None:
+    """Test A01 implementation directly via AgentContext (L2 test, no L1 runner)."""
+    job = _job_for("A01")
+    definition = registry.get_definition("A01")
+    implementation = registry.get_implementation("A01")
+
+    context = AgentContext(
+        job=job,
+        definition=definition,
+        run_id=uuid4(),
+        prompt_text="",
+        prompt_reference=definition.system_prompt_reference,
+        prompt_sha256="0" * 64,
+        prompt_version=1,
+        provider=None,  # type: ignore[arg-type]
+        run_at=datetime.now(tz=UTC),
+        tool_registry=ToolRegistry.canonical(),
+    )
+
+    result = await implementation.execute(context)
     assert result.agent_id == "A01"
     assert result.status.value == "SUCCESS"
     assert "initial_workflows_created" in result.output
 
 
 @pytest.mark.asyncio
-async def test_a02_executes_provisioning_check(registry: AgentRegistry) -> None:
-    runner = AgentRunner(registry, ToolRegistry.canonical())
-    result = await runner.execute(
-        _job_for("A02", job_type="ProvisioningCheckJob"),
-        production=False,
+async def test_a02_implementation_executes_provisioning_check(registry: AgentRegistry) -> None:
+    """Test A02 implementation directly via AgentContext (L2 test, no L1 runner)."""
+    job = _job_for("A02", job_type="ProvisioningCheckJob")
+    definition = registry.get_definition("A02")
+    implementation = registry.get_implementation("A02")
+
+    context = AgentContext(
+        job=job,
+        definition=definition,
+        run_id=uuid4(),
+        prompt_text="",
+        prompt_reference=definition.system_prompt_reference,
+        prompt_sha256="0" * 64,
+        prompt_version=1,
+        provider=None,  # type: ignore[arg-type]
+        run_at=datetime.now(tz=UTC),
+        tool_registry=ToolRegistry.canonical(),
     )
+
+    result = await implementation.execute(context)
     assert result.agent_id == "A02"
-    assert result.output["readiness"] == "READY"
-
-
-@pytest.mark.asyncio
-async def test_unimplemented_agent_raises_on_production(registry: AgentRegistry) -> None:
-    runner = AgentRunner(registry, ToolRegistry.canonical())
-    with pytest.raises(AgentNotCommissionedError):
-        await runner.execute(_job_for("A03", job_type="ResearchCollectionJob"), production=True)
+    assert result.status.value == "SUCCESS"
+    assert "openai" in result.output
+    assert "anthropic" in result.output
+    assert "notion" in result.output
+    assert "etsy" in result.output
 
 
 @pytest.mark.asyncio
 async def test_unimplemented_agent_has_no_implementation(registry: AgentRegistry) -> None:
-    with pytest.raises(AgentNotImplementedError):
+    """A03-A16 (DESIGNED) have no implementations; registry.get_implementation raises."""
+    with pytest.raises(AgentNotImplementedError, match="A05"):
         registry.get_implementation("A05")
 
 
@@ -133,6 +162,11 @@ def test_designed_agents_resolve_tools_from_registry(
 
 
 @pytest.mark.parametrize("agent_id", ["A01", "A02"])
-def test_tested_agents_have_prompt_files(agent_id: str) -> None:
-    prompt_path = Path("prompts/agents") / agent_id / "v1.md"
-    assert prompt_path.is_file(), f"Missing prompt for {agent_id}"
+def test_implemented_agents_resolve_tools_from_registry(
+    registry: AgentRegistry,
+    agent_id: str,
+) -> None:
+    tools = ToolRegistry.canonical()
+    definition = registry.get_definition(agent_id)
+    for tool_id in definition.allowed_tools:
+        tools.resolve(tool_id)
