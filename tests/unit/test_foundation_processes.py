@@ -143,17 +143,15 @@ def test_real_entry_points_exit_78_after_a_connectivity_check(module: str) -> No
     assert "Scheduler cycle not implemented" in result.stderr
     assert "worker path only" in result.stderr
     assert "no jobs processed" in result.stderr
-"""Test that commissioning gates pass for real A01/A02 agents."""
-import pytest
-from pathlib import Path
+
 
 def test_commissioning_gates_pass_for_tested_agents():
     """Prove gates return True for A01/A02 with real roster/prompts."""
     from money_machine.orchestration.worker import _check_commissioning_gates
-    
+
     # Gates should pass when A01/A02 are TESTED with valid prompts
     result = _check_commissioning_gates()
-    
+
     # Must return True (not False which would cause Exit 78)
     assert result is True, "Commissioning gates failed for TESTED agents A01/A02"
 
@@ -162,28 +160,28 @@ def test_worker_enters_claim_loop_when_gates_pass(monkeypatch: pytest.MonkeyPatc
     """Prove that when gates pass, worker enters claim loop (not Exit 78)."""
     from money_machine.orchestration import worker
     from money_machine.orchestration._foundation import EXIT_UNAVAILABLE
-    
+
     # Track whether worker loop was called
     loop_called = []
-    
+
     async def mock_loop():
         loop_called.append(True)
         # Exit immediately to prevent infinite loop
         return
-    
+
     # Gates pass (use real check)
     assert worker._check_commissioning_gates() is True
-    
+
     # Mock the worker loop to prevent infinite execution
     monkeypatch.setattr(worker, "_worker_loop", mock_loop)
-    
+
     # Worker main should NOT return EXIT_UNAVAILABLE when gates pass
     # It should call the loop and return 0
     exit_code = worker.main()
-    
+
     # Verify loop was called
     assert loop_called, "Worker loop was not called despite gates passing"
-    
+
     # Verify exit code is success (not EXIT_UNAVAILABLE)
     assert exit_code == 0, f"Worker returned {exit_code} instead of 0 when gates pass"
     assert exit_code != EXIT_UNAVAILABLE, "Worker returned Exit 78 despite gates passing"
