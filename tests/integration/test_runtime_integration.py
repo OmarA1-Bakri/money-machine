@@ -324,7 +324,7 @@ async def test_uncommissioned_agent_refuses_execution_on_production_path(
     repository_root: Path,
 ) -> None:
     """Wave 9: DESIGNED agents refuse execution even when job is claimed (fail-closed)."""
-    from money_machine.agents.base import AgentContext, AgentNotCommissionedError, BaseAgent
+    from money_machine.agents.base import AgentNotCommissionedError, BaseAgent
     from money_machine.agents.runtime import AgentRunner
     from money_machine.domain.models.jobs import AgentResult
     from money_machine.integrations.llm.fake_provider import FakeLLMProvider
@@ -332,7 +332,7 @@ async def test_uncommissioned_agent_refuses_execution_on_production_path(
 
     # Create a simple DESIGNED agent for testing
     class _TestDesignedAgent(BaseAgent):
-        async def execute(self, context: AgentContext) -> AgentResult:
+        async def execute(self, context) -> AgentResult:  # type: ignore[override]
             return AgentResult(
                 job_id=context.job.job_id,
                 agent_run_id=context.run_id,
