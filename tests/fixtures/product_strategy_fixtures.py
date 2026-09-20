@@ -1,7 +1,6 @@
 """Test fixtures for S05 L3 — A05 Product Strategy scorer."""
 
 from datetime import UTC, datetime
-from decimal import Decimal
 from uuid import UUID, uuid4
 
 from money_machine.domain.models.common import EvidenceReference
