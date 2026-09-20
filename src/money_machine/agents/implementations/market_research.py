@@ -63,7 +63,7 @@ class MarketResearchAgent:
             config_path: Path to research.yaml config (defaults to config/research.yaml)
         """
         self.adapter = adapter or FixtureEtsyAdapter()
-        self.config_path = config_path or Path("config/research.yaml")
+        self.config_path = config_path or (Path(__file__).parents[3] / "config" / "research.yaml")
         self._config = self._load_config()
 
     def _load_config(self) -> dict[str, Any]:
@@ -124,6 +124,8 @@ class MarketResearchAgent:
 
         seed_phrases = self._validate_seed_phrases()
         target_count: int = self._config.get("target_observation_count", 30)
+        if not 25 <= target_count <= 40:
+            raise ValueError(f"target_observation_count must be 25-40, got {target_count}")
         max_per_query: int = self._config.get("max_results_per_query", 50)
         source_policy_version: str = self._config.get("source_policy_version", "v1.0")
 

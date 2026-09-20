@@ -155,8 +155,8 @@ async def test_shortlist_produces_5_candidates(test_workflow, test_database, ses
             result = await session.execute(stmt)
             candidates = list(result.scalars().all())
 
-    # Exactly 5 candidates (or up to 5 if fewer niches)
-    assert 1 <= len(candidates) <= 5, f"Expected 1-5 candidates, got {len(candidates)}"
+    # Exactly 5 candidates
+    assert len(candidates) == 5, f"Expected exactly 5 candidates, got {len(candidates)}"
 
     # Each has non-empty identity and category
     for candidate in candidates:
