@@ -9,10 +9,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from money_machine.domain.models.evidence import EvidenceReference
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from money_machine.domain.enums import DecisionType
-from money_machine.domain.models.evidence import EvidenceReference
 from money_machine.domain.models.portfolio import PortfolioDecision
 from money_machine.integrations.jev import (
     DecisionPacket,
