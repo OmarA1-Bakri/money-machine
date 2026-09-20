@@ -39,6 +39,7 @@ class NonFixtureAdapter(EtsyResearchAdapter):
 async def test_workflow(session_factory):
     """Create a test workflow for research."""
     async with session_factory() as session:
+        shop_id = uuid4()
         session.add(Shop(id=shop_id, name="Test Shop", provider_shop_id="test-shop-123"))
 
         workflow = WorkflowRun(
@@ -266,7 +267,7 @@ async def test_uncommissioned_non_fixture_adapter_raises(test_workflow, session_
 
 
 @pytest.mark.asyncio
-async def test_empty_seed_phrases_raises():
+async def test_empty_seed_phrases_raises(session_factory):
     """Test that missing seed phrases fail fast with clear error."""
     # Create temporary config without seed phrases
     import tempfile
