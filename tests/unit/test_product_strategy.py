@@ -37,7 +37,7 @@ def _create_context(strategy_input: ProductStrategyInput) -> AgentContext:
         object_type="workflow_runs",
         owner_agent_id="A05",
         status=JobStatus.READY,
-        input=strategy_input.model_dump(),  # Keep UUID objects, don't serialize to JSON
+        input=strategy_input.model_dump(mode="json"),  # Serialize to JSON-compatible types
         scheduled_at=datetime.now(tz=UTC),
         attempt=0,
         max_attempts=3,
