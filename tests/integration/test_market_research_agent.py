@@ -49,6 +49,8 @@ async def test_workflow(session_factory):
             product_state="RESEARCHING",
         )
         session.add(workflow)
+        await session.commit()
+        await session.refresh(workflow)
 
         job = Job(
             id=uuid4(),
@@ -64,9 +66,7 @@ async def test_workflow(session_factory):
             retry_class="SAFE",
         )
         session.add(job)
-
         await session.commit()
-        await session.refresh(workflow)
         await session.refresh(job)
 
         yield workflow, job
