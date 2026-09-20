@@ -31,9 +31,9 @@ from money_machine.orchestration.leases import (
     heartbeat,
     release_lease,
 )
-from money_machine.persistence.database import check_connectivity, create_engine
+from money_machine.persistence.database import check_connectivity, create_engine, create_session_factory
 from money_machine.persistence.tables import Job
-from money_machine.persistence.unit_of_work import UnitOfWork
+from money_machine.persistence.unit_of_work import UnitOfWork, unit_of_work
 
 LOGGER: Final = logging.getLogger(__name__)
 LEASE_DURATION: Final = timedelta(minutes=5)
@@ -57,7 +57,7 @@ def _check_commissioning_gates() -> bool:
         # Check if any agent is TESTED or COMMISSIONED
         tested_or_commissioned = [
             defn
-            for defn in registry.all()
+            for defn in registry.roster()
             if defn.commissioning_state
             in (
                 AgentCommissioningState.TESTED,
@@ -69,7 +69,7 @@ def _check_commissioning_gates() -> bool:
             LOGGER.error(
                 "No TESTED or COMMISSIONED agents found; Exit 78 held. "
                 "Found %d agents total, all in state DESIGNED or earlier.",
-                len(list(registry.all())),
+                len(list(registry.roster())),
             )
             return False
 
@@ -276,12 +276,15 @@ async def _worker_loop() -> None:
 
     worker_id = deterministic_worker_id(1)
 
+    # Create session factory for the worker loop
+    session_factory = create_session_factory(engine)
+
     try:
         while True:
             now = datetime.now(UTC)
 
             # Create a new session for each claim attempt
-            async with UnitOfWork.from_engine(engine) as uow:
+            async with unit_of_work(session_factory) as uow:
                 # Claim one READY job
                 job = await claim_ready_job(
                     uow.session,

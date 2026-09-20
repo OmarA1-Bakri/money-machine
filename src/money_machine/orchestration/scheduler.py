@@ -384,7 +384,7 @@ def main() -> int:
         # Check if any agent is TESTED or COMMISSIONED
         tested_or_commissioned = [
             defn
-            for defn in registry.all()
+            for defn in registry.roster()
             if defn.commissioning_state
             in (
                 AgentCommissioningState.TESTED,
@@ -396,7 +396,7 @@ def main() -> int:
             LOGGER.error(
                 "No TESTED or COMMISSIONED agents found; scheduler exits 78 (fail-closed). "
                 "Found %d agents total, all in state DESIGNED or earlier.",
-                len(list(registry.all())),
+                len(list(registry.roster())),
             )
             return uncommissioned_process("scheduler")
 

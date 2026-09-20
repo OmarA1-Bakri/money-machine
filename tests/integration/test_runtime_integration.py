@@ -319,118 +319,110 @@ def test_process_entrypoints_remain_exit_78(module: str) -> None:
 
 @pytest.mark.asyncio
 async def test_uncommissioned_agent_refuses_execution_on_production_path(
-    test_database_url: str,
+    session: AsyncSession,
+    session_factory,
+    repository_root: Path,
 ) -> None:
     """Wave 9: DESIGNED agents refuse execution even when job is claimed (fail-closed)."""
     from money_machine.agents.base import AgentNotCommissionedError
     from money_machine.agents.implementations.market_research import MarketResearchAgent
     from money_machine.agents.runtime import AgentRunner
     from money_machine.integrations.llm.fake_provider import FakeLLMProvider
-    from money_machine.persistence.database import create_engine
-    from money_machine.persistence.unit_of_work import UnitOfWork
+    from money_machine.persistence.unit_of_work import unit_of_work
 
-    engine = create_engine(test_database_url)
+    # Setup: create test data
+    await seed(session, repository_root=repository_root)
+    shop = await make_shop(session)
+    workflow = await make_workflow(session, shop=shop)
 
-    try:
-        async with UnitOfWork.from_engine(engine) as uow:
-            await seed(uow.session)
-            shop = await make_shop(uow.session)
-            workflow = await make_workflow(uow.session, shop_id=shop.id)
+    # Create a job for A03 (Market Research) which is DESIGNED
+    job = await _make_schedule_configuration_job(
+        session,
+        workflow.id,
+        object_id=workflow.id,
+    )
+    # Override owner to A03 (DESIGNED agent)
+    job.owner_agent_id = "A03"
+    job.job_type = "MarketResearchJob"
+    await session.commit()
 
-            # Create a job for A03 (Market Research) which is DESIGNED
-            job = await _make_schedule_configuration_job(
-                uow.session,
-                workflow.id,
-                object_id=workflow.id,
-            )
-            # Override owner to A03 (DESIGNED agent)
-            job.owner_agent_id = "A03"
-            job.job_type = "MarketResearchJob"
-            await uow.commit()
+    job_id = job.id
 
-        # Attempt to execute with production=True
-        repo_root = Path(__file__).parent.parent.parent
-        runner = AgentRunner.from_repository_root(
-            repo_root,
-            provider=FakeLLMProvider(),
-        )
+    # Attempt to execute with production=True
+    runner = AgentRunner.from_repository_root(
+        repository_root,
+        provider=FakeLLMProvider(),
+    )
 
-        async with UnitOfWork.from_engine(engine) as uow:
-            job = await uow.session.get(Job, job.id)
-            envelope = _job_envelope(job)
-            agent = MarketResearchAgent()
+    async with unit_of_work(session_factory) as uow:
+        job = await uow.session.get(Job, job_id)
+        envelope = _job_envelope(job)
+        agent = MarketResearchAgent()
 
-            # Execution should raise AgentNotCommissionedError
-            with pytest.raises(AgentNotCommissionedError) as exc_info:
-                await runner.execute(
-                    uow.session,
-                    job=envelope,
-                    agent=agent,
-                    production=True,
-                )
-
-            assert (
-                "DESIGNED" in str(exc_info.value)
-                or "not commissioned" in str(exc_info.value).lower()
-            ), f"Expected 'DESIGNED' or 'not commissioned' in error message, got: {exc_info.value}"
-
-    finally:
-        await engine.dispose()
-
-
-@pytest.mark.asyncio
-async def test_tested_agent_executes_on_production_path(
-    test_database_url: str,
-) -> None:
-    """Wave 9: TESTED agents execute successfully on production path."""
-    from money_machine.agents.implementations.shop_orchestrator import ShopOrchestratorAgent
-    from money_machine.agents.runtime import AgentRunner
-    from money_machine.domain.enums import AgentRunStatus
-    from money_machine.integrations.llm.fake_provider import FakeLLMProvider
-    from money_machine.persistence.database import create_engine
-    from money_machine.persistence.unit_of_work import UnitOfWork
-
-    engine = create_engine(test_database_url)
-
-    try:
-        async with UnitOfWork.from_engine(engine) as uow:
-            await seed(uow.session)
-            shop = await make_shop(uow.session)
-            workflow = await make_workflow(uow.session, shop_id=shop.id)
-
-            # Create a job for A01 (Shop Orchestrator) which is TESTED
-            job = await _make_schedule_configuration_job(
-                uow.session,
-                workflow.id,
-                object_id=workflow.id,
-            )
-            await uow.commit()
-
-        # Execute with production=True (should succeed)
-        repo_root = Path(__file__).parent.parent.parent
-        runner = AgentRunner.from_repository_root(
-            repo_root,
-            provider=FakeLLMProvider(),
-        )
-
-        async with UnitOfWork.from_engine(engine) as uow:
-            job = await uow.session.get(Job, job.id)
-            envelope = _job_envelope(job)
-            agent = ShopOrchestratorAgent()
-
-            result, receipt = await runner.execute(
+        # Execution should raise AgentNotCommissionedError
+        with pytest.raises(AgentNotCommissionedError) as exc_info:
+            await runner.execute(
                 uow.session,
                 job=envelope,
                 agent=agent,
                 production=True,
             )
 
-            # A01 is TESTED and should execute successfully
-            assert result.status in (AgentRunStatus.SUCCESS, AgentRunStatus.FAILURE), (
-                f"Expected SUCCESS or FAILURE for TESTED agent, got {result.status}"
-            )
-            assert receipt.agent_id == "A01"
-            assert receipt.status in (AgentRunStatus.SUCCESS, AgentRunStatus.FAILURE)
+        assert (
+            "DESIGNED" in str(exc_info.value)
+            or "not commissioned" in str(exc_info.value).lower()
+        ), f"Expected 'DESIGNED' or 'not commissioned' in error message, got: {exc_info.value}"
 
-    finally:
-        await engine.dispose()
+
+@pytest.mark.asyncio
+async def test_tested_agent_executes_on_production_path(
+    session: AsyncSession,
+    session_factory,
+    repository_root: Path,
+) -> None:
+    """Wave 9: TESTED agents execute successfully on production path."""
+    from money_machine.agents.implementations.shop_orchestrator import ShopOrchestratorAgent
+    from money_machine.agents.runtime import AgentRunner
+    from money_machine.domain.enums import AgentRunStatus
+    from money_machine.integrations.llm.fake_provider import FakeLLMProvider
+    from money_machine.persistence.unit_of_work import unit_of_work
+
+    # Setup: create test data
+    await seed(session, repository_root=repository_root)
+    shop = await make_shop(session)
+    workflow = await make_workflow(session, shop=shop)
+
+    # Create a job for A01 (Shop Orchestrator) which is TESTED
+    job = await _make_schedule_configuration_job(
+        session,
+        workflow.id,
+        object_id=workflow.id,
+    )
+    await session.commit()
+
+    job_id = job.id
+
+    # Execute with production=True (should succeed)
+    runner = AgentRunner.from_repository_root(
+        repository_root,
+        provider=FakeLLMProvider(),
+    )
+
+    async with unit_of_work(session_factory) as uow:
+        job = await uow.session.get(Job, job_id)
+        envelope = _job_envelope(job)
+        agent = ShopOrchestratorAgent()
+
+        result, receipt = await runner.execute(
+            uow.session,
+            job=envelope,
+            agent=agent,
+            production=True,
+        )
+
+        # A01 is TESTED and should execute successfully
+        assert result.status in (AgentRunStatus.SUCCESS, AgentRunStatus.FAILURE), (
+            f"Expected SUCCESS or FAILURE for TESTED agent, got {result.status}"
+        )
+        assert receipt.agent_id == "A01"
+        assert receipt.status in (AgentRunStatus.SUCCESS, AgentRunStatus.FAILURE)
