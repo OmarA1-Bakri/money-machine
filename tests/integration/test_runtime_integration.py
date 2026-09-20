@@ -324,11 +324,25 @@ async def test_uncommissioned_agent_refuses_execution_on_production_path(
     repository_root: Path,
 ) -> None:
     """Wave 9: DESIGNED agents refuse execution even when job is claimed (fail-closed)."""
-    from money_machine.agents.base import AgentNotCommissionedError
-    from money_machine.agents.implementations.market_research import MarketResearchAgent
+    from money_machine.agents.base import AgentContext, AgentNotCommissionedError, BaseAgent
     from money_machine.agents.runtime import AgentRunner
+    from money_machine.domain.models.jobs import AgentResult
     from money_machine.integrations.llm.fake_provider import FakeLLMProvider
     from money_machine.persistence.unit_of_work import unit_of_work
+
+    # Create a simple DESIGNED agent for testing
+    class _TestDesignedAgent(BaseAgent):
+        async def execute(self, context: AgentContext) -> AgentResult:
+            return AgentResult(
+                job_id=context.job.job_id,
+                agent_run_id=context.run_id,
+                agent_id=context.definition.agent_id,
+                agent_definition_version=context.definition.contract_version,
+                prompt_reference=context.prompt_reference,
+                prompt_sha256=context.prompt_sha256,
+                status=AgentRunStatus.SUCCESS,
+                output={},
+            )
 
     # Setup: create test data
     await seed(session, repository_root=repository_root)
@@ -356,8 +370,9 @@ async def test_uncommissioned_agent_refuses_execution_on_production_path(
 
     async with unit_of_work(session_factory) as uow:
         job = await uow.session.get(Job, job_id)
+        assert job is not None
         envelope = _job_envelope(job)
-        agent = MarketResearchAgent()
+        agent = _TestDesignedAgent()
 
         # Execution should raise AgentNotCommissionedError
         with pytest.raises(AgentNotCommissionedError) as exc_info:
@@ -409,6 +424,7 @@ async def test_tested_agent_executes_on_production_path(
 
     async with unit_of_work(session_factory) as uow:
         job = await uow.session.get(Job, job_id)
+        assert job is not None
         envelope = _job_envelope(job)
         agent = ShopOrchestratorAgent()
 

@@ -14,7 +14,7 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from money_machine.domain.enums import JobStatus, RetryClass, SideEffectClass
@@ -177,12 +177,12 @@ async def test_idempotent_reclaim_prevents_duplicate_events(
     # Check event count before re-claim
     async with unit_of_work(session_factory) as uow:
         event_count_before = await uow.session.scalar(
-            select(Event)
+            select(func.count())
+            .select_from(Event)
             .where(
                 Event.workflow_id == workflow_id,
                 Event.job_id == job_id,
             )
-            .count()
         )
         # No events yet (crashed before emit)
         assert event_count_before == 0 or event_count_before is None
@@ -238,12 +238,12 @@ async def test_idempotent_reclaim_prevents_duplicate_events(
     # Verify exactly one event exists
     async with unit_of_work(session_factory) as uow:
         event_count_after = await uow.session.scalar(
-            select(Event)
+            select(func.count())
+            .select_from(Event)
             .where(
                 Event.workflow_id == workflow_id,
                 Event.job_id == job_id,
             )
-            .count()
         )
         assert event_count_after == 1, (
             f"Expected exactly 1 event (idempotent), got {event_count_after}"
@@ -278,7 +278,7 @@ async def test_double_execution_prevented_by_for_update_skip_locked(
     now = datetime.now(UTC)
     lease_duration = timedelta(minutes=5)
 
-    execution_count = []
+    execution_count: list[int] = []
 
     async def execute_worker1():
         async with unit_of_work(session_factory) as uow1:
