@@ -11,6 +11,7 @@ Tests cover:
 - TOO_CLOSE outcomes
 """
 
+from decimal import Decimal
 from uuid import uuid4
 
 import pytest
@@ -33,7 +34,9 @@ class TestTitleNormalization:
         """Unicode normalization (NFKD) and case-folding."""
         title = "Café Latté — Naïve"
         normalized = normalize_title(title)
-        assert "café" in normalized.lower()
+        assert "cafe" in normalized.lower()
+        assert "latte" in normalized.lower()
+        assert "naive" in normalized.lower()
         assert normalized == normalized.lower()
 
     def test_normalize_title_punctuation(self):
@@ -213,8 +216,8 @@ class TestCheckDedupe:
         collision = result.collisions[0]
         assert collision.reason == "TITLE_SIMILARITY"
         assert collision.other_spec_id == existing.spec_id
-        assert collision.similarity >= JACCARD_THRESHOLD
-        assert collision.similarity == pytest.approx(expected_similarity, abs=0.01)  # type: ignore[arg-type]
+        assert collision.similarity >= Decimal(str(JACCARD_THRESHOLD))
+        assert float(collision.similarity) == pytest.approx(expected_similarity, abs=0.01)
 
     def test_dedupe_pass_title_below_threshold(self):
         """PASS when title similarity < 0.70 threshold."""
@@ -331,7 +334,7 @@ class TestCheckDedupe:
         assert result.spec_id == candidate.spec_id
         assert result.workflow_id == candidate.workflow_id
         assert result.outcome in {BranchOutcome.PASS, BranchOutcome.TOO_CLOSE}
-        assert result.title_similarity_threshold == JACCARD_THRESHOLD
+        assert result.title_similarity_threshold == Decimal(str(JACCARD_THRESHOLD))
         # Self-comparison not allowed
         assert result.spec_id not in result.compared_spec_ids
         # PASS forbids collisions
