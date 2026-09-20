@@ -105,12 +105,20 @@ class A05ProductStrategy(BaseAgent):
                 message=str(e),
                 retryable=False,
             )
-            
+
             # Extract job metadata from context or use defaults
             job_id = context.job.job_id
-            workflow_id = getattr(context.job.input.get("workflow_id"), "hex", str(uuid4())) if isinstance(context.job.input.get("workflow_id"), UUID) else str(uuid4())
-            research_run_id = getattr(context.job.input.get("research_run_id"), "hex", str(uuid4())) if isinstance(context.job.input.get("research_run_id"), UUID) else str(uuid4())
-            
+            workflow_id = (
+                getattr(context.job.input.get("workflow_id"), "hex", str(uuid4()))
+                if isinstance(context.job.input.get("workflow_id"), UUID)
+                else str(uuid4())
+            )
+            research_run_id = (
+                getattr(context.job.input.get("research_run_id"), "hex", str(uuid4()))
+                if isinstance(context.job.input.get("research_run_id"), UUID)
+                else str(uuid4())
+            )
+
             result = ProductStrategyResult(
                 agent_run_id=context.agent_run_id,
                 agent_id=self.agent_id,
@@ -128,7 +136,7 @@ class A05ProductStrategy(BaseAgent):
                 error=error,
                 completed_at=datetime.now(UTC),
             )
-            
+
             return AgentResult(
                 job_id=job_id,
                 agent_run_id=context.agent_run_id,
