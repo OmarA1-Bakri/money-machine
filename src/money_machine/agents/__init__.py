@@ -25,27 +25,21 @@ from money_machine.agents.tool_registry import (
 )
 
 __all__ = [
-    # L1 Runtime
-    "AgentRunner",
-    "AgentRunReceipt",
-    "input_hash",
-    # Registry
+    "EXECUTABLE_COMMISSIONING_STATES",
+    "AgentContext",
+    "AgentDefinition",
+    "AgentNotCommissionedError",
     "AgentRegistry",
-    # L2 Tool Registry
-    "ToolRegistry",
+    "AgentRegistryError",
+    "AgentRunReceipt",
+    "AgentRunner",
+    "AgentRuntimeError",
+    "BaseAgent",
     "ToolDefinition",
     "ToolNotFoundError",
     "ToolPermissionError",
-    # Types
-    "AgentContext",
-    "AgentDefinition",
-    "BaseAgent",
-    # Commissioning
-    "EXECUTABLE_COMMISSIONING_STATES",
+    "ToolRegistry",
     "assert_production_executable",
+    "input_hash",
     "parse_system_prompt_reference",
-    # Errors
-    "AgentNotCommissionedError",
-    "AgentRegistryError",
-    "AgentRuntimeError",
 ]
