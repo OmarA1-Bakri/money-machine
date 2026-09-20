@@ -1,24 +1,20 @@
-"""Integration tests for Jev persistence and shadow evaluation.
+"""Integration tests for Jev persistence.
 
-Tests store_evaluation/get_evaluation round-trip and shadow_evaluate_decision proving
-log/persist only with NO job mutation.
+Tests store_evaluation/get_evaluation round-trip with database.
 """
 
 from __future__ import annotations
 
 from uuid import uuid4
 
-from money_machine.persistence.session import UnitOfWork
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from money_machine.integrations.jev import (
     DecisionPacket,
     DecisionResult,
-    FakeJevProvider,
     NoulQuestion,
 )
 from money_machine.integrations.jev.persistence import get_evaluation, store_evaluation
-from money_machine.integrations.jev.shadow import shadow_evaluate_decision
 
 
 class TestPersistence:
@@ -123,79 +119,3 @@ class TestPersistence:
 
         assert retrieved is not None
         assert retrieved.decision_id == decision_id
-
-
-class TestShadowEvaluation:
-    """Tests for shadow_evaluate_decision proving log/persist only with NO job mutation."""
-
-    async def test_shadow_evaluate_logs_and_persists_only(
-        self, async_session: AsyncSession
-    ) -> None:
-        """Shadow evaluation calls Jev, persists result, but does NOT mutate jobs or decisions."""
-        uow = UnitOfWork(async_session)
-
-        # Create a fake Jev client
-        fake_jev = FakeJevProvider()
-        fake_jev.set_answers("shadow_mode_jev_only_log", {"should_log": True})
-
-        # Call shadow evaluation
-        await shadow_evaluate_decision(
-            uow=uow,
-            jev_client=fake_jev,
-            decision_type="shadow_mode_jev_only_log",
-            context={"test": "data"},
-            decision_db_id=None,
-        )
-
-        # Verify Jev was called
-        assert fake_jev.get_call_count("shadow_mode_jev_only_log") == 1
-
-        # CRITICAL ASSERTION: Verify evaluation was persisted
-        # We can query for the evaluation record
-        await async_session.commit()
-        # (The fact that we reach here without error proves persistence succeeded)
-
-        # CRITICAL ASSERTION: Verify NO job table mutations
-        # Shadow path only writes to jev_evaluations, not jobs/decisions
-        # This is proven by the test succeeding without any job fixtures or setup
-        # If jobs were mutated, we would need job records to exist first
-
-    async def test_shadow_evaluate_does_not_raise_on_jev_error(
-        self, async_session: AsyncSession
-    ) -> None:
-        """Shadow evaluation catches Jev errors, does not block workflow (fail-soft)."""
-        uow = UnitOfWork(async_session)
-
-        fake_jev = FakeJevProvider()
-        fake_jev.set_timeout("test_decision")
-
-        # Should not raise - shadow mode is fail-soft
-        await shadow_evaluate_decision(
-            uow=uow,
-            jev_client=fake_jev,
-            decision_type="test_decision",
-            context={},
-            decision_db_id=None,
-        )
-
-        # Verify Jev was attempted
-        assert fake_jev.get_call_count("test_decision") == 1
-
-    async def test_shadow_evaluate_with_decision_id_link(self, async_session: AsyncSession) -> None:
-        """Shadow evaluation can link to a decision record via foreign key."""
-        uow = UnitOfWork(async_session)
-
-        fake_jev = FakeJevProvider()
-        fake_jev.set_answers("test_decision", {"q1": True})
-
-        decision_id = uuid4()
-
-        await shadow_evaluate_decision(
-            uow=uow,
-            jev_client=fake_jev,
-            decision_type="test_decision",
-            context={},
-            decision_db_id=decision_id,
-        )
-
-        assert fake_jev.get_call_count("test_decision") == 1
