@@ -60,7 +60,6 @@ class AgentRegistry:
         """L2: Return agent implementation or raise AgentNotImplementedError."""
         from money_machine.agents.base import AgentNotImplementedError
 
-        definition = self.get(agent_id)
         # Map agent IDs to their implementations
         implementations: dict[str, str] = {
             "A01": "money_machine.agents.implementations.shop_orchestrator.ShopOrchestrator",
