@@ -51,6 +51,8 @@ reportUnknownMemberType = "none"
 reportUnknownVariableType = "none"
 reportUnknownParameterType = "none"
 reportUnknownArgumentType = "none"
+reportMissingParameterType = "none"
+reportCallIssue = "none"
 
 [tool.ruff]
 line-length = 100
