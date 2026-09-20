@@ -14,20 +14,25 @@ from typing import Protocol, TypedDict
 
 from pydantic import BaseModel, Field
 
+try:
+    from typing import NotRequired
+except ImportError:
+    from typing_extensions import NotRequired
 
-class EtsyObservationDict(TypedDict, total=False):
+
+class EtsyObservationDict(TypedDict):
     """Type definition for Etsy observation in JSON fixtures."""
 
     rank: int
     title: str
     current_price_cents: int
-    anchor_price_cents: int | None
+    anchor_price_cents: NotRequired[int | None]
     shop_name: str
-    shop_sales_count: int | None
-    shop_age_years: int | None
-    badges: list[str]
-    urgency_signals: list[str]
-    review_count: int | None
+    shop_sales_count: NotRequired[int | None]
+    shop_age_years: NotRequired[int | None]
+    badges: NotRequired[list[str]]
+    urgency_signals: NotRequired[list[str]]
+    review_count: NotRequired[int | None]
     identity_niche: str
     base_category: str
     listing_url: str
@@ -165,8 +170,6 @@ class EtsyFixtureAdapter:
             raise KeyError(f"Phrase '{phrase}' not found in fixtures")
 
         raw_observations = fixtures[phrase]
-        if not isinstance(raw_observations, list):
-            raise ValueError(f"Fixture data for '{phrase}' must be a list")
 
         observations = [
             EtsyResearchObservation(
