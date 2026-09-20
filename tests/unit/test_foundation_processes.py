@@ -59,7 +59,9 @@ def test_worker_entrypoint_configures_logging(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(worker, "unavailable", unavailable_stub)
 
     assert worker.main() == EXIT_UNAVAILABLE
-    assert calls == [{"level": logging.INFO, "format": "%(asctime)s %(levelname)s %(name)s: %(message)s"}]
+    assert calls == [
+        {"level": logging.INFO, "format": "%(asctime)s %(levelname)s %(name)s: %(message)s"}
+    ]
 
 
 def test_scheduler_entrypoint_configures_logging(monkeypatch: pytest.MonkeyPatch) -> None:
