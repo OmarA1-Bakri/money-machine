@@ -30,7 +30,7 @@ async def test_workflow(session_factory):
     """Create a test workflow for research."""
     async with session_factory() as session:
         shop_id = uuid4()
-        session.add(Shop(id=shop_id, name="Test Shop", identifier="test-shop"))
+        session.add(Shop(id=shop_id, name="Test Shop", provider_shop_id="test-shop-123"))
 
         workflow = WorkflowRun(
             id=uuid4(),
@@ -86,7 +86,8 @@ async def test_market_research_produces_25_40_observations(test_workflow, test_d
     """
     workflow, job = test_workflow
 
-    async with UnitOfWork() as uow:
+    async with session_factory() as session:
+        uow = UnitOfWork(session)
         report = await execute_market_research(workflow.id, job, uow)
 
     # At least 25 listing observations
@@ -129,7 +130,8 @@ async def test_shortlist_produces_5_candidates(test_workflow, test_database, ses
     """
     workflow, job = test_workflow
 
-    async with UnitOfWork() as uow:
+    async with session_factory() as session:
+        uow = UnitOfWork(session)
         report = await execute_market_research(workflow.id, job, uow)
 
         # Verify candidates were persisted
@@ -171,11 +173,13 @@ async def test_research_persists_to_database(test_workflow, test_database):
     """Test that ResearchRun is created and marked complete."""
     workflow, job = test_workflow
 
-    async with UnitOfWork() as uow:
+    async with session_factory() as session:
+        uow = UnitOfWork(session)
         _ = await execute_market_research(workflow.id, job, uow)
 
     # Verify ResearchRun was persisted
-    async with UnitOfWork() as uow:
+    async with session_factory() as session:
+        uow = UnitOfWork(session)
         repo = ResearchRunRepository(uow.session)
         runs = await repo.for_workflow(workflow.id)
 
@@ -198,7 +202,8 @@ async def test_nullable_fields_preserved(test_workflow, test_database, session_f
     """
     workflow, job = test_workflow
 
-    async with UnitOfWork() as uow:
+    async with session_factory() as session:
+        uow = UnitOfWork(session)
         report = await execute_market_research(workflow.id, job, uow)
 
     # Check if any observations have NULL anchor_price (expected for some fixtures)
@@ -231,7 +236,8 @@ async def test_duplicate_source_reference_handling(test_workflow, test_database)
     """
     workflow, job = test_workflow
 
-    async with UnitOfWork() as uow:
+    async with session_factory() as session:
+        uow = UnitOfWork(session)
         report = await execute_market_research(workflow.id, job, uow)
 
     # Check for duplicates in persisted observations
@@ -250,7 +256,8 @@ async def test_uncommissioned_non_fixture_adapter_raises(test_workflow):
     # Create agent with non-fixture adapter
     agent = MarketResearchAgent(adapter=NonFixtureAdapter())
 
-    async with UnitOfWork() as uow:
+    async with session_factory() as session:
+        uow = UnitOfWork(session)
         with pytest.raises(NotImplementedError, match="Only fixture adapter supported"):
             await agent.execute(workflow.id, job, uow)
 
@@ -279,11 +286,10 @@ async def test_empty_seed_phrases_raises():
             object_id=workflow_id,
             owner_agent_id="A03",
             status="READY",
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
         )
 
-        async with UnitOfWork() as uow:
+        async with session_factory() as session:
+        uow = UnitOfWork(session)
             with pytest.raises(ValueError, match="No seed phrases configured"):
                 await agent.execute(workflow_id, job, uow)
     finally:
@@ -295,7 +301,8 @@ async def test_young_and_fast_shop_detection(test_workflow, test_database, sessi
     """Test that young-and-fast shops are identified in shortlist analysis."""
     workflow, job = test_workflow
 
-    async with UnitOfWork() as uow:
+    async with session_factory() as session:
+        uow = UnitOfWork(session)
         report = await execute_market_research(workflow.id, job, uow)
 
     # At least some fixtures should have young-and-fast shops
@@ -325,7 +332,8 @@ async def test_price_bands_extracted(test_workflow, test_database):
     """Test that price ranges are calculated for each candidate."""
     workflow, job = test_workflow
 
-    async with UnitOfWork() as uow:
+    async with session_factory() as session:
+        uow = UnitOfWork(session)
         report = await execute_market_research(workflow.id, job, uow)
 
     # Group observations by identity to verify price diversity
@@ -356,7 +364,8 @@ async def test_risk_notes_generated(test_workflow, test_database, session_factor
     """Test that risk notes are generated for each candidate."""
     workflow, job = test_workflow
 
-    async with UnitOfWork() as uow:
+    async with session_factory() as session:
+        uow = UnitOfWork(session)
         _ = await execute_market_research(workflow.id, job, uow)
 
         async with session_factory() as session:
@@ -379,7 +388,8 @@ async def test_observation_count_matches_report(test_workflow, test_database, se
     """Test that ResearchRun.observation_count matches actual observations."""
     workflow, job = test_workflow
 
-    async with UnitOfWork() as uow:
+    async with session_factory() as session:
+        uow = UnitOfWork(session)
         report = await execute_market_research(workflow.id, job, uow)
 
         async with session_factory() as session:
