@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from money_machine.persistence.repositories._base import Repository
-from money_machine.persistence.tables import AgentDefinition, AgentRun, PromptVersion
+from money_machine.persistence.tables import AgentDefinition, AgentRun, AgentToolCall, PromptVersion
 
 
 class AgentDefinitionRepository(Repository[AgentDefinition]):
@@ -65,4 +65,26 @@ class AgentRunRepository(Repository[AgentRun]):
     async def for_job(self, job_id: object) -> tuple[AgentRun, ...]:
         """Every run for one job, oldest first."""
         statement = select(AgentRun).where(AgentRun.job_id == job_id).order_by(AgentRun.started_at)
+        return tuple((await self.session.execute(statement)).scalars().all())
+
+    async def for_agent(self, agent_id: str) -> tuple[AgentRun, ...]:
+        """Every run for one agent, oldest first."""
+        statement = (
+            select(AgentRun).where(AgentRun.agent_id == agent_id).order_by(AgentRun.started_at)
+        )
+        return tuple((await self.session.execute(statement)).scalars().all())
+
+
+class AgentToolCallRepository(Repository[AgentToolCall]):
+    """Tool invocations recorded against agent runs."""
+
+    model = AgentToolCall
+
+    async def for_run(self, agent_run_id: object) -> tuple[AgentToolCall, ...]:
+        """Every tool call for one agent run, oldest first."""
+        statement = (
+            select(AgentToolCall)
+            .where(AgentToolCall.agent_run_id == agent_run_id)
+            .order_by(AgentToolCall.created_at)
+        )
         return tuple((await self.session.execute(statement)).scalars().all())

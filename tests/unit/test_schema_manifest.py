@@ -193,16 +193,16 @@ def test_exactly_one_migration_revision_exists_and_it_is_the_root() -> None:
     """The foundation ships one reviewed initial revision, not a chain of fixups."""
     revisions = sorted(path for path in MIGRATIONS.glob("*.py"))
 
-    # Two revisions now: canonical + jev_evaluations addendum
-    assert len(revisions) == 2
+    # Three revisions now: canonical + jev_evaluations + agent_run observability addenda
+    assert len(revisions) == 3
 
     # Canonical (root) migration
     canonical = next(r for r in revisions if "9f46f3152a68" in r.name)
     body = canonical.read_text(encoding="utf-8")
     assert "down_revision: str | None = None" in body
-    # Canonical creates all tables except jev_evaluations
-    assert body.count("op.create_table") == len(EXPECTED_TABLES) - 1
-    assert body.count("op.drop_table") == len(EXPECTED_TABLES) - 1
+    # Canonical creates all workbook tables plus pre-observability addendum tables
+    assert body.count("op.create_table") == len(EXPECTED_TABLES) - 2
+    assert body.count("op.drop_table") == len(EXPECTED_TABLES) - 2
     assert "CREATE EXTENSION IF NOT EXISTS pgcrypto" in body
 
     # Jev addendum migration
@@ -212,6 +212,13 @@ def test_exactly_one_migration_revision_exists_and_it_is_the_root() -> None:
     assert "jev_evaluations" in jev_body
     assert "op.create_table" in jev_body
     assert 'op.drop_table("jev_evaluations")' in jev_body
+
+    # Agent-run observability addendum migration
+    obs_migration = next(r for r in revisions if "b2c3d4e5f6a7" in r.name)
+    obs_body = obs_migration.read_text(encoding="utf-8")
+    assert 'down_revision = "a1b2c3d4e5f6"' in obs_body
+    assert "agent_tool_calls" in obs_body
+    assert 'op.add_column("agent_runs", sa.Column("run_number"' in obs_body
 
 
 def test_contract_taxonomies_are_subsets_of_their_table_taxonomies() -> None:

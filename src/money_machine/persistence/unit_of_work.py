@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from money_machine.persistence.repositories.agents import (
     AgentDefinitionRepository,
     AgentRunRepository,
+    AgentToolCallRepository,
 )
 from money_machine.persistence.repositories.artifacts import ArtifactRepository, ReceiptRepository
 from money_machine.persistence.repositories.events import EventRepository, IdempotencyRepository
@@ -37,6 +38,7 @@ class UnitOfWork:
         self.idempotency = IdempotencyRepository(session)
         self.agent_definitions = AgentDefinitionRepository(session)
         self.agent_runs = AgentRunRepository(session)
+        self.agent_tool_calls = AgentToolCallRepository(session)
         self.artifacts = ArtifactRepository(session)
         self.receipts = ReceiptRepository(session)
         self.products = ProductRepository(session)
