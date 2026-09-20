@@ -80,8 +80,5 @@ class AgentRegistry:
         for definition in self.roster():
             unknown = set(definition.allowed_tools) - known_tool_ids
             if unknown:
-                msg = (
-                    f"agent {definition.agent_id} references unknown tools: "
-                    f"{sorted(unknown)}"
-                )
+                msg = f"agent {definition.agent_id} references unknown tools: {sorted(unknown)}"
                 raise AgentRegistryError(msg)
