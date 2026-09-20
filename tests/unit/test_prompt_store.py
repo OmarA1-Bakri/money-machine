@@ -309,11 +309,11 @@ def test_path_traversal_absolute_path(prompts_root: Path) -> None:
     store = PromptStore(prompts_root)
     expected_hash = "a" * 64  # Dummy hash
 
-    # Absolute Unix path
-    with pytest.raises(ValueError, match="cannot be an absolute path"):
+    # Absolute Unix path (caught by slash check)
+    with pytest.raises(ValueError, match=r"forbidden pattern '/'"):
         store.load("/etc/passwd", "v1", expected_hash=expected_hash)
 
-    # Absolute Windows path (if applicable)
+    # Absolute Windows path (caught by backslash or colon check)
     with pytest.raises(ValueError, match=r"forbidden pattern|cannot be an absolute path"):
         store.load("C:\\Windows", "v1", expected_hash=expected_hash)
 
