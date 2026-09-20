@@ -18,7 +18,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from money_machine.domain.enums import JobStatus, RetryClass, SideEffectClass
 from money_machine.domain.events import EventName
-from money_machine.domain.models.common import SuccessContract
 from money_machine.orchestration.leases import (
     claim_ready_job,
     deterministic_worker_id,
@@ -242,7 +241,7 @@ async def test_idempotent_reclaim_prevents_duplicate_events(
                 dedupe_key=dedupe_key,
                 occurred_at=later,
             )
-            session.add(event)
+            uow.session.add(event)
             await uow.commit()
 
         # Verify exactly one event exists
@@ -340,7 +339,7 @@ async def test_double_execution_prevented_by_for_update_skip_locked(
                 return claimed
 
         # Run both workers concurrently
-        results = await asyncio.gather(execute_worker1(), execute_worker2())
+        _ = await asyncio.gather(execute_worker1(), execute_worker2())
 
         # Exactly one worker should have executed
         assert len(execution_count) == 1, (
