@@ -76,11 +76,15 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("id", sa.UUID(), server_default=sa.text("gen_random_uuid()"), nullable=False),
-        sa.CheckConstraint("length(input_hash) = 64", name=op.f("ck_agent_tool_calls_input_hash_length")),
+        sa.CheckConstraint(
+            "length(input_hash) = 64", name=op.f("ck_agent_tool_calls_input_hash_length")
+        ),
         sa.CheckConstraint(
             "length(output_hash) = 64", name=op.f("ck_agent_tool_calls_output_hash_length")
         ),
-        sa.CheckConstraint("duration_ms >= 0", name=op.f("ck_agent_tool_calls_duration_non_negative")),
+        sa.CheckConstraint(
+            "duration_ms >= 0", name=op.f("ck_agent_tool_calls_duration_non_negative")
+        ),
         sa.ForeignKeyConstraint(
             ["agent_run_id"],
             ["agent_runs.id"],

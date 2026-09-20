@@ -22,9 +22,7 @@ from tests.integration.factories import make_job, make_shop, make_workflow
 class TestAgentRunObservability:
     """Prove agent runs, tool calls, logs, and telemetry queue correctly."""
 
-    async def test_finalize_run_persists_observability_fields(
-        self, session: AsyncSession
-    ) -> None:
+    async def test_finalize_run_persists_observability_fields(self, session: AsyncSession) -> None:
         """Completed runs persist metrics, tool calls, logs, and PostHog-shaped events."""
         shop = await make_shop(session)
         workflow = await make_workflow(session, shop)

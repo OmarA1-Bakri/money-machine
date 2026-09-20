@@ -736,9 +736,7 @@ class AgentRun(Identified):
         ),
         CheckConstraint("completed_at >= started_at", name="run_ends_after_start"),
         CheckConstraint("run_number >= 1", name="run_number_positive"),
-        CheckConstraint(
-            "input_hash IS NULL OR length(input_hash) = 64", name="input_hash_length"
-        ),
+        CheckConstraint("input_hash IS NULL OR length(input_hash) = 64", name="input_hash_length"),
         CheckConstraint("token_count IS NULL OR token_count >= 0", name="token_count_non_negative"),
         CheckConstraint("cost_usd IS NULL OR cost_usd >= 0", name="cost_usd_non_negative"),
         Index("ix_agent_runs_agent_id", "agent_id"),
