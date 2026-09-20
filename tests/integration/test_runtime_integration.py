@@ -313,7 +313,8 @@ def test_process_entrypoints_remain_exit_78(module: str) -> None:
     )
     assert result.returncode == EXIT_UNAVAILABLE
     assert result.stdout == ""
-    assert "database check" in result.stderr
+    # Wave 9: Commissioning gates pass but process loop deferred
+    assert "Commissioning gates pass" in result.stderr
     assert "no jobs were processed" in result.stderr
 
 

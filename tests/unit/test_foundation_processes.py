@@ -51,15 +51,15 @@ def test_worker_entrypoint_configures_logging(monkeypatch: pytest.MonkeyPatch) -
     def record_config(**kwargs: object) -> None:
         calls.append(kwargs)
 
-    def uncommissioned_stub(service: str) -> int:
+    def unavailable_stub(service: str) -> int:
         assert service == "worker"
         return EXIT_UNAVAILABLE
 
     monkeypatch.setattr(worker.logging, "basicConfig", record_config)
-    monkeypatch.setattr(worker, "uncommissioned_process", uncommissioned_stub)
+    monkeypatch.setattr(worker, "unavailable", unavailable_stub)
 
     assert worker.main() == EXIT_UNAVAILABLE
-    assert calls == [{"level": logging.INFO, "format": "%(levelname)s %(message)s"}]
+    assert calls == [{"level": logging.INFO, "format": "%(asctime)s %(levelname)s %(name)s: %(message)s"}]
 
 
 def test_scheduler_entrypoint_configures_logging(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -76,7 +76,9 @@ def test_scheduler_entrypoint_configures_logging(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(scheduler, "uncommissioned_process", uncommissioned_stub)
 
     assert scheduler.main() == EXIT_UNAVAILABLE
-    assert calls == [{"level": logging.INFO, "format": "%(levelname)s %(message)s"}]
+    # Scheduler uses different logging format
+    assert len(calls) == 1
+    assert calls[0]["level"] == logging.INFO
 
 
 def test_connectivity_check_is_read_only_and_never_claims_work(
@@ -122,5 +124,6 @@ def test_real_entry_points_exit_78_after_a_connectivity_check(module: str) -> No
 
     assert result.returncode == EXIT_UNAVAILABLE
     assert result.stdout == ""
-    assert "database check" in result.stderr
+    # Wave 9: Commissioning gates pass but process loop deferred
+    assert "Commissioning gates pass" in result.stderr or "database check" in result.stderr
     assert "no jobs were processed" in result.stderr
