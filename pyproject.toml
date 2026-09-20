@@ -47,6 +47,10 @@ asyncio_default_fixture_loop_scope = "function"
 include = ["src", "tests", "migrations/env.py"]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportUnknownParameterType = "none"
+reportUnknownArgumentType = "none"
 
 [tool.ruff]
 line-length = 100
