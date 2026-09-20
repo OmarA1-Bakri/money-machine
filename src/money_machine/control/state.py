@@ -123,6 +123,25 @@ SESSION_EVIDENCE_KEYS: Mapping[int, frozenset[str]] = MappingProxyType(
                 "evidence_closure_commit_recorded",
             }
         ),
+        5: frozenset(
+            {
+                # Session 05: market research through product spec vertical slice.
+                # Etsy research adapters (fixture primary, browser/API stubs), A03 market research,
+                # shortlist analysis, A05 scoring, A04 teardown workflow, ProductSpec generation,
+                # A06 dedupe agent, automatic workflow linking research→teardown→spec→dedupe→build.
+                # A03-A06 promoted to TESTED or COMMISSIONED with real implementations and tests.
+                "etsy_adapters_implemented",
+                "research_agent_implemented",
+                "shortlist_analysis_implemented",
+                "scoring_agent_implemented",
+                "teardown_workflow_implemented",
+                "product_spec_generation_implemented",
+                "dedupe_agent_implemented",
+                "workflow_linking_complete",
+                "control_files_and_checkpoint_current",
+                "evidence_closure_commit_recorded",
+            }
+        ),
     }
 )
 """Each session's completion-evidence contract (D-0010). A session without an entry cannot be

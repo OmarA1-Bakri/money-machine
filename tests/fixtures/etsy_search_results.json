@@ -1,0 +1,5392 @@
+{
+  "digital planner": [
+    {
+      "rank": 1,
+      "title": "Digital Planner - Design 1 Variant",
+      "current_price_cents": 644,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumPro",
+      "shop_sales_count": 17197,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1806,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-28740",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 2,
+      "title": "Digital Planner - Design 2 Variant",
+      "current_price_cents": 707,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantLab",
+      "shop_sales_count": 9138,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Shipping",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 583,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-45621",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 3,
+      "title": "Digital Planner - Design 3 Variant",
+      "current_price_cents": 840,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantTemplates",
+      "shop_sales_count": 19272,
+      "shop_age_years": 1,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 1286,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-77242",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 4,
+      "title": "Digital Planner - Design 4 Variant",
+      "current_price_cents": 805,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantStudio",
+      "shop_sales_count": 13174,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [
+        "3 orders in last 24 hours"
+      ],
+      "review_count": 2581,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-82859",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 5,
+      "title": "Digital Planner - Design 5 Variant",
+      "current_price_cents": 1004,
+      "anchor_price_cents": 1479,
+      "shop_name": "PremiumLab",
+      "shop_sales_count": 19873,
+      "shop_age_years": null,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 2457,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-89584",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 6,
+      "title": "Digital Planner - Design 6 Variant",
+      "current_price_cents": 1272,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantShop",
+      "shop_sales_count": 3208,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 525,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-49406",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 7,
+      "title": "Digital Planner - Design 7 Variant",
+      "current_price_cents": 584,
+      "anchor_price_cents": null,
+      "shop_name": "ModernStudio",
+      "shop_sales_count": null,
+      "shop_age_years": null,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-31421",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 8,
+      "title": "Digital Planner - Design 8 Variant",
+      "current_price_cents": 1492,
+      "anchor_price_cents": 2664,
+      "shop_name": "DigitalPro",
+      "shop_sales_count": 16474,
+      "shop_age_years": 1,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 1887,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-1627",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 9,
+      "title": "Digital Planner - Design 9 Variant",
+      "current_price_cents": 831,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantArt",
+      "shop_sales_count": null,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-3884",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 10,
+      "title": "Digital Planner - Design 10 Variant",
+      "current_price_cents": 652,
+      "anchor_price_cents": 1136,
+      "shop_name": "ModernStore",
+      "shop_sales_count": 10595,
+      "shop_age_years": null,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 1853,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-36363",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 11,
+      "title": "Digital Planner - Design 11 Variant",
+      "current_price_cents": 1020,
+      "anchor_price_cents": 1997,
+      "shop_name": "MinimalistStore",
+      "shop_sales_count": 4437,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [
+        "Only 13 left"
+      ],
+      "review_count": 521,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-56396",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 12,
+      "title": "Digital Planner - Design 12 Variant",
+      "current_price_cents": 756,
+      "anchor_price_cents": null,
+      "shop_name": "DigitalTemplates",
+      "shop_sales_count": 2777,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 308,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-13428",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 13,
+      "title": "Digital Planner - Design 13 Variant",
+      "current_price_cents": 830,
+      "anchor_price_cents": null,
+      "shop_name": "SimplePro",
+      "shop_sales_count": 13448,
+      "shop_age_years": 3,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 742,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-86246",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 14,
+      "title": "Digital Planner - Design 14 Variant",
+      "current_price_cents": 567,
+      "anchor_price_cents": 1089,
+      "shop_name": "SimpleCo",
+      "shop_sales_count": null,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-9605",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 15,
+      "title": "Digital Planner - Design 15 Variant",
+      "current_price_cents": 1453,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalTemplates",
+      "shop_sales_count": 2219,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 265,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-73912",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 16,
+      "title": "Digital Planner - Design 16 Variant",
+      "current_price_cents": 1394,
+      "anchor_price_cents": null,
+      "shop_name": "MinimalistStore",
+      "shop_sales_count": 6459,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [
+        "Only 10 left"
+      ],
+      "review_count": 523,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-91499",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 17,
+      "title": "Digital Planner - Design 17 Variant",
+      "current_price_cents": 997,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumArt",
+      "shop_sales_count": 17625,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 2604,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-19656",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 18,
+      "title": "Digital Planner - Design 18 Variant",
+      "current_price_cents": 1035,
+      "anchor_price_cents": 1802,
+      "shop_name": "PremiumLab",
+      "shop_sales_count": 923,
+      "shop_age_years": null,
+      "badges": [
+        "Fast Shipping",
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 82,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-88299",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 19,
+      "title": "Digital Planner - Design 19 Variant",
+      "current_price_cents": 564,
+      "anchor_price_cents": 858,
+      "shop_name": "DigitalCo",
+      "shop_sales_count": 6145,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [
+        "19 orders in last 24 hours"
+      ],
+      "review_count": 943,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-72527",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 20,
+      "title": "Digital Planner - Design 20 Variant",
+      "current_price_cents": 649,
+      "anchor_price_cents": null,
+      "shop_name": "CreativeCo",
+      "shop_sales_count": 10444,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1245,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-92480",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 21,
+      "title": "Digital Planner - Design 21 Variant",
+      "current_price_cents": 679,
+      "anchor_price_cents": 1087,
+      "shop_name": "DigitalCo",
+      "shop_sales_count": 16862,
+      "shop_age_years": null,
+      "badges": [
+        "Best Selling",
+        "Trending"
+      ],
+      "urgency_signals": [],
+      "review_count": 2061,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-69091",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 22,
+      "title": "Digital Planner - Design 22 Variant",
+      "current_price_cents": 1178,
+      "anchor_price_cents": null,
+      "shop_name": "ArtfulPro",
+      "shop_sales_count": 9793,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1906,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-56667",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 23,
+      "title": "Digital Planner - Design 23 Variant",
+      "current_price_cents": 1369,
+      "anchor_price_cents": 2732,
+      "shop_name": "ProfessionalStudio",
+      "shop_sales_count": 9424,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1303,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-80614",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 24,
+      "title": "Digital Planner - Design 24 Variant",
+      "current_price_cents": 928,
+      "anchor_price_cents": null,
+      "shop_name": "SimpleDesigns",
+      "shop_sales_count": 17696,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Delivery",
+        "Star Seller"
+      ],
+      "urgency_signals": [
+        "Only 8 left"
+      ],
+      "review_count": 1031,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-90544",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 25,
+      "title": "Digital Planner - Design 25 Variant",
+      "current_price_cents": 730,
+      "anchor_price_cents": null,
+      "shop_name": "VintageStudio",
+      "shop_sales_count": 4301,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 852,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-91990",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 26,
+      "title": "Digital Planner - Design 26 Variant",
+      "current_price_cents": 914,
+      "anchor_price_cents": null,
+      "shop_name": "MinimalistTemplates",
+      "shop_sales_count": 4449,
+      "shop_age_years": 1,
+      "badges": [
+        "Best Selling",
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 827,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-46875",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 27,
+      "title": "Digital Planner - Design 27 Variant",
+      "current_price_cents": 1063,
+      "anchor_price_cents": 2014,
+      "shop_name": "MinimalistStore",
+      "shop_sales_count": null,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [
+        "Only 15 left"
+      ],
+      "review_count": null,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-44252",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 28,
+      "title": "Digital Planner - Design 28 Variant",
+      "current_price_cents": 1066,
+      "anchor_price_cents": null,
+      "shop_name": "CreativeLab",
+      "shop_sales_count": 10455,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1839,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-24199",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 29,
+      "title": "Digital Planner - Design 29 Variant",
+      "current_price_cents": 755,
+      "anchor_price_cents": null,
+      "shop_name": "ArtfulDesigns",
+      "shop_sales_count": 17098,
+      "shop_age_years": 1,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 3100,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-94644",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 30,
+      "title": "Digital Planner - Design 30 Variant",
+      "current_price_cents": 598,
+      "anchor_price_cents": 894,
+      "shop_name": "ModernPro",
+      "shop_sales_count": 16172,
+      "shop_age_years": 3,
+      "badges": [
+        "Fast Delivery",
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 1123,
+      "identity_niche": "productivity digital downloads",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-20258",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    }
+  ],
+  "printable wall art": [
+    {
+      "rank": 1,
+      "title": "Printable Wall Art - Design 1 Variant",
+      "current_price_cents": 672,
+      "anchor_price_cents": 1007,
+      "shop_name": "ElegantCo",
+      "shop_sales_count": 7721,
+      "shop_age_years": null,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 1330,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-57602",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 2,
+      "title": "Printable Wall Art - Design 2 Variant",
+      "current_price_cents": 996,
+      "anchor_price_cents": 1618,
+      "shop_name": "SimpleCo",
+      "shop_sales_count": 6147,
+      "shop_age_years": 2,
+      "badges": [
+        "Trending",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 1181,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-2270",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 3,
+      "title": "Printable Wall Art - Design 3 Variant",
+      "current_price_cents": 607,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalArt",
+      "shop_sales_count": 4859,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 646,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-29534",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 4,
+      "title": "Printable Wall Art - Design 4 Variant",
+      "current_price_cents": 679,
+      "anchor_price_cents": null,
+      "shop_name": "CreativeDesigns",
+      "shop_sales_count": 13366,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1383,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-57790",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 5,
+      "title": "Printable Wall Art - Design 5 Variant",
+      "current_price_cents": 866,
+      "anchor_price_cents": 1371,
+      "shop_name": "SimpleArt",
+      "shop_sales_count": 10456,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1271,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-37691",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 6,
+      "title": "Printable Wall Art - Design 6 Variant",
+      "current_price_cents": 562,
+      "anchor_price_cents": null,
+      "shop_name": "CreativeHub",
+      "shop_sales_count": 16306,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 3246,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-77739",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 7,
+      "title": "Printable Wall Art - Design 7 Variant",
+      "current_price_cents": 428,
+      "anchor_price_cents": 676,
+      "shop_name": "ModernStore",
+      "shop_sales_count": 19328,
+      "shop_age_years": 2,
+      "badges": [
+        "Trending"
+      ],
+      "urgency_signals": [],
+      "review_count": 2736,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-62353",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 8,
+      "title": "Printable Wall Art - Design 8 Variant",
+      "current_price_cents": 653,
+      "anchor_price_cents": null,
+      "shop_name": "CreativeCo",
+      "shop_sales_count": 5998,
+      "shop_age_years": 1,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 480,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-75912",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 9,
+      "title": "Printable Wall Art - Design 9 Variant",
+      "current_price_cents": 665,
+      "anchor_price_cents": null,
+      "shop_name": "MinimalistTemplates",
+      "shop_sales_count": 6059,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [
+        "Only 2 left"
+      ],
+      "review_count": 1110,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-56189",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 10,
+      "title": "Printable Wall Art - Design 10 Variant",
+      "current_price_cents": 603,
+      "anchor_price_cents": null,
+      "shop_name": "MinimalistHub",
+      "shop_sales_count": 8986,
+      "shop_age_years": 3,
+      "badges": [
+        "Trending",
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 1333,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-21788",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 11,
+      "title": "Printable Wall Art - Design 11 Variant",
+      "current_price_cents": 595,
+      "anchor_price_cents": null,
+      "shop_name": "MinimalistTemplates",
+      "shop_sales_count": 13895,
+      "shop_age_years": 2,
+      "badges": [
+        "Trending"
+      ],
+      "urgency_signals": [],
+      "review_count": 1878,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-86877",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 12,
+      "title": "Printable Wall Art - Design 12 Variant",
+      "current_price_cents": 919,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantHub",
+      "shop_sales_count": 7165,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1271,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-43826",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 13,
+      "title": "Printable Wall Art - Design 13 Variant",
+      "current_price_cents": 455,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumPro",
+      "shop_sales_count": 7028,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1030,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-53343",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 14,
+      "title": "Printable Wall Art - Design 14 Variant",
+      "current_price_cents": 659,
+      "anchor_price_cents": null,
+      "shop_name": "MinimalistLab",
+      "shop_sales_count": 13764,
+      "shop_age_years": 2,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 903,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-76240",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 15,
+      "title": "Printable Wall Art - Design 15 Variant",
+      "current_price_cents": 796,
+      "anchor_price_cents": 1214,
+      "shop_name": "ProfessionalArt",
+      "shop_sales_count": 12074,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [
+        "Only 7 left"
+      ],
+      "review_count": 1782,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-78616",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 16,
+      "title": "Printable Wall Art - Design 16 Variant",
+      "current_price_cents": 776,
+      "anchor_price_cents": null,
+      "shop_name": "DigitalCo",
+      "shop_sales_count": 11459,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1207,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-23478",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 17,
+      "title": "Printable Wall Art - Design 17 Variant",
+      "current_price_cents": 926,
+      "anchor_price_cents": 1792,
+      "shop_name": "ArtfulStudio",
+      "shop_sales_count": 4055,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 721,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-76133",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 18,
+      "title": "Printable Wall Art - Design 18 Variant",
+      "current_price_cents": 634,
+      "anchor_price_cents": 1101,
+      "shop_name": "ProfessionalShop",
+      "shop_sales_count": null,
+      "shop_age_years": null,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-49559",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 19,
+      "title": "Printable Wall Art - Design 19 Variant",
+      "current_price_cents": 467,
+      "anchor_price_cents": null,
+      "shop_name": "CreativeCo",
+      "shop_sales_count": 11378,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Shipping",
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 1699,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-64138",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 20,
+      "title": "Printable Wall Art - Design 20 Variant",
+      "current_price_cents": 781,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumStudio",
+      "shop_sales_count": 19850,
+      "shop_age_years": null,
+      "badges": [
+        "Best Selling",
+        "Fast Shipping"
+      ],
+      "urgency_signals": [
+        "2 orders in last 24 hours"
+      ],
+      "review_count": 2712,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-93052",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 21,
+      "title": "Printable Wall Art - Design 21 Variant",
+      "current_price_cents": 491,
+      "anchor_price_cents": 761,
+      "shop_name": "PremiumLab",
+      "shop_sales_count": 14487,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 2556,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-69420",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 22,
+      "title": "Printable Wall Art - Design 22 Variant",
+      "current_price_cents": 778,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalArt",
+      "shop_sales_count": 18405,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [
+        "Only 19 left"
+      ],
+      "review_count": 3307,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-12410",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 23,
+      "title": "Printable Wall Art - Design 23 Variant",
+      "current_price_cents": 536,
+      "anchor_price_cents": 839,
+      "shop_name": "CreativeLab",
+      "shop_sales_count": 3923,
+      "shop_age_years": 3,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 229,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-82531",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 24,
+      "title": "Printable Wall Art - Design 24 Variant",
+      "current_price_cents": 927,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumShop",
+      "shop_sales_count": 6627,
+      "shop_age_years": 3,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 667,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-36629",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 25,
+      "title": "Printable Wall Art - Design 25 Variant",
+      "current_price_cents": 548,
+      "anchor_price_cents": null,
+      "shop_name": "CreativeTemplates",
+      "shop_sales_count": null,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [
+        "7 orders in last 24 hours"
+      ],
+      "review_count": null,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-15836",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 26,
+      "title": "Printable Wall Art - Design 26 Variant",
+      "current_price_cents": 749,
+      "anchor_price_cents": null,
+      "shop_name": "DigitalLab",
+      "shop_sales_count": 9888,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 899,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-650",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 27,
+      "title": "Printable Wall Art - Design 27 Variant",
+      "current_price_cents": 667,
+      "anchor_price_cents": null,
+      "shop_name": "SimpleHub",
+      "shop_sales_count": 4326,
+      "shop_age_years": 1,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 336,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-97551",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 28,
+      "title": "Printable Wall Art - Design 28 Variant",
+      "current_price_cents": 706,
+      "anchor_price_cents": null,
+      "shop_name": "DigitalCo",
+      "shop_sales_count": 11535,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Delivery",
+        "Fast Shipping"
+      ],
+      "urgency_signals": [
+        "Trending now"
+      ],
+      "review_count": 1885,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-88917",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 29,
+      "title": "Printable Wall Art - Design 29 Variant",
+      "current_price_cents": 963,
+      "anchor_price_cents": null,
+      "shop_name": "CreativeCo",
+      "shop_sales_count": 10817,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Delivery",
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 1107,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-93795",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 30,
+      "title": "Printable Wall Art - Design 30 Variant",
+      "current_price_cents": 778,
+      "anchor_price_cents": 1232,
+      "shop_name": "PremiumShop",
+      "shop_sales_count": 15138,
+      "shop_age_years": 2,
+      "badges": [
+        "Trending"
+      ],
+      "urgency_signals": [],
+      "review_count": 861,
+      "identity_niche": "home decor printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-62847",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    }
+  ],
+  "custom pet portrait": [
+    {
+      "rank": 1,
+      "title": "Custom Pet Portrait - Design 1 Variant",
+      "current_price_cents": 2569,
+      "anchor_price_cents": null,
+      "shop_name": "ModernArt",
+      "shop_sales_count": 1642,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Shipping",
+        "Trending"
+      ],
+      "urgency_signals": [],
+      "review_count": 301,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-71820",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 2,
+      "title": "Custom Pet Portrait - Design 2 Variant",
+      "current_price_cents": 2807,
+      "anchor_price_cents": 3944,
+      "shop_name": "SimpleArt",
+      "shop_sales_count": 19446,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 3213,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-44541",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 3,
+      "title": "Custom Pet Portrait - Design 3 Variant",
+      "current_price_cents": 3932,
+      "anchor_price_cents": null,
+      "shop_name": "ModernShop",
+      "shop_sales_count": 11204,
+      "shop_age_years": 1,
+      "badges": [
+        "Best Selling",
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 748,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-50865",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 4,
+      "title": "Custom Pet Portrait - Design 4 Variant",
+      "current_price_cents": 3033,
+      "anchor_price_cents": null,
+      "shop_name": "VintageStore",
+      "shop_sales_count": 14598,
+      "shop_age_years": null,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 814,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-41766",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 5,
+      "title": "Custom Pet Portrait - Design 5 Variant",
+      "current_price_cents": 2106,
+      "anchor_price_cents": null,
+      "shop_name": "SimpleDesigns",
+      "shop_sales_count": 15143,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1410,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-73230",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 6,
+      "title": "Custom Pet Portrait - Design 6 Variant",
+      "current_price_cents": 3047,
+      "anchor_price_cents": null,
+      "shop_name": "VintagePro",
+      "shop_sales_count": 12262,
+      "shop_age_years": 2,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 2443,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-70694",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 7,
+      "title": "Custom Pet Portrait - Design 7 Variant",
+      "current_price_cents": 4978,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantCo",
+      "shop_sales_count": 1300,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [
+        "13 orders in last 24 hours"
+      ],
+      "review_count": 224,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-34540",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 8,
+      "title": "Custom Pet Portrait - Design 8 Variant",
+      "current_price_cents": 2898,
+      "anchor_price_cents": null,
+      "shop_name": "ArtfulArt",
+      "shop_sales_count": 8108,
+      "shop_age_years": null,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [
+        "Only 14 left"
+      ],
+      "review_count": 1126,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-99649",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 9,
+      "title": "Custom Pet Portrait - Design 9 Variant",
+      "current_price_cents": 4740,
+      "anchor_price_cents": 6219,
+      "shop_name": "SimpleStore",
+      "shop_sales_count": 6020,
+      "shop_age_years": null,
+      "badges": [
+        "Trending"
+      ],
+      "urgency_signals": [],
+      "review_count": 806,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-38542",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 10,
+      "title": "Custom Pet Portrait - Design 10 Variant",
+      "current_price_cents": 4773,
+      "anchor_price_cents": null,
+      "shop_name": "SimpleStudio",
+      "shop_sales_count": 5788,
+      "shop_age_years": 3,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 1035,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-17210",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 11,
+      "title": "Custom Pet Portrait - Design 11 Variant",
+      "current_price_cents": 3887,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumShop",
+      "shop_sales_count": 16060,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 2977,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-65951",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 12,
+      "title": "Custom Pet Portrait - Design 12 Variant",
+      "current_price_cents": 2571,
+      "anchor_price_cents": null,
+      "shop_name": "SimplePro",
+      "shop_sales_count": 9509,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [
+        "Only 10 left"
+      ],
+      "review_count": 1113,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-42971",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 13,
+      "title": "Custom Pet Portrait - Design 13 Variant",
+      "current_price_cents": 3579,
+      "anchor_price_cents": 7064,
+      "shop_name": "PremiumDesigns",
+      "shop_sales_count": 9734,
+      "shop_age_years": 3,
+      "badges": [
+        "Fast Shipping",
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 698,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-99272",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 14,
+      "title": "Custom Pet Portrait - Design 14 Variant",
+      "current_price_cents": 4258,
+      "anchor_price_cents": 6169,
+      "shop_name": "CreativeLab",
+      "shop_sales_count": 14506,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1424,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-17374",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 15,
+      "title": "Custom Pet Portrait - Design 15 Variant",
+      "current_price_cents": 4362,
+      "anchor_price_cents": null,
+      "shop_name": "VintageTemplates",
+      "shop_sales_count": 10913,
+      "shop_age_years": 1,
+      "badges": [
+        "Trending"
+      ],
+      "urgency_signals": [],
+      "review_count": 1648,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-94495",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 16,
+      "title": "Custom Pet Portrait - Design 16 Variant",
+      "current_price_cents": 3348,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalLab",
+      "shop_sales_count": 5261,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 311,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-50444",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 17,
+      "title": "Custom Pet Portrait - Design 17 Variant",
+      "current_price_cents": 2940,
+      "anchor_price_cents": null,
+      "shop_name": "VintageDesigns",
+      "shop_sales_count": null,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [
+        "In 7 carts"
+      ],
+      "review_count": null,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-65586",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 18,
+      "title": "Custom Pet Portrait - Design 18 Variant",
+      "current_price_cents": 4382,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalLab",
+      "shop_sales_count": 13003,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 885,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-4118",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 19,
+      "title": "Custom Pet Portrait - Design 19 Variant",
+      "current_price_cents": 4643,
+      "anchor_price_cents": 8459,
+      "shop_name": "SimpleTemplates",
+      "shop_sales_count": 10149,
+      "shop_age_years": 2,
+      "badges": [
+        "Best Selling",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [
+        "Trending now"
+      ],
+      "review_count": 1252,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-14345",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 20,
+      "title": "Custom Pet Portrait - Design 20 Variant",
+      "current_price_cents": 2639,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalHub",
+      "shop_sales_count": 17293,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 2842,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-82753",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 21,
+      "title": "Custom Pet Portrait - Design 21 Variant",
+      "current_price_cents": 4193,
+      "anchor_price_cents": null,
+      "shop_name": "ModernShop",
+      "shop_sales_count": 18701,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1857,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-59901",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 22,
+      "title": "Custom Pet Portrait - Design 22 Variant",
+      "current_price_cents": 4432,
+      "anchor_price_cents": null,
+      "shop_name": "VintageDesigns",
+      "shop_sales_count": 5692,
+      "shop_age_years": null,
+      "badges": [
+        "Trending"
+      ],
+      "urgency_signals": [
+        "Only 11 left"
+      ],
+      "review_count": 973,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-88078",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 23,
+      "title": "Custom Pet Portrait - Design 23 Variant",
+      "current_price_cents": 4990,
+      "anchor_price_cents": 9839,
+      "shop_name": "MinimalistArt",
+      "shop_sales_count": 903,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 127,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-73736",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 24,
+      "title": "Custom Pet Portrait - Design 24 Variant",
+      "current_price_cents": 2074,
+      "anchor_price_cents": 3605,
+      "shop_name": "DigitalHub",
+      "shop_sales_count": 2651,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [
+        "6 orders in last 24 hours"
+      ],
+      "review_count": 284,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-40739",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 25,
+      "title": "Custom Pet Portrait - Design 25 Variant",
+      "current_price_cents": 3073,
+      "anchor_price_cents": 4890,
+      "shop_name": "VintageArt",
+      "shop_sales_count": 9978,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 549,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-99145",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 26,
+      "title": "Custom Pet Portrait - Design 26 Variant",
+      "current_price_cents": 2428,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantPro",
+      "shop_sales_count": 1488,
+      "shop_age_years": null,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 227,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-19910",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 27,
+      "title": "Custom Pet Portrait - Design 27 Variant",
+      "current_price_cents": 4745,
+      "anchor_price_cents": 6430,
+      "shop_name": "SimpleStore",
+      "shop_sales_count": 13106,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [
+        "In 18 carts"
+      ],
+      "review_count": 1753,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-98977",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 28,
+      "title": "Custom Pet Portrait - Design 28 Variant",
+      "current_price_cents": 2936,
+      "anchor_price_cents": null,
+      "shop_name": "ArtfulStore",
+      "shop_sales_count": 6751,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 393,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-81486",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 29,
+      "title": "Custom Pet Portrait - Design 29 Variant",
+      "current_price_cents": 4487,
+      "anchor_price_cents": null,
+      "shop_name": "DigitalCo",
+      "shop_sales_count": 11712,
+      "shop_age_years": 2,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [
+        "In 2 carts"
+      ],
+      "review_count": 1292,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-85642",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 30,
+      "title": "Custom Pet Portrait - Design 30 Variant",
+      "current_price_cents": 3299,
+      "anchor_price_cents": 4957,
+      "shop_name": "ElegantPro",
+      "shop_sales_count": 7798,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 929,
+      "identity_niche": "custom digital art",
+      "base_category": "Art & Collectibles",
+      "listing_url": "https://www.etsy.com/listing/fixture-3225",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    }
+  ],
+  "wedding invitation template": [
+    {
+      "rank": 1,
+      "title": "Wedding Invitation Template - Design 1 Variant",
+      "current_price_cents": 1048,
+      "anchor_price_cents": null,
+      "shop_name": "CreativeCo",
+      "shop_sales_count": 5958,
+      "shop_age_years": 3,
+      "badges": [
+        "Fast Delivery",
+        "Fast Shipping"
+      ],
+      "urgency_signals": [
+        "Trending now"
+      ],
+      "review_count": 892,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-25451",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 2,
+      "title": "Wedding Invitation Template - Design 2 Variant",
+      "current_price_cents": 1287,
+      "anchor_price_cents": null,
+      "shop_name": "DigitalDesigns",
+      "shop_sales_count": 7078,
+      "shop_age_years": 1,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 743,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-94251",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 3,
+      "title": "Wedding Invitation Template - Design 3 Variant",
+      "current_price_cents": 1003,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumPro",
+      "shop_sales_count": null,
+      "shop_age_years": 3,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [
+        "Trending now"
+      ],
+      "review_count": null,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-1201",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 4,
+      "title": "Wedding Invitation Template - Design 4 Variant",
+      "current_price_cents": 1235,
+      "anchor_price_cents": 2215,
+      "shop_name": "MinimalistShop",
+      "shop_sales_count": 16910,
+      "shop_age_years": 2,
+      "badges": [
+        "Trending"
+      ],
+      "urgency_signals": [],
+      "review_count": 1509,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-8961",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 5,
+      "title": "Wedding Invitation Template - Design 5 Variant",
+      "current_price_cents": 1026,
+      "anchor_price_cents": 2024,
+      "shop_name": "DigitalStudio",
+      "shop_sales_count": 19215,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [
+        "Trending now"
+      ],
+      "review_count": 1406,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-54890",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 6,
+      "title": "Wedding Invitation Template - Design 6 Variant",
+      "current_price_cents": 1067,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalDesigns",
+      "shop_sales_count": null,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-35263",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 7,
+      "title": "Wedding Invitation Template - Design 7 Variant",
+      "current_price_cents": 1192,
+      "anchor_price_cents": null,
+      "shop_name": "MinimalistStore",
+      "shop_sales_count": 14440,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 2802,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-42821",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 8,
+      "title": "Wedding Invitation Template - Design 8 Variant",
+      "current_price_cents": 850,
+      "anchor_price_cents": null,
+      "shop_name": "MinimalistDesigns",
+      "shop_sales_count": 13234,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1205,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-31133",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 9,
+      "title": "Wedding Invitation Template - Design 9 Variant",
+      "current_price_cents": 553,
+      "anchor_price_cents": null,
+      "shop_name": "CreativeHub",
+      "shop_sales_count": 13703,
+      "shop_age_years": null,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 2385,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-61133",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 10,
+      "title": "Wedding Invitation Template - Design 10 Variant",
+      "current_price_cents": 944,
+      "anchor_price_cents": null,
+      "shop_name": "ArtfulLab",
+      "shop_sales_count": 17668,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [
+        "19 orders in last 24 hours"
+      ],
+      "review_count": 3426,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-3223",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 11,
+      "title": "Wedding Invitation Template - Design 11 Variant",
+      "current_price_cents": 1316,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantShop",
+      "shop_sales_count": 18812,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1900,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-75705",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 12,
+      "title": "Wedding Invitation Template - Design 12 Variant",
+      "current_price_cents": 837,
+      "anchor_price_cents": null,
+      "shop_name": "ModernStore",
+      "shop_sales_count": 19706,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [
+        "9 orders in last 24 hours"
+      ],
+      "review_count": 985,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-20155",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 13,
+      "title": "Wedding Invitation Template - Design 13 Variant",
+      "current_price_cents": 1133,
+      "anchor_price_cents": null,
+      "shop_name": "SimpleHub",
+      "shop_sales_count": 9725,
+      "shop_age_years": null,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 1616,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-1540",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 14,
+      "title": "Wedding Invitation Template - Design 14 Variant",
+      "current_price_cents": 608,
+      "anchor_price_cents": null,
+      "shop_name": "DigitalArt",
+      "shop_sales_count": 6691,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 436,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-65682",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 15,
+      "title": "Wedding Invitation Template - Design 15 Variant",
+      "current_price_cents": 753,
+      "anchor_price_cents": 1151,
+      "shop_name": "PremiumStudio",
+      "shop_sales_count": 10577,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [
+        "Only 4 left"
+      ],
+      "review_count": 715,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-3469",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 16,
+      "title": "Wedding Invitation Template - Design 16 Variant",
+      "current_price_cents": 969,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumLab",
+      "shop_sales_count": null,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-11208",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 17,
+      "title": "Wedding Invitation Template - Design 17 Variant",
+      "current_price_cents": 1302,
+      "anchor_price_cents": null,
+      "shop_name": "CreativeStore",
+      "shop_sales_count": 9050,
+      "shop_age_years": 2,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 807,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-74283",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 18,
+      "title": "Wedding Invitation Template - Design 18 Variant",
+      "current_price_cents": 1362,
+      "anchor_price_cents": 2213,
+      "shop_name": "ElegantDesigns",
+      "shop_sales_count": 11179,
+      "shop_age_years": 1,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 725,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-71071",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 19,
+      "title": "Wedding Invitation Template - Design 19 Variant",
+      "current_price_cents": 776,
+      "anchor_price_cents": 1301,
+      "shop_name": "SimpleTemplates",
+      "shop_sales_count": 12496,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 2278,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-61113",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 20,
+      "title": "Wedding Invitation Template - Design 20 Variant",
+      "current_price_cents": 1259,
+      "anchor_price_cents": 2346,
+      "shop_name": "ArtfulStudio",
+      "shop_sales_count": 2307,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 173,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-64553",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 21,
+      "title": "Wedding Invitation Template - Design 21 Variant",
+      "current_price_cents": 874,
+      "anchor_price_cents": null,
+      "shop_name": "SimpleStudio",
+      "shop_sales_count": 5677,
+      "shop_age_years": 1,
+      "badges": [
+        "Best Selling",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 405,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-41533",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 22,
+      "title": "Wedding Invitation Template - Design 22 Variant",
+      "current_price_cents": 965,
+      "anchor_price_cents": null,
+      "shop_name": "VintageDesigns",
+      "shop_sales_count": 5999,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 548,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-2901",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 23,
+      "title": "Wedding Invitation Template - Design 23 Variant",
+      "current_price_cents": 962,
+      "anchor_price_cents": 1593,
+      "shop_name": "SimpleDesigns",
+      "shop_sales_count": 2747,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 419,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-80430",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 24,
+      "title": "Wedding Invitation Template - Design 24 Variant",
+      "current_price_cents": 1021,
+      "anchor_price_cents": 1787,
+      "shop_name": "DigitalLab",
+      "shop_sales_count": null,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-72353",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 25,
+      "title": "Wedding Invitation Template - Design 25 Variant",
+      "current_price_cents": 983,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalArt",
+      "shop_sales_count": 565,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [
+        "16 orders in last 24 hours"
+      ],
+      "review_count": 35,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-73925",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 26,
+      "title": "Wedding Invitation Template - Design 26 Variant",
+      "current_price_cents": 623,
+      "anchor_price_cents": 848,
+      "shop_name": "ArtfulCo",
+      "shop_sales_count": 19281,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [
+        "9 orders in last 24 hours"
+      ],
+      "review_count": 1708,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-93481",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 27,
+      "title": "Wedding Invitation Template - Design 27 Variant",
+      "current_price_cents": 1456,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantStudio",
+      "shop_sales_count": 10437,
+      "shop_age_years": 3,
+      "badges": [
+        "Trending",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 1311,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-86596",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 28,
+      "title": "Wedding Invitation Template - Design 28 Variant",
+      "current_price_cents": 1056,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalArt",
+      "shop_sales_count": 18965,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 2384,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-37401",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 29,
+      "title": "Wedding Invitation Template - Design 29 Variant",
+      "current_price_cents": 1274,
+      "anchor_price_cents": 1759,
+      "shop_name": "DigitalTemplates",
+      "shop_sales_count": 13623,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Shipping",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 1165,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-12408",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 30,
+      "title": "Wedding Invitation Template - Design 30 Variant",
+      "current_price_cents": 1229,
+      "anchor_price_cents": 1659,
+      "shop_name": "CreativeLab",
+      "shop_sales_count": 18282,
+      "shop_age_years": 3,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 917,
+      "identity_niche": "wedding printables",
+      "base_category": "Weddings",
+      "listing_url": "https://www.etsy.com/listing/fixture-35191",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    }
+  ],
+  "vintage logo design": [
+    {
+      "rank": 1,
+      "title": "Vintage Logo Design - Design 1 Variant",
+      "current_price_cents": 3751,
+      "anchor_price_cents": 6222,
+      "shop_name": "VintageTemplates",
+      "shop_sales_count": 17258,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [
+        "Only 13 left"
+      ],
+      "review_count": 1080,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-5260",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 2,
+      "title": "Vintage Logo Design - Design 2 Variant",
+      "current_price_cents": 3758,
+      "anchor_price_cents": null,
+      "shop_name": "SimpleTemplates",
+      "shop_sales_count": 8233,
+      "shop_age_years": null,
+      "badges": [
+        "Trending"
+      ],
+      "urgency_signals": [],
+      "review_count": 474,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-15544",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 3,
+      "title": "Vintage Logo Design - Design 3 Variant",
+      "current_price_cents": 2742,
+      "anchor_price_cents": null,
+      "shop_name": "MinimalistCo",
+      "shop_sales_count": null,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-93740",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 4,
+      "title": "Vintage Logo Design - Design 4 Variant",
+      "current_price_cents": 4141,
+      "anchor_price_cents": 6763,
+      "shop_name": "ArtfulStudio",
+      "shop_sales_count": 775,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 42,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-47759",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 5,
+      "title": "Vintage Logo Design - Design 5 Variant",
+      "current_price_cents": 4763,
+      "anchor_price_cents": 7568,
+      "shop_name": "MinimalistLab",
+      "shop_sales_count": 980,
+      "shop_age_years": 2,
+      "badges": [
+        "Trending"
+      ],
+      "urgency_signals": [
+        "Only 8 left"
+      ],
+      "review_count": 50,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-15726",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 6,
+      "title": "Vintage Logo Design - Design 6 Variant",
+      "current_price_cents": 3043,
+      "anchor_price_cents": 6021,
+      "shop_name": "VintageStudio",
+      "shop_sales_count": 18245,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1611,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-53581",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 7,
+      "title": "Vintage Logo Design - Design 7 Variant",
+      "current_price_cents": 3563,
+      "anchor_price_cents": null,
+      "shop_name": "ModernArt",
+      "shop_sales_count": 13340,
+      "shop_age_years": 1,
+      "badges": [
+        "Trending"
+      ],
+      "urgency_signals": [],
+      "review_count": 2555,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-97198",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 8,
+      "title": "Vintage Logo Design - Design 8 Variant",
+      "current_price_cents": 2651,
+      "anchor_price_cents": 4391,
+      "shop_name": "SimpleDesigns",
+      "shop_sales_count": null,
+      "shop_age_years": null,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-59186",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 9,
+      "title": "Vintage Logo Design - Design 9 Variant",
+      "current_price_cents": 4746,
+      "anchor_price_cents": 9482,
+      "shop_name": "ModernStudio",
+      "shop_sales_count": 6480,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [
+        "In 9 carts"
+      ],
+      "review_count": 494,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-25923",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 10,
+      "title": "Vintage Logo Design - Design 10 Variant",
+      "current_price_cents": 2075,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantArt",
+      "shop_sales_count": null,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [
+        "5 orders in last 24 hours"
+      ],
+      "review_count": null,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-64257",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 11,
+      "title": "Vintage Logo Design - Design 11 Variant",
+      "current_price_cents": 2695,
+      "anchor_price_cents": 4568,
+      "shop_name": "DigitalArt",
+      "shop_sales_count": 11132,
+      "shop_age_years": null,
+      "badges": [
+        "Trending"
+      ],
+      "urgency_signals": [],
+      "review_count": 1485,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-661",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 12,
+      "title": "Vintage Logo Design - Design 12 Variant",
+      "current_price_cents": 4034,
+      "anchor_price_cents": null,
+      "shop_name": "ModernShop",
+      "shop_sales_count": 3701,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 208,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-5481",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 13,
+      "title": "Vintage Logo Design - Design 13 Variant",
+      "current_price_cents": 3190,
+      "anchor_price_cents": 5788,
+      "shop_name": "ModernStudio",
+      "shop_sales_count": 5516,
+      "shop_age_years": null,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 806,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-13756",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 14,
+      "title": "Vintage Logo Design - Design 14 Variant",
+      "current_price_cents": 2405,
+      "anchor_price_cents": null,
+      "shop_name": "ArtfulTemplates",
+      "shop_sales_count": 11055,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1962,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-61587",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 15,
+      "title": "Vintage Logo Design - Design 15 Variant",
+      "current_price_cents": 3615,
+      "anchor_price_cents": 5170,
+      "shop_name": "ElegantDesigns",
+      "shop_sales_count": 9991,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1044,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-39180",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 16,
+      "title": "Vintage Logo Design - Design 16 Variant",
+      "current_price_cents": 3711,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalStudio",
+      "shop_sales_count": 14822,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 2172,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-61139",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 17,
+      "title": "Vintage Logo Design - Design 17 Variant",
+      "current_price_cents": 4292,
+      "anchor_price_cents": 5989,
+      "shop_name": "ElegantDesigns",
+      "shop_sales_count": 12069,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [
+        "Trending now"
+      ],
+      "review_count": 892,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-6517",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 18,
+      "title": "Vintage Logo Design - Design 18 Variant",
+      "current_price_cents": 4072,
+      "anchor_price_cents": null,
+      "shop_name": "ModernPro",
+      "shop_sales_count": null,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-49130",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 19,
+      "title": "Vintage Logo Design - Design 19 Variant",
+      "current_price_cents": 3338,
+      "anchor_price_cents": 5058,
+      "shop_name": "ArtfulTemplates",
+      "shop_sales_count": 13515,
+      "shop_age_years": null,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 862,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-63543",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 20,
+      "title": "Vintage Logo Design - Design 20 Variant",
+      "current_price_cents": 3789,
+      "anchor_price_cents": null,
+      "shop_name": "SimpleLab",
+      "shop_sales_count": 13892,
+      "shop_age_years": null,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 1252,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-91953",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 21,
+      "title": "Vintage Logo Design - Design 21 Variant",
+      "current_price_cents": 4307,
+      "anchor_price_cents": 7822,
+      "shop_name": "ElegantShop",
+      "shop_sales_count": 15446,
+      "shop_age_years": 3,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [
+        "13 orders in last 24 hours"
+      ],
+      "review_count": 2932,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-37730",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 22,
+      "title": "Vintage Logo Design - Design 22 Variant",
+      "current_price_cents": 3266,
+      "anchor_price_cents": null,
+      "shop_name": "ModernTemplates",
+      "shop_sales_count": 17722,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Shipping",
+        "Best Selling"
+      ],
+      "urgency_signals": [
+        "Trending now"
+      ],
+      "review_count": 2914,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-68119",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 23,
+      "title": "Vintage Logo Design - Design 23 Variant",
+      "current_price_cents": 4456,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalCo",
+      "shop_sales_count": 8909,
+      "shop_age_years": 3,
+      "badges": [
+        "Fast Shipping",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 544,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-44815",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 24,
+      "title": "Vintage Logo Design - Design 24 Variant",
+      "current_price_cents": 4564,
+      "anchor_price_cents": null,
+      "shop_name": "CreativeShop",
+      "shop_sales_count": 13437,
+      "shop_age_years": 1,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [
+        "6 orders in last 24 hours"
+      ],
+      "review_count": 1259,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-20689",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 25,
+      "title": "Vintage Logo Design - Design 25 Variant",
+      "current_price_cents": 2636,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalStudio",
+      "shop_sales_count": 13606,
+      "shop_age_years": null,
+      "badges": [
+        "Trending"
+      ],
+      "urgency_signals": [
+        "2 orders in last 24 hours"
+      ],
+      "review_count": 706,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-96102",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 26,
+      "title": "Vintage Logo Design - Design 26 Variant",
+      "current_price_cents": 2074,
+      "anchor_price_cents": 3177,
+      "shop_name": "ModernArt",
+      "shop_sales_count": 6062,
+      "shop_age_years": 1,
+      "badges": [
+        "Trending",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [
+        "Only 4 left"
+      ],
+      "review_count": 584,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-89724",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 27,
+      "title": "Vintage Logo Design - Design 27 Variant",
+      "current_price_cents": 2977,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalStudio",
+      "shop_sales_count": 508,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [
+        "In 9 carts"
+      ],
+      "review_count": 50,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-34617",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 28,
+      "title": "Vintage Logo Design - Design 28 Variant",
+      "current_price_cents": 2321,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalCo",
+      "shop_sales_count": 8205,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Delivery",
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 1454,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-70419",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 29,
+      "title": "Vintage Logo Design - Design 29 Variant",
+      "current_price_cents": 2506,
+      "anchor_price_cents": null,
+      "shop_name": "VintagePro",
+      "shop_sales_count": 18346,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Shipping",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 2498,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-54668",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 30,
+      "title": "Vintage Logo Design - Design 30 Variant",
+      "current_price_cents": 3221,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantDesigns",
+      "shop_sales_count": 16524,
+      "shop_age_years": null,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [
+        "Trending now"
+      ],
+      "review_count": 1309,
+      "identity_niche": "custom design services",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-62924",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    }
+  ],
+  "social media templates": [
+    {
+      "rank": 1,
+      "title": "Social Media Templates - Design 1 Variant",
+      "current_price_cents": 1441,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumLab",
+      "shop_sales_count": 8524,
+      "shop_age_years": 2,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 1086,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-83705",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 2,
+      "title": "Social Media Templates - Design 2 Variant",
+      "current_price_cents": 1050,
+      "anchor_price_cents": null,
+      "shop_name": "ArtfulDesigns",
+      "shop_sales_count": 11481,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 2143,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-16367",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 3,
+      "title": "Social Media Templates - Design 3 Variant",
+      "current_price_cents": 1394,
+      "anchor_price_cents": 2557,
+      "shop_name": "ElegantArt",
+      "shop_sales_count": 1226,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 166,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-40874",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 4,
+      "title": "Social Media Templates - Design 4 Variant",
+      "current_price_cents": 1314,
+      "anchor_price_cents": null,
+      "shop_name": "CreativeShop",
+      "shop_sales_count": 4081,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Delivery",
+        "Fast Shipping"
+      ],
+      "urgency_signals": [
+        "In 6 carts"
+      ],
+      "review_count": 564,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-73641",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 5,
+      "title": "Social Media Templates - Design 5 Variant",
+      "current_price_cents": 932,
+      "anchor_price_cents": 1603,
+      "shop_name": "DigitalHub",
+      "shop_sales_count": 8609,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [
+        "Only 16 left"
+      ],
+      "review_count": 755,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-88077",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 6,
+      "title": "Social Media Templates - Design 6 Variant",
+      "current_price_cents": 1195,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumLab",
+      "shop_sales_count": 9891,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 696,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-46627",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 7,
+      "title": "Social Media Templates - Design 7 Variant",
+      "current_price_cents": 772,
+      "anchor_price_cents": 1530,
+      "shop_name": "ProfessionalDesigns",
+      "shop_sales_count": 6551,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1300,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-23044",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 8,
+      "title": "Social Media Templates - Design 8 Variant",
+      "current_price_cents": 688,
+      "anchor_price_cents": 1257,
+      "shop_name": "ElegantStudio",
+      "shop_sales_count": 8385,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1440,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-1310",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 9,
+      "title": "Social Media Templates - Design 9 Variant",
+      "current_price_cents": 1134,
+      "anchor_price_cents": null,
+      "shop_name": "ModernLab",
+      "shop_sales_count": 13639,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Shipping",
+        "Trending"
+      ],
+      "urgency_signals": [
+        "Only 17 left"
+      ],
+      "review_count": 2537,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-3260",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 10,
+      "title": "Social Media Templates - Design 10 Variant",
+      "current_price_cents": 1424,
+      "anchor_price_cents": 2284,
+      "shop_name": "MinimalistTemplates",
+      "shop_sales_count": 4782,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 927,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-15460",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 11,
+      "title": "Social Media Templates - Design 11 Variant",
+      "current_price_cents": 1368,
+      "anchor_price_cents": null,
+      "shop_name": "DigitalDesigns",
+      "shop_sales_count": 11202,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1014,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-88657",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 12,
+      "title": "Social Media Templates - Design 12 Variant",
+      "current_price_cents": 907,
+      "anchor_price_cents": null,
+      "shop_name": "ModernStudio",
+      "shop_sales_count": 508,
+      "shop_age_years": 3,
+      "badges": [
+        "Best Selling",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 93,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-27181",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 13,
+      "title": "Social Media Templates - Design 13 Variant",
+      "current_price_cents": 1186,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantCo",
+      "shop_sales_count": 3267,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 168,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-36349",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 14,
+      "title": "Social Media Templates - Design 14 Variant",
+      "current_price_cents": 1365,
+      "anchor_price_cents": 2224,
+      "shop_name": "PremiumHub",
+      "shop_sales_count": 17665,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1921,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-3306",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 15,
+      "title": "Social Media Templates - Design 15 Variant",
+      "current_price_cents": 787,
+      "anchor_price_cents": 1114,
+      "shop_name": "ArtfulStore",
+      "shop_sales_count": 11888,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 2116,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-12442",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 16,
+      "title": "Social Media Templates - Design 16 Variant",
+      "current_price_cents": 1106,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantStudio",
+      "shop_sales_count": 4518,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 446,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-5573",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 17,
+      "title": "Social Media Templates - Design 17 Variant",
+      "current_price_cents": 636,
+      "anchor_price_cents": null,
+      "shop_name": "ArtfulLab",
+      "shop_sales_count": 10916,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1658,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-78718",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 18,
+      "title": "Social Media Templates - Design 18 Variant",
+      "current_price_cents": 1113,
+      "anchor_price_cents": 1787,
+      "shop_name": "VintageArt",
+      "shop_sales_count": 16173,
+      "shop_age_years": 2,
+      "badges": [
+        "Trending",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [
+        "Trending now"
+      ],
+      "review_count": 2468,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-82336",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 19,
+      "title": "Social Media Templates - Design 19 Variant",
+      "current_price_cents": 1147,
+      "anchor_price_cents": 1752,
+      "shop_name": "ModernShop",
+      "shop_sales_count": 11683,
+      "shop_age_years": 1,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 1230,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-73605",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 20,
+      "title": "Social Media Templates - Design 20 Variant",
+      "current_price_cents": 966,
+      "anchor_price_cents": 1459,
+      "shop_name": "ModernLab",
+      "shop_sales_count": 8869,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 930,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-96649",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 21,
+      "title": "Social Media Templates - Design 21 Variant",
+      "current_price_cents": 770,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumHub",
+      "shop_sales_count": 1746,
+      "shop_age_years": null,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [
+        "In 16 carts"
+      ],
+      "review_count": 302,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-58682",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 22,
+      "title": "Social Media Templates - Design 22 Variant",
+      "current_price_cents": 858,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumArt",
+      "shop_sales_count": 812,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 54,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-45697",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 23,
+      "title": "Social Media Templates - Design 23 Variant",
+      "current_price_cents": 737,
+      "anchor_price_cents": null,
+      "shop_name": "DigitalShop",
+      "shop_sales_count": 4399,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 509,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-54902",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 24,
+      "title": "Social Media Templates - Design 24 Variant",
+      "current_price_cents": 947,
+      "anchor_price_cents": null,
+      "shop_name": "MinimalistStudio",
+      "shop_sales_count": 13762,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 2336,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-84446",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 25,
+      "title": "Social Media Templates - Design 25 Variant",
+      "current_price_cents": 735,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumStore",
+      "shop_sales_count": 8288,
+      "shop_age_years": 2,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [
+        "10 orders in last 24 hours"
+      ],
+      "review_count": 1164,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-26387",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 26,
+      "title": "Social Media Templates - Design 26 Variant",
+      "current_price_cents": 1051,
+      "anchor_price_cents": null,
+      "shop_name": "ArtfulPro",
+      "shop_sales_count": 19799,
+      "shop_age_years": 2,
+      "badges": [
+        "Star Seller",
+        "Trending"
+      ],
+      "urgency_signals": [
+        "In 7 carts"
+      ],
+      "review_count": 2919,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-7312",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 27,
+      "title": "Social Media Templates - Design 27 Variant",
+      "current_price_cents": 812,
+      "anchor_price_cents": 1277,
+      "shop_name": "ProfessionalTemplates",
+      "shop_sales_count": 18300,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [
+        "Trending now"
+      ],
+      "review_count": 1490,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-86891",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 28,
+      "title": "Social Media Templates - Design 28 Variant",
+      "current_price_cents": 1136,
+      "anchor_price_cents": 2193,
+      "shop_name": "VintageCo",
+      "shop_sales_count": null,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-14802",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 29,
+      "title": "Social Media Templates - Design 29 Variant",
+      "current_price_cents": 911,
+      "anchor_price_cents": 1707,
+      "shop_name": "PremiumHub",
+      "shop_sales_count": 14767,
+      "shop_age_years": 3,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 960,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-91455",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 30,
+      "title": "Social Media Templates - Design 30 Variant",
+      "current_price_cents": 1170,
+      "anchor_price_cents": null,
+      "shop_name": "ModernArt",
+      "shop_sales_count": 2987,
+      "shop_age_years": 2,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 347,
+      "identity_niche": "social media marketing tools",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-52046",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    }
+  ],
+  "budget spreadsheet": [
+    {
+      "rank": 1,
+      "title": "Budget Spreadsheet - Design 1 Variant",
+      "current_price_cents": 787,
+      "anchor_price_cents": 1452,
+      "shop_name": "ArtfulStudio",
+      "shop_sales_count": 12995,
+      "shop_age_years": 1,
+      "badges": [
+        "Best Selling",
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 1955,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-71151",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 2,
+      "title": "Budget Spreadsheet - Design 2 Variant",
+      "current_price_cents": 630,
+      "anchor_price_cents": null,
+      "shop_name": "DigitalPro",
+      "shop_sales_count": 4951,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 897,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-11109",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 3,
+      "title": "Budget Spreadsheet - Design 3 Variant",
+      "current_price_cents": 880,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumPro",
+      "shop_sales_count": 17433,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1770,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-6986",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 4,
+      "title": "Budget Spreadsheet - Design 4 Variant",
+      "current_price_cents": 512,
+      "anchor_price_cents": 796,
+      "shop_name": "PremiumHub",
+      "shop_sales_count": 1666,
+      "shop_age_years": null,
+      "badges": [
+        "Best Selling",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 116,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-24657",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 5,
+      "title": "Budget Spreadsheet - Design 5 Variant",
+      "current_price_cents": 542,
+      "anchor_price_cents": null,
+      "shop_name": "VintageCo",
+      "shop_sales_count": 7439,
+      "shop_age_years": null,
+      "badges": [
+        "Best Selling",
+        "Trending"
+      ],
+      "urgency_signals": [
+        "Only 7 left"
+      ],
+      "review_count": 525,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-23292",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 6,
+      "title": "Budget Spreadsheet - Design 6 Variant",
+      "current_price_cents": 688,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumStore",
+      "shop_sales_count": 19172,
+      "shop_age_years": 2,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 2265,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-87882",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 7,
+      "title": "Budget Spreadsheet - Design 7 Variant",
+      "current_price_cents": 965,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalStudio",
+      "shop_sales_count": 16937,
+      "shop_age_years": 1,
+      "badges": [
+        "Best Selling",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 920,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-46933",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 8,
+      "title": "Budget Spreadsheet - Design 8 Variant",
+      "current_price_cents": 976,
+      "anchor_price_cents": 1840,
+      "shop_name": "DigitalStore",
+      "shop_sales_count": 18021,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [
+        "17 orders in last 24 hours"
+      ],
+      "review_count": 3080,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-93197",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 9,
+      "title": "Budget Spreadsheet - Design 9 Variant",
+      "current_price_cents": 923,
+      "anchor_price_cents": null,
+      "shop_name": "VintagePro",
+      "shop_sales_count": 7549,
+      "shop_age_years": 3,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [
+        "9 orders in last 24 hours"
+      ],
+      "review_count": 1376,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-58443",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 10,
+      "title": "Budget Spreadsheet - Design 10 Variant",
+      "current_price_cents": 853,
+      "anchor_price_cents": 1207,
+      "shop_name": "ModernStore",
+      "shop_sales_count": 1845,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Shipping",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [
+        "In 12 carts"
+      ],
+      "review_count": 192,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-50407",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 11,
+      "title": "Budget Spreadsheet - Design 11 Variant",
+      "current_price_cents": 640,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantTemplates",
+      "shop_sales_count": 15335,
+      "shop_age_years": null,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 2150,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-85996",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 12,
+      "title": "Budget Spreadsheet - Design 12 Variant",
+      "current_price_cents": 408,
+      "anchor_price_cents": 595,
+      "shop_name": "ElegantStore",
+      "shop_sales_count": 9880,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1749,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-80223",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 13,
+      "title": "Budget Spreadsheet - Design 13 Variant",
+      "current_price_cents": 901,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumLab",
+      "shop_sales_count": 6138,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 661,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-55041",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 14,
+      "title": "Budget Spreadsheet - Design 14 Variant",
+      "current_price_cents": 764,
+      "anchor_price_cents": 1505,
+      "shop_name": "MinimalistCo",
+      "shop_sales_count": 1392,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 238,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-53838",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 15,
+      "title": "Budget Spreadsheet - Design 15 Variant",
+      "current_price_cents": 694,
+      "anchor_price_cents": 1184,
+      "shop_name": "ModernStudio",
+      "shop_sales_count": 1369,
+      "shop_age_years": 1,
+      "badges": [
+        "Best Selling",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [
+        "20 orders in last 24 hours"
+      ],
+      "review_count": 195,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-64037",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 16,
+      "title": "Budget Spreadsheet - Design 16 Variant",
+      "current_price_cents": 700,
+      "anchor_price_cents": 1075,
+      "shop_name": "ElegantStudio",
+      "shop_sales_count": 12484,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [
+        "In 8 carts"
+      ],
+      "review_count": 2062,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-62466",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 17,
+      "title": "Budget Spreadsheet - Design 17 Variant",
+      "current_price_cents": 576,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalPro",
+      "shop_sales_count": 862,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Shipping",
+        "Star Seller"
+      ],
+      "urgency_signals": [
+        "Trending now"
+      ],
+      "review_count": 66,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-42712",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 18,
+      "title": "Budget Spreadsheet - Design 18 Variant",
+      "current_price_cents": 635,
+      "anchor_price_cents": 1049,
+      "shop_name": "ElegantShop",
+      "shop_sales_count": 19569,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 2956,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-42345",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 19,
+      "title": "Budget Spreadsheet - Design 19 Variant",
+      "current_price_cents": 486,
+      "anchor_price_cents": null,
+      "shop_name": "MinimalistShop",
+      "shop_sales_count": 10360,
+      "shop_age_years": 2,
+      "badges": [
+        "Star Seller",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 519,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-73308",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 20,
+      "title": "Budget Spreadsheet - Design 20 Variant",
+      "current_price_cents": 820,
+      "anchor_price_cents": null,
+      "shop_name": "ModernHub",
+      "shop_sales_count": 16276,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1366,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-94337",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 21,
+      "title": "Budget Spreadsheet - Design 21 Variant",
+      "current_price_cents": 645,
+      "anchor_price_cents": 1274,
+      "shop_name": "VintageHub",
+      "shop_sales_count": 19874,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 2676,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-7781",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 22,
+      "title": "Budget Spreadsheet - Design 22 Variant",
+      "current_price_cents": 958,
+      "anchor_price_cents": 1370,
+      "shop_name": "SimpleShop",
+      "shop_sales_count": null,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-62310",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 23,
+      "title": "Budget Spreadsheet - Design 23 Variant",
+      "current_price_cents": 502,
+      "anchor_price_cents": 970,
+      "shop_name": "MinimalistStudio",
+      "shop_sales_count": 17058,
+      "shop_age_years": 3,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 2264,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-19587",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 24,
+      "title": "Budget Spreadsheet - Design 24 Variant",
+      "current_price_cents": 942,
+      "anchor_price_cents": null,
+      "shop_name": "SimpleDesigns",
+      "shop_sales_count": 10945,
+      "shop_age_years": 3,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 1405,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-58770",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 25,
+      "title": "Budget Spreadsheet - Design 25 Variant",
+      "current_price_cents": 827,
+      "anchor_price_cents": 1450,
+      "shop_name": "ElegantDesigns",
+      "shop_sales_count": 8387,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1265,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-24511",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 26,
+      "title": "Budget Spreadsheet - Design 26 Variant",
+      "current_price_cents": 453,
+      "anchor_price_cents": 678,
+      "shop_name": "ProfessionalStore",
+      "shop_sales_count": 4023,
+      "shop_age_years": 1,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [
+        "16 orders in last 24 hours"
+      ],
+      "review_count": 372,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-52526",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 27,
+      "title": "Budget Spreadsheet - Design 27 Variant",
+      "current_price_cents": 772,
+      "anchor_price_cents": null,
+      "shop_name": "MinimalistArt",
+      "shop_sales_count": 9194,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1481,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-52945",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 28,
+      "title": "Budget Spreadsheet - Design 28 Variant",
+      "current_price_cents": 494,
+      "anchor_price_cents": 794,
+      "shop_name": "SimpleHub",
+      "shop_sales_count": 10815,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [
+        "Only 14 left"
+      ],
+      "review_count": 983,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-46194",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 29,
+      "title": "Budget Spreadsheet - Design 29 Variant",
+      "current_price_cents": 955,
+      "anchor_price_cents": 1869,
+      "shop_name": "ElegantDesigns",
+      "shop_sales_count": 19395,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1275,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-56797",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 30,
+      "title": "Budget Spreadsheet - Design 30 Variant",
+      "current_price_cents": 788,
+      "anchor_price_cents": 1315,
+      "shop_name": "CreativeTemplates",
+      "shop_sales_count": 8166,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 755,
+      "identity_niche": "personal finance templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-22520",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    }
+  ],
+  "meal planner printable": [
+    {
+      "rank": 1,
+      "title": "Meal Planner Printable - Design 1 Variant",
+      "current_price_cents": 1399,
+      "anchor_price_cents": 2585,
+      "shop_name": "ModernArt",
+      "shop_sales_count": 3326,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 522,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-54615",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 2,
+      "title": "Meal Planner Printable - Design 2 Variant",
+      "current_price_cents": 848,
+      "anchor_price_cents": 1135,
+      "shop_name": "MinimalistHub",
+      "shop_sales_count": null,
+      "shop_age_years": 2,
+      "badges": [
+        "Trending"
+      ],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-92865",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 3,
+      "title": "Meal Planner Printable - Design 3 Variant",
+      "current_price_cents": 858,
+      "anchor_price_cents": 1212,
+      "shop_name": "VintageShop",
+      "shop_sales_count": 4445,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [
+        "8 orders in last 24 hours"
+      ],
+      "review_count": 811,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-46263",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 4,
+      "title": "Meal Planner Printable - Design 4 Variant",
+      "current_price_cents": 1317,
+      "anchor_price_cents": 2396,
+      "shop_name": "VintageStore",
+      "shop_sales_count": null,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-14573",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 5,
+      "title": "Meal Planner Printable - Design 5 Variant",
+      "current_price_cents": 698,
+      "anchor_price_cents": null,
+      "shop_name": "ArtfulCo",
+      "shop_sales_count": 6119,
+      "shop_age_years": 1,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 790,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-49633",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 6,
+      "title": "Meal Planner Printable - Design 6 Variant",
+      "current_price_cents": 592,
+      "anchor_price_cents": 1059,
+      "shop_name": "ElegantLab",
+      "shop_sales_count": 18677,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Shipping",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 2620,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-48628",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 7,
+      "title": "Meal Planner Printable - Design 7 Variant",
+      "current_price_cents": 851,
+      "anchor_price_cents": 1523,
+      "shop_name": "ProfessionalHub",
+      "shop_sales_count": 7356,
+      "shop_age_years": 2,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 1167,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-10107",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 8,
+      "title": "Meal Planner Printable - Design 8 Variant",
+      "current_price_cents": 1130,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantStore",
+      "shop_sales_count": 932,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 83,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-42616",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 9,
+      "title": "Meal Planner Printable - Design 9 Variant",
+      "current_price_cents": 1135,
+      "anchor_price_cents": null,
+      "shop_name": "ArtfulLab",
+      "shop_sales_count": 7551,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 1250,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-98905",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 10,
+      "title": "Meal Planner Printable - Design 10 Variant",
+      "current_price_cents": 1183,
+      "anchor_price_cents": null,
+      "shop_name": "DigitalStore",
+      "shop_sales_count": 16807,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [
+        "Trending now"
+      ],
+      "review_count": 1450,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-84361",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 11,
+      "title": "Meal Planner Printable - Design 11 Variant",
+      "current_price_cents": 720,
+      "anchor_price_cents": 1377,
+      "shop_name": "ProfessionalHub",
+      "shop_sales_count": 11814,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Shipping",
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 1589,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-6360",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 12,
+      "title": "Meal Planner Printable - Design 12 Variant",
+      "current_price_cents": 733,
+      "anchor_price_cents": null,
+      "shop_name": "VintageLab",
+      "shop_sales_count": 13145,
+      "shop_age_years": 1,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 936,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-72549",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 13,
+      "title": "Meal Planner Printable - Design 13 Variant",
+      "current_price_cents": 1270,
+      "anchor_price_cents": 2329,
+      "shop_name": "VintageShop",
+      "shop_sales_count": 16049,
+      "shop_age_years": 1,
+      "badges": [
+        "Trending",
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 2715,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-68871",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 14,
+      "title": "Meal Planner Printable - Design 14 Variant",
+      "current_price_cents": 514,
+      "anchor_price_cents": null,
+      "shop_name": "SimpleStudio",
+      "shop_sales_count": 3890,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 366,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-88852",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 15,
+      "title": "Meal Planner Printable - Design 15 Variant",
+      "current_price_cents": 1278,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumLab",
+      "shop_sales_count": 648,
+      "shop_age_years": null,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 122,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-17112",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 16,
+      "title": "Meal Planner Printable - Design 16 Variant",
+      "current_price_cents": 888,
+      "anchor_price_cents": null,
+      "shop_name": "ArtfulStore",
+      "shop_sales_count": 1287,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [
+        "Only 6 left"
+      ],
+      "review_count": 210,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-25185",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 17,
+      "title": "Meal Planner Printable - Design 17 Variant",
+      "current_price_cents": 502,
+      "anchor_price_cents": null,
+      "shop_name": "CreativeDesigns",
+      "shop_sales_count": 13860,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 792,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-11817",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 18,
+      "title": "Meal Planner Printable - Design 18 Variant",
+      "current_price_cents": 549,
+      "anchor_price_cents": 747,
+      "shop_name": "ArtfulShop",
+      "shop_sales_count": null,
+      "shop_age_years": null,
+      "badges": [
+        "Fast Shipping",
+        "Trending"
+      ],
+      "urgency_signals": [
+        "10 orders in last 24 hours"
+      ],
+      "review_count": null,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-76796",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 19,
+      "title": "Meal Planner Printable - Design 19 Variant",
+      "current_price_cents": 568,
+      "anchor_price_cents": null,
+      "shop_name": "DigitalCo",
+      "shop_sales_count": 13074,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 703,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-79591",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 20,
+      "title": "Meal Planner Printable - Design 20 Variant",
+      "current_price_cents": 618,
+      "anchor_price_cents": null,
+      "shop_name": "ModernArt",
+      "shop_sales_count": null,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-94967",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 21,
+      "title": "Meal Planner Printable - Design 21 Variant",
+      "current_price_cents": 970,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalPro",
+      "shop_sales_count": 11865,
+      "shop_age_years": 3,
+      "badges": [
+        "Fast Shipping",
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 1285,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-78626",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 22,
+      "title": "Meal Planner Printable - Design 22 Variant",
+      "current_price_cents": 1329,
+      "anchor_price_cents": null,
+      "shop_name": "SimplePro",
+      "shop_sales_count": 5753,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 458,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-27898",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 23,
+      "title": "Meal Planner Printable - Design 23 Variant",
+      "current_price_cents": 1132,
+      "anchor_price_cents": null,
+      "shop_name": "DigitalArt",
+      "shop_sales_count": 17054,
+      "shop_age_years": 2,
+      "badges": [
+        "Best Selling",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [
+        "Only 4 left"
+      ],
+      "review_count": 2970,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-4474",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 24,
+      "title": "Meal Planner Printable - Design 24 Variant",
+      "current_price_cents": 1268,
+      "anchor_price_cents": 2444,
+      "shop_name": "CreativePro",
+      "shop_sales_count": 990,
+      "shop_age_years": 1,
+      "badges": [
+        "Best Selling",
+        "Star Seller"
+      ],
+      "urgency_signals": [
+        "In 4 carts"
+      ],
+      "review_count": 52,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-48942",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 25,
+      "title": "Meal Planner Printable - Design 25 Variant",
+      "current_price_cents": 791,
+      "anchor_price_cents": null,
+      "shop_name": "ModernDesigns",
+      "shop_sales_count": null,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Shipping",
+        "Trending"
+      ],
+      "urgency_signals": [
+        "In 17 carts"
+      ],
+      "review_count": null,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-66367",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 26,
+      "title": "Meal Planner Printable - Design 26 Variant",
+      "current_price_cents": 1232,
+      "anchor_price_cents": null,
+      "shop_name": "ArtfulDesigns",
+      "shop_sales_count": 14067,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 2452,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-85037",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 27,
+      "title": "Meal Planner Printable - Design 27 Variant",
+      "current_price_cents": 544,
+      "anchor_price_cents": 878,
+      "shop_name": "ProfessionalShop",
+      "shop_sales_count": 5063,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [
+        "Trending now"
+      ],
+      "review_count": 314,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-78279",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 28,
+      "title": "Meal Planner Printable - Design 28 Variant",
+      "current_price_cents": 1183,
+      "anchor_price_cents": null,
+      "shop_name": "ArtfulDesigns",
+      "shop_sales_count": 9781,
+      "shop_age_years": 2,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [
+        "Only 4 left"
+      ],
+      "review_count": 1155,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-81956",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 29,
+      "title": "Meal Planner Printable - Design 29 Variant",
+      "current_price_cents": 820,
+      "anchor_price_cents": 1159,
+      "shop_name": "ElegantTemplates",
+      "shop_sales_count": 2400,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 120,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-77054",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 30,
+      "title": "Meal Planner Printable - Design 30 Variant",
+      "current_price_cents": 1237,
+      "anchor_price_cents": 2091,
+      "shop_name": "VintageStudio",
+      "shop_sales_count": 9069,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1548,
+      "identity_niche": "household organization printables",
+      "base_category": "Home & Living",
+      "listing_url": "https://www.etsy.com/listing/fixture-24877",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    }
+  ],
+  "business card template": [
+    {
+      "rank": 1,
+      "title": "Business Card Template - Design 1 Variant",
+      "current_price_cents": 1296,
+      "anchor_price_cents": 2373,
+      "shop_name": "ArtfulArt",
+      "shop_sales_count": 15485,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [
+        "4 orders in last 24 hours"
+      ],
+      "review_count": 785,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-3717",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 2,
+      "title": "Business Card Template - Design 2 Variant",
+      "current_price_cents": 844,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantPro",
+      "shop_sales_count": 4432,
+      "shop_age_years": 2,
+      "badges": [
+        "Trending"
+      ],
+      "urgency_signals": [
+        "3 orders in last 24 hours"
+      ],
+      "review_count": 617,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-95924",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 3,
+      "title": "Business Card Template - Design 3 Variant",
+      "current_price_cents": 1137,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumPro",
+      "shop_sales_count": null,
+      "shop_age_years": null,
+      "badges": [
+        "Trending",
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-6339",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 4,
+      "title": "Business Card Template - Design 4 Variant",
+      "current_price_cents": 1056,
+      "anchor_price_cents": 1745,
+      "shop_name": "ProfessionalTemplates",
+      "shop_sales_count": 6812,
+      "shop_age_years": null,
+      "badges": [
+        "Trending"
+      ],
+      "urgency_signals": [
+        "Only 13 left"
+      ],
+      "review_count": 946,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-54458",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 5,
+      "title": "Business Card Template - Design 5 Variant",
+      "current_price_cents": 645,
+      "anchor_price_cents": null,
+      "shop_name": "ArtfulPro",
+      "shop_sales_count": 11845,
+      "shop_age_years": null,
+      "badges": [
+        "Trending",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 2304,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-42723",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 6,
+      "title": "Business Card Template - Design 6 Variant",
+      "current_price_cents": 1191,
+      "anchor_price_cents": null,
+      "shop_name": "DigitalPro",
+      "shop_sales_count": 4018,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 750,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-38180",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 7,
+      "title": "Business Card Template - Design 7 Variant",
+      "current_price_cents": 1363,
+      "anchor_price_cents": null,
+      "shop_name": "MinimalistLab",
+      "shop_sales_count": 3952,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [
+        "Only 8 left"
+      ],
+      "review_count": 440,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-78644",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 8,
+      "title": "Business Card Template - Design 8 Variant",
+      "current_price_cents": 682,
+      "anchor_price_cents": 1284,
+      "shop_name": "MinimalistDesigns",
+      "shop_sales_count": 19184,
+      "shop_age_years": 1,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 3503,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-20581",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 9,
+      "title": "Business Card Template - Design 9 Variant",
+      "current_price_cents": 615,
+      "anchor_price_cents": 1179,
+      "shop_name": "SimpleTemplates",
+      "shop_sales_count": 7856,
+      "shop_age_years": 1,
+      "badges": [
+        "Trending",
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 535,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-84374",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 10,
+      "title": "Business Card Template - Design 10 Variant",
+      "current_price_cents": 1168,
+      "anchor_price_cents": null,
+      "shop_name": "CreativeDesigns",
+      "shop_sales_count": null,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Shipping",
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-57677",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 11,
+      "title": "Business Card Template - Design 11 Variant",
+      "current_price_cents": 1437,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalPro",
+      "shop_sales_count": 7791,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Shipping",
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 1360,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-42391",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 12,
+      "title": "Business Card Template - Design 12 Variant",
+      "current_price_cents": 652,
+      "anchor_price_cents": null,
+      "shop_name": "MinimalistArt",
+      "shop_sales_count": 5807,
+      "shop_age_years": null,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [
+        "Trending now"
+      ],
+      "review_count": 297,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-87748",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 13,
+      "title": "Business Card Template - Design 13 Variant",
+      "current_price_cents": 787,
+      "anchor_price_cents": 1512,
+      "shop_name": "CreativeTemplates",
+      "shop_sales_count": 7368,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [
+        "In 9 carts"
+      ],
+      "review_count": 813,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-53456",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 14,
+      "title": "Business Card Template - Design 14 Variant",
+      "current_price_cents": 658,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantHub",
+      "shop_sales_count": 11416,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 878,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-17930",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 15,
+      "title": "Business Card Template - Design 15 Variant",
+      "current_price_cents": 791,
+      "anchor_price_cents": 1142,
+      "shop_name": "CreativeDesigns",
+      "shop_sales_count": null,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-92358",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 16,
+      "title": "Business Card Template - Design 16 Variant",
+      "current_price_cents": 999,
+      "anchor_price_cents": null,
+      "shop_name": "VintageStore",
+      "shop_sales_count": 3806,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [
+        "In 8 carts"
+      ],
+      "review_count": 732,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-9201",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 17,
+      "title": "Business Card Template - Design 17 Variant",
+      "current_price_cents": 1438,
+      "anchor_price_cents": null,
+      "shop_name": "DigitalArt",
+      "shop_sales_count": null,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-83290",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 18,
+      "title": "Business Card Template - Design 18 Variant",
+      "current_price_cents": 1090,
+      "anchor_price_cents": null,
+      "shop_name": "ArtfulHub",
+      "shop_sales_count": 5004,
+      "shop_age_years": null,
+      "badges": [
+        "Star Seller",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 892,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-53044",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 19,
+      "title": "Business Card Template - Design 19 Variant",
+      "current_price_cents": 953,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumLab",
+      "shop_sales_count": 2969,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 154,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-66583",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 20,
+      "title": "Business Card Template - Design 20 Variant",
+      "current_price_cents": 885,
+      "anchor_price_cents": 1703,
+      "shop_name": "VintageDesigns",
+      "shop_sales_count": 17797,
+      "shop_age_years": 2,
+      "badges": [
+        "Trending"
+      ],
+      "urgency_signals": [],
+      "review_count": 2949,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-41070",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 21,
+      "title": "Business Card Template - Design 21 Variant",
+      "current_price_cents": 600,
+      "anchor_price_cents": null,
+      "shop_name": "DigitalShop",
+      "shop_sales_count": 1601,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 244,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-55571",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 22,
+      "title": "Business Card Template - Design 22 Variant",
+      "current_price_cents": 899,
+      "anchor_price_cents": 1734,
+      "shop_name": "ModernLab",
+      "shop_sales_count": 3595,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 563,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-36411",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 23,
+      "title": "Business Card Template - Design 23 Variant",
+      "current_price_cents": 1019,
+      "anchor_price_cents": 1787,
+      "shop_name": "SimpleArt",
+      "shop_sales_count": 14270,
+      "shop_age_years": 3,
+      "badges": [
+        "Fast Shipping",
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 2366,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-6082",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 24,
+      "title": "Business Card Template - Design 24 Variant",
+      "current_price_cents": 1386,
+      "anchor_price_cents": 1890,
+      "shop_name": "VintageArt",
+      "shop_sales_count": 16982,
+      "shop_age_years": 1,
+      "badges": [
+        "Trending"
+      ],
+      "urgency_signals": [],
+      "review_count": 2406,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-58531",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 25,
+      "title": "Business Card Template - Design 25 Variant",
+      "current_price_cents": 1190,
+      "anchor_price_cents": null,
+      "shop_name": "ModernCo",
+      "shop_sales_count": 7628,
+      "shop_age_years": 1,
+      "badges": [
+        "Trending"
+      ],
+      "urgency_signals": [],
+      "review_count": 413,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-97897",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 26,
+      "title": "Business Card Template - Design 26 Variant",
+      "current_price_cents": 688,
+      "anchor_price_cents": 1065,
+      "shop_name": "MinimalistShop",
+      "shop_sales_count": 9607,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Delivery",
+        "Fast Shipping"
+      ],
+      "urgency_signals": [
+        "10 orders in last 24 hours"
+      ],
+      "review_count": 1409,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-47401",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 27,
+      "title": "Business Card Template - Design 27 Variant",
+      "current_price_cents": 568,
+      "anchor_price_cents": null,
+      "shop_name": "ModernLab",
+      "shop_sales_count": 2284,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [
+        "Trending now"
+      ],
+      "review_count": 266,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-10340",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 28,
+      "title": "Business Card Template - Design 28 Variant",
+      "current_price_cents": 649,
+      "anchor_price_cents": 969,
+      "shop_name": "SimpleCo",
+      "shop_sales_count": 3295,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 260,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-95603",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 29,
+      "title": "Business Card Template - Design 29 Variant",
+      "current_price_cents": 1024,
+      "anchor_price_cents": null,
+      "shop_name": "ArtfulTemplates",
+      "shop_sales_count": 15332,
+      "shop_age_years": 2,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 799,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-4522",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 30,
+      "title": "Business Card Template - Design 30 Variant",
+      "current_price_cents": 1013,
+      "anchor_price_cents": 1686,
+      "shop_name": "MinimalistStudio",
+      "shop_sales_count": 2045,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [
+        "In 15 carts"
+      ],
+      "review_count": 285,
+      "identity_niche": "business branding templates",
+      "base_category": "Business & Office",
+      "listing_url": "https://www.etsy.com/listing/fixture-36589",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    }
+  ],
+  "resume template": [
+    {
+      "rank": 1,
+      "title": "Resume Template - Design 1 Variant",
+      "current_price_cents": 1382,
+      "anchor_price_cents": 2502,
+      "shop_name": "VintageCo",
+      "shop_sales_count": 19836,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Delivery",
+        "Trending"
+      ],
+      "urgency_signals": [],
+      "review_count": 2450,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-57081",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 2,
+      "title": "Resume Template - Design 2 Variant",
+      "current_price_cents": 708,
+      "anchor_price_cents": null,
+      "shop_name": "MinimalistPro",
+      "shop_sales_count": 17999,
+      "shop_age_years": 3,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [
+        "In 19 carts"
+      ],
+      "review_count": 1386,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-58931",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 3,
+      "title": "Resume Template - Design 3 Variant",
+      "current_price_cents": 831,
+      "anchor_price_cents": null,
+      "shop_name": "DigitalArt",
+      "shop_sales_count": 16805,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [
+        "18 orders in last 24 hours"
+      ],
+      "review_count": 3018,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-168",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 4,
+      "title": "Resume Template - Design 4 Variant",
+      "current_price_cents": 739,
+      "anchor_price_cents": null,
+      "shop_name": "VintageArt",
+      "shop_sales_count": 15093,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Shipping",
+        "Trending"
+      ],
+      "urgency_signals": [
+        "Trending now"
+      ],
+      "review_count": 2203,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-16896",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 5,
+      "title": "Resume Template - Design 5 Variant",
+      "current_price_cents": 931,
+      "anchor_price_cents": null,
+      "shop_name": "CreativeLab",
+      "shop_sales_count": 19710,
+      "shop_age_years": 3,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 1876,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-86213",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 6,
+      "title": "Resume Template - Design 6 Variant",
+      "current_price_cents": 687,
+      "anchor_price_cents": 1294,
+      "shop_name": "DigitalTemplates",
+      "shop_sales_count": 7756,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1030,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-74165",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 7,
+      "title": "Resume Template - Design 7 Variant",
+      "current_price_cents": 998,
+      "anchor_price_cents": null,
+      "shop_name": "ElegantPro",
+      "shop_sales_count": 4965,
+      "shop_age_years": 3,
+      "badges": [],
+      "urgency_signals": [
+        "In 6 carts"
+      ],
+      "review_count": 575,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-70573",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 8,
+      "title": "Resume Template - Design 8 Variant",
+      "current_price_cents": 706,
+      "anchor_price_cents": 1190,
+      "shop_name": "ModernHub",
+      "shop_sales_count": 18822,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 1520,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-8816",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 9,
+      "title": "Resume Template - Design 9 Variant",
+      "current_price_cents": 1015,
+      "anchor_price_cents": 1662,
+      "shop_name": "CreativeHub",
+      "shop_sales_count": null,
+      "shop_age_years": 1,
+      "badges": [
+        "Fast Delivery",
+        "Best Selling"
+      ],
+      "urgency_signals": [
+        "In 7 carts"
+      ],
+      "review_count": null,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-71679",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 10,
+      "title": "Resume Template - Design 10 Variant",
+      "current_price_cents": 1417,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalArt",
+      "shop_sales_count": 11962,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1784,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-59021",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 11,
+      "title": "Resume Template - Design 11 Variant",
+      "current_price_cents": 640,
+      "anchor_price_cents": null,
+      "shop_name": "CreativeStore",
+      "shop_sales_count": 8080,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 1426,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-78047",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 12,
+      "title": "Resume Template - Design 12 Variant",
+      "current_price_cents": 724,
+      "anchor_price_cents": null,
+      "shop_name": "ModernPro",
+      "shop_sales_count": 16278,
+      "shop_age_years": 2,
+      "badges": [
+        "Star Seller",
+        "Trending"
+      ],
+      "urgency_signals": [],
+      "review_count": 2464,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-92000",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 13,
+      "title": "Resume Template - Design 13 Variant",
+      "current_price_cents": 1482,
+      "anchor_price_cents": null,
+      "shop_name": "ArtfulStudio",
+      "shop_sales_count": 7403,
+      "shop_age_years": 3,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [
+        "18 orders in last 24 hours"
+      ],
+      "review_count": 1219,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-90645",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 14,
+      "title": "Resume Template - Design 14 Variant",
+      "current_price_cents": 1347,
+      "anchor_price_cents": null,
+      "shop_name": "SimpleLab",
+      "shop_sales_count": null,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": null,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-56792",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 15,
+      "title": "Resume Template - Design 15 Variant",
+      "current_price_cents": 1306,
+      "anchor_price_cents": null,
+      "shop_name": "VintagePro",
+      "shop_sales_count": 2526,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 457,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-80451",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 16,
+      "title": "Resume Template - Design 16 Variant",
+      "current_price_cents": 1151,
+      "anchor_price_cents": null,
+      "shop_name": "ModernTemplates",
+      "shop_sales_count": 17564,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 2331,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-10828",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 17,
+      "title": "Resume Template - Design 17 Variant",
+      "current_price_cents": 1354,
+      "anchor_price_cents": null,
+      "shop_name": "VintageStore",
+      "shop_sales_count": 13922,
+      "shop_age_years": null,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 2129,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-75230",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 18,
+      "title": "Resume Template - Design 18 Variant",
+      "current_price_cents": 1103,
+      "anchor_price_cents": 1465,
+      "shop_name": "VintageHub",
+      "shop_sales_count": 11567,
+      "shop_age_years": 1,
+      "badges": [],
+      "urgency_signals": [
+        "Only 5 left"
+      ],
+      "review_count": 1972,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-74136",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 19,
+      "title": "Resume Template - Design 19 Variant",
+      "current_price_cents": 570,
+      "anchor_price_cents": null,
+      "shop_name": "CreativeStudio",
+      "shop_sales_count": 5147,
+      "shop_age_years": 2,
+      "badges": [
+        "Trending",
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 357,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-51698",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 20,
+      "title": "Resume Template - Design 20 Variant",
+      "current_price_cents": 607,
+      "anchor_price_cents": 1024,
+      "shop_name": "VintageDesigns",
+      "shop_sales_count": 4583,
+      "shop_age_years": 3,
+      "badges": [
+        "Fast Delivery"
+      ],
+      "urgency_signals": [],
+      "review_count": 273,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-42780",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 21,
+      "title": "Resume Template - Design 21 Variant",
+      "current_price_cents": 1227,
+      "anchor_price_cents": null,
+      "shop_name": "MinimalistCo",
+      "shop_sales_count": 8858,
+      "shop_age_years": null,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 789,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-75617",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 22,
+      "title": "Resume Template - Design 22 Variant",
+      "current_price_cents": 1335,
+      "anchor_price_cents": null,
+      "shop_name": "VintageLab",
+      "shop_sales_count": 14025,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 901,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-10076",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 23,
+      "title": "Resume Template - Design 23 Variant",
+      "current_price_cents": 726,
+      "anchor_price_cents": null,
+      "shop_name": "VintageStudio",
+      "shop_sales_count": 4326,
+      "shop_age_years": 1,
+      "badges": [
+        "Best Selling"
+      ],
+      "urgency_signals": [],
+      "review_count": 538,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-53246",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 24,
+      "title": "Resume Template - Design 24 Variant",
+      "current_price_cents": 1168,
+      "anchor_price_cents": null,
+      "shop_name": "ProfessionalCo",
+      "shop_sales_count": 17776,
+      "shop_age_years": 3,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 2136,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-87134",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 25,
+      "title": "Resume Template - Design 25 Variant",
+      "current_price_cents": 1202,
+      "anchor_price_cents": 2009,
+      "shop_name": "MinimalistLab",
+      "shop_sales_count": 7709,
+      "shop_age_years": 1,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [],
+      "review_count": 649,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-11402",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 26,
+      "title": "Resume Template - Design 26 Variant",
+      "current_price_cents": 1082,
+      "anchor_price_cents": null,
+      "shop_name": "PremiumStore",
+      "shop_sales_count": 3078,
+      "shop_age_years": 2,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 610,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-8181",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 27,
+      "title": "Resume Template - Design 27 Variant",
+      "current_price_cents": 822,
+      "anchor_price_cents": null,
+      "shop_name": "ModernShop",
+      "shop_sales_count": 3030,
+      "shop_age_years": 3,
+      "badges": [
+        "Star Seller"
+      ],
+      "urgency_signals": [
+        "Trending now"
+      ],
+      "review_count": 428,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-59496",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 28,
+      "title": "Resume Template - Design 28 Variant",
+      "current_price_cents": 896,
+      "anchor_price_cents": 1249,
+      "shop_name": "DigitalDesigns",
+      "shop_sales_count": 13410,
+      "shop_age_years": 1,
+      "badges": [
+        "Best Selling",
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 2356,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-41849",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 29,
+      "title": "Resume Template - Design 29 Variant",
+      "current_price_cents": 1444,
+      "anchor_price_cents": null,
+      "shop_name": "SimpleStore",
+      "shop_sales_count": 16163,
+      "shop_age_years": 2,
+      "badges": [],
+      "urgency_signals": [],
+      "review_count": 2277,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-23750",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    },
+    {
+      "rank": 30,
+      "title": "Resume Template - Design 30 Variant",
+      "current_price_cents": 999,
+      "anchor_price_cents": 1604,
+      "shop_name": "PremiumArt",
+      "shop_sales_count": 3524,
+      "shop_age_years": 3,
+      "badges": [
+        "Fast Shipping"
+      ],
+      "urgency_signals": [],
+      "review_count": 403,
+      "identity_niche": "career development templates",
+      "base_category": "Office & School Supplies",
+      "listing_url": "https://www.etsy.com/listing/fixture-28687",
+      "search_timestamp": "2026-09-20T20:00:00Z"
+    }
+  ]
+}
