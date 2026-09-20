@@ -2,7 +2,7 @@
 
 **Session 04 is IN PROGRESS** (2026-09-20) — agent runtime and roster. Exit 78 remains in place per Session 03/04 contracts; worker and scheduler process entrypoints stay fail-closed with no production claim path.
 
-## Session 04 progress (post-W8 @ `d9eb8e28`)
+## Session 04 progress (post-Lane C @ `744cc36b`)
 
 | Wave | Status | Commit | Evidence key(s) |
 |---|---|---|---|
@@ -10,20 +10,21 @@
 | W2 — LLM provider abstraction | **COMPLETE** | `d187fb2` (#19) | `provider_abstraction_implemented` = true |
 | W3 — PromptStore + A01/A02 prompts | **COMPLETE** | `726437d` | `prompt_registry_and_hashes_implemented` = true |
 | Phase A — Jev client/library | **COMPLETE** | `3cbe39b` | library only; not a Session 04 exit-criteria key |
-| W4 — AgentRunner + registry + receipts | **COMPLETE** | `b87c547` | library runner + receipt integration; `agent_runner_integrated_with_jobs` still false (no orchestrator-lease → successor proof) |
+| W4 — AgentRunner + registry + receipts | **COMPLETE** | `b87c547` | library runner + receipt integration |
 | W5 — ToolRegistry + sixteen-agent roster | **COMPLETE** | `827272b` | `sixteen_agents_registered` = true |
 | W6 — bounded review subagent | **COMPLETE** | `d9eb8e2` | artifact-only; fail-closed mutate |
 | W7 — agent-run observability | **COMPLETE** | `4ee63ce` | logs + PostHog-shaped offline queue |
 | W8 — roster contract tests A01–A16 | **COMPLETE** | `44d554f` | `uncommissioned_agents_documented` = true |
-| Remainder — runtime integration + exit | **OPEN** | — | `agent_runner_integrated_with_jobs`, `contract_and_runtime_tests_pass`, `evidence_closure_commit_recorded` false |
+| Lane C — runtime integration tests | **COMPLETE** | `744cc36` | `contract_and_runtime_tests_pass` = true |
+| Remainder — orchestrator wire + exit | **OPEN** | — | `agent_runner_integrated_with_jobs`, `evidence_closure_commit_recorded` false |
 
-**Exit 78 held.** No worker claiming, no commissioning, no live Notion/Etsy. W4–W8 are library and test slices only.
+**Exit 78 held.** No worker claiming, no commissioning, no live Notion/Etsy. Lane C proves the library lease → run → persist → event → successor path only; `agent_runner_integrated_with_jobs` requires the orchestrator wire (Lane A), not tests alone.
 
 ## Next work (Session 04 remainder)
 
 Per `docs/control/reviews/2026-09-20-session-04-prompt-integrity.md` addendum slices still open:
 
-1. **Runtime integration tests** — orchestrator-lease → agent-execute → result-persist → event-emit → successor-create flow with fake providers; schema retry, transaction rollback, restart retention.
+1. **Agent runner integrated with durable jobs** — Lane A orchestrator wire connecting production job path to `AgentRunner` (library runtime-integration tests alone do not earn this key).
 2. **Session 04 exit** — two independent reviews, all eight evidence keys true, closure commit sequence. Exit 78 removal remains a **post-session gate** (decision record + commissioning evidence), not Session 04 closure.
 
 ## Session 03 completion (reference)

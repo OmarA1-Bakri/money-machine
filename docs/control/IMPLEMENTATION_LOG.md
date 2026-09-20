@@ -176,3 +176,11 @@
 - Evidence keys updated to match delivered waves: `sixteen_agents_registered` and `uncommissioned_agents_documented` set true after W5 (`827272b`) and W8 (`44d554f`); `agent_runner_integrated_with_jobs` and `contract_and_runtime_tests_pass` remain false — W4 proves library runner receipts and commissioning gates only; orchestrator-lease → successor runtime integration and full exit-criteria suite are not yet delivered. `control_files_and_checkpoint_current` set true by this tip-sync.
 - W4–W8 and Phase A recorded in state notes. Exit 78 unchanged. Session 04 remains `incomplete`; `completed_sessions` unchanged at `[0, 1, 2, 3]`.
 - Local verification of affected suites: **162 passed, 4 skipped** across W4–W8 tests plus **146 passed, 12 skipped** across W2/W3/Phase A and `tests/bootstrap/test_control_state.py` (279 s total on cloud agent VM).
+
+## 2026-09-20 — Session 04 control tip-bump (post-Lane C @ `744cc36b`)
+
+- Rebased PR #30 onto post-C tip `744cc36ba162ac780bd14df75856d5a9cbd7e760` on `build/full-automation`. Docs/control only; no feature code, no Exit 78 lift, no W9 decision record.
+- Refreshed `head_sha` and `evidence_closure_commit_sha` to `744cc36b`. State revision 25 → 26.
+- `contract_and_runtime_tests_pass` set true: Lane C `tests/integration/test_runtime_integration.py` present on tip (lease → run → persist → event → successor library path; **2 passed, 2 skipped** locally) plus W8 roster contracts (**135 passed**).
+- `agent_runner_integrated_with_jobs` remains false — Lane A orchestrator wire not delivered; library runtime tests alone do not earn production job integration.
+- Exit 78 unchanged. Session 04 remains `incomplete`; `completed_sessions` unchanged at `[0, 1, 2, 3]`.
