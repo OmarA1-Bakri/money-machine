@@ -18,7 +18,7 @@ from money_machine.agents.base import AgentContext, BaseAgent
 from money_machine.domain.enums import AgentRunStatus, BranchOutcome
 from money_machine.domain.events import EventName
 from money_machine.domain.models._base import JsonObject
-from money_machine.domain.models.common import EvidenceReference
+from money_machine.domain.models.common import ContractError, EvidenceReference
 from money_machine.domain.models.jobs import AgentResult
 from money_machine.domain.models.products import ProductSpec
 from money_machine.domain.services.dedupe import check_dedupe
@@ -48,12 +48,27 @@ class CatalogueDedupeAgent(BaseAgent):
                 prompt_sha256=context.prompt_sha256,
                 status=AgentRunStatus.FAILURE,
                 output={},
-                error={
-                    "code": "MISSING_SPEC_ID",
-                    "message": "Job input must contain spec_id",
-                },
+                error=ContractError(
+                    code="MISSING_SPEC_ID",
+                    message="Job input must contain spec_id",
+                ),
             )
 
+        if not isinstance(candidate_spec_id_str, str):
+            return AgentResult(
+                job_id=job.job_id,
+                agent_run_id=context.agent_run_id,
+                agent_id=self.agent_id,
+                agent_definition_version=context.definition.contract_version,
+                prompt_reference=context.prompt_reference,
+                prompt_sha256=context.prompt_sha256,
+                status=AgentRunStatus.FAILURE,
+                output={},
+                error=ContractError(
+                    code="INVALID_SPEC_ID_TYPE",
+                    message="spec_id must be a string",
+                ),
+            )
         candidate_spec_id = UUID(candidate_spec_id_str)
 
         # Load candidate ProductSpec from database
@@ -74,10 +89,10 @@ class CatalogueDedupeAgent(BaseAgent):
                 prompt_sha256=context.prompt_sha256,
                 status=AgentRunStatus.FAILURE,
                 output={},
-                error={
-                    "code": "SPEC_NOT_FOUND",
-                    "message": f"ProductSpec {candidate_spec_id} not found",
-                },
+                error=ContractError(
+                    code="SPEC_NOT_FOUND",
+                    message=f"ProductSpec {candidate_spec_id} not found",
+                ),
             )
 
         # Parse candidate ProductSpec from tool result
@@ -126,8 +141,10 @@ class CatalogueDedupeAgent(BaseAgent):
                     "evidence": [
                         {
                             "evidence_id": str(ev.evidence_id),
-                            "evidence_kind": ev.evidence_kind,
-                            "reference": ev.reference,
+                            "evidence_type": ev.evidence_type,
+                            "source_reference": ev.source_reference,
+                            "observed_at": ev.observed_at.isoformat(),
+                            "safe_summary": ev.safe_summary,
                         }
                         for ev in collision.evidence
                     ],
@@ -154,13 +171,13 @@ class CatalogueDedupeAgent(BaseAgent):
                 prompt_sha256=context.prompt_sha256,
                 status=AgentRunStatus.FAILURE,
                 output={},
-                error={
-                    "code": "INVALID_OUTCOME",
-                    "message": (
+                error=ContractError(
+                    code="INVALID_OUTCOME",
+                    message=(
                         f"DedupeResult outcome must be PASS or TOO_CLOSE, "
                         f"got {dedupe_result.outcome}"
                     ),
-                },
+                ),
             )
 
         # Build agent output with dedupe result
