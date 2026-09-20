@@ -122,9 +122,11 @@ class TestShadowEvaluation:
             explanation="Test decision for shadow eval",
             evidence=(
                 EvidenceReference(
-                    artifact_id=uuid4(),
-                    check_name="test_check",
-                    verdict="PASS",
+                    evidence_id=uuid4(),
+                    evidence_type="unit_test",
+                    source_reference="test_check",
+                    observed_at=datetime.now(UTC),
+                    safe_summary="PASS",
                 ),
             ),
             decided_at=datetime.now(UTC),
@@ -168,9 +170,11 @@ class TestShadowEvaluation:
             explanation="Test decision",
             evidence=(
                 EvidenceReference(
-                    artifact_id=uuid4(),
-                    check_name="test_check",
-                    verdict="PASS",
+                    evidence_id=uuid4(),
+                    evidence_type="unit_test",
+                    source_reference="test_check",
+                    observed_at=datetime.now(UTC),
+                    safe_summary="PASS",
                 ),
             ),
             decided_at=datetime.now(UTC),
@@ -206,9 +210,11 @@ class TestShadowEvaluation:
             explanation="Test decision",
             evidence=(
                 EvidenceReference(
-                    artifact_id=uuid4(),
-                    check_name="test_check",
-                    verdict="PASS",
+                    evidence_id=uuid4(),
+                    evidence_type="unit_test",
+                    source_reference="test_check",
+                    observed_at=datetime.now(UTC),
+                    safe_summary="PASS",
                 ),
             ),
             decided_at=datetime.now(UTC),
@@ -240,9 +246,11 @@ class TestShadowEvaluation:
             explanation="Repair decision",
             evidence=(
                 EvidenceReference(
-                    artifact_id=uuid4(),
-                    check_name="test_check",
-                    verdict="FAIL",
+                    evidence_id=uuid4(),
+                    evidence_type="unit_test",
+                    source_reference="test_check",
+                    observed_at=datetime.now(UTC),
+                    safe_summary="FAIL",
                 ),
             ),
             repair_job_id=repair_job_id,
