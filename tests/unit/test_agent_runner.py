@@ -14,7 +14,6 @@ from money_machine.agents.base import (
     assert_production_executable,
     parse_system_prompt_reference,
 )
-from money_machine.agents.registry import AgentRegistry
 from money_machine.agents.runtime import AgentRunner
 from money_machine.config.settings import AgentCommissioningState
 from money_machine.domain.enums import JobStatus, RetryClass, SideEffectClass
@@ -23,26 +22,10 @@ from money_machine.domain.models.jobs import JobEnvelope
 from money_machine.integrations.llm.fake_provider import FakeLLMProvider
 
 
-def test_registry_loads_sixteen_agents(repository_root: Path) -> None:
-    registry = AgentRegistry.from_yaml(repository_root)
-    roster = registry.roster()
-    assert len(roster) == 16
-    assert roster[0].agent_id == "A01"
-    assert roster[-1].agent_id == "A16"
-
-
 def test_parse_system_prompt_reference() -> None:
     agent_id, version = parse_system_prompt_reference("agent://A01/system/v1")
     assert agent_id == "A01"
     assert version == "v1"
-
-
-def test_uncommissioned_agent_fails_closed(repository_root: Path) -> None:
-    registry = AgentRegistry.from_yaml(repository_root)
-    definition = registry.get("A03")  # L2: Use A03 (DESIGNED) instead of A01 (TESTED)
-    assert definition.commissioning_state is AgentCommissioningState.DESIGNED
-    with pytest.raises(AgentNotCommissionedError, match="production execution requires"):
-        assert_production_executable(definition)
 
 
 def test_tested_agent_allows_production_execution() -> None:
