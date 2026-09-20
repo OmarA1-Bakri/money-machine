@@ -147,7 +147,9 @@ def test_real_entry_points_exit_78_after_a_connectivity_check(module: str) -> No
 
 def test_commissioning_gates_pass_for_tested_agents():
     """Prove gates return True for A01/A02 with real roster/prompts."""
-    from money_machine.orchestration.worker import _check_commissioning_gates  # pyright: ignore[reportPrivateUsage]
+    from money_machine.orchestration.worker import (
+        _check_commissioning_gates,  # pyright: ignore[reportPrivateUsage]
+    )
 
     # Gates should pass when A01/A02 are TESTED with valid prompts
     result = _check_commissioning_gates()
