@@ -104,7 +104,7 @@ class AgentContext:
         """Alias for L2 compatibility."""
         return self.run_id
 
-    def invoke_tool(self, tool_id: str, **kwargs: object) -> Any:  # noqa: ANN401
+    def invoke_tool(self, tool_id: str, **kwargs: object) -> Any:
         """L2: Invoke a tool through the registry with allowlist enforcement."""
         if self.tool_registry is None:
             raise AgentRuntimeError("ToolRegistry not available in context")
