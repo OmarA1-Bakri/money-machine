@@ -93,6 +93,28 @@ class AgentContext:
     prompt_version: int
     provider: LLMProvider
     run_at: datetime
+    tool_registry: object | None = None  # L2: ToolRegistry for invoke_tool()
+
+    @property
+    def agent_run_id(self) -> UUID:
+        """Alias for L2 compatibility."""
+        return self.run_id
+
+    def invoke_tool(self, tool_id: str, **kwargs: object) -> object:
+        """L2: Invoke a tool through the registry with allowlist enforcement."""
+        if self.tool_registry is None:
+            raise AgentRuntimeError("ToolRegistry not available in context")
+        # Import here to avoid circular dependency
+        from money_machine.agents.tool_registry import ToolRegistry
+
+        if not isinstance(self.tool_registry, ToolRegistry):
+            raise AgentRuntimeError("Invalid tool_registry type")
+        return self.tool_registry.invoke(
+            tool_id,
+            allowed_tools=frozenset(self.definition.allowed_tools),
+            agent_id=self.definition.agent_id,
+            **kwargs,
+        )
 
 
 class BaseAgent(ABC):
