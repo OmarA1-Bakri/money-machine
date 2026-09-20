@@ -57,13 +57,15 @@ def _check_commissioning_gates() -> bool:
 
         # Check if any agent is TESTED or COMMISSIONED
         tested_or_commissioned = [
-            defn for defn in registry.all()
-            if defn.commissioning_state in (
+            defn
+            for defn in registry.all()
+            if defn.commissioning_state
+            in (
                 AgentCommissioningState.TESTED,
                 AgentCommissioningState.COMMISSIONED,
             )
         ]
-        
+
         if not tested_or_commissioned:
             LOGGER.error(
                 "No TESTED or COMMISSIONED agents found; Exit 78 held. "
@@ -71,14 +73,14 @@ def _check_commissioning_gates() -> bool:
                 len(list(registry.all())),
             )
             return False
-        
+
         LOGGER.info(
             "Commissioning gates pass: %d TESTED/COMMISSIONED agent(s) found: %s",
             len(tested_or_commissioned),
             [a.agent_id for a in tested_or_commissioned],
         )
         return True
-        
+
     except Exception as error:
         LOGGER.exception("Commissioning gate check failed: %s", error)
         return False
@@ -88,7 +90,7 @@ def _job_envelope(job: Job) -> JobEnvelope:
     """Convert a Job table row to a JobEnvelope for agent execution."""
     from money_machine.domain.enums import RetryClass, SideEffectClass
     from money_machine.domain.models.common import SuccessContract
-    
+
     return JobEnvelope(
         job_id=job.id,
         workflow_id=job.workflow_id,
@@ -116,7 +118,7 @@ async def _execute_job_with_runner(
     now: datetime,
 ) -> AgentResult | None:
     """Execute one job via AgentRunner, persist result, emit events, create successors.
-    
+
     Returns the AgentResult on success, or None if execution failed.
     This is the REAL claim path: claim → execute → persist → event → successor.
     """

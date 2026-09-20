@@ -363,30 +363,32 @@ def main() -> int:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    
+
     # Check commissioning evidence gates (same as worker)
     from money_machine.agents.registry import AgentRegistry
     from money_machine.config.runtime import RuntimeSettingsError, load_runtime_settings
     from money_machine.domain.enums import AgentCommissioningState
     from pathlib import Path
-    
+
     try:
         # Load runtime settings to verify configuration
         _settings = load_runtime_settings()
-        
+
         # Verify agent registry loads (proves config valid)
         repo_root = Path(__file__).parent.parent.parent.parent
         registry = AgentRegistry.from_yaml(repo_root)
-        
+
         # Check if any agent is TESTED or COMMISSIONED
         tested_or_commissioned = [
-            defn for defn in registry.all()
-            if defn.commissioning_state in (
+            defn
+            for defn in registry.all()
+            if defn.commissioning_state
+            in (
                 AgentCommissioningState.TESTED,
                 AgentCommissioningState.COMMISSIONED,
             )
         ]
-        
+
         if not tested_or_commissioned:
             LOGGER.error(
                 "No TESTED or COMMISSIONED agents found; scheduler exits 78 (fail-closed). "
@@ -394,13 +396,13 @@ def main() -> int:
                 len(list(registry.all())),
             )
             return uncommissioned_process("scheduler")
-        
+
         LOGGER.info(
             "Commissioning gates pass: %d TESTED/COMMISSIONED agent(s) found; "
             "scheduler library functions available but process loop not implemented in Wave 9",
             len(tested_or_commissioned),
         )
-        
+
         # Wave 9: Gates pass but scheduler process loop deferred to future work
         # Library functions (promote_due_jobs, detect_stalled_jobs, etc.) are tested
         # but the daemon loop is out of scope. Exit 78 for now.
@@ -409,7 +411,7 @@ def main() -> int:
             "library functions available via imports but daemon deferred"
         )
         return uncommissioned_process("scheduler")
-        
+
     except RuntimeSettingsError as error:
         LOGGER.error("Runtime settings error: %s", error)
         return uncommissioned_process("scheduler")
