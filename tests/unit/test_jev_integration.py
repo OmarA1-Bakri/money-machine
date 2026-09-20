@@ -441,7 +441,7 @@ class TestJevGatewayClient:
     ) -> None:
         """Client fails closed when response is missing expected answer keys."""
         # Response missing "has_blockers" key
-        mock_response = {
+        mock_response: dict[str, str | int | dict[str, bool]] = {
             "decision_type": "preflight_blockers_present",
             "answers": {},  # Empty answers - missing "has_blockers"
             "model_id": "jev-1.0",
@@ -461,7 +461,7 @@ class TestJevGatewayClient:
     ) -> None:
         """Client fails closed when response has unexpected extra answer keys."""
         # Response has extra "unexpected_key"
-        mock_response = {
+        mock_response: dict[str, str | int | dict[str, bool]] = {
             "decision_type": "preflight_blockers_present",
             "answers": {
                 "has_blockers": False,
