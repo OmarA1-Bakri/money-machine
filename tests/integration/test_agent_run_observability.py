@@ -176,7 +176,7 @@ async def _seed_agent_definition(session: AsyncSession, *, agent_id: str):
         name=f"Agent {agent_id}",
         implementation_version=1,
         contract_version=1,
-        default_side_effect_class="READ_ONLY",
+        default_side_effect_class="EXTERNAL_READ",
         default_retry_class="SAFE",
         timeout_seconds=600,
         commissioning_state="TESTED",

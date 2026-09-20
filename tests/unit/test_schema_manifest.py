@@ -218,7 +218,7 @@ def test_exactly_one_migration_revision_exists_and_it_is_the_root() -> None:
     obs_body = obs_migration.read_text(encoding="utf-8")
     assert 'down_revision = "a1b2c3d4e5f6"' in obs_body
     assert "agent_tool_calls" in obs_body
-    assert 'op.add_column(\n        "agent_runs",\n        sa.Column("run_number"' in obs_body
+    assert 'op.add_column("agent_runs", sa.Column("run_number"' in obs_body
 
 
 def test_contract_taxonomies_are_subsets_of_their_table_taxonomies() -> None:
