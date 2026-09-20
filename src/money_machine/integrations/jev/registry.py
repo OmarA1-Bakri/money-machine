@@ -28,7 +28,7 @@ class DecisionDefinition(BaseModel):
     description: str = Field(description="Human-readable description")
     questions: list[Question] = Field(description="Questions for this decision", min_length=1)
     auto_gates: dict[str, Any] = Field(
-        description="Auto gate configuration (threshold_question, threshold_value, below_threshold_action)"
+        description="Auto gate config (threshold_question, threshold_value, below_threshold_action)"
     )
     authority_tier: str = Field(
         description="Authority tier (automated/operator_required/safety_gate/shadow_only)"
