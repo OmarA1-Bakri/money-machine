@@ -2,15 +2,16 @@ version: 1
 research:
   # Seed phrases from playbook for initial market research
   seed_phrases:
-    - teacher appreciation gifts
+    - budget planner
+    - teacher appreciation
     - mindfulness journal
-    - workout tracker printable
-    - budget planner template
-    - meal prep templates
+    - workout tracker
     - habit tracker
     - gratitude journal
-    - desk organizer printable
-    - password tracker
+    - desk organizer
+    - password organizer
+    - productivity planner
+    - mood tracker
 
   # Research collection parameters
   target_observation_count: 30  # Target 25-40, aim for middle
