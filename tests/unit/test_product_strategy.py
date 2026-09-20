@@ -190,11 +190,11 @@ class TestA05ProductStrategyScoring:
         assert len(output["scored_candidates"]) == 5
 
         # Check ranking order
-        scores = [c["total_score"] for c in output["scored_candidates"]]
+        scores = [c["total_score"] for c in output["scored_candidates"]]  # type: ignore[index]
         assert scores == sorted(scores, reverse=True), "Candidates should be ranked by score"
 
         # Check ranks are sequential
-        ranks = [c["rank"] for c in output["scored_candidates"]]
+        ranks = [c["rank"] for c in output["scored_candidates"]]  # type: ignore[index]
         assert ranks == [1, 2, 3, 4, 5]
 
     @pytest.mark.asyncio
@@ -214,10 +214,10 @@ class TestA05ProductStrategyScoring:
         result = await agent.execute(context)
 
         output = result.output
-        primary = output["primary_candidate"]
-        assert len(primary["scoring"]) == 4
+        primary = output["primary_candidate"]  # type: ignore[index]
+        assert len(primary["scoring"]) == 4  # type: ignore[arg-type, index]
 
-        dimensions = {s["dimension"] for s in primary["scoring"]}
+        dimensions = {s["dimension"] for s in primary["scoring"]}  # type: ignore[index]
         assert dimensions == {
             "impulse_priced",
             "tangible",
@@ -226,8 +226,8 @@ class TestA05ProductStrategyScoring:
         }
 
         # Check total equals sum of dimensions
-        total_from_dimensions = sum(s["score"] for s in primary["scoring"])
-        assert primary["total_score"] == total_from_dimensions
+        total_from_dimensions = sum(s["score"] for s in primary["scoring"])  # type: ignore[index]
+        assert primary["total_score"] == total_from_dimensions  # type: ignore[index]
 
     @pytest.mark.asyncio
     async def test_evidence_collected(self):
@@ -246,8 +246,8 @@ class TestA05ProductStrategyScoring:
         result = await agent.execute(context)
 
         output = result.output
-        assert len(output["evidence"]) >= 1
-        assert all("evidence_type" in e for e in output["evidence"])
+        assert len(output["evidence"]) >= 1  # type: ignore[arg-type]
+        assert all("evidence_type" in e for e in output["evidence"])  # type: ignore[operator]
 
     @pytest.mark.asyncio
     async def test_product_spec_generated_when_qualified(self):
