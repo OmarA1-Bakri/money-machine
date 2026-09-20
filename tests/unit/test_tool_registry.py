@@ -55,8 +55,6 @@ def test_unknown_tool_raises_not_found() -> None:
 
 
 def test_custom_tool_registration() -> None:
-    from typing import Any
-
     registry = ToolRegistry()
     registry.register(
         ToolDefinition("custom.read", SideEffectClass.EXTERNAL_READ, "custom"),
