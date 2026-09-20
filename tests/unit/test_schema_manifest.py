@@ -193,12 +193,24 @@ def test_exactly_one_migration_revision_exists_and_it_is_the_root() -> None:
     """The foundation ships one reviewed initial revision, not a chain of fixups."""
     revisions = sorted(path for path in MIGRATIONS.glob("*.py"))
 
-    assert len(revisions) == 1
-    body = revisions[0].read_text(encoding="utf-8")
+    # Two revisions now: canonical + jev_evaluations addendum
+    assert len(revisions) == 2
+
+    # Canonical (root) migration
+    canonical = next(r for r in revisions if "9f46f3152a68" in r.name)
+    body = canonical.read_text(encoding="utf-8")
     assert "down_revision: str | None = None" in body
-    assert body.count("op.create_table") == len(EXPECTED_TABLES)
-    assert body.count("op.drop_table") == len(EXPECTED_TABLES)
+    # Canonical creates all tables except jev_evaluations
+    assert body.count("op.create_table") == len(EXPECTED_TABLES) - 1
+    assert body.count("op.drop_table") == len(EXPECTED_TABLES) - 1
     assert "CREATE EXTENSION IF NOT EXISTS pgcrypto" in body
+
+    # Jev addendum migration
+    jev_migration = next(r for r in revisions if "a1b2c3d4e5f6" in r.name)
+    jev_body = jev_migration.read_text(encoding="utf-8")
+    assert 'down_revision = "9f46f3152a68"' in jev_body
+    assert 'op.create_table("jev_evaluations"' in jev_body
+    assert 'op.drop_table("jev_evaluations")' in jev_body
 
 
 def test_contract_taxonomies_are_subsets_of_their_table_taxonomies() -> None:
@@ -270,7 +282,9 @@ def test_append_only_tables_are_declared_with_their_ddl() -> None:
 
 def test_the_migration_installs_the_triggers_and_leaves_pgcrypto_on_downgrade() -> None:
     """Alembic does not autogenerate triggers, so the revision must install them."""
-    revision = next(MIGRATIONS.glob("*.py")).read_text(encoding="utf-8")
+    # Check the canonical migration (not the jev addendum)
+    canonical = next(p for p in MIGRATIONS.glob("*.py") if "9f46f3152a68" in p.name)
+    revision = canonical.read_text(encoding="utf-8")
     upgrade_body, downgrade_body = revision.split("def downgrade() -> None:")
 
     assert "install_append_only_triggers(op.execute)" in upgrade_body
