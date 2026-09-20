@@ -158,6 +158,7 @@ class TestAgentRunObservability:
 
         assert run.status == "FAILURE"
         assert run.error == {
+            "schema_version": 1,
             "code": "SCHEMA_VALIDATION",
             "message": "invalid output",
             "retryable": False,
