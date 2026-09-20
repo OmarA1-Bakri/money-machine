@@ -102,7 +102,7 @@ The operator provided a focused lane instruction that constrains Session 05 Sect
 - "Ten seed search phrases must be defined in a configuration file under `config/`, loaded via a configuration module, and never appear as string literals in `money_machine/domain/` or `money_machine/agents/`."
 - "Browser and API adapter stubs must be present as separate modules with type signatures matching the fixture adapter, but must not make network requests or launch browsers; tests must prove these stubs raise NotImplementedError or return empty collections."
 
-## Corrective Addendum — Executable Instruction Set
+## Corrective addendum — Executable Instruction Set
 
 This lane will execute the following bounded implementation:
 
