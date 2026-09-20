@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -14,12 +16,17 @@ from money_machine.agents.base import (
     assert_production_executable,
     parse_system_prompt_reference,
 )
-from money_machine.agents.runtime import AgentRunner
+from money_machine.agents.runtime import (
+    AgentRunner,
+    _provider_model_name,
+    _receipt_from_run,
+)
 from money_machine.config.settings import AgentCommissioningState
-from money_machine.domain.enums import JobStatus, RetryClass, SideEffectClass
+from money_machine.domain.enums import AgentRunStatus, JobStatus, RetryClass, SideEffectClass
 from money_machine.domain.models.common import SuccessContract
 from money_machine.domain.models.jobs import JobEnvelope
 from money_machine.integrations.llm.fake_provider import FakeLLMProvider
+from money_machine.persistence.tables import AgentRun
 
 
 def test_parse_system_prompt_reference() -> None:
@@ -68,6 +75,63 @@ def _job_for(agent_id: str) -> JobEnvelope:
         retry_class=RetryClass.SAFE,
         success_contract=SuccessContract(output_model="AgentResult"),
     )
+
+
+def test_provider_model_name_reads_fake_provider_default() -> None:
+    assert _provider_model_name(FakeLLMProvider(default_model="lane-model")) == "lane-model"
+    assert _provider_model_name(MagicMock()) is None
+
+
+def test_receipt_from_run_maps_persisted_row() -> None:
+    run_id = uuid4()
+    job_id = uuid4()
+    definition_id = uuid4()
+    prompt_id = uuid4()
+    started_at = datetime(2026, 9, 20, 12, 0, tzinfo=UTC)
+    completed_at = datetime(2026, 9, 20, 12, 1, tzinfo=UTC)
+    run = AgentRun(
+        id=run_id,
+        job_id=job_id,
+        agent_definition_id=definition_id,
+        agent_id="A01",
+        agent_definition_version=1,
+        prompt_version_id=prompt_id,
+        prompt_reference="agent://A01/system/v1",
+        prompt_sha256="a" * 64,
+        run_number=2,
+        model="fake-model-1",
+        input_hash="b" * 64,
+        token_count=42,
+        cost_usd=Decimal("0.01"),
+        status="SUCCESS",
+        output={"ok": True},
+        error=None,
+        started_at=started_at,
+        completed_at=completed_at,
+    )
+    receipt = _receipt_from_run(run, error=None)
+    assert receipt.run_id == run_id
+    assert receipt.job_id == job_id
+    assert receipt.agent_id == "A01"
+    assert receipt.status is AgentRunStatus.SUCCESS
+    assert receipt.output == {"ok": True}
+    assert receipt.started_at == started_at
+    assert receipt.completed_at == completed_at
+
+
+def test_runner_accepts_injected_observer(repository_root: Path) -> None:
+    observer = MagicMock()
+    runner = AgentRunner.from_repository_root(
+        repository_root,
+        provider=FakeLLMProvider(),
+    )
+    runner_with_observer = AgentRunner(
+        registry=runner._registry,
+        prompt_store=runner._prompt_store,
+        provider=runner._provider,
+        observer=observer,
+    )
+    assert runner_with_observer._observer is observer
 
 
 def test_runner_assert_production_executable(repository_root: Path) -> None:
