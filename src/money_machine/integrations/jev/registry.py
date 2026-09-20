@@ -28,10 +28,7 @@ class DecisionDefinition(BaseModel):
     description: str = Field(description="Human-readable description")
     questions: list[Question] = Field(description="Questions for this decision", min_length=1)
     auto_gates: dict[str, Any] = Field(
-        description=(
-            "Auto gate configuration "
-            "(threshold_question, threshold_value, below_threshold_action)"
-        )
+        description="Auto gate configuration (threshold_question, threshold_value, below_threshold_action)"
     )
     authority_tier: str = Field(
         description="Authority tier (automated/operator_required/safety_gate/shadow_only)"
@@ -74,7 +71,7 @@ class DecisionRegistry:
     def _load_file(self, yaml_file: Path) -> None:
         """Load decisions from a single YAML file."""
         try:
-            with open(yaml_file, "r") as f:
+            with open(yaml_file) as f:
                 data = yaml.safe_load(f)
         except Exception as e:
             raise ValueError(f"Failed to load {yaml_file}: {e}") from e
