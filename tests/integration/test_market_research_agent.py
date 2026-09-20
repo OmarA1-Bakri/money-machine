@@ -58,6 +58,7 @@ async def test_workflow(session_factory):
             object_id=workflow.id,
             owner_agent_id="A03",
             status="READY",
+            scheduled_at=datetime.now(UTC),
         )
         session.add(job)
 
@@ -289,6 +290,7 @@ async def test_empty_seed_phrases_raises(session_factory):
             object_id=workflow_id,
             owner_agent_id="A03",
             status="READY",
+            scheduled_at=datetime.now(UTC),
         )
 
         async with session_factory() as session:
