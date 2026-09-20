@@ -8,12 +8,22 @@ from uuid import uuid4
 
 import pytest
 
+from sqlalchemy import select
+
 from money_machine.agents.contracts.market_research import execute_market_research
 from money_machine.agents.implementations.market_research import MarketResearchAgent
 from money_machine.integrations.etsy.fixture_adapter import FixtureEtsyAdapter
 from money_machine.integrations.etsy.interface import EtsyResearchAdapter
 from money_machine.persistence.repositories.research import ResearchRunRepository
-from money_machine.persistence.tables import Job, Shop, WorkflowRun
+from money_machine.persistence.tables import (
+    Job,
+    MarketListingObservation,
+    MarketShopObservation,
+    ProductCandidate,
+    ResearchRun,
+    Shop,
+    WorkflowRun,
+)
 from money_machine.persistence.unit_of_work import UnitOfWork
 
 
@@ -135,7 +145,6 @@ async def test_shortlist_produces_5_candidates(test_workflow, test_database, ses
 
         # Verify candidates were persisted
         async with session_factory() as session:
-            from money_machine.persistence.tables import ProductCandidate
 
             stmt = select(ProductCandidate).where(ProductCandidate.workflow_id == workflow.id)
             result = await session.execute(stmt)
@@ -209,7 +218,6 @@ async def test_nullable_fields_preserved(test_workflow, test_database, session_f
     # Some fixtures don't have anchor prices - verify they're NULL not zero
     if null_anchor_prices:
         async with session_factory() as session:
-            from money_machine.persistence.tables import MarketListingObservation
 
             stmt = select(MarketListingObservation).where(
                 MarketListingObservation.research_run_id == report.research_run_id
@@ -303,9 +311,7 @@ async def test_young_and_fast_shop_detection(test_workflow, test_database, sessi
     # At least some fixtures should have young-and-fast shops
     # (based on fixture data: shops with < 365 days age and > 400 sales)
     async with session_factory() as session:
-        from sqlalchemy import select
 
-        from money_machine.persistence.tables import MarketShopObservation
 
         cutoff = datetime.now(UTC) - timedelta(days=365)
         stmt = select(MarketShopObservation).where(
@@ -362,7 +368,6 @@ async def test_risk_notes_generated(test_workflow, test_database, session_factor
         _ = await execute_market_research(workflow.id, job, uow)
 
         async with session_factory() as session:
-            from money_machine.persistence.tables import ProductCandidate
 
             stmt = select(ProductCandidate).where(ProductCandidate.workflow_id == workflow.id)
             result = await session.execute(stmt)
@@ -384,7 +389,6 @@ async def test_observation_count_matches_report(test_workflow, test_database, se
         report = await execute_market_research(workflow.id, job, uow)
 
         async with session_factory() as session:
-            from money_machine.persistence.tables import MarketListingObservation, ResearchRun
 
             # Get ResearchRun
             run_stmt = select(ResearchRun).where(ResearchRun.id == report.research_run_id)
