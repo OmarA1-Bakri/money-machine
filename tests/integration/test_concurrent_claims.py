@@ -89,15 +89,15 @@ async def test_concurrent_claim_skip_locked(
 
     async def claim_worker1():
         async with unit_of_work(session_factory) as uow1:
-                claimed = await claim_ready_job(
-                    uow1.session,
-                    worker_id=worker1_id,
-                    now=now,
-                    lease_duration=lease_duration,
-                )
-                if claimed:
-                    await uow1.commit()
-                return claimed
+            claimed = await claim_ready_job(
+                uow1.session,
+                worker_id=worker1_id,
+                now=now,
+                lease_duration=lease_duration,
+            )
+            if claimed:
+                await uow1.commit()
+            return claimed
 
     async def claim_worker2():
         async with unit_of_work(session_factory) as uow2:
@@ -326,9 +326,7 @@ async def test_double_execution_prevented_by_for_update_skip_locked(
     _ = await asyncio.gather(execute_worker1(), execute_worker2())
 
     # Exactly one worker should have executed
-    assert len(execution_count) == 1, (
-        f"Expected exactly one execution, got {len(execution_count)}"
-    )
+    assert len(execution_count) == 1, f"Expected exactly one execution, got {len(execution_count)}"
 
     # Verify the job is SUCCEEDED and owned by the successful worker
     async with unit_of_work(session_factory) as uow:
