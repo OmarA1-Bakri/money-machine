@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import NotRequired, Protocol, TypedDict
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class EtsyObservationDict(TypedDict):
@@ -78,8 +78,7 @@ class EtsyResearchObservation(BaseModel):
     listing_url: str = Field(description="Full Etsy listing URL")
     evidence_timestamp: datetime = Field(description="UTC timestamp when observation was captured")
 
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class EtsyResearchAdapter(Protocol):
