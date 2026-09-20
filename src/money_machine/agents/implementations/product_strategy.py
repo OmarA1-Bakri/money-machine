@@ -39,7 +39,16 @@ class A05ProductStrategy(BaseAgent):
     async def execute(self, context: AgentContext) -> AgentResult:
         """Score candidates and generate ProductSpec for qualified primary."""
         try:
-            strategy_input = ProductStrategyInput.model_validate(context.job.input)
+            # Parse input, allowing string UUIDs to be converted
+            input_data = context.job.input
+            if isinstance(input_data.get("job_id"), str):
+                input_data["job_id"] = UUID(input_data["job_id"])
+            if isinstance(input_data.get("workflow_id"), str):
+                input_data["workflow_id"] = UUID(input_data["workflow_id"])
+            if isinstance(input_data.get("research_run_id"), str):
+                input_data["research_run_id"] = UUID(input_data["research_run_id"])
+            
+            strategy_input = ProductStrategyInput.model_validate(input_data)
 
             # Score all candidates
             scored = self._score_candidates(strategy_input)
