@@ -271,17 +271,17 @@ class TestA05ProductStrategyScoring:
         assert isinstance(spec_data, dict)
         assert spec_data["identity"] == QUALIFIED_CANDIDATE.identity
         assert spec_data["base_category"] == QUALIFIED_CANDIDATE.base_category
-        
+
         hubs = spec_data.get("hubs")
         assert hubs is not None and isinstance(hubs, (list, tuple))
         assert len(hubs) >= 6
         assert len(hubs) <= 8
-        
+
         colour_variants = spec_data.get("colour_variants")
         assert colour_variants is not None and isinstance(colour_variants, (list, tuple))
         assert len(colour_variants) >= 3
         assert len(colour_variants) <= 4
-        
+
         # Type-safe comparison for prices
         real_price = spec_data.get("real_price")
         anchor_price = spec_data.get("anchor_price")
@@ -309,7 +309,7 @@ class TestA05ProductStrategyScoring:
         output = result.output
         primary = output.get("primary_candidate")
         assert primary is not None and isinstance(primary, dict)
-        
+
         total_score = primary.get("total_score")
         assert isinstance(total_score, int)
 
