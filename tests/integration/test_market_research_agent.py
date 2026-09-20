@@ -60,6 +60,8 @@ async def test_workflow(session_factory):
             status="READY",
             scheduled_at=datetime.now(UTC),
             idempotency_key=str(uuid4()),
+            side_effect_class="EXTERNAL_READ",
+            retry_class="SAFE",
         )
         session.add(job)
 
@@ -293,6 +295,8 @@ async def test_empty_seed_phrases_raises(session_factory):
             status="READY",
             scheduled_at=datetime.now(UTC),
             idempotency_key=str(uuid4()),
+            side_effect_class="EXTERNAL_READ",
+            retry_class="SAFE",
         )
 
         async with session_factory() as session:
