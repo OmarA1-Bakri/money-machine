@@ -44,8 +44,10 @@ REQUIRED_SECTIONS: Final[list[str]] = [
 ]
 
 # Pattern matching runtime secrets that must not appear in prompts
+# Matches secret-like patterns with assignment operators (=, :) or quotes
+# to avoid false positives on documentation that mentions these concepts
 SECRET_PATTERN: Final[re.Pattern[str]] = re.compile(
-    r"(?:api[_-]?key|token|password|secret|credential)",
+    r"(?:api[_-]?key|token|password|secret|credential)\s*[:=]\s*['\"]?[a-zA-Z0-9_-]{8,}",
     re.IGNORECASE,
 )
 

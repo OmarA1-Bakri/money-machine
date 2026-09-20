@@ -293,10 +293,35 @@ Allowed: v2
     (a01_dir / "v1.md").write_text(v1_content, encoding="utf-8")
     (a01_dir / "v2.md").write_text(v2_content, encoding="utf-8")
 
-    # Create minimal config structure
+    # Create minimal config structure with 16 agents (schema requirement)
     config_dir = root / "config"
     config_dir.mkdir()
-    (config_dir / "agents.yaml").write_text("version: 1\nagents: []", encoding="utf-8")
+    agents_yaml_lines = ["version: 1", "agents:"]
+    for i in range(1, 17):
+        agent_num = f"A{i:02d}"
+        agents_yaml_lines.extend(
+            [
+                f"  - agent_id: {agent_num}",
+                f"    name: Agent {agent_num}",
+                "    implementation_version: 1",
+                "    contract_version: 1",
+                f"    system_prompt_reference: agent://{agent_num}/system/v1",
+                "    input_contracts: [JobEnvelope]",
+                "    output_contracts: [AgentResult]",
+                "    allowed_tools: [INTERNAL_ORCHESTRATION]",
+                "    provider_operations: []",
+                "    allowed_side_effect_classes: [NONE]",
+                "    default_side_effect_class: NONE",
+                "    allowed_retry_classes: [SAFE]",
+                "    default_retry_class: SAFE",
+                "    timeout_seconds: 300",
+                "    model_policy: default",
+                "    commissioning_state: DESIGNED",
+                "    commissioning_evidence: []",
+            ]
+        )
+    agents_yaml = "\n".join(agents_yaml_lines) + "\n"
+    (config_dir / "agents.yaml").write_text(agents_yaml, encoding="utf-8")
     impl_prompts = root / "prompts" / "implementation"
     impl_prompts.mkdir(parents=True)
 
