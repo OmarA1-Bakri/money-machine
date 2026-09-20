@@ -47,6 +47,9 @@ class A05ProductStrategy(BaseAgent):
                 input_data["workflow_id"] = UUID(input_data["workflow_id"])  # type: ignore[assignment]
             if isinstance(input_data.get("research_run_id"), str):
                 input_data["research_run_id"] = UUID(input_data["research_run_id"])  # type: ignore[assignment]
+            # Convert candidates list back to tuple
+            if isinstance(input_data.get("candidates"), list):
+                input_data["candidates"] = tuple(input_data["candidates"])  # type: ignore[assignment]
 
             strategy_input = ProductStrategyInput.model_validate(input_data)
 
