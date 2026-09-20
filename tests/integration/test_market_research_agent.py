@@ -378,7 +378,7 @@ async def test_observation_count_matches_report(test_workflow, test_database):
     workflow, job = test_workflow
 
     async with UnitOfWork() as uow:
-        _ = await execute_market_research(workflow.id, job, uow)
+        report = await execute_market_research(workflow.id, job, uow)
 
         async with AsyncSessionLocal() as session:
             from sqlalchemy import select
