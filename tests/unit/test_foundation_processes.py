@@ -51,11 +51,15 @@ def test_worker_entrypoint_configures_logging(monkeypatch: pytest.MonkeyPatch) -
     def record_config(**kwargs: object) -> None:
         calls.append(kwargs)
 
+    def gates_fail() -> bool:
+        return False
+
     def unavailable_stub(service: str) -> int:
         assert service == "worker"
         return EXIT_UNAVAILABLE
 
     monkeypatch.setattr(worker.logging, "basicConfig", record_config)
+    monkeypatch.setattr(worker, "_check_commissioning_gates", gates_fail)
     monkeypatch.setattr(worker, "unavailable", unavailable_stub)
 
     assert worker.main() == EXIT_UNAVAILABLE
@@ -111,10 +115,13 @@ def test_worker_module_exposes_no_claim_surface() -> None:
 
 @pytest.mark.parametrize(
     "module",
-    ["money_machine.orchestration.worker", "money_machine.orchestration.scheduler"],
+    [
+        "money_machine.orchestration.scheduler",
+        # Worker excluded: lifts Exit 78 when gates pass, runs indefinitely
+    ],
 )
 def test_real_entry_points_exit_78_after_a_connectivity_check(module: str) -> None:
-    """A real subprocess proves the fail-closed exit and reports its database check."""
+    """Scheduler subprocess proves fail-closed exit (Wave 9: worker path only)."""
     result = subprocess.run(
         [sys.executable, "-m", module],
         check=False,
@@ -126,6 +133,7 @@ def test_real_entry_points_exit_78_after_a_connectivity_check(module: str) -> No
 
     assert result.returncode == EXIT_UNAVAILABLE
     assert result.stdout == ""
-    # Wave 9: Commissioning gates pass but process loop deferred
-    assert "Commissioning gates pass" in result.stderr or "database check" in result.stderr
-    assert "no jobs were processed" in result.stderr
+    # Scheduler remains fail-closed with honest messaging
+    assert "Scheduler cycle not implemented" in result.stderr
+    assert "worker path only" in result.stderr
+    assert "no jobs processed" in result.stderr

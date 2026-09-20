@@ -45,20 +45,28 @@ CLAIM_POLL_INTERVAL: Final = timedelta(seconds=5)
 
 
 def _check_commissioning_gates() -> bool:
-    """Check if commissioning evidence gates pass for Exit 78 lift.
+    """Check commissioning evidence gates per D-0028.
 
-    Returns True if at least one agent is TESTED or COMMISSIONED with passing tests.
+    Verifies ALL of:
+    1. Agent definition loaded with TESTED/COMMISSIONED state
+    2. Prompt file exists at declared prompt_path
+    3. Tool registry loads successfully
+    4. Runtime settings valid (database config)
+
+    Returns True if at least one agent passes ALL gates.
     Returns False if gates fail, causing worker to exit 78.
     """
     try:
-        # Load runtime settings to verify configuration
-        _settings = load_runtime_settings()
+        # Gate: Runtime settings valid (database config)
+        settings = load_runtime_settings()
+        LOGGER.debug("Gate 1/4: Runtime settings loaded")
 
-        # Verify agent registry loads (proves config valid)
+        # Gate: Agent registry loads (config valid, tools resolve)
         repo_root = Path(__file__).parent.parent.parent.parent
         registry = AgentRegistry.from_yaml(repo_root)
+        LOGGER.debug("Gate 2/4: Agent registry loaded with %d agents", len(list(registry.roster())))
 
-        # Check if any agent is TESTED or COMMISSIONED
+        # Gate: At least one agent is TESTED/COMMISSIONED
         tested_or_commissioned = [
             defn
             for defn in registry.roster()
@@ -71,14 +79,35 @@ def _check_commissioning_gates() -> bool:
 
         if not tested_or_commissioned:
             LOGGER.error(
-                "No TESTED or COMMISSIONED agents found; Exit 78 held. "
+                "Gate 3/4 FAILED: No TESTED or COMMISSIONED agents found; Exit 78 held. "
                 "Found %d agents total, all in state DESIGNED or earlier.",
                 len(list(registry.roster())),
             )
             return False
 
+        LOGGER.debug("Gate 3/4: Found %d TESTED/COMMISSIONED agents", len(tested_or_commissioned))
+
+        # Gate: Prompt files exist for TESTED/COMMISSIONED agents
+        agents_with_missing_prompts = []
+        for agent_def in tested_or_commissioned:
+            prompt_file = repo_root / agent_def.prompt_path
+            if not prompt_file.exists():
+                agents_with_missing_prompts.append(
+                    f"{agent_def.agent_id} (expected: {agent_def.prompt_path})"
+                )
+
+        if agents_with_missing_prompts:
+            LOGGER.error(
+                "Gate 4/4 FAILED: Prompt files missing for TESTED/COMMISSIONED agents: %s",
+                ", ".join(agents_with_missing_prompts),
+            )
+            return False
+
+        LOGGER.debug("Gate 4/4: All prompt files exist for TESTED/COMMISSIONED agents")
+
+        # All gates pass
         LOGGER.info(
-            "Commissioning gates pass: %d TESTED/COMMISSIONED agent(s) found: %s",
+            "Commissioning evidence gates PASS (D-0028): %d agent(s) eligible: %s",
             len(tested_or_commissioned),
             [a.agent_id for a in tested_or_commissioned],
         )
@@ -259,11 +288,11 @@ async def _execute_job_with_runner(
         return None
 
 
-async def _worker_loop() -> None:  # pyright: ignore[reportUnusedFunction]
+async def _worker_loop() -> None:
     """Main worker loop: claim jobs, execute via AgentRunner, emit events, create successors.
 
-    Wave 9: Implementation complete but process entrypoint deferred. Library functions
-    are tested via test_runtime_integration.py. Daemon loop will be activated in future wave.
+    Wave 9: Runs when commissioning evidence gates pass per D-0028.
+    Claims READY jobs, invokes AgentRunner, persists results, emits events, spawns successors.
     """
     settings = load_runtime_settings()
     engine = create_engine(settings.database)
@@ -328,29 +357,34 @@ async def _worker_loop() -> None:  # pyright: ignore[reportUnusedFunction]
 
 
 def main() -> int:
-    """Worker entrypoint with conditional Exit 78 lift (Wave 9)."""
+    """Worker entrypoint with conditional Exit 78 lift (Wave 9).
+
+    Checks commissioning evidence gates per D-0028. When gates pass, runs the production
+    claim loop (lease → execute → persist → event → successor). When gates fail, exits 78.
+    """
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-    # Check commissioning evidence gates
+    # Check commissioning evidence gates per D-0028
     if not _check_commissioning_gates():
-        LOGGER.error("Commissioning gates failed; worker exits 78 (fail-closed)")
+        LOGGER.error("Commissioning evidence gates FAILED; worker exits 78 (fail-closed)")
         return unavailable("worker")
 
-    # Wave 9: Gates pass but worker process loop deferred to future work
-    # Library functions (claim_ready_job, release_lease, AgentRunner, etc.) are tested
-    # but the daemon loop is out of scope. Exit 78 for now.
+    # Gates pass: lift Exit 78 and run production claim loop
     LOGGER.info(
-        "Commissioning gates pass: TESTED/COMMISSIONED agent(s) found; "
-        "worker library functions available but process loop not implemented in Wave 9"
+        "Commissioning evidence gates PASS; worker lifts Exit 78 and starts claim loop"
     )
-    LOGGER.warning(
-        "Worker process loop not implemented in Wave 9; "
-        "library functions available via imports but daemon deferred"
-    )
-    return unavailable("worker")
+    try:
+        asyncio.run(_worker_loop())
+        return 0
+    except KeyboardInterrupt:
+        LOGGER.info("Worker interrupted by signal; shutting down gracefully")
+        return 0
+    except Exception as error:
+        LOGGER.exception("Worker loop failed: %s", error)
+        return 1
 
 
 if __name__ == "__main__":

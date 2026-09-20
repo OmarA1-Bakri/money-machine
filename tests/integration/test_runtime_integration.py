@@ -297,12 +297,13 @@ async def test_designed_agent_fail_closed_after_lease(
 @pytest.mark.parametrize(
     "module",
     [
-        "money_machine.orchestration.worker",
         "money_machine.orchestration.scheduler",
+        # Worker is excluded: when gates pass, worker lifts Exit 78 and runs
+        # indefinitely (claim loop). Scheduler remains fail-closed (W9 out of scope).
     ],
 )
 def test_process_entrypoints_remain_exit_78(module: str) -> None:
-    """Worker/scheduler subprocesses still fail-closed; no W9 claim lift."""
+    """Scheduler subprocess remains fail-closed (Exit 78); worker loop tested separately."""
     result = subprocess.run(
         [sys.executable, "-m", module],
         check=False,
@@ -313,9 +314,10 @@ def test_process_entrypoints_remain_exit_78(module: str) -> None:
     )
     assert result.returncode == EXIT_UNAVAILABLE
     assert result.stdout == ""
-    # Wave 9: Commissioning gates pass but process loop deferred
-    assert "Commissioning gates pass" in result.stderr
-    assert "no jobs were processed" in result.stderr
+    # Scheduler stays fail-closed with honest messaging (W9 out of scope)
+    assert "Scheduler cycle not implemented" in result.stderr
+    assert "worker path only" in result.stderr
+    assert "no jobs processed" in result.stderr
 
 
 @pytest.mark.asyncio
