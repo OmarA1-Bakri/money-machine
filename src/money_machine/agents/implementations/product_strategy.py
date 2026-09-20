@@ -106,46 +106,30 @@ class A05ProductStrategy(BaseAgent):
                 retryable=False,
             )
 
-            # Extract job metadata from context or use defaults
-            job_id = context.job.job_id
-            workflow_id = (
-                getattr(context.job.input.get("workflow_id"), "hex", str(uuid4()))
-                if isinstance(context.job.input.get("workflow_id"), UUID)
-                else str(uuid4())
-            )
-            research_run_id = (
-                getattr(context.job.input.get("research_run_id"), "hex", str(uuid4()))
-                if isinstance(context.job.input.get("research_run_id"), UUID)
-                else str(uuid4())
-            )
-
-            result = ProductStrategyResult(
-                agent_run_id=context.agent_run_id,
-                agent_id="A05",
-                agent_definition_version=context.definition.contract_version,
-                prompt_reference=context.prompt_reference,
-                prompt_sha256=context.prompt_sha256,
-                status=AgentRunStatus.FAILURE,
-                job_id=UUID(workflow_id) if workflow_id else uuid4(),
-                workflow_id=UUID(workflow_id) if workflow_id else uuid4(),
-                research_run_id=UUID(research_run_id) if research_run_id else uuid4(),
-                scored_candidates=(),
-                primary_candidate=None,  # type: ignore
-                qualification_outcome="REJECTED",
-                evidence=(),
-                error=error,
-                completed_at=datetime.now(UTC),
-            )
+            # Create minimal error output
+            error_output = {
+                "agent_run_id": str(context.agent_run_id),
+                "agent_id": "A05",
+                "agent_definition_version": context.definition.contract_version,
+                "prompt_reference": context.prompt_reference,
+                "prompt_sha256": context.prompt_sha256,
+                "status": "FAILURE",
+                "job_id": str(context.job.job_id),
+                "workflow_id": str(context.job.input.get("workflow_id", uuid4())),
+                "research_run_id": str(context.job.input.get("research_run_id", uuid4())),
+                "qualification_outcome": "REJECTED",
+                "error": error.model_dump(),
+            }
 
             return AgentResult(
-                job_id=job_id,
+                job_id=context.job.job_id,
                 agent_run_id=context.agent_run_id,
                 agent_id="A05",
                 agent_definition_version=context.definition.contract_version,
                 prompt_reference=context.prompt_reference,
                 prompt_sha256=context.prompt_sha256,
                 status=AgentRunStatus.FAILURE,
-                output=cast(JsonObject, result.model_dump()),
+                output=cast(JsonObject, error_output),
                 error=error,
             )
 
