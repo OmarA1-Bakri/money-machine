@@ -153,7 +153,7 @@ async def test_review_budget_enforced(coordinator: ReviewSubagentCoordinator) ->
 
 
 def test_mutate_tool_attempt_fails_closed(coordinator: ReviewSubagentCoordinator) -> None:
-    with pytest.raises(ReviewSubagentMutationError, match="cannot invoke write tool 'job.create'"):
+    with pytest.raises(ReviewSubagentMutationError, match=r"cannot invoke write tool 'job.create'"):
         coordinator.invoke_review_tool("job.create", job_type="DedupeJob")
 
 
@@ -179,7 +179,7 @@ def test_read_only_review_tool_succeeds(coordinator: ReviewSubagentCoordinator) 
 def test_tool_registry_invoke_for_review_blocks_job_create() -> None:
     registry = ToolRegistry.canonical()
     a01_tools = frozenset(_a01_definition().allowed_tools)
-    with pytest.raises(ToolPermissionError, match="cannot invoke write tool 'job.create'"):
+    with pytest.raises(ToolPermissionError, match=r"cannot invoke write tool 'job.create'"):
         registry.invoke_for_review(
             "job.create",
             allowed_tools=a01_tools,

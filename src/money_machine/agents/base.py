@@ -133,7 +133,6 @@ class AgentContext:
     ) -> ReviewSubagentArtifact:
         """Request one bounded review subagent from the owning run."""
         from money_machine.agents.review_subagent import (
-            ReviewSubagentArtifact,
             ReviewSubagentCoordinator,
             ReviewSubagentRequest,
         )
