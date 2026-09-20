@@ -290,11 +290,9 @@ Allowed: v2_tool
     assert "V2 instructions" in v2_loaded
 
 
-def test_real_a01_prompt_loads(prompts_root: Path) -> None:
+def test_real_a01_prompt_loads(repository_root: Path) -> None:
     """Verify the real A01 prompt exists and loads correctly."""
-    # This test assumes the real prompts are in the repo
-    repo_root = Path(__file__).parent.parent.parent.parent
-    real_prompts_dir = repo_root / "prompts" / "agents" / "A01"
+    real_prompts_dir = repository_root / "prompts" / "agents" / "A01"
 
     if not real_prompts_dir.exists():
         pytest.skip("Real A01 prompt not found")
@@ -308,7 +306,7 @@ def test_real_a01_prompt_loads(prompts_root: Path) -> None:
     expected_hash = sha256(real_content.encode("utf-8")).hexdigest()
 
     # Load it through the store
-    store = PromptStore(repo_root)
+    store = PromptStore(repository_root)
     content = store.load("A01", "v1", expected_hash=expected_hash)
 
     assert content == real_content
@@ -316,10 +314,9 @@ def test_real_a01_prompt_loads(prompts_root: Path) -> None:
     assert "Shop Orchestrator" in content
 
 
-def test_real_a02_prompt_loads(prompts_root: Path) -> None:
+def test_real_a02_prompt_loads(repository_root: Path) -> None:
     """Verify the real A02 prompt exists and loads correctly."""
-    repo_root = Path(__file__).parent.parent.parent.parent
-    real_prompts_dir = repo_root / "prompts" / "agents" / "A02"
+    real_prompts_dir = repository_root / "prompts" / "agents" / "A02"
 
     if not real_prompts_dir.exists():
         pytest.skip("Real A02 prompt not found")
@@ -331,7 +328,7 @@ def test_real_a02_prompt_loads(prompts_root: Path) -> None:
     real_content = v1_path.read_text(encoding="utf-8")
     expected_hash = sha256(real_content.encode("utf-8")).hexdigest()
 
-    store = PromptStore(repo_root)
+    store = PromptStore(repository_root)
     content = store.load("A02", "v1", expected_hash=expected_hash)
 
     assert content == real_content
