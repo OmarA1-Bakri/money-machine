@@ -111,9 +111,7 @@ class FakeJevProvider(JevClient):
 
         # Get configured answers
         if decision_type not in self._answers:
-            raise JevClientError(
-                f"No fake answers configured for decision type: {decision_type}"
-            )
+            raise JevClientError(f"No fake answers configured for decision type: {decision_type}")
 
         answers = self._answers[decision_type]
 

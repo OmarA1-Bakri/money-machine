@@ -64,9 +64,7 @@ async def get_evaluation(session: AsyncSession, evaluation_id: UUID) -> JevEvalu
     Returns:
         JevEvaluation if found, else None
     """
-    result = await session.execute(
-        select(JevEvaluation).where(JevEvaluation.id == evaluation_id)
-    )
+    result = await session.execute(select(JevEvaluation).where(JevEvaluation.id == evaluation_id))
     return result.scalar_one_or_none()
 
 

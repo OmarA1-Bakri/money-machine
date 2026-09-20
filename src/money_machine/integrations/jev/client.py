@@ -89,7 +89,9 @@ class JevGatewayClient(JevClient):
         """
         self._base_url = base_url or os.getenv("JEV_GATEWAY_URL")
         if not self._base_url:
-            raise JevClientError("JEV_GATEWAY_URL environment variable or base_url parameter required")
+            raise JevClientError(
+                "JEV_GATEWAY_URL environment variable or base_url parameter required"
+            )
 
         self._api_key = api_key or os.getenv("JEV_API_KEY")
         if not self._api_key:
@@ -130,7 +132,9 @@ class JevGatewayClient(JevClient):
                 ) from e
 
         # Should never reach here, but satisfy type checker
-        raise JevClientError(f"Jev Gateway evaluation failed after {max_attempts} attempts") from last_error
+        raise JevClientError(
+            f"Jev Gateway evaluation failed after {max_attempts} attempts"
+        ) from last_error
 
     async def _call_gateway(self, packet: DecisionPacket, timeout: float) -> DecisionResult:
         """Make one HTTP call to Jev Gateway evaluate endpoint."""
