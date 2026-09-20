@@ -6,7 +6,7 @@ Contract: Session 04 W6 — subagent review support lane (S04-09).
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, cast
 
 from pydantic import BeforeValidator
 
@@ -16,7 +16,7 @@ from money_machine.domain.models.common import EvidenceReference
 
 def _coerce_tuple(value: Any) -> Any:
     if type(value) is list:
-        return tuple(value)
+        return tuple(cast(list[Any], value))
     return value
 
 

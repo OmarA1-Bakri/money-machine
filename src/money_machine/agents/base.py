@@ -132,17 +132,12 @@ class AgentContext:
         request: ReviewSubagentRequest,
     ) -> ReviewSubagentArtifact:
         """Request one bounded review subagent from the owning run."""
-        from money_machine.agents.review_subagent import (
-            ReviewSubagentCoordinator,
-            ReviewSubagentRequest,
-        )
+        from money_machine.agents.review_subagent import ReviewSubagentCoordinator
 
         if self.review_coordinator is None:
             raise AgentRuntimeError("ReviewSubagentCoordinator not available in context")
         if not isinstance(self.review_coordinator, ReviewSubagentCoordinator):
             raise AgentRuntimeError("Invalid review_coordinator type")
-        if not isinstance(request, ReviewSubagentRequest):
-            raise AgentRuntimeError("request must be a ReviewSubagentRequest")
         return await self.review_coordinator.request_review(request)
 
     def invoke_review_tool(self, tool_id: str, **kwargs: object) -> Any:

@@ -26,6 +26,10 @@ DEFAULT_MAX_REVIEWS_PER_JOB: Final = 3
 DEFAULT_MAX_TOKENS_PER_REVIEW: Final = 4096
 
 
+def _empty_review_artifacts() -> list[ReviewSubagentArtifact]:
+    return []
+
+
 class ReviewSubagentError(AgentRuntimeError):
     """Base exception for bounded review subagent failures."""
 
@@ -85,7 +89,10 @@ class ReviewSubagentCoordinator:
     tool_registry: ToolRegistry
     bounds: ReviewSubagentBounds = field(default_factory=ReviewSubagentBounds)
     _review_count: int = field(default=0, init=False)
-    artifacts: list[ReviewSubagentArtifact] = field(default_factory=list, init=False)
+    artifacts: list[ReviewSubagentArtifact] = field(
+        default_factory=_empty_review_artifacts,
+        init=False,
+    )
 
     async def request_review(self, request: ReviewSubagentRequest) -> ReviewSubagentArtifact:
         """Invoke one bounded review subagent and record its artifact."""
