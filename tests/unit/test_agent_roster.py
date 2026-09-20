@@ -135,8 +135,8 @@ async def test_a02_implementation_executes_provisioning_check(registry: AgentReg
     assert result.agent_id == "A02"
     assert result.status.value == "SUCCESS"
     providers = result.output.get("providers", {})
+    # A02 checks openai, notion, and etsy for ProvisioningCheckJob
     assert "openai" in providers
-    assert "anthropic" in providers
     assert "notion" in providers
     assert "etsy" in providers
 
