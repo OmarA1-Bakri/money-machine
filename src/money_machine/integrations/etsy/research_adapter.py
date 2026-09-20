@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 class EtsyResearchObservation(BaseModel):
     """A single Etsy listing observation from market research.
-    
+
     Captures thin evidence from search results without invented metrics.
     All fields are required for fixture path; live adapters may return None
     where data is unavailable.
@@ -55,13 +55,9 @@ class EtsyResearchObservation(BaseModel):
     identity_niche: str = Field(
         description="Identified product niche (e.g., 'productivity digital downloads')"
     )
-    base_category: str = Field(
-        description="Etsy base category (e.g., 'Office & School Supplies')"
-    )
+    base_category: str = Field(description="Etsy base category (e.g., 'Office & School Supplies')")
     listing_url: str = Field(description="Full Etsy listing URL")
-    evidence_timestamp: datetime = Field(
-        description="UTC timestamp when observation was captured"
-    )
+    evidence_timestamp: datetime = Field(description="UTC timestamp when observation was captured")
 
     class Config:
         frozen = True
@@ -76,14 +72,14 @@ class EtsyResearchAdapter(Protocol):
         target_count: int = 30,
     ) -> list[EtsyResearchObservation]:
         """Execute a search and return observations.
-        
+
         Args:
             phrase: Search phrase (e.g., "digital planner")
             target_count: Target number of observations to return
-            
+
         Returns:
             List of observations, up to target_count
-            
+
         Raises:
             NotImplementedError: For stub adapters not yet implemented
             ValueError: For invalid search phrase or target_count
