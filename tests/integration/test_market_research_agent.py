@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
+
+import pytest
 
 from money_machine.agents.contracts.market_research import execute_market_research
 from money_machine.agents.implementations.market_research import MarketResearchAgent
@@ -134,6 +135,7 @@ async def test_shortlist_produces_5_candidates(test_workflow, test_database):
         # Verify candidates were persisted
         async with AsyncSessionLocal() as session:
             from sqlalchemy import select
+
             from money_machine.persistence.tables import ProductCandidate
 
             stmt = select(ProductCandidate).where(ProductCandidate.workflow_id == workflow.id)
@@ -206,6 +208,7 @@ async def test_nullable_fields_preserved(test_workflow, test_database):
     if null_anchor_prices:
         async with AsyncSessionLocal() as session:
             from sqlalchemy import select
+
             from money_machine.persistence.tables import MarketListingObservation
 
             stmt = select(MarketListingObservation).where(
@@ -257,6 +260,7 @@ async def test_empty_seed_phrases_raises():
     """Test that missing seed phrases fail fast with clear error."""
     # Create temporary config without seed phrases
     import tempfile
+
     import yaml
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
@@ -295,9 +299,11 @@ async def test_young_and_fast_shop_detection(test_workflow, test_database):
     # At least some fixtures should have young-and-fast shops
     # (based on fixture data: shops with < 365 days age and > 400 sales)
     async with AsyncSessionLocal() as session:
-        from sqlalchemy import select
-        from money_machine.persistence.tables import MarketShopObservation
         from datetime import timedelta
+
+        from sqlalchemy import select
+
+        from money_machine.persistence.tables import MarketShopObservation
 
         cutoff = datetime.now(UTC) - timedelta(days=365)
         stmt = select(MarketShopObservation).where(
@@ -353,6 +359,7 @@ async def test_risk_notes_generated(test_workflow, test_database):
 
         async with AsyncSessionLocal() as session:
             from sqlalchemy import select
+
             from money_machine.persistence.tables import ProductCandidate
 
             stmt = select(ProductCandidate).where(ProductCandidate.workflow_id == workflow.id)
@@ -375,6 +382,7 @@ async def test_observation_count_matches_report(test_workflow, test_database):
 
         async with AsyncSessionLocal() as session:
             from sqlalchemy import select
+
             from money_machine.persistence.tables import MarketListingObservation, ResearchRun
 
             # Get ResearchRun
