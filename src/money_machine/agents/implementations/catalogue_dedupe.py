@@ -35,7 +35,7 @@ class CatalogueDedupeAgent(BaseAgent):
     async def execute(self, context: AgentContext) -> AgentResult:
         job = context.job
         job_input = job.input
-        
+
         # Extract candidate spec_id from job input
         candidate_spec_id_str = job_input.get("spec_id")
         if not candidate_spec_id_str:
@@ -53,9 +53,9 @@ class CatalogueDedupeAgent(BaseAgent):
                     "message": "Job input must contain spec_id",
                 },
             )
-        
+
         candidate_spec_id = UUID(candidate_spec_id_str)
-        
+
         # Load candidate ProductSpec from database
         # Using database.read tool to query product_specs table
         candidate_spec_data = context.invoke_tool(
@@ -63,7 +63,7 @@ class CatalogueDedupeAgent(BaseAgent):
             table="product_specs",
             spec_id=str(candidate_spec_id),
         )
-        
+
         if not candidate_spec_data:
             return AgentResult(
                 job_id=job.job_id,
@@ -79,10 +79,10 @@ class CatalogueDedupeAgent(BaseAgent):
                     "message": f"ProductSpec {candidate_spec_id} not found",
                 },
             )
-        
+
         # Parse candidate ProductSpec from tool result
         candidate_spec = ProductSpec.model_validate(candidate_spec_data)
-        
+
         # Load all existing ProductSpecs from catalogue
         # Exclude the candidate itself and only get specs from different workflows
         existing_specs_data = context.invoke_tool(
@@ -90,7 +90,7 @@ class CatalogueDedupeAgent(BaseAgent):
             table="product_specs",
             exclude_spec_id=str(candidate_spec_id),
         )
-        
+
         # Parse existing specs
         existing_specs: list[ProductSpec] = []
         if existing_specs_data and isinstance(existing_specs_data, list):
@@ -100,14 +100,14 @@ class CatalogueDedupeAgent(BaseAgent):
                 except Exception:
                     # Skip invalid specs (shouldn't happen but be defensive)
                     pass
-        
+
         # Run dedupe check
         dedupe_result = check_dedupe(
             candidate_spec=candidate_spec,
             existing_specs=existing_specs,
             rule_version=DEDUPE_RULE_VERSION,
         )
-        
+
         # Persist DedupeResult to database
         context.invoke_tool(
             "database.write_dedupe_result",
@@ -139,7 +139,7 @@ class CatalogueDedupeAgent(BaseAgent):
             differentiation_evidence=list(dedupe_result.differentiation_evidence),
             completed_at=dedupe_result.completed_at.isoformat(),
         )
-        
+
         # Determine event to emit based on outcome
         if dedupe_result.outcome is BranchOutcome.PASS:
             emitted_event = EventName.DEDUPE_PASSED
@@ -161,7 +161,7 @@ class CatalogueDedupeAgent(BaseAgent):
                     "message": f"DedupeResult outcome must be PASS or TOO_CLOSE, got {dedupe_result.outcome}",
                 },
             )
-        
+
         # Build agent output with dedupe result
         output: JsonObject = {
             "result_id": str(dedupe_result.result_id),
@@ -172,12 +172,12 @@ class CatalogueDedupeAgent(BaseAgent):
             "collisions": len(dedupe_result.collisions),
             "collision_reasons": [c.reason for c in dedupe_result.collisions],
         }
-        
+
         # Prepare evidence references
         evidence_refs: list[EvidenceReference] = []
         for collision in dedupe_result.collisions:
             evidence_refs.extend(collision.evidence)
-        
+
         # Return success with emitted event
         # The orchestration layer will create the successor job based on event_successor_map
         return AgentResult(
