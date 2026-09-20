@@ -10,9 +10,28 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, TypedDict
 
 from pydantic import BaseModel, Field
+
+
+class EtsyObservationDict(TypedDict, total=False):
+    """Type definition for Etsy observation in JSON fixtures."""
+
+    rank: int
+    title: str
+    current_price_cents: int
+    anchor_price_cents: int | None
+    shop_name: str
+    shop_sales_count: int | None
+    shop_age_years: int | None
+    badges: list[str]
+    urgency_signals: list[str]
+    review_count: int | None
+    identity_niche: str
+    base_category: str
+    listing_url: str
+    search_timestamp: str
 
 
 class EtsyResearchObservation(BaseModel):
@@ -123,6 +142,7 @@ class EtsyFixtureAdapter:
             ValueError: If fixture data is malformed
         """
         import json
+        from typing import cast
 
         # Default fixture path relative to repo root
         if self.fixture_path is None:
@@ -140,7 +160,7 @@ class EtsyFixtureAdapter:
             raise FileNotFoundError(f"Fixture file not found: {self.fixture_path}")
 
         with self.fixture_path.open() as f:
-            fixtures = json.load(f)
+            fixtures: dict[str, list[EtsyObservationDict]] = json.load(f)
 
         if phrase not in fixtures:
             raise KeyError(f"Phrase '{phrase}' not found in fixtures")

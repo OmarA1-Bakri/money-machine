@@ -22,7 +22,7 @@ class TestEtsyFixtureAdapter:
     @pytest.fixture
     def adapter(self, tmp_path: Path) -> EtsyFixtureAdapter:
         """Create fixture adapter with temporary fixture file."""
-        fixture_data = {
+        fixture_data: dict[str, list[dict[str, object]]] = {
             "test phrase": [
                 {
                     "rank": 1,
