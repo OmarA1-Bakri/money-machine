@@ -181,7 +181,7 @@ class EtsyFixtureAdapter:
 
 class EtsyBrowserAdapter:
     """Playwright-based Etsy search scraper.
-    
+
     NOT IMPLEMENTED. Raises NotImplementedError on all methods.
     Future implementation will use Playwright to scrape Etsy search results.
     """
@@ -192,7 +192,7 @@ class EtsyBrowserAdapter:
         target_count: int = 30,
     ) -> list[EtsyResearchObservation]:
         """Browser-based scraping not yet implemented.
-        
+
         Raises:
             NotImplementedError: Always; this adapter is a stub
         """
@@ -203,7 +203,7 @@ class EtsyBrowserAdapter:
 
 class EtsyAPIAdapter:
     """Etsy API client for research data.
-    
+
     NOT IMPLEMENTED. Raises NotImplementedError on all methods.
     Future implementation will use Etsy's official API endpoints.
     Requires API key and may incur costs.
@@ -215,7 +215,7 @@ class EtsyAPIAdapter:
         target_count: int = 30,
     ) -> list[EtsyResearchObservation]:
         """API-based search not yet implemented.
-        
+
         Raises:
             NotImplementedError: Always; this adapter is a stub
         """
@@ -226,13 +226,13 @@ class EtsyAPIAdapter:
 
 def get_research_adapter(mode: str = "fixture") -> EtsyResearchAdapter:
     """Get an Etsy research adapter instance.
-    
+
     Args:
         mode: Adapter mode - "fixture", "browser", or "api"
-        
+
     Returns:
         Configured adapter instance
-        
+
     Raises:
         ValueError: If mode is not recognized
     """
@@ -243,6 +243,4 @@ def get_research_adapter(mode: str = "fixture") -> EtsyResearchAdapter:
     elif mode == "api":
         return EtsyAPIAdapter()
     else:
-        raise ValueError(
-            f"Unknown adapter mode: {mode}. Must be 'fixture', 'browser', or 'api'"
-        )
+        raise ValueError(f"Unknown adapter mode: {mode}. Must be 'fixture', 'browser', or 'api'")

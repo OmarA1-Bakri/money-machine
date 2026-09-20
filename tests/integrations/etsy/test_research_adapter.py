@@ -201,8 +201,7 @@ class TestRealFixtureData:
 
         for phrase, observations in fixtures.items():
             assert 25 <= len(observations) <= 40, (
-                f"Phrase '{phrase}' has {len(observations)} observations; "
-                f"must have 25-40"
+                f"Phrase '{phrase}' has {len(observations)} observations; must have 25-40"
             )
 
     def test_real_fixtures_thin_evidence(self):
