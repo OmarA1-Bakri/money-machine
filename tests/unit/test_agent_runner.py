@@ -92,6 +92,8 @@ def test_runner_assert_production_executable(repository_root: Path) -> None:
         repository_root,
         provider=FakeLLMProvider(),
     )
-    definition = runner.definition_for_job(_job_for("A03"))  # L2: Use A03 (DESIGNED) instead of A01 (TESTED)
+    definition = runner.definition_for_job(
+        _job_for("A03")
+    )  # L2: Use A03 (DESIGNED) instead of A01 (TESTED)
     with pytest.raises(AgentNotCommissionedError):
         runner.assert_production_executable(definition)
