@@ -95,7 +95,7 @@ def _check_commissioning_gates() -> bool:
         from money_machine.agents.tool_registry import ToolRegistry
 
         tool_registry = ToolRegistry.canonical()
-        LOGGER.debug("Gate 4/5: Tool registry loaded with %d tools", len(tool_registry.all_tools()))
+        LOGGER.debug("Gate 4/5: Tool registry loaded with %d tools", len(tool_registry.known_tool_ids()))
 
         # Gate 5: Prompt integrity for TESTED/COMMISSIONED agents
         # Per D-0028: file exists, SHA-256 computable, required sections present, no secrets
