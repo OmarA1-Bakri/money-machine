@@ -314,7 +314,7 @@ def test_path_traversal_absolute_path(prompts_root: Path) -> None:
         store.load("/etc/passwd", "v1", expected_hash=expected_hash)
 
     # Absolute Windows path (if applicable)
-    with pytest.raises(ValueError, match="forbidden pattern|cannot be an absolute path"):
+    with pytest.raises(ValueError, match=r"forbidden pattern|cannot be an absolute path"):
         store.load("C:\\Windows", "v1", expected_hash=expected_hash)
 
 
