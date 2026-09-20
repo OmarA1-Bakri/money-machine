@@ -165,6 +165,7 @@ ADDENDUM_ENTITIES: Final = (
     "config_references",
     "evidence_references",
     "jev_evaluations",
+    "agent_tool_calls",
     "qa_result_artifacts",
     "dedupe_comparisons",
     "listing_version_artifacts",
@@ -691,6 +692,12 @@ class AgentRun(Identified):
     )
     prompt_reference: Mapped[str] = text_column()
     prompt_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    run_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    model: Mapped[str | None] = text_column(length=100, nullable=True)
+    input_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(14, 6), nullable=True)
+    validation_errors: Mapped[list[Any] | None] = mapped_column(JsonB, nullable=True)
     status: Mapped[str] = state("status", _enum_values(AgentRunStatus))
     output: Mapped[dict[str, Any]] = mapped_column(JsonB, nullable=False, default=dict)
     error: Mapped[dict[str, Any] | None] = mapped_column(JsonB, nullable=True)
@@ -728,6 +735,33 @@ class AgentRun(Identified):
             name="error_is_a_structured_contract_error",
         ),
         CheckConstraint("completed_at >= started_at", name="run_ends_after_start"),
+        CheckConstraint("run_number >= 1", name="run_number_positive"),
+        CheckConstraint(
+            "input_hash IS NULL OR length(input_hash) = 64", name="input_hash_length"
+        ),
+        CheckConstraint("token_count IS NULL OR token_count >= 0", name="token_count_non_negative"),
+        CheckConstraint("cost_usd IS NULL OR cost_usd >= 0", name="cost_usd_non_negative"),
+        Index("ix_agent_runs_agent_id", "agent_id"),
+    )
+
+
+class AgentToolCall(Identified):
+    """One tool invocation recorded against an agent run for audit and cost attribution."""
+
+    __tablename__ = "agent_tool_calls"
+
+    agent_run_id: Mapped[UUID] = ref("agent_runs.id", ondelete="CASCADE")
+    tool_id: Mapped[str] = text_column(length=100)
+    input_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    output_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    duration_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = moment(default_now=True)
+
+    __table_args__ = (
+        CheckConstraint("length(input_hash) = 64", name="input_hash_length"),
+        CheckConstraint("length(output_hash) = 64", name="output_hash_length"),
+        CheckConstraint("duration_ms >= 0", name="duration_non_negative"),
+        Index("ix_agent_tool_calls_agent_run_id", "agent_run_id"),
     )
 
 
