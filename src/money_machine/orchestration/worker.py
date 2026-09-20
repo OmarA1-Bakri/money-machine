@@ -18,7 +18,9 @@ from money_machine.agents.base import AgentNotCommissionedError
 from money_machine.agents.registry import AgentRegistry
 from money_machine.agents.runtime import AgentRunner
 from money_machine.config.runtime import RuntimeSettingsError, load_runtime_settings
-from money_machine.domain.enums import AgentCommissioningState, JobStatus
+from money_machine.config.settings import AgentCommissioningState
+from money_machine.domain.enums import JobStatus
+from money_machine.domain.errors import InvalidTransitionError
 from money_machine.domain.models.jobs import AgentResult, JobEnvelope
 from money_machine.integrations.llm.fake_provider import FakeLLMProvider
 from money_machine.orchestration._foundation import EXIT_UNAVAILABLE, unavailable
@@ -26,10 +28,9 @@ from money_machine.orchestration.event_dispatcher import EventDispatcher
 from money_machine.orchestration.leases import (
     claim_ready_job,
     deterministic_worker_id,
-    heartbeat_lease,
+    heartbeat,
     release_lease,
 )
-from money_machine.orchestration.transition_guard import TransitionError
 from money_machine.persistence.database import check_connectivity, create_engine
 from money_machine.persistence.tables import Job
 from money_machine.persistence.unit_of_work import UnitOfWork
@@ -163,7 +164,7 @@ async def _execute_job_with_runner(
         )
 
         # Heartbeat the lease to prevent expiry during execution
-        await heartbeat_lease(
+        await heartbeat(
             uow.session,
             job_id=job.id,
             worker_id=worker_id,
@@ -235,7 +236,7 @@ async def _execute_job_with_runner(
         await uow.commit()
         return None
 
-    except TransitionError as error:
+    except InvalidTransitionError as error:
         LOGGER.error(
             "Job transition error for job %s: %s",
             job.id,

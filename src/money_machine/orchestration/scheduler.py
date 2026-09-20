@@ -371,7 +371,7 @@ def main() -> int:
 
     from money_machine.agents.registry import AgentRegistry
     from money_machine.config.runtime import RuntimeSettingsError, load_runtime_settings
-    from money_machine.domain.enums import AgentCommissioningState
+    from money_machine.config.settings import AgentCommissioningState
 
     try:
         # Load runtime settings to verify configuration
