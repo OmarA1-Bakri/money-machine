@@ -20,7 +20,7 @@ from money_machine.integrations.jev.persistence import get_evaluation, store_eva
 class TestPersistence:
     """Tests for Jev evaluation persistence (store_evaluation / get_evaluation round-trip)."""
 
-    async def test_store_and_retrieve_evaluation(self, async_session: AsyncSession) -> None:
+    async def test_store_and_retrieve_evaluation(self, session: AsyncSession) -> None:
         """Round-trip: store evaluation, then retrieve it back with all fields intact."""
         packet = DecisionPacket(
             decision_type="preflight_blockers_present",
@@ -41,16 +41,16 @@ class TestPersistence:
 
         # Store
         stored = await store_evaluation(
-            session=async_session,
+            session=session,
             packet=packet,
             result=result,
             decision_id=None,
             derived=derived,
         )
-        await async_session.commit()
+        await session.commit()
 
         # Retrieve
-        retrieved = await get_evaluation(async_session, stored.id)
+        retrieved = await get_evaluation(session, stored.id)
 
         assert retrieved is not None
         assert retrieved.id == stored.id
@@ -61,7 +61,7 @@ class TestPersistence:
         assert retrieved.model_id == "jev-1.0"
         assert retrieved.latency_ms == 150
 
-    async def test_store_without_derived(self, async_session: AsyncSession) -> None:
+    async def test_store_without_derived(self, session: AsyncSession) -> None:
         """Can store evaluation without derived data."""
         packet = DecisionPacket(
             decision_type="test_decision",
@@ -77,19 +77,19 @@ class TestPersistence:
         )
 
         stored = await store_evaluation(
-            session=async_session,
+            session=session,
             packet=packet,
             result=result,
             derived=None,
         )
-        await async_session.commit()
+        await session.commit()
 
-        retrieved = await get_evaluation(async_session, stored.id)
+        retrieved = await get_evaluation(session, stored.id)
 
         assert retrieved is not None
         assert retrieved.derived is None
 
-    async def test_store_with_decision_id_link(self, async_session: AsyncSession) -> None:
+    async def test_store_with_decision_id_link(self, session: AsyncSession) -> None:
         """Can store evaluation linked to a decision via foreign key."""
         packet = DecisionPacket(
             decision_type="test_decision",
@@ -107,15 +107,15 @@ class TestPersistence:
         decision_id = uuid4()
 
         stored = await store_evaluation(
-            session=async_session,
+            session=session,
             packet=packet,
             result=result,
             decision_id=decision_id,
             derived=None,
         )
-        await async_session.commit()
+        await session.commit()
 
-        retrieved = await get_evaluation(async_session, stored.id)
+        retrieved = await get_evaluation(session, stored.id)
 
         assert retrieved is not None
         assert retrieved.decision_id == decision_id
