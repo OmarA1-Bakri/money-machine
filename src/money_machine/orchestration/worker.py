@@ -43,18 +43,18 @@ CLAIM_POLL_INTERVAL: Final = timedelta(seconds=5)
 
 def _check_commissioning_gates() -> bool:
     """Check if commissioning evidence gates pass for Exit 78 lift.
-    
+
     Returns True if at least one agent is TESTED or COMMISSIONED with passing tests.
     Returns False if gates fail, causing worker to exit 78.
     """
     try:
         # Load runtime settings to verify configuration
         _settings = load_runtime_settings()
-        
+
         # Verify agent registry loads (proves config valid)
         repo_root = Path(__file__).parent.parent.parent.parent
         registry = AgentRegistry.from_yaml(repo_root)
-        
+
         # Check if any agent is TESTED or COMMISSIONED
         tested_or_commissioned = [
             defn for defn in registry.all()
