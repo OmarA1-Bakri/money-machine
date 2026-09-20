@@ -1,6 +1,5 @@
 """ProductSpec domain contract and supporting records for S05 L3."""
 
-from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
@@ -10,7 +9,6 @@ from money_machine.domain.models._base import (
     ContractModel,
     CurrencyCode,
     NonEmptyStr,
-    NonNegativeInt,
     PositiveDecimal,
     PositiveInt,
     UtcDatetime,
