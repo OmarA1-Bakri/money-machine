@@ -346,7 +346,7 @@ class A05ProductStrategy(BaseAgent):
                     source_reference=f"research:{strategy_input.research_run_id}",
                     observed_at=datetime.now(UTC),
                     sha256=hashlib.sha256(
-                        json.dumps(candidate.model_dump(), sort_keys=True).encode()
+                        json.dumps(candidate.model_dump(mode="json"), sort_keys=True).encode()
                     ).hexdigest(),
                     safe_summary=f"{candidate.candidate.identity}: {candidate.total_score}/40",
                 )
