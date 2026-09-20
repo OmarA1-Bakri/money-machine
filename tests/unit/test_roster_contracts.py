@@ -1,4 +1,4 @@
-"""Parametrized roster contract tests for every A01–A16 entry.
+"""Parametrized roster contract tests for every A01-A16 entry.
 
 S04 W8 (S04-11): config/agents.yaml is the roster source of truth. Commissioned/tested
 agents (A01/A02) exercise library contract paths only. Uncommissioned agents fail closed
