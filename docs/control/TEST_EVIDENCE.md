@@ -217,3 +217,17 @@ Reviewed canonical HEAD `3720653`. Fresh targeted checks: bootstrap/control/sour
 ## 2026-09-11 — Startup repair verification
 
 `reviews/2026-09-11-startup-repair.md` records the independent review, failing probes, bounded remediation and source versions. Final affected suite: **125 passed, no skips**, 121.37 seconds (runtime/configuration/foundation/operations/Compose contracts plus real isolated API/CLI integrations). Final Ruff format check: 227 files formatted; lint clean; Pyright zero errors/warnings/information. Tests reject wrong/additional migration revisions, missing tables/columns and unmigrated databases; rendered development/production Compose tests preserve raw percent/reserved/padded passwords and external overrides. These results supersede the intermediate failed expectations and whitespace defect for the repaired scope. No full regression, running deployment or live provider acceptance is implied.
+
+## 2026-09-20 — Session 04 W1–W3 + Phase A (control tip-sync @ `3cbe39b`)
+
+| Wave | Claim | Evidence | Verdict |
+|---|---|---|---|
+| W1 governance | Prompt-integrity review + Session 04 activation | `docs/control/reviews/2026-09-20-session-04-prompt-integrity.md`; activation @ `0ce1400` (#18); revision 22→23 | PASS |
+| W2 provider abstraction | `LLMProvider` interface, OpenAI-compatible provider, `FakeLLMProvider`, structured-output validation, timeout/retry metadata | `tests/unit/test_llm_provider.py` **29 passed**; CI green on #19 (`d187fb2`) | PASS |
+| W3 prompt registry | Versioned/hashed `PromptStore`, A01/A02 v1 prompts, seed integration | `tests/unit/test_prompt_store.py` **17 passed**; `tests/integration/test_seed_agent_prompts.py` **5 passed**; CI green on `726437d` | PASS |
+| Phase A Jev library | Client, registry, FakeJev, `jev_evaluations` table, persistence, shadow dry-run | `tests/unit/test_jev_integration.py` **28 passed**; `tests/integration/test_jev_persistence.py` **6 passed**; CI green on `3cbe39b` | PASS |
+| Control continuity | State shape valid for incomplete Session 04 with partial evidence | `tests/bootstrap/test_control_state.py` **61 passed, 12 skipped** after tip-sync | PASS |
+| Exit 78 boundary | Worker/scheduler entrypoints unchanged; no production claim path | No worker/scheduler or commissioning edits in W1–W3/Phase A lanes | HELD |
+| Session 04 closure | Agent runner, roster, contract/runtime integration, commissioning | Evidence keys remain false except provider abstraction, prompt registry, and control-current | NOT PROVEN |
+
+These results close only the W1–W3 and Phase A slices plus control continuity. Session 04 exit criteria, independent reviews, and closure commit sequence remain open. No live provider calls, no Notion/Etsy mutations, and no Exit 78 lift are claimed.

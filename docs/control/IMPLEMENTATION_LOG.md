@@ -158,3 +158,12 @@
 - The shipped `money-machine-control apply-completion` entry point validated both commit objects, ancestry from the Session 01 closure, branch and HEAD agreement, a clean tracked tree, and the closure document's byte equality with the live state, then advanced revision 18 to 19 atomically.
 - Session 02 is locally complete: `completed_sessions` is `[0, 1, 2]`, `next_session` is 3, the canonical Session 03 prompt is selected, and all eight Session 02 evidence keys are true. The `CODERABBIT_REVIEW_OPEN` blocker is retained because the vendor re-review is still rate-limited.
 - This completed state and its four companion control documents are checkpointed by the later state-pointer commit containing this entry.
+
+## 2026-09-20 — Session 04 control tip-sync (W1–W3 + Phase A)
+
+- Parallel control lane only (`docs/control/*`). No feature code, no AgentRunner/roster/observability implementation, no Exit 78 lift, no live Notion/Etsy.
+- Refreshed `IMPLEMENTATION_STATE.json` to repository tip `3cbe39bf7284da5b4a013b41c2521f0fdb9a0fa6` (post #21 Phase A on `build/full-automation`). State revision 23 → 24.
+- Evidence keys updated to match delivered waves: `provider_abstraction_implemented` and `prompt_registry_and_hashes_implemented` set true after W2 (#19) and W3 (`726437d`); `control_files_and_checkpoint_current` set true by this tip-sync. Six keys remain false: agent runner integration, sixteen-agent roster, uncommissioned-agent documentation, full contract/runtime suite, and closure candidacy.
+- Phase A (Jev client, registry, FakeJev, persistence, shadow dry-run @ `3cbe39b`) recorded in state notes as library-complete but outside the eight Session 04 exit-criteria keys.
+- Exit 78 unchanged. Session 04 remains `incomplete`; `completed_sessions` unchanged at `[0, 1, 2, 3]`.
+- Local verification of affected suites: **85 passed** across W2/W3/Phase A tests plus **61 passed, 12 skipped** in `tests/bootstrap/test_control_state.py` (279 s total on cloud agent VM).

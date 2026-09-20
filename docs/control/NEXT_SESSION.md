@@ -1,58 +1,37 @@
 # Next Session
 
-**Session 03 is COMPLETE** (2026-09-19) — gap-close implementation validated and closed by Verifier FINAL PASS. Exit 78 remains in place per Session 03 contract; commissioning and Exit 78 removal deferred to Session 04.
+**Session 04 is IN PROGRESS** (2026-09-20) — agent runtime and roster. Exit 78 remains in place per Session 03/04 contracts; worker and scheduler process entrypoints stay fail-closed with no production claim path.
 
-**Next: Session 04** — Agent Runtime and Roster. Session 04 will implement agent runtime, prompt loading, and roster evidence gates. Only after Session 04 completion may commissioning occur and Exit 78 be removed.
+## Session 04 progress (post #21 Phase A @ `3cbe39bf`)
 
-## Session 03 Completion Summary
+| Wave | Status | Commit | Evidence key(s) |
+|---|---|---|---|
+| W1 — prompt integrity + activation | **COMPLETE** | `0ce1400` (#18) | governance only; eight keys installed all-false |
+| W2 — LLM provider abstraction | **COMPLETE** | `d187fb2` (#19) | `provider_abstraction_implemented` = true |
+| W3 — PromptStore + A01/A02 prompts | **COMPLETE** | `726437d` | `prompt_registry_and_hashes_implemented` = true |
+| Phase A — Jev client/library | **COMPLETE** | `3cbe39b` | library only; not a Session 04 exit-criteria key |
+| W4+ — AgentRegistry, AgentRunner, roster, observability | **OPEN** | — | remaining six evidence keys false |
 
-Resume from [the recovery review and finish plan](reviews/2026-09-11-recovery-review-and-finish-plan.md). The canonical branch remains `build/full-automation`; the older integration tree is a protected reuse source, including its unfinished Session08 work. The readiness/database-URL/production-environment findings are now repaired: [startup repair record](reviews/2026-09-11-startup-repair.md), 125 affected tests passed with no skips and static checks clean. Next complete Session03 prompt integrity and activation, port the existing durable orchestration behavior to the canonical schema, and prove a persisted workflow survives restart. Neither wave advances session state or claims live commissioning.
+**Exit 78 held.** No worker claiming, no commissioning, no live Notion/Etsy. Phase A and W2/W3 are library and test slices only.
 
-## Session 03 Gap-Close Summary (2026-09-19)
+## Next work (Session 04 remainder)
 
-**Implemented:**
-1. Real `dependency_resolver.py` - evaluates all conditions for PENDING → READY promotion:
-   - All dependencies satisfied (succeeded)
-   - `scheduled_at <= now`
-   - Workflow still active
-   - No idempotency collision
-2. Durable scheduler library functions in `scheduler.py`:
-   - `promote_due_jobs` - promote PENDING to READY
-   - `detect_stalled_jobs` - transition stalled RUNNING jobs
-   - `schedule_maturity_timer` - durable timer for product maturity
-   - `schedule_weekly_timer` - recurring workflow triggers
-   - `run_scheduler_cycle` - complete scheduler pass
-3. Operator surface (CLI + API):
-   - `workflow start/cancel` - create and cancel workflows
-   - `job retry/reconcile` - retry failed jobs, reconcile uncertain effects
-   - `scheduler run-once` - manual scheduler cycle
-   - `worker run-once` - claim job (library only, fail-closed)
-4. Comprehensive unit tests for dependency_resolver and scheduler
-5. Control files updated with honest status
+Per `docs/control/reviews/2026-09-20-session-04-prompt-integrity.md` addendum slices 3–5:
 
-**Exit 78 Held:**
-- Worker and scheduler process entrypoints remain fail-closed
-- No production claim path exists
-- All operations are library-only with deterministic fakes
-- Commissioning deferred to Session 04
+1. **Agent base and registry** — `AgentDefinition`, `AgentContext`, `BaseAgent`, `AgentRegistry`, `ToolRegistry`, `AgentRunner`, commissioning-state checks.
+2. **Agent-run observability** — `agent_runs`, artifacts, tool-call tables, structured logs, offline PostHog queue.
+3. **Sixteen-agent roster** — `config/agents.yaml` + database seed; A01/A02 to `TESTED`; A03–A16 at `DESIGNED` with contract tests proving production refusal.
+4. **Contract and runtime integration tests** — parameterized contract tests (8 per agent) and orchestrator-lease → agent-execute → persist → event → successor flow with fake providers.
+5. **Session 04 exit** — two independent reviews, all eight evidence keys true, closure commit sequence. Exit 78 removal remains a **post-session gate** (decision record + commissioning evidence), not Session 04 closure.
 
-**CI Status:** Awaiting green CI (ruff, pyright, pytest)
+## Session 03 completion (reference)
 
-## Session 03 Original Entry Conditions
-
-Operator clarification (2026-09-11): follow the implementation workbook faithfully; the finish plan is subordinate to it. Reconcile business-rule interpretations in existing decisions against the workbook/playbook before reuse, particularly D-0014's maturity/cull conditions. Do not substitute a commercial model, weaken outputs, or introduce commercial revalidation. Existing decision labels do not prove source fidelity or operator authorization for business changes.
-
-1. Run the prompt-integrity review and corrective exercise first. It is the standing first instruction of every session prompt (`docs/PROMPT_INTEGRITY_REVIEW.md`, D-0026), and `tests/bootstrap/test_prompt_integrity.py` fails until the record exists.
-2. Add Session 03's completion-evidence keys to `SESSION_EVIDENCE_KEYS` in `src/money_machine/control/state.py`, then activate with `money-machine-control activate`. Activation fails closed without that contract.
-3. Session 03 builds orchestration primitives (state machine, leasing, retries, reconciliation, successors, scheduler) with deterministic fake handlers. The worker and scheduler currently perform a read-only database connectivity check and exit 78 with no claim path anywhere in the source. Session 03 keeps that exit-78 boundary; Session 04 adds agent runtime, prompt loading, and commissioning evidence. Commissioning and exit-78 removal may only occur deliberately, with a decision record, in Session 04 or later.
-4. The schema already carries what the orchestrator needs: `jobs` with an idempotency key, lease owner, lease expiry, heartbeat and partial indexes for the ready-and-due and lease-expiry queries; `job_dependencies`; `events` as an append-only log with a semantic dedupe key; `idempotency_records` for reservations; and `effect_attempts` for reconciliation outcomes. Use them rather than adding a parallel mechanism.
-5. Keep provider effects in simulation. Nothing is commissioned; no agent may perform a provider call.
+Session 03 closed 2026-09-19 after Verifier FINAL PASS (#17). Gap-close implementation validated: real `dependency_resolver`, scheduler library functions, operator surface (CLI + API), entry-job spawn. Worker/scheduler processes remain fail-closed until commissioning gates pass.
 
 ## Carry-forward work
 
-- Prove idempotency uniqueness under a concurrent claim path, which only exists once claiming is commissioned (Session 04).
-- Refuse an unreconciled `MetricsSnapshot` as a decision input at the decision layer (Session 02 review, deferred).
-- Wire `require_successor_spawn` into the orchestrator's MULTIPLY spawn path (Session 01 review, deferred to Session 03).
+- Prove idempotency uniqueness under a concurrent claim path (only after commissioning).
+- Refuse an unreconciled `MetricsSnapshot` as a decision input (Session 02 review, deferred).
 - Install Playwright with the first browser-channel work, not before.
 - Relate listing description sections and tags as rows rather than checked JSON arrays when merchandising is built (Session 08).
 - Vendor capability for every `DIRECT_API` selection, and Etsy field-length limits, remain UNVERIFIED until the owning session reads and cites the vendor reference.
@@ -63,5 +42,3 @@ Operator clarification (2026-09-11): follow the implementation workbook faithful
 - The shared development database `money_machine` holds another branch's schema at its own Alembic revision, and the instance carries roughly four hundred leftover test databases from other branches. Nothing on this branch touches them: database-backed tests create and drop their own throwaway databases, and `MONEY_MACHINE_TEST_ADMIN_DATABASE_URL` selects the maintenance connection.
 - `pnpm install` needs `--package-import-method copy` on this filesystem: the hardlink rename fails on the 9p `/mnt/d` mount.
 - Host port 3000 is occupied by an unrelated development server; set `WEB_PORT` to verify the web container.
-
-Session 02 evidence: 45 tables from one reviewed migration with an exact table set, a proven downgrade and re-upgrade, and no drift; database-enforced taxonomies, uniqueness, composite lineage keys and append-only triggers; an idempotent, convergent, concurrency-safe seed; typed repositories with real optimistic locking; a readiness endpoint that fails when the database does; a command line exercised as real subprocesses; five containers with the worker and scheduler still fail-closed; 370 Python tests, a green web gate, and two independent closure reviews resolved.
