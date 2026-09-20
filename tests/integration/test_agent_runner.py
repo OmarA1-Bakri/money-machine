@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -119,7 +118,6 @@ async def test_runner_persists_run_receipt(
         job=envelope,
         agent=_StaticSuccessAgent(),
         production=True,
-        run_at=datetime(2026, 9, 20, 12, 0, tzinfo=UTC),
     )
 
     assert result.status is AgentRunStatus.SUCCESS

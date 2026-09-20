@@ -148,6 +148,8 @@ class AgentRunner:
             raise
         except Exception as error:
             completed_at = datetime.now(tz=UTC)
+            if completed_at < started_at:
+                completed_at = started_at
             contract_error = ContractError(
                 code="AGENT_EXECUTION_FAILED",
                 message=str(error),
@@ -194,6 +196,8 @@ class AgentRunner:
             raise AgentRegistryError(msg)
 
         completed_at = datetime.now(tz=UTC)
+        if completed_at < started_at:
+            completed_at = started_at
         receipt = await self._persist_run(
             session,
             run_id=run_id,
