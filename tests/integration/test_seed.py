@@ -25,7 +25,7 @@ async def test_seed_inserts_the_canonical_configuration(
 
     assert report.shops_created == 1
     assert report.agents_created == 16
-    assert report.prompt_versions_created == 16
+    assert report.prompt_versions_created == 18  # 16 impl + A01 + A02 agent prompts
     assert report.config_references_created == len(SEEDED_CONFIG_FILES)
     assert report.changed
 

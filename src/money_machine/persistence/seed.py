@@ -202,10 +202,13 @@ async def _seed_prompt_versions(
     session: AsyncSession,
     repository_root: Path,
 ) -> tuple[int, int]:
-    prompts = sorted((repository_root / "prompts/implementation").glob(PROMPT_GLOB))
+    """Seed both implementation prompts and agent prompts."""
     created = 0
     corrected = 0
-    for prompt in prompts:
+
+    # Seed implementation prompts (session prompts)
+    impl_prompts = sorted((repository_root / "prompts/implementation").glob(PROMPT_GLOB))
+    for prompt in impl_prompts:
         digest = file_sha256(prompt)
         reference = f"prompt://{prompt.stem}"
         source_path = f"prompts/implementation/{prompt.name}"
@@ -233,6 +236,54 @@ async def _seed_prompt_versions(
             existing.source_path = source_path
             existing.prompt_reference = reference
             corrected += 1
+
+    # Seed agent prompts from prompts/agents/<agent-id>/<version>.md
+    agents_dir = repository_root / "prompts" / "agents"
+    if agents_dir.exists():
+        for agent_dir in sorted(agents_dir.iterdir()):
+            if not agent_dir.is_dir():
+                continue
+            agent_id = agent_dir.name
+            for prompt_file in sorted(agent_dir.glob("*.md")):
+                digest = file_sha256(prompt_file)
+                version_name = prompt_file.stem  # e.g., "v1"
+                # Extract version number (v1 -> 1, v2 -> 2, etc.)
+                try:
+                    version_num = int(version_name.lstrip("v"))
+                except ValueError:
+                    # Skip files that don't match v<number> pattern
+                    continue
+                reference = f"agent://{agent_id}/system/{version_name}"
+                source_path = f"prompts/agents/{agent_id}/{prompt_file.name}"
+                statement = (
+                    insert(PromptVersion)
+                    .values(
+                        id=uuid4(),
+                        prompt_reference=reference,
+                        version=version_num,
+                        sha256=digest,
+                        source_path=source_path,
+                    )
+                    .on_conflict_do_nothing(index_elements=[PromptVersion.sha256])
+                )
+                inserted = await _insert_count(session, statement)
+                created += inserted
+                if inserted:
+                    continue
+                existing = (
+                    (
+                        await session.execute(
+                            select(PromptVersion).where(PromptVersion.sha256 == digest)
+                        )
+                    )
+                    .scalars()
+                    .one()
+                )
+                if (existing.source_path, existing.prompt_reference) != (source_path, reference):
+                    existing.source_path = source_path
+                    existing.prompt_reference = reference
+                    corrected += 1
+
     return created, corrected
 
 
