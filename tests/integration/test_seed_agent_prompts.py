@@ -110,19 +110,19 @@ agents:
 @pytest.mark.asyncio
 async def test_seed_agent_prompts(
     repo_with_agent_prompts: Path,
-    db_session: AsyncSession,
+    session: AsyncSession,
 ) -> None:
     """Seed creates prompt_versions rows for agent prompts."""
     # Run seed
-    report = await seed(db_session, repository_root=repo_with_agent_prompts)
-    await db_session.commit()
+    report = await seed(session, repository_root=repo_with_agent_prompts)
+    await session.commit()
 
     # Check that prompt versions were created
     assert report.prompt_versions_created >= 2
 
     # Verify A01 prompt was seeded
     a01_prompt = (
-        await db_session.execute(
+        await session.execute(
             select(PromptVersion).where(PromptVersion.prompt_reference == "agent://A01/system/v1")
         )
     ).scalar_one_or_none()
@@ -134,7 +134,7 @@ async def test_seed_agent_prompts(
 
     # Verify A02 prompt was seeded
     a02_prompt = (
-        await db_session.execute(
+        await session.execute(
             select(PromptVersion).where(PromptVersion.prompt_reference == "agent://A02/system/v1")
         )
     ).scalar_one_or_none()
@@ -148,18 +148,18 @@ async def test_seed_agent_prompts(
 @pytest.mark.asyncio
 async def test_seed_agent_prompts_idempotent(
     repo_with_agent_prompts: Path,
-    db_session: AsyncSession,
+    session: AsyncSession,
 ) -> None:
     """Seeding agent prompts twice is idempotent."""
     # First seed
-    report1 = await seed(db_session, repository_root=repo_with_agent_prompts)
-    await db_session.commit()
+    report1 = await seed(session, repository_root=repo_with_agent_prompts)
+    await session.commit()
 
     created_first = report1.prompt_versions_created
 
     # Second seed (should be idempotent)
-    report2 = await seed(db_session, repository_root=repo_with_agent_prompts)
-    await db_session.commit()
+    report2 = await seed(session, repository_root=repo_with_agent_prompts)
+    await session.commit()
 
     assert report2.prompt_versions_created == 0
     assert report2.prompt_versions_corrected == 0
@@ -167,7 +167,7 @@ async def test_seed_agent_prompts_idempotent(
     # Verify count hasn't changed
     count = (
         (
-            await db_session.execute(
+            await session.execute(
                 select(PromptVersion).where(PromptVersion.prompt_reference.like("agent://%"))
             )
         )
@@ -181,32 +181,32 @@ async def test_seed_agent_prompts_idempotent(
 @pytest.mark.asyncio
 async def test_seed_corrects_drifted_agent_prompts(
     repo_with_agent_prompts: Path,
-    db_session: AsyncSession,
+    session: AsyncSession,
 ) -> None:
     """Seed corrects prompt_versions rows that drifted from source."""
     # First seed
-    await seed(db_session, repository_root=repo_with_agent_prompts)
-    await db_session.commit()
+    await seed(session, repository_root=repo_with_agent_prompts)
+    await session.commit()
 
     # Manually drift the source_path
     a01_prompt = (
-        await db_session.execute(
+        await session.execute(
             select(PromptVersion).where(PromptVersion.prompt_reference == "agent://A01/system/v1")
         )
     ).scalar_one()
 
     a01_prompt.source_path = "wrong/path.md"
-    await db_session.commit()
+    await session.commit()
 
     # Second seed should correct it
-    report = await seed(db_session, repository_root=repo_with_agent_prompts)
-    await db_session.commit()
+    report = await seed(session, repository_root=repo_with_agent_prompts)
+    await session.commit()
 
     assert report.prompt_versions_corrected >= 1
 
     # Verify correction
     corrected = (
-        await db_session.execute(
+        await session.execute(
             select(PromptVersion).where(PromptVersion.prompt_reference == "agent://A01/system/v1")
         )
     ).scalar_one()
@@ -217,7 +217,7 @@ async def test_seed_corrects_drifted_agent_prompts(
 @pytest.mark.asyncio
 async def test_seed_agent_prompts_hash_matches_file(
     repo_with_agent_prompts: Path,
-    db_session: AsyncSession,
+    session: AsyncSession,
 ) -> None:
     """Seeded prompt hashes match actual file content."""
     # Read A01 prompt file
@@ -226,12 +226,12 @@ async def test_seed_agent_prompts_hash_matches_file(
     expected_hash = sha256(a01_content.encode("utf-8")).hexdigest()
 
     # Run seed
-    await seed(db_session, repository_root=repo_with_agent_prompts)
-    await db_session.commit()
+    await seed(session, repository_root=repo_with_agent_prompts)
+    await session.commit()
 
     # Verify hash in database matches file
     a01_prompt = (
-        await db_session.execute(
+        await session.execute(
             select(PromptVersion).where(PromptVersion.prompt_reference == "agent://A01/system/v1")
         )
     ).scalar_one()
@@ -242,7 +242,7 @@ async def test_seed_agent_prompts_hash_matches_file(
 @pytest.mark.asyncio
 async def test_seed_multiple_versions_same_agent(
     tmp_path_factory: TempPathFactory,
-    db_session: AsyncSession,
+    session: AsyncSession,
 ) -> None:
     """Seed handles multiple versions of the same agent prompt."""
     root = tmp_path_factory.mktemp("repo")
@@ -296,18 +296,18 @@ Allowed: v2
     impl_prompts.mkdir(parents=True)
 
     # Seed
-    await seed(db_session, repository_root=root)
-    await db_session.commit()
+    await seed(session, repository_root=root)
+    await session.commit()
 
     # Verify both versions were seeded
     v1_prompt = (
-        await db_session.execute(
+        await session.execute(
             select(PromptVersion).where(PromptVersion.prompt_reference == "agent://A01/system/v1")
         )
     ).scalar_one()
 
     v2_prompt = (
-        await db_session.execute(
+        await session.execute(
             select(PromptVersion).where(PromptVersion.prompt_reference == "agent://A01/system/v2")
         )
     ).scalar_one()
