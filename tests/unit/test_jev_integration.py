@@ -391,7 +391,7 @@ class TestJevGatewayClient:
     async def test_retry_on_transient_failure(
         self, client: JevGatewayClient, packet: DecisionPacket, mock_gateway_url: str
     ) -> None:
-        """Client retries on transient failures (503)."""
+        """Client retries on transient transport failures."""
         mock_response = {
             "decision_type": "preflight_blockers_present",
             "answers": {"has_blockers": False},
@@ -399,10 +399,10 @@ class TestJevGatewayClient:
             "latency_ms": 100,
         }
 
-        # First attempt: 503, second attempt: success
+        # First attempt: transport error, second attempt: success
         route = respx.post(f"{mock_gateway_url}/evaluate")
         route.side_effect = [
-            httpx.Response(503, text="Service Unavailable"),
+            httpx.RequestError("Connection refused"),
             httpx.Response(200, json=mock_response),
         ]
 
@@ -415,12 +415,12 @@ class TestJevGatewayClient:
     async def test_fail_closed_on_provider_down(
         self, client: JevGatewayClient, packet: DecisionPacket, mock_gateway_url: str
     ) -> None:
-        """Client fails closed (raises error) when provider consistently down."""
+        """Client fails closed (raises error) when provider consistently returns 500."""
         respx.post(f"{mock_gateway_url}/evaluate").mock(
             return_value=httpx.Response(500, text="Internal Server Error")
         )
 
-        with pytest.raises(JevClientError, match="Jev Gateway request failed"):
+        with pytest.raises(JevClientError, match="Jev Gateway returned 500"):
             await client.evaluate(packet, timeout=5.0)
 
     @respx.mock
@@ -432,5 +432,5 @@ class TestJevGatewayClient:
             return_value=httpx.Response(200, json={"invalid": "response"})
         )
 
-        with pytest.raises(JevClientError, match="Jev Gateway request failed"):
+        with pytest.raises(JevClientError, match="Unexpected Jev Gateway response structure"):
             await client.evaluate(packet, timeout=5.0)
