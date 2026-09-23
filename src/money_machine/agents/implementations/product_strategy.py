@@ -239,16 +239,26 @@ class A05ProductStrategy(BaseAgent):
             )
 
         # Select primary (highest scoring)
-        primary_data = ranked[0].model_dump()
-        primary_data["selection"] = "PRIMARY"
-        primary = ScoredCandidate.model_validate(primary_data)
+        primary = ScoredCandidate(
+            candidate=ranked[0].candidate,
+            scoring=ranked[0].scoring,
+            total_score=ranked[0].total_score,
+            passed_threshold=ranked[0].passed_threshold,
+            rank=ranked[0].rank,
+            selection="PRIMARY",
+        )
 
         # Select backup (second highest, if exists and passes threshold)
         backup = None
         if len(ranked) > 1 and ranked[1].passed_threshold:
-            backup_data = ranked[1].model_dump()
-            backup_data["selection"] = "BACKUP"
-            backup = ScoredCandidate.model_validate(backup_data)
+            backup = ScoredCandidate(
+                candidate=ranked[1].candidate,
+                scoring=ranked[1].scoring,
+                total_score=ranked[1].total_score,
+                passed_threshold=ranked[1].passed_threshold,
+                rank=ranked[1].rank,
+                selection="BACKUP",
+            )
 
         # Update remaining as REJECTED (already set in loop above)
 
