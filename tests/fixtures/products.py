@@ -92,8 +92,9 @@ def create_fixture_product_spec(
     if product_id is None:
         product_id = uuid4()
 
-    # Generate concept fingerprint from identity + category + buyer_problem
-    concept_parts = f"{identity}|{base_category}|{buyer_problem}"
+    # Generate concept fingerprint from buyer_problem only (not identity/category)
+    # This allows different identities/categories to share the same concept fingerprint
+    concept_parts = f"{buyer_problem}"
     concept_fingerprint = sha256(concept_parts.encode()).hexdigest()
 
     # Evidence reference

@@ -277,47 +277,35 @@ class TestCheckDedupe:
         )
 
         assert result.outcome is BranchOutcome.TOO_CLOSE
-        # May have TWO collisions: EXACT_IDENTITY_CATEGORY and CONCEPT_FINGERPRINT
-        # Or just EXACT_IDENTITY_CATEGORY if that rule fires first (implementation dependent)
-        # Either way, outcome is TOO_CLOSE
-        assert len(result.collisions) >= 1
-        # Check that at least one collision exists (either reason is valid here)
+        # Should have TWO collisions: EXACT_IDENTITY_CATEGORY and CONCEPT_FINGERPRINT
+        # Both rules fire because identity+category match AND fingerprints match
         collision_reasons = {c.reason for c in result.collisions}
-        assert (
-            "EXACT_IDENTITY_CATEGORY" in collision_reasons
-            or "CONCEPT_FINGERPRINT" in collision_reasons
-        )
+        assert "EXACT_IDENTITY_CATEGORY" in collision_reasons, "Rule 1 should fire"
+        assert "CONCEPT_FINGERPRINT" in collision_reasons, "Rule 3 should fire"
 
     def test_dedupe_too_close_fingerprint_only(self):
-        """TOO_CLOSE on matching fingerprint when identity differs (proves Rule 3 independence)."""
+        """TOO_CLOSE on matching fingerprint when identity/category differ (proves Rule 3 independence)."""
         # Candidate with specific identity, category, buyer_problem
         candidate = create_fixture_product_spec(
             identity="Digital Planner A",
             base_category="Planners & Organizers",
-            buyer_problem="Stay organized daily",
+            buyer_problem="Stay organized with daily planning",
             title="Short Title Alpha",
         )
 
-        # Existing with DIFFERENT identity but SAME category + buyer_problem
-        # → same concept fingerprint (identity|category|buyer_problem)
-        # Wait, that won't work - fingerprint includes identity!
-
-        # Actually, concept_fingerprint = sha256(identity|category|buyer_problem)
-        # So for fingerprints to match with different identity, we'd need different
-        # identity but same hash - not realistic.
-
-        # Instead: test that when BOTH Rule 1 AND Rule 3 would fire,
-        # we get BOTH collision reasons (not just one due to continue)
+        # Existing with DIFFERENT identity and category but SAME buyer_problem
+        # → same concept fingerprint (fingerprint = hash(buyer_problem))
         existing = create_fixture_product_spec(
             spec_id=uuid4(),
-            identity="Digital Planner A",  # SAME identity
-            base_category="Planners & Organizers",  # SAME category
-            buyer_problem="Stay organized daily",  # SAME buyer_problem
+            identity="Daily Organizer Pro",  # DIFFERENT identity
+            base_category="Productivity Tools",  # DIFFERENT category
+            buyer_problem="Stay organized with daily planning",  # SAME buyer_problem
             title="Completely Unrelated Words Here",  # Different title (low Jaccard)
         )
 
-        # Verify fingerprints match and titles differ enough
+        # Verify fingerprints match despite different identity/category
         assert candidate.concept_fingerprint == existing.concept_fingerprint
+        # Verify titles differ enough (Jaccard below threshold)
         candidate_normalized = normalize_title(candidate.title)
         existing_normalized = normalize_title(existing.title)
         candidate_tokens = tokenize_title(candidate_normalized)
@@ -332,11 +320,13 @@ class TestCheckDedupe:
         )
 
         assert result.outcome is BranchOutcome.TOO_CLOSE
-        # Should have collisions from BOTH Rule 1 (exact identity+category)
-        # AND Rule 3 (concept fingerprint), proving no short-circuit
-        collision_reasons = {c.reason for c in result.collisions}
-        assert "EXACT_IDENTITY_CATEGORY" in collision_reasons, "Rule 1 should fire"
-        assert "CONCEPT_FINGERPRINT" in collision_reasons, "Rule 3 should fire (not skipped)"
+        # Should have ONLY Rule 3 collision (CONCEPT_FINGERPRINT)
+        # Rule 1 should NOT fire (different identity/category)
+        # Rule 2 should NOT fire (low title similarity)
+        assert len(result.collisions) == 1, "Should have exactly one collision from Rule 3"
+        collision = result.collisions[0]
+        assert collision.reason == "CONCEPT_FINGERPRINT", "Only Rule 3 should fire"
+        assert collision.other_spec_id == existing.spec_id
 
     def test_dedupe_multiple_collisions(self):
         """TOO_CLOSE with multiple existing specs creating collisions."""
