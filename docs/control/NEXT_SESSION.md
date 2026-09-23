@@ -27,19 +27,29 @@
 
 **Parked #31 SFs (non-blocking):** Structural gates (env-specific, not code defects), stale test docstrings (cosmetic). Noted as carry-forward improvement opportunities.
 
-## Session 05 — Domain Agent Implementation (Next)
+## Session 05 — Domain Agent Implementation (In Progress)
 
-Session 05 scope (when triggered):
-- Research agent (A03): niche research, candidate generation, qualification scoring
+**Status after L4 control tip-sync (@ 9b791d45)**: Nine of ten evidence keys TRUE; `evidence_closure_commit_recorded` remains FALSE (S05 not yet complete).
+
+Session 05 delivered lanes (L1-L4):
+- **L1**: Etsy fixture adapter, browser/API stubs, config-driven seed phrases, comprehensive tests → `etsy_adapters_implemented`
+- **L2**: A03 Market Research agent (fixture-only), ResearchReport with ShortlistAnalysis (top 5 candidates) → `research_agent_implemented`, `shortlist_analysis_implemented`
+- **L3**: A05 Product Strategy scorer (four-criterion: price/demand/young-fast shops/thin evidence), qualification gate (≥20/40), ProductSpec generation → `scoring_agent_implemented`, `product_spec_generation_implemented`
+- **L4**: A06 Catalogue Dedupe agent (three-rule: exact identity×category, title Jaccard ≥0.7, concept fingerprint), PASS/TOO_CLOSE branching, EventDispatcher workflow linking (DEDUPE_PASSED → ProductBuildJob, DEDUPE_FAILED → ReconceptProductJob), fixture teardown → `dedupe_agent_implemented`, `teardown_workflow_implemented`, `workflow_linking_complete`
+
+**Parked L2-L4 nits** (non-blocking): concept_fingerprint drift, evidence SHA self-dump, differentiation self-desc, fail-open suppress, result_id=spec_id. Recorded in carry_forward.
+
+**Remaining S05 scope** (when triggered):
 - Concept agent (A04): concept definition, differentiation, design specification
-- Notion Build agent (A05): workspace setup, database schema, draft pages
-- Variant agent (A06): colour/hub expansion, SKU generation
+- Notion Build agent (A07): workspace setup, database schema, draft pages (successor to DEDUPE_PASSED)
+- Variant agent (A08): colour/hub expansion, SKU generation
+- Reconcept agent (A08 alt): reconcept loop (successor to DEDUPE_FAILED, L4 out of scope)
 - Merchandising agent (A10): description copy, SEO tags, pricing strategy
 - QA agent (A11): build artifact validation, preflight checks
 - Publisher agent (A12): Etsy draft creation, publication, link verification
 - Analytics agent (A14): metrics collection, performance analysis
 
-Session 05 will promote domain agents from DESIGNED to TESTED with:
+Session 05 will promote remaining domain agents from DESIGNED to TESTED with:
 - Agent-specific prompts (v1)
 - Integration tests (real database, fake providers)
 - Contract tests (prompt integrity, tool permissions, commissioning refusal)
@@ -61,6 +71,12 @@ Session 03 closed 2026-09-19 after Verifier FINAL PASS (#17). Gap-close implemen
 - Relate listing description sections and tags as rows rather than checked JSON arrays when merchandising is built (Session 08).
 - Vendor capability for every `DIRECT_API` selection, and Etsy field-length limits, remain UNVERIFIED until the owning session reads and cites the vendor reference.
 - The CodeRabbit vendor re-review of the Session 00 fixes is still rate-limited; the blocker stays in state.
+- **S05 L2-L4 parked nits** (non-blocking, recorded for future lane improvement):
+  1. **Concept fingerprint drift**: A05 hashes identity:category (product_strategy.py:278), L4 fixtures hash buyer_problem only (products.py:97) — cross-lane contract inconsistency
+  2. **Evidence SHA self-dump**: A05 evidence SHA reuses concept_fingerprint (product_strategy.py:328) instead of independent hash
+  3. **Differentiation self-description**: Dedupe differentiation_evidence describes candidate's own fields (dedupe.py:216-225) rather than comparative differentiation from catalogue
+  4. **Fail-open suppression**: A06 uses contextlib.suppress(Exception) on invalid spec parsing (catalogue_dedupe.py:115) instead of fail-closed refusal
+  5. **Result ID reuse**: Dedupe result_id = spec_id (dedupe.py:231) — could use distinct UUID for audit trail clarity
 
 ## Environment notes
 

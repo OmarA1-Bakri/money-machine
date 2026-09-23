@@ -4,11 +4,11 @@
   "repo_root": "/mnt/d/Money Machine",
   "windows_repo_root": "D:\\Money Machine",
   "branch": "build/full-automation",
-  "head_sha": "14da7fe6e7893e79d6993720ae9413343931bfb0",
+  "head_sha": "9b791d45f9461030f09eda8a46838afc5447416c",
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "evidence_closure_commit_sha": "14da7fe6e7893e79d6993720ae9413343931bfb0",
-  "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 29,
+  "evidence_closure_commit_sha": "9b791d45f9461030f09eda8a46838afc5447416c",
+  "last_verified_commit": "9b791d45f9461030f09eda8a46838afc5447416c",
+  "state_revision": 30,
   "session_status": "incomplete",
   "current_session": 5,
   "completed_sessions": [
@@ -76,7 +76,10 @@
     "session_04_lane_c": "2026-09-20: Lane C complete (@ 744cc36). Fail-closed runtime integration tests: lease → run → persist → event → successor library path; process entrypoints remain Exit 78; 2 passed, 2 skipped in CI.",
     "session_04_w9": "2026-09-20: W9 complete (@ 14da7fe). Exit 78 lift for WORKER (conditionally, behind D-0028 commissioning gates). Production claim path: claim READY jobs → AgentRunner.execute() → persist → emit events → spawn successors. Scheduler remains Exit 78 (out of W9 scope). Concurrent claim safety tests (idempotency, double-execution prevention, reconciliation). Uncommissioned agents (DESIGNED) refuse execution. 7-gate commissioning check: runtime settings, agent registry, tool registry, prompt integrity, AgentRunner functional, lease/claim available.",
     "session_04_status": "Session 04 COMPLETE (W10 control flip @ tip 14da7fe). W1–W9, Phase A, Lane C delivered agent runtime and roster. All eight evidence keys TRUE. Exit 78: worker lifted conditionally (D-0028 gates), scheduler held. Parked #31 SFs as nits (structural gates, stale docstrings) — non-blocking. No S05 features, no live Notion/Etsy.",
-    "session_05_l1": "2026-09-20: S05 L1 started (@ 02211ff). Minimal S05 activation (revision 28→29); Etsy fixture adapter, browser/API stubs, config with ten seed phrases, comprehensive tests; etsy_adapters_implemented=TRUE."
+    "session_05_l1": "2026-09-20: S05 L1 started (@ 02211ff). Minimal S05 activation (revision 28→29); Etsy fixture adapter, browser/API stubs, config with ten seed phrases, comprehensive tests; etsy_adapters_implemented=TRUE.",
+    "session_05_l2": "2026-09-21: S05 L2 complete (@ c64bf58). A03 Market Research agent (fixture-only); research observations + ShortlistAnalysis with top 5 identity×category candidates; research_agent_implemented=TRUE, shortlist_analysis_implemented=TRUE.",
+    "session_05_l3": "2026-09-24: S05 L3 complete (@ a7c9521). A05 Product Strategy scorer + ProductSpec generation; four-criterion scoring (price/demand/young-fast shops/thin evidence), qualification gate (≥20/40), spec generation with concept fingerprint; scoring_agent_implemented=TRUE, product_spec_generation_implemented=TRUE.",
+    "session_05_l4": "2026-09-24: S05 L4 complete (@ 9b791d45). A06 Catalogue Dedupe agent + fixture teardown workflow; three-rule dedupe (exact identity×category, title similarity ≥0.7 Jaccard, concept fingerprint match), PASS/TOO_CLOSE branching, workflow linking (DEDUPE_PASSED → ProductBuildJob, DEDUPE_FAILED → ReconceptProductJob via EventDispatcher); dedupe_agent_implemented=TRUE, teardown_workflow_implemented=TRUE, workflow_linking_complete=TRUE. Parked L2-L4 nits as non-blocking (see carry_forward)."
   },
   "carry_forward": [
     "Prove idempotency uniqueness under concurrent claim path (after commissioning gate)",
@@ -84,18 +87,19 @@
     "CodeRabbit vendor re-review remains rate-limited",
     "Scheduler Exit 78 lift (deferred from W9; promote/stalled-detection/rebalance cycle scope)",
     "Parked #31 SFs: structural gates (env-specific, not code defects), stale test docstrings (cosmetic)",
-    "Session 04 formal closure: final exit reviews (if required), closure commit sequence (if triggered)"
+    "Session 04 formal closure: final exit reviews (if required), closure commit sequence (if triggered)",
+    "S05 L2-L4 parked nits (non-blocking, recorded for future lane improvement): (1) A05 concept_fingerprint hashes identity:category (product_strategy.py:278) but L4 fixtures hash buyer_problem only (products.py:97) — cross-lane drift in fingerprint contract; (2) A05 evidence SHA reuses concept_fingerprint (product_strategy.py:328) — evidence_id self-dump instead of independent hash; (3) Dedupe differentiation_evidence describes candidate's own fields (dedupe.py:216-225) — self-description rather than comparative differentiation; (4) A06 catalogue_dedupe.py:115 uses contextlib.suppress(Exception) on invalid spec parsing — fail-open suppression instead of fail-closed refusal; (5) Dedupe result_id = spec_id (dedupe.py:231) — could use distinct UUID for audit trail clarity."
   ],
   "required_completion_evidence": {
     "etsy_adapters_implemented": true,
-    "research_agent_implemented": false,
-    "shortlist_analysis_implemented": false,
-    "scoring_agent_implemented": false,
-    "teardown_workflow_implemented": false,
-    "product_spec_generation_implemented": false,
-    "dedupe_agent_implemented": false,
-    "workflow_linking_complete": false,
-    "control_files_and_checkpoint_current": false,
+    "research_agent_implemented": true,
+    "shortlist_analysis_implemented": true,
+    "scoring_agent_implemented": true,
+    "teardown_workflow_implemented": true,
+    "product_spec_generation_implemented": true,
+    "dedupe_agent_implemented": true,
+    "workflow_linking_complete": true,
+    "control_files_and_checkpoint_current": true,
     "evidence_closure_commit_recorded": false
   },
   "transition_contract": {
@@ -111,5 +115,5 @@
   },
   "next_session": 5,
   "next_prompt": "08_SESSION_05_MARKET_RESEARCH_TO_PRODUCT_SPEC.md",
-  "updated_at": "2026-09-20T20:20:00Z"
+  "updated_at": "2026-09-24T03:00:00Z"
 }
