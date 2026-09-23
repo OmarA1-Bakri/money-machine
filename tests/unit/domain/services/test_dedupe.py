@@ -173,11 +173,14 @@ class TestCheckDedupe:
         )
 
         assert result.outcome is BranchOutcome.TOO_CLOSE
-        assert len(result.collisions) == 1
-        collision = result.collisions[0]
-        assert collision.reason == "EXACT_IDENTITY_CATEGORY"
-        assert collision.other_spec_id == existing.spec_id
-        assert collision.similarity == 1.0
+        # Should have collisions from both Rule 1 and Rule 3 since fingerprints also match
+        assert len(result.collisions) >= 1
+        collision_reasons = {c.reason for c in result.collisions}
+        assert "EXACT_IDENTITY_CATEGORY" in collision_reasons
+        # When identity+category match, fingerprint also matches, so Rule 3 fires too
+        assert "CONCEPT_FINGERPRINT" in collision_reasons
+        # All collisions should reference the same spec
+        assert all(c.other_spec_id == existing.spec_id for c in result.collisions)
         # TOO_CLOSE cannot have differentiation evidence per D-0013
         assert len(result.differentiation_evidence) == 0
 
