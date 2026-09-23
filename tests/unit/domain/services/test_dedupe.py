@@ -298,11 +298,11 @@ class TestCheckDedupe:
         # Existing with DIFFERENT identity but SAME category + buyer_problem
         # → same concept fingerprint (identity|category|buyer_problem)
         # Wait, that won't work - fingerprint includes identity!
-        
+
         # Actually, concept_fingerprint = sha256(identity|category|buyer_problem)
         # So for fingerprints to match with different identity, we'd need different
         # identity but same hash - not realistic.
-        
+
         # Instead: test that when BOTH Rule 1 AND Rule 3 would fire,
         # we get BOTH collision reasons (not just one due to continue)
         existing = create_fixture_product_spec(
