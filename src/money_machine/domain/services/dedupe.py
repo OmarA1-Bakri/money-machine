@@ -159,7 +159,6 @@ def check_dedupe(
                     ),
                 )
             )
-            continue  # No need to check other rules for this spec
 
         # Rule 2: Title similarity (Jaccard >= threshold)
         existing_normalized = normalize_title(existing_spec.title)
@@ -187,7 +186,6 @@ def check_dedupe(
                     ),
                 )
             )
-            continue
 
         # Rule 3: Concept fingerprint match
         if candidate_spec.concept_fingerprint == existing_spec.concept_fingerprint:
