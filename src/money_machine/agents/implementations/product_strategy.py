@@ -62,6 +62,7 @@ class A05ProductStrategy(BaseAgent):
             if qualified:
                 product_spec = self._generate_product_spec(
                     primary.candidate,
+                    primary.total_score,
                     strategy_input.workflow_id,
                     strategy_input.job_id,
                     context.agent_run_id,
@@ -218,7 +219,7 @@ class A05ProductStrategy(BaseAgent):
     def _score_trendy_but_tricky(self, candidate: CandidateProfile) -> int:
         """Score trendy but not tricky dimension (0-10 points)."""
         # Stub logic: actual implementation would analyze trend signals vs. complexity
-        if any(risk.severity == "HIGH" for risk in candidate.risks):
+        if "HIGH" in candidate.risk_notes:
             return 5
         return 8
 
@@ -256,6 +257,7 @@ class A05ProductStrategy(BaseAgent):
     def _generate_product_spec(
         self,
         candidate: CandidateProfile,
+        total_score: int,
         workflow_id: UUID,
         producing_job_id: UUID,
         producing_agent_run_id: UUID,
@@ -311,10 +313,10 @@ class A05ProductStrategy(BaseAgent):
                 EvidenceReference(
                     evidence_id=uuid4(),
                     evidence_type="scoring_analysis",
-                    source_reference=f"candidate:{candidate.candidate_id}",
+                    source_reference=f"candidate:{candidate.identity}",
                     observed_at=datetime.now(UTC),
                     sha256=fingerprint,
-                    safe_summary=f"Qualified with score {candidate.total_score}/40",
+                    safe_summary=f"Qualified with score {total_score}/40",
                 ),
             ),
             created_at=datetime.now(UTC),
