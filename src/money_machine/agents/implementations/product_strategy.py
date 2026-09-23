@@ -28,7 +28,7 @@ from money_machine.domain.models._base import JsonObject
 from money_machine.domain.models.common import ContractError, EvidenceReference
 from money_machine.domain.models.jobs import AgentResult
 from money_machine.domain.models.product_spec import ColourToken, Hub, ProductSpec
-from money_machine.domain.models.research import ProductCandidate
+from money_machine.domain.models.research import CandidateProfile
 
 
 class A05ProductStrategy(BaseAgent):

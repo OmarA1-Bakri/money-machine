@@ -15,7 +15,7 @@ from money_machine.domain.models._base import (
 )
 from money_machine.domain.models.common import ArtifactReference, ContractError, EvidenceReference
 from money_machine.domain.models.product_spec import ProductSpec
-from money_machine.domain.models.research import ProductCandidate
+from money_machine.domain.models.research import CandidateProfile
 
 
 class ProductStrategyInput(ContractModel):
@@ -24,7 +24,7 @@ class ProductStrategyInput(ContractModel):
     job_id: UUID
     workflow_id: UUID
     research_run_id: UUID
-    candidates: tuple[ProductCandidate, ...] = Field(min_length=1, max_length=5)
+    candidates: tuple[CandidateProfile, ...] = Field(min_length=1, max_length=5)
     scoring_threshold: PositiveInt = 30
     maximum_score: PositiveInt = 40
 
@@ -46,7 +46,7 @@ class ScoringReasoning(ContractModel):
 class ScoredCandidate(ContractModel):
     """One candidate with complete scoring breakdown."""
 
-    candidate: ProductCandidate
+    candidate: CandidateProfile
     scoring: tuple[ScoringReasoning, ...] = Field(min_length=4, max_length=4)
     total_score: NonNegativeInt
     passed_threshold: bool

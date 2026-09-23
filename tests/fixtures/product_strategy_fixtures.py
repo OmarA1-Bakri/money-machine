@@ -1,10 +1,11 @@
 """Test fixtures for S05 L3 — A05 Product Strategy scorer."""
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from money_machine.domain.models.common import EvidenceReference
-from money_machine.domain.models.research import CandidateRisk, ProductCandidate
+from money_machine.domain.models.research import CandidateProfile
 
 
 def create_evidence_ref(summary: str) -> EvidenceReference:
@@ -24,18 +25,17 @@ def create_candidate(
     category: str,
     workflow_id: UUID | None = None,
     research_run_id: UUID | None = None,
-    risks: tuple[CandidateRisk, ...] = (),
-) -> ProductCandidate:
-    """Create a test product candidate."""
-    return ProductCandidate(
-        candidate_id=uuid4(),
-        workflow_id=workflow_id or uuid4(),
-        research_run_id=research_run_id or uuid4(),
+    risk_notes: str = "",
+) -> CandidateProfile:
+    """Create a test candidate profile."""
+    return CandidateProfile(
         identity=identity,
         base_category=category,
-        risks=risks,
-        evidence=(create_evidence_ref(f"Evidence for {identity}"),),
-        created_at=datetime.now(UTC),
+        price_range=(Decimal("10.00"), Decimal("25.00")),
+        observation_count=15,
+        shop_count=8,
+        young_fast_shop_count=3,
+        risk_notes=risk_notes,
     )
 
 
@@ -43,31 +43,28 @@ def create_candidate(
 QUALIFIED_CANDIDATE = create_candidate(
     identity="Digital Planner Template",
     category="Productivity",
-    risks=(CandidateRisk(risk="Market saturation", severity="LOW"),),
+    risk_notes="Market saturation (LOW)",
 )
 
 # Medium-scoring candidate (edge case around threshold)
 THRESHOLD_CANDIDATE = create_candidate(
     identity="Basic Budget Tracker",
     category="Finance",
-    risks=(CandidateRisk(risk="Limited differentiation", severity="MEDIUM"),),
+    risk_notes="Limited differentiation (MEDIUM)",
 )
 
 # Low-scoring candidate (should fail threshold)
 REJECTED_CANDIDATE = create_candidate(
     identity="Complex Enterprise Solution",
     category="Business",
-    risks=(
-        CandidateRisk(risk="High complexity", severity="HIGH"),
-        CandidateRisk(risk="Long implementation time", severity="HIGH"),
-    ),
+    risk_notes="High complexity (HIGH); Long implementation time (HIGH)",
 )
 
 # Backup candidate (should be second choice)
 BACKUP_CANDIDATE = create_candidate(
     identity="Simple Task Manager",
     category="Productivity",
-    risks=(CandidateRisk(risk="Competition", severity="LOW"),),
+    risk_notes="Competition (LOW)",
 )
 
 # Complete shortlist with 5 candidates
