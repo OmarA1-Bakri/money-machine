@@ -125,6 +125,7 @@ class TestCheckDedupe:
         candidate = create_fixture_product_spec(
             identity="Modern Digital Planner",
             base_category="Planners & Organizers",
+            buyer_problem="Stay organized with digital planning",
             title="Ultimate 2027 Digital Planner",
         )
 
@@ -132,6 +133,7 @@ class TestCheckDedupe:
             spec_id=uuid4(),
             identity="Fitness Tracker",
             base_category="Health & Wellness",
+            buyer_problem="Track workouts and health metrics",
             title="Complete Workout Log System",
         )
 
@@ -189,6 +191,7 @@ class TestCheckDedupe:
         candidate = create_fixture_product_spec(
             identity="Digital Planner A",
             base_category="Planners & Organizers",
+            buyer_problem="Plan your daily tasks and goals",
             title="Ultimate Digital Planner Bundle 2027 Edition",
         )
 
@@ -197,6 +200,7 @@ class TestCheckDedupe:
             spec_id=uuid4(),
             identity="Digital Planner B",  # Different identity
             base_category="Planners & Organizers",
+            buyer_problem="Organize your weekly schedule efficiently",
             title="Ultimate Digital Planner Bundle 2027",  # High Jaccard overlap
         )
 
@@ -227,6 +231,7 @@ class TestCheckDedupe:
         candidate = create_fixture_product_spec(
             identity="Digital Planner",
             base_category="Planners & Organizers",
+            buyer_problem="Plan your tasks and goals",
             title="Ultimate 2027 Digital Planner Bundle Complete",
         )
 
@@ -235,6 +240,7 @@ class TestCheckDedupe:
             spec_id=uuid4(),
             identity="Fitness Tracker",
             base_category="Health & Wellness",
+            buyer_problem="Track workouts and fitness progress",
             title="Fitness Workout Log",  # Few overlapping words
         )
 

@@ -252,6 +252,7 @@ class TestDedupeWorkflowIntegration:
             spec_id=uuid4(),
             identity="Digital Planner",
             base_category="Planners & Organizers",
+            buyer_problem="Stay organized with digital planning",
             title="Modern Digital Planner Bundle",
         )
 
@@ -263,6 +264,7 @@ class TestDedupeWorkflowIntegration:
             spec_id=uuid4(),
             identity="Fitness Tracker",
             base_category="Health & Wellness",
+            buyer_problem="Track workouts and fitness goals",
             title="Complete Workout Log System",
         )
 
@@ -274,6 +276,7 @@ class TestDedupeWorkflowIntegration:
             spec_id=uuid4(),
             identity="Digital Planner",  # SAME as spec_1
             base_category="Planners & Organizers",  # SAME as spec_1
+            buyer_problem="Stay organized with digital planning",  # SAME as spec_1
             title="Ultimate Digital Planner Collection",
         )
 
@@ -286,6 +289,7 @@ class TestDedupeWorkflowIntegration:
             spec_id=uuid4(),
             identity="Goal Achievement System",  # DIFFERENT
             base_category="Productivity Tools",  # DIFFERENT
+            buyer_problem="Achieve strategic goals systematically",  # DIFFERENT
             title="Strategic Goal Tracking Dashboard",
             lineage_kind="RECONCEPT",
             parent_spec_id=spec_3.spec_id,
