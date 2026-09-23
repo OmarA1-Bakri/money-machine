@@ -284,7 +284,7 @@ class TestCheckDedupe:
         assert "CONCEPT_FINGERPRINT" in collision_reasons, "Rule 3 should fire"
 
     def test_dedupe_too_close_fingerprint_only(self):
-        """TOO_CLOSE on matching fingerprint when identity/category differ (proves Rule 3 independence)."""
+        """TOO_CLOSE on fingerprint match with different identity/category (solo Rule 3)."""
         # Candidate with specific identity, category, buyer_problem
         candidate = create_fixture_product_spec(
             identity="Digital Planner A",
