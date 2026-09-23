@@ -183,19 +183,12 @@ class A05ProductStrategy(BaseAgent):
                 ),
             )
 
-            # Update candidate with scores
-            scored_candidate_dict = candidate.model_dump()
-            scored_candidate_dict["impulse_priced_score"] = impulse_score
-            scored_candidate_dict["tangible_score"] = tangible_score
-            scored_candidate_dict["honest_promise_score"] = honest_promise_score
-            scored_candidate_dict["trendy_but_tricky_score"] = trendy_score
-            scored_candidate_dict["total_score"] = total
-
-            updated_candidate = ProductCandidate.model_validate(scored_candidate_dict)
+            # Calculate pass/fail
+            passed = total >= threshold
 
             scored.append(
                 ScoredCandidate(
-                    candidate=updated_candidate,
+                    candidate=candidate,  # Keep original candidate as-is
                     scoring=scoring,
                     total_score=total,
                     passed_threshold=passed,
@@ -206,26 +199,26 @@ class A05ProductStrategy(BaseAgent):
 
         return scored
 
-    def _score_impulse_priced(self, candidate: ProductCandidate) -> int:
+    def _score_impulse_priced(self, candidate: CandidateProfile) -> int:
         """Score impulse pricing dimension (0-10 points)."""
         # Stub logic: actual implementation would analyze price bands from research
         if "Digital" in candidate.base_category or "Template" in candidate.identity:
             return 9
         return 7
 
-    def _score_tangible(self, candidate: ProductCandidate) -> int:
+    def _score_tangible(self, candidate: CandidateProfile) -> int:
         """Score tangibility dimension (0-10 points)."""
         # Stub logic: actual implementation would analyze deliverable structure
         if "Template" in candidate.identity or "Guide" in candidate.identity:
             return 9
         return 7
 
-    def _score_honest_promise(self, candidate: ProductCandidate) -> int:
+    def _score_honest_promise(self, candidate: CandidateProfile) -> int:
         """Score honest promise dimension (0-10 points)."""
         # Stub logic: actual implementation would analyze market messaging
         return 8
 
-    def _score_trendy_but_tricky(self, candidate: ProductCandidate) -> int:
+    def _score_trendy_but_tricky(self, candidate: CandidateProfile) -> int:
         """Score trendy but not tricky dimension (0-10 points)."""
         # Stub logic: actual implementation would analyze trend signals vs. complexity
         if any(risk.severity == "HIGH" for risk in candidate.risks):
@@ -265,7 +258,7 @@ class A05ProductStrategy(BaseAgent):
 
     def _generate_product_spec(
         self,
-        candidate: ProductCandidate,
+        candidate: CandidateProfile,
         workflow_id: UUID,
         producing_job_id: UUID,
         producing_agent_run_id: UUID,
