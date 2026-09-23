@@ -183,9 +183,6 @@ class A05ProductStrategy(BaseAgent):
                 ),
             )
 
-            # Calculate pass/fail
-            passed = total >= threshold
-
             scored.append(
                 ScoredCandidate(
                     candidate=candidate,  # Keep original candidate as-is
