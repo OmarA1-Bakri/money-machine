@@ -14,6 +14,7 @@ This adapter is injected with a browser session manager for testing flexibility.
 Production will use Playwright; tests inject a fake browser.
 """
 
+import contextlib
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, Protocol
@@ -1049,8 +1050,5 @@ class BrowserNotionAdapter(NotionAdapter):
         finally:
             # Always close the anonymous session
             # Suppress close() errors to avoid masking the original exception
-            try:
+            with contextlib.suppress(Exception):
                 await anon_session.close()
-            except Exception:
-                # Log or suppress - don't mask the original exception
-                pass
