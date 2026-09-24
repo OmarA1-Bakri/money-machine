@@ -92,6 +92,18 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 - **Exit 78 verification**: Zero diffs in `src/money_machine/orchestration/` (worker/scheduler untouched). `git diff 73704c57..HEAD -- src/money_machine/orchestration/` output empty.
 - **OUT OF SCOPE** (W2 hard boundaries): BrowserNotionAdapter / CombinedNotionAdapter real impl, receipts persistence, live product builds, publish-to-web production, Exit78 scheduler lift, live Notion/Etsy product mutations, SESSION_06 COMPLETE marking.
 
+## 2026-09-24 — Session 06 Wave 3: BrowserNotionAdapter (BROWSER ops only)
+
+- **BrowserNotionAdapter real implementation** in `src/money_machine/integrations/notion/browser_adapter.py` for 12 BROWSER-tagged operations per PLATFORM_COMPATIBILITY.md: duplicate_page, create_formula, create_linked_view, create_calendar_view, create_table_view, create_board_view, set_view_title_visibility, publish_page, unpublish_page, set_duplicate_as_template, set_search_indexing, verify_stranger_access.
+- **Dependency injection pattern**: BrowserSession protocol abstraction allows testing with FakeBrowserSession (no real Playwright). Production will use real Playwright-backed session; tests inject synthetic browser responses. Protocol methods: navigate, click, fill, get_attribute, is_visible, wait_for_selector, get_current_url.
+- **UI automation patterns**: All BROWSER operations navigate to Notion URLs, interact via data-testid selectors, handle visibility checks for idempotent toggles (publish/unpublish, view visibility, page settings). Formula editor, view creation, page duplication, and publishing settings implemented per UI interaction sequences.
+- **Unit tests**: 19 new mocked unit tests in `tests/unit/integrations/notion/test_browser_adapter.py` using FakeBrowserSession. **Zero live browser launches, zero Playwright, zero real Notion UI**. Tests cover all 12 BROWSER operations plus idempotency checks (toggles skip when already in desired state), API operation refusal (NotImplementedError for DIRECT_API ops), verify_stranger_access timeout handling.
+- **Configuration preserved**: Fixture adapter remains default in `config/integrations.yaml`. APINotionAdapter from W2 stays intact. BrowserNotionAdapter selectable via router when browser mode configured.
+- **API/COMBINED operations unchanged**: DIRECT_API operations (connection_status, create_page, rename_page, etc.) raise NotImplementedError with clear message ("uses API method, not BROWSER"). COMBINED operations (get_public_url) also raise NotImplementedError (CombinedAdapter scope).
+- **Code quality**: Imports follow existing patterns (Protocol from typing for browser abstraction, uuid4 for ID generation, datetime UTC for timestamps). Consistent error messages for out-of-scope operations.
+- **Exit 78 verification**: Zero diffs in `src/money_machine/orchestration/` (worker/scheduler untouched).
+- **OUT OF SCOPE** (W3 hard boundaries): CombinedNotionAdapter full implementation (tiny stub wiring OK if needed), receipts persistence, live product builds, publish-to-web production, Exit78 scheduler lift, live Notion/Etsy product mutations, SESSION_06 COMPLETE marking, real Playwright integration.
+
 
 ## 2026-09-11 — Startup repair wave after recovery review
 
