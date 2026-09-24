@@ -629,22 +629,34 @@ async def test_set_view_title_visibility_already_visible(browser_adapter, fake_b
 
 
 @pytest.mark.asyncio
-async def test_set_view_title_visibility_fails_on_non_notion_url(fake_browser, fake_anon_browser):
-    """set_view_title_visibility raises when current page is not notion.so."""
+@pytest.mark.parametrize(
+    "invalid_url,expected_match",
+    [
+        ("https://example.com/page", r"not notion\.so"),
+        ("https://www.notion.so", r"no database/page ID"),
+        ("https://www.notion.so/", r"no database/page ID"),
+        ("https://notion.so.evil.com/abc", r"not notion\.so"),
+        ("https://evilnotion.so/abc", r"not notion\.so"),
+    ],
+)
+async def test_set_view_title_visibility_rejects_invalid_urls(
+    fake_browser, fake_anon_browser, invalid_url, expected_match
+):
+    """set_view_title_visibility raises for invalid URLs (non-notion.so, bare domain, malicious)."""
 
-    async def navigate_to_non_notion(url: str) -> None:
+    async def navigate_to_invalid(url: str) -> None:
         fake_browser.navigated_to.append(url)
-        fake_browser.current_url = "https://example.com/page"
+        fake_browser.current_url = invalid_url
 
-    fake_browser.navigate = navigate_to_non_notion
-    fake_browser.current_url = "https://example.com/page"
+    fake_browser.navigate = navigate_to_invalid
+    fake_browser.current_url = invalid_url
 
     adapter = BrowserNotionAdapter(
         browser_session=fake_browser,
         anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
-    with pytest.raises(RuntimeError, match=r"not a notion\.so URL"):
+    with pytest.raises(RuntimeError, match=expected_match):
         await adapter.set_view_title_visibility("view_123", visible=True)
 
 

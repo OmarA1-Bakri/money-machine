@@ -548,27 +548,49 @@ class BrowserNotionAdapter(NotionAdapter):
         Mutates: true
         Idempotent: true
         """
+        from urllib.parse import urlparse
+
         # Get current URL to extract database/page ID
         current_url = await self._browser.get_current_url()
 
-        # Navigate to view using proper Notion URL pattern: page_url?v=view_id
-        # Extract base database/page URL from current notion.so URL
-        if "notion.so" not in current_url:
+        # Parse and validate the current URL
+        try:
+            parsed = urlparse(current_url)
+        except Exception as e:
             raise RuntimeError(
                 f"Cannot construct view URL for {view_id}: "
-                f"current page is not a notion.so URL ({current_url})"
+                f"failed to parse current URL ({current_url}): {e}"
+            ) from e
+
+        # Require hostname to be exactly notion.so or end with .notion.so
+        hostname = parsed.hostname or ""
+        if hostname != "notion.so" and not hostname.endswith(".notion.so"):
+            raise RuntimeError(
+                f"Cannot construct view URL for {view_id}: "
+                f"current page hostname is not notion.so ({current_url})"
             )
 
-        base_url = current_url.split("?")[0]
-        # Verify the base URL has a real page/database ID (not just domain)
-        path_after_domain = base_url.split("notion.so/")[-1]
-        if not path_after_domain or path_after_domain == "":
+        # Reject notion.so.evil.com and similar
+        if hostname.endswith(".notion.so") and hostname != "notion.so":
+            # Allow subdomains like www.notion.so, but reject notion.so.evil.com
+            # Check that there's only one more segment before .notion.so
+            parts = hostname.split(".")
+            if len(parts) != 3 or parts[-2:] != ["notion", "so"]:
+                raise RuntimeError(
+                    f"Cannot construct view URL for {view_id}: "
+                    f"invalid notion.so hostname ({current_url})"
+                )
+
+        # Require non-empty path (not just /, but /page_id)
+        path = parsed.path.strip("/")
+        if not path:
             raise RuntimeError(
                 f"Cannot construct view URL for {view_id}: "
                 f"current notion.so URL has no database/page ID ({current_url})"
             )
 
-        view_url = f"{base_url}?v={view_id}"
+        # Build view URL as scheme://netloc/path?v=view_id
+        view_url = f"{parsed.scheme}://{parsed.netloc}/{path}?v={view_id}"
         await self._browser.navigate(view_url)
 
         # Open view settings
