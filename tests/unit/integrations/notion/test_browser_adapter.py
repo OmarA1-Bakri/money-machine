@@ -410,6 +410,34 @@ async def test_create_calendar_view_fails_if_id_cannot_be_read(fake_browser, fak
         await adapter.create_calendar_view("db_123", "BadCalendar", "date")
 
 
+@pytest.mark.asyncio
+async def test_create_calendar_view_fails_if_id_unchanged(fake_browser, fake_anon_browser):
+    """create_calendar_view raises if view ID unchanged after creation."""
+
+    async def navigate_with_initial_view(url: str) -> None:
+        fake_browser.navigated_to.append(url)
+        # Start with an existing view
+        fake_browser.current_url = "https://www.notion.so/db_123?v=view_existing"
+
+    fake_browser.navigate = navigate_with_initial_view
+
+    async def click_no_change(selector: str) -> None:
+        fake_browser.clicks.append(selector)
+        # Simulate view ID not changing (create failed or clicked wrong button)
+        if selector == '[data-testid="create-view-button"]':
+            fake_browser.current_url = "https://www.notion.so/db_123?v=view_existing"
+
+    fake_browser.click = click_no_change
+
+    adapter = BrowserNotionAdapter(
+        browser_session=fake_browser,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
+    )
+
+    with pytest.raises(RuntimeError, match="View ID unchanged"):
+        await adapter.create_calendar_view("db_123", "Calendar", "date")
+
+
 # Test: create_table_view
 @pytest.mark.asyncio
 async def test_create_table_view(browser_adapter, fake_browser):
@@ -455,6 +483,32 @@ async def test_create_table_view_fails_if_id_cannot_be_read(fake_browser, fake_a
         await adapter.create_table_view("db_123", "BadTable")
 
 
+@pytest.mark.asyncio
+async def test_create_table_view_fails_if_id_unchanged(fake_browser, fake_anon_browser):
+    """create_table_view raises if view ID unchanged after creation."""
+
+    async def navigate_with_initial_view(url: str) -> None:
+        fake_browser.navigated_to.append(url)
+        fake_browser.current_url = "https://www.notion.so/db_123?v=view_existing"
+
+    fake_browser.navigate = navigate_with_initial_view
+
+    async def click_no_change(selector: str) -> None:
+        fake_browser.clicks.append(selector)
+        if selector == '[data-testid="create-view-button"]':
+            fake_browser.current_url = "https://www.notion.so/db_123?v=view_existing"
+
+    fake_browser.click = click_no_change
+
+    adapter = BrowserNotionAdapter(
+        browser_session=fake_browser,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
+    )
+
+    with pytest.raises(RuntimeError, match="View ID unchanged"):
+        await adapter.create_table_view("db_123", "Table")
+
+
 # Test: create_board_view
 @pytest.mark.asyncio
 async def test_create_board_view(browser_adapter, fake_browser):
@@ -498,6 +552,32 @@ async def test_create_board_view_fails_if_id_cannot_be_read(fake_browser, fake_a
 
     with pytest.raises(RuntimeError, match="Failed to read view ID"):
         await adapter.create_board_view("db_123", "BadBoard", "status")
+
+
+@pytest.mark.asyncio
+async def test_create_board_view_fails_if_id_unchanged(fake_browser, fake_anon_browser):
+    """create_board_view raises if view ID unchanged after creation."""
+
+    async def navigate_with_initial_view(url: str) -> None:
+        fake_browser.navigated_to.append(url)
+        fake_browser.current_url = "https://www.notion.so/db_123?v=view_existing"
+
+    fake_browser.navigate = navigate_with_initial_view
+
+    async def click_no_change(selector: str) -> None:
+        fake_browser.clicks.append(selector)
+        if selector == '[data-testid="create-view-button"]':
+            fake_browser.current_url = "https://www.notion.so/db_123?v=view_existing"
+
+    fake_browser.click = click_no_change
+
+    adapter = BrowserNotionAdapter(
+        browser_session=fake_browser,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
+    )
+
+    with pytest.raises(RuntimeError, match="View ID unchanged"):
+        await adapter.create_board_view("db_123", "Board", "status")
 
 
 # Test: set_view_title_visibility
@@ -546,6 +626,26 @@ async def test_set_view_title_visibility_already_visible(browser_adapter, fake_b
 
     # Verify result
     assert result.title_visible is True
+
+
+@pytest.mark.asyncio
+async def test_set_view_title_visibility_fails_on_non_notion_url(fake_browser, fake_anon_browser):
+    """set_view_title_visibility raises when current page is not notion.so."""
+
+    async def navigate_to_non_notion(url: str) -> None:
+        fake_browser.navigated_to.append(url)
+        fake_browser.current_url = "https://example.com/page"
+
+    fake_browser.navigate = navigate_to_non_notion
+    fake_browser.current_url = "https://example.com/page"
+
+    adapter = BrowserNotionAdapter(
+        browser_session=fake_browser,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
+    )
+
+    with pytest.raises(RuntimeError, match=r"not a notion\.so URL"):
+        await adapter.set_view_title_visibility("view_123", visible=True)
 
 
 # Test: publish_page

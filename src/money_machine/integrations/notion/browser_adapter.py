@@ -377,6 +377,12 @@ class BrowserNotionAdapter(NotionAdapter):
         db_url = f"https://www.notion.so/{database_id}"
         await self._browser.navigate(db_url)
 
+        # Capture current view ID (if any) before creating new view
+        initial_url = await self._browser.get_current_url()
+        initial_view_id = None
+        if "?v=" in initial_url:
+            initial_view_id = initial_url.split("?v=")[1].split("&")[0]
+
         # Open view menu
         await self._browser.click('[data-testid="add-view-button"]')
         await self._browser.wait_for_selector('[data-testid="view-type-select"]')
@@ -400,9 +406,16 @@ class BrowserNotionAdapter(NotionAdapter):
         if "?v=" not in current_url:
             raise RuntimeError(
                 f"Failed to read view ID after creating calendar view '{name}' "
-                f"in database {database_id}"
+                f"in database {database_id}: URL missing ?v= parameter"
             )
         view_id = current_url.split("?v=")[1].split("&")[0]
+
+        # Verify the view ID changed (new view was created)
+        if initial_view_id is not None and view_id == initial_view_id:
+            raise RuntimeError(
+                f"View ID unchanged after creating calendar view '{name}' "
+                f"in database {database_id}: still {view_id}"
+            )
 
         return NotionView(
             id=view_id,
@@ -423,6 +436,12 @@ class BrowserNotionAdapter(NotionAdapter):
         db_url = f"https://www.notion.so/{database_id}"
         await self._browser.navigate(db_url)
 
+        # Capture current view ID (if any) before creating new view
+        initial_url = await self._browser.get_current_url()
+        initial_view_id = None
+        if "?v=" in initial_url:
+            initial_view_id = initial_url.split("?v=")[1].split("&")[0]
+
         # Open view menu
         await self._browser.click('[data-testid="add-view-button"]')
         await self._browser.wait_for_selector('[data-testid="view-type-select"]')
@@ -442,9 +461,16 @@ class BrowserNotionAdapter(NotionAdapter):
         if "?v=" not in current_url:
             raise RuntimeError(
                 f"Failed to read view ID after creating table view '{name}' "
-                f"in database {database_id}"
+                f"in database {database_id}: URL missing ?v= parameter"
             )
         view_id = current_url.split("?v=")[1].split("&")[0]
+
+        # Verify the view ID changed (new view was created)
+        if initial_view_id is not None and view_id == initial_view_id:
+            raise RuntimeError(
+                f"View ID unchanged after creating table view '{name}' "
+                f"in database {database_id}: still {view_id}"
+            )
 
         return NotionView(
             id=view_id,
@@ -466,6 +492,12 @@ class BrowserNotionAdapter(NotionAdapter):
         # Navigate to database
         db_url = f"https://www.notion.so/{database_id}"
         await self._browser.navigate(db_url)
+
+        # Capture current view ID (if any) before creating new view
+        initial_url = await self._browser.get_current_url()
+        initial_view_id = None
+        if "?v=" in initial_url:
+            initial_view_id = initial_url.split("?v=")[1].split("&")[0]
 
         # Open view menu
         await self._browser.click('[data-testid="add-view-button"]')
@@ -490,9 +522,16 @@ class BrowserNotionAdapter(NotionAdapter):
         if "?v=" not in current_url:
             raise RuntimeError(
                 f"Failed to read view ID after creating board view '{name}' "
-                f"in database {database_id}"
+                f"in database {database_id}: URL missing ?v= parameter"
             )
         view_id = current_url.split("?v=")[1].split("&")[0]
+
+        # Verify the view ID changed (new view was created)
+        if initial_view_id is not None and view_id == initial_view_id:
+            raise RuntimeError(
+                f"View ID unchanged after creating board view '{name}' "
+                f"in database {database_id}: still {view_id}"
+            )
 
         return NotionView(
             id=view_id,
@@ -509,17 +548,25 @@ class BrowserNotionAdapter(NotionAdapter):
         Mutates: true
         Idempotent: true
         """
-        # Get current URL to extract database ID
+        # Get current URL to extract database/page ID
         current_url = await self._browser.get_current_url()
 
         # Navigate to view using proper Notion URL pattern: page_url?v=view_id
-        # First we need to be on some database page, then append ?v=view_id
-        if "notion.so" in current_url and "/" in current_url:
-            # Extract base database/page URL
-            base_url = current_url.split("?")[0]
-        else:
-            # Fallback: construct a generic database URL (view must belong to a database)
-            base_url = "https://www.notion.so/database"
+        # Extract base database/page URL from current notion.so URL
+        if "notion.so" not in current_url:
+            raise RuntimeError(
+                f"Cannot construct view URL for {view_id}: "
+                f"current page is not a notion.so URL ({current_url})"
+            )
+
+        base_url = current_url.split("?")[0]
+        # Verify the base URL has a real page/database ID (not just domain)
+        path_after_domain = base_url.split("notion.so/")[-1]
+        if not path_after_domain or path_after_domain == "":
+            raise RuntimeError(
+                f"Cannot construct view URL for {view_id}: "
+                f"current notion.so URL has no database/page ID ({current_url})"
+            )
 
         view_url = f"{base_url}?v={view_id}"
         await self._browser.navigate(view_url)
