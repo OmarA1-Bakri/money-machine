@@ -104,12 +104,25 @@ class NotionAdapterRouter:
 
         Raises:
             ValueError: If mode is invalid
+            NotImplementedError: If mode is browser or combined
         """
         valid_modes = {"fixture", "api", "browser", "combined"}
         if mode not in valid_modes:
             raise ValueError(f"Invalid adapter mode: {mode}. Must be one of: {valid_modes}")
 
-        # Clear cached adapter to force reload
+        # Validate that browser/combined modes are rejected BEFORE clearing cache
+        if mode == "browser":
+            raise NotImplementedError(
+                "Browser adapter requires Playwright session injection. "
+                "Production Playwright integration deferred to Session 06 Wave 4+."
+            )
+        if mode == "combined":
+            raise NotImplementedError(
+                "Combined adapter requires both API and browser session setup. "
+                "Deferred to Session 06 Wave 4+."
+            )
+
+        # Clear cached adapter only after validation passes
         self._adapter = None
 
         # Reload with new mode
@@ -117,13 +130,3 @@ class NotionAdapterRouter:
             self._adapter = FixtureNotionAdapter()
         elif mode == "api":
             self._adapter = APINotionAdapter()
-        elif mode == "browser":
-            raise NotImplementedError(
-                "Browser adapter requires Playwright session injection. "
-                "Production Playwright integration deferred to Session 06 Wave 4+."
-            )
-        elif mode == "combined":
-            raise NotImplementedError(
-                "Combined adapter requires both API and browser session setup. "
-                "Deferred to Session 06 Wave 4+."
-            )
