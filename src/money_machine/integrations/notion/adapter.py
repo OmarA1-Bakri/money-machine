@@ -326,9 +326,7 @@ class NotionAdapter(ABC):
         """
 
     @abstractmethod
-    async def create_formula(
-        self, database_id: str, name: str, expression: str
-    ) -> NotionFormula:
+    async def create_formula(self, database_id: str, name: str, expression: str) -> NotionFormula:
         """Create a formula property.
 
         Method: BROWSER (formula editor is UI-only; API read-only)
@@ -371,9 +369,7 @@ class NotionAdapter(ABC):
         """
 
     @abstractmethod
-    async def add_filter(
-        self, database_id: str, view_id: str, filter_spec: NotionFilter
-    ) -> dict:
+    async def add_filter(self, database_id: str, view_id: str, filter_spec: NotionFilter) -> dict:
         """Add a filter to a database view.
 
         Method: DIRECT_API (part of database query)
@@ -392,9 +388,7 @@ class NotionAdapter(ABC):
         """
 
     @abstractmethod
-    async def add_sort(
-        self, database_id: str, view_id: str, sort_spec: NotionSort
-    ) -> dict:
+    async def add_sort(self, database_id: str, view_id: str, sort_spec: NotionSort) -> dict:
         """Add a sort to a database view.
 
         Method: DIRECT_API (part of database query)
@@ -473,9 +467,7 @@ class NotionAdapter(ABC):
         """
 
     @abstractmethod
-    async def set_view_title_visibility(
-        self, view_id: str, visible: bool
-    ) -> NotionView:
+    async def set_view_title_visibility(self, view_id: str, visible: bool) -> NotionView:
         """Set whether view title is visible.
 
         Method: BROWSER (view settings UI-only)
@@ -493,9 +485,7 @@ class NotionAdapter(ABC):
         """
 
     @abstractmethod
-    async def add_child_page(
-        self, parent_page_id: str, title: str
-    ) -> NotionPage:
+    async def add_child_page(self, parent_page_id: str, title: str) -> NotionPage:
         """Add a child page to a parent page.
 
         Method: DIRECT_API (POST /v1/pages with parent page_id)
@@ -530,9 +520,7 @@ class NotionAdapter(ABC):
         """
 
     @abstractmethod
-    async def set_duplicate_as_template(
-        self, page_id: str, enabled: bool
-    ) -> NotionPage:
+    async def set_duplicate_as_template(self, page_id: str, enabled: bool) -> NotionPage:
         """Set "Duplicate as template" page setting.
 
         Method: BROWSER (page settings UI, no API)
@@ -550,9 +538,7 @@ class NotionAdapter(ABC):
         """
 
     @abstractmethod
-    async def set_search_indexing(
-        self, page_id: str, enabled: bool
-    ) -> NotionPage:
+    async def set_search_indexing(self, page_id: str, enabled: bool) -> NotionPage:
         """Set "Allow search engines to index" page setting.
 
         Method: BROWSER (page settings UI, no API)
