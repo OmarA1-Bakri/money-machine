@@ -18,6 +18,23 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
+from .adapter import NotionAdapter
+from .domain import (
+    NotionCalloutBlock,
+    NotionDatabase,
+    NotionDatabaseProperty,
+    NotionFilter,
+    NotionFormula,
+    NotionLinkedView,
+    NotionPage,
+    NotionRelation,
+    NotionRollup,
+    NotionSort,
+    NotionTextBlock,
+    NotionView,
+    NotionWorkspace,
+)
+
 
 def _translate_browser_exceptions(fn):
     """Decorator to translate Playwright-style exceptions to built-in exceptions.
@@ -59,24 +76,6 @@ def _translate_browser_exceptions(fn):
             raise
 
     return wrapper
-
-
-from .adapter import NotionAdapter
-from .domain import (
-    NotionCalloutBlock,
-    NotionDatabase,
-    NotionDatabaseProperty,
-    NotionFilter,
-    NotionFormula,
-    NotionLinkedView,
-    NotionPage,
-    NotionRelation,
-    NotionRollup,
-    NotionSort,
-    NotionTextBlock,
-    NotionView,
-    NotionWorkspace,
-)
 
 
 class BrowserSession(Protocol):
@@ -883,7 +882,8 @@ class BrowserNotionAdapter(NotionAdapter):
         if parsed.username or parsed.password:
             raise ValueError(f"URL must not contain userinfo: {public_url}")
 
-        # Must be exactly notion.so, www.notion.so, notion.site, or www.notion.site (no other subdomains, no lookalikes)
+        # Must be exactly notion.so, www.notion.so, notion.site, or www.notion.site
+        # (no other subdomains, no lookalikes)
         # Reject:
         # - evil.notion.so
         # - notion.so.evil.com
@@ -891,7 +891,8 @@ class BrowserNotionAdapter(NotionAdapter):
         allowed_hosts = {"notion.so", "www.notion.so", "notion.site", "www.notion.site"}
         if parsed.hostname not in allowed_hosts:
             raise ValueError(
-                f"URL host must be notion.so, www.notion.so, notion.site, or www.notion.site, got: {parsed.hostname}"
+                f"URL host must be notion.so, www.notion.so, notion.site, "
+                f"or www.notion.site, got: {parsed.hostname}"
             )
 
         if self._anon_session_factory is None:
