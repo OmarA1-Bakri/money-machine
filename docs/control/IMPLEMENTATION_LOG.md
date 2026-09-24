@@ -12,6 +12,44 @@
 - **Control update**: `etsy_adapters_implemented` evidence key flipped TRUE; remaining S05 keys FALSE. Worker Exit 78 conditional lift preserved (no regression). Commit `02211ff`.
 - **OUT OF SCOPE** (as specified): paid Etsy purchase, live teardown, A03/A05/A06 agent implementations, Scheduler Exit 78 lift, Session 06 work.
 
+## 2026-09-21 — Session 05 Lane 2: A03 Market Research Agent (fixture-only)
+
+- **A03 Market Research agent** implemented with fixture-only research (no live Etsy API/browser). Agent consumes 10 seed phrases from `config/research.yaml`, loads synthetic ListingObservations and ShopObservations from Etsy fixture adapter, extracts identity×category candidates, scores by observation count + young-fast shop signals (< 12 months, > 400 sales), returns top 5 candidates as ShortlistAnalysis.
+- **ResearchReport domain model** extended with ShortlistAnalysis field; CandidateProfile carries identity, base_category, price_range, observation_count, shop_count, young_fast_shop_count, risk_notes.
+- **Prompt integrity review** recorded at `docs/control/reviews/2026-09-20-session-05-wave-01-a03-prompt-integrity.md` - A03 prompt verified against workbook Appendix, one high finding (missing explicit young-fast threshold), addendum executed.
+- **Integration tests** in `tests/integration/test_market_research_agent.py`: A03 invocation with fixture data, ResearchReport validation, ShortlistAnalysis top-5 constraint, candidate ranking, thin evidence handling, idempotent re-runs.
+- **Control update**: `research_agent_implemented` and `shortlist_analysis_implemented` evidence keys flipped TRUE. Commit `c64bf58`.
+- **OUT OF SCOPE**: paid Etsy API, live browser scraping, candidate scoring beyond observation count + young-fast signals.
+
+## 2026-09-24 — Session 05 Lane 3: A05 Product Strategy Scorer + ProductSpec
+
+- **A05 Product Strategy agent** implemented with four-criterion scoring: (1) price attractiveness (higher = better up to $25 USD); (2) demand signal (observation count); (3) young-fast shop count (< 12 months, > 400 sales); (4) thin evidence (fewer competing products). Qualification gate at ≥20/40 points; refuses HOLD if unqualified.
+- **ProductSpec generation**: Primary qualified candidate → ProductSpec with concept_fingerprint (SHA256 of identity:category), buyer_problem, title, tier (mass), real_price, anchor_price, palette (3 colour tokens), hubs (6 with page counts), colour_variants (3), flagship_feature, shared_databases (empty), page_target_min/max (45-55), feature_targets, experiment_hypothesis, experiment_tags (new-front). Stub generation; production would be richer.
+- **EvidenceReference collection**: Scoring evidence attached to ProductSpec; evidence_id generated with uuid4(), sha256 field reuses concept_fingerprint (parked nit: evidence self-dump).
+- **Unit tests** in `tests/unit/test_product_strategy.py`: four-criterion scoring, qualification gate enforcement (HOLD < 20 points, RUN ≥ 20), ProductSpec generation from qualified candidate, concept_fingerprint SHA256 validation, EvidenceReference attachment.
+- **Control update**: `scoring_agent_implemented` and `product_spec_generation_implemented` evidence keys flipped TRUE. Commit `a7c9521`.
+- **Parked nit**: A05 concept_fingerprint = SHA256(identity:category), but L4 fixtures hash buyer_problem only — cross-lane drift in fingerprint contract. Recorded in carry_forward.
+
+## 2026-09-24 — Session 05 Lane 4: A06 Catalogue Dedupe + Fixture Teardown Workflow
+
+- **A06 Catalogue Dedupe agent** implemented with three-rule dedupe check: (1) Exact identity×category match → EXACT_IDENTITY_CATEGORY collision; (2) Title similarity ≥0.7 Jaccard threshold → TITLE_SIMILARITY collision; (3) Concept fingerprint match → CONCEPT_FINGERPRINT collision. Outcome: PASS (no collisions) or TOO_CLOSE (≥1 collision). Differentiation evidence generated for PASS outcomes (parked nit: describes candidate's own fields — self-description rather than comparative).
+- **Workflow linking**: DEDUPE_PASSED event → ProductBuildJob (A07), DEDUPE_FAILED event → ReconceptProductJob via EventDispatcher and SuccessorFactory reading config/workflows.yaml event_successor_map. Orchestrator wire proven in tests/integration/test_event_driven_successors.py (successor workflows start at DEDUPE_CHECK).
+- **Fixture teardown workflow**: Synthetic competitor ProductSpecs generated in tests/fixtures/products.py with buyer_problem-based concept_fingerprints (parked nit: L4 fixtures hash buyer_problem only, A05 hashes identity:category — cross-lane drift).
+- **DedupeResult domain model**: result_id (parked nit: reuses spec_id, could be distinct UUID), workflow_id, spec_id, outcome (PASS/TOO_CLOSE), rule_version, normalized_title, concept_fingerprint, title_similarity_threshold, compared_spec_ids, collisions (DedupeCollision with other_spec_id, reason, similarity, evidence), differentiation_evidence, completed_at.
+- **Integration tests** in `tests/integration/test_dedupe_workflow.py`: PASS path (empty catalogue → ProductBuildJob), TOO_CLOSE path (title collision → ReconceptProductJob), exact identity×category collision, concept fingerprint collision, fixture-based workflow integration.
+- **Parked nit**: catalogue_dedupe.py:115 uses `contextlib.suppress(Exception)` on invalid spec parsing — fail-open suppression instead of fail-closed refusal.
+- **Control update**: `dedupe_agent_implemented`, `teardown_workflow_implemented`, and `workflow_linking_complete` evidence keys flipped TRUE. Commit `9b791d45`.
+- **OUT OF SCOPE**: live product catalogue, paid Etsy teardown, ReconceptProductJob implementation (A08 scope).
+
+## 2026-09-24 — Session 05 control tip-sync (post-L4 @ 9b791d45)
+
+- Parallel control lane only (`docs/control/*`). No feature code, no S06 work, no live Etsy/Notion mutations.
+- Refreshed `head_sha` and `evidence_closure_commit_sha` to `9b791d45f9461030f09eda8a46838afc5447416c` (L4 squash tip on `build/full-automation`); `last_verified_commit` stayed at bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d` (session incomplete continuity). State revision 29 → 30.
+- Evidence keys flipped TRUE for L2-L4 lanes: `research_agent_implemented` (L2 A03), `shortlist_analysis_implemented` (L2 shortlist), `scoring_agent_implemented` (L3 A05), `product_spec_generation_implemented` (L3 ProductSpec), `dedupe_agent_implemented` (L4 A06), `teardown_workflow_implemented` (L4 fixtures), `workflow_linking_complete` (L4 EventDispatcher → SuccessorFactory wire). Nine of ten S05 evidence keys now TRUE; `evidence_closure_commit_recorded` remains FALSE (S05 not yet complete).
+- Parked L2-L4 nits recorded in `carry_forward` as non-blocking improvement opportunities: (1) A05 concept_fingerprint = identity:category vs L4 fixtures = buyer_problem (cross-lane drift); (2) A05 evidence SHA reuses concept_fingerprint (self-dump); (3) Dedupe differentiation_evidence describes candidate's own fields (self-desc); (4) A06 contextlib.suppress(Exception) in spec parsing (fail-open); (5) Dedupe result_id = spec_id (could use distinct UUID).
+- Exit 78 unchanged: worker lifted conditionally (D-0028 commissioning gates), scheduler held. Session 05 remains `incomplete`; `completed_sessions` unchanged at `[0, 1, 2, 3, 4]`. No S06 advance, no live provider calls, no commissioning claims.
+
+
 ## 2026-09-11 — Startup repair wave after recovery review
 
 - Repaired migration-head/schema compatibility readiness, encoded database credentials/IPv6, and production environment selection. Compose now carries raw passwords separately; a bounded independent review identified literal-percent and surrounding-whitespace cases, both reproduced and repaired with regression coverage. Development external-URL overrides retain their credentials.

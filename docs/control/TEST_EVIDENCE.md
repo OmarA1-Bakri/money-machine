@@ -17,6 +17,85 @@ Test coverage:
 
 **Status**: Tests written and committed; CI run deferred to GitHub Actions.
 
+## 2026-09-21 — Session 05 Lane 2: A03 Market Research Agent (fixture-only)
+
+**Test suite**: `tests/integration/test_market_research_agent.py` (CI passed on L2 merge)
+
+Test coverage:
+- A03 agent invocation with fixture data (10 seed phrases from config/research.yaml)
+- ResearchReport validation (research_run_id, workflow_id, job_id, source_policy_version, query_terms, observation/listing/shop counts, shortlist)
+- ShortlistAnalysis top-5 constraint (exactly 5 candidates or fewer if < 5 niches found)
+- Candidate ranking by observation count + young-fast shop signals (< 12 months, > 400 sales)
+- Thin evidence handling (optional fields can be None)
+- Idempotent re-runs (same seed phrases → same candidates)
+- ListingObservation and ShopObservation parsing from fixture adapter
+
+**Result**: All tests passed in CI (c64bf58 merge).
+
+**Status**: `research_agent_implemented` and `shortlist_analysis_implemented` evidence keys TRUE.
+
+## 2026-09-24 — Session 05 Lane 3: A05 Product Strategy Scorer + ProductSpec
+
+**Test suite**: `tests/unit/test_product_strategy.py` (CI passed on L3 merge)
+
+Test coverage:
+- Four-criterion scoring: price attractiveness (higher up to $25), demand (observation count), young-fast shops (< 12 months, > 400 sales), thin evidence (fewer competitors)
+- Qualification gate enforcement: HOLD verdict if total score < 20/40, RUN verdict if ≥ 20/40
+- ProductSpec generation from qualified candidate: spec_id, product_id, workflow_id, version, research_run_id, identity, base_category, buyer_problem, title, tier (mass), real_price, anchor_price, currency, palette (3 colour tokens), hubs (6 with page counts), colour_variants (3), flagship_feature, shared_databases (empty), page_target_min/max (45-55), feature_targets, experiment_hypothesis, experiment_tags (new-front)
+- Concept fingerprint generation: SHA256(identity:category) — parked nit: L4 fixtures hash buyer_problem only
+- EvidenceReference attachment: evidence_id=uuid4(), sha256=concept_fingerprint (parked nit: evidence self-dump), safe_summary with score
+- Fixture integration: candidate from fixture data → ProductSpec with all required fields
+
+**Result**: All tests passed in CI (a7c9521 merge).
+
+**Status**: `scoring_agent_implemented` and `product_spec_generation_implemented` evidence keys TRUE.
+
+## 2026-09-24 — Session 05 Lane 4: A06 Catalogue Dedupe + Workflow Link
+
+**Test suite**: `tests/integration/test_dedupe_workflow.py` + `tests/unit/domain/services/test_dedupe.py` (CI passed on L4 merge)
+
+Test coverage:
+- Three-rule dedupe check: (1) Exact identity×category → EXACT_IDENTITY_CATEGORY collision; (2) Title Jaccard similarity ≥0.7 → TITLE_SIMILARITY collision; (3) Concept fingerprint match → CONCEPT_FINGERPRINT collision
+- PASS outcome: empty catalogue (first product in niche) → no collisions → DEDUPE_PASSED event → ProductBuildJob successor
+- TOO_CLOSE outcome: title collision (Jaccard ≥0.7) or concept fingerprint match → ≥1 collision → DEDUPE_FAILED event → ReconceptProductJob successor
+- Workflow linking: EventDispatcher reads config/workflows.yaml event_successor_map, calls SuccessorFactory.create_successors() for DEDUPE_PASSED/DEDUPE_FAILED
+- Differentiation evidence: PASS outcomes generate evidence from candidate's identity, category, buyer_problem, features, hubs (parked nit: self-description)
+- DedupeResult persistence: result_id (parked nit: reuses spec_id), workflow_id, spec_id, outcome, rule_version, normalized_title, concept_fingerprint, title_similarity_threshold, compared_spec_ids, collisions, differentiation_evidence, completed_at
+- Fixture teardown: synthetic ProductSpecs with buyer_problem-based fingerprints (parked nit: cross-lane drift with A05's identity:category fingerprints)
+- A06 agent invocation: loads candidate ProductSpec from database, excludes self and same-workflow specs, runs check_dedupe(), persists DedupeResult, emits event
+- Fail-open suppression: contextlib.suppress(Exception) on invalid spec parsing (parked nit)
+
+**Result**: All tests passed in CI (9b791d45 merge). Integration tests prove PASS/TOO_CLOSE branching, workflow successor creation via EventDispatcher, and fixture-based dedupe scenarios.
+
+**Status**: `dedupe_agent_implemented`, `teardown_workflow_implemented`, and `workflow_linking_complete` evidence keys TRUE.
+
+**Parked nits** (non-blocking, recorded in carry_forward):
+1. A05 concept_fingerprint = identity:category, L4 fixtures = buyer_problem (cross-lane drift)
+2. A05 evidence SHA reuses concept_fingerprint (evidence_id self-dump)
+3. Dedupe differentiation_evidence describes candidate's own fields (self-desc)
+4. A06 contextlib.suppress(Exception) in spec parsing (fail-open suppression)
+5. Dedupe result_id = spec_id (could use distinct UUID)
+
+## 2026-09-24 — Session 05 control tip-sync verification (post-L4 @ 9b791d45)
+
+**Verification scope**: Control file updates only; no feature code, no runtime gates, no CI run.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Tip SHA update | `head_sha` and `evidence_closure_commit_sha` set to `9b791d45f9461030f09eda8a46838afc5447416c` (L4 squash tip); `last_verified_commit` stayed at bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d` (session incomplete continuity) | PASS |
+| State revision bump | `state_revision` advanced 29 → 30 | PASS |
+| Evidence keys flipped | Nine of ten S05 keys now TRUE: `etsy_adapters_implemented` (L1), `research_agent_implemented` (L2), `shortlist_analysis_implemented` (L2), `scoring_agent_implemented` (L3), `product_spec_generation_implemented` (L3), `dedupe_agent_implemented` (L4), `teardown_workflow_implemented` (L4), `workflow_linking_complete` (L4), `control_files_and_checkpoint_current` (this PR); only `evidence_closure_commit_recorded` remains FALSE | PASS |
+| Session 05 status | `session_status` remains `incomplete`; `current_session` = 5; `completed_sessions` = `[0, 1, 2, 3, 4]` (no S06 advance) | PASS |
+| Exit 78 status | Worker conditional lift preserved (D-0028 gates); scheduler held; no regression | PASS |
+| Parked nits | Five L2-L4 nits recorded in `carry_forward` as non-blocking: concept_fingerprint drift, evidence_id self-dump, differentiation self-desc, fail-open suppress, result_id=spec_id | PASS |
+| L1-L4 notes | Session 05 lanes 1-4 recorded in `notes` with commit SHAs and evidence keys | PASS |
+| IMPLEMENTATION_LOG entries | Four new entries added: L2 A03, L3 A05, L4 A06, control tip-sync | PASS |
+| TEST_EVIDENCE entries | Four new evidence sections added: L2, L3, L4, control tip-sync verification | PASS |
+| NEXT_SESSION content | No S06 content added; Session 05 carry-forward updated with parked nits | PASS |
+
+**Status**: Control files current at tip `9b791d45`. Session 05 remains incomplete with nine of ten evidence keys TRUE. No S06 work, no live provider calls, no commissioning claims.
+
+
 ## 2026-09-19 — Session 03 final full regression (Verifier FINAL PASS)
 
 | Test Suite | Result | Duration | Evidence |
