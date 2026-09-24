@@ -1,0 +1,17 @@
+# Integration Adapter Configuration
+#
+# Controls which adapter implementation is used for each integration.
+# Valid modes per integration documented below.
+
+notion:
+  # Adapter mode: fixture | api | browser | combined
+  #
+  # - fixture: In-memory stub for testing (W1 default)
+  # - api: Notion Official API via notion-client (Wave 2+)
+  # - browser: Playwright for UI-only features (Wave 3+)
+  # - combined: API + browser for create-verify patterns (Wave 3+)
+  adapter_mode: fixture
+
+  # Future: API credentials, browser profile path, etc.
+  # api_token: ${NOTION_API_TOKEN}  # From environment
+  # browser_profile: runtime/browser-profiles/notion-authenticated

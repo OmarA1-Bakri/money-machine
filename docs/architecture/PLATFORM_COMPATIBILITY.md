@@ -1,62 +1,161 @@
-# Platform Compatibility
+# Platform Compatibility Matrix — Notion Integration
 
-**Contract status:** compatibility policy and current safe assessment. Provider mechanics are not claimed commissioned until an operation-specific probe and contract test exists.
+**Status:** Wave 1 capability inspection  
+**Session:** 06  
+**Last Updated:** 2026-09-24  
+**Scope:** Method selection for 25+ Notion operations required by playbook product builds
 
-## Supported execution platforms
+## Method Taxonomy
 
-| Surface | Baseline | Contract |
-|---|---|---|
-| Windows host | Windows with WSL2 | Canonical display root `D:\Money Machine`; no second repository tree |
-| Linux runtime | WSL2 / standard Linux | Canonical persisted root `/mnt/d/Money Machine`; filesystem-identical casing aliases are verified, not normalized |
-| Python | 3.12 | uv lock, Ruff, strict Pyright, explicit UTF-8 and bounded subprocesses |
-| Node | 24 | pnpm 10 workspace and strict TypeScript |
-| Browser | pinned Playwright Chromium | deterministic selectors/rendering; no untracked profile dependency in tests |
-| Database | PostgreSQL 16 | authenticated TCP, migrations, UTC database time |
-| Local/production stack | Docker Compose | five approved services; no Kubernetes dependency |
+| Method | Description |
+|--------|-------------|
+| `DIRECT_API` | Notion Official API via Python SDK (notion-client) |
+| `COMPOSIO` | Composio Notion actions (if present) |
+| `BROWSER` | Browser automation (Playwright) for UI-only features |
+| `COMBINED` | API + browser for create-verify patterns |
+| `NOT_IMPLEMENTED` | Not yet supported in any method |
 
-Bash scripts are invoked with `bash` because executable bits are not relied on across Windows/POSIX clones. PowerShell wrappers must preserve the same contracts.
+## Operation Contracts
 
-## Provider compatibility rule
+| Operation | Method | Mutates | Requires Auth | Idempotent | Reconcilable | W1 Status | Notes |
+|-----------|--------|---------|---------------|------------|--------------|-----------|-------|
+| `connection_status` | DIRECT_API | false | true | true | N/A | stub | Check API token validity via /v1/users/me |
+| `workspace_discovery` | DIRECT_API | false | true | true | N/A | stub | List accessible workspaces via /v1/search |
+| `create_page` | DIRECT_API | true | true | false | true | stub | POST /v1/pages; idempotency via external_id |
+| `duplicate_page` | BROWSER | true | true | false | true | stub | UI-only; no API equivalent |
+| `rename_page` | DIRECT_API | true | true | true | true | stub | PATCH /v1/pages/{id} title property |
+| `move_page` | DIRECT_API | true | true | true | true | stub | PATCH /v1/pages/{id} parent |
+| `set_icon` | DIRECT_API | true | true | true | true | stub | PATCH /v1/pages/{id} icon (emoji or external URL) |
+| `set_cover` | DIRECT_API | true | true | true | true | stub | PATCH /v1/pages/{id} cover (external URL) |
+| `add_text_block` | DIRECT_API | true | true | false | true | stub | PATCH /v1/blocks/{id}/children append paragraph |
+| `add_callout_block` | DIRECT_API | true | true | false | true | stub | PATCH /v1/blocks/{id}/children append callout |
+| `create_database` | DIRECT_API | true | true | false | true | stub | POST /v1/databases; idempotency via title + parent check |
+| `add_property` | DIRECT_API | true | true | true | true | stub | PATCH /v1/databases/{id} properties |
+| `create_relation` | DIRECT_API | true | true | true | true | stub | PATCH /v1/databases/{id} add relation property |
+| `create_rollup` | DIRECT_API | true | true | true | true | stub | PATCH /v1/databases/{id} add rollup property |
+| `create_formula` | BROWSER | true | true | true | true | stub | Formula editor UI-only; API supports read but not write |
+| `create_linked_view` | BROWSER | true | true | false | true | stub | Linked database UI-only; no API equivalent |
+| `add_filter` | DIRECT_API | true | true | true | true | stub | Part of database query filter (GET /v1/databases/{id}/query) |
+| `add_sort` | DIRECT_API | true | true | true | true | stub | Part of database query sorts (GET /v1/databases/{id}/query) |
+| `create_calendar_view` | BROWSER | true | true | false | true | stub | View creation UI-only; API supports querying views |
+| `create_table_view` | BROWSER | true | true | false | true | stub | View creation UI-only |
+| `create_board_view` | BROWSER | true | true | false | true | stub | View creation UI-only |
+| `set_view_title_visibility` | BROWSER | true | true | true | true | stub | View settings UI-only |
+| `add_child_page` | DIRECT_API | true | true | false | true | stub | POST /v1/pages with parent page_id |
+| `publish_page` | BROWSER | true | true | true | true | stub | Share settings UI ("Share to web"); no API equivalent |
+| `set_duplicate_as_template` | BROWSER | true | true | true | true | stub | Page settings UI; no API equivalent |
+| `set_search_indexing` | BROWSER | true | true | true | true | stub | Page settings UI ("Allow search engines"); no API |
+| `get_public_url` | COMBINED | false | true | true | N/A | stub | API returns page.public_url if published; browser verifies stranger access |
+| `unpublish_page` | BROWSER | true | true | true | true | stub | Disable "Share to web" via UI; no API |
+| `inspect_page` | DIRECT_API | false | true | true | N/A | stub | GET /v1/pages/{id} + GET /v1/blocks/{id}/children |
+| `inspect_database` | DIRECT_API | false | true | true | N/A | stub | GET /v1/databases/{id} returns schema |
+| `verify_stranger_access` | BROWSER | false | false | true | N/A | stub | Open public URL in logged-out browser; verify 200 |
 
-Provider documentation and safely observed live behavior govern mechanics only. The playbook remains authoritative for business sequence, outputs, limits, and truthfulness. A provider change may alter an adapter/channel but cannot silently:
+## Method Selection Rationale
 
-- replace Etsy or Notion;
-- weaken dedupe, preflight, maturity, cull, or publication-ramp rules;
-- turn a draft into publication;
-- create repeated approvals inside standing authority;
-- infer authority from credentials;
-- convert an uncertain external effect into an ordinary retry.
+### DIRECT_API Operations
 
-## Compatibility register
+The Notion Official API (v1) supports:
+- **CRUD operations**: Pages, databases, blocks, properties
+- **Content manipulation**: Text, callouts, child pages, icons, covers
+- **Relation setup**: Relations, rollups (read/write)
+- **Inspection**: Read page/database metadata and content
 
-| Area | Required product behavior | Selected mechanism | Current evidence | Adaptation rule |
-|---|---|---|---|---|
-| Etsy listing operations | draft, fields, files/media, publish/update/deactivate, metrics | official API first; browser for visibility/checkout | not safely probed | preserve immutable listing version and reconcile provider state |
-| Etsy search evidence | admitted listing/shop observations | isolated browser read | not safely probed | timestamp provenance; block rather than fabricate unavailable rows |
-| Notion structured content | pages, databases, properties, relations, rollups, formulas | official API | not safely probed | checkpoint every provider object ID |
-| Notion UI-only content | linked views, layouts, publish/indexing/duplication, fresh-view | browser | not safely probed | use deterministic selectors and read-after-write reconciliation |
-| Composio | operation-specific alternative | selected only after safe probe | unavailable in this session | never treat connector presence as whole-provider support |
-| PostHog | operational observations | SDK/API | repository config disabled | telemetry may lag/drop and cannot drive workflow |
-| LLM | strict structured result | OpenAI-compatible abstraction | application provider uncommissioned | provider-specific schema translation stays behind adapter |
-| Asset rendering | reproducible images/video/PDF | pinned Playwright internal renderer | not implemented | record renderer/template/font versions and hashes |
-| Storage | immutable artifacts and denied runtime evidence | local adapter initially | scaffold only | portable storage references; no secrets in metadata |
+**Limitations**:
+- No formula write (formula editor is UI-only; API is read-only)
+- No view creation (calendar, table, board views require UI)
+- No linked database views (UI-only feature)
+- No publishing settings (share-to-web, search indexing, duplicate-as-template)
 
-## Browser compatibility
+**SDK**: `notion-client` (Python) — not currently in requirements.txt; W1 adds stub only
 
-- Tests use an isolated temporary profile and simulation/fixture pages.
-- Runtime profiles and cookies are denied data and never committed or inspected for architecture evidence.
-- Selectors prefer accessibility roles, stable labels, and adapter-owned locator contracts.
-- Every write has a postcondition read and screenshot/redaction receipt where safe.
-- CAPTCHA, MFA, holder verification, and unsolved provider challenges become `MANUAL_RESUME` blockers.
-- Browser timeouts after a mutation become `UNCERTAIN_EXTERNAL_EFFECT` until reconciliation.
+### BROWSER Operations
 
-## Version-change process
+Playwright-based browser automation required for:
+- **View management**: Create calendar/table/board views, set view title visibility
+- **Formula editing**: Formula editor UI (API supports formula read but not write)
+- **Linked databases**: Create linked database view from canonical database
+- **Publishing**: Share to web, duplicate as template, search indexing settings
+- **Duplication**: Duplicate page (UI-only; no API endpoint)
 
-1. Record the affected operation and observed safe metadata.
-2. Add or update a fixture reproducing the provider contract without private payloads.
-3. Adjust only the adapter/channel translation.
-4. Run contract, idempotency, reconciliation, and affected workflow tests.
-5. Review for business-rule drift and secret leakage.
-6. Update this register and commissioning evidence.
+**Requirements**:
+- Authenticated browser profile (stored in `runtime/browser-profiles/`, git-ignored)
+- Selector abstraction for UI stability
+- Screenshot capture on error
+- Reconciliation after uncertain clicks
+- Deferred to Wave 2+
 
-No compatibility claim is made from package installation, a connected development tool, or agent self-report.
+### COMBINED Operations
+
+API + browser verification for:
+- **Public URL retrieval**: API returns `page.public_url` if published; browser verifies stranger (logged-out) access returns 200
+- Future: Create-via-API + verify-via-browser patterns
+
+### COMPOSIO Status
+
+**As of W1**: No Composio integration present in repo. If Composio Notion actions become available:
+- Check coverage against this matrix
+- Prefer Composio for operations where it provides better reliability/receipts than raw API
+- Update method column to `COMPOSIO` for covered operations
+
+**W1 Decision**: Defer Composio research to Wave 2+; proceed with DIRECT_API + BROWSER design
+
+## Idempotency & Reconciliation Notes
+
+### Idempotent Operations
+
+Can be safely retried without duplicate effects:
+- `rename_page`, `move_page`, `set_icon`, `set_cover`: PATCH operations with new value
+- `add_property`, `create_relation`, `create_rollup`: Adding property with same name is idempotent update
+- `create_formula`: Updating formula property is idempotent
+- `add_filter`, `add_sort`: Query filters/sorts are request parameters, not persisted state
+- `set_view_title_visibility`, `publish_page`, `set_duplicate_as_template`, `set_search_indexing`: Boolean settings are idempotent toggles
+
+### Non-Idempotent Operations
+
+Require external idempotency keys or reconciliation:
+- `create_page`: Use external_id or check title + parent before retry
+- `duplicate_page`: Always creates new page; requires receipt to detect double-execution
+- `add_text_block`, `add_callout_block`: Appending blocks is not idempotent
+- `create_database`: Check title + parent before retry
+- `add_child_page`: Check existing children before retry
+- `create_linked_view`, `create_calendar_view`, `create_table_view`, `create_board_view`: View creation not idempotent
+
+### Reconcilable Operations
+
+After uncertain operation (e.g. browser click with unknown outcome):
+1. **Inspect post-state**: Use API inspection to check if effect occurred
+2. **Compare pre/post**: If pre-state captured, diff to detect change
+3. **Receipt decision**: Success if effect detected, Unknown if unable to verify, Failure if neither
+
+All mutation operations are reconcilable via API inspection, even if created via browser.
+
+## W1 Implementation Status
+
+**All operations**: Stub implementations only
+
+- **NotionAdapter interface**: Async method signatures defined
+- **FixtureNotionAdapter**: In-memory stubs return typed domain objects
+- **APINotionAdapter**: Raises `NotImplementedError("Real API adapter deferred to Session 06 Wave 2+")`
+- **BrowserNotionAdapter**: Raises `NotImplementedError("Real browser adapter deferred to Session 06 Wave 2+")`
+- **CombinedNotionAdapter**: Raises `NotImplementedError("Real combined adapter deferred to Session 06 Wave 2+")`
+
+**No live Notion calls in W1**.
+
+## Next Wave Priorities
+
+**Wave 2**: Implement DIRECT_API adapter for core CRUD operations (create_page, create_database, add_property, inspect_page, inspect_database)
+
+**Wave 3**: Implement BROWSER adapter for UI-only features (formulas, views, publishing, linked databases)
+
+**Wave 4**: Implement COMBINED patterns (API create + browser verify)
+
+**Wave 5**: Notion operation receipts table + persistence + idempotency keys
+
+## References
+
+- Notion API Reference: https://developers.notion.com/reference/intro
+- Notion API Changelog: https://developers.notion.com/page/changelog
+- Notion Python SDK: https://github.com/ramnes/notion-sdk-py
+- Session 06 Prompt: `prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md`
+- Prompt Integrity Review: `docs/control/reviews/2026-09-24-session-06-prompt-integrity.md`

@@ -8,9 +8,9 @@
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "evidence_closure_commit_sha": "9b791d45f9461030f09eda8a46838afc5447416c",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 31,
-  "session_status": "complete",
-  "current_session": 5,
+  "state_revision": 32,
+  "session_status": "incomplete",
+  "current_session": 6,
   "completed_sessions": [
     0,
     1,
@@ -81,7 +81,8 @@
     "session_05_l2": "2026-09-21: S05 L2 complete (@ c64bf58). A03 Market Research agent (fixture-only); research observations + ShortlistAnalysis with top 5 identity×category candidates; research_agent_implemented=TRUE, shortlist_analysis_implemented=TRUE.",
     "session_05_l3": "2026-09-24: S05 L3 complete (@ a7c9521). A05 Product Strategy scorer + ProductSpec generation; four-criterion scoring (price/demand/young-fast shops/thin evidence), qualification gate (≥20/40), spec generation with concept fingerprint; scoring_agent_implemented=TRUE, product_spec_generation_implemented=TRUE.",
     "session_05_l4": "2026-09-24: S05 L4 complete (@ 9b791d45). A06 Catalogue Dedupe agent + fixture teardown workflow; three-rule dedupe (exact identity×category, title similarity ≥0.7 Jaccard, concept fingerprint match), PASS/TOO_CLOSE branching, workflow linking (DEDUPE_PASSED → ProductBuildJob, DEDUPE_FAILED → ReconceptProductJob via EventDispatcher); dedupe_agent_implemented=TRUE, teardown_workflow_implemented=TRUE, workflow_linking_complete=TRUE. Parked L2-L4 nits as non-blocking (see carry_forward).",
-    "session_05_status": "Session 05 COMPLETE (W11 control flip @ tip 9b791d45). L1–L4 delivered Etsy adapters, A03 Market Research, A05 Product Strategy scorer + ProductSpec generation, A06 Catalogue Dedupe + workflow linking. All ten evidence keys TRUE. Exit 78: worker lifted conditionally (D-0028 gates), scheduler held. Last_verified_commit stays bootstrap 1abf0d7c (session-complete continuity per S04 pattern); head_sha/evidence_closure_commit_sha at L4 tip 9b791d45. Next_session 6, next_prompt 09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md. Parked L2-L4 nits as non-blocking (concept_fingerprint drift, evidence SHA self-dump, differentiation self-desc, fail-open suppress, result_id reuse). No S06 features, no live Notion/Etsy."
+    "session_05_status": "Session 05 COMPLETE (W11 control flip @ tip 9b791d45). L1–L4 delivered Etsy adapters, A03 Market Research, A05 Product Strategy scorer + ProductSpec generation, A06 Catalogue Dedupe + workflow linking. All ten evidence keys TRUE. Exit 78: worker lifted conditionally (D-0028 gates), scheduler held. Last_verified_commit stays bootstrap 1abf0d7c (session-complete continuity per S04 pattern); head_sha/evidence_closure_commit_sha at L4 tip 9b791d45. Next_session 6, next_prompt 09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md. Parked L2-L4 nits as non-blocking (concept_fingerprint drift, evidence SHA self-dump, differentiation self-desc, fail-open suppress, result_id reuse). No S06 features, no live Notion/Etsy.",
+    "session_06_w1": "2026-09-24: Session 06 Wave 1 activation (revision 31→32). Prompt-integrity review recorded at docs/control/reviews/2026-09-24-session-06-prompt-integrity.md. Session 06 activated: current_session 6, session_status incomplete, eight evidence keys installed all-false. S05 stays complete in history (completed_sessions [0,1,2,3,4,5]). W1 delivers: Notion capability inspection (DIRECT_API/COMPOSIO/BROWSER/COMBINED methods), PLATFORM_COMPATIBILITY.md with per-op method tags, NotionAdapter interface (25+ async operations), FixtureNotionAdapter (in-memory CRUD stubs), adapter router (config-driven selection), API/Browser/Combined adapter stubs (raise NotImplementedError), unit tests. OUT OF SCOPE: live Notion calls, browser sessions, formula builders, receipts persistence, Exit78 lift, SESSION_06 COMPLETE."
   },
   "carry_forward": [
     "Prove idempotency uniqueness under concurrent claim path (after commissioning gate)",
@@ -93,16 +94,14 @@
     "S05 L2-L4 parked nits (non-blocking, recorded for future lane improvement): (1) A05 concept_fingerprint hashes identity:category (product_strategy.py:278) but L4 fixtures hash buyer_problem only (products.py:97) — cross-lane drift in fingerprint contract; (2) A05 evidence SHA reuses concept_fingerprint (product_strategy.py:328) — evidence_id self-dump instead of independent hash; (3) Dedupe differentiation_evidence describes candidate's own fields (dedupe.py:216-225) — self-description rather than comparative differentiation; (4) A06 catalogue_dedupe.py:115 uses contextlib.suppress(Exception) on invalid spec parsing — fail-open suppression instead of fail-closed refusal; (5) Dedupe result_id = spec_id (dedupe.py:231) — could use distinct UUID for audit trail clarity."
   ],
   "required_completion_evidence": {
-    "etsy_adapters_implemented": true,
-    "research_agent_implemented": true,
-    "shortlist_analysis_implemented": true,
-    "scoring_agent_implemented": true,
-    "teardown_workflow_implemented": true,
-    "product_spec_generation_implemented": true,
-    "dedupe_agent_implemented": true,
-    "workflow_linking_complete": true,
-    "control_files_and_checkpoint_current": true,
-    "evidence_closure_commit_recorded": true
+    "notion_capability_inspected": false,
+    "platform_compatibility_documented": false,
+    "notion_adapter_interface_defined": false,
+    "fixture_adapter_implemented": false,
+    "adapter_router_implemented": false,
+    "adapter_unit_tests_pass": false,
+    "control_files_and_checkpoint_current": false,
+    "evidence_closure_commit_recorded": false
   },
   "transition_contract": {
     "completion_requires_all_evidence_true": true,
@@ -117,5 +116,5 @@
   },
   "next_session": 6,
   "next_prompt": "09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md",
-  "updated_at": "2026-09-24T05:30:00Z"
+  "updated_at": "2026-09-24T06:05:00Z"
 }
