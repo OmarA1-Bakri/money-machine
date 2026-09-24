@@ -1090,7 +1090,7 @@ async def test_verify_stranger_access_wraps_navigate_value_error(fake_browser):
 
         async def get_current_url(self) -> str:
             return "https://example.com"
-        
+
         async def close(self) -> None:
             pass
 
@@ -1131,7 +1131,7 @@ async def test_verify_stranger_access_propagates_wait_for_selector_runtime_error
 
         async def get_current_url(self) -> str:
             return "https://example.com"
-        
+
         async def close(self) -> None:
             pass
 
