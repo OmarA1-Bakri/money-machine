@@ -142,6 +142,23 @@ SESSION_EVIDENCE_KEYS: Mapping[int, frozenset[str]] = MappingProxyType(
                 "evidence_closure_commit_recorded",
             }
         ),
+        6: frozenset(
+            {
+                # Session 06: Notion integration foundation stubs (W1 only).
+                # Wave 1 delivers: capability inspection, PLATFORM_COMPATIBILITY.md,
+                # NotionAdapter interface, FixtureNotionAdapter, adapter router stubs,
+                # unit tests. NO live Notion calls, NO browser sessions, NO formulas,
+                # NO Session 06 COMPLETE. Exit 78 unchanged. Full integration deferred to W2+.
+                "notion_capability_inspected",
+                "platform_compatibility_documented",
+                "notion_adapter_interface_defined",
+                "fixture_adapter_implemented",
+                "adapter_router_implemented",
+                "adapter_unit_tests_pass",
+                "control_files_and_checkpoint_current",
+                "evidence_closure_commit_recorded",
+            }
+        ),
     }
 )
 """Each session's completion-evidence contract (D-0010). A session without an entry cannot be
