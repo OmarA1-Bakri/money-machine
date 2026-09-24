@@ -866,6 +866,34 @@ class BrowserNotionAdapter(NotionAdapter):
         Mutates: false
         Idempotent: true
         """
+        # Validate URL is HTTPS and has allowed host
+        # Only allow notion.so, www.notion.so, notion.site, www.notion.site (no other subdomains)
+        from urllib.parse import urlparse
+
+        try:
+            parsed = urlparse(public_url)
+        except Exception as e:
+            raise ValueError(f"Invalid URL: {public_url}") from e
+
+        # Must be HTTPS
+        if parsed.scheme != "https":
+            raise ValueError(f"URL must use HTTPS: {public_url}")
+
+        # Reject userinfo in URL (https://user:pass@host or https://user@host)
+        if parsed.username or parsed.password:
+            raise ValueError(f"URL must not contain userinfo: {public_url}")
+
+        # Must be exactly notion.so, www.notion.so, notion.site, or www.notion.site (no other subdomains, no lookalikes)
+        # Reject:
+        # - evil.notion.so
+        # - notion.so.evil.com
+        # - https://notion.so@evil.com (userinfo trick)
+        allowed_hosts = {"notion.so", "www.notion.so", "notion.site", "www.notion.site"}
+        if parsed.hostname not in allowed_hosts:
+            raise ValueError(
+                f"URL host must be notion.so, www.notion.so, notion.site, or www.notion.site, got: {parsed.hostname}"
+            )
+
         if self._anon_session_factory is None:
             raise RuntimeError(
                 "verify_stranger_access requires an anonymous session factory. "
