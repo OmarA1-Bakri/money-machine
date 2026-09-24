@@ -1625,6 +1625,9 @@ async def test_publish_page_translates_playwright_timeout(fake_anon_browser):
             pass
 
         async def get_attribute(self, selector: str, attribute: str) -> str | None:
+            # Return a public URL so publish_page doesn't fail on URL read
+            if attribute == "value" and "public-url" in selector:
+                return "https://notion.site/published"
             return None
 
         async def is_visible(self, selector: str) -> bool:
