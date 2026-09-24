@@ -54,7 +54,10 @@ def test_router_loads_api_mode_from_config():
 
 
 def test_router_rejects_browser_mode_requires_playwright_session():
-    """Router raises NotImplementedError for browser mode (requires Playwright session)."""
+    """Router raises NotImplementedError for browser mode.
+
+    Browser mode requires Playwright session.
+    """
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         config = {"notion": {"adapter_mode": "browser"}}
         yaml.dump(config, f)
@@ -62,7 +65,9 @@ def test_router_rejects_browser_mode_requires_playwright_session():
 
     try:
         router = NotionAdapterRouter(config_path=config_path)
-        with pytest.raises(NotImplementedError, match="Browser adapter requires Playwright"):
+        with pytest.raises(
+            NotImplementedError, match="Browser adapter requires Playwright"
+        ):
             router.get_adapter()
     finally:
         Path(config_path).unlink()

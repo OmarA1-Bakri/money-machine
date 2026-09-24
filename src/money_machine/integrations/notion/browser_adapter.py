@@ -133,11 +133,16 @@ class BrowserNotionAdapter(NotionAdapter):
         
         # Click duplicate
         await self._browser.click('[data-testid="duplicate-page-action"]')
-        await self._browser.wait_for_selector('[data-testid="page-duplicated-toast"]', timeout=10000)
-        
+        await self._browser.wait_for_selector(
+            '[data-testid="page-duplicated-toast"]', timeout=10000
+        )
+
         # Extract new page ID from URL or duplicate result
         new_url = await self._browser.get_current_url()
-        new_page_id = new_url.split("/")[-1].split("?")[0] if "/" in new_url else f"page_{uuid4().hex[:12]}"
+        if "/" in new_url:
+            new_page_id = new_url.split("/")[-1].split("?")[0]
+        else:
+            new_page_id = f"page_{uuid4().hex[:12]}"
         
         return NotionPage(
             id=new_page_id,
@@ -158,17 +163,20 @@ class BrowserNotionAdapter(NotionAdapter):
         self, page_id: str, new_parent_id: str, new_parent_type: str = "workspace"
     ) -> NotionPage:
         raise NotImplementedError(
-            "move_page uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
+            "move_page uses API method, not BROWSER. "
+            "Use APINotionAdapter or FixtureNotionAdapter."
         )
 
     async def set_icon(self, page_id: str, icon: str) -> NotionPage:
         raise NotImplementedError(
-            "set_icon uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
+            "set_icon uses API method, not BROWSER. "
+            "Use APINotionAdapter or FixtureNotionAdapter."
         )
 
     async def set_cover(self, page_id: str, cover_url: str) -> NotionPage:
         raise NotImplementedError(
-            "set_cover uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
+            "set_cover uses API method, not BROWSER. "
+            "Use APINotionAdapter or FixtureNotionAdapter."
         )
 
     async def add_text_block(self, page_id: str, content: str) -> NotionTextBlock:
@@ -231,7 +239,9 @@ class BrowserNotionAdapter(NotionAdapter):
             "Use APINotionAdapter or FixtureNotionAdapter."
         )
 
-    async def create_formula(self, database_id: str, name: str, expression: str) -> NotionFormula:
+    async def create_formula(
+        self, database_id: str, name: str, expression: str
+    ) -> NotionFormula:
         """Create formula property via UI formula editor.
         
         Method: BROWSER (formula editor is UI-only; API read-only)
@@ -291,8 +301,12 @@ class BrowserNotionAdapter(NotionAdapter):
         await self._browser.click('[data-testid="linked-database-option"]')
         
         # Search for source database
-        await self._browser.fill('[data-testid="database-search-input"]', source_database_id)
-        await self._browser.click(f'[data-testid="database-option-{source_database_id}"]')
+        await self._browser.fill(
+            '[data-testid="database-search-input"]', source_database_id
+        )
+        await self._browser.click(
+            f'[data-testid="database-option-{source_database_id}"]'
+        )
         
         # Set view type
         if view_type != "table":
@@ -310,14 +324,16 @@ class BrowserNotionAdapter(NotionAdapter):
         self, database_id: str, view_id: str, filter_spec: NotionFilter
     ) -> dict[str, Any]:
         raise NotImplementedError(
-            "add_filter uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
+            "add_filter uses API method, not BROWSER. "
+            "Use APINotionAdapter or FixtureNotionAdapter."
         )
 
     async def add_sort(
         self, database_id: str, view_id: str, sort_spec: NotionSort
     ) -> dict[str, Any]:
         raise NotImplementedError(
-            "add_sort uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
+            "add_sort uses API method, not BROWSER. "
+            "Use APINotionAdapter or FixtureNotionAdapter."
         )
 
     async def create_calendar_view(
@@ -415,7 +431,9 @@ class BrowserNotionAdapter(NotionAdapter):
         
         # Select group-by property
         await self._browser.click('[data-testid="board-group-by-select"]')
-        await self._browser.click(f'[data-testid="property-option-{group_by_property}"]')
+        await self._browser.click(
+            f'[data-testid="property-option-{group_by_property}"]'
+        )
         
         # Create view
         await self._browser.click('[data-testid="create-view-button"]')
@@ -428,9 +446,11 @@ class BrowserNotionAdapter(NotionAdapter):
             show_title=True,
         )
 
-    async def set_view_title_visibility(self, view_id: str, visible: bool) -> NotionView:
+    async def set_view_title_visibility(
+        self, view_id: str, visible: bool
+    ) -> NotionView:
         """Set view title visibility via UI settings.
-        
+
         Method: BROWSER (view settings are UI-only)
         Mutates: true
         Idempotent: true
@@ -438,13 +458,17 @@ class BrowserNotionAdapter(NotionAdapter):
         # Navigate to view (URL pattern may vary)
         view_url = f"https://www.notion.so/view/{view_id}"
         await self._browser.navigate(view_url)
-        
+
         # Open view settings
         await self._browser.click('[data-testid="view-settings-button"]')
-        await self._browser.wait_for_selector('[data-testid="view-title-visibility-toggle"]')
-        
+        await self._browser.wait_for_selector(
+            '[data-testid="view-title-visibility-toggle"]'
+        )
+
         # Check current state and toggle if needed
-        is_currently_visible = await self._browser.is_visible('[data-testid="view-title"]')
+        is_currently_visible = await self._browser.is_visible(
+            '[data-testid="view-title"]'
+        )
         if is_currently_visible != visible:
             await self._browser.click('[data-testid="view-title-visibility-toggle"]')
         
@@ -500,7 +524,9 @@ class BrowserNotionAdapter(NotionAdapter):
             updated_at=datetime.now(UTC),
         )
 
-    async def set_duplicate_as_template(self, page_id: str, enabled: bool) -> NotionPage:
+    async def set_duplicate_as_template(
+        self, page_id: str, enabled: bool
+    ) -> NotionPage:
         """Set "Duplicate as template" page setting via UI.
         
         Method: BROWSER (page settings are UI-only)
@@ -590,7 +616,9 @@ class BrowserNotionAdapter(NotionAdapter):
         await self._browser.wait_for_selector('[data-testid="share-menu"]')
         
         # Check if currently published and toggle off if needed
-        is_published = await self._browser.is_visible('[data-testid="public-url-display"]')
+        is_published = await self._browser.is_visible(
+            '[data-testid="public-url-display"]'
+        )
         if is_published:
             await self._browser.click('[data-testid="share-to-web-toggle"]')
         
@@ -630,7 +658,9 @@ class BrowserNotionAdapter(NotionAdapter):
         
         # Check if page content is visible (not login wall)
         try:
-            await self._browser.wait_for_selector('[data-testid="page-content"]', timeout=3000)
+            await self._browser.wait_for_selector(
+                '[data-testid="page-content"]', timeout=3000
+            )
             return True
         except Exception:
             # Login wall or error page

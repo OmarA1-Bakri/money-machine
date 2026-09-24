@@ -139,7 +139,8 @@ async def test_create_formula(browser_adapter, fake_browser):
     assert '[data-testid="add-property-button"]' in fake_browser.clicks
     assert '[data-testid="property-type-formula"]' in fake_browser.clicks
     assert fake_browser.fills.get('[data-testid="property-name-input"]') == "Total"
-    assert "Quantity" in fake_browser.fills.get('[data-testid="formula-expression-input"]', "")
+    formula_input = fake_browser.fills.get('[data-testid="formula-expression-input"]', "")
+    assert "Quantity" in formula_input
     
     # Verify result
     assert isinstance(result, NotionFormula)
@@ -160,7 +161,8 @@ async def test_create_linked_view(browser_adapter, fake_browser):
     # Verify browser interactions
     assert "https://www.notion.so/page_parent" in fake_browser.navigated_to
     assert '[data-testid="linked-database-option"]' in fake_browser.clicks
-    assert fake_browser.fills.get('[data-testid="database-search-input"]') == "db_source"
+    db_search_fill = fake_browser.fills.get('[data-testid="database-search-input"]')
+    assert db_search_fill == "db_source"
     
     # Verify result
     assert isinstance(result, NotionLinkedView)
@@ -323,7 +325,9 @@ async def test_unpublish_page_already_unpublished(browser_adapter, fake_browser)
 async def test_set_duplicate_as_template_enable(browser_adapter, fake_browser):
     """set_duplicate_as_template enables template mode."""
     # Currently disabled
-    fake_browser.set_element_visible('[data-testid="duplicate-as-template-enabled"]', False)
+    fake_browser.set_element_visible(
+        '[data-testid="duplicate-as-template-enabled"]', False
+    )
     
     result = await browser_adapter.set_duplicate_as_template("page_123", enabled=True)
     
@@ -339,7 +343,9 @@ async def test_set_duplicate_as_template_enable(browser_adapter, fake_browser):
 async def test_set_duplicate_as_template_already_enabled(browser_adapter, fake_browser):
     """set_duplicate_as_template skips toggle if already enabled."""
     # Already enabled
-    fake_browser.set_element_visible('[data-testid="duplicate-as-template-enabled"]', True)
+    fake_browser.set_element_visible(
+        '[data-testid="duplicate-as-template-enabled"]', True
+    )
     
     result = await browser_adapter.set_duplicate_as_template("page_123", enabled=True)
     
@@ -382,8 +388,9 @@ async def test_verify_stranger_access_accessible(browser_adapter, fake_browser):
     """verify_stranger_access returns True when page content loads."""
     # Simulate page content visible
     fake_browser.set_element_visible('[data-testid="page-content"]', True)
-    
-    result = await browser_adapter.verify_stranger_access("https://notion.site/page_123")
+
+    url = "https://notion.site/page_123"
+    result = await browser_adapter.verify_stranger_access(url)
     
     # Verify navigation in logged-out context
     assert "https://notion.site/page_123" in fake_browser.navigated_to
@@ -396,15 +403,17 @@ async def test_verify_stranger_access_accessible(browser_adapter, fake_browser):
 async def test_verify_stranger_access_blocked(browser_adapter, fake_browser):
     """verify_stranger_access returns False when page content doesn't load."""
     # Simulate wait_for_selector timeout (page content never appears)
-    # FakeBrowserSession.wait_for_selector is no-op, so simulate by not setting visibility
-    
+    # FakeBrowserSession.wait_for_selector is no-op,
+    # so simulate by not setting visibility
+
     # Override wait_for_selector to raise exception
     async def wait_timeout(selector: str, timeout: int = 5000) -> None:
         raise Exception("Timeout waiting for selector")
-    
+
     fake_browser.wait_for_selector = wait_timeout
-    
-    result = await browser_adapter.verify_stranger_access("https://notion.site/page_blocked")
+
+    url = "https://notion.site/page_blocked"
+    result = await browser_adapter.verify_stranger_access(url)
     
     # Verify result
     assert result is False

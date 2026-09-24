@@ -32,7 +32,8 @@ class NotionAdapterRouter:
         """Initialize router with optional config path.
 
         Args:
-            config_path: Path to integrations.yaml (defaults to config/integrations.yaml)
+            config_path: Path to integrations.yaml
+                        (defaults to config/integrations.yaml)
         """
         if config_path is None:
             # Default to repo root / config / integrations.yaml
@@ -79,13 +80,15 @@ class NotionAdapterRouter:
             raise NotImplementedError(
                 "Browser adapter requires Playwright session injection. "
                 "Production Playwright integration deferred to Session 06 Wave 4+. "
-                "Use FixtureNotionAdapter for testing or APINotionAdapter for API operations."
+                "Use FixtureNotionAdapter for testing or "
+                "APINotionAdapter for API operations."
             )
         elif mode == "combined":
             raise NotImplementedError(
                 "Combined adapter requires both API and browser session setup. "
                 "Deferred to Session 06 Wave 4+. "
-                "Use FixtureNotionAdapter for testing or APINotionAdapter for API operations."
+                "Use FixtureNotionAdapter for testing or "
+                "APINotionAdapter for API operations."
             )
         else:
             raise ValueError(
@@ -106,7 +109,9 @@ class NotionAdapterRouter:
         """
         valid_modes = {"fixture", "api", "browser", "combined"}
         if mode not in valid_modes:
-            raise ValueError(f"Invalid adapter mode: {mode}. Must be one of: {valid_modes}")
+            raise ValueError(
+                f"Invalid adapter mode: {mode}. Must be one of: {valid_modes}"
+            )
 
         # Clear cached adapter to force reload
         self._adapter = None
