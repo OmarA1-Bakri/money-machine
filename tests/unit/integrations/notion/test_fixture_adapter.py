@@ -310,7 +310,7 @@ async def test_fixture_set_view_title_visibility_updates_visibility(adapter):
     database = await adapter.create_database(title="DB")
     view = await adapter.create_table_view(database.id, "View")
 
-    updated = await adapter.set_view_title_visibility(view.id, False)
+    updated = await adapter.set_view_title_visibility(database.id, view.id, False)
 
     assert updated.id == view.id
     assert updated.title_visible is False
