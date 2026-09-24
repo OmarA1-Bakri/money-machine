@@ -94,7 +94,8 @@ def fake_anon_browser():
 def browser_adapter(fake_browser, fake_anon_browser):
     """Create BrowserNotionAdapter with fake browser and anon session factory."""
     return BrowserNotionAdapter(
-        browser_session=fake_browser, anon_session_factory=lambda: fake_anon_browser  # type: ignore[reportUnknownLambdaType]
+        browser_session=fake_browser,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
 
@@ -262,7 +263,8 @@ async def test_create_formula_fails_if_id_cannot_be_read(fake_browser, fake_anon
     # Create adapter with browser that won't return property ID
     fake_browser_no_id = FakeBrowserSession()
     adapter = BrowserNotionAdapter(
-        browser_session=fake_browser_no_id, anon_session_factory=lambda: fake_anon_browser  # type: ignore[reportUnknownLambdaType]
+        browser_session=fake_browser_no_id,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
     with pytest.raises(RuntimeError, match="Failed to read property ID"):
@@ -296,7 +298,8 @@ async def test_create_linked_view_fails_if_id_cannot_be_read(fake_browser, fake_
     """create_linked_view raises if view ID cannot be read."""
     fake_browser_no_id = FakeBrowserSession()
     adapter = BrowserNotionAdapter(
-        browser_session=fake_browser_no_id, anon_session_factory=lambda: fake_anon_browser  # type: ignore[reportUnknownLambdaType]
+        browser_session=fake_browser_no_id,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
     with pytest.raises(RuntimeError, match="Failed to read view ID"):
@@ -344,7 +347,8 @@ async def test_create_calendar_view_fails_if_id_cannot_be_read(fake_browser, fak
     # Browser that doesn't update URL with ?v=
     fake_browser_no_url = FakeBrowserSession()
     adapter = BrowserNotionAdapter(
-        browser_session=fake_browser_no_url, anon_session_factory=lambda: fake_anon_browser  # type: ignore[reportUnknownLambdaType]
+        browser_session=fake_browser_no_url,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
     with pytest.raises(RuntimeError, match="Failed to read view ID"):
@@ -388,7 +392,8 @@ async def test_create_table_view_fails_if_id_cannot_be_read(fake_browser, fake_a
     """create_table_view raises if view ID cannot be read from URL."""
     fake_browser_no_url = FakeBrowserSession()
     adapter = BrowserNotionAdapter(
-        browser_session=fake_browser_no_url, anon_session_factory=lambda: fake_anon_browser  # type: ignore[reportUnknownLambdaType]
+        browser_session=fake_browser_no_url,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
     with pytest.raises(RuntimeError, match="Failed to read view ID"):
@@ -432,7 +437,8 @@ async def test_create_board_view_fails_if_id_cannot_be_read(fake_browser, fake_a
     """create_board_view raises if view ID cannot be read from URL."""
     fake_browser_no_url = FakeBrowserSession()
     adapter = BrowserNotionAdapter(
-        browser_session=fake_browser_no_url, anon_session_factory=lambda: fake_anon_browser  # type: ignore[reportUnknownLambdaType]
+        browser_session=fake_browser_no_url,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
     with pytest.raises(RuntimeError, match="Failed to read view ID"):
@@ -644,7 +650,8 @@ async def test_verify_stranger_access_accessible(browser_adapter, fake_anon_brow
 async def test_verify_stranger_access_blocked(fake_browser, fake_anon_browser):
     """verify_stranger_access returns False when page content doesn't load (login wall)."""
     adapter = BrowserNotionAdapter(
-        browser_session=fake_browser, anon_session_factory=lambda: fake_anon_browser  # type: ignore[reportUnknownLambdaType]
+        browser_session=fake_browser,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
     # Override wait_for_selector to raise TimeoutError
@@ -705,7 +712,8 @@ async def test_verify_stranger_access_propagates_unexpected_errors(fake_browser)
             return "https://example.com"
 
     adapter = BrowserNotionAdapter(
-        browser_session=fake_browser, anon_session_factory=lambda: BadSession()  # type: ignore[reportUnknownLambdaType]
+        browser_session=fake_browser,
+        anon_session_factory=lambda: BadSession(),  # type: ignore[reportUnknownLambdaType]
     )
 
     # Unexpected error should propagate
