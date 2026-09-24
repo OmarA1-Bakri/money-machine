@@ -160,11 +160,12 @@ class BrowserNotionAdapter(NotionAdapter):
 
         # Read the title from the duplicated page
         title_attr = await self._browser.get_attribute('[data-testid="page-title"]', "textContent")
-        title = title_attr or f"Copy of page_{page_id}"
+        if not title_attr:
+            raise RuntimeError(f"Failed to read page title after duplicating {page_id}")
 
         return NotionPage(
             id=new_page_id,
-            title=title,
+            title=title_attr,
             parent_id=None,
             parent_type="workspace",
             created_at=datetime.now(UTC),

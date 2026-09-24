@@ -4,7 +4,9 @@ Tests BROWSER operations without real Playwright or live Notion UI.
 All browser interactions are mocked via FakeBrowserSession.
 """
 
+import re
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 
 import pytest
 
@@ -18,6 +20,43 @@ from money_machine.integrations.notion.domain import (
     NotionSort,
     NotionView,
 )
+
+
+def _parse_platform_compatibility() -> tuple[set[str], set[str]]:
+    """Parse PLATFORM_COMPATIBILITY.md to extract DIRECT_API and COMBINED operations.
+
+    Returns:
+        Tuple of (direct_api_ops, combined_ops) operation name sets.
+    """
+    compat_path = (
+        Path(__file__).parent.parent.parent.parent.parent
+        / "docs"
+        / "architecture"
+        / "PLATFORM_COMPATIBILITY.md"
+    )
+    if not compat_path.exists():
+        raise FileNotFoundError(f"PLATFORM_COMPATIBILITY.md not found at {compat_path}")
+
+    direct_api_ops = set()
+    combined_ops = set()
+
+    with open(compat_path) as f:
+        for line in f:
+            # Match table rows: | `operation_name` | METHOD | ...
+            match = re.match(r"^\|\s*`(\w+)`\s*\|\s*(\w+)\s*\|", line)
+            if match:
+                op_name = match.group(1)
+                method = match.group(2)
+                if method == "DIRECT_API":
+                    direct_api_ops.add(op_name)
+                elif method == "COMBINED":
+                    combined_ops.add(op_name)
+
+    return direct_api_ops, combined_ops
+
+
+# Parse capability matrix to derive expected operation sets
+EXPECTED_DIRECT_API_OPS, EXPECTED_COMBINED_OPS = _parse_platform_compatibility()
 
 
 class FakeBrowserSession:
@@ -100,13 +139,8 @@ def browser_adapter(fake_browser, fake_anon_browser):
 
 
 # Capability matrix refusal: DIRECT_API + COMBINED operations
-# Source: docs/architecture/PLATFORM_COMPATIBILITY.md
-# 18 DIRECT_API operations (lines 23-50: connection_status, workspace_discovery, create_page,
-# rename_page, move_page, set_icon, set_cover, add_text_block, add_callout_block, create_database,
-# add_property, create_relation, create_rollup, add_filter, add_sort, add_child_page, inspect_page,
-# inspect_database)
-# + 1 COMBINED operation (line 48: get_public_url)
-# = 19 total non-BROWSER operations that BrowserAdapter must refuse
+# Derived programmatically from docs/architecture/PLATFORM_COMPATIBILITY.md
+# via _parse_platform_compatibility()
 DIRECT_API_OPERATIONS: list[tuple[str, Callable[[NotionAdapter], Awaitable[object]]]] = [
     ("connection_status", lambda adapter: adapter.connection_status()),
     ("workspace_discovery", lambda adapter: adapter.workspace_discovery()),
@@ -145,13 +179,18 @@ COMBINED_OPERATIONS: list[tuple[str, Callable[[NotionAdapter], Awaitable[object]
     ("get_public_url", lambda adapter: adapter.get_public_url("page_123")),
 ]
 
-# Verify counts match PLATFORM_COMPATIBILITY.md capability matrix
-assert len(DIRECT_API_OPERATIONS) == 18, (
-    f"Expected 18 DIRECT_API ops per PLATFORM_COMPATIBILITY.md lines 23-50, "
-    f"got {len(DIRECT_API_OPERATIONS)}"
+# Verify operation lists match parsed capability matrix (drift detection)
+_test_direct_api_names = {name for name, _ in DIRECT_API_OPERATIONS}
+_test_combined_names = {name for name, _ in COMBINED_OPERATIONS}
+assert _test_direct_api_names == EXPECTED_DIRECT_API_OPS, (
+    f"DIRECT_API test operations drift from PLATFORM_COMPATIBILITY.md. "
+    f"Expected: {EXPECTED_DIRECT_API_OPS}, got: {_test_direct_api_names}, "
+    f"missing: {EXPECTED_DIRECT_API_OPS - _test_direct_api_names}, "
+    f"extra: {_test_direct_api_names - EXPECTED_DIRECT_API_OPS}"
 )
-assert len(COMBINED_OPERATIONS) == 1, (
-    f"Expected 1 COMBINED op per PLATFORM_COMPATIBILITY.md line 48, got {len(COMBINED_OPERATIONS)}"
+assert _test_combined_names == EXPECTED_COMBINED_OPS, (
+    f"COMBINED test operations drift from PLATFORM_COMPATIBILITY.md. "
+    f"Expected: {EXPECTED_COMBINED_OPS}, got: {_test_combined_names}"
 )
 
 ALL_NON_BROWSER_OPERATIONS = DIRECT_API_OPERATIONS + COMBINED_OPERATIONS
@@ -216,6 +255,22 @@ async def test_duplicate_page_reads_real_id(browser_adapter, fake_browser):
 
     assert result.id == "page_newid789"
     assert result.id != "page_source"
+
+
+@pytest.mark.asyncio
+async def test_duplicate_page_fails_if_title_cannot_be_read(browser_adapter, fake_browser):
+    """duplicate_page raises RuntimeError if page title cannot be read."""
+
+    async def navigate_mock(url: str) -> None:
+        fake_browser.navigated_to.append(url)
+        fake_browser.current_url = "https://www.notion.so/page_newid999"
+
+    fake_browser.navigate = navigate_mock
+    # Simulate title attribute not being available
+    fake_browser.set_attribute('[data-testid="page-title"]', "textContent", None)
+
+    with pytest.raises(RuntimeError, match="Failed to read page title after duplicating"):
+        await browser_adapter.duplicate_page("page_source")
 
 
 @pytest.mark.asyncio
