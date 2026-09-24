@@ -11,6 +11,7 @@ dependencies = [
   "alembic>=1.16,<2",
   "asyncpg>=0.30,<1",
   "fastapi>=0.116,<1",
+  "notion-client>=2.2,<3",
   "pydantic>=2.11,<3",
   "pyyaml>=6.0.2,<7",
   "sqlalchemy[asyncio]>=2.0.36,<3",

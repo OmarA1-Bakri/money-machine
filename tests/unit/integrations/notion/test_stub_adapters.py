@@ -8,24 +8,6 @@ from money_machine.integrations.notion.combined_adapter import CombinedNotionAda
 
 
 @pytest.mark.asyncio
-async def test_api_adapter_raises_not_implemented():
-    """APINotionAdapter raises NotImplementedError for all methods."""
-    adapter = APINotionAdapter()
-
-    with pytest.raises(NotImplementedError, match="Real API adapter deferred"):
-        await adapter.connection_status()
-
-    with pytest.raises(NotImplementedError, match="Real API adapter deferred"):
-        await adapter.workspace_discovery()
-
-    with pytest.raises(NotImplementedError, match="Real API adapter deferred"):
-        await adapter.create_page(title="Test")
-
-    with pytest.raises(NotImplementedError, match="Real API adapter deferred"):
-        await adapter.inspect_page(page_id="page_123")
-
-
-@pytest.mark.asyncio
 async def test_browser_adapter_raises_not_implemented_for_ui_ops():
     """BrowserNotionAdapter raises NotImplementedError for UI-only operations."""
     adapter = BrowserNotionAdapter()
@@ -76,7 +58,7 @@ async def test_combined_adapter_raises_not_implemented():
 @pytest.mark.asyncio
 async def test_api_adapter_browser_ops_indicate_method_mismatch():
     """APINotionAdapter indicates UI-only operations require BROWSER method."""
-    adapter = APINotionAdapter()
+    adapter = APINotionAdapter(api_token="test_token")
 
     with pytest.raises(NotImplementedError, match="requires BROWSER method"):
         await adapter.duplicate_page(page_id="page_123")
