@@ -1354,7 +1354,7 @@ async def test_translate_non_playwright_exceptions_propagate():
 
 @pytest.mark.asyncio
 async def test_translate_playwright_non_matching_error_propagates():
-    """Exception translation layer propagates playwright Error without navigation/connection keywords."""
+    """Exception translation layer propagates playwright Error without nav/connection keywords."""
     from money_machine.integrations.notion.browser_adapter import _translate_browser_exceptions
 
     class FakeGenericError(Exception):
