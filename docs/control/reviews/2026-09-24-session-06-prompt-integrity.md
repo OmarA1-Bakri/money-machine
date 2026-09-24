@@ -133,7 +133,7 @@
 - **Ungameable wording:** Fixture duplication test must prove: (1) Original page has properties + blocks, (2) Duplicate receives distinct ID, (3) Duplicate properties match original, (4) Duplicate blocks match original, (5) Changes to duplicate don't affect original
 - **Amendment:** W1 fixture duplication test satisfies ungameable wording using in-memory fixture state. Real Notion duplication tested in later wave after API/browser adapters implemented.
 
-## 3. Corrective Addendum — Wave 1 Execution
+## 3. Corrective addendum — Wave 1 Execution
 
 **Status:** Executable after all CRITICAL and HIGH findings resolved
 
