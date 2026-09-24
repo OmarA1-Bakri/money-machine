@@ -60,6 +60,7 @@ def _translate_browser_exceptions(fn):
 
     return wrapper
 
+
 from .adapter import NotionAdapter
 from .domain import (
     NotionCalloutBlock,
@@ -647,8 +648,10 @@ class BrowserNotionAdapter(NotionAdapter):
         # Validate database_id (32-hex, with or without dashes)
         # Normalize to undashed form
         normalized_db_id = database_id.replace("-", "")
-        if not normalized_db_id or len(normalized_db_id) != 32 or not all(
-            c in "0123456789abcdefABCDEF" for c in normalized_db_id
+        if (
+            not normalized_db_id
+            or len(normalized_db_id) != 32
+            or not all(c in "0123456789abcdefABCDEF" for c in normalized_db_id)
         ):
             raise ValueError(f"Invalid database_id: {database_id}")
 
