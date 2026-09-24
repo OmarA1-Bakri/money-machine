@@ -48,7 +48,14 @@ class APINotionAdapter(NotionAdapter):
             "Real API adapter deferred to Session 06 Wave 2+. Use FixtureNotionAdapter for testing."
         )
 
-    async def create_page(self, title: str, parent_id: str | None = None, parent_type: str = "workspace", icon: str | None = None, cover: str | None = None) -> NotionPage:
+    async def create_page(
+        self,
+        title: str,
+        parent_id: str | None = None,
+        parent_type: str = "workspace",
+        icon: str | None = None,
+        cover: str | None = None,
+    ) -> NotionPage:
         raise NotImplementedError(
             "Real API adapter deferred to Session 06 Wave 2+. Use FixtureNotionAdapter for testing."
         )
@@ -64,7 +71,9 @@ class APINotionAdapter(NotionAdapter):
             "Real API adapter deferred to Session 06 Wave 2+. Use FixtureNotionAdapter for testing."
         )
 
-    async def move_page(self, page_id: str, new_parent_id: str, new_parent_type: str = "workspace") -> NotionPage:
+    async def move_page(
+        self, page_id: str, new_parent_id: str, new_parent_type: str = "workspace"
+    ) -> NotionPage:
         raise NotImplementedError(
             "Real API adapter deferred to Session 06 Wave 2+. Use FixtureNotionAdapter for testing."
         )
@@ -84,27 +93,51 @@ class APINotionAdapter(NotionAdapter):
             "Real API adapter deferred to Session 06 Wave 2+. Use FixtureNotionAdapter for testing."
         )
 
-    async def add_callout_block(self, page_id: str, content: str, icon: str = "💡") -> NotionCalloutBlock:
+    async def add_callout_block(
+        self, page_id: str, content: str, icon: str = "💡"
+    ) -> NotionCalloutBlock:
         raise NotImplementedError(
             "Real API adapter deferred to Session 06 Wave 2+. Use FixtureNotionAdapter for testing."
         )
 
-    async def create_database(self, title: str, parent_id: str | None = None, parent_type: str = "workspace", icon: str | None = None, cover: str | None = None) -> NotionDatabase:
+    async def create_database(
+        self,
+        title: str,
+        parent_id: str | None = None,
+        parent_type: str = "workspace",
+        icon: str | None = None,
+        cover: str | None = None,
+    ) -> NotionDatabase:
         raise NotImplementedError(
             "Real API adapter deferred to Session 06 Wave 2+. Use FixtureNotionAdapter for testing."
         )
 
-    async def add_property(self, database_id: str, name: str, property_type: str, config: dict) -> NotionDatabaseProperty:
+    async def add_property(
+        self, database_id: str, name: str, property_type: str, config: dict
+    ) -> NotionDatabaseProperty:
         raise NotImplementedError(
             "Real API adapter deferred to Session 06 Wave 2+. Use FixtureNotionAdapter for testing."
         )
 
-    async def create_relation(self, database_id: str, name: str, target_database_id: str, synced_property_name: str | None = None) -> NotionRelation:
+    async def create_relation(
+        self,
+        database_id: str,
+        name: str,
+        target_database_id: str,
+        synced_property_name: str | None = None,
+    ) -> NotionRelation:
         raise NotImplementedError(
             "Real API adapter deferred to Session 06 Wave 2+. Use FixtureNotionAdapter for testing."
         )
 
-    async def create_rollup(self, database_id: str, name: str, relation_property_id: str, rollup_property_id: str, function: str) -> NotionRollup:
+    async def create_rollup(
+        self,
+        database_id: str,
+        name: str,
+        relation_property_id: str,
+        rollup_property_id: str,
+        function: str,
+    ) -> NotionRollup:
         raise NotImplementedError(
             "Real API adapter deferred to Session 06 Wave 2+. Use FixtureNotionAdapter for testing."
         )
@@ -115,7 +148,9 @@ class APINotionAdapter(NotionAdapter):
             "Deferred to Session 06 Wave 3+. Use FixtureNotionAdapter for testing."
         )
 
-    async def create_linked_view(self, source_database_id: str, parent_page_id: str, view_type: str = "table") -> NotionLinkedView:
+    async def create_linked_view(
+        self, source_database_id: str, parent_page_id: str, view_type: str = "table"
+    ) -> NotionLinkedView:
         raise NotImplementedError(
             "create_linked_view requires BROWSER method (UI-only). "
             "Deferred to Session 06 Wave 3+. Use FixtureNotionAdapter for testing."
@@ -131,7 +166,9 @@ class APINotionAdapter(NotionAdapter):
             "Real API adapter deferred to Session 06 Wave 2+. Use FixtureNotionAdapter for testing."
         )
 
-    async def create_calendar_view(self, database_id: str, name: str, date_property: str) -> NotionView:
+    async def create_calendar_view(
+        self, database_id: str, name: str, date_property: str
+    ) -> NotionView:
         raise NotImplementedError(
             "create_calendar_view requires BROWSER method (UI-only). "
             "Deferred to Session 06 Wave 3+. Use FixtureNotionAdapter for testing."
@@ -143,7 +180,9 @@ class APINotionAdapter(NotionAdapter):
             "Deferred to Session 06 Wave 3+. Use FixtureNotionAdapter for testing."
         )
 
-    async def create_board_view(self, database_id: str, name: str, group_by_property: str) -> NotionView:
+    async def create_board_view(
+        self, database_id: str, name: str, group_by_property: str
+    ) -> NotionView:
         raise NotImplementedError(
             "create_board_view requires BROWSER method (UI-only). "
             "Deferred to Session 06 Wave 3+. Use FixtureNotionAdapter for testing."

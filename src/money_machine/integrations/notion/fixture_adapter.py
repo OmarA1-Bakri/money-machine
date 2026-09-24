@@ -242,9 +242,7 @@ class FixtureNotionAdapter(NotionAdapter):
 
         # Create new property
         prop_id = self._generate_id("prop")
-        prop = NotionDatabaseProperty(
-            id=prop_id, name=name, type=property_type, config=config
-        )
+        prop = NotionDatabaseProperty(id=prop_id, name=name, type=property_type, config=config)
         database.properties.append(prop)
         database.updated_at = datetime.utcnow()
         return prop
@@ -312,9 +310,7 @@ class FixtureNotionAdapter(NotionAdapter):
 
         return rollup
 
-    async def create_formula(
-        self, database_id: str, name: str, expression: str
-    ) -> NotionFormula:
+    async def create_formula(self, database_id: str, name: str, expression: str) -> NotionFormula:
         """Create a formula property."""
         database = self.databases.get(database_id)
         if not database:
@@ -355,9 +351,7 @@ class FixtureNotionAdapter(NotionAdapter):
         self.linked_views[linked_view_id] = linked_view
         return linked_view
 
-    async def add_filter(
-        self, database_id: str, view_id: str, filter_spec: NotionFilter
-    ) -> dict:
+    async def add_filter(self, database_id: str, view_id: str, filter_spec: NotionFilter) -> dict:
         """Add a filter to a view."""
         if database_id not in self.databases:
             raise ValueError(f"Database {database_id} not found")
@@ -372,9 +366,7 @@ class FixtureNotionAdapter(NotionAdapter):
             },
         }
 
-    async def add_sort(
-        self, database_id: str, view_id: str, sort_spec: NotionSort
-    ) -> dict:
+    async def add_sort(self, database_id: str, view_id: str, sort_spec: NotionSort) -> dict:
         """Add a sort to a view."""
         if database_id not in self.databases:
             raise ValueError(f"Database {database_id} not found")
@@ -396,9 +388,7 @@ class FixtureNotionAdapter(NotionAdapter):
             raise ValueError(f"Database {database_id} not found")
 
         view_id = self._generate_id("view")
-        view = NotionView(
-            id=view_id, database_id=database_id, name=name, type="calendar"
-        )
+        view = NotionView(id=view_id, database_id=database_id, name=name, type="calendar")
         self.views[view_id] = view
         return view
 
@@ -408,9 +398,7 @@ class FixtureNotionAdapter(NotionAdapter):
             raise ValueError(f"Database {database_id} not found")
 
         view_id = self._generate_id("view")
-        view = NotionView(
-            id=view_id, database_id=database_id, name=name, type="table"
-        )
+        view = NotionView(id=view_id, database_id=database_id, name=name, type="table")
         self.views[view_id] = view
         return view
 
@@ -422,15 +410,11 @@ class FixtureNotionAdapter(NotionAdapter):
             raise ValueError(f"Database {database_id} not found")
 
         view_id = self._generate_id("view")
-        view = NotionView(
-            id=view_id, database_id=database_id, name=name, type="board"
-        )
+        view = NotionView(id=view_id, database_id=database_id, name=name, type="board")
         self.views[view_id] = view
         return view
 
-    async def set_view_title_visibility(
-        self, view_id: str, visible: bool
-    ) -> NotionView:
+    async def set_view_title_visibility(self, view_id: str, visible: bool) -> NotionView:
         """Set view title visibility."""
         view = self.views.get(view_id)
         if not view:
@@ -439,16 +423,12 @@ class FixtureNotionAdapter(NotionAdapter):
         view.title_visible = visible
         return view
 
-    async def add_child_page(
-        self, parent_page_id: str, title: str
-    ) -> NotionPage:
+    async def add_child_page(self, parent_page_id: str, title: str) -> NotionPage:
         """Add a child page."""
         if parent_page_id not in self.pages:
             raise ValueError(f"Parent page {parent_page_id} not found")
 
-        return await self.create_page(
-            title=title, parent_id=parent_page_id, parent_type="page_id"
-        )
+        return await self.create_page(title=title, parent_id=parent_page_id, parent_type="page_id")
 
     async def publish_page(self, page_id: str) -> NotionPage:
         """Publish page to web."""
@@ -461,9 +441,7 @@ class FixtureNotionAdapter(NotionAdapter):
         page.updated_at = datetime.utcnow()
         return page
 
-    async def set_duplicate_as_template(
-        self, page_id: str, enabled: bool
-    ) -> NotionPage:
+    async def set_duplicate_as_template(self, page_id: str, enabled: bool) -> NotionPage:
         """Set duplicate-as-template setting."""
         page = self.pages.get(page_id)
         if not page:
@@ -473,9 +451,7 @@ class FixtureNotionAdapter(NotionAdapter):
         page.updated_at = datetime.utcnow()
         return page
 
-    async def set_search_indexing(
-        self, page_id: str, enabled: bool
-    ) -> NotionPage:
+    async def set_search_indexing(self, page_id: str, enabled: bool) -> NotionPage:
         """Set search indexing setting."""
         page = self.pages.get(page_id)
         if not page:

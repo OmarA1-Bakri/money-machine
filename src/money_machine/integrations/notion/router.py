@@ -97,9 +97,7 @@ class NotionAdapterRouter:
         """
         valid_modes = {"fixture", "api", "browser", "combined"}
         if mode not in valid_modes:
-            raise ValueError(
-                f"Invalid adapter mode: {mode}. Must be one of: {valid_modes}"
-            )
+            raise ValueError(f"Invalid adapter mode: {mode}. Must be one of: {valid_modes}")
 
         # Clear cached adapter to force reload
         self._adapter = None

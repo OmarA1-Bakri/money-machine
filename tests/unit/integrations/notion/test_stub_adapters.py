@@ -37,9 +37,7 @@ async def test_browser_adapter_raises_not_implemented_for_ui_ops():
         await adapter.create_formula(database_id="db_123", name="Formula", expression="1+1")
 
     with pytest.raises(NotImplementedError, match="Real browser adapter deferred"):
-        await adapter.create_linked_view(
-            source_database_id="db_123", parent_page_id="page_123"
-        )
+        await adapter.create_linked_view(source_database_id="db_123", parent_page_id="page_123")
 
     with pytest.raises(NotImplementedError, match="Real browser adapter deferred"):
         await adapter.publish_page(page_id="page_123")

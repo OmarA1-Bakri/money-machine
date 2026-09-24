@@ -147,9 +147,7 @@ class CombinedNotionAdapter(NotionAdapter):
             "Use FixtureNotionAdapter for testing."
         )
 
-    async def create_formula(
-        self, database_id: str, name: str, expression: str
-    ) -> NotionFormula:
+    async def create_formula(self, database_id: str, name: str, expression: str) -> NotionFormula:
         raise NotImplementedError(
             "Real combined adapter deferred to Session 06 Wave 3+. "
             "Use FixtureNotionAdapter for testing."
@@ -166,17 +164,13 @@ class CombinedNotionAdapter(NotionAdapter):
             "Use FixtureNotionAdapter for testing."
         )
 
-    async def add_filter(
-        self, database_id: str, view_id: str, filter_spec: NotionFilter
-    ) -> dict:
+    async def add_filter(self, database_id: str, view_id: str, filter_spec: NotionFilter) -> dict:
         raise NotImplementedError(
             "Real combined adapter deferred to Session 06 Wave 3+. "
             "Use FixtureNotionAdapter for testing."
         )
 
-    async def add_sort(
-        self, database_id: str, view_id: str, sort_spec: NotionSort
-    ) -> dict:
+    async def add_sort(self, database_id: str, view_id: str, sort_spec: NotionSort) -> dict:
         raise NotImplementedError(
             "Real combined adapter deferred to Session 06 Wave 3+. "
             "Use FixtureNotionAdapter for testing."
@@ -204,9 +198,7 @@ class CombinedNotionAdapter(NotionAdapter):
             "Use FixtureNotionAdapter for testing."
         )
 
-    async def set_view_title_visibility(
-        self, view_id: str, visible: bool
-    ) -> NotionView:
+    async def set_view_title_visibility(self, view_id: str, visible: bool) -> NotionView:
         raise NotImplementedError(
             "Real combined adapter deferred to Session 06 Wave 3+. "
             "Use FixtureNotionAdapter for testing."
@@ -224,9 +216,7 @@ class CombinedNotionAdapter(NotionAdapter):
             "Use FixtureNotionAdapter for testing."
         )
 
-    async def set_duplicate_as_template(
-        self, page_id: str, enabled: bool
-    ) -> NotionPage:
+    async def set_duplicate_as_template(self, page_id: str, enabled: bool) -> NotionPage:
         raise NotImplementedError(
             "Real combined adapter deferred to Session 06 Wave 3+. "
             "Use FixtureNotionAdapter for testing."

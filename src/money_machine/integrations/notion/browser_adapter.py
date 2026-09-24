@@ -75,20 +75,17 @@ class BrowserNotionAdapter(NotionAdapter):
         self, page_id: str, new_parent_id: str, new_parent_type: str = "workspace"
     ) -> NotionPage:
         raise NotImplementedError(
-            "move_page uses API method, not BROWSER. "
-            "Use APINotionAdapter or FixtureNotionAdapter."
+            "move_page uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
         )
 
     async def set_icon(self, page_id: str, icon: str) -> NotionPage:
         raise NotImplementedError(
-            "set_icon uses API method, not BROWSER. "
-            "Use APINotionAdapter or FixtureNotionAdapter."
+            "set_icon uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
         )
 
     async def set_cover(self, page_id: str, cover_url: str) -> NotionPage:
         raise NotImplementedError(
-            "set_cover uses API method, not BROWSER. "
-            "Use APINotionAdapter or FixtureNotionAdapter."
+            "set_cover uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
         )
 
     async def add_text_block(self, page_id: str, content: str) -> NotionTextBlock:
@@ -151,9 +148,7 @@ class BrowserNotionAdapter(NotionAdapter):
             "Use APINotionAdapter or FixtureNotionAdapter."
         )
 
-    async def create_formula(
-        self, database_id: str, name: str, expression: str
-    ) -> NotionFormula:
+    async def create_formula(self, database_id: str, name: str, expression: str) -> NotionFormula:
         raise NotImplementedError(
             "Real browser adapter deferred to Session 06 Wave 3+. "
             "Use FixtureNotionAdapter for testing."
@@ -170,20 +165,14 @@ class BrowserNotionAdapter(NotionAdapter):
             "Use FixtureNotionAdapter for testing."
         )
 
-    async def add_filter(
-        self, database_id: str, view_id: str, filter_spec: NotionFilter
-    ) -> dict:
+    async def add_filter(self, database_id: str, view_id: str, filter_spec: NotionFilter) -> dict:
         raise NotImplementedError(
-            "add_filter uses API method, not BROWSER. "
-            "Use APINotionAdapter or FixtureNotionAdapter."
+            "add_filter uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
         )
 
-    async def add_sort(
-        self, database_id: str, view_id: str, sort_spec: NotionSort
-    ) -> dict:
+    async def add_sort(self, database_id: str, view_id: str, sort_spec: NotionSort) -> dict:
         raise NotImplementedError(
-            "add_sort uses API method, not BROWSER. "
-            "Use APINotionAdapter or FixtureNotionAdapter."
+            "add_sort uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
         )
 
     async def create_calendar_view(
@@ -208,9 +197,7 @@ class BrowserNotionAdapter(NotionAdapter):
             "Use FixtureNotionAdapter for testing."
         )
 
-    async def set_view_title_visibility(
-        self, view_id: str, visible: bool
-    ) -> NotionView:
+    async def set_view_title_visibility(self, view_id: str, visible: bool) -> NotionView:
         raise NotImplementedError(
             "Real browser adapter deferred to Session 06 Wave 3+. "
             "Use FixtureNotionAdapter for testing."
@@ -228,9 +215,7 @@ class BrowserNotionAdapter(NotionAdapter):
             "Use FixtureNotionAdapter for testing."
         )
 
-    async def set_duplicate_as_template(
-        self, page_id: str, enabled: bool
-    ) -> NotionPage:
+    async def set_duplicate_as_template(self, page_id: str, enabled: bool) -> NotionPage:
         raise NotImplementedError(
             "Real browser adapter deferred to Session 06 Wave 3+. "
             "Use FixtureNotionAdapter for testing."
