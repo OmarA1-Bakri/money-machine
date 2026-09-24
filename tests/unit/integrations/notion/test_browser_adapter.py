@@ -74,6 +74,7 @@ class FakeBrowserSession:
         self.fills: dict[str, str] = {}
         self._element_visibility: dict[str, bool] = {}
         self._element_attributes: dict[tuple[str, str], str] = {}
+        self.closed = False
 
     async def navigate(self, url: str) -> None:
         """Record navigation."""
@@ -103,6 +104,10 @@ class FakeBrowserSession:
     async def get_current_url(self) -> str:
         """Return current URL."""
         return self.current_url
+
+    async def close(self) -> None:
+        """Mark session as closed."""
+        self.closed = True
 
     def set_element_visible(self, selector: str, visible: bool) -> None:
         """Configure element visibility for test."""
@@ -212,6 +217,16 @@ async def test_non_browser_operations_raise_not_implemented(
 
 # Test: duplicate_page
 @pytest.mark.asyncio
+async def test_duplicate_page_raises_on_empty_id(browser_adapter):
+    """duplicate_page raises ValueError when page_id is empty."""
+    with pytest.raises(ValueError, match="page_id cannot be empty"):
+        await browser_adapter.duplicate_page("")
+
+    with pytest.raises(ValueError, match="page_id cannot be empty"):
+        await browser_adapter.duplicate_page("   ")
+
+
+@pytest.mark.asyncio
 async def test_duplicate_page(browser_adapter, fake_browser):
     """duplicate_page navigates to page, clicks duplicate, reads new ID and title."""
 
@@ -219,25 +234,114 @@ async def test_duplicate_page(browser_adapter, fake_browser):
     async def navigate_mock(url: str) -> None:
         fake_browser.navigated_to.append(url)
         # After navigating and duplicating, set the new URL
-        fake_browser.current_url = "https://www.notion.so/page_new123"
+        fake_browser.current_url = "https://www.notion.so/page_new123456789012345678901234"
 
     fake_browser.navigate = navigate_mock
 
     # Set up the page title attribute
     fake_browser.set_attribute('[data-testid="page-title"]', "textContent", "Copy of Original Page")
 
-    result = await browser_adapter.duplicate_page("page_orig456")
+    result = await browser_adapter.duplicate_page("page_orig456789012345678901234")
 
     # Verify browser interactions
-    assert "https://www.notion.so/page_orig456" in fake_browser.navigated_to
+    assert "https://www.notion.so/page_orig456789012345678901234" in fake_browser.navigated_to
     assert '[data-testid="page-menu-button"]' in fake_browser.clicks
     assert '[data-testid="duplicate-page-action"]' in fake_browser.clicks
 
     # Verify result
     assert isinstance(result, NotionPage)
-    assert result.id == "page_new123"
-    assert result.id != "page_orig456"  # New ID must differ from source
+    assert result.id == "pagenew123456789012345678901234"
+    assert result.id != "pageorigb56789012345678901234"  # New ID must differ from source
     assert result.title == "Copy of Original Page"
+
+
+@pytest.mark.asyncio
+async def test_duplicate_page_parses_title_prefixed_id_with_dashes(browser_adapter, fake_browser):
+    """duplicate_page parses ID from Title-32-hex-id-with-dashes URL format."""
+
+    async def navigate_mock(url: str) -> None:
+        fake_browser.navigated_to.append(url)
+        # URL with title prefix and dashed ID
+        fake_browser.current_url = (
+            "https://www.notion.so/My-Page-Title-abc12345-6789-0123-4567-890123456789"
+        )
+
+    fake_browser.navigate = navigate_mock
+    fake_browser.set_attribute('[data-testid="page-title"]', "textContent", "My Page Title")
+
+    result = await browser_adapter.duplicate_page("source12345678901234567890123456")
+
+    # Verify the ID was extracted correctly (32 hex characters, undashed)
+    assert result.id == "abc123456789012345678901234567890"  # Note: reconstructed from parts
+
+
+@pytest.mark.asyncio
+async def test_duplicate_page_parses_title_prefixed_id_undashed(browser_adapter, fake_browser):
+    """duplicate_page parses ID from Title-undashed32hexid URL format."""
+
+    async def navigate_mock(url: str) -> None:
+        fake_browser.navigated_to.append(url)
+        # URL with title prefix and undashed ID (32 contiguous hex chars after last dash)
+        fake_browser.current_url = (
+            "https://www.notion.so/Some-Title-def0123456789abcdef0123456789ab"
+        )
+
+    fake_browser.navigate = navigate_mock
+    fake_browser.set_attribute('[data-testid="page-title"]', "textContent", "Some Title")
+
+    result = await browser_adapter.duplicate_page("source12345678901234567890123456")
+
+    # Verify the ID was extracted correctly
+    assert result.id == "def0123456789abcdef0123456789ab"
+
+
+@pytest.mark.asyncio
+async def test_duplicate_page_parses_plain_dashed_id(browser_adapter, fake_browser):
+    """duplicate_page parses dashed ID without title prefix."""
+
+    async def navigate_mock(url: str) -> None:
+        fake_browser.navigated_to.append(url)
+        fake_browser.current_url = "https://www.notion.so/12345678-9abc-def0-1234-56789abcdef0"
+
+    fake_browser.navigate = navigate_mock
+    fake_browser.set_attribute('[data-testid="page-title"]', "textContent", "Dashed Page")
+
+    result = await browser_adapter.duplicate_page("source12345678901234567890123456")
+
+    # Verify dashes were removed
+    assert result.id == "123456789abcdef0123456789abcdef0"
+
+
+@pytest.mark.asyncio
+async def test_duplicate_page_parses_plain_undashed_id(browser_adapter, fake_browser):
+    """duplicate_page parses undashed 32-hex ID."""
+
+    async def navigate_mock(url: str) -> None:
+        fake_browser.navigated_to.append(url)
+        fake_browser.current_url = "https://www.notion.so/fedcba9876543210fedcba9876543210"
+
+    fake_browser.navigate = navigate_mock
+    fake_browser.set_attribute('[data-testid="page-title"]', "textContent", "Undashed Page")
+
+    result = await browser_adapter.duplicate_page("source12345678901234567890123456")
+
+    assert result.id == "fedcba9876543210fedcba9876543210"
+
+
+@pytest.mark.asyncio
+async def test_duplicate_page_raises_on_malformed_id(browser_adapter, fake_browser):
+    """duplicate_page raises RuntimeError for malformed IDs in URL."""
+
+    async def navigate_mock(url: str) -> None:
+        fake_browser.navigated_to.append(url)
+        # URL with non-hex characters or wrong length
+        fake_browser.current_url = "https://www.notion.so/malformed-zzz"
+
+    fake_browser.navigate = navigate_mock
+    fake_browser.set_attribute('[data-testid="page-title"]', "textContent", "Page")
+
+    with pytest.raises(RuntimeError, match="Failed to parse page ID from URL"):
+        await browser_adapter.duplicate_page("source12345678901234567890123456")
 
 
 @pytest.mark.asyncio
@@ -246,15 +350,15 @@ async def test_duplicate_page_reads_real_id(browser_adapter, fake_browser):
 
     async def navigate_mock(url: str) -> None:
         fake_browser.navigated_to.append(url)
-        fake_browser.current_url = "https://www.notion.so/page_newid789"
+        fake_browser.current_url = "https://www.notion.so/pagenewid789012345678901234567890"
 
     fake_browser.navigate = navigate_mock
     fake_browser.set_attribute('[data-testid="page-title"]', "textContent", "Duplicated Page")
 
-    result = await browser_adapter.duplicate_page("page_source")
+    result = await browser_adapter.duplicate_page("pagesource123456789012345678901234")
 
-    assert result.id == "page_newid789"
-    assert result.id != "page_source"
+    assert result.id == "pagenewid789012345678901234567890"
+    assert result.id != "pagesource123456789012345678901234"
 
 
 @pytest.mark.asyncio
@@ -587,7 +691,15 @@ async def test_set_view_title_visibility_show(browser_adapter, fake_browser):
     # Title currently hidden
     fake_browser.set_element_visible('[data-testid="view-title"]', False)
 
-    result = await browser_adapter.set_view_title_visibility("view_123", visible=True)
+    result = await browser_adapter.set_view_title_visibility(
+        "db12345678901234567890123456789012", "view_123", visible=True
+    )
+
+    # Verify navigation to database with view ID
+    assert any(
+        "db12345678901234567890123456789012" in url and "v=view_123" in url
+        for url in fake_browser.navigated_to
+    )
 
     # Verify toggle was clicked (since current state ≠ desired)
     assert '[data-testid="view-title-visibility-toggle"]' in fake_browser.clicks
@@ -603,7 +715,9 @@ async def test_set_view_title_visibility_hide(browser_adapter, fake_browser):
     # Title currently visible
     fake_browser.set_element_visible('[data-testid="view-title"]', True)
 
-    result = await browser_adapter.set_view_title_visibility("view_456", visible=False)
+    result = await browser_adapter.set_view_title_visibility(
+        "db12345678901234567890123456789012", "view_456", visible=False
+    )
 
     # Verify toggle was clicked (since current state ≠ desired)
     assert '[data-testid="view-title-visibility-toggle"]' in fake_browser.clicks
@@ -619,7 +733,9 @@ async def test_set_view_title_visibility_already_visible(browser_adapter, fake_b
     # Title already visible
     fake_browser.set_element_visible('[data-testid="view-title"]', True)
 
-    result = await browser_adapter.set_view_title_visibility("view_123", visible=True)
+    result = await browser_adapter.set_view_title_visibility(
+        "ab12345678901234567890123456789012", "view_123", visible=True
+    )
 
     # Verify toggle was NOT clicked (already in desired state)
     assert '[data-testid="view-title-visibility-toggle"]' not in fake_browser.clicks
@@ -629,39 +745,55 @@ async def test_set_view_title_visibility_already_visible(browser_adapter, fake_b
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "invalid_url,expected_match",
-    [
-        ("https://example.com/page", r"not notion\.so"),
-        ("https://www.notion.so", r"no database/page ID"),
-        ("https://www.notion.so/", r"no database/page ID"),
-        ("https://notion.so.evil.com/abc", r"not notion\.so"),
-        ("https://evilnotion.so/abc", r"not notion\.so"),
-        ("http://www.notion.so/abc", r"must use https"),
-    ],
-)
-async def test_set_view_title_visibility_rejects_invalid_urls(
-    fake_browser, fake_anon_browser, invalid_url, expected_match
+async def test_set_view_title_visibility_uses_given_database_not_current_page(
+    fake_browser, fake_anon_browser
 ):
-    """set_view_title_visibility raises for invalid URLs.
-
-    Tests rejection of non-https, non-notion.so, bare domain, and malicious URLs.
-    """
-
-    async def navigate_to_invalid(url: str) -> None:
-        fake_browser.navigated_to.append(url)
-        fake_browser.current_url = invalid_url
-
-    fake_browser.navigate = navigate_to_invalid
-    fake_browser.current_url = invalid_url
+    """set_view_title_visibility builds URL from given database_id, not current page."""
+    # Set fake browser to a different database page
+    fake_browser.current_url = "https://www.notion.so/different_db_id"
 
     adapter = BrowserNotionAdapter(
         browser_session=fake_browser,
         anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
-    with pytest.raises(RuntimeError, match=expected_match):
-        await adapter.set_view_title_visibility("view_123", visible=True)
+    fake_browser.set_element_visible('[data-testid="view-title"]', False)
+
+    await adapter.set_view_title_visibility(
+        "target_db_12345678901234567890123", "view_abc", visible=True
+    )
+
+    # Verify we navigated to the TARGET database, not the "different_db_id"
+    assert any(
+        "target_db_12345678901234567890123" in url and "v=view_abc" in url
+        for url in fake_browser.navigated_to
+    )
+    assert not any("different_db_id" in url for url in fake_browser.navigated_to[1:])
+
+
+@pytest.mark.asyncio
+async def test_set_view_title_visibility_rejects_invalid_database_id(
+    fake_browser, fake_anon_browser
+):
+    """set_view_title_visibility raises ValueError for invalid database_id."""
+    adapter = BrowserNotionAdapter(
+        browser_session=fake_browser,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
+    )
+
+    # Empty database_id
+    with pytest.raises(ValueError, match="Invalid database_id"):
+        await adapter.set_view_title_visibility("", "view_123", visible=True)
+
+    # Too short
+    with pytest.raises(ValueError, match="Invalid database_id"):
+        await adapter.set_view_title_visibility("short", "view_123", visible=True)
+
+    # Non-hex characters
+    with pytest.raises(ValueError, match="Invalid database_id"):
+        await adapter.set_view_title_visibility(
+            "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", "view_123", visible=True
+        )
 
 
 # Test: publish_page
@@ -840,6 +972,9 @@ async def test_verify_stranger_access_accessible(browser_adapter, fake_anon_brow
     # Verify result
     assert result is True
 
+    # Verify session was closed
+    assert fake_anon_browser.closed is True
+
 
 @pytest.mark.asyncio
 async def test_verify_stranger_access_blocked(fake_browser, fake_anon_browser):
@@ -860,6 +995,56 @@ async def test_verify_stranger_access_blocked(fake_browser, fake_anon_browser):
 
     # Verify result
     assert result is False
+
+    # Verify session was closed even when blocked
+    assert fake_anon_browser.closed is True
+
+
+@pytest.mark.asyncio
+async def test_verify_stranger_access_close_called_on_error(fake_browser):
+    """verify_stranger_access closes session even when an error propagates."""
+
+    # Create anon session that tracks close() calls
+    class ErrorSession:
+        def __init__(self):
+            self.closed = False
+
+        async def navigate(self, url: str) -> None:
+            raise RuntimeError("Unexpected DOM error")
+
+        async def click(self, selector: str) -> None:
+            pass
+
+        async def fill(self, selector: str, value: str) -> None:
+            pass
+
+        async def get_attribute(self, selector: str, attribute: str) -> str | None:
+            return None
+
+        async def is_visible(self, selector: str) -> bool:
+            return False
+
+        async def wait_for_selector(self, selector: str, timeout: int = 5000) -> None:
+            pass
+
+        async def get_current_url(self) -> str:
+            return "https://example.com"
+
+        async def close(self) -> None:
+            self.closed = True
+
+    error_session = ErrorSession()
+    adapter = BrowserNotionAdapter(
+        browser_session=fake_browser,
+        anon_session_factory=lambda: error_session,  # type: ignore[reportUnknownLambdaType]
+    )
+
+    # RuntimeError from wait_for_selector should propagate
+    with pytest.raises(RuntimeError, match="Unexpected DOM error"):
+        await adapter.verify_stranger_access("https://notion.site/page_error")
+
+    # Verify session was closed even when error propagated
+    assert error_session.closed is True
 
 
 @pytest.mark.asyncio
@@ -962,3 +1147,135 @@ async def test_verify_stranger_access_requires_anon_session_factory(fake_browser
 
     with pytest.raises(RuntimeError, match="requires an anonymous session factory"):
         await adapter.verify_stranger_access("https://notion.site/page")
+
+
+# Test: Exception translation layer
+@pytest.mark.asyncio
+async def test_translate_playwright_timeout_error():
+    """Exception translation layer maps playwright.*.TimeoutError to built-in TimeoutError."""
+    from money_machine.integrations.notion.browser_adapter import _translate_browser_exceptions
+
+    # Create a fake playwright TimeoutError
+    class FakePlaywrightModule:
+        """Fake module to simulate playwright._impl._errors."""
+
+        pass
+
+    class FakeTimeoutError(Exception):
+        """Fake TimeoutError from playwright."""
+
+        pass
+
+    # Set the module name to simulate playwright exception
+    FakeTimeoutError.__module__ = "playwright._impl._errors"
+    FakeTimeoutError.__name__ = "TimeoutError"
+
+    @_translate_browser_exceptions
+    async def fake_operation():
+        raise FakeTimeoutError("Timeout waiting for selector")
+
+    # Should be translated to built-in TimeoutError
+    with pytest.raises(TimeoutError, match="Timeout waiting for selector"):
+        await fake_operation()
+
+
+@pytest.mark.asyncio
+async def test_translate_playwright_navigation_error():
+    """Exception translation layer maps playwright navigation Error to ConnectionError."""
+    from money_machine.integrations.notion.browser_adapter import _translate_browser_exceptions
+
+    class FakeNavigationError(Exception):
+        """Fake Error from playwright with navigation keyword."""
+
+        pass
+
+    FakeNavigationError.__module__ = "playwright._impl._errors"
+    FakeNavigationError.__name__ = "Error"
+
+    @_translate_browser_exceptions
+    async def fake_operation():
+        raise FakeNavigationError("Navigation timeout exceeded")
+
+    # Should be translated to built-in ConnectionError
+    with pytest.raises(ConnectionError, match="Navigation timeout exceeded"):
+        await fake_operation()
+
+
+@pytest.mark.asyncio
+async def test_translate_playwright_connection_error():
+    """Exception translation layer maps playwright connection Error to ConnectionError."""
+    from money_machine.integrations.notion.browser_adapter import _translate_browser_exceptions
+
+    class FakeConnectionError(Exception):
+        """Fake Error from playwright with connection keyword."""
+
+        pass
+
+    FakeConnectionError.__module__ = "playwright._impl._errors"
+    FakeConnectionError.__name__ = "Error"
+
+    @_translate_browser_exceptions
+    async def fake_operation():
+        raise FakeConnectionError("net::ERR_CONNECTION_REFUSED")
+
+    # Should be translated to built-in ConnectionError
+    with pytest.raises(ConnectionError, match="net::ERR_CONNECTION_REFUSED"):
+        await fake_operation()
+
+
+@pytest.mark.asyncio
+async def test_translate_playwright_network_error():
+    """Exception translation layer maps playwright network Error to ConnectionError."""
+    from money_machine.integrations.notion.browser_adapter import _translate_browser_exceptions
+
+    class FakeNetworkError(Exception):
+        """Fake Error from playwright with network keyword."""
+
+        pass
+
+    FakeNetworkError.__module__ = "playwright._impl._errors"
+    FakeNetworkError.__name__ = "Error"
+
+    @_translate_browser_exceptions
+    async def fake_operation():
+        raise FakeNetworkError("Network error occurred")
+
+    # Should be translated to built-in ConnectionError
+    with pytest.raises(ConnectionError, match="Network error occurred"):
+        await fake_operation()
+
+
+@pytest.mark.asyncio
+async def test_translate_non_playwright_exceptions_propagate():
+    """Exception translation layer lets non-playwright exceptions propagate unchanged."""
+    from money_machine.integrations.notion.browser_adapter import _translate_browser_exceptions
+
+    @_translate_browser_exceptions
+    async def fake_operation():
+        raise ValueError("Some other error")
+
+    # Should propagate as-is
+    with pytest.raises(ValueError, match="Some other error"):
+        await fake_operation()
+
+
+@pytest.mark.asyncio
+async def test_translate_playwright_non_matching_error_propagates():
+    """Exception translation layer propagates playwright Error without navigation/connection keywords."""
+    from money_machine.integrations.notion.browser_adapter import _translate_browser_exceptions
+
+    class FakeGenericError(Exception):
+        """Fake Error from playwright without special keywords."""
+
+        pass
+
+    FakeGenericError.__module__ = "playwright._impl._errors"
+    FakeGenericError.__name__ = "Error"
+
+    @_translate_browser_exceptions
+    async def fake_operation():
+        raise FakeGenericError("Some other playwright error")
+
+    # Should propagate as-is (not ConnectionError)
+    with pytest.raises(FakeGenericError, match="Some other playwright error"):
+        await fake_operation()

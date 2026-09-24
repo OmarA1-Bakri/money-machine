@@ -419,7 +419,9 @@ class FixtureNotionAdapter(NotionAdapter):
         self.views[view_id] = view
         return view
 
-    async def set_view_title_visibility(self, view_id: str, visible: bool) -> NotionView:
+    async def set_view_title_visibility(
+        self, database_id: str, view_id: str, visible: bool
+    ) -> NotionView:
         """Set view title visibility."""
         view = self.views.get(view_id)
         if not view:

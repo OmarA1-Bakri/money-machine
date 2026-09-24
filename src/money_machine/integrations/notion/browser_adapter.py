@@ -17,7 +17,48 @@ Production will use Playwright; tests inject a fake browser.
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, Protocol
-from urllib.parse import urlparse
+
+
+def _translate_browser_exceptions(fn):
+    """Decorator to translate Playwright-style exceptions to built-in exceptions.
+
+    Maps:
+    - Exceptions named 'TimeoutError' from 'playwright.*' modules -> built-in TimeoutError
+    - Exceptions named 'Error' from 'playwright.*' modules containing navigation/connection
+      keywords -> ConnectionError
+    - All other exceptions propagate unchanged
+
+    Uses FAKE exception matching only — no actual Playwright import.
+    """
+
+    async def wrapper(*args, **kwargs):
+        try:
+            return await fn(*args, **kwargs)
+        except Exception as e:
+            exc_type = type(e)
+            exc_module = exc_type.__module__
+            exc_name = exc_type.__name__
+
+            # Check if exception is from a playwright module
+            if exc_module and exc_module.startswith("playwright."):
+                # Map TimeoutError from playwright to built-in TimeoutError
+                if exc_name == "TimeoutError":
+                    raise TimeoutError(str(e)) from e
+
+                # Map Error from playwright containing navigation/connection keywords
+                # to built-in ConnectionError
+                if exc_name == "Error":
+                    error_message = str(e).lower()
+                    if any(
+                        keyword in error_message
+                        for keyword in ["navigation", "connection", "net::", "network"]
+                    ):
+                        raise ConnectionError(str(e)) from e
+
+            # All other exceptions propagate unchanged
+            raise
+
+    return wrapper
 
 from .adapter import NotionAdapter
 from .domain import (
@@ -70,6 +111,10 @@ class BrowserSession(Protocol):
 
     async def get_current_url(self) -> str:
         """Get current page URL."""
+        ...
+
+    async def close(self) -> None:
+        """Close the browser session."""
         ...
 
 
@@ -132,6 +177,10 @@ class BrowserNotionAdapter(NotionAdapter):
         Mutates: true
         Idempotent: false (always creates new page)
         """
+        # Validate page_id is not empty
+        if not page_id or not page_id.strip():
+            raise ValueError("page_id cannot be empty")
+
         # Navigate to page
         page_url = f"https://www.notion.so/{page_id}"
         await self._browser.navigate(page_url)
@@ -148,12 +197,57 @@ class BrowserNotionAdapter(NotionAdapter):
 
         # Extract new page ID from URL
         new_url = await self._browser.get_current_url()
-        new_page_id = new_url.split("/")[-1].split("?")[0]
-        if not new_page_id:
-            raise RuntimeError(f"Failed to read new page ID from URL after duplicating {page_id}")
+
+        # Parse the ID from the URL
+        # Notion URLs can be:
+        # - https://www.notion.so/32hexid
+        # - https://www.notion.so/Title-32hexid
+        # - https://www.notion.so/32-hex-id-with-dashes
+        # - https://www.notion.so/Title-32-hex-id-with-dashes
+        # Extract the last path segment
+        url_path = new_url.split("?")[0]  # Remove query params
+        last_segment = url_path.rstrip("/").split("/")[-1]
+
+        # If the segment contains a dash and looks like Title-ID, extract the trailing ID
+        if "-" in last_segment:
+            # Split by dash and look for the trailing 32-hex ID
+            parts = last_segment.split("-")
+            # Try to find a 32-character hex string (with or without dashes)
+            # Start from the end and reconstruct the ID
+            potential_id = ""
+            for i in range(len(parts) - 1, -1, -1):
+                part = parts[i]
+                # Check if this part contains only hex characters
+                if all(c in "0123456789abcdefABCDEF" for c in part):
+                    potential_id = part + potential_id
+                    # Check if we have 32 hex characters
+                    if len(potential_id) == 32:
+                        break
+                else:
+                    # If we hit a non-hex part, we've gone past the ID
+                    break
+
+            if len(potential_id) == 32:
+                new_page_id = potential_id
+            else:
+                raise RuntimeError(
+                    f"Failed to parse page ID from URL {new_url}: "
+                    f"expected 32-hex ID, got segment '{last_segment}'"
+                )
+        else:
+            # No dash, expect the whole segment to be a 32-hex ID
+            new_page_id = last_segment.replace("-", "")  # Remove any dashes
+            if len(new_page_id) != 32 or not all(
+                c in "0123456789abcdefABCDEF" for c in new_page_id
+            ):
+                raise RuntimeError(
+                    f"Failed to parse page ID from URL {new_url}: "
+                    f"expected 32-hex ID, got '{last_segment}'"
+                )
 
         # Verify new ID differs from source
-        if new_page_id == page_id:
+        source_id_normalized = page_id.replace("-", "")
+        if new_page_id == source_id_normalized:
             raise RuntimeError(
                 f"Duplicate page ID matches source ID ({page_id}). Duplication may have failed."
             )
@@ -541,55 +635,25 @@ class BrowserNotionAdapter(NotionAdapter):
             title_visible=True,
         )
 
-    async def set_view_title_visibility(self, view_id: str, visible: bool) -> NotionView:
+    async def set_view_title_visibility(
+        self, database_id: str, view_id: str, visible: bool
+    ) -> NotionView:
         """Set view title visibility via UI settings.
 
         Method: BROWSER (view settings are UI-only)
         Mutates: true
         Idempotent: true
         """
-        # Get current URL to extract database/page ID
-        current_url = await self._browser.get_current_url()
+        # Validate database_id (32-hex, with or without dashes)
+        # Normalize to undashed form
+        normalized_db_id = database_id.replace("-", "")
+        if not normalized_db_id or len(normalized_db_id) != 32 or not all(
+            c in "0123456789abcdefABCDEF" for c in normalized_db_id
+        ):
+            raise ValueError(f"Invalid database_id: {database_id}")
 
-        # Parse and validate the current URL
-        parsed = urlparse(current_url)
-
-        # Require https scheme
-        if parsed.scheme != "https":
-            raise RuntimeError(
-                f"Cannot construct view URL for {view_id}: "
-                f"current page must use https, not {parsed.scheme} ({current_url})"
-            )
-
-        # Require hostname to be exactly notion.so or end with .notion.so
-        hostname = parsed.hostname or ""
-        if hostname != "notion.so" and not hostname.endswith(".notion.so"):
-            raise RuntimeError(
-                f"Cannot construct view URL for {view_id}: "
-                f"current page hostname is not notion.so ({current_url})"
-            )
-
-        # Reject notion.so.evil.com and similar
-        if hostname.endswith(".notion.so") and hostname != "notion.so":
-            # Allow subdomains like www.notion.so, but reject notion.so.evil.com
-            # Check that there's only one more segment before .notion.so
-            parts = hostname.split(".")
-            if len(parts) != 3 or parts[-2:] != ["notion", "so"]:
-                raise RuntimeError(
-                    f"Cannot construct view URL for {view_id}: "
-                    f"invalid notion.so hostname ({current_url})"
-                )
-
-        # Require non-empty path (not just /, but /page_id)
-        path = parsed.path.strip("/")
-        if not path:
-            raise RuntimeError(
-                f"Cannot construct view URL for {view_id}: "
-                f"current notion.so URL has no database/page ID ({current_url})"
-            )
-
-        # Build view URL as scheme://netloc/path?v=view_id
-        view_url = f"{parsed.scheme}://{parsed.netloc}/{path}?v={view_id}"
+        # Build view URL directly from database_id
+        view_url = f"https://www.notion.so/{normalized_db_id}?v={view_id}"
         await self._browser.navigate(view_url)
 
         # Open view settings
@@ -808,17 +872,21 @@ class BrowserNotionAdapter(NotionAdapter):
         # Create a separate anonymous (logged-out) session
         anon_session = self._anon_session_factory()
 
-        # Navigate to public URL in anonymous context
         try:
-            await anon_session.navigate(public_url)
-        except (ConnectionError, TimeoutError, ValueError) as e:
-            # Network, navigation, or value failures
-            raise RuntimeError(f"Failed to navigate to {public_url}: {e}") from e
+            # Navigate to public URL in anonymous context
+            try:
+                await anon_session.navigate(public_url)
+            except (ConnectionError, TimeoutError, ValueError) as e:
+                # Network, navigation, or value failures
+                raise RuntimeError(f"Failed to navigate to {public_url}: {e}") from e
 
-        # Check if page content is visible (not login wall)
-        try:
-            await anon_session.wait_for_selector('[data-testid="page-content"]', timeout=3000)
-            return True
-        except TimeoutError:
-            # Timeout means page content didn't appear (likely login wall)
-            return False
+            # Check if page content is visible (not login wall)
+            try:
+                await anon_session.wait_for_selector('[data-testid="page-content"]', timeout=3000)
+                return True
+            except TimeoutError:
+                # Timeout means page content didn't appear (likely login wall)
+                return False
+        finally:
+            # Always close the anonymous session
+            await anon_session.close()

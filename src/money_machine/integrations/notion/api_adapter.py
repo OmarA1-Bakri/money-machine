@@ -545,7 +545,9 @@ class APINotionAdapter(NotionAdapter):
             "Deferred to Session 06 Wave 3+. Use FixtureNotionAdapter for testing."
         )
 
-    async def set_view_title_visibility(self, view_id: str, visible: bool) -> NotionView:
+    async def set_view_title_visibility(
+        self, database_id: str, view_id: str, visible: bool
+    ) -> NotionView:
         raise NotImplementedError(
             "set_view_title_visibility requires BROWSER method (UI-only). "
             "Deferred to Session 06 Wave 3+. Use FixtureNotionAdapter for testing."
