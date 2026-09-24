@@ -8,8 +8,6 @@ import yaml
 
 from money_machine.integrations.notion import NotionAdapterRouter
 from money_machine.integrations.notion.api_adapter import APINotionAdapter
-from money_machine.integrations.notion.browser_adapter import BrowserNotionAdapter
-from money_machine.integrations.notion.combined_adapter import CombinedNotionAdapter
 from money_machine.integrations.notion.fixture_adapter import FixtureNotionAdapter
 
 
@@ -65,9 +63,7 @@ def test_router_rejects_browser_mode_requires_playwright_session():
 
     try:
         router = NotionAdapterRouter(config_path=config_path)
-        with pytest.raises(
-            NotImplementedError, match="Browser adapter requires Playwright"
-        ):
+        with pytest.raises(NotImplementedError, match="Browser adapter requires Playwright"):
             router.get_adapter()
     finally:
         Path(config_path).unlink()

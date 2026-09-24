@@ -38,7 +38,7 @@ from .domain import (
 
 class BrowserSession(Protocol):
     """Protocol for browser session abstraction.
-    
+
     Allows dependency injection for testing without real Playwright.
     Production implementation will use real Playwright browser.
     """
@@ -75,13 +75,13 @@ class BrowserSession(Protocol):
 class BrowserNotionAdapter(NotionAdapter):
     """Notion browser adapter (BROWSER method) — Wave 3 implementation.
 
-    Uses browser automation (Playwright in production, fake in tests) for 
+    Uses browser automation (Playwright in production, fake in tests) for
     UI-only Notion operations that have no API equivalent.
     """
 
     def __init__(self, browser_session: BrowserSession) -> None:
         """Initialize with injected browser session.
-        
+
         Args:
             browser_session: Browser abstraction for navigation/interaction.
                             Production: Playwright-backed session (W4+ scope).
@@ -118,7 +118,7 @@ class BrowserNotionAdapter(NotionAdapter):
     # BROWSER operations — implemented in Wave 3
     async def duplicate_page(self, page_id: str) -> NotionPage:
         """Duplicate page via UI interaction.
-        
+
         Method: BROWSER
         Mutates: true
         Idempotent: false (always creates new page)
@@ -126,11 +126,11 @@ class BrowserNotionAdapter(NotionAdapter):
         # Navigate to page
         page_url = f"https://www.notion.so/{page_id}"
         await self._browser.navigate(page_url)
-        
+
         # Click page menu (three dots)
         await self._browser.click('[data-testid="page-menu-button"]')
         await self._browser.wait_for_selector('[data-testid="duplicate-page-action"]')
-        
+
         # Click duplicate
         await self._browser.click('[data-testid="duplicate-page-action"]')
         await self._browser.wait_for_selector(
@@ -143,7 +143,7 @@ class BrowserNotionAdapter(NotionAdapter):
             new_page_id = new_url.split("/")[-1].split("?")[0]
         else:
             new_page_id = f"page_{uuid4().hex[:12]}"
-        
+
         return NotionPage(
             id=new_page_id,
             title=f"Copy of page_{page_id}",
@@ -163,20 +163,17 @@ class BrowserNotionAdapter(NotionAdapter):
         self, page_id: str, new_parent_id: str, new_parent_type: str = "workspace"
     ) -> NotionPage:
         raise NotImplementedError(
-            "move_page uses API method, not BROWSER. "
-            "Use APINotionAdapter or FixtureNotionAdapter."
+            "move_page uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
         )
 
     async def set_icon(self, page_id: str, icon: str) -> NotionPage:
         raise NotImplementedError(
-            "set_icon uses API method, not BROWSER. "
-            "Use APINotionAdapter or FixtureNotionAdapter."
+            "set_icon uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
         )
 
     async def set_cover(self, page_id: str, cover_url: str) -> NotionPage:
         raise NotImplementedError(
-            "set_cover uses API method, not BROWSER. "
-            "Use APINotionAdapter or FixtureNotionAdapter."
+            "set_cover uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
         )
 
     async def add_text_block(self, page_id: str, content: str) -> NotionTextBlock:
@@ -239,11 +236,9 @@ class BrowserNotionAdapter(NotionAdapter):
             "Use APINotionAdapter or FixtureNotionAdapter."
         )
 
-    async def create_formula(
-        self, database_id: str, name: str, expression: str
-    ) -> NotionFormula:
+    async def create_formula(self, database_id: str, name: str, expression: str) -> NotionFormula:
         """Create formula property via UI formula editor.
-        
+
         Method: BROWSER (formula editor is UI-only; API read-only)
         Mutates: true
         Idempotent: true (updating same formula)
@@ -251,25 +246,25 @@ class BrowserNotionAdapter(NotionAdapter):
         # Navigate to database
         db_url = f"https://www.notion.so/{database_id}"
         await self._browser.navigate(db_url)
-        
+
         # Open property menu
         await self._browser.click('[data-testid="add-property-button"]')
         await self._browser.wait_for_selector('[data-testid="property-type-select"]')
-        
+
         # Select formula type
         await self._browser.click('[data-testid="property-type-select"]')
         await self._browser.click('[data-testid="property-type-formula"]')
-        
+
         # Fill property name
         await self._browser.fill('[data-testid="property-name-input"]', name)
-        
+
         # Fill formula expression in editor
         await self._browser.click('[data-testid="formula-editor"]')
         await self._browser.fill('[data-testid="formula-expression-input"]', expression)
-        
+
         # Save property
         await self._browser.click('[data-testid="save-property-button"]')
-        
+
         return NotionFormula(
             id=f"prop_{uuid4().hex[:12]}",
             name=name,
@@ -283,7 +278,7 @@ class BrowserNotionAdapter(NotionAdapter):
         view_type: str = "table",
     ) -> NotionLinkedView:
         """Create linked database view via UI.
-        
+
         Method: BROWSER (linked database creation is UI-only)
         Mutates: true
         Idempotent: false
@@ -291,28 +286,24 @@ class BrowserNotionAdapter(NotionAdapter):
         # Navigate to parent page
         page_url = f"https://www.notion.so/{parent_page_id}"
         await self._browser.navigate(page_url)
-        
+
         # Click slash command menu
         await self._browser.click('[data-testid="page-content"]')
         await self._browser.fill('[data-testid="slash-command-input"]', "/linked")
         await self._browser.wait_for_selector('[data-testid="linked-database-option"]')
-        
+
         # Select linked database
         await self._browser.click('[data-testid="linked-database-option"]')
-        
+
         # Search for source database
-        await self._browser.fill(
-            '[data-testid="database-search-input"]', source_database_id
-        )
-        await self._browser.click(
-            f'[data-testid="database-option-{source_database_id}"]'
-        )
-        
+        await self._browser.fill('[data-testid="database-search-input"]', source_database_id)
+        await self._browser.click(f'[data-testid="database-option-{source_database_id}"]')
+
         # Set view type
         if view_type != "table":
             await self._browser.click('[data-testid="view-type-select"]')
             await self._browser.click(f'[data-testid="view-type-{view_type}"]')
-        
+
         return NotionLinkedView(
             id=f"view_{uuid4().hex[:12]}",
             source_database_id=source_database_id,
@@ -324,23 +315,21 @@ class BrowserNotionAdapter(NotionAdapter):
         self, database_id: str, view_id: str, filter_spec: NotionFilter
     ) -> dict[str, Any]:
         raise NotImplementedError(
-            "add_filter uses API method, not BROWSER. "
-            "Use APINotionAdapter or FixtureNotionAdapter."
+            "add_filter uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
         )
 
     async def add_sort(
         self, database_id: str, view_id: str, sort_spec: NotionSort
     ) -> dict[str, Any]:
         raise NotImplementedError(
-            "add_sort uses API method, not BROWSER. "
-            "Use APINotionAdapter or FixtureNotionAdapter."
+            "add_sort uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
         )
 
     async def create_calendar_view(
         self, database_id: str, name: str, date_property: str
     ) -> NotionView:
         """Create calendar view via UI.
-        
+
         Method: BROWSER (view creation is UI-only)
         Mutates: true
         Idempotent: false
@@ -348,35 +337,35 @@ class BrowserNotionAdapter(NotionAdapter):
         # Navigate to database
         db_url = f"https://www.notion.so/{database_id}"
         await self._browser.navigate(db_url)
-        
+
         # Open view menu
         await self._browser.click('[data-testid="add-view-button"]')
         await self._browser.wait_for_selector('[data-testid="view-type-select"]')
-        
+
         # Select calendar type
         await self._browser.click('[data-testid="view-type-calendar"]')
-        
+
         # Fill view name
         await self._browser.fill('[data-testid="view-name-input"]', name)
-        
+
         # Select date property
         await self._browser.click('[data-testid="calendar-date-property-select"]')
         await self._browser.click(f'[data-testid="property-option-{date_property}"]')
-        
+
         # Create view
         await self._browser.click('[data-testid="create-view-button"]')
-        
+
         return NotionView(
             id=f"view_{uuid4().hex[:12]}",
             database_id=database_id,
             name=name,
             type="calendar",
-            show_title=True,
+            title_visible=True,
         )
 
     async def create_table_view(self, database_id: str, name: str) -> NotionView:
         """Create table view via UI.
-        
+
         Method: BROWSER (view creation is UI-only)
         Mutates: true
         Idempotent: false
@@ -384,33 +373,33 @@ class BrowserNotionAdapter(NotionAdapter):
         # Navigate to database
         db_url = f"https://www.notion.so/{database_id}"
         await self._browser.navigate(db_url)
-        
+
         # Open view menu
         await self._browser.click('[data-testid="add-view-button"]')
         await self._browser.wait_for_selector('[data-testid="view-type-select"]')
-        
+
         # Select table type
         await self._browser.click('[data-testid="view-type-table"]')
-        
+
         # Fill view name
         await self._browser.fill('[data-testid="view-name-input"]', name)
-        
+
         # Create view
         await self._browser.click('[data-testid="create-view-button"]')
-        
+
         return NotionView(
             id=f"view_{uuid4().hex[:12]}",
             database_id=database_id,
             name=name,
             type="table",
-            show_title=True,
+            title_visible=True,
         )
 
     async def create_board_view(
         self, database_id: str, name: str, group_by_property: str
     ) -> NotionView:
         """Create board (kanban) view via UI.
-        
+
         Method: BROWSER (view creation is UI-only)
         Mutates: true
         Idempotent: false
@@ -418,37 +407,33 @@ class BrowserNotionAdapter(NotionAdapter):
         # Navigate to database
         db_url = f"https://www.notion.so/{database_id}"
         await self._browser.navigate(db_url)
-        
+
         # Open view menu
         await self._browser.click('[data-testid="add-view-button"]')
         await self._browser.wait_for_selector('[data-testid="view-type-select"]')
-        
+
         # Select board type
         await self._browser.click('[data-testid="view-type-board"]')
-        
+
         # Fill view name
         await self._browser.fill('[data-testid="view-name-input"]', name)
-        
+
         # Select group-by property
         await self._browser.click('[data-testid="board-group-by-select"]')
-        await self._browser.click(
-            f'[data-testid="property-option-{group_by_property}"]'
-        )
-        
+        await self._browser.click(f'[data-testid="property-option-{group_by_property}"]')
+
         # Create view
         await self._browser.click('[data-testid="create-view-button"]')
-        
+
         return NotionView(
             id=f"view_{uuid4().hex[:12]}",
             database_id=database_id,
             name=name,
             type="board",
-            show_title=True,
+            title_visible=True,
         )
 
-    async def set_view_title_visibility(
-        self, view_id: str, visible: bool
-    ) -> NotionView:
+    async def set_view_title_visibility(self, view_id: str, visible: bool) -> NotionView:
         """Set view title visibility via UI settings.
 
         Method: BROWSER (view settings are UI-only)
@@ -461,23 +446,19 @@ class BrowserNotionAdapter(NotionAdapter):
 
         # Open view settings
         await self._browser.click('[data-testid="view-settings-button"]')
-        await self._browser.wait_for_selector(
-            '[data-testid="view-title-visibility-toggle"]'
-        )
+        await self._browser.wait_for_selector('[data-testid="view-title-visibility-toggle"]')
 
         # Check current state and toggle if needed
-        is_currently_visible = await self._browser.is_visible(
-            '[data-testid="view-title"]'
-        )
+        is_currently_visible = await self._browser.is_visible('[data-testid="view-title"]')
         if is_currently_visible != visible:
             await self._browser.click('[data-testid="view-title-visibility-toggle"]')
-        
+
         return NotionView(
             id=view_id,
             database_id="",  # Unknown from this context
             name="",  # Unknown from this context
             type="unknown",
-            show_title=visible,
+            title_visible=visible,
         )
 
     async def add_child_page(self, parent_page_id: str, title: str) -> NotionPage:
@@ -488,7 +469,7 @@ class BrowserNotionAdapter(NotionAdapter):
 
     async def publish_page(self, page_id: str) -> NotionPage:
         """Publish page to web via UI share settings.
-        
+
         Method: BROWSER (share to web is UI-only)
         Mutates: true
         Idempotent: true
@@ -496,25 +477,24 @@ class BrowserNotionAdapter(NotionAdapter):
         # Navigate to page
         page_url = f"https://www.notion.so/{page_id}"
         await self._browser.navigate(page_url)
-        
+
         # Open share menu
         await self._browser.click('[data-testid="share-button"]')
         await self._browser.wait_for_selector('[data-testid="share-menu"]')
-        
+
         # Enable "Share to web"
         await self._browser.click('[data-testid="share-to-web-toggle"]')
         await self._browser.wait_for_selector('[data-testid="public-url-display"]')
-        
+
         # Extract public URL
         public_url_attr = await self._browser.get_attribute(
-            '[data-testid="public-url-display"]', 
-            "value"
+            '[data-testid="public-url-display"]', "value"
         )
         public_url = public_url_attr or f"https://www.notion.so/{page_id}"
-        
+
         # Close share menu
         await self._browser.click('[data-testid="close-share-menu"]')
-        
+
         return NotionPage(
             id=page_id,
             title="",  # Unknown from this context
@@ -524,11 +504,9 @@ class BrowserNotionAdapter(NotionAdapter):
             updated_at=datetime.now(UTC),
         )
 
-    async def set_duplicate_as_template(
-        self, page_id: str, enabled: bool
-    ) -> NotionPage:
+    async def set_duplicate_as_template(self, page_id: str, enabled: bool) -> NotionPage:
         """Set "Duplicate as template" page setting via UI.
-        
+
         Method: BROWSER (page settings are UI-only)
         Mutates: true
         Idempotent: true
@@ -536,22 +514,22 @@ class BrowserNotionAdapter(NotionAdapter):
         # Navigate to page
         page_url = f"https://www.notion.so/{page_id}"
         await self._browser.navigate(page_url)
-        
+
         # Open page settings menu
         await self._browser.click('[data-testid="page-menu-button"]')
         await self._browser.wait_for_selector('[data-testid="page-settings"]')
         await self._browser.click('[data-testid="page-settings"]')
-        
+
         # Toggle "Duplicate as template"
         is_currently_enabled = await self._browser.is_visible(
             '[data-testid="duplicate-as-template-enabled"]'
         )
         if is_currently_enabled != enabled:
             await self._browser.click('[data-testid="duplicate-as-template-toggle"]')
-        
+
         # Close settings
         await self._browser.click('[data-testid="close-settings"]')
-        
+
         return NotionPage(
             id=page_id,
             title="",  # Unknown from this context
@@ -562,7 +540,7 @@ class BrowserNotionAdapter(NotionAdapter):
 
     async def set_search_indexing(self, page_id: str, enabled: bool) -> NotionPage:
         """Set "Allow search engines to index" page setting via UI.
-        
+
         Method: BROWSER (page settings are UI-only)
         Mutates: true
         Idempotent: true
@@ -570,22 +548,22 @@ class BrowserNotionAdapter(NotionAdapter):
         # Navigate to page
         page_url = f"https://www.notion.so/{page_id}"
         await self._browser.navigate(page_url)
-        
+
         # Open page settings menu
         await self._browser.click('[data-testid="page-menu-button"]')
         await self._browser.wait_for_selector('[data-testid="page-settings"]')
         await self._browser.click('[data-testid="page-settings"]')
-        
+
         # Toggle "Allow search engines to index"
         is_currently_enabled = await self._browser.is_visible(
             '[data-testid="search-indexing-enabled"]'
         )
         if is_currently_enabled != enabled:
             await self._browser.click('[data-testid="search-indexing-toggle"]')
-        
+
         # Close settings
         await self._browser.click('[data-testid="close-settings"]')
-        
+
         return NotionPage(
             id=page_id,
             title="",  # Unknown from this context
@@ -602,7 +580,7 @@ class BrowserNotionAdapter(NotionAdapter):
 
     async def unpublish_page(self, page_id: str) -> NotionPage:
         """Unpublish page (disable share to web) via UI.
-        
+
         Method: BROWSER (share settings are UI-only)
         Mutates: true
         Idempotent: true
@@ -610,21 +588,19 @@ class BrowserNotionAdapter(NotionAdapter):
         # Navigate to page
         page_url = f"https://www.notion.so/{page_id}"
         await self._browser.navigate(page_url)
-        
+
         # Open share menu
         await self._browser.click('[data-testid="share-button"]')
         await self._browser.wait_for_selector('[data-testid="share-menu"]')
-        
+
         # Check if currently published and toggle off if needed
-        is_published = await self._browser.is_visible(
-            '[data-testid="public-url-display"]'
-        )
+        is_published = await self._browser.is_visible('[data-testid="public-url-display"]')
         if is_published:
             await self._browser.click('[data-testid="share-to-web-toggle"]')
-        
+
         # Close share menu
         await self._browser.click('[data-testid="close-share-menu"]')
-        
+
         return NotionPage(
             id=page_id,
             title="",  # Unknown from this context
@@ -648,19 +624,17 @@ class BrowserNotionAdapter(NotionAdapter):
 
     async def verify_stranger_access(self, public_url: str) -> bool:
         """Verify public URL is accessible to logged-out users.
-        
+
         Method: BROWSER (requires logged-out browser session)
         Mutates: false
         Idempotent: true
         """
         # Navigate to public URL (in logged-out context)
         await self._browser.navigate(public_url)
-        
+
         # Check if page content is visible (not login wall)
         try:
-            await self._browser.wait_for_selector(
-                '[data-testid="page-content"]', timeout=3000
-            )
+            await self._browser.wait_for_selector('[data-testid="page-content"]', timeout=3000)
             return True
         except Exception:
             # Login wall or error page
