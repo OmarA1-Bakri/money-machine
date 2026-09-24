@@ -7,7 +7,7 @@
   "head_sha": "9b791d45f9461030f09eda8a46838afc5447416c",
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "evidence_closure_commit_sha": "9b791d45f9461030f09eda8a46838afc5447416c",
-  "last_verified_commit": "9b791d45f9461030f09eda8a46838afc5447416c",
+  "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "state_revision": 30,
   "session_status": "incomplete",
   "current_session": 5,
