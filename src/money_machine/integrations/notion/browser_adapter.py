@@ -14,9 +14,10 @@ This adapter is injected with a browser session manager for testing flexibility.
 Production will use Playwright; tests inject a fake browser.
 """
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, Protocol
-from uuid import uuid4
+from urllib.parse import urlparse
 
 from .adapter import NotionAdapter
 from .domain import (
@@ -79,15 +80,23 @@ class BrowserNotionAdapter(NotionAdapter):
     UI-only Notion operations that have no API equivalent.
     """
 
-    def __init__(self, browser_session: BrowserSession) -> None:
+    def __init__(
+        self,
+        browser_session: BrowserSession,
+        anon_session_factory: Callable[[], BrowserSession] | None = None,
+    ) -> None:
         """Initialize with injected browser session.
 
         Args:
             browser_session: Browser abstraction for navigation/interaction.
                             Production: Playwright-backed session (W4+ scope).
                             Tests: Fake session with synthetic responses.
+            anon_session_factory: Factory to create anonymous (logged-out) browser sessions.
+                                 Required for verify_stranger_access.
+                                 Tests can inject a factory returning a separate fake session.
         """
         self._browser = browser_session
+        self._anon_session_factory = anon_session_factory
 
     # DIRECT_API operations — not implemented in browser adapter
     async def connection_status(self) -> dict[str, bool | str | int]:
@@ -137,16 +146,26 @@ class BrowserNotionAdapter(NotionAdapter):
             '[data-testid="page-duplicated-toast"]', timeout=10000
         )
 
-        # Extract new page ID from URL or duplicate result
+        # Extract new page ID from URL
         new_url = await self._browser.get_current_url()
-        if "/" in new_url:
-            new_page_id = new_url.split("/")[-1].split("?")[0]
-        else:
-            new_page_id = f"page_{uuid4().hex[:12]}"
+        new_page_id = new_url.split("/")[-1].split("?")[0]
+        if not new_page_id:
+            raise RuntimeError(f"Failed to read new page ID from URL after duplicating {page_id}")
+
+        # Verify new ID differs from source
+        if new_page_id == page_id:
+            raise RuntimeError(
+                f"Duplicate page ID matches source ID ({page_id}). Duplication may have failed."
+            )
+
+        # Read the title from the duplicated page
+        title_attr = await self._browser.get_attribute('[data-testid="page-title"]', "textContent")
+        if not title_attr:
+            raise RuntimeError(f"Failed to read page title after duplicating {page_id}")
 
         return NotionPage(
             id=new_page_id,
-            title=f"Copy of page_{page_id}",
+            title=title_attr,
             parent_id=None,
             parent_type="workspace",
             created_at=datetime.now(UTC),
@@ -265,8 +284,18 @@ class BrowserNotionAdapter(NotionAdapter):
         # Save property
         await self._browser.click('[data-testid="save-property-button"]')
 
+        # Read the property ID from the saved property element
+        property_id_attr = await self._browser.get_attribute(
+            '[data-testid="property-saved"]', "data-property-id"
+        )
+        if not property_id_attr:
+            raise RuntimeError(
+                f"Failed to read property ID after creating formula '{name}' "
+                f"in database {database_id}"
+            )
+
         return NotionFormula(
-            id=f"prop_{uuid4().hex[:12]}",
+            id=property_id_attr,
             name=name,
             expression=expression,
         )
@@ -304,8 +333,18 @@ class BrowserNotionAdapter(NotionAdapter):
             await self._browser.click('[data-testid="view-type-select"]')
             await self._browser.click(f'[data-testid="view-type-{view_type}"]')
 
+        # Read the view ID from the created linked view element
+        view_id_attr = await self._browser.get_attribute(
+            '[data-testid="linked-view-created"]', "data-view-id"
+        )
+        if not view_id_attr:
+            raise RuntimeError(
+                f"Failed to read view ID after creating linked view "
+                f"for database {source_database_id} in page {parent_page_id}"
+            )
+
         return NotionLinkedView(
-            id=f"view_{uuid4().hex[:12]}",
+            id=view_id_attr,
             source_database_id=source_database_id,
             parent_page_id=parent_page_id,
             view_type=view_type,
@@ -338,6 +377,12 @@ class BrowserNotionAdapter(NotionAdapter):
         db_url = f"https://www.notion.so/{database_id}"
         await self._browser.navigate(db_url)
 
+        # Capture current view ID (if any) before creating new view
+        initial_url = await self._browser.get_current_url()
+        initial_view_id = None
+        if "?v=" in initial_url:
+            initial_view_id = initial_url.split("?v=")[1].split("&")[0]
+
         # Open view menu
         await self._browser.click('[data-testid="add-view-button"]')
         await self._browser.wait_for_selector('[data-testid="view-type-select"]')
@@ -355,8 +400,25 @@ class BrowserNotionAdapter(NotionAdapter):
         # Create view
         await self._browser.click('[data-testid="create-view-button"]')
 
+        # Read the view ID from the created view
+        current_url = await self._browser.get_current_url()
+        # View ID is in URL after ?v=
+        if "?v=" not in current_url:
+            raise RuntimeError(
+                f"Failed to read view ID after creating calendar view '{name}' "
+                f"in database {database_id}: URL missing ?v= parameter"
+            )
+        view_id = current_url.split("?v=")[1].split("&")[0]
+
+        # Verify the view ID changed (new view was created)
+        if initial_view_id is not None and view_id == initial_view_id:
+            raise RuntimeError(
+                f"View ID unchanged after creating calendar view '{name}' "
+                f"in database {database_id}: still {view_id}"
+            )
+
         return NotionView(
-            id=f"view_{uuid4().hex[:12]}",
+            id=view_id,
             database_id=database_id,
             name=name,
             type="calendar",
@@ -374,6 +436,12 @@ class BrowserNotionAdapter(NotionAdapter):
         db_url = f"https://www.notion.so/{database_id}"
         await self._browser.navigate(db_url)
 
+        # Capture current view ID (if any) before creating new view
+        initial_url = await self._browser.get_current_url()
+        initial_view_id = None
+        if "?v=" in initial_url:
+            initial_view_id = initial_url.split("?v=")[1].split("&")[0]
+
         # Open view menu
         await self._browser.click('[data-testid="add-view-button"]')
         await self._browser.wait_for_selector('[data-testid="view-type-select"]')
@@ -387,8 +455,25 @@ class BrowserNotionAdapter(NotionAdapter):
         # Create view
         await self._browser.click('[data-testid="create-view-button"]')
 
+        # Read the view ID from the created view
+        current_url = await self._browser.get_current_url()
+        # View ID is in URL after ?v=
+        if "?v=" not in current_url:
+            raise RuntimeError(
+                f"Failed to read view ID after creating table view '{name}' "
+                f"in database {database_id}: URL missing ?v= parameter"
+            )
+        view_id = current_url.split("?v=")[1].split("&")[0]
+
+        # Verify the view ID changed (new view was created)
+        if initial_view_id is not None and view_id == initial_view_id:
+            raise RuntimeError(
+                f"View ID unchanged after creating table view '{name}' "
+                f"in database {database_id}: still {view_id}"
+            )
+
         return NotionView(
-            id=f"view_{uuid4().hex[:12]}",
+            id=view_id,
             database_id=database_id,
             name=name,
             type="table",
@@ -408,6 +493,12 @@ class BrowserNotionAdapter(NotionAdapter):
         db_url = f"https://www.notion.so/{database_id}"
         await self._browser.navigate(db_url)
 
+        # Capture current view ID (if any) before creating new view
+        initial_url = await self._browser.get_current_url()
+        initial_view_id = None
+        if "?v=" in initial_url:
+            initial_view_id = initial_url.split("?v=")[1].split("&")[0]
+
         # Open view menu
         await self._browser.click('[data-testid="add-view-button"]')
         await self._browser.wait_for_selector('[data-testid="view-type-select"]')
@@ -425,8 +516,25 @@ class BrowserNotionAdapter(NotionAdapter):
         # Create view
         await self._browser.click('[data-testid="create-view-button"]')
 
+        # Read the view ID from the created view
+        current_url = await self._browser.get_current_url()
+        # View ID is in URL after ?v=
+        if "?v=" not in current_url:
+            raise RuntimeError(
+                f"Failed to read view ID after creating board view '{name}' "
+                f"in database {database_id}: URL missing ?v= parameter"
+            )
+        view_id = current_url.split("?v=")[1].split("&")[0]
+
+        # Verify the view ID changed (new view was created)
+        if initial_view_id is not None and view_id == initial_view_id:
+            raise RuntimeError(
+                f"View ID unchanged after creating board view '{name}' "
+                f"in database {database_id}: still {view_id}"
+            )
+
         return NotionView(
-            id=f"view_{uuid4().hex[:12]}",
+            id=view_id,
             database_id=database_id,
             name=name,
             type="board",
@@ -440,8 +548,48 @@ class BrowserNotionAdapter(NotionAdapter):
         Mutates: true
         Idempotent: true
         """
-        # Navigate to view (URL pattern may vary)
-        view_url = f"https://www.notion.so/view/{view_id}"
+        # Get current URL to extract database/page ID
+        current_url = await self._browser.get_current_url()
+
+        # Parse and validate the current URL
+        parsed = urlparse(current_url)
+
+        # Require https scheme
+        if parsed.scheme != "https":
+            raise RuntimeError(
+                f"Cannot construct view URL for {view_id}: "
+                f"current page must use https, not {parsed.scheme} ({current_url})"
+            )
+
+        # Require hostname to be exactly notion.so or end with .notion.so
+        hostname = parsed.hostname or ""
+        if hostname != "notion.so" and not hostname.endswith(".notion.so"):
+            raise RuntimeError(
+                f"Cannot construct view URL for {view_id}: "
+                f"current page hostname is not notion.so ({current_url})"
+            )
+
+        # Reject notion.so.evil.com and similar
+        if hostname.endswith(".notion.so") and hostname != "notion.so":
+            # Allow subdomains like www.notion.so, but reject notion.so.evil.com
+            # Check that there's only one more segment before .notion.so
+            parts = hostname.split(".")
+            if len(parts) != 3 or parts[-2:] != ["notion", "so"]:
+                raise RuntimeError(
+                    f"Cannot construct view URL for {view_id}: "
+                    f"invalid notion.so hostname ({current_url})"
+                )
+
+        # Require non-empty path (not just /, but /page_id)
+        path = parsed.path.strip("/")
+        if not path:
+            raise RuntimeError(
+                f"Cannot construct view URL for {view_id}: "
+                f"current notion.so URL has no database/page ID ({current_url})"
+            )
+
+        # Build view URL as scheme://netloc/path?v=view_id
+        view_url = f"{parsed.scheme}://{parsed.netloc}/{path}?v={view_id}"
         await self._browser.navigate(view_url)
 
         # Open view settings
@@ -453,11 +601,28 @@ class BrowserNotionAdapter(NotionAdapter):
         if is_currently_visible != visible:
             await self._browser.click('[data-testid="view-title-visibility-toggle"]')
 
+        # Read back view properties where possible
+        view_name_attr = await self._browser.get_attribute(
+            '[data-testid="view-name"]', "textContent"
+        )
+        view_name = view_name_attr or ""
+
+        view_type_attr = await self._browser.get_attribute(
+            '[data-testid="view-type"]', "data-view-type"
+        )
+        view_type = view_type_attr or "unknown"
+
+        # Extract database_id from URL
+        current_url_after = await self._browser.get_current_url()
+        database_id = ""
+        if "/" in current_url_after:
+            database_id = current_url_after.split("/")[-1].split("?")[0]
+
         return NotionView(
             id=view_id,
-            database_id="",  # Unknown from this context
-            name="",  # Unknown from this context
-            type="unknown",
+            database_id=database_id,
+            name=view_name,
+            type=view_type,
             title_visible=visible,
         )
 
@@ -482,15 +647,20 @@ class BrowserNotionAdapter(NotionAdapter):
         await self._browser.click('[data-testid="share-button"]')
         await self._browser.wait_for_selector('[data-testid="share-menu"]')
 
-        # Enable "Share to web"
-        await self._browser.click('[data-testid="share-to-web-toggle"]')
-        await self._browser.wait_for_selector('[data-testid="public-url-display"]')
+        # Check if already published
+        is_already_published = await self._browser.is_visible('[data-testid="public-url-display"]')
+
+        # Only toggle if not already published
+        if not is_already_published:
+            await self._browser.click('[data-testid="share-to-web-toggle"]')
+            await self._browser.wait_for_selector('[data-testid="public-url-display"]')
 
         # Extract public URL
         public_url_attr = await self._browser.get_attribute(
             '[data-testid="public-url-display"]', "value"
         )
-        public_url = public_url_attr or f"https://www.notion.so/{page_id}"
+        if not public_url_attr:
+            raise RuntimeError(f"Failed to read public URL after publishing {page_id}")
 
         # Close share menu
         await self._browser.click('[data-testid="close-share-menu"]')
@@ -498,7 +668,7 @@ class BrowserNotionAdapter(NotionAdapter):
         return NotionPage(
             id=page_id,
             title="",  # Unknown from this context
-            public_url=public_url,
+            public_url=public_url_attr,
             is_published=True,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
@@ -593,7 +763,7 @@ class BrowserNotionAdapter(NotionAdapter):
         await self._browser.click('[data-testid="share-button"]')
         await self._browser.wait_for_selector('[data-testid="share-menu"]')
 
-        # Check if currently published and toggle off if needed
+        # Check if currently published and only toggle if it is
         is_published = await self._browser.is_visible('[data-testid="public-url-display"]')
         if is_published:
             await self._browser.click('[data-testid="share-to-web-toggle"]')
@@ -629,13 +799,26 @@ class BrowserNotionAdapter(NotionAdapter):
         Mutates: false
         Idempotent: true
         """
-        # Navigate to public URL (in logged-out context)
-        await self._browser.navigate(public_url)
+        if self._anon_session_factory is None:
+            raise RuntimeError(
+                "verify_stranger_access requires an anonymous session factory. "
+                "BrowserNotionAdapter must be initialized with anon_session_factory."
+            )
+
+        # Create a separate anonymous (logged-out) session
+        anon_session = self._anon_session_factory()
+
+        # Navigate to public URL in anonymous context
+        try:
+            await anon_session.navigate(public_url)
+        except (ConnectionError, TimeoutError, ValueError) as e:
+            # Network, navigation, or value failures
+            raise RuntimeError(f"Failed to navigate to {public_url}: {e}") from e
 
         # Check if page content is visible (not login wall)
         try:
-            await self._browser.wait_for_selector('[data-testid="page-content"]', timeout=3000)
+            await anon_session.wait_for_selector('[data-testid="page-content"]', timeout=3000)
             return True
-        except Exception:
-            # Login wall or error page
+        except TimeoutError:
+            # Timeout means page content didn't appear (likely login wall)
             return False

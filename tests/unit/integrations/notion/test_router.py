@@ -143,3 +143,39 @@ def test_router_set_adapter_mode_rejects_invalid_mode():
 
     with pytest.raises(ValueError, match="Invalid adapter mode"):
         router.set_adapter_mode("invalid_mode")
+
+
+def test_router_set_adapter_mode_preserves_cache_on_browser_rejection():
+    """set_adapter_mode() keeps cached adapter when browser mode is rejected."""
+    router = NotionAdapterRouter()
+
+    # Set to fixture mode first
+    router.set_adapter_mode("fixture")
+    original_adapter = router.get_adapter()
+    assert isinstance(original_adapter, FixtureNotionAdapter)
+
+    # Try to switch to browser mode (should fail)
+    with pytest.raises(NotImplementedError, match="Browser adapter requires Playwright"):
+        router.set_adapter_mode("browser")
+
+    # Cached adapter should be unchanged
+    current_adapter = router.get_adapter()
+    assert current_adapter is original_adapter  # Same instance preserved
+
+
+def test_router_set_adapter_mode_preserves_cache_on_combined_rejection():
+    """set_adapter_mode() keeps cached adapter when combined mode is rejected."""
+    router = NotionAdapterRouter()
+
+    # Set to API mode first
+    router.set_adapter_mode("api")
+    original_adapter = router.get_adapter()
+    assert isinstance(original_adapter, APINotionAdapter)
+
+    # Try to switch to combined mode (should fail)
+    with pytest.raises(NotImplementedError, match="Combined adapter requires"):
+        router.set_adapter_mode("combined")
+
+    # Cached adapter should be unchanged
+    current_adapter = router.get_adapter()
+    assert current_adapter is original_adapter  # Same instance preserved
