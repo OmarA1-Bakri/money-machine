@@ -100,13 +100,16 @@ DIRECT_API_OPERATIONS: list[tuple[str, Callable[[NotionAdapter], Awaitable[objec
     ("add_text_block", lambda adapter: adapter.add_text_block("page_123", "Text content")),
     ("add_callout_block", lambda adapter: adapter.add_callout_block("page_123", "Callout", "info")),
     ("create_database", lambda adapter: adapter.create_database("DB", "page_parent")),
-    ("add_property", lambda adapter: adapter.add_property("db_123", "Prop", "text")),  # type: ignore[reportUnknownLambdaType]
+    ("add_property", lambda adapter: adapter.add_property("db_123", "Prop", "text", {})),  # type: ignore[reportUnknownLambdaType]
     ("create_relation", lambda adapter: adapter.create_relation("db_123", "Rel", "db_target")),
-    ("create_rollup", lambda adapter: adapter.create_rollup("db_123", "Roll", "rel", "prop")),  # type: ignore[reportUnknownLambdaType]
+    (
+        "create_rollup",
+        lambda adapter: adapter.create_rollup("db_123", "Roll", "rel_prop", "rollup_prop", "count"),
+    ),  # type: ignore[reportUnknownLambdaType]
     (
         "add_filter",
         lambda adapter: adapter.add_filter(
-            "db_123", "view_123", NotionFilter(property="prop", operator="equals", value="value")
+            "db_123", "view_123", NotionFilter(property="prop", condition="equals", value="value")
         ),
     ),
     (
