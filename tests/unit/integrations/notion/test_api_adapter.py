@@ -186,7 +186,9 @@ async def test_set_cover(api_adapter):
         return_value=Response(200, json=mock_response)
     )
 
-    page = await api_adapter.set_cover(page_id="page_123", cover_url="https://example.com/cover.jpg")
+    page = await api_adapter.set_cover(
+        page_id="page_123", cover_url="https://example.com/cover.jpg"
+    )
 
     assert page.cover == "https://example.com/cover.jpg"
 

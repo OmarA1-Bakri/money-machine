@@ -63,7 +63,7 @@ class APINotionAdapter(NotionAdapter):
             API calls will fail if no token is available.
         """
         token = api_token or os.getenv("NOTION_API_TOKEN")
-        
+
         # Create client even if token is None to allow router initialization
         # Methods will fail with appropriate error if token is actually needed
         self.client = AsyncClient(auth=token or "")
@@ -249,7 +249,7 @@ class APINotionAdapter(NotionAdapter):
         }
 
         result = await self.client.blocks.children.append(block_id=page_id, children=[block_data])
-        
+
         # Extract the created block from results
         if result.get("results"):
             block = result["results"][0]
@@ -262,7 +262,7 @@ class APINotionAdapter(NotionAdapter):
                 if block.get("created_time")
                 else datetime.now(UTC),
             )
-        
+
         # Fallback if results not in expected format
         raise ValueError("Failed to create text block")
 
@@ -280,7 +280,7 @@ class APINotionAdapter(NotionAdapter):
         }
 
         result = await self.client.blocks.children.append(block_id=page_id, children=[block_data])
-        
+
         # Extract the created block from results
         if result.get("results"):
             block = result["results"][0]
@@ -294,7 +294,7 @@ class APINotionAdapter(NotionAdapter):
                 if block.get("created_time")
                 else datetime.now(UTC),
             )
-        
+
         raise ValueError("Failed to create callout block")
 
     async def create_database(
@@ -339,7 +339,7 @@ class APINotionAdapter(NotionAdapter):
     def _map_database(self, api_db: dict[str, Any]) -> NotionDatabase:
         """Map Notion API database response to domain model."""
         db_id = api_db["id"]
-        
+
         title_array = api_db.get("title", [])
         title = title_array[0]["plain_text"] if title_array else "Untitled"
 
@@ -404,7 +404,7 @@ class APINotionAdapter(NotionAdapter):
         properties = {name: prop_def}
 
         result = await self.client.databases.update(database_id=database_id, properties=properties)
-        
+
         # Find the property we just added/updated
         props_data = result.get("properties", {})
         if name in props_data:
@@ -415,7 +415,7 @@ class APINotionAdapter(NotionAdapter):
                 type=property_type,
                 config=config,
             )
-        
+
         raise ValueError(f"Failed to add property {name}")
 
     async def create_relation(
@@ -429,14 +429,14 @@ class APINotionAdapter(NotionAdapter):
         relation_config: dict[str, Any] = {
             "database_id": target_database_id,
         }
-        
+
         if synced_property_name:
             relation_config["synced_property_name"] = synced_property_name
 
         properties = {name: {"relation": relation_config}}
 
         result = await self.client.databases.update(database_id=database_id, properties=properties)
-        
+
         # Extract relation info
         props_data = result.get("properties", {})
         if name in props_data:
@@ -446,7 +446,7 @@ class APINotionAdapter(NotionAdapter):
                 database_id=target_database_id,
                 synced_property_name=synced_property_name,
             )
-        
+
         raise ValueError(f"Failed to create relation {name}")
 
     async def create_rollup(
@@ -467,7 +467,7 @@ class APINotionAdapter(NotionAdapter):
         properties = {name: {"rollup": rollup_config}}
 
         result = await self.client.databases.update(database_id=database_id, properties=properties)
-        
+
         # Extract rollup info
         props_data = result.get("properties", {})
         if name in props_data:
@@ -478,7 +478,7 @@ class APINotionAdapter(NotionAdapter):
                 rollup_property_id=rollup_property_id,
                 function=function,
             )
-        
+
         raise ValueError(f"Failed to create rollup {name}")
 
     async def create_formula(self, database_id: str, name: str, expression: str) -> NotionFormula:
