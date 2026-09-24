@@ -82,7 +82,7 @@ Test coverage:
 
 | Claim | Evidence | Verdict |
 |---|---|---|
-| Tip SHA update | `head_sha`, `evidence_closure_commit_sha`, `last_verified_commit` all set to `9b791d45f9461030f09eda8a46838afc5447416c` (L4 squash tip) | PASS |
+| Tip SHA update | `head_sha` and `evidence_closure_commit_sha` set to `9b791d45f9461030f09eda8a46838afc5447416c` (L4 squash tip); `last_verified_commit` stayed at bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d` (session incomplete continuity) | PASS |
 | State revision bump | `state_revision` advanced 29 → 30 | PASS |
 | Evidence keys flipped | Nine of ten S05 keys now TRUE: `etsy_adapters_implemented` (L1), `research_agent_implemented` (L2), `shortlist_analysis_implemented` (L2), `scoring_agent_implemented` (L3), `product_spec_generation_implemented` (L3), `dedupe_agent_implemented` (L4), `teardown_workflow_implemented` (L4), `workflow_linking_complete` (L4), `control_files_and_checkpoint_current` (this PR); only `evidence_closure_commit_recorded` remains FALSE | PASS |
 | Session 05 status | `session_status` remains `incomplete`; `current_session` = 5; `completed_sessions` = `[0, 1, 2, 3, 4]` (no S06 advance) | PASS |
