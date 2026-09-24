@@ -637,12 +637,16 @@ async def test_set_view_title_visibility_already_visible(browser_adapter, fake_b
         ("https://www.notion.so/", r"no database/page ID"),
         ("https://notion.so.evil.com/abc", r"not notion\.so"),
         ("https://evilnotion.so/abc", r"not notion\.so"),
+        ("http://www.notion.so/abc", r"must use https"),
     ],
 )
 async def test_set_view_title_visibility_rejects_invalid_urls(
     fake_browser, fake_anon_browser, invalid_url, expected_match
 ):
-    """set_view_title_visibility raises for invalid URLs (non-notion.so, bare domain, malicious)."""
+    """set_view_title_visibility raises for invalid URLs.
+
+    Tests rejection of non-https, non-notion.so, bare domain, and malicious URLs.
+    """
 
     async def navigate_to_invalid(url: str) -> None:
         fake_browser.navigated_to.append(url)
@@ -703,6 +707,30 @@ async def test_publish_page_already_published(browser_adapter, fake_browser):
     # Verify result
     assert result.is_published is True
     assert result.public_url == "https://notion.site/page_456"
+
+
+@pytest.mark.asyncio
+async def test_publish_page_fails_if_public_url_cannot_be_read(fake_browser, fake_anon_browser):
+    """publish_page raises RuntimeError if public URL cannot be read after publishing."""
+    # Page not published initially
+    fake_browser.set_element_visible('[data-testid="public-url-display"]', False)
+
+    # After clicking toggle, element becomes visible but attribute is None
+    async def click_with_visibility_update(selector: str) -> None:
+        fake_browser.clicks.append(selector)
+        if selector == '[data-testid="share-to-web-toggle"]':
+            fake_browser.set_element_visible('[data-testid="public-url-display"]', True)
+            # Don't set the value attribute (simulate failure to read)
+
+    fake_browser.click = click_with_visibility_update
+
+    adapter = BrowserNotionAdapter(
+        browser_session=fake_browser,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
+    )
+
+    with pytest.raises(RuntimeError, match="Failed to read public URL after publishing"):
+        await adapter.publish_page("page_123")
 
 
 # Test: unpublish_page
@@ -852,10 +880,10 @@ async def test_verify_stranger_access_uses_separate_session(
 
 
 @pytest.mark.asyncio
-async def test_verify_stranger_access_propagates_unexpected_errors(fake_browser):
-    """verify_stranger_access propagates unexpected errors (not TimeoutError)."""
+async def test_verify_stranger_access_wraps_navigate_value_error(fake_browser):
+    """verify_stranger_access wraps ValueError from navigate() as RuntimeError."""
 
-    # Create anon session that raises unexpected error
+    # Create anon session that raises ValueError during navigation
     class BadSession:
         async def navigate(self, url: str) -> None:
             raise ValueError("Unexpected navigation error")
@@ -883,9 +911,47 @@ async def test_verify_stranger_access_propagates_unexpected_errors(fake_browser)
         anon_session_factory=lambda: BadSession(),  # type: ignore[reportUnknownLambdaType]
     )
 
-    # Unexpected error should propagate
+    # Unexpected error from navigate() should be wrapped as RuntimeError
     with pytest.raises(RuntimeError, match="Failed to navigate"):
         await adapter.verify_stranger_access("https://notion.site/page_bad")
+
+
+@pytest.mark.asyncio
+async def test_verify_stranger_access_propagates_wait_for_selector_runtime_error(fake_browser):
+    """verify_stranger_access propagates RuntimeError from wait_for_selector (not TimeoutError)."""
+
+    # Create anon session where wait_for_selector raises RuntimeError
+    class SessionWithRuntimeError:
+        async def navigate(self, url: str) -> None:
+            pass  # Navigate succeeds
+
+        async def click(self, selector: str) -> None:
+            pass
+
+        async def fill(self, selector: str, value: str) -> None:
+            pass
+
+        async def get_attribute(self, selector: str, attribute: str) -> str | None:
+            return None
+
+        async def is_visible(self, selector: str) -> bool:
+            return False
+
+        async def wait_for_selector(self, selector: str, timeout: int = 5000) -> None:
+            # Unexpected runtime error (not timeout)
+            raise RuntimeError("Unexpected DOM error")
+
+        async def get_current_url(self) -> str:
+            return "https://example.com"
+
+    adapter = BrowserNotionAdapter(
+        browser_session=fake_browser,
+        anon_session_factory=lambda: SessionWithRuntimeError(),  # type: ignore[reportUnknownLambdaType]
+    )
+
+    # RuntimeError from wait_for_selector should propagate (not return False)
+    with pytest.raises(RuntimeError, match="Unexpected DOM error"):
+        await adapter.verify_stranger_access("https://notion.site/page_error")
 
 
 @pytest.mark.asyncio

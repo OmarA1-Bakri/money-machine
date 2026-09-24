@@ -17,6 +17,7 @@ Production will use Playwright; tests inject a fake browser.
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, Protocol
+from urllib.parse import urlparse
 
 from .adapter import NotionAdapter
 from .domain import (
@@ -147,9 +148,8 @@ class BrowserNotionAdapter(NotionAdapter):
 
         # Extract new page ID from URL
         new_url = await self._browser.get_current_url()
-        if "/" in new_url:
-            new_page_id = new_url.split("/")[-1].split("?")[0]
-        else:
+        new_page_id = new_url.split("/")[-1].split("?")[0]
+        if not new_page_id:
             raise RuntimeError(f"Failed to read new page ID from URL after duplicating {page_id}")
 
         # Verify new ID differs from source
@@ -548,19 +548,18 @@ class BrowserNotionAdapter(NotionAdapter):
         Mutates: true
         Idempotent: true
         """
-        from urllib.parse import urlparse
-
         # Get current URL to extract database/page ID
         current_url = await self._browser.get_current_url()
 
         # Parse and validate the current URL
-        try:
-            parsed = urlparse(current_url)
-        except Exception as e:
+        parsed = urlparse(current_url)
+
+        # Require https scheme
+        if parsed.scheme != "https":
             raise RuntimeError(
                 f"Cannot construct view URL for {view_id}: "
-                f"failed to parse current URL ({current_url}): {e}"
-            ) from e
+                f"current page must use https, not {parsed.scheme} ({current_url})"
+            )
 
         # Require hostname to be exactly notion.so or end with .notion.so
         hostname = parsed.hostname or ""
@@ -660,7 +659,8 @@ class BrowserNotionAdapter(NotionAdapter):
         public_url_attr = await self._browser.get_attribute(
             '[data-testid="public-url-display"]', "value"
         )
-        public_url = public_url_attr or f"https://www.notion.so/{page_id}"
+        if not public_url_attr:
+            raise RuntimeError(f"Failed to read public URL after publishing {page_id}")
 
         # Close share menu
         await self._browser.click('[data-testid="close-share-menu"]')
@@ -668,7 +668,7 @@ class BrowserNotionAdapter(NotionAdapter):
         return NotionPage(
             id=page_id,
             title="",  # Unknown from this context
-            public_url=public_url,
+            public_url=public_url_attr,
             is_published=True,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
