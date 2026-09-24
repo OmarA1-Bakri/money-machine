@@ -5,7 +5,6 @@ import pytest
 from money_machine.integrations.notion.api_adapter import APINotionAdapter
 from money_machine.integrations.notion.combined_adapter import CombinedNotionAdapter
 
-
 # Note: BrowserNotionAdapter tests removed - W3 implements real browser adapter
 # with dependency injection. See test_browser_adapter.py for full coverage.
 

@@ -105,6 +105,7 @@ async def test_api_operations_not_implemented(browser_adapter):
 @pytest.mark.asyncio
 async def test_duplicate_page(browser_adapter, fake_browser):
     """duplicate_page navigates to page and clicks duplicate."""
+
     # Navigate will be called first, then we set the URL for get_current_url
     # Simulate the new page URL after duplication
     async def navigate_mock(url: str) -> None:
