@@ -76,6 +76,27 @@ Test coverage:
 4. A06 contextlib.suppress(Exception) in spec parsing (fail-open suppression)
 5. Dedupe result_id = spec_id (could use distinct UUID)
 
+## 2026-09-24 — Session 05 W11: SESSION_05 COMPLETE control flip (post-L4 @ 9b791d45)
+
+**Verification scope**: Control file updates only; no feature code, no runtime gates, no CI run.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| All ten evidence keys TRUE | `etsy_adapters_implemented` (L1), `research_agent_implemented` (L2), `shortlist_analysis_implemented` (L2), `scoring_agent_implemented` (L3), `product_spec_generation_implemented` (L3), `dedupe_agent_implemented` (L4), `teardown_workflow_implemented` (L4), `workflow_linking_complete` (L4), `control_files_and_checkpoint_current` (W11), `evidence_closure_commit_recorded` (W11) | PASS |
+| Session 05 status | `session_status`: "incomplete" → "complete"; `current_session`: 5; `completed_sessions`: [0,1,2,3,4] → [0,1,2,3,4,5]; `next_session`: 5 → 6; `next_prompt`: SESSION_05 → SESSION_06 | PASS |
+| State revision bump | `state_revision` advanced 30 → 31 | PASS |
+| Tip SHA preserved | `head_sha` and `evidence_closure_commit_sha` remain at `9b791d45f9461030f09eda8a46838afc5447416c` (L4 tip) | PASS |
+| Last verified continuity | `last_verified_commit` remains at bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d` (session-complete continuity per S04 pattern) | PASS |
+| Exit 78 status | Worker conditional lift preserved (D-0028 gates); scheduler held; no regression | PASS |
+| Parked nits | Five L2-L4 nits remain in `carry_forward` as non-blocking | PASS |
+| Session 05 notes | W11 control flip recorded in `notes` | PASS |
+| IMPLEMENTATION_LOG entry | Session 05 W11 control flip entry added | PASS |
+| TEST_EVIDENCE entry | Session 05 W11 verification section added | PASS |
+| NEXT_SESSION content | Updated for Session 06 planning; Session 05 carry-forward preserved | PASS |
+
+**Status**: Session 05 COMPLETE. All ten evidence keys TRUE. No S06 work, no live provider calls, no commissioning claims. Docs/control only.
+
+
 ## 2026-09-24 — Session 05 control tip-sync verification (post-L4 @ 9b791d45)
 
 **Verification scope**: Control file updates only; no feature code, no runtime gates, no CI run.

@@ -41,6 +41,20 @@
 - **Control update**: `dedupe_agent_implemented`, `teardown_workflow_implemented`, and `workflow_linking_complete` evidence keys flipped TRUE. Commit `9b791d45`.
 - **OUT OF SCOPE**: live product catalogue, paid Etsy teardown, ReconceptProductJob implementation (A08 scope).
 
+## 2026-09-24 — Session 05 W11: SESSION_05 COMPLETE control flip (post-L4 @ 9b791d45)
+
+Parallel control lane only (`docs/control/*`). No feature code, no S06 features, no live Notion/Etsy, no Exit78 changes.
+
+- Updated `IMPLEMENTATION_STATE.json` to mark SESSION_05 COMPLETE. State revision 30 → 31.
+- Evidence keys: ALL TEN TRUE. `evidence_closure_commit_recorded` set TRUE by W11 control flip.
+- Session 05 status: COMPLETE. `completed_sessions` advanced to `[0, 1, 2, 3, 4, 5]`; `next_session` set to 6; `next_prompt` set to SESSION_06.
+- `head_sha` and `evidence_closure_commit_sha` remain at `9b791d45f9461030f09eda8a46838afc5447416c` (L4 squash tip).
+- `last_verified_commit` remains at bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d` (session-complete continuity per S04 pattern).
+- Exit 78 status UNCHANGED: worker lifted conditionally (D-0028 gates), scheduler held.
+- Parked L2-L4 nits remain in carry_forward as non-blocking.
+- L1–L4 complete: Etsy adapters, A03 research, A05 scoring/ProductSpec, A06 dedupe/workflow linking. No S06 features, no live production/Notion/Etsy.
+
+
 ## 2026-09-24 — Session 05 control tip-sync (post-L4 @ 9b791d45)
 
 - Parallel control lane only (`docs/control/*`). No feature code, no S06 work, no live Etsy/Notion mutations.
