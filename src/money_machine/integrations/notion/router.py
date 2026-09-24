@@ -11,8 +11,6 @@ import yaml
 
 from .adapter import NotionAdapter
 from .api_adapter import APINotionAdapter
-from .browser_adapter import BrowserNotionAdapter
-from .combined_adapter import CombinedNotionAdapter
 from .fixture_adapter import FixtureNotionAdapter
 
 
@@ -32,7 +30,8 @@ class NotionAdapterRouter:
         """Initialize router with optional config path.
 
         Args:
-            config_path: Path to integrations.yaml (defaults to config/integrations.yaml)
+            config_path: Path to integrations.yaml
+                        (defaults to config/integrations.yaml)
         """
         if config_path is None:
             # Default to repo root / config / integrations.yaml
@@ -76,9 +75,19 @@ class NotionAdapterRouter:
         elif mode == "api":
             self._adapter = APINotionAdapter()
         elif mode == "browser":
-            self._adapter = BrowserNotionAdapter()
+            raise NotImplementedError(
+                "Browser adapter requires Playwright session injection. "
+                "Production Playwright integration deferred to Session 06 Wave 4+. "
+                "Use FixtureNotionAdapter for testing or "
+                "APINotionAdapter for API operations."
+            )
         elif mode == "combined":
-            self._adapter = CombinedNotionAdapter()
+            raise NotImplementedError(
+                "Combined adapter requires both API and browser session setup. "
+                "Deferred to Session 06 Wave 4+. "
+                "Use FixtureNotionAdapter for testing or "
+                "APINotionAdapter for API operations."
+            )
         else:
             raise ValueError(
                 f"Invalid notion.adapter_mode: {mode}. "
@@ -109,6 +118,12 @@ class NotionAdapterRouter:
         elif mode == "api":
             self._adapter = APINotionAdapter()
         elif mode == "browser":
-            self._adapter = BrowserNotionAdapter()
+            raise NotImplementedError(
+                "Browser adapter requires Playwright session injection. "
+                "Production Playwright integration deferred to Session 06 Wave 4+."
+            )
         elif mode == "combined":
-            self._adapter = CombinedNotionAdapter()
+            raise NotImplementedError(
+                "Combined adapter requires both API and browser session setup. "
+                "Deferred to Session 06 Wave 4+."
+            )

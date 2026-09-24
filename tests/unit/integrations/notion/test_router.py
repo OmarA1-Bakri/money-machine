@@ -8,8 +8,6 @@ import yaml
 
 from money_machine.integrations.notion import NotionAdapterRouter
 from money_machine.integrations.notion.api_adapter import APINotionAdapter
-from money_machine.integrations.notion.browser_adapter import BrowserNotionAdapter
-from money_machine.integrations.notion.combined_adapter import CombinedNotionAdapter
 from money_machine.integrations.notion.fixture_adapter import FixtureNotionAdapter
 
 
@@ -53,8 +51,11 @@ def test_router_loads_api_mode_from_config():
         Path(config_path).unlink()
 
 
-def test_router_loads_browser_mode_from_config():
-    """Router returns BrowserNotionAdapter when config specifies browser mode."""
+def test_router_rejects_browser_mode_requires_playwright_session():
+    """Router raises NotImplementedError for browser mode.
+
+    Browser mode requires Playwright session.
+    """
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         config = {"notion": {"adapter_mode": "browser"}}
         yaml.dump(config, f)
@@ -62,14 +63,14 @@ def test_router_loads_browser_mode_from_config():
 
     try:
         router = NotionAdapterRouter(config_path=config_path)
-        adapter = router.get_adapter()
-        assert isinstance(adapter, BrowserNotionAdapter)
+        with pytest.raises(NotImplementedError, match="Browser adapter requires Playwright"):
+            router.get_adapter()
     finally:
         Path(config_path).unlink()
 
 
-def test_router_loads_combined_mode_from_config():
-    """Router returns CombinedNotionAdapter when config specifies combined mode."""
+def test_router_rejects_combined_mode_requires_setup():
+    """Router raises NotImplementedError for combined mode (requires setup)."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         config = {"notion": {"adapter_mode": "combined"}}
         yaml.dump(config, f)
@@ -77,8 +78,8 @@ def test_router_loads_combined_mode_from_config():
 
     try:
         router = NotionAdapterRouter(config_path=config_path)
-        adapter = router.get_adapter()
-        assert isinstance(adapter, CombinedNotionAdapter)
+        with pytest.raises(NotImplementedError, match="Combined adapter requires"):
+            router.get_adapter()
     finally:
         Path(config_path).unlink()
 
