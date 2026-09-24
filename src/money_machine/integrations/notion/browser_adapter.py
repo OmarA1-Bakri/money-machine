@@ -17,6 +17,7 @@ Production will use Playwright; tests inject a fake browser.
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, Protocol
+from urllib.parse import urlparse
 
 from .adapter import NotionAdapter
 from .domain import (
@@ -118,6 +119,115 @@ class BrowserSession(Protocol):
         ...
 
 
+class TranslatingBrowserSession:
+    """Wrapper that translates Playwright-style exceptions to built-in exceptions.
+    
+    Wraps a BrowserSession and intercepts all method calls, translating any
+    Playwright-module exceptions to Python built-in exceptions:
+    - playwright.*.TimeoutError → TimeoutError
+    - playwright.*.Error (with navigation/connection keywords) → ConnectionError
+    - All other exceptions pass through unchanged
+    
+    This is the adapter-owned translation boundary for production Playwright integration.
+    """
+
+    def __init__(self, wrapped_session: BrowserSession) -> None:
+        """Initialize with a session to wrap.
+        
+        Args:
+            wrapped_session: The underlying BrowserSession (could be real Playwright or fake).
+        """
+        self._wrapped = wrapped_session
+
+    def _translate_exception(self, e: Exception) -> Exception:
+        """Translate a Playwright exception to a built-in exception if applicable.
+        
+        Args:
+            e: The exception to potentially translate
+            
+        Returns:
+            The translated exception (TimeoutError or ConnectionError) or the original
+        """
+        exc_type = type(e)
+        exc_module = exc_type.__module__
+        exc_name = exc_type.__name__
+
+        # Check if exception is from a playwright module
+        if exc_module and exc_module.startswith("playwright."):
+            # Map TimeoutError from playwright to built-in TimeoutError
+            if exc_name == "TimeoutError":
+                return TimeoutError(str(e))
+
+            # Map Error from playwright containing navigation/connection keywords
+            # to built-in ConnectionError
+            if exc_name == "Error":
+                error_message = str(e).lower()
+                if any(
+                    keyword in error_message
+                    for keyword in ["navigation", "connection", "net::", "network"]
+                ):
+                    return ConnectionError(str(e))
+
+        # All other exceptions return unchanged
+        return e
+
+    async def navigate(self, url: str) -> None:
+        """Navigate to URL, translating any Playwright exceptions."""
+        try:
+            await self._wrapped.navigate(url)
+        except Exception as e:
+            raise self._translate_exception(e) from e
+
+    async def click(self, selector: str) -> None:
+        """Click element, translating any Playwright exceptions."""
+        try:
+            await self._wrapped.click(selector)
+        except Exception as e:
+            raise self._translate_exception(e) from e
+
+    async def fill(self, selector: str, value: str) -> None:
+        """Fill input field, translating any Playwright exceptions."""
+        try:
+            await self._wrapped.fill(selector, value)
+        except Exception as e:
+            raise self._translate_exception(e) from e
+
+    async def get_attribute(self, selector: str, attribute: str) -> str | None:
+        """Get element attribute, translating any Playwright exceptions."""
+        try:
+            return await self._wrapped.get_attribute(selector, attribute)
+        except Exception as e:
+            raise self._translate_exception(e) from e
+
+    async def is_visible(self, selector: str) -> bool:
+        """Check if element is visible, translating any Playwright exceptions."""
+        try:
+            return await self._wrapped.is_visible(selector)
+        except Exception as e:
+            raise self._translate_exception(e) from e
+
+    async def wait_for_selector(self, selector: str, timeout: int = 5000) -> None:
+        """Wait for element to appear, translating any Playwright exceptions."""
+        try:
+            await self._wrapped.wait_for_selector(selector, timeout=timeout)
+        except Exception as e:
+            raise self._translate_exception(e) from e
+
+    async def get_current_url(self) -> str:
+        """Get current page URL, translating any Playwright exceptions."""
+        try:
+            return await self._wrapped.get_current_url()
+        except Exception as e:
+            raise self._translate_exception(e) from e
+
+    async def close(self) -> None:
+        """Close the browser session, translating any Playwright exceptions."""
+        try:
+            await self._wrapped.close()
+        except Exception as e:
+            raise self._translate_exception(e) from e
+
+
 class BrowserNotionAdapter(NotionAdapter):
     """Notion browser adapter (BROWSER method) — Wave 3 implementation.
 
@@ -140,8 +250,13 @@ class BrowserNotionAdapter(NotionAdapter):
                                  Required for verify_stranger_access.
                                  Tests can inject a factory returning a separate fake session.
         """
-        self._browser = browser_session
-        self._anon_session_factory = anon_session_factory
+        # Wrap sessions with exception translation boundary
+        self._browser = TranslatingBrowserSession(browser_session)
+        self._anon_session_factory = (
+            (lambda: TranslatingBrowserSession(anon_session_factory()))
+            if anon_session_factory
+            else None
+        )
 
     # DIRECT_API operations — not implemented in browser adapter
     async def connection_status(self) -> dict[str, bool | str | int]:
@@ -236,7 +351,7 @@ class BrowserNotionAdapter(NotionAdapter):
                 )
         else:
             # No dash, expect the whole segment to be a 32-hex ID
-            new_page_id = last_segment.replace("-", "")  # Remove any dashes
+            new_page_id = last_segment
             if len(new_page_id) != 32 or not all(
                 c in "0123456789abcdefABCDEF" for c in new_page_id
             ):
@@ -245,12 +360,16 @@ class BrowserNotionAdapter(NotionAdapter):
                     f"expected 32-hex ID, got '{last_segment}'"
                 )
 
-        # Verify new ID differs from source
-        source_id_normalized = page_id.replace("-", "")
-        if new_page_id == source_id_normalized:
+        # Normalize both IDs (strip dashes, lowercase) before comparing
+        new_page_id_normalized = new_page_id.replace("-", "").lower()
+        source_id_normalized = page_id.replace("-", "").lower()
+        if new_page_id_normalized == source_id_normalized:
             raise RuntimeError(
                 f"Duplicate page ID matches source ID ({page_id}). Duplication may have failed."
             )
+
+        # Return the normalized ID
+        new_page_id = new_page_id_normalized
 
         # Read the title from the duplicated page
         title_attr = await self._browser.get_attribute('[data-testid="page-title"]', "textContent")
@@ -678,15 +797,9 @@ class BrowserNotionAdapter(NotionAdapter):
         )
         view_type = view_type_attr or "unknown"
 
-        # Extract database_id from URL
-        current_url_after = await self._browser.get_current_url()
-        database_id = ""
-        if "/" in current_url_after:
-            database_id = current_url_after.split("/")[-1].split("?")[0]
-
         return NotionView(
             id=view_id,
-            database_id=database_id,
+            database_id=normalized_db_id,
             name=view_name,
             type=view_type,
             title_visible=visible,
@@ -866,13 +979,8 @@ class BrowserNotionAdapter(NotionAdapter):
         Idempotent: true
         """
         # Validate URL is HTTPS and has allowed host
-        # Only allow notion.so, www.notion.so, notion.site, www.notion.site (no other subdomains)
-        from urllib.parse import urlparse
-
-        try:
-            parsed = urlparse(public_url)
-        except Exception as e:
-            raise ValueError(f"Invalid URL: {public_url}") from e
+        # Only allow notion.so or www.notion.so (no other subdomains)
+        parsed = urlparse(public_url)
 
         # Must be HTTPS
         if parsed.scheme != "https":
@@ -882,17 +990,35 @@ class BrowserNotionAdapter(NotionAdapter):
         if parsed.username or parsed.password:
             raise ValueError(f"URL must not contain userinfo: {public_url}")
 
-        # Must be exactly notion.so, www.notion.so, notion.site, or www.notion.site
-        # (no other subdomains, no lookalikes)
+        # Allow notion.so, www.notion.so, notion.site, www.notion.site,
+        # and single-label *.notion.site (e.g. omar.notion.site)
         # Reject:
-        # - evil.notion.so
-        # - notion.so.evil.com
+        # - evil.notion.so (subdomain of notion.so)
+        # - a.b.notion.site (deeper nesting)
+        # - notion.so.evil.com, notion.site.evil.com (lookalikes)
+        # - xnotion.site (lookalike)
         # - https://notion.so@evil.com (userinfo trick)
-        allowed_hosts = {"notion.so", "www.notion.so", "notion.site", "www.notion.site"}
-        if parsed.hostname not in allowed_hosts:
+        hostname = parsed.hostname
+        if not hostname:
+            raise ValueError(f"URL must have a valid hostname: {public_url}")
+
+        # Exact matches
+        if hostname in {"notion.so", "www.notion.so", "notion.site", "www.notion.site"}:
+            pass  # Allowed
+        # Single-label subdomain of notion.site (e.g., omar.notion.site)
+        elif hostname.endswith(".notion.site"):
+            # Extract the part before .notion.site
+            prefix = hostname[: -len(".notion.site")]
+            # Must be a single label (no dots)
+            if "." in prefix:
+                raise ValueError(
+                    f"URL host must be notion.so, www.notion.so, notion.site, "
+                    f"www.notion.site, or single-label.notion.site, got: {hostname}"
+                )
+        else:
             raise ValueError(
                 f"URL host must be notion.so, www.notion.so, notion.site, "
-                f"or www.notion.site, got: {parsed.hostname}"
+                f"www.notion.site, or single-label.notion.site, got: {hostname}"
             )
 
         if self._anon_session_factory is None:
@@ -902,6 +1028,7 @@ class BrowserNotionAdapter(NotionAdapter):
             )
 
         # Create a separate anonymous (logged-out) session
+        # (translation happens at the boundary via TranslatingBrowserSession wrapper)
         anon_session = self._anon_session_factory()
 
         try:
@@ -921,4 +1048,9 @@ class BrowserNotionAdapter(NotionAdapter):
                 return False
         finally:
             # Always close the anonymous session
-            await anon_session.close()
+            # Suppress close() errors to avoid masking the original exception
+            try:
+                await anon_session.close()
+            except Exception:
+                # Log or suppress - don't mask the original exception
+                pass
