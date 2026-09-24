@@ -22,7 +22,7 @@
 
 ## Session 06 — (Future work)
 
-**Status**: Not started. Session 06 prompt: `09_SESSION_06_PRODUCT_SPEC_TO_NOTION_BUILD.md`.
+**Status**: Not started. Session 06 prompt: `09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md`.
 
 **Session 05 delivered scope**:
 - L1: Etsy fixture adapter, browser/API stubs, config-driven seed phrases, comprehensive tests

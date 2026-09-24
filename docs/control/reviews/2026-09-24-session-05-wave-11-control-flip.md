@@ -29,7 +29,7 @@ Mark SESSION_05 COMPLETE after all ten evidence keys verified TRUE. Docs/control
 - `session_status`: "incomplete" → "complete"
 - `completed_sessions`: [0,1,2,3,4] → [0,1,2,3,4,5]
 - `next_session`: 5 → 6
-- `next_prompt`: SESSION_05 → SESSION_06 (09_SESSION_06_PRODUCT_SPEC_TO_NOTION_BUILD.md)
+- `next_prompt`: SESSION_05 → SESSION_06 (09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md)
 - `evidence_closure_commit_recorded`: false → true
 
 ## Preserved fields (continuity per S04 pattern)
