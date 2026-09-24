@@ -167,12 +167,16 @@ class BrowserNotionAdapter(NotionAdapter):
             "Use FixtureNotionAdapter for testing."
         )
 
-    async def add_filter(self, database_id: str, view_id: str, filter_spec: NotionFilter) -> dict[str, Any]:
+    async def add_filter(
+        self, database_id: str, view_id: str, filter_spec: NotionFilter
+    ) -> dict[str, Any]:
         raise NotImplementedError(
             "add_filter uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
         )
 
-    async def add_sort(self, database_id: str, view_id: str, sort_spec: NotionSort) -> dict[str, Any]:
+    async def add_sort(
+        self, database_id: str, view_id: str, sort_spec: NotionSort
+    ) -> dict[str, Any]:
         raise NotImplementedError(
             "add_sort uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
         )

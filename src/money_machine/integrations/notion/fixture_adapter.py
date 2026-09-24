@@ -352,7 +352,9 @@ class FixtureNotionAdapter(NotionAdapter):
         self.linked_views[linked_view_id] = linked_view
         return linked_view
 
-    async def add_filter(self, database_id: str, view_id: str, filter_spec: NotionFilter) -> dict[str, Any]:
+    async def add_filter(
+        self, database_id: str, view_id: str, filter_spec: NotionFilter
+    ) -> dict[str, Any]:
         """Add a filter to a view."""
         if database_id not in self.databases:
             raise ValueError(f"Database {database_id} not found")
@@ -367,7 +369,9 @@ class FixtureNotionAdapter(NotionAdapter):
             },
         }
 
-    async def add_sort(self, database_id: str, view_id: str, sort_spec: NotionSort) -> dict[str, Any]:
+    async def add_sort(
+        self, database_id: str, view_id: str, sort_spec: NotionSort
+    ) -> dict[str, Any]:
         """Add a sort to a view."""
         if database_id not in self.databases:
             raise ValueError(f"Database {database_id} not found")

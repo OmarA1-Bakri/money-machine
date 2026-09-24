@@ -158,12 +158,16 @@ class APINotionAdapter(NotionAdapter):
             "Deferred to Session 06 Wave 3+. Use FixtureNotionAdapter for testing."
         )
 
-    async def add_filter(self, database_id: str, view_id: str, filter_spec: NotionFilter) -> dict[str, Any]:
+    async def add_filter(
+        self, database_id: str, view_id: str, filter_spec: NotionFilter
+    ) -> dict[str, Any]:
         raise NotImplementedError(
             "Real API adapter deferred to Session 06 Wave 2+. Use FixtureNotionAdapter for testing."
         )
 
-    async def add_sort(self, database_id: str, view_id: str, sort_spec: NotionSort) -> dict[str, Any]:
+    async def add_sort(
+        self, database_id: str, view_id: str, sort_spec: NotionSort
+    ) -> dict[str, Any]:
         raise NotImplementedError(
             "Real API adapter deferred to Session 06 Wave 2+. Use FixtureNotionAdapter for testing."
         )

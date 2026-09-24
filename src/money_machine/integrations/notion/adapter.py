@@ -370,7 +370,9 @@ class NotionAdapter(ABC):
         """
 
     @abstractmethod
-    async def add_filter(self, database_id: str, view_id: str, filter_spec: NotionFilter) -> dict[str, Any]:
+    async def add_filter(
+        self, database_id: str, view_id: str, filter_spec: NotionFilter
+    ) -> dict[str, Any]:
         """Add a filter to a database view.
 
         Method: DIRECT_API (part of database query)
@@ -389,7 +391,9 @@ class NotionAdapter(ABC):
         """
 
     @abstractmethod
-    async def add_sort(self, database_id: str, view_id: str, sort_spec: NotionSort) -> dict[str, Any]:
+    async def add_sort(
+        self, database_id: str, view_id: str, sort_spec: NotionSort
+    ) -> dict[str, Any]:
         """Add a sort to a database view.
 
         Method: DIRECT_API (part of database query)
