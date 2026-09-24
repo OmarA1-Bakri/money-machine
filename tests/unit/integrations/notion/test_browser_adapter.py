@@ -4,13 +4,18 @@ Tests BROWSER operations without real Playwright or live Notion UI.
 All browser interactions are mocked via FakeBrowserSession.
 """
 
+from collections.abc import Awaitable, Callable
+
 import pytest
 
+from money_machine.integrations.notion.adapter import NotionAdapter
 from money_machine.integrations.notion.browser_adapter import BrowserNotionAdapter
 from money_machine.integrations.notion.domain import (
+    NotionFilter,
     NotionFormula,
     NotionLinkedView,
     NotionPage,
+    NotionSort,
     NotionView,
 )
 
@@ -81,24 +86,65 @@ def browser_adapter(fake_browser):
     return BrowserNotionAdapter(browser_session=fake_browser)
 
 
-# Test: API operations should raise NotImplementedError
+# Capability matrix refusal: DIRECT_API + COMBINED operations
+# Derived from docs/architecture/PLATFORM_COMPATIBILITY.md
+# 18 DIRECT_API operations + 1 COMBINED operation = 19 total
+DIRECT_API_OPERATIONS: list[tuple[str, Callable[[NotionAdapter], Awaitable[object]]]] = [
+    ("connection_status", lambda adapter: adapter.connection_status()),
+    ("workspace_discovery", lambda adapter: adapter.workspace_discovery()),
+    ("create_page", lambda adapter: adapter.create_page("Test")),
+    ("rename_page", lambda adapter: adapter.rename_page("page_123", "New Title")),
+    ("move_page", lambda adapter: adapter.move_page("page_123", "page_parent")),
+    ("set_icon", lambda adapter: adapter.set_icon("page_123", "📄")),
+    ("set_cover", lambda adapter: adapter.set_cover("page_123", "https://example.com/cover.jpg")),
+    ("add_text_block", lambda adapter: adapter.add_text_block("page_123", "Text content")),
+    ("add_callout_block", lambda adapter: adapter.add_callout_block("page_123", "Callout", "info")),
+    ("create_database", lambda adapter: adapter.create_database("DB", "page_parent")),
+    ("add_property", lambda adapter: adapter.add_property("db_123", "Prop", "text")),  # type: ignore[reportUnknownLambdaType]
+    ("create_relation", lambda adapter: adapter.create_relation("db_123", "Rel", "db_target")),
+    ("create_rollup", lambda adapter: adapter.create_rollup("db_123", "Roll", "rel", "prop")),  # type: ignore[reportUnknownLambdaType]
+    (
+        "add_filter",
+        lambda adapter: adapter.add_filter(
+            "db_123", "view_123", NotionFilter(property="prop", operator="equals", value="value")
+        ),
+    ),
+    (
+        "add_sort",
+        lambda adapter: adapter.add_sort(
+            "db_123", "view_123", NotionSort(property="prop", direction="ascending")
+        ),
+    ),
+    ("add_child_page", lambda adapter: adapter.add_child_page("page_parent", "Child")),
+    ("inspect_page", lambda adapter: adapter.inspect_page("page_123")),
+    ("inspect_database", lambda adapter: adapter.inspect_database("db_123")),
+]
+
+COMBINED_OPERATIONS: list[tuple[str, Callable[[NotionAdapter], Awaitable[object]]]] = [
+    ("get_public_url", lambda adapter: adapter.get_public_url("page_123")),
+]
+
+# Verify counts match capability matrix (18 DIRECT_API + 1 COMBINED)
+assert len(DIRECT_API_OPERATIONS) == 18, (
+    f"Expected 18 DIRECT_API ops, got {len(DIRECT_API_OPERATIONS)}"
+)
+assert len(COMBINED_OPERATIONS) == 1, f"Expected 1 COMBINED op, got {len(COMBINED_OPERATIONS)}"
+
+ALL_NON_BROWSER_OPERATIONS = DIRECT_API_OPERATIONS + COMBINED_OPERATIONS
+
+
+@pytest.mark.parametrize("operation_name,call_fn", ALL_NON_BROWSER_OPERATIONS)
 @pytest.mark.asyncio
-async def test_api_operations_not_implemented(browser_adapter):
-    """DIRECT_API operations raise NotImplementedError in browser adapter."""
-    with pytest.raises(NotImplementedError, match="API method"):
-        await browser_adapter.connection_status()
+async def test_non_browser_operations_raise_not_implemented(
+    browser_adapter, operation_name, call_fn
+):
+    """BrowserAdapter raises NotImplementedError for all DIRECT_API and COMBINED operations.
 
-    with pytest.raises(NotImplementedError, match="API method"):
-        await browser_adapter.workspace_discovery()
-
-    with pytest.raises(NotImplementedError, match="API method"):
-        await browser_adapter.create_page("Test")
-
-    with pytest.raises(NotImplementedError, match="API method"):
-        await browser_adapter.rename_page("page_123", "New Title")
-
-    with pytest.raises(NotImplementedError, match="API method"):
-        await browser_adapter.inspect_page("page_123")
+    Parametrized over 18 DIRECT_API + 1 COMBINED operations from capability matrix.
+    BrowserAdapter only implements BROWSER-tagged operations.
+    """
+    with pytest.raises(NotImplementedError, match=r"(API method|COMBINED)"):
+        await call_fn(browser_adapter)
 
 
 # Test: duplicate_page
