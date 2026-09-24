@@ -105,6 +105,16 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 - **OUT OF SCOPE** (W3 hard boundaries): CombinedNotionAdapter full implementation (tiny stub wiring OK if needed), receipts persistence, live product builds, publish-to-web production, Exit78 scheduler lift, live Notion/Etsy product mutations, SESSION_06 COMPLETE marking, real Playwright integration.
 
 
+## 2026-09-24 — Session 06 Wave 4a: BrowserNotionAdapter defect fixes (PR #41 review)
+
+- **All 7 defects fixed** from PR #41 review: (1) publish_page/unpublish_page idempotency (check state before clicking); (2) create_formula & create_*_view read real IDs from session/URL, raise on failure; (3) duplicate_page verifies new ID differs from source, reads real title; (4) set_view_title_visibility uses proper Notion URL shape (?v=), returns full NotionView; (5) verify_stranger_access uses separate anonymous BrowserSession via factory, catches specific errors (ConnectionError/TimeoutError/ValueError), lets unknown errors propagate; (6) router.set_adapter_mode validates before clearing cache (preserves adapter when rejecting browser/combined); (7) IMPLEMENTATION_LOG.md corrected router selectability wording.
+- **Test coverage expanded**: 48 browser adapter tests (19 parametrized refusal + 29 BROWSER operation tests including success/failure paths for ID reading, both starting states for idempotent toggles, anonymous session usage verification). 11 router tests (8 existing + 3 new cache-preservation tests). Parametrized operation list explicitly references PLATFORM_COMPATIBILITY.md source lines for drift detection.
+- **FakeBrowserSession enhancements**: Deterministic IDs (prop_abc123, view_def456) for property/view creation tests. Anonymous session factory support for verify_stranger_access isolation testing.
+- **BrowserNotionAdapter constructor updated**: Added optional `anon_session_factory` parameter for anonymous session injection (required for verify_stranger_access).
+- **Test results**: 1031 collected, 1030 passed, 1 skipped in CI. Local: 48 browser adapter + 11 router = 59 tests, all pass. Zero orchestration/ diffs, api_adapter.py untouched, fixture adapter default preserved.
+- **OUT OF SCOPE** (W4a hard boundaries): CombinedNotionAdapter implementation, receipts persistence, live Playwright integration, SESSION_06 COMPLETE marking.
+
+
 ## 2026-09-11 — Startup repair wave after recovery review
 
 - Repaired migration-head/schema compatibility readiness, encoded database credentials/IPv6, and production environment selection. Compose now carries raw passwords separately; a bounded independent review identified literal-percent and surrounding-whitespace cases, both reproduced and repaired with regression coverage. Development external-URL overrides retain their credentials.
