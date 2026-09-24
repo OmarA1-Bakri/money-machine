@@ -204,7 +204,9 @@ class CombinedNotionAdapter(NotionAdapter):
             "Use FixtureNotionAdapter for testing."
         )
 
-    async def set_view_title_visibility(self, view_id: str, visible: bool) -> NotionView:
+    async def set_view_title_visibility(
+        self, database_id: str, view_id: str, visible: bool
+    ) -> NotionView:
         raise NotImplementedError(
             "Real combined adapter deferred to Session 06 Wave 3+. "
             "Use FixtureNotionAdapter for testing."

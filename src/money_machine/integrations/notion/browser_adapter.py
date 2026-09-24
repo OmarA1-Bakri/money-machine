@@ -36,7 +36,7 @@ from .domain import (
 )
 
 
-def _translate_browser_exceptions(fn):
+def translate_browser_exceptions(fn):
     """Decorator to translate Playwright-style exceptions to built-in exceptions.
 
     Maps:

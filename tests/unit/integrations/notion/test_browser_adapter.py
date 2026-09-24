@@ -1161,7 +1161,7 @@ async def test_verify_stranger_access_accepts_notion_so(fake_browser, fake_anon_
     """verify_stranger_access accepts https://notion.so URLs."""
     adapter = BrowserNotionAdapter(
         browser_session=fake_browser,
-        anon_session_factory=lambda: fake_anon_browser,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
     # Should not raise ValueError
@@ -1174,7 +1174,7 @@ async def test_verify_stranger_access_accepts_www_notion_so(fake_browser, fake_a
     """verify_stranger_access accepts https://www.notion.so URLs."""
     adapter = BrowserNotionAdapter(
         browser_session=fake_browser,
-        anon_session_factory=lambda: fake_anon_browser,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
     # Should not raise ValueError
@@ -1187,7 +1187,7 @@ async def test_verify_stranger_access_rejects_http(fake_browser, fake_anon_brows
     """verify_stranger_access rejects HTTP (non-HTTPS) URLs."""
     adapter = BrowserNotionAdapter(
         browser_session=fake_browser,
-        anon_session_factory=lambda: fake_anon_browser,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
     with pytest.raises(ValueError, match="must use HTTPS"):
@@ -1199,7 +1199,7 @@ async def test_verify_stranger_access_rejects_subdomain(fake_browser, fake_anon_
     """verify_stranger_access rejects subdomains like evil.notion.so."""
     adapter = BrowserNotionAdapter(
         browser_session=fake_browser,
-        anon_session_factory=lambda: fake_anon_browser,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
     with pytest.raises(ValueError, match="URL host must be"):
@@ -1211,7 +1211,7 @@ async def test_verify_stranger_access_rejects_lookalike_domain(fake_browser, fak
     """verify_stranger_access rejects lookalike domains like notion.so.evil.com."""
     adapter = BrowserNotionAdapter(
         browser_session=fake_browser,
-        anon_session_factory=lambda: fake_anon_browser,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
     with pytest.raises(ValueError, match="URL host must be"):
@@ -1223,7 +1223,7 @@ async def test_verify_stranger_access_rejects_userinfo(fake_browser, fake_anon_b
     """verify_stranger_access rejects URLs with userinfo (e.g., https://notion.so@evil.com)."""
     adapter = BrowserNotionAdapter(
         browser_session=fake_browser,
-        anon_session_factory=lambda: fake_anon_browser,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
     with pytest.raises(ValueError, match="must not contain userinfo"):
@@ -1235,7 +1235,7 @@ async def test_verify_stranger_access_rejects_malformed_url(fake_browser, fake_a
     """verify_stranger_access rejects malformed URLs."""
     adapter = BrowserNotionAdapter(
         browser_session=fake_browser,
-        anon_session_factory=lambda: fake_anon_browser,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
     with pytest.raises(ValueError, match="URL must use HTTPS"):
@@ -1246,14 +1246,11 @@ async def test_verify_stranger_access_rejects_malformed_url(fake_browser, fake_a
 @pytest.mark.asyncio
 async def test_translate_playwright_timeout_error():
     """Exception translation layer maps playwright.*.TimeoutError to built-in TimeoutError."""
-    from money_machine.integrations.notion.browser_adapter import _translate_browser_exceptions
+    from money_machine.integrations.notion.browser_adapter import (
+        translate_browser_exceptions,
+    )
 
     # Create a fake playwright TimeoutError
-    class FakePlaywrightModule:
-        """Fake module to simulate playwright._impl._errors."""
-
-        pass
-
     class FakeTimeoutError(Exception):
         """Fake TimeoutError from playwright."""
 
@@ -1263,7 +1260,7 @@ async def test_translate_playwright_timeout_error():
     FakeTimeoutError.__module__ = "playwright._impl._errors"
     FakeTimeoutError.__name__ = "TimeoutError"
 
-    @_translate_browser_exceptions
+    @translate_browser_exceptions
     async def fake_operation():
         raise FakeTimeoutError("Timeout waiting for selector")
 
@@ -1275,7 +1272,9 @@ async def test_translate_playwright_timeout_error():
 @pytest.mark.asyncio
 async def test_translate_playwright_navigation_error():
     """Exception translation layer maps playwright navigation Error to ConnectionError."""
-    from money_machine.integrations.notion.browser_adapter import _translate_browser_exceptions
+    from money_machine.integrations.notion.browser_adapter import (
+        translate_browser_exceptions,
+    )
 
     class FakeNavigationError(Exception):
         """Fake Error from playwright with navigation keyword."""
@@ -1285,7 +1284,7 @@ async def test_translate_playwright_navigation_error():
     FakeNavigationError.__module__ = "playwright._impl._errors"
     FakeNavigationError.__name__ = "Error"
 
-    @_translate_browser_exceptions
+    @translate_browser_exceptions
     async def fake_operation():
         raise FakeNavigationError("Navigation timeout exceeded")
 
@@ -1297,7 +1296,9 @@ async def test_translate_playwright_navigation_error():
 @pytest.mark.asyncio
 async def test_translate_playwright_connection_error():
     """Exception translation layer maps playwright connection Error to ConnectionError."""
-    from money_machine.integrations.notion.browser_adapter import _translate_browser_exceptions
+    from money_machine.integrations.notion.browser_adapter import (
+        translate_browser_exceptions,
+    )
 
     class FakeConnectionError(Exception):
         """Fake Error from playwright with connection keyword."""
@@ -1307,7 +1308,7 @@ async def test_translate_playwright_connection_error():
     FakeConnectionError.__module__ = "playwright._impl._errors"
     FakeConnectionError.__name__ = "Error"
 
-    @_translate_browser_exceptions
+    @translate_browser_exceptions
     async def fake_operation():
         raise FakeConnectionError("net::ERR_CONNECTION_REFUSED")
 
@@ -1319,7 +1320,9 @@ async def test_translate_playwright_connection_error():
 @pytest.mark.asyncio
 async def test_translate_playwright_network_error():
     """Exception translation layer maps playwright network Error to ConnectionError."""
-    from money_machine.integrations.notion.browser_adapter import _translate_browser_exceptions
+    from money_machine.integrations.notion.browser_adapter import (
+        translate_browser_exceptions,
+    )
 
     class FakeNetworkError(Exception):
         """Fake Error from playwright with network keyword."""
@@ -1329,7 +1332,7 @@ async def test_translate_playwright_network_error():
     FakeNetworkError.__module__ = "playwright._impl._errors"
     FakeNetworkError.__name__ = "Error"
 
-    @_translate_browser_exceptions
+    @translate_browser_exceptions
     async def fake_operation():
         raise FakeNetworkError("Network error occurred")
 
@@ -1341,9 +1344,11 @@ async def test_translate_playwright_network_error():
 @pytest.mark.asyncio
 async def test_translate_non_playwright_exceptions_propagate():
     """Exception translation layer lets non-playwright exceptions propagate unchanged."""
-    from money_machine.integrations.notion.browser_adapter import _translate_browser_exceptions
+    from money_machine.integrations.notion.browser_adapter import (
+        translate_browser_exceptions,
+    )
 
-    @_translate_browser_exceptions
+    @translate_browser_exceptions
     async def fake_operation():
         raise ValueError("Some other error")
 
@@ -1355,7 +1360,9 @@ async def test_translate_non_playwright_exceptions_propagate():
 @pytest.mark.asyncio
 async def test_translate_playwright_non_matching_error_propagates():
     """Exception translation layer propagates playwright Error without nav/connection keywords."""
-    from money_machine.integrations.notion.browser_adapter import _translate_browser_exceptions
+    from money_machine.integrations.notion.browser_adapter import (
+        translate_browser_exceptions,
+    )
 
     class FakeGenericError(Exception):
         """Fake Error from playwright without special keywords."""
@@ -1365,7 +1372,7 @@ async def test_translate_playwright_non_matching_error_propagates():
     FakeGenericError.__module__ = "playwright._impl._errors"
     FakeGenericError.__name__ = "Error"
 
-    @_translate_browser_exceptions
+    @translate_browser_exceptions
     async def fake_operation():
         raise FakeGenericError("Some other playwright error")
 
