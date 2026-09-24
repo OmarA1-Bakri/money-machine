@@ -81,7 +81,7 @@ async def test_api_adapter_browser_ops_indicate_method_mismatch():
     with pytest.raises(NotImplementedError, match="requires BROWSER method"):
         await adapter.duplicate_page(page_id="page_123")
 
-    with pytest.raises(NotImplementedError, match="formula editor is UI-only"):
+    with pytest.raises(NotImplementedError, match="formula editor UI-only"):
         await adapter.create_formula(database_id="db_123", name="Formula", expression="1+1")
 
     with pytest.raises(NotImplementedError, match="requires BROWSER method"):

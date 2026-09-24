@@ -44,8 +44,8 @@ class NotionBlock:
     """Base class for Notion blocks."""
 
     id: str
-    type: str
     parent_id: str
+    type: str
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -53,17 +53,17 @@ class NotionBlock:
 class NotionTextBlock(NotionBlock):
     """A Notion paragraph (text) block."""
 
-    content: str = ""
     type: str = "paragraph"
+    content: str = ""
 
 
 @dataclass
 class NotionCalloutBlock(NotionBlock):
     """A Notion callout block."""
 
+    type: str = "callout"
     content: str = ""
     icon: str = "💡"
-    type: str = "callout"
 
 
 @dataclass
