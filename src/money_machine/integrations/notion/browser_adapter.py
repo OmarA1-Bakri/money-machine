@@ -121,19 +121,19 @@ class BrowserSession(Protocol):
 
 class TranslatingBrowserSession:
     """Wrapper that translates Playwright-style exceptions to built-in exceptions.
-    
+
     Wraps a BrowserSession and intercepts all method calls, translating any
     Playwright-module exceptions to Python built-in exceptions:
     - playwright.*.TimeoutError → TimeoutError
     - playwright.*.Error (with navigation/connection keywords) → ConnectionError
     - All other exceptions pass through unchanged
-    
+
     This is the adapter-owned translation boundary for production Playwright integration.
     """
 
     def __init__(self, wrapped_session: BrowserSession) -> None:
         """Initialize with a session to wrap.
-        
+
         Args:
             wrapped_session: The underlying BrowserSession (could be real Playwright or fake).
         """
@@ -141,10 +141,10 @@ class TranslatingBrowserSession:
 
     def _translate_exception(self, e: Exception) -> Exception:
         """Translate a Playwright exception to a built-in exception if applicable.
-        
+
         Args:
             e: The exception to potentially translate
-            
+
         Returns:
             The translated exception (TimeoutError or ConnectionError) or the original
         """

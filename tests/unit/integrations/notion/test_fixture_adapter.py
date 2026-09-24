@@ -438,3 +438,31 @@ async def test_fixture_verify_stranger_access_returns_false_for_invalid_url(adap
     accessible = await adapter.verify_stranger_access("https://example.com/page")
 
     assert accessible is False
+
+
+# Tests for set_view_title_visibility validation
+@pytest.mark.asyncio
+async def test_fixture_set_view_title_visibility_rejects_invalid_database_id(adapter):
+    """Fixture set_view_title_visibility rejects invalid database_id."""
+    database = await adapter.create_database(title="DB")
+    view = await adapter.create_table_view(database.id, "View")
+
+    # Too short
+    with pytest.raises(ValueError, match="Invalid database_id"):
+        await adapter.set_view_title_visibility("abc123", view.id, False)
+
+    # Not hex
+    with pytest.raises(ValueError, match="Invalid database_id"):
+        await adapter.set_view_title_visibility("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", view.id, False)
+
+
+@pytest.mark.asyncio
+async def test_fixture_set_view_title_visibility_rejects_wrong_database(adapter):
+    """Fixture set_view_title_visibility rejects view from wrong database."""
+    database1 = await adapter.create_database(title="DB1")
+    database2 = await adapter.create_database(title="DB2")
+    view1 = await adapter.create_table_view(database1.id, "View1")
+
+    # Try to access view1 as if it belongs to database2
+    with pytest.raises(ValueError, match="does not belong to database"):
+        await adapter.set_view_title_visibility(database2.id, view1.id, False)

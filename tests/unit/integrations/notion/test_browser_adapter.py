@@ -1243,27 +1243,58 @@ async def test_verify_stranger_access_rejects_malformed_url(fake_browser, fake_a
 
 
 @pytest.mark.asyncio
-async def test_verify_stranger_access_rejects_notion_site(fake_browser, fake_anon_browser):
-    """verify_stranger_access rejects notion.site domain (different from notion.so)."""
+async def test_verify_stranger_access_accepts_notion_site(fake_browser, fake_anon_browser):
+    """verify_stranger_access accepts https://notion.site URLs."""
     adapter = BrowserNotionAdapter(
         browser_session=fake_browser,
         anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
-    with pytest.raises(ValueError, match="URL host must be"):
-        await adapter.verify_stranger_access("https://notion.site/page")
+    result = await adapter.verify_stranger_access("https://notion.site/page-789")
+    assert result is True
 
 
 @pytest.mark.asyncio
-async def test_verify_stranger_access_rejects_notion_site_subdomain(fake_browser, fake_anon_browser):
-    """verify_stranger_access rejects notion.site subdomains like foo.notion.site."""
+async def test_verify_stranger_access_accepts_www_notion_site(fake_browser, fake_anon_browser):
+    """verify_stranger_access accepts https://www.notion.site URLs."""
+    adapter = BrowserNotionAdapter(
+        browser_session=fake_browser,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
+    )
+
+    result = await adapter.verify_stranger_access("https://www.notion.site/page-abc")
+    assert result is True
+
+
+@pytest.mark.asyncio
+async def test_verify_stranger_access_accepts_single_label_notion_site(
+    fake_browser, fake_anon_browser
+):
+    """verify_stranger_access accepts single-label subdomains like https://omar.notion.site."""
+    adapter = BrowserNotionAdapter(
+        browser_session=fake_browser,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
+    )
+
+    # Test with a 32-hex page ID
+    result = await adapter.verify_stranger_access(
+        "https://omar.notion.site/Page-abc123def456789012345678901234"
+    )
+    assert result is True
+
+
+@pytest.mark.asyncio
+async def test_verify_stranger_access_rejects_deep_nesting_notion_site(
+    fake_browser, fake_anon_browser
+):
+    """verify_stranger_access rejects deeply nested subdomains like a.b.notion.site."""
     adapter = BrowserNotionAdapter(
         browser_session=fake_browser,
         anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
     with pytest.raises(ValueError, match="URL host must be"):
-        await adapter.verify_stranger_access("https://foo.notion.site/page")
+        await adapter.verify_stranger_access("https://a.b.notion.site/page")
 
 
 # Test: Exception translation layer
@@ -1519,3 +1550,139 @@ async def test_verify_stranger_access_translates_playwright_navigation_error():
 
     # Verify session was still closed
     assert nav_error_session.closed is True
+
+
+# Test: close() error masking
+@pytest.mark.asyncio
+async def test_verify_stranger_access_close_error_doesnt_mask_original():
+    """verify_stranger_access: close() error doesn't mask the original exception."""
+
+    class ErrorOnCloseSession:
+        def __init__(self):
+            self.closed = False
+
+        async def navigate(self, url: str) -> None:
+            raise RuntimeError("Original navigation error")
+
+        async def wait_for_selector(self, selector: str, timeout: int = 5000) -> None:
+            pass
+
+        async def click(self, selector: str) -> None:
+            pass
+
+        async def fill(self, selector: str, value: str) -> None:
+            pass
+
+        async def get_attribute(self, selector: str, attribute: str) -> str | None:
+            return None
+
+        async def is_visible(self, selector: str) -> bool:
+            return False
+
+        async def get_current_url(self) -> str:
+            return "https://example.com"
+
+        async def close(self) -> None:
+            self.closed = True
+            raise RuntimeError("Close also failed!")
+
+    fake_browser = FakeBrowserSession()
+    error_session = ErrorOnCloseSession()
+    adapter = BrowserNotionAdapter(
+        browser_session=fake_browser,
+        anon_session_factory=lambda: error_session,  # type: ignore[reportUnknownLambdaType]
+    )
+
+    # Should raise the original navigation error wrapped in RuntimeError, not the close error
+    with pytest.raises(RuntimeError, match="Failed to navigate"):
+        await adapter.verify_stranger_access("https://notion.so/page")
+
+    # Close was attempted
+    assert error_session.closed is True
+
+
+# Test: Translation for logged-in operation
+@pytest.mark.asyncio
+async def test_publish_page_translates_playwright_timeout(fake_anon_browser):
+    """publish_page translates Playwright TimeoutError to built-in TimeoutError."""
+
+    class FakePlaywrightTimeoutError(Exception):
+        pass
+
+    FakePlaywrightTimeoutError.__module__ = "playwright._impl._errors"
+    FakePlaywrightTimeoutError.__name__ = "TimeoutError"
+
+    class TimeoutSession:
+        async def navigate(self, url: str) -> None:
+            pass
+
+        async def click(self, selector: str) -> None:
+            # Raise fake Playwright timeout when trying to click publish
+            if "publish-button" in selector:
+                raise FakePlaywrightTimeoutError("Timeout waiting for publish button")
+
+        async def fill(self, selector: str, value: str) -> None:
+            pass
+
+        async def get_attribute(self, selector: str, attribute: str) -> str | None:
+            return None
+
+        async def is_visible(self, selector: str) -> bool:
+            return False
+
+        async def wait_for_selector(self, selector: str, timeout: int = 5000) -> None:
+            pass
+
+        async def get_current_url(self) -> str:
+            return "https://notion.so/page123"
+
+        async def close(self) -> None:
+            pass
+
+    timeout_session = TimeoutSession()
+    adapter = BrowserNotionAdapter(
+        browser_session=timeout_session,
+        anon_session_factory=lambda: fake_anon_browser,
+    )
+
+    # Should translate to built-in TimeoutError
+    with pytest.raises(TimeoutError, match="Timeout waiting for publish button"):
+        await adapter.publish_page("abc123def456789012345678901234")
+
+
+# Test: duplicate_page with uppercase source
+@pytest.mark.asyncio
+async def test_duplicate_page_raises_when_uppercase_source_matches(browser_adapter, fake_browser):
+    """duplicate_page normalizes and compares IDs (case-insensitive)."""
+
+    async def navigate_mock(url: str) -> None:
+        fake_browser.navigated_to.append(url)
+        # Return uppercase version of the source ID (should still match after normalization)
+        fake_browser.current_url = "https://www.notion.so/FFEEDDCCBBAA99887766554433221100"
+
+    fake_browser.navigate = navigate_mock
+    fake_browser.set_attribute('[data-testid="page-title"]', "textContent", "My Page")
+
+    # Source has mixed case - should still detect as same after normalization
+    with pytest.raises(RuntimeError, match="Duplicate page ID matches source ID"):
+        await browser_adapter.duplicate_page("FFeedDCcbbAA99887766554433221100")
+
+
+# Test: set_view_title_visibility with dashed uppercase input
+@pytest.mark.asyncio
+async def test_set_view_title_visibility_returns_normalized_id(browser_adapter, fake_browser):
+    """set_view_title_visibility returns NotionView with normalized database_id."""
+    # Input with dashes and uppercase
+    database_id_input = "AABBCCDD-1122-3344-5566-778899AABBCC"
+    view_id = "view_abc"
+
+    fake_browser.set_element_visible('[data-testid="view-title"]', False)
+    fake_browser.set_attribute('[data-testid="view-name"]', "textContent", "My View")
+    fake_browser.set_attribute('[data-testid="view-type"]', "data-view-type", "table")
+
+    result = await browser_adapter.set_view_title_visibility(database_id_input, view_id, True)
+
+    # Returned database_id should be normalized (no dashes, lowercase)
+    assert result.database_id == "aabbccdd112233445566778899aabbcc"
+    assert result.id == view_id
+    assert result.title_visible is True
