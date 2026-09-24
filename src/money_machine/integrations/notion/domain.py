@@ -72,7 +72,9 @@ class NotionDatabaseProperty:
 
     id: str
     name: str
-    type: str  # title | text | number | select | multi_select | date | person | checkbox | url | email | phone | formula | relation | rollup | created_time | created_by | last_edited_time | last_edited_by
+    type: str  # title | text | number | select | multi_select | date | person | checkbox
+    # | url | email | phone | formula | relation | rollup | created_time
+    # | created_by | last_edited_time | last_edited_by
     config: dict[str, Any] = field(default_factory=dict)
 
 
@@ -94,7 +96,10 @@ class NotionRollup:
     name: str
     relation_property_id: str
     rollup_property_id: str
-    function: str  # count | count_values | empty | not_empty | unique | show_unique | percent_empty | percent_not_empty | sum | average | median | min | max | range | earliest_date | latest_date | date_range | checked | unchecked | percent_checked | percent_unchecked
+    function: str  # count | count_values | empty | not_empty | unique | show_unique
+    # | percent_empty | percent_not_empty | sum | average | median | min | max
+    # | range | earliest_date | latest_date | date_range | checked | unchecked
+    # | percent_checked | percent_unchecked
 
 
 @dataclass
@@ -147,7 +152,8 @@ class NotionFilter:
     """A Notion database filter."""
 
     property: str
-    condition: str  # equals | does_not_equal | contains | does_not_contain | is_empty | is_not_empty | greater_than | less_than | etc.
+    condition: str  # equals | does_not_equal | contains | does_not_contain
+    # | is_empty | is_not_empty | greater_than | less_than | etc.
     value: Any
 
 

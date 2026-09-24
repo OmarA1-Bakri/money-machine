@@ -92,7 +92,7 @@ def test_router_rejects_invalid_adapter_mode():
 
     try:
         router = NotionAdapterRouter(config_path=config_path)
-        with pytest.raises(ValueError, match="Invalid notion.adapter_mode"):
+        with pytest.raises(ValueError, match=r"Invalid notion\.adapter_mode"):
             router.get_adapter()
     finally:
         Path(config_path).unlink()
