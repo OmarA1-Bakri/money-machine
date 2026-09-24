@@ -6,7 +6,7 @@ with minimal validation, suitable for in-memory testing and later API/browser ma
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -34,8 +34,8 @@ class NotionPage:
     is_published: bool = False
     duplicate_as_template: bool = False
     search_indexing: bool = True
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     properties: dict[str, Any] = field(default_factory=dict)
 
 
@@ -46,7 +46,7 @@ class NotionBlock:
     id: str
     type: str
     parent_id: str
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
@@ -122,8 +122,8 @@ class NotionDatabase:
     icon: str | None = None
     cover: str | None = None
     properties: list[NotionDatabaseProperty] = field(default_factory=list)
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass

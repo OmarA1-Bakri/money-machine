@@ -4,6 +4,8 @@ Real implementation will use Notion Official API via notion-client Python SDK.
 Wave 1 raises NotImplementedError to mark deferred boundary.
 """
 
+from typing import Any
+
 from .adapter import NotionAdapter
 from .domain import (
     NotionCalloutBlock,
@@ -38,7 +40,7 @@ class APINotionAdapter(NotionAdapter):
     - Publishing settings (UI-only)
     """
 
-    async def connection_status(self) -> dict[str, bool]:
+    async def connection_status(self) -> dict[str, bool | str | int]:
         raise NotImplementedError(
             "Real API adapter deferred to Session 06 Wave 2+. Use FixtureNotionAdapter for testing."
         )
@@ -113,7 +115,7 @@ class APINotionAdapter(NotionAdapter):
         )
 
     async def add_property(
-        self, database_id: str, name: str, property_type: str, config: dict
+        self, database_id: str, name: str, property_type: str, config: dict[str, Any]
     ) -> NotionDatabaseProperty:
         raise NotImplementedError(
             "Real API adapter deferred to Session 06 Wave 2+. Use FixtureNotionAdapter for testing."
@@ -156,12 +158,12 @@ class APINotionAdapter(NotionAdapter):
             "Deferred to Session 06 Wave 3+. Use FixtureNotionAdapter for testing."
         )
 
-    async def add_filter(self, database_id: str, view_id: str, filter_spec: NotionFilter) -> dict:
+    async def add_filter(self, database_id: str, view_id: str, filter_spec: NotionFilter) -> dict[str, Any]:
         raise NotImplementedError(
             "Real API adapter deferred to Session 06 Wave 2+. Use FixtureNotionAdapter for testing."
         )
 
-    async def add_sort(self, database_id: str, view_id: str, sort_spec: NotionSort) -> dict:
+    async def add_sort(self, database_id: str, view_id: str, sort_spec: NotionSort) -> dict[str, Any]:
         raise NotImplementedError(
             "Real API adapter deferred to Session 06 Wave 2+. Use FixtureNotionAdapter for testing."
         )

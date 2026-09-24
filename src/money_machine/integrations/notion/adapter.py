@@ -9,6 +9,7 @@ for per-operation method selection and contracts.
 """
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 from .domain import (
     NotionCalloutBlock,
@@ -35,7 +36,7 @@ class NotionAdapter(ABC):
     """
 
     @abstractmethod
-    async def connection_status(self) -> dict[str, bool]:
+    async def connection_status(self) -> dict[str, bool | str | int]:
         """Check API token validity and workspace access.
 
         Method: DIRECT_API
@@ -251,7 +252,7 @@ class NotionAdapter(ABC):
 
     @abstractmethod
     async def add_property(
-        self, database_id: str, name: str, property_type: str, config: dict
+        self, database_id: str, name: str, property_type: str, config: dict[str, Any]
     ) -> NotionDatabaseProperty:
         """Add a property (column) to a database.
 
@@ -369,7 +370,7 @@ class NotionAdapter(ABC):
         """
 
     @abstractmethod
-    async def add_filter(self, database_id: str, view_id: str, filter_spec: NotionFilter) -> dict:
+    async def add_filter(self, database_id: str, view_id: str, filter_spec: NotionFilter) -> dict[str, Any]:
         """Add a filter to a database view.
 
         Method: DIRECT_API (part of database query)
@@ -388,7 +389,7 @@ class NotionAdapter(ABC):
         """
 
     @abstractmethod
-    async def add_sort(self, database_id: str, view_id: str, sort_spec: NotionSort) -> dict:
+    async def add_sort(self, database_id: str, view_id: str, sort_spec: NotionSort) -> dict[str, Any]:
         """Add a sort to a database view.
 
         Method: DIRECT_API (part of database query)

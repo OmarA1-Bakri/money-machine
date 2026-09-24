@@ -4,6 +4,8 @@ Real implementation will use Playwright for UI-only Notion operations.
 Wave 1 raises NotImplementedError to mark deferred boundary.
 """
 
+from typing import Any
+
 from .adapter import NotionAdapter
 from .domain import (
     NotionCalloutBlock,
@@ -34,7 +36,7 @@ class BrowserNotionAdapter(NotionAdapter):
     - Stranger access verification (logged-out browser)
     """
 
-    async def connection_status(self) -> dict[str, bool]:
+    async def connection_status(self) -> dict[str, bool | str | int]:
         raise NotImplementedError(
             "connection_status uses API method, not BROWSER. "
             "Use APINotionAdapter or FixtureNotionAdapter."
@@ -116,7 +118,7 @@ class BrowserNotionAdapter(NotionAdapter):
         )
 
     async def add_property(
-        self, database_id: str, name: str, property_type: str, config: dict
+        self, database_id: str, name: str, property_type: str, config: dict[str, Any]
     ) -> NotionDatabaseProperty:
         raise NotImplementedError(
             "add_property uses API method, not BROWSER. "
@@ -165,12 +167,12 @@ class BrowserNotionAdapter(NotionAdapter):
             "Use FixtureNotionAdapter for testing."
         )
 
-    async def add_filter(self, database_id: str, view_id: str, filter_spec: NotionFilter) -> dict:
+    async def add_filter(self, database_id: str, view_id: str, filter_spec: NotionFilter) -> dict[str, Any]:
         raise NotImplementedError(
             "add_filter uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
         )
 
-    async def add_sort(self, database_id: str, view_id: str, sort_spec: NotionSort) -> dict:
+    async def add_sort(self, database_id: str, view_id: str, sort_spec: NotionSort) -> dict[str, Any]:
         raise NotImplementedError(
             "add_sort uses API method, not BROWSER. Use APINotionAdapter or FixtureNotionAdapter."
         )

@@ -5,6 +5,7 @@ to use: fixture (W1), api (W2+), browser (W3+), or combined (W3+).
 """
 
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -43,7 +44,7 @@ class NotionAdapterRouter:
         self.config_path = config_path
         self._adapter: NotionAdapter | None = None
 
-    def _load_config(self) -> dict:
+    def _load_config(self) -> dict[str, Any]:
         """Load integrations config from YAML."""
         if not self.config_path.exists():
             # Default to fixture if config missing

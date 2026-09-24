@@ -7,7 +7,8 @@ NOT suitable for production or live Notion integration.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Any
 
 from .adapter import NotionAdapter
 from .domain import (
@@ -57,7 +58,7 @@ class FixtureNotionAdapter(NotionAdapter):
         """Generate a unique object ID."""
         return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
-    async def connection_status(self) -> dict[str, bool]:
+    async def connection_status(self) -> dict[str, bool | str | int]:
         """Check connection status (always connected in fixture)."""
         return {
             "connected": True,
@@ -79,7 +80,7 @@ class FixtureNotionAdapter(NotionAdapter):
     ) -> NotionPage:
         """Create a new page."""
         page_id = self._generate_id("page")
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         page = NotionPage(
             id=page_id,
@@ -101,7 +102,7 @@ class FixtureNotionAdapter(NotionAdapter):
             raise ValueError(f"Page {page_id} not found")
 
         new_id = self._generate_id("page")
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         duplicate = NotionPage(
             id=new_id,
@@ -127,7 +128,7 @@ class FixtureNotionAdapter(NotionAdapter):
             raise ValueError(f"Page {page_id} not found")
 
         page.title = new_title
-        page.updated_at = datetime.utcnow()
+        page.updated_at = datetime.now(timezone.utc)
         return page
 
     async def move_page(
@@ -140,7 +141,7 @@ class FixtureNotionAdapter(NotionAdapter):
 
         page.parent_id = new_parent_id
         page.parent_type = new_parent_type
-        page.updated_at = datetime.utcnow()
+        page.updated_at = datetime.now(timezone.utc)
         return page
 
     async def set_icon(self, page_id: str, icon: str) -> NotionPage:
@@ -150,7 +151,7 @@ class FixtureNotionAdapter(NotionAdapter):
             raise ValueError(f"Page {page_id} not found")
 
         page.icon = icon
-        page.updated_at = datetime.utcnow()
+        page.updated_at = datetime.now(timezone.utc)
         return page
 
     async def set_cover(self, page_id: str, cover_url: str) -> NotionPage:
@@ -160,7 +161,7 @@ class FixtureNotionAdapter(NotionAdapter):
             raise ValueError(f"Page {page_id} not found")
 
         page.cover = cover_url
-        page.updated_at = datetime.utcnow()
+        page.updated_at = datetime.now(timezone.utc)
         return page
 
     async def add_text_block(self, page_id: str, content: str) -> NotionTextBlock:
@@ -174,7 +175,7 @@ class FixtureNotionAdapter(NotionAdapter):
             type="paragraph",
             parent_id=page_id,
             content=content,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         self.blocks[block_id] = block
         return block
@@ -193,7 +194,7 @@ class FixtureNotionAdapter(NotionAdapter):
             parent_id=page_id,
             content=content,
             icon=icon,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         self.blocks[block_id] = block
         return block
@@ -208,7 +209,7 @@ class FixtureNotionAdapter(NotionAdapter):
     ) -> NotionDatabase:
         """Create a new database."""
         db_id = self._generate_id("db")
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         database = NotionDatabase(
             id=db_id,
@@ -225,7 +226,7 @@ class FixtureNotionAdapter(NotionAdapter):
         return database
 
     async def add_property(
-        self, database_id: str, name: str, property_type: str, config: dict
+        self, database_id: str, name: str, property_type: str, config: dict[str, Any]
     ) -> NotionDatabaseProperty:
         """Add a property to a database."""
         database = self.databases.get(database_id)
@@ -237,14 +238,14 @@ class FixtureNotionAdapter(NotionAdapter):
         if existing:
             existing.type = property_type
             existing.config = config
-            database.updated_at = datetime.utcnow()
+            database.updated_at = datetime.now(timezone.utc)
             return existing
 
         # Create new property
         prop_id = self._generate_id("prop")
         prop = NotionDatabaseProperty(id=prop_id, name=name, type=property_type, config=config)
         database.properties.append(prop)
-        database.updated_at = datetime.utcnow()
+        database.updated_at = datetime.now(timezone.utc)
         return prop
 
     async def create_relation(
@@ -275,7 +276,7 @@ class FixtureNotionAdapter(NotionAdapter):
             id=relation_id, name=name, type="relation", config={"relation": relation}
         )
         database.properties.append(prop)
-        database.updated_at = datetime.utcnow()
+        database.updated_at = datetime.now(timezone.utc)
 
         return relation
 
@@ -306,7 +307,7 @@ class FixtureNotionAdapter(NotionAdapter):
             id=rollup_id, name=name, type="rollup", config={"rollup": rollup}
         )
         database.properties.append(prop)
-        database.updated_at = datetime.utcnow()
+        database.updated_at = datetime.now(timezone.utc)
 
         return rollup
 
@@ -324,7 +325,7 @@ class FixtureNotionAdapter(NotionAdapter):
             id=formula_id, name=name, type="formula", config={"formula": formula}
         )
         database.properties.append(prop)
-        database.updated_at = datetime.utcnow()
+        database.updated_at = datetime.now(timezone.utc)
 
         return formula
 
@@ -351,7 +352,7 @@ class FixtureNotionAdapter(NotionAdapter):
         self.linked_views[linked_view_id] = linked_view
         return linked_view
 
-    async def add_filter(self, database_id: str, view_id: str, filter_spec: NotionFilter) -> dict:
+    async def add_filter(self, database_id: str, view_id: str, filter_spec: NotionFilter) -> dict[str, Any]:
         """Add a filter to a view."""
         if database_id not in self.databases:
             raise ValueError(f"Database {database_id} not found")
@@ -366,7 +367,7 @@ class FixtureNotionAdapter(NotionAdapter):
             },
         }
 
-    async def add_sort(self, database_id: str, view_id: str, sort_spec: NotionSort) -> dict:
+    async def add_sort(self, database_id: str, view_id: str, sort_spec: NotionSort) -> dict[str, Any]:
         """Add a sort to a view."""
         if database_id not in self.databases:
             raise ValueError(f"Database {database_id} not found")
@@ -438,7 +439,7 @@ class FixtureNotionAdapter(NotionAdapter):
 
         page.is_published = True
         page.public_url = f"https://fixture.notion.site/{page_id}"
-        page.updated_at = datetime.utcnow()
+        page.updated_at = datetime.now(timezone.utc)
         return page
 
     async def set_duplicate_as_template(self, page_id: str, enabled: bool) -> NotionPage:
@@ -448,7 +449,7 @@ class FixtureNotionAdapter(NotionAdapter):
             raise ValueError(f"Page {page_id} not found")
 
         page.duplicate_as_template = enabled
-        page.updated_at = datetime.utcnow()
+        page.updated_at = datetime.now(timezone.utc)
         return page
 
     async def set_search_indexing(self, page_id: str, enabled: bool) -> NotionPage:
@@ -458,7 +459,7 @@ class FixtureNotionAdapter(NotionAdapter):
             raise ValueError(f"Page {page_id} not found")
 
         page.search_indexing = enabled
-        page.updated_at = datetime.utcnow()
+        page.updated_at = datetime.now(timezone.utc)
         return page
 
     async def get_public_url(self, page_id: str) -> str | None:
@@ -477,7 +478,7 @@ class FixtureNotionAdapter(NotionAdapter):
 
         page.is_published = False
         page.public_url = None
-        page.updated_at = datetime.utcnow()
+        page.updated_at = datetime.now(timezone.utc)
         return page
 
     async def inspect_page(self, page_id: str) -> NotionPage:
