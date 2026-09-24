@@ -84,7 +84,7 @@ class BrowserNotionAdapter(NotionAdapter):
         
         Args:
             browser_session: Browser abstraction for navigation/interaction.
-                            Production: Playwright-backed session.
+                            Production: Playwright-backed session (W4+ scope).
                             Tests: Fake session with synthetic responses.
         """
         self._browser = browser_session

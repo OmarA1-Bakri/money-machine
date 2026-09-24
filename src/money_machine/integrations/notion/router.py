@@ -76,9 +76,17 @@ class NotionAdapterRouter:
         elif mode == "api":
             self._adapter = APINotionAdapter()
         elif mode == "browser":
-            self._adapter = BrowserNotionAdapter()
+            raise NotImplementedError(
+                "Browser adapter requires Playwright session injection. "
+                "Production Playwright integration deferred to Session 06 Wave 4+. "
+                "Use FixtureNotionAdapter for testing or APINotionAdapter for API operations."
+            )
         elif mode == "combined":
-            self._adapter = CombinedNotionAdapter()
+            raise NotImplementedError(
+                "Combined adapter requires both API and browser session setup. "
+                "Deferred to Session 06 Wave 4+. "
+                "Use FixtureNotionAdapter for testing or APINotionAdapter for API operations."
+            )
         else:
             raise ValueError(
                 f"Invalid notion.adapter_mode: {mode}. "
@@ -109,6 +117,12 @@ class NotionAdapterRouter:
         elif mode == "api":
             self._adapter = APINotionAdapter()
         elif mode == "browser":
-            self._adapter = BrowserNotionAdapter()
+            raise NotImplementedError(
+                "Browser adapter requires Playwright session injection. "
+                "Production Playwright integration deferred to Session 06 Wave 4+."
+            )
         elif mode == "combined":
-            self._adapter = CombinedNotionAdapter()
+            raise NotImplementedError(
+                "Combined adapter requires both API and browser session setup. "
+                "Deferred to Session 06 Wave 4+."
+            )
