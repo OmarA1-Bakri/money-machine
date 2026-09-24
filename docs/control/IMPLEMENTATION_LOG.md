@@ -78,6 +78,20 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 - **OUT OF SCOPE** (W1 hard boundaries): Live Notion API/browser calls, browser session management, formula builders beyond stubs, Notion receipts table/persistence, publishing helpers, relation/linked-view helpers, live connection CLI, Exit78 scheduler lift, SESSION_06 COMPLETE marking.
 - Unit tests pending CI run. Next: write unit tests for adapter interface, router selection, fixture CRUD, stub NotImplementedError behavior; run `bash scripts/test.sh` to green.
 
+## 2026-09-24 — Session 06 Wave 2: APINotionAdapter real implementation (DIRECT_API ops only)
+
+- **APINotionAdapter real implementation** in `src/money_machine/integrations/notion/api_adapter.py` for 18 DIRECT_API operations tagged in PLATFORM_COMPATIBILITY.md: connection_status, workspace_discovery, create_page, rename_page, move_page, set_icon, set_cover, add_text_block, add_callout_block, create_database, add_property, create_relation, create_rollup, add_filter, add_sort, add_child_page, inspect_page, inspect_database, get_public_url.
+- **Dependency added**: `notion-client>=2.2,<3` in `pyproject.toml` for Notion Official API access. All adapter methods use AsyncClient from notion-client SDK. No credentials in repo; uses `NOTION_API_TOKEN` env var with deferred validation (token checked on first API call, not at initialization).
+- **Domain object mapping**: All API responses converted to typed domain models (NotionPage, NotionDatabase, NotionBlock, etc.) via helper methods `_map_page` and `_map_database`. Consistent field extraction from Notion API JSON.
+- **Error handling**: Generic `Exception` catching in connection_status and workspace_discovery for robustness; re-raised with context chaining (`raise ... from e`) per Ruff B904.
+- **Unit tests**: 21 new mocked unit tests in `tests/unit/integrations/notion/test_api_adapter.py` using `respx` for HTTP request mocking. **Zero live Notion API calls** in tests. Tests cover all 18 implemented operations plus error cases (connection failure, workspace discovery failure). All W1 fixture/router/stub tests remain green (69 total tests passing).
+- **Configuration preserved**: Fixture adapter remains default in `config/integrations.yaml` (notion.adapter_mode=fixture). API mode selectable via config only.
+- **Stub operations unchanged**: BROWSER/COMBINED operations remain `NotImplementedError` stubs as required. Only DIRECT_API operations implemented per W2 scope.
+- **Code quality**: Ruff formatting applied (removed trailing whitespace, reformatted long lines), Pyright type checking clean. No linting errors.
+- **Control update**: `adapter_unit_tests_pass` evidence key flipped TRUE (commit 45dc656); `control_files_and_checkpoint_current` flipped TRUE (commit 9d88e53, then corrected to match tip in this entry). State revision 32 → 35. Remaining six Session 06 evidence keys remain FALSE (W1 design keys, evidence_closure_commit_recorded).
+- **Exit 78 verification**: Zero diffs in `src/money_machine/orchestration/` (worker/scheduler untouched). `git diff 73704c57..HEAD -- src/money_machine/orchestration/` output empty.
+- **OUT OF SCOPE** (W2 hard boundaries): BrowserNotionAdapter / CombinedNotionAdapter real impl, receipts persistence, live product builds, publish-to-web production, Exit78 scheduler lift, live Notion/Etsy product mutations, SESSION_06 COMPLETE marking.
+
 
 ## 2026-09-11 — Startup repair wave after recovery review
 

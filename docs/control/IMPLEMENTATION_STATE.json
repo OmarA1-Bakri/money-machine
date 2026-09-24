@@ -4,11 +4,11 @@
   "repo_root": "/mnt/d/Money Machine",
   "windows_repo_root": "D:\\Money Machine",
   "branch": "build/full-automation",
-  "head_sha": "45dc6568ad3d98e6ba8f1bb01e2de04675fe0c10",
+  "head_sha": "824738be2c7f4aeb1c43bd5b54ae2e0e5e9f9c7f",
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "evidence_closure_commit_sha": "9b791d45f9461030f09eda8a46838afc5447416c",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 34,
+  "state_revision": 35,
   "session_status": "incomplete",
   "current_session": 6,
   "completed_sessions": [
@@ -117,5 +117,5 @@
   },
   "next_session": 6,
   "next_prompt": "09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md",
-  "updated_at": "2026-09-24T07:15:14Z"
+  "updated_at": "2026-09-24T07:28:12Z"
 }
