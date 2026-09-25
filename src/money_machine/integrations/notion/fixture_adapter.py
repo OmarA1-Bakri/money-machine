@@ -430,8 +430,13 @@ class FixtureNotionAdapter(NotionAdapter):
         # Normalize ID: strip prefix, dashes, lowercase
         normalized_input = database_id.removeprefix("db_").replace("-", "").lower()
 
-        # Validate it's not empty and contains only hex characters
-        if not normalized_input or not all(c in "0123456789abcdef" for c in normalized_input):
+        # Validate it's not empty, contains only hex, and is at least 12 characters
+        # (fixture IDs are 12 hex, real IDs are 32 hex)
+        if (
+            not normalized_input
+            or len(normalized_input) < 12
+            or not all(c in "0123456789abcdef" for c in normalized_input)
+        ):
             raise ValueError(f"Invalid database_id: {database_id}")
 
         view = self.views.get(view_id)
