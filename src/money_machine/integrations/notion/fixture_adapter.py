@@ -426,7 +426,7 @@ class FixtureNotionAdapter(NotionAdapter):
         # Fixture adapter uses short IDs (12 hex) with prefixes
         # Real IDs are 32 hex (with or without dashes, with or without prefix)
         # Skip strict validation and just normalize for comparison
-        
+
         view = self.views.get(view_id)
         if not view:
             raise ValueError(f"View {view_id} not found")
@@ -440,9 +440,7 @@ class FixtureNotionAdapter(NotionAdapter):
 
         # Validate that the view belongs to the given database
         if normalized_view_db != normalized_input:
-            raise ValueError(
-                f"View {view_id} does not belong to database {database_id}"
-            )
+            raise ValueError(f"View {view_id} does not belong to database {database_id}")
 
         view.title_visible = visible
         return view
