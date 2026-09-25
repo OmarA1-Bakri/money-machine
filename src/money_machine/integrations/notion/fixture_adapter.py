@@ -444,9 +444,7 @@ class FixtureNotionAdapter(NotionAdapter):
 
         # Validate that the view belongs to the given database
         if view_db_normalized != normalized_db_id:
-            raise ValueError(
-                f"View {view_id} does not belong to database {database_id}"
-            )
+            raise ValueError(f"View {view_id} does not belong to database {database_id}")
 
         view.title_visible = visible
         return view
