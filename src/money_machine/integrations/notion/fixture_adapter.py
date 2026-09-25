@@ -425,18 +425,21 @@ class FixtureNotionAdapter(NotionAdapter):
         """Set view title visibility."""
         # Fixture adapter uses short IDs (12 hex) with prefixes
         # Real IDs are 32 hex (with or without dashes, with or without prefix)
-        # Skip strict validation and just normalize for comparison
+        # Validate that the database_id is at least hex after normalization
+
+        # Normalize ID: strip prefix, dashes, lowercase
+        normalized_input = database_id.removeprefix("db_").replace("-", "").lower()
+
+        # Validate it's not empty and contains only hex characters
+        if not normalized_input or not all(c in "0123456789abcdef" for c in normalized_input):
+            raise ValueError(f"Invalid database_id: {database_id}")
 
         view = self.views.get(view_id)
         if not view:
             raise ValueError(f"View {view_id} not found")
 
-        # Normalize both IDs for comparison (strip prefix, dashes, lowercase)
-        def normalize_id(id_str: str) -> str:
-            return id_str.removeprefix("db_").replace("-", "").lower()
-
-        normalized_input = normalize_id(database_id)
-        normalized_view_db = normalize_id(view.database_id)
+        # Normalize view's database_id for comparison
+        normalized_view_db = view.database_id.removeprefix("db_").replace("-", "").lower()
 
         # Validate that the view belongs to the given database
         if normalized_view_db != normalized_input:
