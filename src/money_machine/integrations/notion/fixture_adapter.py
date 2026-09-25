@@ -423,28 +423,26 @@ class FixtureNotionAdapter(NotionAdapter):
         self, database_id: str, view_id: str, visible: bool
     ) -> NotionView:
         """Set view title visibility."""
-        # Validate database_id (32-hex, with or without dashes, with or without 'db_' prefix)
-        # Strip prefix if present, then normalize to undashed lowercase
-        stripped_id = database_id.removeprefix("db_")
-        normalized_db_id = stripped_id.replace("-", "").lower()
-        if (
-            not normalized_db_id
-            or len(normalized_db_id) != 32
-            or not all(c in "0123456789abcdef" for c in normalized_db_id)
-        ):
-            raise ValueError(f"Invalid database_id: {database_id}")
-
+        # Fixture adapter uses short IDs (12 hex) with prefixes
+        # Real IDs are 32 hex (with or without dashes, with or without prefix)
+        # Skip strict validation and just normalize for comparison
+        
         view = self.views.get(view_id)
         if not view:
             raise ValueError(f"View {view_id} not found")
 
-        # Normalize the view's database_id for comparison
-        view_db_stripped = view.database_id.removeprefix("db_")
-        view_db_normalized = view_db_stripped.replace("-", "").lower()
+        # Normalize both IDs for comparison (strip prefix, dashes, lowercase)
+        def normalize_id(id_str: str) -> str:
+            return id_str.removeprefix("db_").replace("-", "").lower()
+
+        normalized_input = normalize_id(database_id)
+        normalized_view_db = normalize_id(view.database_id)
 
         # Validate that the view belongs to the given database
-        if view_db_normalized != normalized_db_id:
-            raise ValueError(f"View {view_id} does not belong to database {database_id}")
+        if normalized_view_db != normalized_input:
+            raise ValueError(
+                f"View {view_id} does not belong to database {database_id}"
+            )
 
         view.title_visible = visible
         return view
