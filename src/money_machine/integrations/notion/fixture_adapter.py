@@ -423,12 +423,14 @@ class FixtureNotionAdapter(NotionAdapter):
         self, database_id: str, view_id: str, visible: bool
     ) -> NotionView:
         """Set view title visibility."""
-        # Validate database_id (32-hex, with or without dashes)
-        normalized_db_id = database_id.replace("-", "")
+        # Validate database_id (32-hex, with or without dashes, with or without 'db_' prefix)
+        # Strip prefix if present, then normalize to undashed lowercase
+        stripped_id = database_id.removeprefix("db_")
+        normalized_db_id = stripped_id.replace("-", "").lower()
         if (
             not normalized_db_id
             or len(normalized_db_id) != 32
-            or not all(c in "0123456789abcdefABCDEF" for c in normalized_db_id)
+            or not all(c in "0123456789abcdef" for c in normalized_db_id)
         ):
             raise ValueError(f"Invalid database_id: {database_id}")
 
@@ -436,11 +438,14 @@ class FixtureNotionAdapter(NotionAdapter):
         if not view:
             raise ValueError(f"View {view_id} not found")
 
+        # Normalize the view's database_id for comparison
+        view_db_stripped = view.database_id.removeprefix("db_")
+        view_db_normalized = view_db_stripped.replace("-", "").lower()
+
         # Validate that the view belongs to the given database
-        if view.database_id != normalized_db_id:
+        if view_db_normalized != normalized_db_id:
             raise ValueError(
-                f"View {view_id} does not belong to database {database_id} "
-                f"(belongs to {view.database_id})"
+                f"View {view_id} does not belong to database {database_id}"
             )
 
         view.title_visible = visible

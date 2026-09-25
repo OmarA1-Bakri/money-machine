@@ -1617,8 +1617,8 @@ async def test_publish_page_translates_playwright_timeout(fake_anon_browser):
             pass
 
         async def click(self, selector: str) -> None:
-            # Raise fake Playwright timeout when trying to click publish
-            if "publish-button" in selector:
+            # Raise fake Playwright timeout when trying to click share button
+            if "share-button" in selector:
                 raise FakePlaywrightTimeoutError("Timeout waiting for publish button")
 
         async def fill(self, selector: str, value: str) -> None:

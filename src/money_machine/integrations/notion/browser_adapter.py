@@ -765,8 +765,8 @@ class BrowserNotionAdapter(NotionAdapter):
         Idempotent: true
         """
         # Validate database_id (32-hex, with or without dashes)
-        # Normalize to undashed form
-        normalized_db_id = database_id.replace("-", "")
+        # Normalize to undashed lowercase form
+        normalized_db_id = database_id.replace("-", "").lower()
         if (
             not normalized_db_id
             or len(normalized_db_id) != 32
@@ -1036,8 +1036,8 @@ class BrowserNotionAdapter(NotionAdapter):
             # Navigate to public URL in anonymous context
             try:
                 await anon_session.navigate(public_url)
-            except (ConnectionError, TimeoutError, ValueError) as e:
-                # Network, navigation, or value failures
+            except Exception as e:
+                # Network, navigation, or any failures
                 raise RuntimeError(f"Failed to navigate to {public_url}: {e}") from e
 
             # Check if page content is visible (not login wall)
