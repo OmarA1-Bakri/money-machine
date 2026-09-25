@@ -1645,7 +1645,7 @@ async def test_publish_page_translates_playwright_timeout(fake_anon_browser):
     timeout_session = TimeoutSession()
     adapter = BrowserNotionAdapter(
         browser_session=timeout_session,
-        anon_session_factory=lambda: fake_anon_browser,
+        anon_session_factory=lambda: fake_anon_browser,  # type: ignore[reportUnknownLambdaType]
     )
 
     # Should translate to built-in TimeoutError
