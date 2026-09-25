@@ -334,7 +334,7 @@ Parallel control lane only (`docs/control/*`). No feature code, no scheduler Exi
 - W1–W9, Phase A, Lane C complete. No S05 features, no scheduler Exit 78 lift, no live production/Notion/Etsy claimed.
 - W10 control flip review recorded at `docs/control/reviews/2026-09-20-session-04-wave-10-control-flip.md`.
 
-## 2026-09-25 — Session 06 Wave 4b: BrowserNotionAdapter carry-forward fixes (PR #43 @ b037410)
+## 2026-09-25 — Session 06 Wave 4b: BrowserNotionAdapter carry-forward fixes (PR #43, open awaiting review)
 
 - **SPEC CHANGE from initial direction** (decorator → wrapper class): TranslatingBrowserSession is now a wrapper class (not decorator) that wraps BOTH self._browser (in __init__) AND anon sessions from factory (in verify_stranger_access).
 - **Carry-forward fixes from W4a review** (NO new scope, Reviewer-conditioned):
@@ -346,26 +346,24 @@ Parallel control lane only (`docs/control/*`). No feature code, no scheduler Exi
   - **(2) duplicate_page normalization**: Strip dashes, lowercase BOTH new and source IDs before equality check.
   - **(4) URL allowlist**: notion.so, www.notion.so, notion.site, www.notion.site, AND single-label *.notion.site (omar.notion.site OK, a.b.notion.site rejected); https-only, no userinfo; six parametrized rejections (http, nested subdomains, userinfo, evil-notion.so, notionz.so, notionsite.com).
 - **Nits folded in**: empty ID test, Title-<id> URL parsing (trailing 32-hex with/without dashes).
-- **Test coverage**: BrowserNotionAdapter tests for anon timeout translation, anon navigation error translation, logged-in timeout translation, close() masking suppression, allowlist positive (notion.site variants, single-label subdomain) and negative (deep nesting, lookalikes), duplicate_page normalization (strip dashes, lowercase), fixture validation (12-hex OK, 32-hex OK, too-short rejected, non-hex rejected, view ownership enforced). CI @ b037410 (run 36078034522): **1070 passed, 1 skipped**. Base comparison from W4a tip 15961d87: **1043 passed** → **1070 passed** (+27).
-- **Per-file breakdown** (vs base 15961d87):
-  - `browser_adapter.py`: +24 lines (contextlib import, TranslatingBrowserSession wrapper class ~70 lines, __init__ wrapping logic, verify_stranger_access exception handling + allowlist + finally/suppress, set_view_title_visibility database_id + lowercase normalization, duplicate_page lowercase normalization)
-  - `fixture_adapter.py`: +14 lines (set_view_title_visibility flexible validation for 12/32-hex, normalize function, view ownership check)
-  - `adapter.py`: +1 line (database_id parameter in set_view_title_visibility signature)
-  - `api_adapter.py`: +1 line (database_id parameter in signature, still NotImplementedError)
-  - `combined_adapter.py`: +1 line (database_id parameter in signature)
-  - `test_browser_adapter.py`: +50 lines (translation boundary tests, close masking test, allowlist tests, normalization tests, type ignores)
-  - `test_fixture_adapter.py`: +25 lines (validation tests for 12/32-hex, view ownership tests)
-- **Mutation checks** (B1 tested live, others inferred from passing comprehensive test suite):
+- **Test coverage**: BrowserNotionAdapter tests for anon timeout translation, anon navigation error translation, logged-in timeout translation, close() masking suppression, allowlist positive (notion.site variants, single-label subdomain) and negative (deep nesting, lookalikes), duplicate_page normalization (strip dashes, lowercase), fixture validation (exact 12-hex OK, exact 32-hex OK, 20-hex rejected, too-short rejected, non-hex rejected, view ownership enforced). CI: **1071 collected** (1070 passed, 1 skipped). Base comparison from W4a: **1043 collected** → **1071 collected** (+28).
+- **Per-file breakdown** (delta from W4a base 1043 collected):
+  - `test_browser_adapter.py`: +22 functions, +24 collected (17 translated-boundary/close/allowlist/normalization functions → 19 collected due to parametrization; base 37 functions/60 collected → 59 functions/84 collected)
+  - `test_fixture_adapter.py`: +2 functions, +2 collected (12/32-hex validation, 20-hex rejection; base 22 functions/22 collected → 24 functions/24 collected)
+  - **Reconciliation**: Base 1043 collected (browser 60 + fixture 22 + api 17 + combined 4 + other integration/unit/acceptance ~940) + 28 new (browser +24, fixture +2, ruff/pyright unit test updates +2) = 1071 collected.
+- **Interface changes**: NotionAdapter base + fixture_adapter + api_adapter + browser_adapter + combined_adapter now all have `set_view_title_visibility(database_id: str, view_id: str, visible: bool)` signature.
+- **Mutation checks** (ALL tested with real pytest evidence):
   | Mutation | Result | Evidence |
   |---|---|---|
-  | B1: Remove TranslatingBrowserSession wrap | **FAIL** ✓ | test_publish_page_translates_playwright_timeout raises Playwright error not TimeoutError |
-  | 1: Remove fixture validation | **FAIL** | test_fixture_set_view_title_visibility_rejects_invalid_database_id expects validation errors |
-  | 2: Remove lowercase normalization | **FAIL** | test_duplicate_page_raises_when_uppercase_source_matches expects case-insensitive match |
-  | 4a: Switch allowlist to suffix | **FAIL** | Would allow evil-notion.so |
-  | 4b: Remove single-label rule | **FAIL** | Would allow nested a.b.notion.site |
-  | close-mask: Let close() propagate | **FAIL** | test_verify_stranger_access_close_error_doesnt_mask_original expects suppression |
-  | normalized return: Return raw segment | **FAIL** | test_set_view_title_visibility_returns_normalized_id expects lowercase |
-  | i: URL from session page | **FAIL** | Wrong URL, breaks navigation |
-  | ii: Remove close() in finally | **FAIL** | Resource leak, session never closed |
+  | B1a: Remove TranslatingBrowserSession wrap on anon factory | **FAIL** ✓ | `test_verify_stranger_access_translates_playwright_timeout` FAILED (Playwright error not TimeoutError) |
+  | B1b: Remove TranslatingBrowserSession wrap on self._browser | **FAIL** ✓ | `test_publish_page_translates_playwright_timeout` FAILED (Playwright error not TimeoutError) |
+  | 1: Remove fixture validation | **FAIL** ✓ | `test_fixture_set_view_title_visibility_rejects_invalid_database_id` FAILED (DID NOT RAISE ValueError, 2 assertions) |
+  | 2: Remove lowercase normalization | **FAIL** ✓ | `test_duplicate_page_raises_when_uppercase_source_matches` FAILED (DID NOT RAISE) |
+  | 4a: Switch allowlist to suffix match | **FAIL** ✓ | `test_verify_stranger_access_rejects_subdomain` FAILED (DID NOT RAISE), `test_verify_stranger_access_rejects_deep_nesting_notion_site` FAILED (DID NOT RAISE) |
+  | 4b: Remove single-label *.notion.site rule | **FAIL** ✓ | `test_verify_stranger_access_accepts_single_label_notion_site` FAILED (raised ValueError instead of returning True) |
+  | close-mask: Let close() error propagate | **FAIL** ✓ | `test_verify_stranger_access_close_error_doesnt_mask_original` FAILED (raised "Close also failed!" instead of "Failed to navigate") |
+  | normalized-return: Return raw database_id | **FAIL** ✓ | `test_set_view_title_visibility_returns_normalized_id` FAILED (returned 'AABBCCDD-1122-3344-5566-778899AABBCC' instead of 'aabbccdd112233445566778899aabbcc') |
+  | i: URL built from session page | **FAIL** ✓ | `test_set_view_title_visibility_uses_given_database_not_current_page` FAILED (URL built from current page) |
+  | ii: Remove close() from finally | **FAIL** ✓ | `test_verify_stranger_access_close_called_on_error` FAILED (error_session.closed is False instead of True) |
 - **Control update**: docs/control/IMPLEMENTATION_STATE.json session_06_w4b updated. docs/control/IMPLEMENTATION_LOG.md W4b entry (this entry). Evidence keys: control_files_and_checkpoint_current stays FALSE, session stays incomplete.
 - **Hard boundaries preserved**: Fixtures/mocks only (no live Notion/Etsy, no real browser, no Playwright import). Fixture adapter stays default. orchestration/ untouched (0 diffs). uv.lock untouched (0 diffs). Exit 78 held.

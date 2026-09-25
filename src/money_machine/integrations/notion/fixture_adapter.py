@@ -423,18 +423,19 @@ class FixtureNotionAdapter(NotionAdapter):
         self, database_id: str, view_id: str, visible: bool
     ) -> NotionView:
         """Set view title visibility."""
-        # Fixture adapter uses short IDs (12 hex) with prefixes
-        # Real IDs are 32 hex (with or without dashes, with or without prefix)
-        # Validate that the database_id is at least hex after normalization
+        # Fixture adapter deliberately uses 12-hex IDs (e.g. db_a1b2c3d4e5f6) for
+        # in-memory testing, while real Notion IDs are always 32-hex (with or without
+        # dashes). This validates both formats: exactly 12 hex (fixture) or exactly
+        # 32 hex (real), rejecting intermediate lengths (13-31) including 20-hex UUIDs
+        # that might be passed accidentally.
 
         # Normalize ID: strip prefix, dashes, lowercase
         normalized_input = database_id.removeprefix("db_").replace("-", "").lower()
-
-        # Validate it's not empty, contains only hex, and is at least 12 characters
-        # (fixture IDs are 12 hex, real IDs are 32 hex)
+        
+        # Validate exactly 12 or 32 hex characters (no other lengths)
         if (
             not normalized_input
-            or len(normalized_input) < 12
+            or len(normalized_input) not in (12, 32)
             or not all(c in "0123456789abcdef" for c in normalized_input)
         ):
             raise ValueError(f"Invalid database_id: {database_id}")
