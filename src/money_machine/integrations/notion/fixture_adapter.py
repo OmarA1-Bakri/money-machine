@@ -431,7 +431,7 @@ class FixtureNotionAdapter(NotionAdapter):
 
         # Normalize ID: strip prefix, dashes, lowercase
         normalized_input = database_id.removeprefix("db_").replace("-", "").lower()
-        
+
         # Validate exactly 12 or 32 hex characters (no other lengths)
         if (
             not normalized_input
