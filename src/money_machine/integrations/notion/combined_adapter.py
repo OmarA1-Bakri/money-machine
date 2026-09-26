@@ -1,10 +1,13 @@
 """Combined Notion adapter: route each operation to the API or browser delegate.
 
 Preferred channel follows the method column in
-``docs/architecture/PLATFORM_COMPATIBILITY.md``. ``get_public_url`` is the
-COMBINED operation and prefers the API delegate. If the preferred delegate
-reports the operation unsupported, or raises, the other delegate is called
-with the same arguments.
+``docs/architecture/PLATFORM_COMPATIBILITY.md``. Fallback runs only when the
+preferred delegate explicitly reports the operation unsupported
+(``reports_unsupported`` or ``NotImplementedError``, which is that signal).
+Any other error, including a write that raises, propagates and is not retried.
+
+``get_public_url`` is the COMBINED operation: the API delegate returns the
+public URL, then the browser delegate verifies stranger access.
 """
 
 from __future__ import annotations
@@ -29,7 +32,16 @@ from .domain import (
     NotionWorkspace,
 )
 
-# DIRECT_API operations, plus COMBINED get_public_url (API returns the URL).
+
+class OperationUnsupportedError(NotImplementedError):
+    """Preferred adapter did not perform the operation.
+
+    ``NotImplementedError`` is the same signal: the delegate refused before
+    doing the work. It is the only exception that selects the other adapter.
+    """
+
+
+# DIRECT_API operations. get_public_url is COMBINED, not a single-delegate call.
 API_OPERATIONS: frozenset[str] = frozenset(
     {
         "connection_status",
@@ -48,11 +60,12 @@ API_OPERATIONS: frozenset[str] = frozenset(
         "add_filter",
         "add_sort",
         "add_child_page",
-        "get_public_url",
         "inspect_page",
         "inspect_database",
     }
 )
+
+COMBINED_OPERATIONS: frozenset[str] = frozenset({"get_public_url"})
 
 # BROWSER operations from PLATFORM_COMPATIBILITY.md.
 BROWSER_OPERATIONS: frozenset[str] = frozenset(
@@ -102,14 +115,30 @@ async def _invoke(
     return await outcome
 
 
+async def _invoke_fallback(
+    fallback: NotionAdapter,
+    operation: str,
+    first: Exception,
+    /,
+    *args: object,
+    **kwargs: object,
+) -> Any:
+    """Call the other adapter. A second failure keeps ``first`` as ``__cause__``."""
+    try:
+        return await _invoke(fallback, operation, *args, **kwargs)
+    except Exception as second:
+        raise second from first
+
+
 class CombinedNotionAdapter(NotionAdapter):
     """Route Notion operations to an API delegate or a browser delegate.
 
     The preferred delegate is selected from ``API_OPERATIONS`` and
-    ``BROWSER_OPERATIONS``. A delegate that returns ``True`` from
-    ``reports_unsupported(operation)`` is skipped. A preferred delegate that
-    raises is not used; the other delegate receives the same arguments.
-    The object returned by the delegate that actually ran is returned unchanged.
+    ``BROWSER_OPERATIONS``. ``reports_unsupported(operation)`` and
+    ``NotImplementedError`` are the only unsupported signals; the other
+    delegate then receives the same arguments. Every other exception is
+    re-raised and the other delegate is not called. ``get_public_url`` follows
+    the COMBINED contract instead of this single-delegate route.
     """
 
     def __init__(self, api_adapter: NotionAdapter, browser_adapter: NotionAdapter) -> None:
@@ -132,11 +161,17 @@ class CombinedNotionAdapter(NotionAdapter):
     ) -> Any:
         preferred, fallback = self._pair(operation)
         if _reports_unsupported(preferred, operation):
-            return await _invoke(fallback, operation, *args, **kwargs)
+            return await _invoke_fallback(
+                fallback,
+                operation,
+                OperationUnsupportedError(f"{operation} is unsupported on the preferred adapter"),
+                *args,
+                **kwargs,
+            )
         try:
             return await _invoke(preferred, operation, *args, **kwargs)
-        except Exception:
-            return await _invoke(fallback, operation, *args, **kwargs)
+        except NotImplementedError as first:
+            return await _invoke_fallback(fallback, operation, first, *args, **kwargs)
 
     async def connection_status(self) -> dict[str, bool | str | int]:
         return await self._delegate("connection_status")
@@ -340,7 +375,25 @@ class CombinedNotionAdapter(NotionAdapter):
         return await self._delegate("set_search_indexing", page_id=page_id, enabled=enabled)
 
     async def get_public_url(self, page_id: str) -> str | None:
-        return await self._delegate("get_public_url", page_id=page_id)
+        """Return the API public URL only when stranger access succeeds.
+
+        ``docs/architecture/PLATFORM_COMPATIBILITY.md`` (COMBINED Operations):
+        the API delegate returns ``page.public_url`` when the page is published,
+        and the browser delegate verifies logged-out access. ``None`` from the
+        API means unpublished, so the browser is not called. A false stranger
+        check returns ``None``. Errors from either delegate propagate.
+        """
+        url = await _invoke(self._api, "get_public_url", page_id=page_id)
+        if url is None:
+            return None
+        if not isinstance(url, str):
+            raise TypeError("get_public_url must return a string or None")
+        accessible = await _invoke(self._browser, "verify_stranger_access", public_url=url)
+        if not isinstance(accessible, bool):
+            raise TypeError("verify_stranger_access must return bool")
+        if not accessible:
+            return None
+        return url
 
     async def unpublish_page(self, page_id: str) -> NotionPage:
         return await self._delegate("unpublish_page", page_id=page_id)

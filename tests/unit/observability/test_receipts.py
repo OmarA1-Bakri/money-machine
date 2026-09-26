@@ -31,7 +31,7 @@ def _receipt(**overrides: object) -> NotionOperationReceipt:
         "evidence": "evidence/page_1",
         "timestamp": _WHEN,
         "idempotency_key": "create_page:job_1",
-        "status": "CONFIRMED",
+        "status": "Success",
     }
     fields.update(overrides)
     return NotionOperationReceipt(**fields)  # type: ignore[arg-type]
@@ -51,7 +51,7 @@ def test_receipt_keeps_section_4_fields() -> None:
     assert receipt.evidence == "evidence/page_1"
     assert receipt.timestamp == _WHEN
     assert receipt.idempotency_key == "create_page:job_1"
-    assert receipt.status == "CONFIRMED"
+    assert receipt.status == "Success"
 
 
 def test_pre_state_may_be_absent() -> None:
@@ -135,3 +135,120 @@ def test_corrupt_receipt_file_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="not a receipt"):
         NotionOperationReceiptLog(path)
+
+
+def test_reloaded_receipt_round_trips_every_field(tmp_path: Path) -> None:
+    """Every section-4 field survives a write and a reload."""
+    path = tmp_path / "receipts.jsonl"
+    when = datetime(2026, 9, 26, 4, 5, 6, tzinfo=UTC)
+    original = _receipt(
+        job_id="job-field",
+        operation="rename_page",
+        workspace="ws-field",
+        target="target-field",
+        pre_state={"before": "pre"},
+        post_state={"after": "post"},
+        provider_response={"provider": "ok"},
+        evidence="evidence-field",
+        timestamp=when,
+        idempotency_key="key-field",
+        status="Unknown",
+    )
+    NotionOperationReceiptLog(path).record(original)
+    stored = NotionOperationReceiptLog(path).get("key-field")
+
+    assert stored is not None
+    assert stored.job_id == "job-field"
+    assert stored.operation == "rename_page"
+    assert stored.workspace == "ws-field"
+    assert stored.target == "target-field"
+    assert stored.pre_state == {"before": "pre"}
+    assert stored.post_state == {"after": "post"}
+    assert stored.provider_response == {"provider": "ok"}
+    assert stored.evidence == "evidence-field"
+    assert stored.timestamp == when
+    assert stored.idempotency_key == "key-field"
+    assert stored.status == "Unknown"
+
+
+def test_naive_timestamp_is_rejected() -> None:
+    with pytest.raises(ValueError, match="timezone-aware"):
+        _receipt(timestamp=datetime(2026, 9, 26, 1, 2, 3))
+
+
+def test_timestamp_must_be_a_datetime() -> None:
+    with pytest.raises(ValueError, match="timestamp must be a datetime"):
+        _receipt(timestamp="2026-09-26T01:02:03+00:00")
+
+
+def test_status_rejects_values_outside_the_enum() -> None:
+    with pytest.raises(ValueError, match="status must be Success, Unknown, or Failure"):
+        _receipt(status="CONFIRMED")
+
+
+def test_post_state_must_be_a_mapping() -> None:
+    with pytest.raises(ValueError, match="post_state"):
+        _receipt(post_state="not-a-mapping")
+
+
+def test_load_rejects_duplicate_idempotency_key(tmp_path: Path) -> None:
+    path = tmp_path / "receipts.jsonl"
+    log = NotionOperationReceiptLog(path)
+    log.record(_receipt())
+    line = path.read_text(encoding="utf-8")
+    path.write_text(line + line, encoding="utf-8")
+
+    with pytest.raises(DuplicateReceiptError, match="create_page:job_1"):
+        NotionOperationReceiptLog(path)
+
+
+def test_torn_trailing_line_is_skipped(tmp_path: Path) -> None:
+    """A crash fragment without a newline is skipped; the prior receipt reloads."""
+    path = tmp_path / "receipts.jsonl"
+    NotionOperationReceiptLog(path).record(_receipt())
+    path.write_text(path.read_text(encoding="utf-8") + '{"idem', encoding="utf-8")
+
+    reloaded = NotionOperationReceiptLog(path)
+    assert len(reloaded) == 1
+    assert reloaded.get("create_page:job_1") is not None
+
+
+def test_two_logs_reject_a_duplicate_key_without_corrupting_the_file(tmp_path: Path) -> None:
+    path = tmp_path / "receipts.jsonl"
+    first = NotionOperationReceiptLog(path)
+    second = NotionOperationReceiptLog(path)
+    first.record(_receipt())
+
+    with pytest.raises(DuplicateReceiptError, match="create_page:job_1"):
+        second.record(_receipt(target="page_2"))
+
+    assert path.read_text(encoding="utf-8").count("\n") == 1
+    reloaded = NotionOperationReceiptLog(path)
+    assert len(reloaded) == 1
+    stored = reloaded.get("create_page:job_1")
+    assert stored is not None
+    assert stored.target == "page_1"
+
+
+def test_caller_dict_mutation_does_not_change_the_stored_receipt() -> None:
+    post_state = {"title": "Hello", "nested": {"n": 1}}
+    provider_response = {"id": "page_1"}
+    receipt = _receipt(post_state=post_state, provider_response=provider_response)
+    log = NotionOperationReceiptLog()
+    log.record(receipt)
+    post_state["title"] = "changed"
+    nested = post_state["nested"]
+    assert isinstance(nested, dict)
+    nested["n"] = 9
+    provider_response["id"] = "other"
+
+    stored = log.get(receipt.idempotency_key)
+    assert stored is not None
+    assert stored.post_state == {"title": "Hello", "nested": {"n": 1}}
+    assert stored.provider_response == {"id": "page_1"}
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_non_finite_numbers_are_rejected(bad: float) -> None:
+    with pytest.raises(ValueError, match="JSON-serializable"):
+        _receipt(post_state={"n": bad})

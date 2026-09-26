@@ -13,7 +13,9 @@ from money_machine.integrations.notion.adapter import NotionAdapter
 from money_machine.integrations.notion.combined_adapter import (
     API_OPERATIONS,
     BROWSER_OPERATIONS,
+    COMBINED_OPERATIONS,
     CombinedNotionAdapter,
+    OperationUnsupportedError,
 )
 from money_machine.integrations.notion.domain import (
     NotionFilter,
@@ -30,6 +32,122 @@ _VIEW = NotionView(
     type="table",
     title_visible=False,
 )
+_FILTER = NotionFilter(property="Name", condition="equals", value="A")
+_SORT = NotionSort(property="Name", direction="ascending")
+_PUBLIC_URL = "https://notion.site/Page-abc"
+
+# Expected kwargs are fixed here. A dropped or rewritten argument fails that case.
+_EXPECTED_CALLS: dict[str, dict[str, object]] = {
+    "connection_status": {},
+    "workspace_discovery": {},
+    "create_page": {
+        "title": "Title-distinct",
+        "parent_id": "parent-9",
+        "parent_type": "page_id",
+        "icon": "📄",
+        "cover": "https://example.com/cover-distinct.png",
+    },
+    "duplicate_page": {"page_id": "page-1"},
+    "rename_page": {"page_id": "page-1", "new_title": "Renamed-title"},
+    "move_page": {
+        "page_id": "page-1",
+        "new_parent_id": "parent-2",
+        "new_parent_type": "database_id",
+    },
+    "set_icon": {"page_id": "page-1", "icon": "🔥"},
+    "set_cover": {"page_id": "page-1", "cover_url": "https://example.com/cover.png"},
+    "add_text_block": {"page_id": "page-1", "content": "hello-block"},
+    "add_callout_block": {"page_id": "page-1", "content": "note-body", "icon": "📌"},
+    "create_database": {
+        "title": "Tasks-distinct",
+        "parent_id": "parent-db",
+        "parent_type": "page_id",
+        "icon": "📁",
+        "cover": "https://example.com/db-cover.png",
+    },
+    "add_property": {
+        "database_id": "db-1",
+        "name": "Name",
+        "property_type": "title",
+        "config": {"options": ["A"]},
+    },
+    "create_relation": {
+        "database_id": "db-1",
+        "name": "Project",
+        "target_database_id": "db-2",
+        "synced_property_name": "Backlink",
+    },
+    "create_rollup": {
+        "database_id": "db-1",
+        "name": "Total",
+        "relation_property_id": "rel-1",
+        "rollup_property_id": "prop-1",
+        "function": "sum",
+    },
+    "create_formula": {"database_id": "db-1", "name": "Score", "expression": "1+1"},
+    "create_linked_view": {
+        "source_database_id": "db-1",
+        "parent_page_id": "page-1",
+        "view_type": "board",
+    },
+    "add_filter": {"database_id": "db-1", "view_id": "view-1", "filter_spec": _FILTER},
+    "add_sort": {"database_id": "db-1", "view_id": "view-1", "sort_spec": _SORT},
+    "create_calendar_view": {"database_id": "db-1", "name": "Calendar", "date_property": "Date"},
+    "create_table_view": {"database_id": "db-1", "name": "Table"},
+    "create_board_view": {"database_id": "db-1", "name": "Board", "group_by_property": "Status"},
+    "set_view_title_visibility": {
+        "database_id": "Db-ABC",
+        "view_id": "view-specific",
+        "visible": False,
+    },
+    "add_child_page": {"parent_page_id": "page-1", "title": "Child"},
+    "publish_page": {"page_id": "page-1"},
+    "set_duplicate_as_template": {"page_id": "page-1", "enabled": False},
+    "set_search_indexing": {"page_id": "page-1", "enabled": False},
+    "get_public_url": {"page_id": "page-specific"},
+    "unpublish_page": {"page_id": "page-1"},
+    "inspect_page": {"page_id": "page-1"},
+    "inspect_database": {"database_id": "db-1"},
+    "verify_stranger_access": {"public_url": "https://www.notion.so/page-1"},
+}
+
+# Channels are fixed here so a source-map swap fails these cases.
+_EXPECTED_API = (
+    "add_callout_block",
+    "add_child_page",
+    "add_filter",
+    "add_property",
+    "add_sort",
+    "add_text_block",
+    "connection_status",
+    "create_database",
+    "create_page",
+    "create_relation",
+    "create_rollup",
+    "inspect_database",
+    "inspect_page",
+    "move_page",
+    "rename_page",
+    "set_cover",
+    "set_icon",
+    "workspace_discovery",
+)
+_EXPECTED_BROWSER = (
+    "create_board_view",
+    "create_calendar_view",
+    "create_formula",
+    "create_linked_view",
+    "create_table_view",
+    "duplicate_page",
+    "publish_page",
+    "set_duplicate_as_template",
+    "set_search_indexing",
+    "set_view_title_visibility",
+    "unpublish_page",
+    "verify_stranger_access",
+)
+_EXPECTED_COMBINED = ("get_public_url",)
+_DELEGATED = _EXPECTED_API + _EXPECTED_BROWSER
 
 
 class _FakeAdapter:
@@ -38,7 +156,7 @@ class _FakeAdapter:
     def __init__(self) -> None:
         self.calls: list[tuple[str, tuple[object, ...], dict[str, object]]] = []
         self.results: dict[str, object] = {}
-        self.errors: dict[str, Exception] = {}
+        self.errors: dict[str, BaseException] = {}
         self.unsupported: set[str] = set()
 
     def reports_unsupported(self, operation: str) -> bool:
@@ -70,128 +188,31 @@ def _seed(adapter: _FakeAdapter, operation: str, result: object) -> None:
     adapter.results[operation] = result
 
 
-async def _call(adapter: CombinedNotionAdapter, operation: str) -> object:
-    if operation == "connection_status":
-        return await adapter.connection_status()
-    if operation == "workspace_discovery":
-        return await adapter.workspace_discovery()
-    if operation == "create_page":
-        return await adapter.create_page("Title", parent_id="parent", icon="📄")
-    if operation == "duplicate_page":
-        return await adapter.duplicate_page("page_1")
-    if operation == "rename_page":
-        return await adapter.rename_page("page_1", "Renamed")
-    if operation == "move_page":
-        return await adapter.move_page("page_1", "parent_2", "page_id")
-    if operation == "set_icon":
-        return await adapter.set_icon("page_1", "🔥")
-    if operation == "set_cover":
-        return await adapter.set_cover("page_1", "https://example.com/cover.png")
-    if operation == "add_text_block":
-        return await adapter.add_text_block("page_1", "hello")
-    if operation == "add_callout_block":
-        return await adapter.add_callout_block("page_1", "note", "💡")
-    if operation == "create_database":
-        return await adapter.create_database("Tasks")
-    if operation == "add_property":
-        return await adapter.add_property("db_1", "Name", "title", {})
-    if operation == "create_relation":
-        return await adapter.create_relation("db_1", "Project", "db_2")
-    if operation == "create_rollup":
-        return await adapter.create_rollup("db_1", "Total", "rel", "prop", "sum")
-    if operation == "create_formula":
-        return await adapter.create_formula("db_1", "Score", "1+1")
-    if operation == "create_linked_view":
-        return await adapter.create_linked_view("db_1", "page_1", "table")
-    if operation == "add_filter":
-        return await adapter.add_filter("db_1", "view_1", NotionFilter("Name", "equals", "A"))
-    if operation == "add_sort":
-        return await adapter.add_sort("db_1", "view_1", NotionSort("Name", "ascending"))
-    if operation == "create_calendar_view":
-        return await adapter.create_calendar_view("db_1", "Calendar", "Date")
-    if operation == "create_table_view":
-        return await adapter.create_table_view("db_1", "Table")
-    if operation == "create_board_view":
-        return await adapter.create_board_view("db_1", "Board", "Status")
-    if operation == "set_view_title_visibility":
-        return await adapter.set_view_title_visibility("db_1", "view_1", True)
-    if operation == "add_child_page":
-        return await adapter.add_child_page("page_1", "Child")
-    if operation == "publish_page":
-        return await adapter.publish_page("page_1")
-    if operation == "set_duplicate_as_template":
-        return await adapter.set_duplicate_as_template("page_1", True)
-    if operation == "set_search_indexing":
-        return await adapter.set_search_indexing("page_1", False)
-    if operation == "get_public_url":
-        return await adapter.get_public_url("page_1")
-    if operation == "unpublish_page":
-        return await adapter.unpublish_page("page_1")
-    if operation == "inspect_page":
-        return await adapter.inspect_page("page_1")
-    if operation == "inspect_database":
-        return await adapter.inspect_database("db_1")
-    if operation == "verify_stranger_access":
-        return await adapter.verify_stranger_access("https://www.notion.so/page_1")
-    raise AssertionError(operation)
-
-
-# Expected channels are fixed here so a source-map swap fails these cases.
-# They are the method column in docs/architecture/PLATFORM_COMPATIBILITY.md.
-_EXPECTED_API = (
-    "add_callout_block",
-    "add_child_page",
-    "add_filter",
-    "add_property",
-    "add_sort",
-    "add_text_block",
-    "connection_status",
-    "create_database",
-    "create_page",
-    "create_relation",
-    "create_rollup",
-    "get_public_url",
-    "inspect_database",
-    "inspect_page",
-    "move_page",
-    "rename_page",
-    "set_cover",
-    "set_icon",
-    "workspace_discovery",
-)
-_EXPECTED_BROWSER = (
-    "create_board_view",
-    "create_calendar_view",
-    "create_formula",
-    "create_linked_view",
-    "create_table_view",
-    "duplicate_page",
-    "publish_page",
-    "set_duplicate_as_template",
-    "set_search_indexing",
-    "set_view_title_visibility",
-    "unpublish_page",
-    "verify_stranger_access",
-)
+async def _invoke(combined: CombinedNotionAdapter, operation: str) -> object:
+    return await getattr(combined, operation)(**_EXPECTED_CALLS[operation])
 
 
 def test_operation_channels_partition_the_adapter_interface() -> None:
     """Every NotionAdapter operation has exactly one preferred channel."""
     assert API_OPERATIONS.isdisjoint(BROWSER_OPERATIONS)
-    assert set(NotionAdapter.__abstractmethods__) == API_OPERATIONS | BROWSER_OPERATIONS
+    assert COMBINED_OPERATIONS.isdisjoint(API_OPERATIONS | BROWSER_OPERATIONS)
+    assert set(NotionAdapter.__abstractmethods__) == (
+        API_OPERATIONS | BROWSER_OPERATIONS | COMBINED_OPERATIONS
+    )
     assert set(_EXPECTED_API) == API_OPERATIONS
     assert set(_EXPECTED_BROWSER) == BROWSER_OPERATIONS
+    assert set(_EXPECTED_COMBINED) == COMBINED_OPERATIONS
 
 
 @pytest.mark.parametrize("operation", _EXPECTED_API)
 async def test_operation_uses_api_adapter(operation: str) -> None:
-    """DIRECT_API and COMBINED operations call the API delegate only."""
+    """DIRECT_API operations call the API delegate only."""
     api, browser, combined = _adapters()
     api_result = object()
     _seed(api, operation, api_result)
     _seed(browser, operation, object())
 
-    result = await _call(combined, operation)
+    result = await _invoke(combined, operation)
 
     assert result is api_result
     assert [call[0] for call in api.calls] == [operation]
@@ -206,43 +227,80 @@ async def test_operation_uses_browser_adapter(operation: str) -> None:
     _seed(api, operation, object())
     _seed(browser, operation, browser_result)
 
-    result = await _call(combined, operation)
+    result = await _invoke(combined, operation)
 
     assert result is browser_result
     assert [call[0] for call in browser.calls] == [operation]
     assert api.calls == []
 
 
-@pytest.mark.parametrize(
-    ("operation", "preferred_channel"),
-    [("create_page", "api"), ("duplicate_page", "browser")],
-)
-async def test_fallback_when_preferred_raises(operation: str, preferred_channel: str) -> None:
-    """A preferred delegate that raises is skipped and the other delegate's result is returned."""
+@pytest.mark.parametrize("operation", _DELEGATED)
+async def test_operation_forwards_every_argument(operation: str) -> None:
+    """Each delegated operation passes its arguments through unchanged."""
     api, browser, combined = _adapters()
-    fallback_result = object()
-    preferred = api if preferred_channel == "api" else browser
-    fallback = browser if preferred_channel == "api" else api
-    preferred.errors[operation] = RuntimeError("preferred failed")
-    _seed(fallback, operation, fallback_result)
+    preferred = api if operation in _EXPECTED_API else browser
+    _seed(preferred, operation, object())
 
-    result = await _call(combined, operation)
+    await _invoke(combined, operation)
 
-    assert result is fallback_result
-    assert [call[0] for call in preferred.calls] == [operation]
-    assert [call[0] for call in fallback.calls] == [operation]
+    assert preferred.calls == [(operation, (), _EXPECTED_CALLS[operation])]
 
 
-async def test_fallback_when_preferred_reports_not_implemented() -> None:
-    """NotImplementedError from the preferred delegate is an unsupported report and falls back."""
+@pytest.mark.parametrize("operation", ["create_page", "add_text_block"])
+async def test_write_error_is_not_retried_on_the_other_adapter(operation: str) -> None:
+    """A write that raises is not run again on the other adapter."""
     api, browser, combined = _adapters()
-    browser_page = NotionPage(id="from_browser", title="browser")
-    api.errors["create_page"] = NotImplementedError("requires BROWSER method")
-    _seed(browser, "create_page", browser_page)
+    error = TimeoutError(f"{operation} timed out")
+    api.errors[operation] = error
+    _seed(browser, operation, _PAGE)
 
-    result = await combined.create_page("Title")
+    with pytest.raises(TimeoutError) as caught:
+        await _invoke(combined, operation)
 
-    assert result is browser_page
+    assert caught.value is error
+    assert len(api.calls) == 1
+    assert browser.calls == []
+
+
+async def test_type_error_propagates_unchanged() -> None:
+    """A TypeError from the preferred adapter is not swallowed or retried."""
+    api, browser, combined = _adapters()
+    error = TypeError("bad page id")
+    api.errors["inspect_page"] = error
+    _seed(browser, "inspect_page", _PAGE)
+
+    with pytest.raises(TypeError) as caught:
+        await _invoke(combined, "inspect_page")
+
+    assert caught.value is error
+    assert browser.calls == []
+
+
+async def test_auth_error_propagates_unchanged() -> None:
+    """An authentication failure from the preferred adapter is not retried."""
+    api, browser, combined = _adapters()
+    error = PermissionError("401 unauthorized")
+    api.errors["inspect_page"] = error
+    _seed(browser, "inspect_page", _PAGE)
+
+    with pytest.raises(PermissionError) as caught:
+        await _invoke(combined, "inspect_page")
+
+    assert caught.value is error
+    assert browser.calls == []
+
+
+async def test_not_implemented_is_an_unsupported_signal() -> None:
+    """NotImplementedError is the unsupported signal and falls back once."""
+    api, browser, combined = _adapters()
+    error = NotImplementedError("requires BROWSER method")
+    api.errors["create_page"] = error
+    _seed(browser, "create_page", _PAGE)
+
+    result = await _invoke(combined, "create_page")
+
+    assert result is _PAGE
+    assert browser.calls == [("create_page", (), _EXPECTED_CALLS["create_page"])]
 
 
 @pytest.mark.parametrize(
@@ -252,7 +310,7 @@ async def test_fallback_when_preferred_reports_not_implemented() -> None:
 async def test_fallback_when_preferred_reports_unsupported(
     operation: str, preferred_channel: str
 ) -> None:
-    """reports_unsupported skips the preferred call and returns the other delegate's result."""
+    """reports_unsupported skips the preferred call and forwards every argument."""
     api, browser, combined = _adapters()
     fallback_result = object()
     preferred = api if preferred_channel == "api" else browser
@@ -261,57 +319,95 @@ async def test_fallback_when_preferred_reports_unsupported(
     _seed(preferred, operation, object())
     _seed(fallback, operation, fallback_result)
 
-    result = await _call(combined, operation)
+    result = await _invoke(combined, operation)
 
     assert result is fallback_result
     assert preferred.calls == []
-    assert [call[0] for call in fallback.calls] == [operation]
+    assert fallback.calls == [(operation, (), _EXPECTED_CALLS[operation])]
 
 
-async def test_fallback_error_propagates() -> None:
-    """When the fallback delegate also raises, that exception propagates."""
+@pytest.mark.parametrize(
+    "signal",
+    ["not_implemented", "reports_unsupported"],
+)
+async def test_unsupported_fallback_error_is_chained_from_the_first_error(signal: str) -> None:
+    """When the fallback also fails, its error's __cause__ is the first refusal."""
     api, browser, combined = _adapters()
-    api.errors["create_page"] = RuntimeError("api down")
     browser.errors["create_page"] = RuntimeError("browser down")
+    first: Exception | None = None
+    if signal == "not_implemented":
+        first = NotImplementedError("api refuses create_page")
+        api.errors["create_page"] = first
+    else:
+        api.unsupported.add("create_page")
 
-    with pytest.raises(RuntimeError, match="browser down"):
-        await combined.create_page("Title")
+    with pytest.raises(RuntimeError, match="browser down") as caught:
+        await _invoke(combined, "create_page")
+
+    cause = caught.value.__cause__
+    assert cause is not None
+    if signal == "not_implemented":
+        assert cause is first
+    else:
+        assert isinstance(cause, OperationUnsupportedError)
 
 
-async def test_set_view_title_visibility_passes_arguments_and_returns_delegate_view() -> None:
-    """database_id, view_id, and visible are passed through; the delegate's view is returned."""
+async def test_set_view_title_visibility_returns_delegate_view() -> None:
+    """The browser delegate's NotionView is returned unchanged."""
     _api, browser, combined = _adapters()
     _seed(browser, "set_view_title_visibility", _VIEW)
 
-    result = await combined.set_view_title_visibility(
-        "Db-ABC",
-        "view-specific",
-        False,
-    )
+    result = await _invoke(combined, "set_view_title_visibility")
 
     assert result is _VIEW
-    assert browser.calls == [
-        (
-            "set_view_title_visibility",
-            (),
-            {"database_id": "Db-ABC", "view_id": "view-specific", "visible": False},
-        )
-    ]
 
 
-async def test_set_view_title_visibility_falls_back_to_api_with_same_arguments() -> None:
-    """A browser failure still forwards database_id, view_id, and visible to the API delegate."""
+async def test_get_public_url_returns_api_url_only_when_stranger_access_succeeds() -> None:
+    """COMBINED: API supplies the URL, browser verifies it, both arguments pass through."""
     api, browser, combined = _adapters()
-    browser.errors["set_view_title_visibility"] = RuntimeError("ui missing")
-    _seed(api, "set_view_title_visibility", _VIEW)
+    _seed(api, "get_public_url", _PUBLIC_URL)
+    _seed(browser, "verify_stranger_access", True)
 
-    result = await combined.set_view_title_visibility("db_1", "view_9", True)
+    result = await combined.get_public_url("page-specific")
 
-    assert result is _VIEW
-    assert api.calls == [
-        (
-            "set_view_title_visibility",
-            (),
-            {"database_id": "db_1", "view_id": "view_9", "visible": True},
-        )
-    ]
+    assert result == _PUBLIC_URL
+    assert api.calls == [("get_public_url", (), {"page_id": "page-specific"})]
+    assert browser.calls == [("verify_stranger_access", (), {"public_url": _PUBLIC_URL})]
+
+
+async def test_get_public_url_skips_browser_when_unpublished() -> None:
+    """None from the API means unpublished, so stranger access is not checked."""
+    api, browser, combined = _adapters()
+    _seed(api, "get_public_url", None)
+
+    result = await combined.get_public_url("page-specific")
+
+    assert result is None
+    assert api.calls == [("get_public_url", (), {"page_id": "page-specific"})]
+    assert browser.calls == []
+
+
+async def test_get_public_url_returns_none_when_stranger_access_fails() -> None:
+    """A URL the stranger check rejects is not returned."""
+    api, browser, combined = _adapters()
+    _seed(api, "get_public_url", _PUBLIC_URL)
+    _seed(browser, "verify_stranger_access", False)
+
+    result = await combined.get_public_url("page-specific")
+
+    assert result is None
+    assert browser.calls == [("verify_stranger_access", (), {"public_url": _PUBLIC_URL})]
+
+
+async def test_get_public_url_does_not_hide_api_errors() -> None:
+    """An API error is not turned into a browser get_public_url call."""
+    api, browser, combined = _adapters()
+    error = TimeoutError("api timed out")
+    api.errors["get_public_url"] = error
+    _seed(browser, "get_public_url", _PUBLIC_URL)
+
+    with pytest.raises(TimeoutError) as caught:
+        await combined.get_public_url("page-specific")
+
+    assert caught.value is error
+    assert browser.calls == []

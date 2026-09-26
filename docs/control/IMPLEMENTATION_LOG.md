@@ -120,7 +120,7 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 - **OUT OF SCOPE** (W4a hard boundaries): CombinedNotionAdapter implementation, receipts persistence, live Playwright integration, SESSION_06 COMPLETE marking.
 
 
-## 2026-09-25 — Session 06 Wave 4b: BrowserNotionAdapter carry-forward fixes (PR #43, open awaiting review)
+## 2026-09-25 — Session 06 Wave 4b: BrowserNotionAdapter carry-forward fixes (PR #43)
 
 - **SPEC CHANGE** (decorator removed): `TranslatingBrowserSession` wraps both `self._browser` in `__init__` and every anonymous session from the factory in `verify_stranger_access`. `translate_browser_exceptions` is gone from `browser_adapter.py`; the translation tests call the wrapper.
 - **Carry-forward from the W4a review** (no new scope):
@@ -171,32 +171,57 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 
 ## 2026-09-26 — Session 06 Wave 5: combined adapter delegation, receipt stub, cause-test parametrization
 
-- **Combined adapter**: `CombinedNotionAdapter` routes API-tagged operations, including `get_public_url`, to the injected API adapter and browser-tagged operations to the injected browser adapter. If the preferred adapter reports the operation unsupported, or raises (including `NotImplementedError`), the same arguments go to the other adapter. `set_view_title_visibility(database_id, view_id, visible)` passes those three arguments through unchanged and returns the delegate's `NotionView`. The router still refuses browser and combined modes. The fixture adapter stays the default.
-- **Receipts stub**: `NotionOperationReceipt` and `NotionOperationReceiptLog` follow Session 06 prompt section "### 4. Implement Notion operation receipts" (`prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md`). Fields: job ID, operation, workspace, page/database target, pre-state when available, post-state, provider response, screenshot or response evidence, timestamp, idempotency key, status. A repeated idempotency key is rejected before append. Writes happen only at a path the caller injects. No database table and no network.
+- **Combined adapter**: `CombinedNotionAdapter` routes API-tagged operations to the injected API adapter and browser-tagged operations to the injected browser adapter. Fallback runs only when the preferred adapter reports the operation unsupported (`reports_unsupported` or `NotImplementedError`). A write that raises, a `TypeError`, and an auth-style error propagate, and the other adapter is not called. When the fallback also fails, the second error is chained from the first. `get_public_url` is COMBINED: the API delegate returns the public URL, then the browser delegate verifies stranger access; `None` from the API skips the browser, and a failed stranger check returns `None`. `set_view_title_visibility(database_id, view_id, visible)` passes those three arguments through unchanged and returns the delegate's `NotionView`. The router still refuses browser and combined modes. The fixture adapter stays the default.
+- **Receipts stub**: `NotionOperationReceipt` and `NotionOperationReceiptLog` follow Session 06 prompt section "### 4. Implement Notion operation receipts" (`prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md`). Fields: job ID, operation, workspace, page/database target, pre-state when available, post-state, provider response, screenshot or response evidence, timestamp, idempotency key, status. Status is `Success`, `Unknown`, or `Failure`. Timestamps must be timezone-aware. A repeated idempotency key is rejected before append, including when a second log instance re-reads the same path. A torn trailing line that is not newline-terminated and is not JSON is skipped; a newline-terminated corrupt line is rejected. Caller mappings are copied before store. `NaN` and `Inf` are rejected. Writes happen only at a path the caller injects. No database table and no network.
 - **Cause test**: `test_translating_session_keeps_original_playwright_error_as_cause` is parametrized over the eight `TranslatingBrowserSession` methods (`navigate`, `click`, `fill`, `get_attribute`, `is_visible`, `wait_for_selector`, `get_current_url`, `close`). No behaviour change in `browser_adapter.py`.
-- **Pytest**: 1148 collected, 1147 passed, 1 skipped. W4b baseline: 1088 collected, 1087 passed, 1 skipped. Delta +60 collected.
+- **Pytest collected**: 1195. W4b baseline: 1088 collected, 1087 passed, 1 skipped. Delta +107 collected.
 - **Per-file counts**:
 
   | File | Functions (base → tip) | Collected (base → tip) | Delta collected |
   |---|---|---|---|
   | `tests/unit/integrations/notion/test_browser_adapter.py` | 75 → 75 | 100 → 107 | +7 |
   | `tests/unit/integrations/notion/test_stub_adapters.py` | 2 → 1 | 2 → 1 | -1 |
-  | `tests/unit/integrations/notion/test_combined_adapter.py` | 0 → 9 | 0 → 40 | +40 |
-  | `tests/unit/observability/test_receipts.py` | 0 → 8 | 0 → 14 | +14 |
+  | `tests/unit/integrations/notion/test_combined_adapter.py` | 0 → 15 | 0 → 75 | +75 |
+  | `tests/unit/observability/test_receipts.py` | 0 → 18 | 0 → 26 | +26 |
   | Remaining files | unchanged | 986 → 986 | 0 |
-  | **Total** | | **1088 → 1148** | **+60** |
+  | **Total** | | **1088 → 1195** | **+107** |
 
 - **Mutation checks** (each applied, pytest run, then reverted):
 
   | Mutation | Failing test |
   |---|---|
   | Swap `create_page` from the API operation set into the browser set | `test_operation_uses_api_adapter[create_page]` |
-  | Remove the exception fallback (re-raise instead of calling the other adapter) | `test_fallback_when_preferred_raises[create_page-api]` |
+  | Fall back on `except Exception` after a write raises | `test_write_error_is_not_retried_on_the_other_adapter[create_page]` |
+  | Fall back on `TypeError` | `test_type_error_propagates_unchanged` |
+  | Fall back on `PermissionError` | `test_auth_error_propagates_unchanged` |
   | Remove the `reports_unsupported` pre-check | `test_fallback_when_preferred_reports_unsupported[create_page-api]` |
-  | Drop `visible=` in `set_view_title_visibility` | `test_set_view_title_visibility_passes_arguments_and_returns_delegate_view` |
+  | Drop the `NotImplementedError` fallback | `test_not_implemented_is_an_unsupported_signal` |
+  | Return the API public URL without stranger verification | `test_get_public_url_returns_none_when_stranger_access_fails` |
+  | Raise the fallback error without `from first` | `test_unsupported_fallback_error_is_chained_from_the_first_error[not_implemented]` |
+  | Pass `parent_id=None` from `create_page` | `test_operation_forwards_every_argument[create_page]` |
+  | Drop `icon=` in `create_page` | `test_operation_forwards_every_argument[create_page]` |
+  | Drop `new_parent_type=` in `move_page` | `test_operation_forwards_every_argument[move_page]` |
+  | Hard-code `enabled=True` in `set_search_indexing` | `test_operation_forwards_every_argument[set_search_indexing]` |
+  | Hard-code `icon="💡"` in `add_callout_block` | `test_operation_forwards_every_argument[add_callout_block]` |
+  | Pass `new_title=page_id` from `rename_page` | `test_operation_forwards_every_argument[rename_page]` |
+  | Drop `visible=` in `set_view_title_visibility` | `test_operation_forwards_every_argument[set_view_title_visibility]` |
   | Change `raise translated from e` to `raise translated from None` on `fill` | `test_translating_session_keeps_original_playwright_error_as_cause[fill]` |
   | Change `raise translated from e` to `raise translated from None` on `close` | `test_translating_session_keeps_original_playwright_error_as_cause[close]` |
+  | Write `job_id` from `operation` | `test_reloaded_receipt_round_trips_every_field` |
+  | Write `operation` from `workspace` | `test_reloaded_receipt_round_trips_every_field` |
+  | Write `workspace` from `target` | `test_reloaded_receipt_round_trips_every_field` |
+  | Write `target` from `job_id` | `test_reloaded_receipt_round_trips_every_field` |
+  | Write `idempotency_key` from `evidence` | `test_reloaded_receipt_round_trips_every_field` |
+  | Remove the in-file duplicate idempotency-key check | `test_load_rejects_duplicate_idempotency_key` |
+  | Remove the `timestamp` datetime check | `test_timestamp_must_be_a_datetime` |
+  | Store `post_state` without the mapping check | `test_post_state_must_be_a_mapping` |
+  | Accept a naive timestamp | `test_naive_timestamp_is_rejected` |
+  | Accept a status outside Success, Unknown, and Failure | `test_status_rejects_values_outside_the_enum` |
+  | Reject a torn trailing line | `test_torn_trailing_line_is_skipped` |
+  | Skip the pre-append re-read | `test_two_logs_reject_a_duplicate_key_without_corrupting_the_file` |
+  | Allow `NaN` in receipt JSON | `test_non_finite_numbers_are_rejected[nan]` |
   | Remove the `record()` duplicate idempotency-key guard | `test_duplicate_idempotency_key_is_rejected_and_not_appended` |
+  | Store the caller mapping without copying it | `test_caller_dict_mutation_does_not_change_the_stored_receipt` |
 
 - **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w5` and this log entry. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
 - **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. Exit 78 held.
