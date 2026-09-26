@@ -18,6 +18,7 @@ from money_machine.integrations.notion.relations import (
     CanonicalDatabases,
     DashboardRelation,
     DashboardRollup,
+    NotificationDashboard,
     ViewFilter,
     build_canonical_databases,
     build_dashboard_rollup,
@@ -117,9 +118,11 @@ def test_duplicate_data_type_is_rejected() -> None:
 
 @pytest.mark.parametrize("dimension", ["date", "category", "status"])
 def test_filter_dimension_is_accepted(dimension: str) -> None:
-    filt = build_filter(dimension, "Field", "equals", "Value")
+    value = "today" if dimension == "date" else "Value"
+    filt = build_filter(dimension, "Field", "equals", value)
     assert filt.dimension == dimension
     assert filt.condition == "equals"
+    assert filt.value == value
 
 
 def test_other_filter_dimension_is_rejected() -> None:
@@ -140,6 +143,17 @@ def test_filter_property_name_must_be_present() -> None:
 def test_filter_value_must_be_present() -> None:
     with pytest.raises(SchemaBuilderError, match="filter value"):
         build_filter("status", "Status", "equals", "")
+
+
+def test_date_filter_value_must_be_today_or_an_iso_date() -> None:
+    today = build_filter("date", "Due", "equals", "today")
+    iso = build_filter("date", "Due", "equals", "2026-09-26")
+    assert today.value == "today"
+    assert iso.value == "2026-09-26"
+    with pytest.raises(SchemaBuilderError, match="date filter value"):
+        build_filter("date", "Due", "equals", "banana")
+    status = build_filter("status", "Status", "equals", "banana")
+    assert status.value == "banana"
 
 
 def test_hand_built_view_filter_is_rejected() -> None:
@@ -484,25 +498,6 @@ def test_each_dashboard_database_adds_its_rollup(kind: str) -> None:
     assert dashboard.row_count == 1
 
 
-def test_habits_relation_links_only_todays_row() -> None:
-    dashboard = build_notification_dashboard(build_canonical_databases(["Tasks", "Habits"]))
-    by_type = {item.data_type: item for item in dashboard.relations}
-    today = ViewFilter(dimension="date", property_name="Date", condition="equals", value="today")
-    assert by_type["Habits"].filters == (today,)
-    assert by_type["Habits"].linked_rows is None
-    assert by_type["Tasks"].filters == ()
-    assert by_type["Tasks"].linked_rows is None
-    habits = [item for item in dashboard.rollups if item.relation_name == "Habits"]
-    assert habits == [
-        DashboardRollup(
-            name="water_glasses_remaining",
-            relation_name="Habits",
-            property_name="water_glasses_remaining",
-            function="sum",
-        )
-    ]
-
-
 def test_water_glasses_rollup_is_omitted_when_habits_is_absent() -> None:
     canonical = build_canonical_databases(["Tasks", "Events", "Finance"])
     dashboard = build_notification_dashboard(canonical)
@@ -618,24 +613,19 @@ def test_caller_by_type_mutation_has_no_effect() -> None:
     assert tuple(registry.by_type) == ("Tasks",)
 
 
-def test_linked_rows_yesterday_is_rejected() -> None:
-    with pytest.raises(SchemaBuilderError, match="yesterday is not allowed"):
-        DashboardRelation(name="Habits", data_type="Habits", linked_rows="yesterday")
-
-
-def test_linked_rows_must_not_be_empty() -> None:
-    with pytest.raises(SchemaBuilderError, match="must not be empty"):
-        DashboardRelation(name="Habits", data_type="Habits", linked_rows="")
-
-
-def test_linked_rows_must_be_a_string() -> None:
-    with pytest.raises(SchemaBuilderError, match="must be a string"):
-        DashboardRelation(name="Habits", data_type="Habits", linked_rows=cast(str, 123))
+def test_relation_name_must_not_be_blank() -> None:
+    with pytest.raises(SchemaBuilderError, match="relation name"):
+        DashboardRelation(name="  ", data_type="Habits")
 
 
 def test_relation_data_type_must_be_canonical() -> None:
     with pytest.raises(SchemaBuilderError, match="not canonical"):
         DashboardRelation(name="Habits", data_type="Bogus")
+
+
+def test_hand_built_notification_dashboard_rejects_a_row_count_other_than_one() -> None:
+    with pytest.raises(SchemaBuilderError, match="row count"):
+        NotificationDashboard(row_count=2, relations=(), rollups=())
 
 
 def test_rollup_names_the_canonical_database() -> None:

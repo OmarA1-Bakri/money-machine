@@ -24,7 +24,8 @@ yearly. A February 29 birthday matches only when today is February 29, so
 that date. ``money_spent_today`` is this Finance row's amount when its calendar
 date is today, otherwise 0, not a sum. A date property is never compared to
 ``now()`` directly. ``water_glasses_remaining`` is Goal minus Glasses on Habits
-and is omitted when Habits is not verified (water glasses only where relevant).
+when that row's calendar date is today, otherwise 0, and is omitted when Habits
+is not verified (water glasses only where relevant).
 Any dashboard formula is omitted when its database is not in the verified map,
 so each personal preset can be used alone. A key that is not in
 ``schema_definitions()`` is rejected. A known database that is simply absent
@@ -103,14 +104,15 @@ _DASHBOARD: tuple[tuple[str, str, str, str], ...] = (
         "water_glasses_remaining",
         "Habits",
         "number",
-        'subtract(prop("Goal"), prop("Glasses"))',
+        'if(equal(formatDate(prop("Date"),"YYYY-MM-DD"), formatDate(now(),"YYYY-MM-DD")), '
+        'subtract(prop("Goal"),prop("Glasses")), 0)',
     ),
 )
 _EXPECTED_TYPES: dict[str, dict[str, str]] = {
     "Tasks": {"Status": "select", "Due": "date"},
     "Events": {"Birthday": "checkbox", "Date": "date"},
     "Finance": {"Date": "date", "Amount": "number"},
-    "Habits": {"Goal": "number", "Glasses": "number"},
+    "Habits": {"Date": "date", "Goal": "number", "Glasses": "number"},
 }
 
 

@@ -27,7 +27,7 @@ _VERIFIED: dict[str, dict[str, str]] = {
     "Tasks": {"Name": "title", "Status": "select", "Due": "date"},
     "Events": {"Name": "title", "Date": "date", "Birthday": "checkbox"},
     "Finance": {"Name": "title", "Amount": "number", "Date": "date"},
-    "Habits": {"Name": "title", "Glasses": "number", "Goal": "number"},
+    "Habits": {"Name": "title", "Date": "date", "Glasses": "number", "Goal": "number"},
 }
 
 _ALLOWED_FORMULA_TYPES = ("text", "number", "checkbox", "date")
@@ -82,9 +82,9 @@ def test_dashboard_formulas_use_verified_property_names() -> None:
         'if(equal(formatDate(prop("Date"), "YYYY-MM-DD"), formatDate(now(), "YYYY-MM-DD")), '
         'prop("Amount"), 0)'
     )
-    assert (
-        generated.expressions["water_glasses_remaining"]
-        == 'subtract(prop("Goal"), prop("Glasses"))'
+    assert generated.expressions["water_glasses_remaining"] == (
+        'if(equal(formatDate(prop("Date"),"YYYY-MM-DD"), formatDate(now(),"YYYY-MM-DD")), '
+        'subtract(prop("Goal"),prop("Glasses")), 0)'
     )
     assert dict(generated.result_types) == {
         "current_date": "date",
@@ -102,6 +102,23 @@ def test_dashboard_formulas_use_verified_property_names() -> None:
     }
     assert generated.verified_properties["Clients"]["Name"] == "title"
     assert generated.verified_properties["Habits"]["Goal"] == "number"
+
+
+def test_water_glasses_remaining_contributes_only_todays_row() -> None:
+    expression = (
+        'if(equal(formatDate(prop("Date"),"YYYY-MM-DD"), formatDate(now(),"YYYY-MM-DD")), '
+        'subtract(prop("Goal"),prop("Glasses")), 0)'
+    )
+    generated = generate_notification_dashboard_formulas(_VERIFIED)
+    assert generated.expressions["water_glasses_remaining"] == expression
+    compiled = compile_formula(
+        expression,
+        {"Date": "date", "Goal": "number", "Glasses": "number"},
+        "number",
+    )
+    assert compiled.referenced_property_names == frozenset({"Date", "Goal", "Glasses"})
+    assert compiled.depth == 4
+    assert compiled.result_type == "number"
 
 
 def test_missing_verified_name_is_rejected() -> None:
@@ -443,7 +460,10 @@ _MONEY_SPENT = (
     'if(equal(formatDate(prop("Date"), "YYYY-MM-DD"), formatDate(now(), "YYYY-MM-DD")), '
     'prop("Amount"), 0)'
 )
-_WATER = 'subtract(prop("Goal"), prop("Glasses"))'
+_WATER = (
+    'if(equal(formatDate(prop("Date"),"YYYY-MM-DD"), formatDate(now(),"YYYY-MM-DD")), '
+    'subtract(prop("Goal"),prop("Glasses")), 0)'
+)
 _PRESET_EXPRESSIONS: dict[str, dict[str, str]] = {
     "Tasks": {"current_date": "now()", "task_open_and_due_today": _TASK_OPEN},
     "Events": {"birthday_status": _BIRTHDAY},

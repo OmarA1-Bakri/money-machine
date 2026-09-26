@@ -9,8 +9,10 @@ status, and each filter property must exist on that database. The home
 dashboard has a today view, a monthly calendar, and quick notes. The
 notification dashboard is one row of relations and rollups over the Tasks,
 Events, Finance, and Habits formulas from section 5. A missing database omits
-its relation and rollup. The Habits relation carries a date-equals-today filter
-on the Habits Date property, so ``water_glasses_remaining`` is today's row.
+its relation and rollup. The relation links all Habits rows, and the formula
+contributes only today's row, so the rollup sum is today's value. Notion
+evaluates now() and formatDate in the viewer's local time zone, API reads
+return UTC, and 'today' can differ near midnight.
 ``client_name``, the configured buyer name, and ``current_date`` are not
 relations. This module does not call Notion, the network, or a browser.
 """
@@ -19,6 +21,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date
 from types import MappingProxyType
 from typing import cast
 
@@ -125,6 +128,24 @@ class ViewFilter:
             raise SchemaBuilderError("filter condition must be equals")
         validated_name("property name", self.property_name)
         validated_name("filter value", self.value)
+        if dimension == "date":
+            _require_date_filter_value(self.value)
+
+
+def _require_date_filter_value(value: str) -> None:
+    if value == "today" or _is_iso_date(value):
+        return
+    raise SchemaBuilderError(f"date filter value {value!r} must be today or an ISO date")
+
+
+def _is_iso_date(value: str) -> bool:
+    if len(value) != 10 or value[4] != "-" or value[7] != "-":
+        return False
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError:
+        return False
+    return parsed.isoformat() == value
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,27 +163,16 @@ class LinkedView:
 class DashboardRelation:
     """A relation from the one-row dashboard to one canonical database.
 
-    Habits uses a date-equals-today filter on Date, so the water rollup is
-    today's row. ``linked_rows`` is not that filter and is rejected.
+    The relation links every Habits row. ``water_glasses_remaining`` contributes
+    only today's row, so the rollup sum is today's value.
     """
 
     name: str
     data_type: str
-    filters: tuple[ViewFilter, ...] = ()
-    linked_rows: str | None = None
 
     def __post_init__(self) -> None:
+        validated_name("relation name", self.name)
         _require_catalogue_data_type(cast(object, self.data_type))
-        linked = cast(object, self.linked_rows)
-        if linked is None:
-            return
-        if not isinstance(linked, str):
-            raise SchemaBuilderError("linked rows must be a string")
-        if linked == "":
-            raise SchemaBuilderError("linked rows must not be empty")
-        if linked == "yesterday":
-            raise SchemaBuilderError("linked rows yesterday is not allowed")
-        raise SchemaBuilderError(f"linked rows {linked!r} is not allowed")
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,6 +192,10 @@ class NotificationDashboard:
     row_count: int
     relations: tuple[DashboardRelation, ...]
     rollups: tuple[DashboardRollup, ...]
+
+    def __post_init__(self) -> None:
+        if self.row_count != 1:
+            raise SchemaBuilderError("notification dashboard row count must be 1")
 
 
 def build_canonical_databases(data_types: object) -> CanonicalDatabases:
@@ -305,8 +319,7 @@ def build_notification_dashboard(canonical: object) -> NotificationDashboard:
     for data_type, rollup_name, property_name, function in _DASHBOARD_LINKS:
         if data_type not in canonical.by_type:
             continue
-        filters = _relation_filters(data_type)
-        relations.append(DashboardRelation(name=data_type, data_type=data_type, filters=filters))
+        relations.append(DashboardRelation(name=data_type, data_type=data_type))
         rollups.append(build_dashboard_rollup(data_type, rollup_name, property_name, function))
     return NotificationDashboard(
         row_count=1,
@@ -331,14 +344,6 @@ def _copy_filters(filters: object) -> tuple[ViewFilter, ...]:
         seen.add(item.dimension)
         copied.append(item)
     return tuple(copied)
-
-
-def _relation_filters(data_type: str) -> tuple[ViewFilter, ...]:
-    if data_type != "Habits":
-        return ()
-    today = build_filter("date", "Date", "equals", "today")
-    _require_filter(data_type, today, _catalogue_properties(data_type))
-    return (today,)
 
 
 def _catalogue_properties(data_type: str) -> dict[str, _PropertyFacts]:
