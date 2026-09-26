@@ -12,8 +12,8 @@ reconciled by observing, and any observe error is Unknown. A click that
 raises any Exception is observed once and stays Unknown, even when the
 observe result is applied, and taints the session. If that observe also
 raises, one Unknown receipt is still returned. A KeyboardInterrupt,
-SystemExit, or GeneratorExit from click or observe still records Unknown
-before it propagates. An interrupt from the screenshot propagates. A captcha,
+SystemExit, or GeneratorExit from click, observe, or a screenshot still
+records one Unknown receipt before it propagates. A captcha,
 verification, or unknown page fails closed. An idempotency key is bound
 to the profile, operation, workspace, target, and job. A rejected session
 id is closed. If that close fails, the profile is locked and the
@@ -373,7 +373,7 @@ class BrowserSessionManager:
             recorded = True
             return receipt
         finally:
-            if not recorded:
+            if not recorded and key not in self._seen:
                 self._record_unknown(session, job, operation, space, page, key, moment, kind)
 
     def _require_open(self, profile_name: str) -> _OpenSession:
@@ -408,10 +408,11 @@ class BrowserSessionManager:
         timestamp: datetime,
         kind: str,
     ) -> NotionOperationReceipt:
-        """Observe once, record Unknown, and taint. Applied is not Success."""
-        observed = "unknown"
+        """Observe once, whitelist it, record Unknown, and taint."""
+        raw: object = "unknown"
         with suppress(Exception):
-            observed = self._driver.observe(session.session_id)
+            raw = self._driver.observe(session.session_id)
+        observed = raw if raw in {"applied", "absent", "unknown"} else "unknown"
         return self._record_unknown(
             session,
             job,
@@ -436,11 +437,28 @@ class BrowserSessionManager:
         kind: str,
         observed: str = "unknown",
     ) -> NotionOperationReceipt:
-        """Store one Unknown receipt and taint the session."""
+        """Store one Unknown receipt and taint. An interrupt still stores it."""
         try:
             evidence = self._capture(session, "uncertain")
         except Exception:
             evidence = "screenshot-failed"
+        except BaseException:
+            self._record(
+                session,
+                job,
+                operation,
+                workspace,
+                target,
+                key,
+                timestamp,
+                status="Unknown",
+                evidence="screenshot-failed",
+                click="uncertain",
+                observed=observed,
+                kind=kind,
+                taint=True,
+            )
+            raise
         return self._record(
             session,
             job,

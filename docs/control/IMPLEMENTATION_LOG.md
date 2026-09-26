@@ -742,20 +742,20 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 ## 2026-09-26 — Session 06 Wave 9: browser session management
 
 - **Heading**: `### 3. Implement browser session management` in `prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md` and `hands-off-money-machine-full-implementation-workbook.md`.
-- **Narrow reading**: Profiles stay under `runtime/browser-profiles`, which git ignores. A profile is reused only while it is authenticated, open, and healthy. A read makes 3 attempts in total on a timeout and does not retry a connection failure. Any other read error is wrapped, recorded with screenshot reason error, and taints the session. An uncertain click is reconciled by observing and is not clicked twice. Any observe error is Unknown and taints the session. A click that raises any Exception is observed once, recorded as Unknown with the observe result, and taints the session. Observe returning applied does not make that receipt Success. If that observe also raises, one Unknown receipt is still returned. KeyboardInterrupt, SystemExit, and GeneratorExit from click or observe still record Unknown before they propagate. An interrupt from the screenshot propagates. A captcha, verification, or unknown page fails closed, with a screenshot and a tainted session. A page-kind timeout, connection error, or other error records one failure and does not click. Each mutation records one `NotionOperationReceipt`. The idempotency key is bound to the profile, operation, workspace, target, and job. Selectors are a catalogue of data-testid strings. The driver is injected. The prompt-integrity review is already recorded at `docs/control/reviews/2026-09-24-session-06-prompt-integrity.md` and is not rewritten. No network, live Notion, live Etsy, or browser launch.
+- **Narrow reading**: Profiles stay under `runtime/browser-profiles`, which git ignores. A profile is reused only while it is authenticated, open, and healthy. A read makes 3 attempts in total on a timeout and does not retry a connection failure. Any other read error is wrapped, recorded with screenshot reason error, and taints the session. An uncertain click is reconciled by observing and is not clicked twice. Any observe error is Unknown and taints the session. A click that raises any Exception is observed once, recorded as Unknown with the observe result, and taints the session. The observe value is kept only when it is applied, absent, or unknown. Observe returning applied does not make that receipt Success, and absent does not make it Failure. If that observe also raises, one Unknown receipt is still returned. KeyboardInterrupt, SystemExit, and GeneratorExit from click, observe, or a screenshot still record one Unknown receipt before they propagate. A repeated screenshot interrupt still leaves that one receipt, with evidence screenshot-failed, and a same-key replay does not click again. A captcha, verification, or unknown page fails closed, with a screenshot and a tainted session. A page-kind timeout, connection error, or other error records one failure and does not click. Each mutation records one `NotionOperationReceipt`. The idempotency key is bound to the profile, operation, workspace, target, and job. Selectors are a catalogue of data-testid strings. The driver is injected. The prompt-integrity review is already recorded at `docs/control/reviews/2026-09-24-session-06-prompt-integrity.md` and is not rewritten. No network, live Notion, live Etsy, or browser launch.
 - **W8 deferred fixes folded in**: Page references reject Unicode categories Cc, Cf, Zl, Zp, and Zs. `test_page_reference_rejects_a_space_separator` covers ASCII space, NBSP U+00A0, U+1680, U+2002, U+202F, U+205F, and U+3000, in titled, plain, leading, and trailing shapes, for page_id, links, and other_catalogue_pages. The forbidden scan reads the raw value before the padding check, includes the first character, and includes a leading C0 run. W8 row 71, drop the page-id padding check at `publishing.py:196`, is equivalent. Re-checked on the publishing file after the wider Zs set: deleting that check still passes, including `test_page_url_rejects_padding`, because every character strip() removes is already rejected as Cc, Zl, Zp, or Zs.
-- **Session policy**: `BrowserSessionManager` opens an authenticated profile or reuses its healthy session. `profile_path` runs before the driver opens or restarts. `ProfileStatus` is compared by identity, so a string status is rejected. A session id that is not a slug is closed. If that close fails, the profile is locked and the original session-id error is re-raised with the close error as its cause; the next open fails with the locked error. If that close succeeds, the profile is not locked and the next open is allowed. A failed restart close locks the profile, and both mutate and read then fail closed. Reads of public_url and share_menu make 3 attempts in total on TimeoutError and fail on ConnectionError without another try. Any other read error is wrapped in BrowserSessionError, recorded with screenshot reason error, and taints the session. Mutations are publish_page, unpublish_page, set_duplicate_as_template, and set_search_indexing. The same idempotency key returns the same receipt only when the profile, operation, workspace, target, and job match, and it does not click again, including after a failure. A mismatch raises `BrowserSessionError` before the session is required. An applied click is Success with evidence applied. An uncertain click or a click TimeoutError observes once: applied is Success with evidence reconciled and no taint; absent is Failure; any other observe result, including RuntimeError, ValueError, OSError, TimeoutError, and ConnectionError, is Unknown and taints the session. A click that raises any Exception is observed once and recorded as Unknown with the observe result, and the session is tainted even when observe returns applied. That receipt is not Success. If that observe also raises, the call still returns one Unknown receipt. A KeyboardInterrupt, SystemExit, or GeneratorExit from click, or from observe after an uncertain click, records one Unknown receipt and taints the session before it propagates. An interrupt raised from the screenshot propagates. An unexpected click string is one error receipt. A page-kind TimeoutError, ConnectionError, or other exception is one Failure with page kind unknown and reason timeout, connection, or error. A screenshot failure still records one receipt with evidence screenshot-failed. The screenshot-reason guard is equivalent because every caller reason is already in the screenshot set. Receipts are a tuple. Invalid input raises `BrowserSessionError`. The module does not name Playwright, urllib, or socket.
-- **Pytest collected**: 1841 collected, 1840 passed, 1 skipped. W8 baseline: 1718 collected, 1717 passed, 1 skipped. Delta +123 collected and +123 passed.
+- **Session policy**: `BrowserSessionManager` opens an authenticated profile or reuses its healthy session. `profile_path` runs before the driver opens or restarts. `ProfileStatus` is compared by identity, so a string status is rejected. A session id that is not a slug is closed. If that close fails, the profile is locked and the original session-id error is re-raised with the close error as its cause; the next open fails with the locked error. If that close succeeds, the profile is not locked and the next open is allowed. A failed restart close locks the profile, and both mutate and read then fail closed. Reads of public_url and share_menu make 3 attempts in total on TimeoutError and fail on ConnectionError without another try. Any other read error is wrapped in BrowserSessionError, recorded with screenshot reason error, and taints the session. Mutations are publish_page, unpublish_page, set_duplicate_as_template, and set_search_indexing. The same idempotency key returns the same receipt only when the profile, operation, workspace, target, and job match, and it does not click again, including after a failure. A mismatch raises `BrowserSessionError` before the session is required. An applied click is Success with evidence applied. An uncertain click or a click TimeoutError observes once: applied is Success with evidence reconciled and no taint; absent is Failure; any other observe result, including RuntimeError, ValueError, OSError, TimeoutError, and ConnectionError, is Unknown and taints the session. A click that raises any Exception is observed once and recorded as Unknown with the observe result, and the session is tainted even when observe returns applied or absent. The observe value is kept only when it is applied, absent, or unknown; any other value, including None, an object, or a 5000-character string, is stored as unknown. That receipt is not Success and it is not Failure. If that observe also raises, the call still returns one Unknown receipt. A KeyboardInterrupt, SystemExit, or GeneratorExit from click, from observe after an uncertain click, or from a screenshot records one Unknown receipt and taints the session before it propagates. The screenshot interrupt stores evidence screenshot-failed and the observed value, including when the screenshot raises every time. The finally block does not record a second receipt when the key is already stored. An unexpected click string is one error receipt. A page-kind TimeoutError, ConnectionError, or other exception is one Failure with page kind unknown and reason timeout, connection, or error. A screenshot failure still records one receipt with evidence screenshot-failed. The screenshot-reason guard is equivalent because every caller reason is already in the screenshot set. Receipts are a tuple. Invalid input raises `BrowserSessionError`. The module does not name Playwright, urllib, or socket.
+- **Pytest collected**: 1854 collected, 1853 passed, 1 skipped. W8 baseline: 1718 collected, 1717 passed, 1 skipped. Delta +136 collected and +136 passed.
 - **Per-file counts**:
 
 | File | Functions (base → tip) | Collected (base → tip) | Passed (base → tip) | Failed (base → tip) | Skipped (base → tip) |
 |---|---|---|---|---|---|
 | `tests/unit/integrations/notion/test_publishing.py` | 81 → 86 | 153 → 178 | 153 → 178 | 0 → 0 | 0 → 0 |
-| `tests/unit/integrations/notion/test_browser_session.py` | 0 → 58 | 0 → 98 | 0 → 98 | 0 → 0 | 0 → 0 |
+| `tests/unit/integrations/notion/test_browser_session.py` | 0 → 61 | 0 → 111 | 0 → 111 | 0 → 0 | 0 → 0 |
 | Remaining files | unchanged | 1565 → 1565 | 1564 → 1564 | 0 → 0 | 1 → 1 |
-| **Total** | | **1718 → 1841** | **1717 → 1840** | **0 → 0** | **1 → 1** |
+| **Total** | | **1718 → 1854** | **1717 → 1853** | **0 → 0** | **1 → 1** |
 
-- **Mutation checks** (91 rows; each applied, pytest run, then reverted; 89 killed and 2 equivalent):
+- **Mutation checks** (95 rows; each applied, pytest run, then reverted; 93 killed and 2 equivalent):
 
 | Mutation | Site | Failing test |
 |---|---|---|
@@ -781,9 +781,9 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 | Store a session id that is not a slug | `browser_session.py:222` | `test_open_rejects_a_bad_session_id` |
 | Drop publish_page from the operation map | `browser_session.py:61` | `test_mutation_clicks_the_operation_selector` |
 | Drop unpublish_page from the operation map | `browser_session.py:62` | `test_mutation_clicks_the_operation_selector` |
-| Click the logical name instead of the selector | `browser_session.py:619` | `test_mutation_clicks_the_operation_selector` |
+| Click the logical name instead of the selector | `browser_session.py:637` | `test_mutation_clicks_the_operation_selector` |
 | Skip the idempotency lookup | `browser_session.py:307` | `test_replay_returns_the_same_receipt` |
-| Do not store the receipt under its idempotency key | `browser_session.py:589` | `test_replay_returns_the_same_receipt` |
+| Do not store the receipt under its idempotency key | `browser_session.py:607` | `test_replay_returns_the_same_receipt` |
 | Look up the idempotency key after requiring an open session | `browser_session.py:307` | `test_replay_after_failure_does_not_click` |
 | Skip the captcha check | `browser_session.py:334` | `test_challenge_page_fails_closed[captcha]` |
 | Skip the verification check | `browser_session.py:336` | `test_challenge_page_fails_closed[verification]` |
@@ -792,17 +792,17 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 | Do not observe a raised connection click | `browser_session.py:392` | `test_connection_error_click_is_one_unknown_receipt` |
 | Do not observe a raised runtime click | `browser_session.py:392` | `test_raised_click_is_one_unknown_receipt[RuntimeError]` |
 | Restore the narrow raised-click catch | `browser_session.py:392` | `test_raised_click_is_one_unknown_receipt[DriverError]` |
-| Click again before reconciling | `browser_session.py:471` | `test_uncertain_click_is_reconciled_when_applied` |
-| Record an absent reconciliation as Success | `browser_session.py:492` | `test_uncertain_click_absent_is_a_failure` |
-| Record an unknown reconciliation as Success | `browser_session.py:494` | `test_uncertain_click_unknown_stays_unknown` |
-| Taint a reconciled applied click | `browser_session.py:489` | `test_uncertain_click_is_reconciled_when_applied` |
-| Do not taint a blocked mutation | `browser_session.py:539` | `test_challenge_page_fails_closed[captcha]` |
-| Let a screenshot failure skip the receipt | `browser_session.py:552` | `test_screenshot_failure_still_records_one_receipt` |
-| Do not append the receipt | `browser_session.py:588` | `test_mutation_clicks_the_operation_selector` |
+| Click again before reconciling | `browser_session.py:489` | `test_uncertain_click_is_reconciled_when_applied` |
+| Record an absent reconciliation as Success | `browser_session.py:510` | `test_uncertain_click_absent_is_a_failure` |
+| Record an unknown reconciliation as Success | `browser_session.py:512` | `test_uncertain_click_unknown_stays_unknown` |
+| Taint a reconciled applied click | `browser_session.py:507` | `test_uncertain_click_is_reconciled_when_applied` |
+| Do not taint a blocked mutation | `browser_session.py:557` | `test_challenge_page_fails_closed[captcha]` |
+| Let a screenshot failure skip the receipt | `browser_session.py:570` | `test_screenshot_failure_still_records_one_receipt` |
+| Do not append the receipt | `browser_session.py:606` | `test_mutation_clicks_the_operation_selector` |
 | Return the receipt list | `browser_session.py:201` | `test_receipts_property_is_a_tuple` |
 | Retry a read only once | `browser_session.py:39` | `test_read_retries_timeout_then_returns` |
 | Retry a read four times | `browser_session.py:39` | `test_read_stops_after_three_timeouts` |
-| Leave a timed-out read healthy | `browser_session.py:543` | `test_read_stops_after_three_timeouts` |
+| Leave a timed-out read healthy | `browser_session.py:561` | `test_read_stops_after_three_timeouts` |
 | Retry a read connection error | `browser_session.py:276` | `test_read_does_not_retry_a_connection_error` |
 | Read the logical name instead of the selector | `browser_session.py:269` | `test_read_retries_timeout_then_returns` |
 | Allow a mutation selector to be read | `browser_session.py:66` | `test_read_rejects_a_mutation_selector` |
@@ -813,43 +813,47 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 | Treat an unauthenticated profile as authenticated | `browser_session.py:133` | `test_profile_status_values` |
 | Accept a naive timestamp | `browser_session.py:177` | `test_naive_timestamp_is_rejected` |
 | Accept a padded mutation token | `browser_session.py:169` | `test_mutation_tokens_must_be_present` |
-| Accept an unknown operation | `browser_session.py:617` | `test_unknown_operation_is_rejected` |
+| Accept an unknown operation | `browser_session.py:635` | `test_unknown_operation_is_rejected` |
 | Reuse a tainted session | `browser_session.py:216` | `test_tainted_session_is_not_reused_until_restart` |
 | Skip the open-session lock check | `browser_session.py:214` | `test_failed_restart_locks_the_profile` |
-| Catch only TimeoutError from observe | `browser_session.py:473` | `test_observe_exception_is_one_unknown_receipt[ConnectionError]` |
-| Restore the narrow observe catch | `browser_session.py:473` | `test_observe_exception_is_one_unknown_receipt[RuntimeError]` |
+| Catch only TimeoutError from observe | `browser_session.py:491` | `test_observe_exception_is_one_unknown_receipt[ConnectionError]` |
+| Restore the narrow observe catch | `browser_session.py:491` | `test_observe_exception_is_one_unknown_receipt[RuntimeError]` |
 | Skip the page-kind timeout branch | `browser_session.py:322` | `test_page_kind_error_records_one_receipt[timeout]` |
 | Skip the page-kind connection branch | `browser_session.py:326` | `test_page_kind_error_records_one_receipt[connection]` |
 | Skip the page-kind error branch | `browser_session.py:330` | `test_page_kind_error_records_one_receipt[error]` |
 | Drop the locked check in _require_open | `browser_session.py:383` | `test_locked_profile_blocks_mutate_and_read` |
 | Pass a garbage click result through | `browser_session.py:396` | `test_unknown_click_result_is_one_error_receipt` |
-| Taint only on Failure | `browser_session.py:573` | `test_uncertain_click_unknown_stays_unknown` |
-| Unknown page not tainted | `browser_session.py:539` | `test_unknown_page_kind_is_not_clicked` |
+| Taint only on Failure | `browser_session.py:591` | `test_uncertain_click_unknown_stays_unknown` |
+| Unknown page not tainted | `browser_session.py:557` | `test_unknown_page_kind_is_not_clicked` |
 | Skip close on a bad session id | `browser_session.py:224` | `test_open_rejects_a_bad_session_id` |
 | Let close raise on a bad session id | `browser_session.py:224` | `test_open_rejects_a_bad_session_id_when_close_fails` |
 | Drop lock on failed cleanup | `browser_session.py:231` | `test_open_rejects_a_bad_session_id_when_close_fails` |
-| Accept an idempotency key bound to a different call | `browser_session.py:604` | `test_idempotency_key_is_bound_to_the_call` |
-| Drop profile from the idempotency binding | `browser_session.py:605` | `test_idempotency_key_is_bound_to_the_call` |
-| Drop operation from the idempotency binding | `browser_session.py:606` | `test_idempotency_key_is_bound_to_the_call` |
-| Drop workspace from the idempotency binding | `browser_session.py:607` | `test_idempotency_key_is_bound_to_the_call` |
-| Drop target from the idempotency binding | `browser_session.py:608` | `test_idempotency_key_is_bound_to_the_call` |
-| Drop job from the idempotency binding | `browser_session.py:609` | `test_idempotency_key_is_bound_to_the_call` |
+| Accept an idempotency key bound to a different call | `browser_session.py:622` | `test_idempotency_key_is_bound_to_the_call` |
+| Drop profile from the idempotency binding | `browser_session.py:623` | `test_idempotency_key_is_bound_to_the_call` |
+| Drop operation from the idempotency binding | `browser_session.py:624` | `test_idempotency_key_is_bound_to_the_call` |
+| Drop workspace from the idempotency binding | `browser_session.py:625` | `test_idempotency_key_is_bound_to_the_call` |
+| Drop target from the idempotency binding | `browser_session.py:626` | `test_idempotency_key_is_bound_to_the_call` |
+| Drop job from the idempotency binding | `browser_session.py:627` | `test_idempotency_key_is_bound_to_the_call` |
 | Drop profile_path in open_session | `browser_session.py:210` | `test_open_rejects_an_invalid_profile_name` |
 | Drop profile_path in restart | `browser_session.py:245` | `test_restart_rejects_an_invalid_profile_name` |
-| Drop the operation string check | `browser_session.py:614` | `test_operation_must_be_a_string` |
+| Drop the operation string check | `browser_session.py:632` | `test_operation_must_be_a_string` |
 | Drop the timestamp type check | `browser_session.py:175` | `test_timestamp_must_be_a_datetime` |
 | Drop the session-id type check | `browser_session.py:183` | `test_open_rejects_a_non_string_session_id` |
-| Drop the screenshot reason check | `browser_session.py:547` | equivalent: every caller reason is already in the screenshot set |
-| Record every blocked click as not-clicked | `browser_session.py:525` | `test_page_kind_error_records_one_receipt[error]` |
-| Drop session_id from the receipt pre_state | `browser_session.py:580` | `test_mutation_clicks_the_operation_selector` |
+| Drop the screenshot reason check | `browser_session.py:565` | equivalent: every caller reason is already in the screenshot set |
+| Record every blocked click as not-clicked | `browser_session.py:543` | `test_page_kind_error_records_one_receipt[error]` |
+| Drop session_id from the receipt pre_state | `browser_session.py:598` | `test_mutation_clicks_the_operation_selector` |
 | Drop the finally | `browser_session.py:375` | `test_base_exception_still_records_an_unknown_receipt[click-KeyboardInterrupt]` |
 | Do not wrap a read error | `browser_session.py:279` | `test_read_other_error_is_wrapped_and_taints` |
 | Do not taint a connection read | `browser_session.py:277` | `test_read_connection_error_taints_the_session` |
 | Drop suppress(Exception) | `browser_session.py:413` | `test_raised_click_observe_error_returns_one_unknown_receipt[RuntimeError-RuntimeError]` |
-| Swallow a screenshot interrupt | `browser_session.py:442` | `test_screenshot_interrupt_propagates[KeyboardInterrupt]` |
+| Swallow a screenshot interrupt | `browser_session.py:443` | `test_screenshot_interrupt_propagates[KeyboardInterrupt]` |
 | Label a read error as a timeout screenshot | `browser_session.py:280` | `test_read_other_error_is_wrapped_and_taints` |
-| Drop the observe result on a raised click | `browser_session.py:424` | `test_connection_error_click_is_one_unknown_receipt` |
-| Treat applied after a raised click as Success | `browser_session.py:415` | `test_raised_click_stays_unknown_when_observe_returns_applied` |
+| Drop the observe result on a raised click | `browser_session.py:425` | `test_connection_error_click_is_one_unknown_receipt` |
+| Treat applied after a raised click as Success | `browser_session.py:416` | `test_raised_click_stays_unknown_when_observe_returns_applied` |
+| Drop the BaseException branch | `browser_session.py:445` | `test_screenshot_interrupt_records_one_unknown_receipt[always-raised]` |
+| Drop the seen-key guard | `browser_session.py:376` | `test_screenshot_interrupt_records_one_unknown_receipt[once-raised]` |
+| Record Failure when a raised click observes absent | `browser_session.py:470` | `test_raised_click_stays_unknown_for_any_observe_result[absent]` |
+| Skip the observe whitelist on a raised click | `browser_session.py:415` | `test_raised_click_observe_value_is_whitelisted[object]` |
 
 - **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w9` and this log entry. Against base, STATE changes only these things: `state_revision` 44 to 45, the `session_06_w8` trailing comma, `session_06_w9`, and `updated_at`. `updated_at` moves forward from `2026-09-26T20:41:44Z`. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
 - **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. `pyproject.toml` untouched. `src/money_machine/integrations/notion/router.py` untouched. Exit 78 held.

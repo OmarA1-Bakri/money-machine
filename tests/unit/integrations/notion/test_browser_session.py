@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -39,9 +40,10 @@ class FakeDriver:
         self.page_kind_value: str | Exception = "normal"
         self.click_result: str | BaseException = "applied"
         self.read_results: list[str | Exception] = ["ok"]
-        self.observe_result: str | BaseException = "applied"
+        self.observe_result: object = "applied"
         self.close_error: Exception | None = None
         self.screenshot_error: BaseException | None = None
+        self.screenshot_raises_left: int | None = None
         self.open_result: object | None = None
         self._session = 0
 
@@ -75,8 +77,16 @@ class FakeDriver:
 
     def screenshot(self, session_id: str, path: str) -> None:
         self.screenshots.append((session_id, path))
-        if self.screenshot_error is not None:
-            raise self.screenshot_error
+        error = self.screenshot_error
+        if error is None:
+            return
+        left = self.screenshot_raises_left
+        if left is None:
+            raise error
+        if left <= 0:
+            return
+        self.screenshot_raises_left = left - 1
+        raise error
 
     def close(self, session_id: object) -> None:
         self.closes.append(session_id)
@@ -85,9 +95,10 @@ class FakeDriver:
 
     def observe(self, session_id: str) -> str:
         self.observes.append(session_id)
-        if isinstance(self.observe_result, BaseException):
-            raise self.observe_result
-        return self.observe_result
+        result = self.observe_result
+        if isinstance(result, BaseException):
+            raise result
+        return cast("str", result)
 
 
 def _manager(driver: FakeDriver | None = None) -> tuple[BrowserSessionManager, FakeDriver]:
@@ -486,6 +497,43 @@ def test_raised_click_stays_unknown_when_observe_returns_applied() -> None:
     assert len(driver.clicks) == 1
 
 
+@pytest.mark.parametrize("observed", ["applied", "absent", "unknown", "garbage"])
+def test_raised_click_stays_unknown_for_any_observe_result(observed: str) -> None:
+    manager, driver = _manager()
+    _open(manager)
+    driver.click_result = RuntimeError("boom")
+    driver.observe_result = observed
+    receipt = _mutate(manager)
+    assert receipt.status == "Unknown"
+    expected = observed if observed in {"applied", "absent", "unknown"} else "unknown"
+    assert receipt.post_state["observed"] == expected
+    replay = _mutate(manager)
+    assert replay is receipt
+    assert len(driver.clicks) == 1
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        _mutate(manager, key="other")
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [object(), None, "x" * 5000],
+    ids=["object", "none", "long-string"],
+)
+def test_raised_click_observe_value_is_whitelisted(raw: object) -> None:
+    manager, driver = _manager()
+    _open(manager)
+    driver.click_result = DriverError("boom")
+    driver.observe_result = raw
+    receipt = _mutate(manager)
+    assert receipt.status == "Unknown"
+    assert receipt.post_state["observed"] == "unknown"
+    replay = _mutate(manager)
+    assert replay is receipt
+    assert len(driver.clicks) == 1
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        _mutate(manager, key="other")
+
+
 @pytest.mark.parametrize(
     ("click_error", "observe_error"),
     [
@@ -728,6 +776,45 @@ def test_screenshot_interrupt_propagates(exc_type: type[BaseException]) -> None:
     driver.screenshot_error = exc_type("stop")
     with pytest.raises(exc_type):
         _mutate(manager)
+    assert manager.receipts[0].post_state["observed"] == "applied"
+
+
+@pytest.mark.parametrize("path", ["raised", "uncertain-absent", "garbage"])
+@pytest.mark.parametrize("raises", ["once", "always"])
+def test_screenshot_interrupt_records_one_unknown_receipt(path: str, raises: str) -> None:
+    manager, driver = _manager()
+    _open(manager)
+    if path == "raised":
+        driver.click_result = DriverError("boom")
+        driver.observe_result = "applied"
+        expected_observed = "applied"
+    elif path == "uncertain-absent":
+        driver.click_result = "uncertain"
+        driver.observe_result = "absent"
+        expected_observed = "unknown"
+    elif path == "garbage":
+        driver.click_result = "maybe"
+        expected_observed = "unknown"
+    else:
+        raise AssertionError(path)
+    driver.screenshot_error = KeyboardInterrupt("stop")
+    if raises == "once":
+        driver.screenshot_raises_left = 1
+    elif raises != "always":
+        raise AssertionError(raises)
+    with pytest.raises(KeyboardInterrupt):
+        _mutate(manager)
+    assert len(manager.receipts) == 1
+    receipt = manager.receipts[0]
+    assert receipt.status == "Unknown"
+    assert receipt.post_state["observed"] == expected_observed
+    if raises == "always":
+        assert receipt.evidence == "screenshot-failed"
+    replay = _mutate(manager)
+    assert replay is receipt
+    assert len(driver.clicks) == 1
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        _mutate(manager, key="other")
 
 
 @pytest.mark.parametrize("exc_type", [KeyboardInterrupt, SystemExit, GeneratorExit])
@@ -748,6 +835,7 @@ def test_base_exception_still_records_an_unknown_receipt(
         _mutate(manager)
     assert len(manager.receipts) == 1
     assert manager.receipts[0].status == "Unknown"
+    assert manager.receipts[0].post_state["observed"] == "unknown"
     assert len(driver.clicks) == 1
     replay = _mutate(manager)
     assert replay is manager.receipts[0]
