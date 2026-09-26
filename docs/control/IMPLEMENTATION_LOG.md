@@ -459,21 +459,21 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 ## 2026-09-26 — Session 06 Wave 7: relation and linked-view helpers
 
 - **Heading**: `### 6. Implement relation and linked-view helpers` in `prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md` and `hands-off-money-machine-full-implementation-workbook.md`.
-- **Narrow reading**: One canonical database per catalogue data type. Hub views link to that database and do not create a second store. Filters are date, category, or status, the condition is equals, and a view has at most 3 filters. The home dashboard has a today view (open tasks due today), a monthly calendar, and quick notes. The notification dashboard is one row of relations and rollups over the section 5 formulas: Tasks `open_tasks_due_today` counts checked `task_open_and_due_today`, Events `birthday_status` counts checked `birthday_status`, Finance `money_spent_today` sums `money_spent_today`, and Habits `water_glasses_remaining` sums `water_glasses_remaining`. A missing database omits its relation and rollup, so water glasses are omitted when Habits is absent. Notes, Meals, and the business kinds do not add relations. `client_name`, the configured buyer name, and `current_date` are not emitted. No publishing, fixture-parity expansion, live connect, adapter calls, or Session 07 product build. No Notion, network, or browser calls.
-- **Carry-forward**: Names reject U+200C, U+200D, U+2060, and U+00AD in the interior and at either edge. `now()` and `formatDate` are evaluated in UTC; a naive moment is rejected. A formula that references itself, such as `A = prop("A")`, raises the formula-cycle error rather than the unverified-property error.
-- **Helpers**: `build_canonical_databases` copies the caller sequence, rejects a string, a non-sequence, an empty sequence, a non-string item, an unknown kind (the error names the key and the valid keys), a case difference, and a duplicate. The registry mapping is immutable. `build_filter` accepts date, category, and status with condition equals, and validates the property name and value. `build_linked_view` requires the canonical registry, a registered data type, and a view type of table, calendar, or board. Hub and view names are validated. Filters are copied. `dashboard_today_view` is Dashboard / Tasks / table / Today with Due equals today and Status equals Open. `monthly_calendar` is Dashboard / Events / calendar / Month with no filters. `quick_notes` is Dashboard / Notes / table / Quick notes with no filters. `build_notification_dashboard` returns one row. Relation names are the data types. Rollups use checked for the two checkbox formulas and sum for the two number formulas. Invalid input raises `SchemaBuilderError`.
-- **Pytest collected**: 1515 collected, 1514 passed, 1 skipped. W6 baseline: 1454 collected, 1453 passed, 1 skipped. Delta +61 collected and +61 passed.
+- **Narrow reading**: One canonical database per catalogue data type. Hub views link to that database and do not create a second store. Filters are date, category, or status, the condition is equals, and a view has at most 3 filters. The home dashboard has a today view (open tasks due today), a monthly calendar, and quick notes. The notification dashboard is one row of relations and rollups over the section 5 formulas: Tasks `open_tasks_due_today` counts checked `task_open_and_due_today`, Events `birthday_status` counts checked `birthday_status`, Finance `money_spent_today` sums `money_spent_today`, and Habits `water_glasses_remaining` sums `water_glasses_remaining` on the Habits relation, which links only today's Habits row. A missing database omits its relation and rollup, so water glasses are omitted when Habits is absent. A filter property must exist and its type must fit the dimension. A status value must be an option of that property. A rollup source must exist on the schema or as a dashboard formula, and the rollup function must fit the property type. Notes, Meals, and the business kinds do not add relations. `client_name`, the configured buyer name, and `current_date` are not emitted. No publishing, fixture-parity expansion, live connect, adapter calls, or Session 07 product build. No Notion, network, or browser calls.
+- **Carry-forward**: Names reject U+200C, U+200D, U+2060, and U+00AD in the interior and at either edge. Notion evaluates now() and formatDate in the viewer's local time zone, API reads return UTC, and 'today' can differ near midnight.. A formula that references itself, such as `A = prop("A")`, raises the formula-cycle error rather than the unverified-property error.
+- **Helpers**: `build_canonical_databases` copies the caller sequence, rejects a string, a non-sequence, an empty sequence, a non-string item, an unknown kind (the error names the key and the valid keys), a case difference, and a duplicate. The registry mapping is immutable. `build_filter` accepts date, category, and status with condition equals, and validates the property name and value. `build_linked_view` requires the canonical registry, a registered data type, and a view type of table, calendar, or board. Hub and view names are validated. Filters are copied. `dashboard_today_view` is Dashboard / Tasks / table / Today with Due equals today and Status equals Open. `monthly_calendar` is Dashboard / Events / calendar / Month with no filters. `quick_notes` is Dashboard / Notes / table / Quick notes with no filters. `build_notification_dashboard` returns one row. Relation names are the data types. Rollups use checked for the two checkbox formulas and sum for the two number formulas. `ViewFilter` validates dimension, condition, property name, and value in `__post_init__`. Linked views and rollups are checked against `schema_definitions()` plus the dashboard formulas. The Habits relation sets `linked_rows` to today. Invalid input raises `SchemaBuilderError`.
+- **Pytest collected**: 1526 collected, 1525 passed, 1 skipped. W6 baseline: 1454 collected, 1453 passed, 1 skipped. Delta +72 collected and +72 passed.
 - **Per-file counts**:
 
   | File | Functions (base → tip) | Collected (base → tip) | Delta collected |
   |---|---|---|---|
   | `tests/unit/integrations/notion/test_schema_builder.py` | 60 → 61 | 96 → 97 | +1 |
-  | `tests/unit/integrations/notion/test_formulas.py` | 68 → 72 | 101 → 116 | +15 |
-  | `tests/unit/integrations/notion/test_relations.py` | 0 → 40 | 0 → 45 | +45 |
+  | `tests/unit/integrations/notion/test_formulas.py` | 68 → 69 | 101 → 113 | +12 |
+  | `tests/unit/integrations/notion/test_relations.py` | 0 → 54 | 0 → 59 | +59 |
   | Remaining files | unchanged | 1257 → 1257 | 0 |
-  | **Total** | | **1454 → 1515** | **+61** |
+  | **Total** | | **1454 → 1526** | **+72** |
 
-- **Mutation checks** (75 rows; each applied, pytest run, then reverted):
+- **Mutation checks** (85 rows; each applied, pytest run, then reverted):
 
 | Mutation | Failing test |
 |---|---|
@@ -483,10 +483,6 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 | Drop U+00AD from the invisible set | `test_added_invisible_characters_in_names_are_rejected[leading-soft-hyphen]` |
 | Reject the added invisible characters only at the edges | `test_added_invisible_characters_in_names_are_rejected[interior-zwnj]` |
 | Reject the added invisible characters only in the interior | `test_added_invisible_characters_in_names_are_rejected[trailing-zwnj]` |
-| Evaluate now() without converting to UTC | `test_now_and_format_date_are_evaluated_in_utc` |
-| Evaluate formatDate in the original offset | `test_now_and_format_date_are_evaluated_in_utc` |
-| Treat a naive moment as UTC | `test_naive_moment_is_not_evaluated_as_utc` |
-| Drop the formatDate pattern check | `test_format_date_rejects_an_unknown_pattern` |
 | Exclude the formula's own name so a self-reference raises the unverified-property error | `test_self_referential_formula_raises_formula_cycle` |
 | Accept a string as the data-type sequence | `test_data_types_reject_a_string` |
 | Accept a non-sequence as the data types | `test_data_types_reject_a_non_sequence` |
@@ -552,6 +548,20 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 | Emit client_name on the dashboard | `test_dashboard_does_not_emit_client_name_or_current_date` |
 | Emit current_date as a rollup | `test_dashboard_does_not_emit_client_name_or_current_date` |
 | Accept a mapping in place of the dashboard registry | `test_notification_dashboard_requires_the_canonical_registry` |
+| Skip ViewFilter validation | `test_hand_built_view_filter_is_rejected` |
+| Look up a filter dimension before checking it is a string | `test_unhashable_filter_dimension_is_rejected` |
+| Look up a data type before checking it is a string | `test_unhashable_data_type_is_rejected` |
+| Look up a view type before checking it is a string | `test_unhashable_view_type_is_rejected` |
+| Accept a string of filters | `test_filters_reject_a_string` |
+| Reverse the copied filters | `test_filter_order_is_preserved` |
+| Allow a filter on a missing property | `test_filter_on_a_missing_property_is_rejected` |
+| Allow a date filter on a select property | `test_date_filter_on_a_select_property_is_rejected` |
+| Allow a category filter on a date property | `test_category_filter_on_a_date_property_is_rejected` |
+| Skip the status option check | `test_invalid_status_value_is_rejected` |
+| Allow a calendar without a date property | `test_calendar_view_requires_a_date_property` |
+| Allow a rollup whose source is missing | `test_missing_rollup_source_is_rejected` |
+| Allow a rollup function that does not fit the property | `test_mismatched_rollup_function_is_rejected` |
+| Link every Habits row | `test_habits_relation_links_only_todays_row` |
 
 - **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w7` and this log entry. `state_revision` 42 to 43 vs base. `updated_at` was refreshed. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
 - **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. `pyproject.toml` untouched. `src/money_machine/integrations/notion/router.py` untouched. Exit 78 held.

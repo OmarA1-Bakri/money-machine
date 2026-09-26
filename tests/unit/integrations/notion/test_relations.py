@@ -13,7 +13,9 @@ from money_machine.integrations.notion.relations import (
     VIEW_TYPES,
     CanonicalDatabase,
     DashboardRollup,
+    ViewFilter,
     build_canonical_databases,
+    build_dashboard_rollup,
     build_filter,
     build_linked_view,
     build_notification_dashboard,
@@ -117,6 +119,38 @@ def test_filter_value_must_be_present() -> None:
         build_filter("status", "Status", "equals", "")
 
 
+def test_hand_built_view_filter_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError):
+        ViewFilter("priority", " x ", "contains", "")
+    canonical = build_canonical_databases(["Tasks"])
+    with pytest.raises(SchemaBuilderError):
+        build_linked_view(
+            "Home",
+            "Tasks",
+            "table",
+            "Open",
+            (ViewFilter("priority", " x ", "contains", ""),),
+            canonical,
+        )
+
+
+def test_unhashable_filter_dimension_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError):
+        build_filter([], "Due", "equals", "today")
+
+
+def test_unhashable_data_type_is_rejected() -> None:
+    canonical = build_canonical_databases(["Tasks"])
+    with pytest.raises(SchemaBuilderError):
+        build_linked_view("Home", [], "table", "Open", (), canonical)
+
+
+def test_unhashable_view_type_is_rejected() -> None:
+    canonical = build_canonical_databases(["Tasks"])
+    with pytest.raises(SchemaBuilderError):
+        build_linked_view("Home", "Tasks", [], "Open", (), canonical)
+
+
 def test_two_hubs_link_to_one_canonical_database() -> None:
     canonical = build_canonical_databases(["Tasks"])
     home = build_linked_view("Home", "Tasks", "table", "Open", (), canonical)
@@ -159,7 +193,7 @@ def test_three_filter_dimensions_are_accepted() -> None:
     canonical = build_canonical_databases(["Tasks"])
     filters = [
         build_filter("date", "Due", "equals", "today"),
-        build_filter("category", "Category", "equals", "Work"),
+        build_filter("category", "Status", "equals", "Work"),
         build_filter("status", "Status", "equals", "Open"),
     ]
     view = build_linked_view("Home", "Tasks", "table", "Open", filters, canonical)
@@ -178,7 +212,7 @@ def test_duplicate_filter_dimension_is_rejected() -> None:
     canonical = build_canonical_databases(["Tasks"])
     filters = [
         build_filter("status", "Status", "equals", "Open"),
-        build_filter("status", "State", "equals", "Done"),
+        build_filter("status", "Status", "equals", "Done"),
     ]
     with pytest.raises(SchemaBuilderError, match="duplicated"):
         build_linked_view("Home", "Tasks", "table", "Open", filters, canonical)
@@ -202,6 +236,66 @@ def test_filters_must_be_a_sequence() -> None:
     canonical = build_canonical_databases(["Tasks"])
     with pytest.raises(SchemaBuilderError, match="sequence"):
         build_linked_view("Home", "Tasks", "table", "Open", None, canonical)
+
+
+def test_filters_reject_a_string() -> None:
+    canonical = build_canonical_databases(["Tasks"])
+    with pytest.raises(SchemaBuilderError, match="sequence"):
+        build_linked_view("Home", "Tasks", "table", "Open", "", canonical)
+
+
+def test_filter_order_is_preserved() -> None:
+    canonical = build_canonical_databases(["Tasks"])
+    filters = (
+        build_filter("status", "Status", "equals", "Open"),
+        build_filter("date", "Due", "equals", "today"),
+    )
+    view = build_linked_view("Home", "Tasks", "table", "Open", filters, canonical)
+    assert [item.dimension for item in view.filters] == ["status", "date"]
+
+
+def test_filter_on_a_missing_property_is_rejected() -> None:
+    canonical = build_canonical_databases(["Tasks"])
+    filters = (build_filter("date", "Missing", "equals", "today"),)
+    with pytest.raises(SchemaBuilderError, match="not on Tasks"):
+        build_linked_view("Home", "Tasks", "table", "Open", filters, canonical)
+
+
+def test_date_filter_on_a_select_property_is_rejected() -> None:
+    canonical = build_canonical_databases(["Tasks"])
+    filters = (build_filter("date", "Status", "equals", "today"),)
+    with pytest.raises(SchemaBuilderError, match="does not fit"):
+        build_linked_view("Home", "Tasks", "table", "Open", filters, canonical)
+
+
+def test_category_filter_on_a_date_property_is_rejected() -> None:
+    canonical = build_canonical_databases(["Tasks"])
+    filters = (build_filter("category", "Due", "equals", "today"),)
+    with pytest.raises(SchemaBuilderError, match="does not fit"):
+        build_linked_view("Home", "Tasks", "table", "Open", filters, canonical)
+
+
+def test_invalid_status_value_is_rejected() -> None:
+    canonical = build_canonical_databases(["Tasks"])
+    filters = (build_filter("status", "Status", "equals", "Later"),)
+    with pytest.raises(SchemaBuilderError, match="status value"):
+        build_linked_view("Home", "Tasks", "table", "Open", filters, canonical)
+
+
+def test_calendar_view_requires_a_date_property() -> None:
+    canonical = build_canonical_databases(["Notes"])
+    with pytest.raises(SchemaBuilderError, match="date property"):
+        build_linked_view("Home", "Notes", "calendar", "Month", (), canonical)
+
+
+def test_missing_rollup_source_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="not on Tasks"):
+        build_dashboard_rollup("Tasks", "open_tasks_due_today", "Missing", "checked")
+
+
+def test_mismatched_rollup_function_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="does not fit"):
+        build_dashboard_rollup("Tasks", "open_tasks_due_today", "task_open_and_due_today", "sum")
 
 
 def test_dashboard_today_view() -> None:
@@ -315,6 +409,22 @@ def test_each_dashboard_database_adds_its_rollup(kind: str) -> None:
         ),
     )
     assert dashboard.row_count == 1
+
+
+def test_habits_relation_links_only_todays_row() -> None:
+    dashboard = build_notification_dashboard(build_canonical_databases(["Tasks", "Habits"]))
+    by_type = {item.data_type: item for item in dashboard.relations}
+    assert by_type["Habits"].linked_rows == "today"
+    assert by_type["Tasks"].linked_rows is None
+    habits = [item for item in dashboard.rollups if item.relation_name == "Habits"]
+    assert habits == [
+        DashboardRollup(
+            name="water_glasses_remaining",
+            relation_name="Habits",
+            property_name="water_glasses_remaining",
+            function="sum",
+        )
+    ]
 
 
 def test_water_glasses_rollup_is_omitted_when_habits_is_absent() -> None:

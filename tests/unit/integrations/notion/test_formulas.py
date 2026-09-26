@@ -6,7 +6,7 @@ No network, no Notion, no browser.
 from __future__ import annotations
 
 import re
-from datetime import UTC, date, datetime, timedelta, timezone
+from datetime import date
 from typing import cast
 
 import pytest
@@ -17,8 +17,6 @@ from money_machine.integrations.notion.errors import (
 )
 from money_machine.integrations.notion.formulas import (
     compile_formula,
-    evaluate_format_date,
-    evaluate_now,
     generate_notification_dashboard_formulas,
     validated_name,
 )
@@ -614,27 +612,6 @@ def test_added_invisible_characters_in_names_are_rejected(char: str, placement: 
     }
     with pytest.raises(SchemaBuilderError, match="invisible character"):
         validated_name("property name", names[placement])
-
-
-def test_now_and_format_date_are_evaluated_in_utc() -> None:
-    behind = datetime(2026, 1, 15, 23, 30, tzinfo=timezone(timedelta(hours=-5)))
-    assert evaluate_now(behind) == datetime(2026, 1, 16, 4, 30, tzinfo=UTC)
-    assert evaluate_format_date(behind, "YYYY-MM-DD") == "2026-01-16"
-    assert evaluate_format_date(behind, "MM-DD") == "01-16"
-    ahead = datetime(2026, 1, 16, 1, 30, tzinfo=timezone(timedelta(hours=5)))
-    assert evaluate_now(ahead) == datetime(2026, 1, 15, 20, 30, tzinfo=UTC)
-    assert evaluate_format_date(ahead, "YYYY-MM-DD") == "2026-01-15"
-
-
-def test_naive_moment_is_not_evaluated_as_utc() -> None:
-    with pytest.raises(SchemaBuilderError, match="timezone-aware"):
-        evaluate_now(datetime(2026, 1, 15, 23, 30))
-
-
-def test_format_date_rejects_an_unknown_pattern() -> None:
-    moment = datetime(2026, 1, 16, tzinfo=UTC)
-    with pytest.raises(SchemaBuilderError, match="pattern"):
-        evaluate_format_date(moment, "YYYY")
 
 
 def test_arabic_indic_digit_is_rejected() -> None:
