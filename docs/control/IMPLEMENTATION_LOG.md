@@ -456,6 +456,106 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 - **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w6` and this log entry. `state_revision` 40 to 42 vs base. `updated_at` was refreshed. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
 - **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. `pyproject.toml` untouched. `src/money_machine/integrations/notion/router.py` untouched. Exit 78 held.
 
+## 2026-09-26 — Session 06 Wave 7: relation and linked-view helpers
+
+- **Heading**: `### 6. Implement relation and linked-view helpers` in `prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md` and `hands-off-money-machine-full-implementation-workbook.md`.
+- **Narrow reading**: One canonical database per catalogue data type. Hub views link to that database and do not create a second store. Filters are date, category, or status, the condition is equals, and a view has at most 3 filters. The home dashboard has a today view (open tasks due today), a monthly calendar, and quick notes. The notification dashboard is one row of relations and rollups over the section 5 formulas: Tasks `open_tasks_due_today` counts checked `task_open_and_due_today`, Events `birthday_status` counts checked `birthday_status`, Finance `money_spent_today` sums `money_spent_today`, and Habits `water_glasses_remaining` sums `water_glasses_remaining`. A missing database omits its relation and rollup, so water glasses are omitted when Habits is absent. Notes, Meals, and the business kinds do not add relations. `client_name`, the configured buyer name, and `current_date` are not emitted. No publishing, fixture-parity expansion, live connect, adapter calls, or Session 07 product build. No Notion, network, or browser calls.
+- **Carry-forward**: Names reject U+200C, U+200D, U+2060, and U+00AD in the interior and at either edge. `now()` and `formatDate` are evaluated in UTC; a naive moment is rejected. A formula that references itself, such as `A = prop("A")`, raises the formula-cycle error rather than the unverified-property error.
+- **Helpers**: `build_canonical_databases` copies the caller sequence, rejects a string, a non-sequence, an empty sequence, a non-string item, an unknown kind (the error names the key and the valid keys), a case difference, and a duplicate. The registry mapping is immutable. `build_filter` accepts date, category, and status with condition equals, and validates the property name and value. `build_linked_view` requires the canonical registry, a registered data type, and a view type of table, calendar, or board. Hub and view names are validated. Filters are copied. `dashboard_today_view` is Dashboard / Tasks / table / Today with Due equals today and Status equals Open. `monthly_calendar` is Dashboard / Events / calendar / Month with no filters. `quick_notes` is Dashboard / Notes / table / Quick notes with no filters. `build_notification_dashboard` returns one row. Relation names are the data types. Rollups use checked for the two checkbox formulas and sum for the two number formulas. Invalid input raises `SchemaBuilderError`.
+- **Pytest collected**: 1515 collected, 1514 passed, 1 skipped. W6 baseline: 1454 collected, 1453 passed, 1 skipped. Delta +61 collected and +61 passed.
+- **Per-file counts**:
+
+  | File | Functions (base → tip) | Collected (base → tip) | Delta collected |
+  |---|---|---|---|
+  | `tests/unit/integrations/notion/test_schema_builder.py` | 60 → 61 | 96 → 97 | +1 |
+  | `tests/unit/integrations/notion/test_formulas.py` | 68 → 72 | 101 → 116 | +15 |
+  | `tests/unit/integrations/notion/test_relations.py` | 0 → 40 | 0 → 45 | +45 |
+  | Remaining files | unchanged | 1257 → 1257 | 0 |
+  | **Total** | | **1454 → 1515** | **+61** |
+
+- **Mutation checks** (75 rows; each applied, pytest run, then reverted):
+
+| Mutation | Failing test |
+|---|---|
+| Drop U+200C from the invisible set | `test_added_invisible_characters_in_names_are_rejected[leading-zwnj]` |
+| Drop U+200D from the invisible set | `test_added_invisible_characters_in_names_are_rejected[leading-zwj]` |
+| Drop U+2060 from the invisible set | `test_added_invisible_characters_in_names_are_rejected[leading-word-joiner]` |
+| Drop U+00AD from the invisible set | `test_added_invisible_characters_in_names_are_rejected[leading-soft-hyphen]` |
+| Reject the added invisible characters only at the edges | `test_added_invisible_characters_in_names_are_rejected[interior-zwnj]` |
+| Reject the added invisible characters only in the interior | `test_added_invisible_characters_in_names_are_rejected[trailing-zwnj]` |
+| Evaluate now() without converting to UTC | `test_now_and_format_date_are_evaluated_in_utc` |
+| Evaluate formatDate in the original offset | `test_now_and_format_date_are_evaluated_in_utc` |
+| Treat a naive moment as UTC | `test_naive_moment_is_not_evaluated_as_utc` |
+| Drop the formatDate pattern check | `test_format_date_rejects_an_unknown_pattern` |
+| Exclude the formula's own name so a self-reference raises the unverified-property error | `test_self_referential_formula_raises_formula_cycle` |
+| Accept a string as the data-type sequence | `test_data_types_reject_a_string` |
+| Accept a non-sequence as the data types | `test_data_types_reject_a_non_sequence` |
+| Remove the empty data-type check | `test_empty_data_types_are_rejected` |
+| Accept a non-string data type | `test_data_type_must_be_a_string` |
+| Accept an unknown data type | `test_unknown_data_type_is_rejected` |
+| Omit the valid keys from the unknown data-type error | `test_unknown_data_type_is_rejected` |
+| Look up a data type case-insensitively | `test_data_type_case_must_match` |
+| Treat Invoices as an unknown data type | `test_each_catalogue_kind_is_its_own_canonical_database` |
+| Allow a duplicated data type | `test_duplicate_data_type_is_rejected` |
+| Store the caller data-type list | `test_caller_data_type_list_is_copied` |
+| Sort the canonical data types | `test_each_catalogue_kind_is_its_own_canonical_database` |
+| Return a mutable canonical mapping | `test_canonical_mapping_is_immutable` |
+| Drop date from the filter dimensions | `test_filter_dimension_is_accepted[date]` |
+| Drop category from the filter dimensions | `test_filter_dimension_is_accepted[category]` |
+| Drop status from the filter dimensions | `test_filter_dimension_is_accepted[status]` |
+| Accept a filter dimension outside the set | `test_other_filter_dimension_is_rejected` |
+| Accept a filter condition other than equals | `test_filter_condition_must_be_equals` |
+| Skip filter property-name validation | `test_filter_property_name_must_be_present` |
+| Skip filter value validation | `test_filter_value_must_be_present` |
+| Drop table from the view types | `test_dashboard_today_view` |
+| Drop calendar from the view types | `test_monthly_calendar` |
+| Drop board from the view types | `test_two_hubs_link_to_one_canonical_database` |
+| Accept a view type outside the set | `test_disallowed_view_type_is_rejected` |
+| Link a view to a data type that is not canonical | `test_linked_view_rejects_a_database_that_is_not_canonical` |
+| Accept a mapping in place of the canonical registry | `test_linked_view_requires_the_canonical_registry` |
+| Skip hub name validation | `test_linked_view_rejects_an_empty_hub` |
+| Skip view name validation | `test_linked_view_rejects_an_empty_name` |
+| Set the filter limit to 2 | `test_three_filter_dimensions_are_accepted` |
+| Set the filter limit to 4 | `test_four_filters_are_rejected` |
+| Compare the filter count with >= | `test_three_filter_dimensions_are_accepted` |
+| Allow a duplicated filter dimension | `test_duplicate_filter_dimension_is_rejected` |
+| Accept a filter that is not a view filter | `test_filter_must_be_a_view_filter` |
+| Return the caller filter sequence | `test_caller_filter_list_is_copied` |
+| Accept a non-sequence of filters | `test_filters_must_be_a_sequence` |
+| Change the today view to a calendar | `test_dashboard_today_view` |
+| Point the today view at Events | `test_dashboard_today_view` |
+| Drop the today date filter | `test_dashboard_today_view` |
+| Drop the today status filter | `test_dashboard_today_view` |
+| Compare the today status filter to Done | `test_dashboard_today_view` |
+| Change the monthly calendar to a table | `test_monthly_calendar` |
+| Point the monthly calendar at Tasks | `test_monthly_calendar` |
+| Rename the monthly calendar | `test_monthly_calendar` |
+| Add a filter to the monthly calendar | `test_monthly_calendar` |
+| Change quick notes to a calendar | `test_quick_notes` |
+| Point quick notes at Tasks | `test_quick_notes` |
+| Rename quick notes | `test_quick_notes` |
+| Set the dashboard row count to 2 | `test_notification_dashboard_is_one_row` |
+| Return a list of dashboard rollups | `test_notification_dashboard_is_one_row` |
+| Drop the Tasks rollup | `test_each_dashboard_database_adds_its_rollup[Tasks]` |
+| Drop the Events rollup | `test_each_dashboard_database_adds_its_rollup[Events]` |
+| Drop the Finance rollup | `test_each_dashboard_database_adds_its_rollup[Finance]` |
+| Drop the Habits rollup | `test_each_dashboard_database_adds_its_rollup[Habits]` |
+| Use sum for open_tasks_due_today | `test_each_dashboard_database_adds_its_rollup[Tasks]` |
+| Use checked for money_spent_today | `test_each_dashboard_database_adds_its_rollup[Finance]` |
+| Use sum for birthday_status | `test_each_dashboard_database_adds_its_rollup[Events]` |
+| Use checked for water_glasses_remaining | `test_each_dashboard_database_adds_its_rollup[Habits]` |
+| Roll up Due instead of task_open_and_due_today | `test_each_dashboard_database_adds_its_rollup[Tasks]` |
+| Name the dashboard relation after the rollup | `test_each_dashboard_database_adds_its_rollup[Tasks]` |
+| Point the rollup relation at the rollup name | `test_each_dashboard_database_adds_its_rollup[Tasks]` |
+| Emit a rollup when its database is absent | `test_notes_does_not_add_a_dashboard_relation` |
+| Skip a missing database only for Habits | `test_each_dashboard_database_adds_its_rollup[Tasks]` |
+| Emit client_name on the dashboard | `test_dashboard_does_not_emit_client_name_or_current_date` |
+| Emit current_date as a rollup | `test_dashboard_does_not_emit_client_name_or_current_date` |
+| Accept a mapping in place of the dashboard registry | `test_notification_dashboard_requires_the_canonical_registry` |
+
+- **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w7` and this log entry. `state_revision` 42 to 43 vs base. `updated_at` was refreshed. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
+- **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. `pyproject.toml` untouched. `src/money_machine/integrations/notion/router.py` untouched. Exit 78 held.
+
 ## 2026-09-11 — Startup repair wave after recovery review
 
 - Repaired migration-head/schema compatibility readiness, encoded database credentials/IPv6, and production environment selection. Compose now carries raw passwords separately; a bounded independent review identified literal-percent and surrounding-whitespace cases, both reproduced and repaired with regression coverage. Development external-URL overrides retain their credentials.

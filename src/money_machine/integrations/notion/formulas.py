@@ -13,9 +13,9 @@ A cross-row count or a rollup is out of scope. Session 07 section 4 names a
 configured buyer name and does not name ``client_name``. That buyer name is
 deferred to Session 07 and is not emitted here, and ``client_name`` is not
 emitted either, so a verified map with no Clients database is valid.
-``current_date`` is ``now()`` on Tasks.
-``task_open_and_due_today`` is this Tasks row, not a count of tasks, and it
-compares the Due calendar day to today. That per-row name is a justified
+``current_date`` is ``now()`` on Tasks. ``now()`` and ``formatDate`` are
+evaluated in UTC. ``task_open_and_due_today`` is this Tasks row, not a count
+of tasks, and it compares the Due calendar day to today. That per-row name is a justified
 correction: a formula evaluates per row, and the count belongs in a section 6
 rollup. ``birthday_status`` compares month and day so the Events row recurs
 yearly. A February 29 birthday matches only when today is February 29, so
@@ -39,6 +39,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from types import MappingProxyType
 from typing import Literal
 
@@ -152,7 +153,8 @@ class NotificationDashboardFormulas:
     verified_properties: Mapping[str, Mapping[str, str]]
 
 
-_INVISIBLE_NAME_CHARACTERS = ("\u200b", "\ufeff")
+_INVISIBLE_NAME_CHARACTERS = ("\u200b", "\ufeff", "\u200c", "\u200d", "\u2060", "\u00ad")
+_FORMAT_DATE_PATTERNS = {"YYYY-MM-DD": "%Y-%m-%d", "MM-DD": "%m-%d"}
 
 
 def _is_ascii_digit(char: str) -> bool:
@@ -172,6 +174,20 @@ def validated_name(label: str, value: object) -> str:
     if len(value) > MAX_NAME_LENGTH:
         raise SchemaBuilderError(f"{label} longer than 64 characters is rejected")
     return value
+
+
+def evaluate_now(moment: datetime) -> datetime:
+    """Return ``moment`` as UTC. ``now()`` is evaluated in UTC."""
+    if moment.tzinfo is None or moment.tzinfo.utcoffset(moment) is None:
+        raise SchemaBuilderError("now() requires a timezone-aware moment")
+    return moment.astimezone(UTC)
+
+
+def evaluate_format_date(moment: datetime, pattern: str) -> str:
+    """Format ``moment`` in UTC. ``formatDate`` is evaluated in UTC."""
+    if pattern not in _FORMAT_DATE_PATTERNS:
+        raise SchemaBuilderError(f"formatDate pattern {pattern!r} is not allowed")
+    return evaluate_now(moment).strftime(_FORMAT_DATE_PATTERNS[pattern])
 
 
 def formula_value_type(property_type: str) -> str:

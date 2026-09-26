@@ -344,7 +344,8 @@ def _compile_formulas(properties: tuple[SchemaProperty, ...]) -> tuple[SchemaPro
             raise SchemaBuilderError("formula property requires an expression")
         if result_type is None:
             raise SchemaBuilderError("formula property requires a result type")
-        siblings = {name: raw_types[name] for name in raw_types if name != prop.name}
+        # Own name stays visible so prop("A") on A is a cycle, not an unverified name.
+        siblings = dict(raw_types)
         formula = compile_formula(expression, siblings, result_type)
         formula_refs[prop.name] = formula.referenced_property_names
         compiled.append(

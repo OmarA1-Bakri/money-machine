@@ -469,8 +469,16 @@ def test_formula_property_rejects_an_unverified_name() -> None:
 
 def test_formula_property_rejects_its_own_name() -> None:
     properties = [_title(), _formula("Flag", 'prop("Flag")', "checkbox")]
-    with pytest.raises(UnverifiedPropertyNameError, match="Flag"):
+    with pytest.raises(SchemaBuilderError, match="formula cycle Flag -> Flag") as raised:
         build_schema("Tasks", properties)
+    assert not isinstance(raised.value, UnverifiedPropertyNameError)
+
+
+def test_self_referential_formula_raises_formula_cycle() -> None:
+    properties = [_title(), _formula("A", 'prop("A")', "text")]
+    with pytest.raises(SchemaBuilderError, match="formula cycle A -> A") as raised:
+        build_schema("Tasks", properties)
+    assert not isinstance(raised.value, UnverifiedPropertyNameError)
 
 
 def test_formula_property_requires_an_expression() -> None:
