@@ -270,7 +270,7 @@ def _receipt_from_payload(payload: object) -> NotionOperationReceipt:
 def _complete_json(line: str) -> bool:
     try:
         json.loads(line)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, RecursionError):
         return False
     return True
 
@@ -323,7 +323,7 @@ def _repair_tail(path: Path) -> None:
         tail = data[newline + 1 :]
         try:
             json.loads(tail.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
+        except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
             handle.truncate(newline + 1)
             return
         handle.seek(0, os.SEEK_END)

@@ -6,6 +6,7 @@ No network and no writes except the path a test injects.
 from __future__ import annotations
 
 import gc
+import json
 import os
 import threading
 from dataclasses import replace
@@ -342,37 +343,99 @@ def test_complete_json_tail_without_newline_is_kept(tmp_path: Path) -> None:
     assert stored.target == "page_1"
 
 
-def test_record_after_torn_tail_round_trips(tmp_path: Path) -> None:
-    """Appending after a torn fragment does not glue the next receipt onto it."""
-    path = tmp_path / "receipts.jsonl"
-    NotionOperationReceiptLog(path).record(_receipt())
-    path.write_text(path.read_text(encoding="utf-8") + '{"idem', encoding="utf-8")
+def _record_three(path: Path) -> tuple[bytes, tuple[str, ...]]:
+    """Write three valid receipts and return their exact on-disk prefix."""
+    keys = ("key-1", "key-2", "key-3")
+    log = NotionOperationReceiptLog(path)
+    for index, key in enumerate(keys, start=1):
+        log.record(_receipt(idempotency_key=key, target=f"page_{index}"))
+    prefix = path.read_bytes()
+    assert prefix.endswith(b"\n")
+    assert _stored_keys(prefix) == keys
+    return prefix, keys
 
-    NotionOperationReceiptLog(path).record(_receipt(idempotency_key="key-2", target="page_2"))
+
+def _assert_loaded_keys(log: NotionOperationReceiptLog, keys: tuple[str, ...]) -> None:
+    assert len(log) == len(keys)
+    for index, key in enumerate(keys, start=1):
+        stored = log.get(key)
+        assert stored is not None
+        assert stored.target == f"page_{index}"
+
+
+def _stored_keys(blob: bytes) -> tuple[str, ...]:
+    keys: list[str] = []
+    for line in blob.decode("utf-8").splitlines():
+        if not line.strip():
+            continue
+        payload = json.loads(line)
+        key = payload["idempotency_key"]
+        if not isinstance(key, str):
+            raise AssertionError("idempotency_key")
+        keys.append(key)
+    return tuple(keys)
+
+
+def _reject_later_duplicate(path: Path, before: bytes) -> None:
+    with pytest.raises(ValueError, match="key-3") as caught:
+        NotionOperationReceiptLog(path).record(_receipt(idempotency_key="key-3", target="other"))
+    assert type(caught.value) is DuplicateReceiptError
+    assert path.read_bytes() == before
+
+
+def test_record_after_torn_tail_round_trips(tmp_path: Path) -> None:
+    """Appending after a torn fragment keeps every earlier line."""
+    path = tmp_path / "receipts.jsonl"
+    prefix, keys = _record_three(path)
+    path.write_bytes(prefix + b'{"idem')
+
     reloaded = NotionOperationReceiptLog(path)
-    assert reloaded.get("create_page:job_1") is not None
-    stored = reloaded.get("key-2")
-    assert stored is not None
-    assert stored.target == "page_2"
+    _assert_loaded_keys(reloaded, keys)
+    _reject_later_duplicate(path, prefix + b'{"idem')
+
+    reloaded.record(_receipt(idempotency_key="key-4", target="page_4"))
+    raw = path.read_bytes()
+    assert raw.startswith(prefix)
+    assert b'{"idem' not in raw
+    assert _stored_keys(raw) == (*keys, "key-4")
+    again = NotionOperationReceiptLog(path)
+    _assert_loaded_keys(again, (*keys, "key-4"))
 
 
 def test_incomplete_utf8_tail_is_skipped(tmp_path: Path) -> None:
     """An incomplete UTF-8 tail is skipped on load and truncated before append."""
     path = tmp_path / "receipts.jsonl"
-    NotionOperationReceiptLog(path).record(_receipt())
-    with path.open("ab") as handle:
-        handle.write(b"\xc3")
+    prefix, keys = _record_three(path)
+    torn = prefix + b"\xc3"
+    path.write_bytes(torn)
 
     reloaded = NotionOperationReceiptLog(path)
-    assert reloaded.get("create_page:job_1") is not None
-    reloaded.record(_receipt(idempotency_key="key-2", target="page_2"))
+    _assert_loaded_keys(reloaded, keys)
+    _reject_later_duplicate(path, torn)
 
-    assert b"\xc3" not in path.read_bytes()
+    reloaded.record(_receipt(idempotency_key="key-4", target="page_4"))
+    raw = path.read_bytes()
+    assert raw.startswith(prefix)
+    assert b"\xc3" not in raw
+    assert _stored_keys(raw) == (*keys, "key-4")
     again = NotionOperationReceiptLog(path)
-    assert again.get("create_page:job_1") is not None
-    stored = again.get("key-2")
-    assert stored is not None
-    assert stored.target == "page_2"
+    _assert_loaded_keys(again, (*keys, "key-4"))
+
+
+def test_deeply_nested_torn_tail_is_skipped(tmp_path: Path) -> None:
+    """A torn tail of nested brackets is skipped, not a RecursionError."""
+    path = tmp_path / "receipts.jsonl"
+    prefix, keys = _record_three(path)
+    path.write_bytes(prefix + b"[" * 10000)
+
+    reloaded = NotionOperationReceiptLog(path)
+    _assert_loaded_keys(reloaded, keys)
+    reloaded.record(_receipt(idempotency_key="key-4", target="page_4"))
+    raw = path.read_bytes()
+    assert raw.startswith(prefix)
+    assert _stored_keys(raw) == (*keys, "key-4")
+    again = NotionOperationReceiptLog(path)
+    _assert_loaded_keys(again, (*keys, "key-4"))
 
 
 def test_recorded_lines_are_ascii(tmp_path: Path) -> None:
