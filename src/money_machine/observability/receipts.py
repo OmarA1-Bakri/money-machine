@@ -7,10 +7,10 @@ timezone-aware. This module does not open network connections and does not
 write anywhere except a path the caller injects.
 
 A trailing partial line that is not valid JSON and is not newline-terminated
-is a torn write from a crash. Load skips that tail, and the next append
-truncates it before writing. A complete JSON line that lacks a trailing
-newline is kept on load, and a newline is added before the next append.
-A newline-terminated line that is not JSON is rejected.
+is a torn write from a crash. Load skips that tail. Before the next append,
+and while the path lock is held, that fragment is truncated in place and a
+complete JSON line that lacks a newline gets one. The valid prefix is not
+rewritten. A newline-terminated line that is not JSON is rejected.
 
 Writers of one path in this process share a lock and re-read the file before
 appending, so two log instances cannot record the same idempotency key. The
@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import threading
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -233,20 +234,32 @@ def _logical_lines(text: str) -> list[str]:
 
 
 def _repair_tail(path: Path) -> None:
-    """Truncate a torn fragment, or terminate a complete last line, before append."""
+    """Prepare a file for append without rewriting its valid prefix.
+
+    A complete last line that lacks a newline gets one appended. A torn
+    fragment is truncated in place. The bytes before that fragment stay put.
+    """
     if not path.is_file():
         return
-    text = path.read_text(encoding="utf-8")
-    if not text or text.endswith("\n"):
-        return
-    lines = text.splitlines()
-    if _complete_json(lines[-1]):
-        path.write_text(text + "\n", encoding="utf-8")
-        return
-    kept = "\n".join(lines[:-1])
-    if kept:
-        kept += "\n"
-    path.write_text(kept, encoding="utf-8")
+    with path.open("rb+") as handle:
+        handle.seek(0, os.SEEK_END)
+        size = handle.tell()
+        if size == 0:
+            return
+        handle.seek(size - 1)
+        if handle.read(1) == b"\n":
+            return
+        handle.seek(0)
+        data = handle.read()
+        newline = data.rfind(b"\n")
+        tail = data[newline + 1 :]
+        try:
+            json.loads(tail.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            handle.truncate(newline + 1)
+            return
+        handle.seek(0, os.SEEK_END)
+        handle.write(b"\n")
 
 
 class NotionOperationReceiptLog:

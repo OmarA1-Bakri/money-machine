@@ -252,7 +252,15 @@ class _WriteFailure(Exception):
 
 @pytest.mark.parametrize(
     "error_type",
-    [RuntimeError, ValueError, ConnectionError, KeyError, AttributeError, _WriteFailure],
+    [
+        RuntimeError,
+        ValueError,
+        ConnectionError,
+        KeyError,
+        AttributeError,
+        NotImplementedError,
+        _WriteFailure,
+    ],
 )
 async def test_write_error_is_not_retried_on_the_other_adapter(
     error_type: type[Exception],
@@ -299,17 +307,32 @@ async def test_auth_error_propagates_unchanged() -> None:
     assert browser.calls == []
 
 
-async def test_not_implemented_is_an_unsupported_signal() -> None:
-    """NotImplementedError is the unsupported signal and falls back once."""
+async def test_operation_unsupported_error_triggers_fallback() -> None:
+    """OperationUnsupportedError is the unsupported signal and falls back once."""
     api, browser, combined = _adapters()
-    error = NotImplementedError("requires BROWSER method")
-    api.errors["create_page"] = error
+    api.errors["create_page"] = OperationUnsupportedError("api refuses create_page")
     _seed(browser, "create_page", _PAGE)
 
     result = await _invoke(combined, "create_page")
 
     assert result is _PAGE
+    assert len(api.calls) == 1
     assert browser.calls == [("create_page", (), _EXPECTED_CALLS["create_page"])]
+
+
+async def test_browser_preferred_write_error_is_not_retried() -> None:
+    """A browser-preferred write that raises is not run on the API adapter."""
+    api, browser, combined = _adapters()
+    error = RuntimeError("duplicate_page failed")
+    browser.errors["duplicate_page"] = error
+    _seed(api, "duplicate_page", _PAGE)
+
+    with pytest.raises(RuntimeError) as caught:
+        await _invoke(combined, "duplicate_page")
+
+    assert caught.value is error
+    assert len(browser.calls) == 1
+    assert api.calls == []
 
 
 @pytest.mark.parametrize(
@@ -337,15 +360,15 @@ async def test_fallback_when_preferred_reports_unsupported(
 
 @pytest.mark.parametrize(
     "signal",
-    ["not_implemented", "reports_unsupported"],
+    ["operation_unsupported", "reports_unsupported"],
 )
 async def test_unsupported_fallback_error_is_chained_from_the_first_error(signal: str) -> None:
     """When the fallback also fails, its error's __cause__ is the first refusal."""
     api, browser, combined = _adapters()
     browser.errors["create_page"] = RuntimeError("browser down")
     first: Exception | None = None
-    if signal == "not_implemented":
-        first = NotImplementedError("api refuses create_page")
+    if signal == "operation_unsupported":
+        first = OperationUnsupportedError("api refuses create_page")
         api.errors["create_page"] = first
     else:
         api.unsupported.add("create_page")
@@ -355,7 +378,7 @@ async def test_unsupported_fallback_error_is_chained_from_the_first_error(signal
 
     cause = caught.value.__cause__
     assert cause is not None
-    if signal == "not_implemented":
+    if signal == "operation_unsupported":
         assert cause is first
     else:
         assert isinstance(cause, OperationUnsupportedError)
@@ -406,6 +429,29 @@ async def test_get_public_url_returns_none_when_stranger_access_fails() -> None:
 
     assert result is None
     assert browser.calls == [("verify_stranger_access", (), {"public_url": _PUBLIC_URL})]
+
+
+async def test_get_public_url_does_not_hide_stranger_access_errors() -> None:
+    """A stranger-check error is not turned into None."""
+    api, browser, combined = _adapters()
+    error = RuntimeError("stranger check failed")
+    _seed(api, "get_public_url", _PUBLIC_URL)
+    browser.errors["verify_stranger_access"] = error
+
+    with pytest.raises(RuntimeError) as caught:
+        await combined.get_public_url("page-specific")
+
+    assert caught.value is error
+
+
+async def test_get_public_url_rejects_a_non_bool_stranger_check() -> None:
+    """verify_stranger_access must return bool."""
+    api, browser, combined = _adapters()
+    _seed(api, "get_public_url", _PUBLIC_URL)
+    _seed(browser, "verify_stranger_access", "yes")
+
+    with pytest.raises(TypeError, match="bool"):
+        await combined.get_public_url("page-specific")
 
 
 async def test_get_public_url_does_not_hide_api_errors() -> None:

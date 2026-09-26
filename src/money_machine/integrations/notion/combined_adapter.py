@@ -2,9 +2,10 @@
 
 Preferred channel follows the method column in
 ``docs/architecture/PLATFORM_COMPATIBILITY.md``. Fallback runs only when the
-preferred delegate explicitly reports the operation unsupported
-(``reports_unsupported`` or ``NotImplementedError``, which is that signal).
-Any other error, including a write that raises, propagates and is not retried.
+preferred delegate reports the operation unsupported (``reports_unsupported``)
+or raises ``OperationUnsupportedError``. A bare ``NotImplementedError`` is not
+that signal. Any other error, including a write that raises, propagates and
+is not retried.
 
 ``get_public_url`` is the COMBINED operation: the API delegate returns the
 public URL, then the browser delegate verifies stranger access.
@@ -34,10 +35,11 @@ from .domain import (
 
 
 class OperationUnsupportedError(NotImplementedError):
-    """Preferred adapter did not perform the operation.
+    """Preferred adapter refused the operation before doing any work.
 
-    ``NotImplementedError`` is the same signal: the delegate refused before
-    doing the work. It is the only exception that selects the other adapter.
+    This class is the only exception that selects the other adapter. A bare
+    ``NotImplementedError`` is not that signal: a write may raise it after a
+    partial mutation, and that error propagates with the other adapter uncalled.
     """
 
 
@@ -135,10 +137,11 @@ class CombinedNotionAdapter(NotionAdapter):
 
     The preferred delegate is selected from ``API_OPERATIONS`` and
     ``BROWSER_OPERATIONS``. ``reports_unsupported(operation)`` and
-    ``NotImplementedError`` are the only unsupported signals; the other
-    delegate then receives the same arguments. Every other exception is
-    re-raised and the other delegate is not called. ``get_public_url`` follows
-    the COMBINED contract instead of this single-delegate route.
+    ``OperationUnsupportedError`` are the only unsupported signals; the other
+    delegate then receives the same arguments. A bare ``NotImplementedError``
+    and every other exception are re-raised, and the other delegate is not
+    called. ``get_public_url`` follows the COMBINED contract instead of this
+    single-delegate route.
     """
 
     def __init__(self, api_adapter: NotionAdapter, browser_adapter: NotionAdapter) -> None:
@@ -170,7 +173,7 @@ class CombinedNotionAdapter(NotionAdapter):
             )
         try:
             return await _invoke(preferred, operation, *args, **kwargs)
-        except NotImplementedError as first:
+        except OperationUnsupportedError as first:
             return await _invoke_fallback(fallback, operation, first, *args, **kwargs)
 
     async def connection_status(self) -> dict[str, bool | str | int]:

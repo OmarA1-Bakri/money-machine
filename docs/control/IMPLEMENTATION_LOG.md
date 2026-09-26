@@ -171,20 +171,20 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 
 ## 2026-09-26 — Session 06 Wave 5: combined adapter delegation, receipt stub, cause-test parametrization
 
-- **Combined adapter**: `CombinedNotionAdapter` routes API-tagged operations to the injected API adapter and browser-tagged operations to the injected browser adapter. Fallback runs only when the preferred adapter reports the operation unsupported (`reports_unsupported` or `NotImplementedError`). A write that raises (`RuntimeError`, `ValueError`, `ConnectionError`, `KeyError`, `AttributeError`, or any other exception that is not that signal), a `TypeError`, and an auth-style error propagate, and the other adapter is not called. When the fallback also fails, the second error is chained from the first. `get_public_url` is COMBINED: the API delegate returns the public URL, then the browser delegate verifies stranger access; `None` from the API skips the browser, and a failed stranger check returns `None`. `set_view_title_visibility(database_id, view_id, visible)` passes those three arguments through unchanged and returns the delegate's `NotionView`. The router still refuses browser and combined modes. The fixture adapter stays the default.
+- **Combined adapter**: `CombinedNotionAdapter` routes API-tagged operations to the injected API adapter and browser-tagged operations to the injected browser adapter. Fallback runs only when the preferred adapter reports the operation unsupported (`reports_unsupported`) or raises `OperationUnsupportedError`. A bare `NotImplementedError` is not that signal. A write that raises (`RuntimeError`, `ValueError`, `ConnectionError`, `KeyError`, `AttributeError`, `NotImplementedError`, or any other exception that is not `OperationUnsupportedError`), a `TypeError`, and an auth-style error propagate, and the other adapter is not called. When the fallback also fails, the second error is chained from the first. `get_public_url` is COMBINED: the API delegate returns the public URL, then the browser delegate verifies stranger access; `None` from the API skips the browser, and a failed stranger check returns `None`. `set_view_title_visibility(database_id, view_id, visible)` passes those three arguments through unchanged and returns the delegate's `NotionView`. The router still refuses browser and combined modes. The fixture adapter stays the default.
 - **Receipts stub**: `NotionOperationReceipt` and `NotionOperationReceiptLog` follow Session 06 prompt section "### 4. Implement Notion operation receipts" (`prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md`). Fields: job ID, operation, workspace, page/database target, pre-state when available, post-state, provider response, screenshot or response evidence, timestamp, idempotency key, status. Status is `Success`, `Unknown`, or `Failure`. Timestamps must be timezone-aware. A repeated idempotency key is rejected before append, including when a second log instance re-reads the same path. A torn trailing line that is not newline-terminated and is not JSON is skipped on load and truncated before the next append. A complete JSON line with no trailing newline is kept, and a newline is added before the next append. A newline-terminated corrupt line is rejected. Caller mappings are copied before store. `NaN` and `Inf` are rejected. Writes happen only at a path the caller injects. No database table and no network.
 - **Cause test**: `test_translating_session_keeps_original_playwright_error_as_cause` is parametrized over the eight `TranslatingBrowserSession` methods (`navigate`, `click`, `fill`, `get_attribute`, `is_visible`, `wait_for_selector`, `get_current_url`, `close`). No behaviour change in `browser_adapter.py`.
-- **Pytest collected**: 1205. W4b baseline: 1088 collected, 1087 passed, 1 skipped. Delta +117 collected.
+- **Pytest collected**: 1209. W4b baseline: 1088 collected, 1087 passed, 1 skipped. Delta +121 collected.
 - **Per-file counts**:
 
   | File | Functions (base → tip) | Collected (base → tip) | Delta collected |
   |---|---|---|---|
   | `tests/unit/integrations/notion/test_browser_adapter.py` | 75 → 75 | 100 → 107 | +7 |
   | `tests/unit/integrations/notion/test_stub_adapters.py` | 2 → 1 | 2 → 1 | -1 |
-  | `tests/unit/integrations/notion/test_combined_adapter.py` | 0 → 15 | 0 → 79 | +79 |
+  | `tests/unit/integrations/notion/test_combined_adapter.py` | 0 → 18 | 0 → 83 | +83 |
   | `tests/unit/observability/test_receipts.py` | 0 → 24 | 0 → 32 | +32 |
   | Remaining files | unchanged | 986 → 986 | 0 |
-  | **Total** | | **1088 → 1205** | **+117** |
+  | **Total** | | **1088 → 1209** | **+121** |
 
 - **Mutation checks** (each applied, pytest run, then reverted):
 
@@ -196,9 +196,12 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
   | Fall back on `TypeError` | `test_type_error_propagates_unchanged` |
   | Fall back on `PermissionError` | `test_auth_error_propagates_unchanged` |
   | Remove the `reports_unsupported` pre-check | `test_fallback_when_preferred_reports_unsupported[create_page-api]` |
-  | Drop the `NotImplementedError` fallback | `test_not_implemented_is_an_unsupported_signal` |
+  | Fall back on bare `NotImplementedError` | `test_write_error_is_not_retried_on_the_other_adapter[NotImplementedError]` |
+  | Drop the `OperationUnsupportedError` fallback | `test_operation_unsupported_error_triggers_fallback` |
   | Return the API public URL without stranger verification | `test_get_public_url_returns_none_when_stranger_access_fails` |
-  | Raise the fallback error without `from first` | `test_unsupported_fallback_error_is_chained_from_the_first_error[not_implemented]` |
+  | Turn a stranger-check error into `None` | `test_get_public_url_does_not_hide_stranger_access_errors` |
+  | Drop the stranger-check bool type check | `test_get_public_url_rejects_a_non_bool_stranger_check` |
+  | Raise the fallback error without `from first` | `test_unsupported_fallback_error_is_chained_from_the_first_error[operation_unsupported]` |
   | Pass `parent_id=None` from `create_page` | `test_operation_forwards_every_argument[create_page]` |
   | Drop `icon=` in `create_page` | `test_operation_forwards_every_argument[create_page]` |
   | Drop `new_parent_type=` in `move_page` | `test_operation_forwards_every_argument[move_page]` |
