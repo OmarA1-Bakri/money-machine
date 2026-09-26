@@ -135,56 +135,80 @@ class TranslatingBrowserSession:
         try:
             await self._wrapped.navigate(url)
         except Exception as e:
-            raise self._translate_exception(e) from e
+            translated = self._translate_exception(e)
+            if translated is e:
+                raise
+            raise translated from e
 
     async def click(self, selector: str) -> None:
         """Click element, translating any Playwright exceptions."""
         try:
             await self._wrapped.click(selector)
         except Exception as e:
-            raise self._translate_exception(e) from e
+            translated = self._translate_exception(e)
+            if translated is e:
+                raise
+            raise translated from e
 
     async def fill(self, selector: str, value: str) -> None:
         """Fill input field, translating any Playwright exceptions."""
         try:
             await self._wrapped.fill(selector, value)
         except Exception as e:
-            raise self._translate_exception(e) from e
+            translated = self._translate_exception(e)
+            if translated is e:
+                raise
+            raise translated from e
 
     async def get_attribute(self, selector: str, attribute: str) -> str | None:
         """Get element attribute, translating any Playwright exceptions."""
         try:
             return await self._wrapped.get_attribute(selector, attribute)
         except Exception as e:
-            raise self._translate_exception(e) from e
+            translated = self._translate_exception(e)
+            if translated is e:
+                raise
+            raise translated from e
 
     async def is_visible(self, selector: str) -> bool:
         """Check if element is visible, translating any Playwright exceptions."""
         try:
             return await self._wrapped.is_visible(selector)
         except Exception as e:
-            raise self._translate_exception(e) from e
+            translated = self._translate_exception(e)
+            if translated is e:
+                raise
+            raise translated from e
 
     async def wait_for_selector(self, selector: str, timeout: int = 5000) -> None:
         """Wait for element to appear, translating any Playwright exceptions."""
         try:
             await self._wrapped.wait_for_selector(selector, timeout=timeout)
         except Exception as e:
-            raise self._translate_exception(e) from e
+            translated = self._translate_exception(e)
+            if translated is e:
+                raise
+            raise translated from e
 
     async def get_current_url(self) -> str:
         """Get current page URL, translating any Playwright exceptions."""
         try:
             return await self._wrapped.get_current_url()
         except Exception as e:
-            raise self._translate_exception(e) from e
+            translated = self._translate_exception(e)
+            if translated is e:
+                raise
+            raise translated from e
 
     async def close(self) -> None:
         """Close the browser session, translating any Playwright exceptions."""
         try:
             await self._wrapped.close()
         except Exception as e:
-            raise self._translate_exception(e) from e
+            translated = self._translate_exception(e)
+            if translated is e:
+                raise
+            raise translated from e
 
 
 class BrowserNotionAdapter(NotionAdapter):

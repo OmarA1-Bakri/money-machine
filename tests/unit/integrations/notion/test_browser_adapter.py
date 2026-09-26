@@ -1440,6 +1440,45 @@ async def test_translate_playwright_non_matching_error_propagates():
         await session.navigate("https://www.notion.so/page")
 
 
+@pytest.mark.asyncio
+async def test_translating_session_preserves_cause_of_untranslated_exception():
+    """An untranslated exception keeps the __cause__ it was raised with."""
+
+    class CausedSession:
+        async def navigate(self, url: str) -> None:
+            try:
+                raise KeyError("missing")
+            except KeyError as err:
+                raise RuntimeError("wrapped") from err
+
+        async def click(self, selector: str) -> None:
+            return None
+
+        async def fill(self, selector: str, value: str) -> None:
+            return None
+
+        async def get_attribute(self, selector: str, attribute: str) -> str | None:
+            return None
+
+        async def is_visible(self, selector: str) -> bool:
+            return False
+
+        async def wait_for_selector(self, selector: str, timeout: int = 5000) -> None:
+            return None
+
+        async def get_current_url(self) -> str:
+            return "https://www.notion.so/page"
+
+        async def close(self) -> None:
+            return None
+
+    session = TranslatingBrowserSession(CausedSession())
+    with pytest.raises(RuntimeError, match="wrapped") as exc_info:
+        await session.navigate("https://www.notion.so/page")
+
+    assert isinstance(exc_info.value.__cause__, KeyError)
+
+
 # Test: Exception translation layer behavior in verify_stranger_access
 @pytest.mark.asyncio
 async def test_verify_stranger_access_translates_playwright_timeout():
@@ -1556,6 +1595,52 @@ async def test_verify_stranger_access_translates_playwright_navigation_error():
 
     # Verify session was still closed
     assert nav_error_session.closed is True
+
+
+@pytest.mark.asyncio
+async def test_verify_stranger_access_wraps_playwright_navigate_timeout():
+    """A Playwright TimeoutError from navigate is a RuntimeError caused by TimeoutError."""
+
+    class TimeoutNavigateSession:
+        def __init__(self) -> None:
+            self.closed = False
+
+        async def navigate(self, url: str) -> None:
+            raise _fake_playwright_error("TimeoutError", "navigation timed out")
+
+        async def wait_for_selector(self, selector: str, timeout: int = 5000) -> None:
+            return None
+
+        async def click(self, selector: str) -> None:
+            return None
+
+        async def fill(self, selector: str, value: str) -> None:
+            return None
+
+        async def get_attribute(self, selector: str, attribute: str) -> str | None:
+            return None
+
+        async def is_visible(self, selector: str) -> bool:
+            return False
+
+        async def get_current_url(self) -> str:
+            return "https://www.notion.so/page"
+
+        async def close(self) -> None:
+            self.closed = True
+
+    fake_browser = FakeBrowserSession()
+    timeout_session = TimeoutNavigateSession()
+    adapter = BrowserNotionAdapter(
+        browser_session=fake_browser,
+        anon_session_factory=lambda: timeout_session,  # type: ignore[reportUnknownLambdaType]
+    )
+
+    with pytest.raises(RuntimeError, match="Failed to navigate") as exc_info:
+        await adapter.verify_stranger_access("https://notion.so/page")
+
+    assert type(exc_info.value.__cause__) is TimeoutError
+    assert timeout_session.closed is True
 
 
 @pytest.mark.asyncio
