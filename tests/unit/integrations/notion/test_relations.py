@@ -744,7 +744,7 @@ def test_hand_built_rollup_source_must_be_present() -> None:
 
 
 def test_hand_built_rollup_function_must_be_known() -> None:
-    with pytest.raises(SchemaBuilderError, match="rollup function"):
+    with pytest.raises(SchemaBuilderError, match="is not allowed"):
         DashboardRollup(
             name="open_tasks_due_today",
             relation_name="Tasks",

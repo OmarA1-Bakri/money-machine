@@ -54,6 +54,7 @@ class PublishedPage:
         _capture_secret_link(cast(object, self.secret_link))
         _ensure_public_access(cast(object, self.public_access))
         links = _copy_page_ids(cast(object, self.links), "links", "link")
+        links = _dedupe_page_ids(links)
         other = _copy_page_ids(
             cast(object, self.other_catalogue_pages),
             "other catalogue pages",
@@ -118,23 +119,30 @@ def _ensure_public_access(value: object) -> None:
 def _capture_secret_link(value: object) -> str:
     if not isinstance(value, str):
         raise SchemaBuilderError("secret link must be a string")
-    if any(ord(char) < 32 or ord(char) == 127 for char in value):
+    if any(_forbidden_secret_char(char) for char in value):
         raise SchemaBuilderError("secret link must not contain a control character")
     if value.strip() == "" or value != value.strip():
         raise SchemaBuilderError("secret link must be present")
-    parsed = urlparse(value)
+    try:
+        parsed = urlparse(value)
+    except ValueError as exc:
+        raise SchemaBuilderError("secret link must be a valid url") from exc
     if parsed.scheme != "https":
         raise SchemaBuilderError("secret link must use https")
     if parsed.username is not None or parsed.password is not None:
         raise SchemaBuilderError("secret link must not contain userinfo")
-    if _secret_port(parsed) not in (None, 443):
+    if parsed.netloc.endswith(":") or _secret_port(parsed) not in (None, 443):
         raise SchemaBuilderError("secret link port is not allowed")
     host = parsed.hostname
     if not isinstance(host, str) or not _allowed_secret_host(host):
         raise SchemaBuilderError("secret link host is not allowed")
-    if parsed.path in ("", "/", "//"):
+    if parsed.path.strip("/") == "":
         raise SchemaBuilderError("secret link must name a page")
     return value
+
+
+def _forbidden_secret_char(char: str) -> bool:
+    return ord(char) < 32 or ord(char) == 127 or char in "\u0085\u200b"
 
 
 def _secret_port(parsed: ParseResult) -> int | None:
@@ -159,19 +167,51 @@ def _copy_page_ids(value: object, plural: str, singular: str) -> tuple[str, ...]
     return tuple(_canonical_page_id(item, singular) for item in value)
 
 
+def _dedupe_page_ids(page_ids: tuple[str, ...]) -> tuple[str, ...]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for page_id in page_ids:
+        if page_id in seen:
+            continue
+        seen.add(page_id)
+        unique.append(page_id)
+    return tuple(unique)
+
+
 def _canonical_page_id(value: object, label: str) -> str:
     if not isinstance(value, str) or value == "" or value != value.strip():
         raise _page_id_error(label)
-    if "://" in value:
-        return _page_id_from_url(value, label)
-    compact = value.replace("-", "").lower()
+    text = value.strip()
+    if "://" in text:
+        return _page_id_from_url(text, label)
+    page_id = _plain_page_id(text)
+    if page_id is None:
+        raise _page_id_error(label)
+    return page_id
+
+
+def _plain_page_id(value: str) -> str | None:
+    if "-" in value:
+        parts = value.split("-")
+        if tuple(len(part) for part in parts) != (8, 4, 4, 4, 12):
+            return None
+        compact = "".join(parts).lower()
+    else:
+        compact = value.lower()
     if len(compact) == _PAGE_ID_LENGTH and all(char in _HEX for char in compact):
         return compact
-    raise _page_id_error(label)
+    return None
 
 
 def _page_id_from_url(value: str, label: str) -> str:
-    parsed = urlparse(value)
+    try:
+        parsed = urlparse(value)
+    except ValueError as exc:
+        raise _page_id_error(label) from exc
+    if parsed.username is not None or parsed.password is not None:
+        raise _page_id_error(label)
+    if parsed.netloc.endswith(":") or _page_port(parsed, label) not in (None, 443):
+        raise _page_id_error(label)
     host = parsed.hostname
     if parsed.scheme != "https" or not isinstance(host, str) or not _allowed_secret_host(host):
         raise _page_id_error(label)
@@ -182,22 +222,44 @@ def _page_id_from_url(value: str, label: str) -> str:
     return page_id
 
 
+def _page_port(parsed: ParseResult, label: str) -> int | None:
+    try:
+        return parsed.port
+    except ValueError as exc:
+        raise _page_id_error(label) from exc
+
+
 def _hex_from_segment(segment: str) -> str | None:
-    if "-" not in segment:
-        compact = segment.lower()
-        if len(compact) == _PAGE_ID_LENGTH and all(char in _HEX for char in compact):
-            return compact
+    plain = _exact_undashed(segment)
+    if plain is not None:
+        return plain
+    _head, hyphen, tail = segment.rpartition("-")
+    if hyphen == "-" and _exact_undashed(tail) is not None:
+        return _exact_undashed(tail)
+    return _trailing_uuid(segment)
+
+
+def _exact_undashed(segment: str) -> str | None:
+    compact = segment.lower()
+    if len(compact) > _PAGE_ID_LENGTH:
         return None
-    potential = ""
-    for part in reversed(segment.split("-")):
-        if part == "" or any(char not in "0123456789abcdefABCDEF" for char in part):
-            break
-        potential = part + potential
-        if len(potential) == _PAGE_ID_LENGTH:
-            return potential.lower()
-        if len(potential) > _PAGE_ID_LENGTH:
-            return None
-    return None
+    if len(compact) < _PAGE_ID_LENGTH:
+        return None
+    if any(char not in _HEX for char in compact):
+        return None
+    return compact
+
+
+def _trailing_uuid(segment: str) -> str | None:
+    parts = segment.split("-")
+    if len(parts) < 5:
+        return None
+    tail = parts[-5:]
+    if tuple(len(part) for part in tail) != (8, 4, 4, 4, 12):
+        return None
+    if any(any(char not in "0123456789abcdefABCDEF" for char in part) for part in tail):
+        return None
+    return "".join(tail).lower()
 
 
 def _reject_other_catalogue_links(
