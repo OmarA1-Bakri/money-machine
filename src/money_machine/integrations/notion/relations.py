@@ -20,6 +20,7 @@ relations. This module does not call Notion, the network, or a browser.
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -43,7 +44,7 @@ _ROLLUP_FUNCTION_TYPES: dict[str, frozenset[str]] = {
     "sum": frozenset({"number"}),
 }
 _CATALOGUE_KINDS: frozenset[str] = frozenset(DATABASE_KINDS)
-_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_ISO_DATE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 _PropertyFacts = tuple[str, tuple[str, ...], bool]
 
 # data type, rollup name, source property, function.
@@ -146,12 +147,21 @@ def _is_iso_date(value: str) -> bool:
     return _is_calendar_date(value)
 
 
+def _decimal_digits(value: str) -> str:
+    pieces: list[str] = []
+    for char in value:
+        digit = unicodedata.digit(char, -1)
+        pieces.append(str(digit) if digit >= 0 else char)
+    return "".join(pieces)
+
+
 def _is_calendar_date(value: str) -> bool:
+    normalized = _decimal_digits(value)
     try:
-        parsed = date.fromisoformat(value)
+        parsed = date.fromisoformat(normalized)
     except ValueError:
         return False
-    return parsed.isoformat() == value
+    return parsed.isoformat() == normalized
 
 
 @dataclass(frozen=True, slots=True)
