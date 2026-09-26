@@ -739,6 +739,84 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 - **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w8` and this log entry. Against base, STATE changes only these things: `state_revision` 43 to 44, the `session_06_w7` trailing comma, `session_06_w8`, and `updated_at`. `updated_at` moves forward from `2026-09-26T17:46:39Z`. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
 - **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. `pyproject.toml` untouched. `src/money_machine/integrations/notion/router.py` untouched. Exit 78 held.
 
+## 2026-09-26 — Session 06 Wave 9: browser session management
+
+- **Heading**: `### 3. Implement browser session management` in `prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md` and `hands-off-money-machine-full-implementation-workbook.md`.
+- **Narrow reading**: Profiles stay under `runtime/browser-profiles`, which git ignores. A profile is reused only while it is authenticated, open, and healthy. A read retries a timeout and does not retry a connection failure. An uncertain click is reconciled by observing and is not clicked twice. A captcha, verification, or unknown page fails closed, with a screenshot and a tainted session. Each mutation records one `NotionOperationReceipt`. Selectors are a catalogue of data-testid strings. The driver is injected. The prompt-integrity review is already recorded at `docs/control/reviews/2026-09-24-session-06-prompt-integrity.md` and is not rewritten. No network, live Notion, live Etsy, or browser launch.
+- **W8 deferred fixes folded in**: Page references reject Unicode categories Cc, Cf, Zl, Zp, and Zs. NBSP U+00A0 and U+3000 fail closed with the control-character error, inside a URL title and inside a plain id, for page_id, links, and other_catalogue_pages. `test_page_reference_rejects_a_forbidden_character` uses a leading shape, a trailing shape, a titled shape, and a plain id. The forbidden scan reads the raw value before the padding check, includes the first character, and includes a leading C0 run. W8 row 71, drop the page-id padding check at `publishing.py:196`, is equivalent. The publishing file still passes, including `test_page_url_rejects_padding`, because Zs and the other characters strip() removes are already rejected.
+- **Session policy**: `BrowserSessionManager` opens an authenticated profile or reuses its healthy session. `ProfileStatus` is compared by identity, so a string status is rejected. A failed close locks the profile. Reads of public_url and share_menu retry TimeoutError three times and fail on ConnectionError without another try. Mutations are publish_page, unpublish_page, set_duplicate_as_template, and set_search_indexing. The same idempotency key returns the same receipt and does not click again, including after a failure. An applied click is Success with evidence applied. An uncertain click or a click TimeoutError observes once: applied is Success with evidence reconciled and no taint; absent is Failure; any other observe result is Unknown and taints the session. A connection or runtime click error is one Failure and does not observe. A screenshot failure still records one receipt with evidence screenshot-failed. Receipts are a tuple. Invalid input raises `BrowserSessionError`. The module does not name Playwright, urllib, or socket.
+- **Pytest collected**: 1790 collected, 1789 passed, 1 skipped. W8 baseline: 1718 collected, 1717 passed, 1 skipped. Delta +72 collected and +72 passed.
+- **Per-file counts**:
+
+| File | Functions (base → tip) | Collected (base → tip) | Passed (base → tip) | Failed (base → tip) | Skipped (base → tip) |
+|---|---|---|---|---|---|
+| `tests/unit/integrations/notion/test_publishing.py` | 81 → 86 | 153 → 163 | 153 → 163 | 0 → 0 | 0 → 0 |
+| `tests/unit/integrations/notion/test_browser_session.py` | 0 → 41 | 0 → 62 | 0 → 62 | 0 → 0 | 0 → 0 |
+| Remaining files | unchanged | 1565 → 1565 | 1564 → 1564 | 0 → 0 | 1 → 1 |
+| **Total** | | **1718 → 1790** | **1717 → 1789** | **0 → 0** | **1 → 1** |
+
+- **Mutation checks** (54 rows; each applied, pytest run, then reverted; 53 killed and 1 equivalent):
+
+| Mutation | Site | Failing test |
+|---|---|---|
+| Check padding before forbidden characters | `publishing.py:194` | `test_forbidden_characters_are_checked_before_padding` |
+| Forbidden check applied on strip() | `publishing.py:194` | `test_forbidden_check_reads_characters_strip_would_remove` |
+| Skip the first character | `publishing.py:194` | `test_page_reference_rejects_a_leading_control_character` |
+| Skip a leading C0 run | `publishing.py:194` | `test_page_reference_rejects_a_leading_control_run` |
+| Drop Zs from page-reference categories | `publishing.py:30` | `test_page_reference_rejects_a_space_separator` |
+| Drop the page-id padding check | `publishing.py:196` | equivalent: W8 row 71 still passes `test_page_url_rejects_padding` because Zs and the other characters strip() removes are already rejected |
+| Store profiles under the screenshot root | `browser_session.py:26` | `test_browser_profiles_stay_outside_git` |
+| Store screenshots under the profile root | `browser_session.py:27` | `test_challenge_page_fails_closed` |
+| Drop Zs from profile-name categories | `browser_session.py:29` | `test_profile_name_is_rejected` |
+| Allow a 65-character profile name | `browser_session.py:141` | `test_profile_name_is_rejected` |
+| Allow a profile name that ends with a hyphen | `browser_session.py:143` | `test_profile_name_is_rejected` |
+| Reject a digit in a profile slug | `browser_session.py:150` | `test_profile_slug_is_accepted` |
+| Accept an uppercase profile slug | `browser_session.py:150` | `test_profile_name_is_rejected` |
+| Skip the authenticated-profile check | `browser_session.py:191` | `test_open_requires_an_authenticated_profile` |
+| Compare profile status by its text | `browser_session.py:191` | `test_string_status_is_not_authenticated` |
+| Open a new session instead of reusing a healthy one | `browser_session.py:198` | `test_healthy_session_is_reused` |
+| Reuse the first open session for every profile | `browser_session.py:193` | `test_two_profiles_are_not_the_same_session` |
+| Store a session id that is not a slug | `browser_session.py:200` | `test_open_rejects_a_bad_session_id` |
+| Drop publish_page from the operation map | `browser_session.py:50` | `test_mutation_clicks_the_operation_selector` |
+| Drop unpublish_page from the operation map | `browser_session.py:51` | `test_mutation_clicks_the_operation_selector` |
+| Click the logical name instead of the selector | `browser_session.py:458` | `test_mutation_clicks_the_operation_selector` |
+| Skip the idempotency lookup | `browser_session.py:261` | `test_replay_returns_the_same_receipt` |
+| Do not store the receipt under its idempotency key | `browser_session.py:448` | `test_replay_returns_the_same_receipt` |
+| Look up the idempotency key after requiring an open session | `browser_session.py:260` | `test_replay_after_failure_does_not_click` |
+| Skip the captcha check | `browser_session.py:265` | `test_challenge_page_fails_closed[captcha]` |
+| Skip the verification check | `browser_session.py:267` | `test_challenge_page_fails_closed[verification]` |
+| Click a page that is not normal | `browser_session.py:271` | `test_unknown_page_kind_is_not_clicked` |
+| Treat a click timeout as a connection failure | `browser_session.py:309` | `test_click_timeout_is_reconciled` |
+| Observe after a connection error | `browser_session.py:311` | `test_connection_error_does_not_observe` |
+| Observe after a click runtime error | `browser_session.py:313` | `test_click_runtime_error_is_one_failure_receipt` |
+| Click again before reconciling | `browser_session.py:331` | `test_uncertain_click_is_reconciled_when_applied` |
+| Record an absent reconciliation as Success | `browser_session.py:351` | `test_uncertain_click_absent_is_a_failure` |
+| Record an unknown reconciliation as Success | `browser_session.py:353` | `test_uncertain_click_unknown_stays_unknown` |
+| Taint a reconciled applied click | `browser_session.py:348` | `test_uncertain_click_is_reconciled_when_applied` |
+| Do not taint a blocked mutation | `browser_session.py:398` | `test_challenge_page_fails_closed` |
+| Let a screenshot failure skip the receipt | `browser_session.py:411` | `test_screenshot_failure_still_records_one_receipt` |
+| Do not append the receipt | `browser_session.py:447` | `test_mutation_clicks_the_operation_selector` |
+| Return the receipt list | `browser_session.py:186` | `test_receipts_property_is_a_tuple` |
+| Retry a read only once | `browser_session.py:28` | `test_read_retries_timeout_then_returns` |
+| Retry a read four times | `browser_session.py:28` | `test_read_stops_after_three_timeouts` |
+| Leave a timed-out read healthy | `browser_session.py:402` | `test_read_stops_after_three_timeouts` |
+| Retry a read connection error | `browser_session.py:236` | `test_read_does_not_retry_a_connection_error` |
+| Read the logical name instead of the selector | `browser_session.py:229` | `test_read_retries_timeout_then_returns` |
+| Allow a mutation selector to be read | `browser_session.py:55` | `test_read_rejects_a_mutation_selector` |
+| Do not lock the profile when close fails | `browser_session.py:220` | `test_failed_restart_locks_the_profile` |
+| Drop the session before close | `browser_session.py:217` | `test_failed_restart_locks_the_profile` |
+| Skip the profile bool check | `browser_session.py:112` | `test_profile_status_requires_bool_flags` |
+| Allow an absent profile to be authenticated | `browser_session.py:114` | `test_absent_profile_cannot_be_authenticated` |
+| Treat an unauthenticated profile as authenticated | `browser_session.py:118` | `test_profile_status_values` |
+| Accept a naive timestamp | `browser_session.py:162` | `test_naive_timestamp_is_rejected` |
+| Accept a padded mutation token | `browser_session.py:154` | `test_mutation_tokens_must_be_present` |
+| Accept an unknown operation | `browser_session.py:456` | `test_unknown_operation_is_rejected` |
+| Reuse a tainted session | `browser_session.py:196` | `test_tainted_session_is_not_reused_until_restart` |
+| Skip the open-session lock check | `browser_session.py:194` | `test_failed_restart_locks_the_profile` |
+
+- **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w9` and this log entry. Against base, STATE changes only these things: `state_revision` 44 to 45, the `session_06_w8` trailing comma, `session_06_w9`, and `updated_at`. `updated_at` moves forward from `2026-09-26T20:41:44Z`. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
+- **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. `pyproject.toml` untouched. `src/money_machine/integrations/notion/router.py` untouched. Exit 78 held.
+
 ## 2026-09-11 — Startup repair wave after recovery review
 
 - Repaired migration-head/schema compatibility readiness, encoded database credentials/IPv6, and production environment selection. Compose now carries raw passwords separately; a bounded independent review identified literal-percent and surrounding-whitespace cases, both reproduced and repaired with regression coverage. Development external-URL overrides retain their credentials.

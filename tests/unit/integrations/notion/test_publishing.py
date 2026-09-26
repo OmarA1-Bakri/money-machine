@@ -622,15 +622,69 @@ def test_page_url_rejects_an_empty_query() -> None:
     ],
 )
 def test_page_reference_rejects_a_forbidden_character(char: str) -> None:
+    leading = f"{char}https://www.notion.so/{_TODAY}"
+    trailing = f"https://www.notion.so/{_TODAY}{char}"
     titled = f"https://www.notion.so/T{char}x-{_TODAY}"
     plain = _TODAY[:16] + char + _TODAY[16:]
-    for value in (titled, plain):
+    for value in (leading, trailing, titled, plain):
         with pytest.raises(SchemaBuilderError, match="control character"):
             _publish(page_id=value)
         with pytest.raises(SchemaBuilderError, match="control character"):
             _publish(links=(value,))
         with pytest.raises(SchemaBuilderError, match="control character"):
             _publish(other_catalogue_pages=(value,))
+
+
+def test_forbidden_characters_are_checked_before_padding() -> None:
+    value = f"\thttps://www.notion.so/T\x00-{_TODAY}"
+    with pytest.raises(SchemaBuilderError, match="control character"):
+        _publish(page_id=value)
+    with pytest.raises(SchemaBuilderError, match="control character"):
+        _publish(links=(value,))
+    with pytest.raises(SchemaBuilderError, match="control character"):
+        _publish(other_catalogue_pages=(value,))
+
+
+def test_forbidden_check_reads_characters_strip_would_remove() -> None:
+    for value in (
+        f"\thttps://www.notion.so/{_TODAY}",
+        f"https://www.notion.so/{_TODAY}\n",
+        f"\u00a0{_TODAY}",
+        f"{_TODAY}\u3000",
+    ):
+        with pytest.raises(SchemaBuilderError, match="control character"):
+            _publish(page_id=value)
+
+
+def test_page_reference_rejects_a_leading_control_character() -> None:
+    value = f"\x00https://www.notion.so/{_TODAY}"
+    with pytest.raises(SchemaBuilderError, match="control character"):
+        _publish(page_id=value)
+    with pytest.raises(SchemaBuilderError, match="control character"):
+        _publish(links=(value,))
+    with pytest.raises(SchemaBuilderError, match="control character"):
+        _publish(other_catalogue_pages=(value,))
+
+
+def test_page_reference_rejects_a_leading_control_run() -> None:
+    value = f"\x00\x00https://www.notion.so/{_TODAY}"
+    with pytest.raises(SchemaBuilderError, match="control character"):
+        _publish(page_id=value)
+    with pytest.raises(SchemaBuilderError, match="control character"):
+        _publish(links=(value,))
+    with pytest.raises(SchemaBuilderError, match="control character"):
+        _publish(other_catalogue_pages=(value,))
+
+
+@pytest.mark.parametrize("char", ["\u00a0", "\u3000"])
+@pytest.mark.parametrize("field", ["page_id", "links", "other_catalogue_pages"])
+def test_page_reference_rejects_a_space_separator(char: str, field: str) -> None:
+    titled = f"https://www.notion.so/T{char}x-{_TODAY}"
+    plain = _TODAY[:16] + char + _TODAY[16:]
+    for value in (titled, plain):
+        payload: object = value if field == "page_id" else (value,)
+        with pytest.raises(SchemaBuilderError, match="control character"):
+            _publish(**{field: payload})
 
 
 def test_deduped_link_order_is_preserved() -> None:
