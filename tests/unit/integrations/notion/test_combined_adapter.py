@@ -594,6 +594,37 @@ async def test_get_public_url_does_not_hide_stranger_access_errors() -> None:
     assert caught.value is error
 
 
+async def test_reports_unsupported_must_return_bool() -> None:
+    """A non-bool reports_unsupported result is rejected before either adapter runs."""
+
+    class _NonBoolReporter(_FakeAdapter):
+        def reports_unsupported(self, operation: str) -> bool:
+            return cast(bool, "yes")
+
+    api = _NonBoolReporter()
+    browser = _FakeAdapter()
+    combined = CombinedNotionAdapter(cast(NotionAdapter, api), cast(NotionAdapter, browser))
+    _seed(browser, "inspect_page", _PAGE)
+
+    with pytest.raises(TypeError, match="must return bool"):
+        await _invoke(combined, "inspect_page")
+
+    assert api.calls == []
+    assert browser.calls == []
+
+
+async def test_get_public_url_rejects_a_non_str_url() -> None:
+    """A public URL that is not a string is rejected before the browser runs."""
+    api, browser, combined = _adapters()
+    _seed(api, "get_public_url", 123)
+    _seed(browser, "verify_stranger_access", True)
+
+    with pytest.raises(TypeError, match="string or None"):
+        await combined.get_public_url("page-specific")
+
+    assert browser.calls == []
+
+
 async def test_get_public_url_rejects_a_non_bool_stranger_check() -> None:
     """verify_stranger_access must return bool."""
     api, browser, combined = _adapters()

@@ -273,6 +273,28 @@ def test_pre_state_snapshot_is_independent_of_the_caller() -> None:
     assert stored.pre_state == {"items": ({"n": 1},)}
 
 
+def test_nested_list_and_mapping_are_frozen() -> None:
+    """A mapping nested through a list and a tuple cannot be mutated at any depth."""
+    inner = {"title": "old"}
+    receipt = _receipt(post_state={"level": [{"wrap": (inner,)}]})
+    log = NotionOperationReceiptLog()
+    log.record(receipt)
+    inner["title"] = "NEW"
+
+    stored = log.get(receipt.idempotency_key)
+    assert stored is not None
+    level = stored.post_state["level"]
+    assert isinstance(level, tuple)
+    wrap = level[0]["wrap"]
+    assert isinstance(wrap, tuple)
+    nested = wrap[0]
+    assert isinstance(nested, MappingProxyType)
+    assert nested["title"] == "old"
+    assignment = cast(dict[str, object], nested)
+    with pytest.raises(TypeError):
+        assignment["title"] = "NEW"
+
+
 def test_tuple_nested_mapping_is_frozen() -> None:
     """A mapping inside a tuple is copied and cannot be mutated in place."""
     inner = {"title": "old"}
@@ -374,29 +396,34 @@ def test_non_finite_numbers_are_rejected(bad: float) -> None:
 
 
 def test_same_resolved_path_shares_one_lock(tmp_path: Path) -> None:
-    """One resolved path has one lock. A different path has a different lock."""
+    """The same resolved path always gets the same lock object."""
     path = tmp_path / "receipts.jsonl"
     first = NotionOperationReceiptLog(path)
-    second = NotionOperationReceiptLog(Path(os.path.relpath(path)))
+    second = NotionOperationReceiptLog(path)
+    relative = NotionOperationReceiptLog(Path(os.path.relpath(path)))
     other = NotionOperationReceiptLog(tmp_path / "other.jsonl")
     first_lock = first._lock  # pyright: ignore[reportPrivateUsage]
     second_lock = second._lock  # pyright: ignore[reportPrivateUsage]
+    relative_lock = relative._lock  # pyright: ignore[reportPrivateUsage]
     other_lock = other._lock  # pyright: ignore[reportPrivateUsage]
     assert first_lock is second_lock
+    assert first_lock is relative_lock
     assert first_lock is not other_lock
 
 
 def test_record_waits_for_the_path_lock(tmp_path: Path) -> None:
-    """record() holds the path lock, so a second record waits until it is released."""
+    """A second log on the same path blocks while the first holds the lock."""
     path = tmp_path / "receipts.jsonl"
-    log = NotionOperationReceiptLog(path)
-    lock = log._lock  # pyright: ignore[reportPrivateUsage]
+    first = NotionOperationReceiptLog(path)
+    second = NotionOperationReceiptLog(path)
+    lock = first._lock  # pyright: ignore[reportPrivateUsage]
     assert lock is not None
+    assert lock is second._lock  # pyright: ignore[reportPrivateUsage]
     assert lock.acquire(blocking=False)
     finished = threading.Event()
 
     def _record() -> None:
-        log.record(_receipt(idempotency_key="key-wait"))
+        second.record(_receipt(idempotency_key="key-wait"))
         finished.set()
 
     thread = threading.Thread(target=_record)
@@ -405,7 +432,7 @@ def test_record_waits_for_the_path_lock(tmp_path: Path) -> None:
     lock.release()
     thread.join(timeout=2)
     assert finished.is_set()
-    assert log.get("key-wait") is not None
+    assert second.get("key-wait") is not None
 
 
 def test_discarded_log_drops_its_path_lock(tmp_path: Path) -> None:
