@@ -676,12 +676,14 @@ def test_page_reference_rejects_a_leading_control_run() -> None:
         _publish(other_catalogue_pages=(value,))
 
 
-@pytest.mark.parametrize("char", ["\u00a0", "\u3000"])
+@pytest.mark.parametrize("char", [" ", "\u00a0", "\u1680", "\u2002", "\u202f", "\u205f", "\u3000"])
 @pytest.mark.parametrize("field", ["page_id", "links", "other_catalogue_pages"])
 def test_page_reference_rejects_a_space_separator(char: str, field: str) -> None:
     titled = f"https://www.notion.so/T{char}x-{_TODAY}"
     plain = _TODAY[:16] + char + _TODAY[16:]
-    for value in (titled, plain):
+    leading = f"{char}https://www.notion.so/{_TODAY}"
+    trailing = f"https://www.notion.so/{_TODAY}{char}"
+    for value in (titled, plain, leading, trailing):
         payload: object = value if field == "page_id" else (value,)
         with pytest.raises(SchemaBuilderError, match="control character"):
             _publish(**{field: payload})

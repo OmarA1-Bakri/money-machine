@@ -7,8 +7,10 @@ Profiles stay under ``runtime/browser-profiles``, which git ignores.
 Screenshots stay under ``runtime/screenshots``. A profile is reused only
 while it is authenticated, open, and healthy. A read retries a timeout and
 does not retry a connection failure. A mutation is not clicked twice. An
-uncertain click is reconciled by observing, and a captcha or verification
-page fails closed. Each mutation records one receipt. This module does not
+uncertain click is reconciled by observing, and any observe error is
+Unknown. A captcha, verification, or unknown page fails closed. An
+idempotency key is bound to the profile, operation, workspace, target, and
+job. Each mutation records one receipt. This module does not
 launch a browser engine, open a network connection, or write a cookie file.
 A driver is injected.
 """
@@ -16,6 +18,7 @@ A driver is injected.
 from __future__ import annotations
 
 import unicodedata
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -70,7 +73,7 @@ class ProfileStatus(Enum):
 class BrowserDriver(Protocol):
     """Injected browser boundary. Tests pass a fake. Production is out of scope."""
 
-    def open(self, profile_name: str) -> str:
+    def open(self, profile_name: str) -> object:
         """Open one profile and return its session id."""
         ...
 
@@ -90,7 +93,7 @@ class BrowserDriver(Protocol):
         """Capture one screenshot at a caller-built path."""
         ...
 
-    def close(self, session_id: str) -> None:
+    def close(self, session_id: object) -> None:
         """Close one session."""
         ...
 
@@ -197,7 +200,13 @@ class BrowserSessionManager:
             raise BrowserSessionError("session must be restarted")
         if current is not None:
             return current.session_id
-        session_id = _require_session_id(self._driver.open(profile_name))
+        opened = self._driver.open(profile_name)
+        try:
+            session_id = _require_session_id(opened)
+        except BrowserSessionError:
+            with suppress(Exception):
+                self._driver.close(opened)
+            raise
         self._open[profile_name] = _OpenSession(
             profile_name=profile_name,
             session_id=session_id,
@@ -250,7 +259,11 @@ class BrowserSessionManager:
         idempotency_key: object,
         timestamp: object,
     ) -> NotionOperationReceipt:
-        """Run one mutation and record exactly one receipt."""
+        """Run one mutation and record exactly one receipt.
+
+        The idempotency key is bound to the profile, operation, workspace,
+        target, and job. A different call with that key is rejected.
+        """
         job = _require_token("job id", job_id)
         space = _require_token("workspace", workspace)
         page = _require_token("target", target)
@@ -259,9 +272,31 @@ class BrowserSessionManager:
         selector = _mutation_selector(operation)
         existing = self._seen.get(key)
         if existing is not None:
+            if not _matches_idempotency_call(
+                existing,
+                profile=profile_name,
+                operation=operation,
+                workspace=space,
+                target=page,
+                job=job,
+            ):
+                raise BrowserSessionError("idempotency key does not match")
             return existing
         session = self._require_open(profile_name)
-        kind = self._driver.page_kind(session.session_id)
+        try:
+            kind = self._driver.page_kind(session.session_id)
+        except TimeoutError:
+            return self._block(
+                session, job, operation, space, page, key, moment, "unknown", "timeout"
+            )
+        except ConnectionError:
+            return self._block(
+                session, job, operation, space, page, key, moment, "unknown", "connection"
+            )
+        except Exception:
+            return self._block(
+                session, job, operation, space, page, key, moment, "unknown", "error"
+            )
         if kind == "captcha":
             return self._block(session, job, operation, space, page, key, moment, kind, "captcha")
         if kind == "verification":
@@ -329,7 +364,7 @@ class BrowserSessionManager:
     ) -> NotionOperationReceipt:
         try:
             observed = self._driver.observe(session.session_id)
-        except (TimeoutError, ConnectionError):
+        except Exception:
             observed = "unknown"
         if observed == "applied":
             return self._record(
@@ -447,6 +482,26 @@ class BrowserSessionManager:
         self._receipts.append(receipt)
         self._seen[key] = receipt
         return receipt
+
+
+def _matches_idempotency_call(
+    existing: NotionOperationReceipt,
+    *,
+    profile: str,
+    operation: object,
+    workspace: str,
+    target: str,
+    job: str,
+) -> bool:
+    state = existing.pre_state
+    stored = state.get("profile") if state is not None else None
+    return (
+        stored == profile
+        and existing.operation == operation
+        and existing.workspace == workspace
+        and existing.target == target
+        and existing.job_id == job
+    )
 
 
 def _mutation_selector(operation: object) -> str:

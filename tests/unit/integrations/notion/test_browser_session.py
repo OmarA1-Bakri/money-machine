@@ -34,18 +34,18 @@ class FakeDriver:
         self.clicks: list[tuple[str, str]] = []
         self.reads: list[tuple[str, str]] = []
         self.screenshots: list[tuple[str, str]] = []
-        self.closes: list[str] = []
+        self.closes: list[object] = []
         self.observes: list[str] = []
-        self.page_kind_value = "normal"
+        self.page_kind_value: str | Exception = "normal"
         self.click_result: str | Exception = "applied"
         self.read_results: list[str | Exception] = ["ok"]
         self.observe_result: str | Exception = "applied"
         self.close_error: Exception | None = None
         self.screenshot_error: Exception | None = None
-        self.open_result: str | None = None
+        self.open_result: object | None = None
         self._session = 0
 
-    def open(self, profile_name: str) -> str:
+    def open(self, profile_name: str) -> object:
         self.opens.append(profile_name)
         if self.open_result is not None:
             return self.open_result
@@ -54,6 +54,8 @@ class FakeDriver:
 
     def page_kind(self, session_id: str) -> str:
         self.kinds.append(session_id)
+        if isinstance(self.page_kind_value, Exception):
+            raise self.page_kind_value
         return self.page_kind_value
 
     def click(self, session_id: str, selector: str) -> str:
@@ -76,7 +78,7 @@ class FakeDriver:
         if self.screenshot_error is not None:
             raise self.screenshot_error
 
-    def close(self, session_id: str) -> None:
+    def close(self, session_id: object) -> None:
         self.closes.append(session_id)
         if self.close_error is not None:
             raise self.close_error
@@ -221,9 +223,36 @@ def test_open_rejects_a_bad_session_id() -> None:
     driver.open_result = "../escape"
     with pytest.raises(BrowserSessionError, match="session id"):
         _open(manager)
+    assert driver.closes == ["../escape"]
     driver.open_result = None
     assert _open(manager) == "session-1"
     assert driver.opens == ["shop-a", "shop-a"]
+
+
+def test_open_rejects_a_bad_session_id_when_close_fails() -> None:
+    manager, driver = _manager()
+    driver.open_result = "../escape"
+    driver.close_error = ConnectionError("down")
+    with pytest.raises(BrowserSessionError, match="session id"):
+        _open(manager)
+    assert driver.closes == ["../escape"]
+    assert driver.opens == ["shop-a"]
+
+
+def test_open_rejects_a_non_string_session_id() -> None:
+    manager, driver = _manager()
+    driver.open_result = 1
+    with pytest.raises(BrowserSessionError, match="session id"):
+        _open(manager)
+    assert driver.closes == [1]
+    assert driver.opens == ["shop-a"]
+
+
+def test_open_rejects_an_invalid_profile_name() -> None:
+    manager, driver = _manager()
+    with pytest.raises(BrowserSessionError, match="lowercase slug"):
+        manager.open_session("A", ProfileStatus.AUTHENTICATED)
+    assert driver.opens == []
 
 
 @pytest.mark.parametrize(
@@ -243,6 +272,10 @@ def test_mutation_clicks_the_operation_selector(operation: str, selector: str) -
     assert receipt.evidence == "applied"
     assert receipt.operation == operation
     assert receipt.timestamp == _WHEN
+    pre = receipt.pre_state
+    assert pre is not None
+    assert pre["session_id"] == session_id
+    assert pre["profile"] == "shop-a"
     assert driver.clicks == [(session_id, selector)]
     assert driver.screenshots == []
     assert driver.observes == []
@@ -298,6 +331,8 @@ def test_unknown_page_kind_is_not_clicked() -> None:
     post = receipt.post_state
     assert post["click"] == "not-clicked"
     assert post["page_kind"] == "login-wall"
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        _mutate(manager, key="other")
 
 
 def test_uncertain_click_is_reconciled_when_applied() -> None:
@@ -351,6 +386,8 @@ def test_uncertain_click_unknown_stays_unknown() -> None:
     assert receipt.status == "Unknown"
     assert receipt.post_state["observed"] == "unknown"
     assert len(driver.clicks) == 1
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        _mutate(manager, key="other")
 
 
 def test_garbage_observe_result_is_unknown() -> None:
@@ -361,6 +398,8 @@ def test_garbage_observe_result_is_unknown() -> None:
     receipt = _mutate(manager)
     assert receipt.status == "Unknown"
     assert receipt.post_state["observed"] == "unknown"
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        _mutate(manager, key="other")
 
 
 def test_observe_timeout_is_unknown() -> None:
@@ -372,6 +411,8 @@ def test_observe_timeout_is_unknown() -> None:
     assert receipt.status == "Unknown"
     assert len(manager.receipts) == 1
     assert driver.screenshots != []
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        _mutate(manager, key="other")
 
 
 def test_connection_error_does_not_observe() -> None:
@@ -381,6 +422,7 @@ def test_connection_error_does_not_observe() -> None:
     receipt = _mutate(manager)
     assert receipt.status == "Failure"
     assert receipt.evidence.endswith("-connection.png")
+    assert receipt.post_state["click"] == "connection"
     assert driver.observes == []
     assert len(driver.clicks) == 1
     assert len(manager.receipts) == 1
@@ -393,6 +435,7 @@ def test_click_runtime_error_is_one_failure_receipt() -> None:
     receipt = _mutate(manager)
     assert receipt.status == "Failure"
     assert receipt.evidence.endswith("-error.png")
+    assert receipt.post_state["click"] == "error"
     assert driver.observes == []
     assert len(manager.receipts) == 1
 
@@ -528,6 +571,13 @@ def test_read_rejects_a_mutation_selector() -> None:
     assert driver.opens == []
 
 
+def test_restart_rejects_an_invalid_profile_name() -> None:
+    manager, driver = _manager()
+    with pytest.raises(BrowserSessionError, match="lowercase slug"):
+        manager.restart("A")
+    assert driver.closes == []
+
+
 def test_restart_closes_and_opens_a_new_session() -> None:
     manager, driver = _manager()
     first = _open(manager)
@@ -570,6 +620,157 @@ def test_tainted_session_is_not_reused_until_restart() -> None:
     assert _open(manager) == "session-2"
     receipt = _mutate(manager, key="after")
     assert receipt.status == "Success"
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        RuntimeError("observe"),
+        ValueError("observe"),
+        OSError("observe"),
+        ConnectionError("observe"),
+    ],
+    ids=["RuntimeError", "ValueError", "OSError", "ConnectionError"],
+)
+def test_observe_exception_is_one_unknown_receipt(error: Exception) -> None:
+    manager, driver = _manager()
+    _open(manager)
+    driver.click_result = "uncertain"
+    driver.observe_result = error
+    receipt = _mutate(manager)
+    assert receipt.status == "Unknown"
+    assert len(manager.receipts) == 1
+    assert len(driver.clicks) == 1
+    replay = _mutate(manager)
+    assert replay is receipt
+    assert len(driver.clicks) == 1
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        _mutate(manager, key="other")
+
+
+@pytest.mark.parametrize(
+    ("error", "reason"),
+    [
+        (RuntimeError("kind"), "error"),
+        (TimeoutError("kind"), "timeout"),
+        (ConnectionError("kind"), "connection"),
+    ],
+    ids=["error", "timeout", "connection"],
+)
+def test_page_kind_error_records_one_receipt(error: Exception, reason: str) -> None:
+    manager, driver = _manager()
+    _open(manager)
+    driver.page_kind_value = error
+    receipt = _mutate(manager)
+    assert receipt.status == "Failure"
+    assert receipt.post_state["page_kind"] == "unknown"
+    assert receipt.post_state["click"] == reason
+    assert str(receipt.evidence).endswith(f"-{reason}.png")
+    assert driver.clicks == []
+    assert len(manager.receipts) == 1
+    assert len(driver.kinds) == 1
+    replay = _mutate(manager)
+    assert replay is receipt
+    assert len(driver.kinds) == 1
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        _mutate(manager, key="other")
+
+
+def test_locked_profile_blocks_mutate_and_read() -> None:
+    manager, driver = _manager()
+    _open(manager)
+    driver.close_error = ConnectionError("down")
+    with pytest.raises(BrowserSessionError, match="restart failed"):
+        manager.restart("shop-a")
+    with pytest.raises(BrowserSessionError, match="profile is locked"):
+        _mutate(manager)
+    with pytest.raises(BrowserSessionError, match="profile is locked"):
+        manager.read("shop-a", "public_url")
+    assert driver.clicks == []
+    assert driver.reads == []
+
+
+def test_unknown_click_result_is_one_error_receipt() -> None:
+    manager, driver = _manager()
+    _open(manager)
+    driver.click_result = "maybe"
+    receipt = _mutate(manager)
+    assert receipt.status == "Failure"
+    assert receipt.post_state["click"] == "error"
+    assert str(receipt.evidence).endswith("-error.png")
+    assert len(manager.receipts) == 1
+    assert len(driver.clicks) == 1
+
+
+def test_idempotency_key_is_bound_to_the_call() -> None:
+    manager, driver = _manager()
+    _open(manager)
+    first = _mutate(manager)
+    mismatches: tuple[dict[str, object], ...] = (
+        {"profile_name": "shop-b"},
+        {"operation": "unpublish_page"},
+        {"job_id": "job-2"},
+        {"workspace": "workspace-2"},
+        {"target": "page-2"},
+    )
+    for extra in mismatches:
+        kwargs: dict[str, object] = {
+            "profile_name": "shop-a",
+            "operation": "publish_page",
+            "job_id": "job-1",
+            "workspace": "workspace-1",
+            "target": "page-1",
+            "idempotency_key": "job-1:publish_page",
+            "timestamp": _WHEN,
+        }
+        kwargs.update(extra)
+        with pytest.raises(BrowserSessionError, match="does not match"):
+            manager.mutate(
+                str(kwargs["profile_name"]),
+                str(kwargs["operation"]),
+                job_id=kwargs["job_id"],
+                workspace=kwargs["workspace"],
+                target=kwargs["target"],
+                idempotency_key=kwargs["idempotency_key"],
+                timestamp=kwargs["timestamp"],
+            )
+    assert len(driver.clicks) == 1
+    assert len(driver.kinds) == 1
+    assert _mutate(manager) is first
+
+
+def test_operation_must_be_a_string() -> None:
+    manager, driver = _manager()
+    _open(manager)
+    with pytest.raises(BrowserSessionError, match="operation"):
+        manager.mutate(
+            "shop-a",
+            ["publish_page"],  # type: ignore[arg-type]
+            job_id="job-1",
+            workspace="workspace-1",
+            target="page-1",
+            idempotency_key="key-1",
+            timestamp=_WHEN,
+        )
+    assert driver.kinds == []
+    assert manager.receipts == ()
+
+
+def test_timestamp_must_be_a_datetime() -> None:
+    manager, driver = _manager()
+    _open(manager)
+    with pytest.raises(BrowserSessionError, match="timezone-aware"):
+        manager.mutate(
+            "shop-a",
+            "publish_page",
+            job_id="job-1",
+            workspace="workspace-1",
+            target="page-1",
+            idempotency_key="key-1",
+            timestamp="2026-09-26T21:00:00+00:00",
+        )
+    assert driver.kinds == []
+    assert manager.receipts == ()
 
 
 def test_session_module_does_not_reference_playwright() -> None:
