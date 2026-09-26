@@ -37,9 +37,9 @@ class FakeDriver:
         self.closes: list[object] = []
         self.observes: list[str] = []
         self.page_kind_value: str | Exception = "normal"
-        self.click_result: str | Exception = "applied"
+        self.click_result: str | BaseException = "applied"
         self.read_results: list[str | Exception] = ["ok"]
-        self.observe_result: str | Exception = "applied"
+        self.observe_result: str | BaseException = "applied"
         self.close_error: Exception | None = None
         self.screenshot_error: Exception | None = None
         self.open_result: object | None = None
@@ -60,7 +60,7 @@ class FakeDriver:
 
     def click(self, session_id: str, selector: str) -> str:
         self.clicks.append((session_id, selector))
-        if isinstance(self.click_result, Exception):
+        if isinstance(self.click_result, BaseException):
             raise self.click_result
         return self.click_result
 
@@ -85,7 +85,7 @@ class FakeDriver:
 
     def observe(self, session_id: str) -> str:
         self.observes.append(session_id)
-        if isinstance(self.observe_result, Exception):
+        if isinstance(self.observe_result, BaseException):
             raise self.observe_result
         return self.observe_result
 
@@ -147,6 +147,7 @@ def test_profile_slug_is_accepted() -> None:
         ("-a", "hyphen"),
         ("a-", "hyphen"),
         ("a" * 65, "too long"),
+        ("_", "lowercase slug"),
         ("a\u00a0b", "control character"),
         ("a\nb", "control character"),
     ],
@@ -422,25 +423,39 @@ def test_connection_error_does_not_observe() -> None:
     manager, driver = _manager()
     _open(manager)
     driver.click_result = ConnectionError("down")
+    driver.observe_result = "applied"
     receipt = _mutate(manager)
-    assert receipt.status == "Failure"
-    assert receipt.evidence.endswith("-connection.png")
-    assert receipt.post_state["click"] == "connection"
-    assert driver.observes == []
+    assert receipt.status == "Unknown"
     assert len(driver.clicks) == 1
+    assert len(driver.observes) == 1
     assert len(manager.receipts) == 1
+    replay = _mutate(manager)
+    assert replay is receipt
+    assert len(driver.clicks) == 1
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        _mutate(manager, key="other")
 
 
-def test_click_runtime_error_is_one_failure_receipt() -> None:
+@pytest.mark.parametrize(
+    "error",
+    [RuntimeError("boom"), ValueError("boom"), OSError("boom")],
+    ids=["RuntimeError", "ValueError", "OSError"],
+)
+def test_click_runtime_error_is_one_failure_receipt(error: Exception) -> None:
     manager, driver = _manager()
     _open(manager)
-    driver.click_result = RuntimeError("boom")
+    driver.click_result = error
+    driver.observe_result = "applied"
     receipt = _mutate(manager)
-    assert receipt.status == "Failure"
-    assert receipt.evidence.endswith("-error.png")
-    assert receipt.post_state["click"] == "error"
-    assert driver.observes == []
+    assert receipt.status == "Unknown"
+    assert len(driver.clicks) == 1
+    assert len(driver.observes) == 1
     assert len(manager.receipts) == 1
+    replay = _mutate(manager)
+    assert replay is receipt
+    assert len(driver.clicks) == 1
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        _mutate(manager, key="other")
 
 
 def test_screenshot_failure_still_records_one_receipt() -> None:
@@ -566,6 +581,28 @@ def test_read_does_not_retry_a_connection_error() -> None:
     assert manager.receipts == ()
 
 
+def test_read_connection_error_taints_the_session() -> None:
+    manager, driver = _manager()
+    _open(manager)
+    driver.read_results = [ConnectionError("down")]
+    with pytest.raises(BrowserSessionError, match="connection failed"):
+        manager.read("shop-a", "public_url")
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        manager.read("shop-a", "public_url")
+
+
+def test_read_other_error_is_wrapped_and_taints() -> None:
+    manager, driver = _manager()
+    _open(manager)
+    driver.read_results = [RuntimeError("boom"), "url"]
+    with pytest.raises(BrowserSessionError, match="read failed") as caught:
+        manager.read("shop-a", "public_url")
+    assert isinstance(caught.value.__cause__, RuntimeError)
+    assert len(driver.reads) == 1
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        manager.read("shop-a", "public_url")
+
+
 def test_read_rejects_a_mutation_selector() -> None:
     manager, driver = _manager()
     with pytest.raises(BrowserSessionError, match="not readable"):
@@ -623,6 +660,32 @@ def test_tainted_session_is_not_reused_until_restart() -> None:
     assert _open(manager) == "session-2"
     receipt = _mutate(manager, key="after")
     assert receipt.status == "Success"
+
+
+@pytest.mark.parametrize("exc_type", [KeyboardInterrupt, SystemExit, GeneratorExit])
+@pytest.mark.parametrize("source", ["click", "observe"])
+def test_base_exception_still_records_an_unknown_receipt(
+    exc_type: type[BaseException], source: str
+) -> None:
+    manager, driver = _manager()
+    _open(manager)
+    if source == "click":
+        driver.click_result = exc_type("boom")
+    elif source == "observe":
+        driver.click_result = "uncertain"
+        driver.observe_result = exc_type("boom")
+    else:
+        raise AssertionError(source)
+    with pytest.raises(exc_type):
+        _mutate(manager)
+    assert len(manager.receipts) == 1
+    assert manager.receipts[0].status == "Unknown"
+    assert len(driver.clicks) == 1
+    replay = _mutate(manager)
+    assert replay is manager.receipts[0]
+    assert len(driver.clicks) == 1
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        _mutate(manager, key="other")
 
 
 @pytest.mark.parametrize(

@@ -6,11 +6,15 @@ Session 06 prompt heading "### 3. Implement browser session management"
 Profiles stay under ``runtime/browser-profiles``, which git ignores.
 Screenshots stay under ``runtime/screenshots``. A profile is reused only
 while it is authenticated, open, and healthy. A read retries a timeout and
-does not retry a connection failure. A mutation is not clicked twice. An
-uncertain click is reconciled by observing, and any observe error is
-Unknown. A captcha, verification, or unknown page fails closed. An
-idempotency key is bound to the profile, operation, workspace, target, and
-job. A rejected session id is closed. If that close fails, the profile
+does not retry a connection failure. Any other read error is wrapped and
+taints the session. A mutation is not clicked twice. An uncertain click is
+reconciled by observing, and any observe error is Unknown. A click that
+raises RuntimeError, ValueError, OSError, or ConnectionError is observed
+once, recorded as Unknown, and taints the session. A KeyboardInterrupt,
+SystemExit, or GeneratorExit from click or observe still records Unknown
+before it propagates. A captcha, verification, or unknown page fails
+closed. An idempotency key is bound to the profile, operation, workspace,
+target, and job. A rejected session id is closed. If that close fails, the profile
 is locked and the session-id error is raised again with the close error
 as its cause. Each mutation records one receipt. This module does not
 launch a browser engine, open a network connection, or write a cookie file.
@@ -20,6 +24,7 @@ A driver is injected.
 from __future__ import annotations
 
 import unicodedata
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -83,7 +88,11 @@ class BrowserDriver(Protocol):
         ...
 
     def click(self, session_id: str, selector: str) -> str:
-        """Click one selector. Return applied or uncertain."""
+        """Click one selector. Return applied or uncertain.
+
+        A raised RuntimeError, ValueError, OSError, or ConnectionError is
+        observed once, recorded as Unknown, and taints the session.
+        """
         ...
 
     def read(self, session_id: str, selector: str) -> str:
@@ -246,7 +255,12 @@ class BrowserSessionManager:
         self._open.pop(profile_name)
 
     def read(self, profile_name: str, selector_name: str) -> str:
-        """Read a known selector. A timeout is retried. A connection error is not."""
+        """Read a known selector.
+
+        TimeoutError gets 3 attempts in total. ConnectionError is not retried.
+        Any other driver error is wrapped in BrowserSessionError and taints
+        the session.
+        """
         if selector_name not in _READ_SELECTORS:
             raise BrowserSessionError("selector is not readable")
         session = self._require_open(profile_name)
@@ -260,6 +274,9 @@ class BrowserSessionManager:
             except ConnectionError as exc:
                 self._note_error(session, "connection")
                 raise BrowserSessionError("connection failed") from exc
+            except Exception as exc:
+                self._note_error(session, "error")
+                raise BrowserSessionError("read failed") from exc
         self._note_error(session, "timeout")
         raise BrowserSessionError("read timed out") from last_timeout
 
@@ -322,26 +339,40 @@ class BrowserSessionManager:
             return self._block(
                 session, job, operation, space, page, key, moment, kind, "unknown-page"
             )
-        outcome = self._click(session, selector)
-        if outcome == "applied":
-            return self._record(
-                session,
-                job,
-                operation,
-                space,
-                page,
-                key,
-                moment,
-                status="Success",
-                evidence="applied",
-                click="applied",
-                observed="not-observed",
-                kind=kind,
-                taint=False,
-            )
-        if outcome == "uncertain":
-            return self._reconcile(session, job, operation, space, page, key, moment, kind)
-        return self._block(session, job, operation, space, page, key, moment, kind, outcome)
+        recorded = False
+        try:
+            outcome = self._click(session, selector)
+            if outcome == "applied":
+                receipt = self._record(
+                    session,
+                    job,
+                    operation,
+                    space,
+                    page,
+                    key,
+                    moment,
+                    status="Success",
+                    evidence="applied",
+                    click="applied",
+                    observed="not-observed",
+                    kind=kind,
+                    taint=False,
+                )
+            elif outcome == "uncertain":
+                receipt = self._reconcile(session, job, operation, space, page, key, moment, kind)
+            elif outcome == "raised":
+                receipt = self._record_raised_click(
+                    session, job, operation, space, page, key, moment, kind
+                )
+            else:
+                receipt = self._block(
+                    session, job, operation, space, page, key, moment, kind, outcome
+                )
+            recorded = True
+            return receipt
+        finally:
+            if not recorded:
+                self._record_unknown(session, job, operation, space, page, key, moment, kind)
 
     def _require_open(self, profile_name: str) -> _OpenSession:
         current = self._open.get(profile_name)
@@ -358,13 +389,63 @@ class BrowserSessionManager:
             outcome = self._driver.click(session.session_id, selector)
         except TimeoutError:
             return "uncertain"
-        except ConnectionError:
-            return "connection"
+        except (RuntimeError, ValueError, OSError):
+            return "raised"
         except Exception:
             return "error"
         if outcome in {"applied", "uncertain"}:
             return outcome
         return "error"
+
+    def _record_raised_click(
+        self,
+        session: _OpenSession,
+        job: str,
+        operation: str,
+        workspace: str,
+        target: str,
+        key: str,
+        timestamp: datetime,
+        kind: str,
+    ) -> NotionOperationReceipt:
+        """Observe once, then record Unknown. The session is tainted."""
+        with suppress(Exception):
+            self._driver.observe(session.session_id)
+        return self._record_unknown(
+            session, job, operation, workspace, target, key, timestamp, kind
+        )
+
+    def _record_unknown(
+        self,
+        session: _OpenSession,
+        job: str,
+        operation: str,
+        workspace: str,
+        target: str,
+        key: str,
+        timestamp: datetime,
+        kind: str,
+    ) -> NotionOperationReceipt:
+        """Store one Unknown receipt and taint the session."""
+        try:
+            evidence = self._capture(session, "uncertain")
+        except BaseException:
+            evidence = "screenshot-failed"
+        return self._record(
+            session,
+            job,
+            operation,
+            workspace,
+            target,
+            key,
+            timestamp,
+            status="Unknown",
+            evidence=evidence,
+            click="uncertain",
+            observed="unknown",
+            kind=kind,
+            taint=True,
+        )
 
     def _reconcile(
         self,
