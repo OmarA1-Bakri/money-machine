@@ -172,9 +172,9 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 ## 2026-09-26 — Session 06 Wave 5: combined adapter delegation, receipt stub, cause-test parametrization
 
 - **Combined adapter**: `CombinedNotionAdapter` routes API-tagged operations to the injected API adapter and browser-tagged operations to the injected browser adapter. `reports_unsupported` is checked before the call and may route to the other adapter, including for a non-idempotent write, because nothing has been invoked yet. `OperationUnsupportedError` is raised before any side effect and selects the other adapter only for a read or other idempotent operation. After a non-idempotent write has been invoked, no exception selects the other adapter, including `NotImplementedError`, its subclasses, and `OperationUnsupportedError`. A write that raises (`RuntimeError`, `ValueError`, `ConnectionError`, `KeyError`, `AttributeError`, or any other exception), a `TypeError`, and an auth-style error propagate, and the other adapter is not called. A read or other idempotent operation that raises `RuntimeError`, `ConnectionError`, `ValueError`, `KeyError`, `AttributeError`, `LookupError`, or `NotImplementedError` propagates that same error object, and the other adapter is not called. `TypeError` and `PermissionError` on a non-idempotent write, including a browser-preferred write, propagate the same way. The API adapter reports browser operations unsupported. The browser adapter reports API and combined operations unsupported. Expected channels are parsed from `PLATFORM_COMPATIBILITY.md`. When the fallback also fails, the second error is chained from the first. `get_public_url` is COMBINED: the API delegate returns the public URL, then the browser delegate verifies stranger access; `None` from the API skips the browser, and a failed stranger check returns `None`. `set_view_title_visibility(database_id, view_id, visible)` passes those three arguments through unchanged and returns the delegate's `NotionView`. A non-bool `reports_unsupported` result is rejected before either adapter runs. A public URL that is not a string is rejected before the browser runs. The fixture adapter stays the default.
-- **Receipts stub**: `NotionOperationReceipt` and `NotionOperationReceiptLog` follow Session 06 prompt section "### 4. Implement Notion operation receipts" (`prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md`). Fields: job ID, operation, workspace, page/database target, pre-state when available, post-state, provider response, screenshot or response evidence, timestamp, idempotency key, status. Status is `Success`, `Unknown`, or `Failure`. Timestamps must be timezone-aware. A repeated idempotency key is rejected before append, including when a second log instance re-reads the same path. A torn trailing line that is not newline-terminated and is not JSON is skipped on load and truncated before the next append. A complete JSON line with no trailing newline is kept, and a newline is added before the next append. A newline-terminated corrupt line is rejected. Caller mappings are copied before store. Nested mappings, lists, and tuples are frozen at every depth into new containers, so a frozen mapping can be snapshotted again. Mapping keys must be strings at every level. `NaN` and `Inf` are rejected. The path must be a `pathlib.Path` whose parent directory already exists; a string path and a missing parent are rejected, and the stub does not create directories. Writers of one resolved path in this process share one lock object, held weakly in a registry: each log keeps a strong reference for its lifetime, a different path gets a different lock, and a discarded path leaves the registry. Writes happen only at a path the caller injects. No database table and no network.
+- **Receipts stub**: `NotionOperationReceipt` and `NotionOperationReceiptLog` follow Session 06 prompt section "### 4. Implement Notion operation receipts" (`prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md`). Fields: job ID, operation, workspace, page/database target, pre-state when available, post-state, provider response, screenshot or response evidence, timestamp, idempotency key, status. Status is `Success`, `Unknown`, or `Failure`. Timestamps must be timezone-aware. A repeated idempotency key is rejected before append, including when a second log instance re-reads the same path. A torn trailing line that is not newline-terminated and is not JSON is skipped on load and truncated before the next append. A complete JSON line with no trailing newline is kept, and a newline is added before the next append. A newline-terminated corrupt line is rejected. Caller mappings are copied before store. Nested mappings, lists, and tuples are frozen at every depth into new containers, so a frozen mapping can be snapshotted again without deepcopy. `dataclasses.replace` keeps nested `pre_state`, `post_state`, and `provider_response` frozen and equal. Mutating the caller's nested dict and list leaves the receipt unchanged. A `threading.Lock` inside state raises `ValueError`. Mapping keys must be strings at every level. `NaN` and `Inf` are rejected. The path must be a `pathlib.Path` whose parent directory already exists; a string path and a missing parent are rejected, and the stub does not create directories. Writers of one resolved path in this process share one lock object, held weakly in a registry: each log keeps a strong reference for its lifetime, a different path gets a different lock, and a discarded path leaves the registry. Writes happen only at a path the caller injects. No database table and no network.
 - **Cause test**: `test_translating_session_keeps_original_playwright_error_as_cause` is parametrized over the eight `TranslatingBrowserSession` methods (`navigate`, `click`, `fill`, `get_attribute`, `is_visible`, `wait_for_selector`, `get_current_url`, `close`). `TranslatingBrowserSession` is unchanged.
-- **Pytest collected**: 1247. W4b baseline: 1088 collected, 1087 passed, 1 skipped. Delta +159 collected.
+- **Pytest collected**: 1248 collected, 1247 passed, 1 skipped. W4b baseline: 1088 collected, 1087 passed, 1 skipped. Delta +160 collected and +160 passed.
 - **Per-file counts**:
 
   | File | Functions (base → tip) | Collected (base → tip) | Delta collected |
@@ -182,16 +182,16 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
   | `tests/unit/integrations/notion/test_browser_adapter.py` | 75 → 75 | 100 → 107 | +7 |
   | `tests/unit/integrations/notion/test_stub_adapters.py` | 2 → 1 | 2 → 1 | -1 |
   | `tests/unit/integrations/notion/test_combined_adapter.py` | 0 → 29 | 0 → 109 | +109 |
-  | `tests/unit/observability/test_receipts.py` | 0 → 36 | 0 → 44 | +44 |
+  | `tests/unit/observability/test_receipts.py` | 0 → 37 | 0 → 45 | +45 |
   | Remaining files | unchanged | 986 → 986 | 0 |
-  | **Total** | | **1088 → 1247** | **+159** |
+  | **Total** | | **1088 → 1248** | **+160** |
 
-- **Mutation checks** (each applied, pytest run, then reverted):
+- **Mutation checks** (68 rows; each applied, pytest run, then reverted):
 
   | Mutation | Failing test |
   |---|---|
   | Swap `create_page` from the API operation set into the browser set | `test_operation_uses_api_adapter[create_page]` |
-  | Fall back on `except Exception` after a write raises | `test_write_error_is_not_retried_on_the_other_adapter[RuntimeError]` |
+  | Fall back on `except Exception` after a non-idempotent write is invoked | `test_write_error_is_not_retried_on_the_other_adapter[RuntimeError]` |
   | Catch `RuntimeError` after a non-idempotent write and fall back | `test_write_error_is_not_retried_on_the_other_adapter[RuntimeError]` |
   | Catch `ValueError` after a non-idempotent write and fall back | `test_write_error_is_not_retried_on_the_other_adapter[ValueError]` |
   | Fall back on `TypeError` from a read | `test_type_error_propagates_unchanged` |
@@ -204,6 +204,17 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
   | Fall back on `OperationUnsupportedError` after a non-idempotent write is invoked | `test_write_operation_unsupported_error_is_not_retried` |
   | Drop the read-side `OperationUnsupportedError` fallback | `test_read_operation_unsupported_error_falls_back` |
   | Skip `OperationUnsupportedError` fallback for an idempotent write | `test_idempotent_operation_unsupported_error_falls_back` |
+  | Widen the read/idempotent `except` with `RuntimeError` | `test_read_and_idempotent_error_propagates[inspect_page-RuntimeError]` |
+  | Widen the read/idempotent `except` with `ConnectionError` | `test_read_and_idempotent_error_propagates[inspect_page-ConnectionError]` |
+  | Widen the read/idempotent `except` with `ValueError` | `test_read_and_idempotent_error_propagates[inspect_page-ValueError]` |
+  | Widen the read/idempotent `except` with `KeyError` | `test_read_and_idempotent_error_propagates[inspect_page-KeyError]` |
+  | Widen the read/idempotent `except` with `AttributeError` | `test_read_and_idempotent_error_propagates[inspect_page-AttributeError]` |
+  | Widen the read/idempotent `except` with `NotImplementedError` | `test_read_and_idempotent_error_propagates[inspect_page-NotImplementedError]` |
+  | Widen the read/idempotent `except` with `LookupError` | `test_read_and_idempotent_error_propagates[inspect_page-LookupError]` |
+  | Catch `TypeError` after a non-idempotent write and fall back | `test_write_type_and_permission_errors_propagate[create_page-TypeError]` |
+  | Catch `TypeError` after a browser-preferred write and fall back | `test_write_type_and_permission_errors_propagate[duplicate_page-TypeError]` |
+  | Catch `PermissionError` after a non-idempotent write and fall back | `test_write_type_and_permission_errors_propagate[create_page-PermissionError]` |
+  | Catch `PermissionError` after a browser-preferred write and fall back | `test_write_type_and_permission_errors_propagate[duplicate_page-PermissionError]` |
   | Return the API public URL without stranger verification | `test_get_public_url_returns_none_when_stranger_access_fails` |
   | Turn a stranger-check error into `None` | `test_get_public_url_does_not_hide_stranger_access_errors` |
   | Drop the stranger-check bool type check | `test_get_public_url_rejects_a_non_bool_stranger_check` |
@@ -226,34 +237,23 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
   | Remove the `timestamp` datetime check | `test_timestamp_must_be_a_datetime` |
   | Store `post_state` without the mapping check | `test_post_state_must_be_a_mapping` |
   | Accept a naive timestamp | `test_naive_timestamp_is_rejected` |
+  | Accept a timestamp whose `utcoffset()` is `None` | `test_timestamp_with_null_utcoffset_is_rejected` |
   | Accept a status outside Success, Unknown, and Failure | `test_status_rejects_values_outside_the_enum` |
+  | Accept a case-folded status | `test_lowercase_success_status_is_rejected` |
   | Reject a torn trailing line | `test_torn_trailing_line_is_skipped` |
+  | Skip a complete JSON tail that has no newline | `test_complete_json_tail_without_newline_is_kept` |
+  | Skip tail repair before append | `test_record_after_torn_tail_round_trips` |
+  | Skip tail repair before append | `test_record_after_complete_line_without_newline_round_trips` |
   | Skip the pre-append re-read | `test_two_logs_reject_a_duplicate_key_without_corrupting_the_file` |
   | Allow `NaN` in receipt JSON | `test_non_finite_numbers_are_rejected[nan]` |
   | Remove the `record()` duplicate idempotency-key guard | `test_duplicate_idempotency_key_is_rejected_and_not_appended` |
   | Store the caller mapping without copying it | `test_caller_dict_mutation_does_not_change_the_stored_receipt` |
   | Return a tuple from `_freeze_value` without freezing its elements | `test_tuple_nested_mapping_is_frozen` |
+  | Leave nested lists mutable | `test_nested_list_and_mapping_are_frozen` |
+  | Re-introduce deepcopy of a frozen mapping | `test_replace_keeps_nested_state_frozen` |
   | Accept non-string mapping keys | `test_non_string_mapping_keys_are_rejected` |
   | Accept a non-string key nested in a tuple | `test_nested_non_string_mapping_keys_are_rejected` |
   | per-instance lock instead of shared path lock | `test_same_resolved_path_shares_one_lock` |
-  | Leave nested lists mutable | `test_nested_list_and_mapping_are_frozen` |
-  | Re-introduce deepcopy of a frozen mapping | `test_replace_keeps_nested_state_frozen` |
-  | Widen the read/idempotent `except` with `RuntimeError` | `test_read_and_idempotent_error_propagates[inspect_page-RuntimeError]` |
-  | Widen the read/idempotent `except` with `ConnectionError` | `test_read_and_idempotent_error_propagates[inspect_page-ConnectionError]` |
-  | Widen the read/idempotent `except` with `ValueError` | `test_read_and_idempotent_error_propagates[inspect_page-ValueError]` |
-  | Widen the read/idempotent `except` with `KeyError` | `test_read_and_idempotent_error_propagates[inspect_page-KeyError]` |
-  | Widen the read/idempotent `except` with `AttributeError` | `test_read_and_idempotent_error_propagates[inspect_page-AttributeError]` |
-  | Widen the read/idempotent `except` with `NotImplementedError` | `test_read_and_idempotent_error_propagates[inspect_page-NotImplementedError]` |
-  | Widen the read/idempotent `except` with `LookupError` | `test_read_and_idempotent_error_propagates[inspect_page-LookupError]` |
-  | Catch `TypeError` after a non-idempotent write and fall back | `test_write_type_and_permission_errors_propagate[create_page-TypeError]` |
-  | Catch `TypeError` after a browser-preferred write and fall back | `test_write_type_and_permission_errors_propagate[duplicate_page-TypeError]` |
-  | Catch `PermissionError` after a non-idempotent write and fall back | `test_write_type_and_permission_errors_propagate[create_page-PermissionError]` |
-  | Catch `PermissionError` after a browser-preferred write and fall back | `test_write_type_and_permission_errors_propagate[duplicate_page-PermissionError]` |
-  | Accept a timestamp whose `utcoffset()` is `None` | `test_timestamp_with_null_utcoffset_is_rejected` |
-  | Accept a case-folded status | `test_lowercase_success_status_is_rejected` |
-  | Skip a complete JSON tail that has no newline | `test_complete_json_tail_without_newline_is_kept` |
-  | Skip tail repair before append | `test_record_after_torn_tail_round_trips` |
-  | Skip tail repair before append | `test_record_after_complete_line_without_newline_round_trips` |
   | `record()` does not take the path lock | `test_record_waits_for_the_path_lock` |
   | Keep discarded path locks in a strong registry | `test_discarded_log_drops_its_path_lock` |
   | Accept a missing parent directory | `test_missing_parent_directory_is_rejected` |

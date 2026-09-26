@@ -391,32 +391,64 @@ def test_caller_dict_mutation_does_not_change_the_stored_receipt() -> None:
 
 
 def test_replace_keeps_nested_state_frozen() -> None:
-    """Replacing status keeps nested pre-state and post-state frozen and equal."""
+    """Replacing status keeps nested pre-state, post-state, and provider response."""
     receipt = _receipt(
         status="Unknown",
         pre_state={"items": [{"title": "before"}]},
         post_state={"items": [{"title": "after"}]},
+        provider_response={"blocks": [{"type": "text"}]},
     )
     replaced = replace(receipt, status="Failure")
+    round_trip = replace(replaced, status="Unknown")
 
     assert replaced.status == "Failure"
+    assert round_trip.status == "Unknown"
     assert replaced.pre_state == receipt.pre_state
     assert replaced.post_state == receipt.post_state
+    assert replaced.provider_response == receipt.provider_response
+    assert round_trip.pre_state == receipt.pre_state
+    assert round_trip.post_state == receipt.post_state
+    assert round_trip.provider_response == receipt.provider_response
     assert replaced.pre_state is not None
     pre_items = replaced.pre_state["items"]
     post_items = replaced.post_state["items"]
+    blocks = replaced.provider_response["blocks"]
     assert isinstance(pre_items, tuple)
     assert isinstance(post_items, tuple)
+    assert isinstance(blocks, tuple)
     pre_nested = pre_items[0]
     post_nested = post_items[0]
+    block = blocks[0]
     assert isinstance(pre_nested, MappingProxyType)
     assert isinstance(post_nested, MappingProxyType)
+    assert isinstance(block, MappingProxyType)
     assert pre_nested["title"] == "before"
     assert post_nested["title"] == "after"
+    assert block["type"] == "text"
     assignment = cast(dict[str, object], post_nested)
     with pytest.raises(TypeError):
         assignment["title"] = "changed"
     assert post_nested["title"] == "after"
+
+
+def test_caller_nested_dict_and_list_stay_outside_the_receipt() -> None:
+    """Mutating the caller's nested dict and list leaves the receipt unchanged."""
+    inner = {"title": "old"}
+    items = [inner]
+    post_state = {"items": items}
+    receipt = _receipt(post_state=post_state)
+    inner["title"] = "NEW"
+    items.append({"title": "extra"})
+    post_state["extra"] = True
+
+    assert receipt.post_state == {"items": ({"title": "old"},)}
+    stored_items = receipt.post_state["items"]
+    assert isinstance(stored_items, tuple)
+    assert stored_items is not items
+    stored_inner = stored_items[0]
+    assert isinstance(stored_inner, MappingProxyType)
+    assert stored_inner is not inner
+    assert receipt.post_state is not post_state
 
 
 def test_reloaded_post_state_seeds_a_new_receipt(tmp_path: Path) -> None:
