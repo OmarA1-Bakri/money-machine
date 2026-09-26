@@ -38,48 +38,6 @@ from .domain import (
 )
 
 
-def translate_browser_exceptions(fn):
-    """Decorator to translate Playwright-style exceptions to built-in exceptions.
-
-    Maps:
-    - Exceptions named 'TimeoutError' from 'playwright.*' modules -> built-in TimeoutError
-    - Exceptions named 'Error' from 'playwright.*' modules containing navigation/connection
-      keywords -> ConnectionError
-    - All other exceptions propagate unchanged
-
-    Uses FAKE exception matching only — no actual Playwright import.
-    """
-
-    async def wrapper(*args, **kwargs):
-        try:
-            return await fn(*args, **kwargs)
-        except Exception as e:
-            exc_type = type(e)
-            exc_module = exc_type.__module__
-            exc_name = exc_type.__name__
-
-            # Check if exception is from a playwright module
-            if exc_module and exc_module.startswith("playwright."):
-                # Map TimeoutError from playwright to built-in TimeoutError
-                if exc_name == "TimeoutError":
-                    raise TimeoutError(str(e)) from e
-
-                # Map Error from playwright containing navigation/connection keywords
-                # to built-in ConnectionError
-                if exc_name == "Error":
-                    error_message = str(e).lower()
-                    if any(
-                        keyword in error_message
-                        for keyword in ["navigation", "connection", "net::", "network"]
-                    ):
-                        raise ConnectionError(str(e)) from e
-
-            # All other exceptions propagate unchanged
-            raise
-
-    return wrapper
-
-
 class BrowserSession(Protocol):
     """Protocol for browser session abstraction.
 
@@ -979,8 +937,9 @@ class BrowserNotionAdapter(NotionAdapter):
         Mutates: false
         Idempotent: true
         """
-        # Validate URL is HTTPS and has allowed host
-        # Only allow notion.so or www.notion.so (no other subdomains)
+        # Validate URL is HTTPS and has an allowed Notion host:
+        # notion.so, www.notion.so, notion.site, www.notion.site,
+        # or a single non-empty label under notion.site.
         parsed = urlparse(public_url)
 
         # Must be HTTPS
@@ -1010,8 +969,8 @@ class BrowserNotionAdapter(NotionAdapter):
         elif hostname.endswith(".notion.site"):
             # Extract the part before .notion.site
             prefix = hostname[: -len(".notion.site")]
-            # Must be a single label (no dots)
-            if "." in prefix:
+            # Reject an empty label (https://.notion.site) and deeper nesting.
+            if not prefix or "." in prefix:
                 raise ValueError(
                     f"URL host must be notion.so, www.notion.so, notion.site, "
                     f"www.notion.site, or single-label.notion.site, got: {hostname}"
@@ -1033,11 +992,12 @@ class BrowserNotionAdapter(NotionAdapter):
         anon_session = self._anon_session_factory()
 
         try:
-            # Navigate to public URL in anonymous context
+            # Navigate to public URL in anonymous context.
+            # Only connection, timeout, and value errors are wrapped. A plain
+            # RuntimeError from navigate propagates unwrapped.
             try:
                 await anon_session.navigate(public_url)
-            except Exception as e:
-                # Network, navigation, or any failures
+            except (ConnectionError, TimeoutError, ValueError) as e:
                 raise RuntimeError(f"Failed to navigate to {public_url}: {e}") from e
 
             # Check if page content is visible (not login wall)

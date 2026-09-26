@@ -120,6 +120,48 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 - **OUT OF SCOPE** (W4a hard boundaries): CombinedNotionAdapter implementation, receipts persistence, live Playwright integration, SESSION_06 COMPLETE marking.
 
 
+## 2026-09-25 — Session 06 Wave 4b: BrowserNotionAdapter carry-forward fixes (PR #43, open awaiting review)
+
+- **SPEC CHANGE** (decorator removed): `TranslatingBrowserSession` wraps both `self._browser` in `__init__` and every anonymous session from the factory in `verify_stranger_access`. `translate_browser_exceptions` is gone from `browser_adapter.py`; the translation tests call the wrapper.
+- **Carry-forward from the W4a review** (no new scope):
+  - **(i)** `set_view_title_visibility(database_id, view_id, visible)` on `adapter.py`, `fixture_adapter.py`, `api_adapter.py`, `browser_adapter.py`, and `combined_adapter.py`. The view URL is built from the normalized database id. The returned `NotionView.database_id` is that input-derived lowercase undashed id, including when the post-navigate URL is a `Title-<id>` slug whose last segment differs.
+  - **(ii)** `BrowserSession` gains `close()`. `verify_stranger_access` closes the anonymous session in `finally` under `contextlib.suppress(Exception)`, so a close error does not mask the original error.
+  - **(iii)** The wrapper maps a Playwright-style `TimeoutError` to built-in `TimeoutError`, and a Playwright-style `Error` whose message mentions navigation, connection, `net::`, or network to `ConnectionError`. `verify_stranger_access` catches only `(ConnectionError, TimeoutError, ValueError)` around `navigate` and re-raises those as `RuntimeError` with that exception as `__cause__`. A plain `RuntimeError` from `navigate` propagates unwrapped. Tests use fake Playwright classes only (no `playwright` import, `uv.lock` untouched).
+- **SHOULD-FIX**:
+  - **(1)** Fixture `database_id` validation requires exactly 12 or 32 hex characters after stripping a `db_` prefix and dashes and lowercasing. Fixture ids are 12-hex on purpose; real Notion ids are 32-hex. A 20-hex id is rejected. View ownership compares the normalized ids.
+  - **(2)** `duplicate_page` strips dashes and lowercases the id read from the page URL before comparing it with the source and before returning it. An upper-case dashed URL returns the lower-case undashed id.
+  - **(4)** Host allowlist, covered by separate tests: accepts `notion.so`, `www.notion.so`, `notion.site`, `www.notion.site`, and a single-label `*.notion.site` (`omar.notion.site`). Rejects `http`, `evil.notion.so`, `notion.so.evil.com`, userinfo, a non-URL, `a.b.notion.site`, and an empty label (`https://.notion.site/x`). HTTPS only.
+- **Pytest**: 1078 collected, 1077 passed, 1 skipped. W4a baseline: 1043 collected, 1042 passed, 1 skipped. Delta +35 collected.
+- **Per-file counts** (functions / collected):
+  - `tests/unit/integrations/notion/test_browser_adapter.py`: 37 / 60 → 72 / 90 (+30 collected).
+  - `tests/unit/integrations/notion/test_fixture_adapter.py`: 35 / 35 → 40 / 40 (+5 collected).
+  - `tests/unit/integrations/notion/test_api_adapter.py`: 21 / 21, unchanged.
+  - Remaining files: 948 collected, unchanged. 90 + 40 + 948 = 1078.
+- **Mutation checks** (each applied, pytest run, then reverted):
+
+  | Mutation | Failing test |
+  |---|---|
+  | B1a: drop the wrapper on the anonymous factory | `test_verify_stranger_access_translates_playwright_timeout` |
+  | B1b: drop the wrapper on `self._browser` | `test_publish_page_translates_playwright_timeout` |
+  | Fixture length check widened to `12<=len<=32` | `test_fixture_set_view_title_visibility_rejects_20_hex` |
+  | Fixture length check narrowed to `len<12` | `test_fixture_set_view_title_visibility_rejects_20_hex` |
+  | Remove fixture id validation | `test_fixture_set_view_title_visibility_rejects_20_hex`, `test_fixture_set_view_title_visibility_rejects_invalid_database_id` |
+  | `duplicate_page` returns the raw URL segment | `test_duplicate_page_returns_lowercase_undashed_from_uppercase_dashed_url` |
+  | `duplicate_page` compare skips lowercase | `test_duplicate_page_raises_when_uppercase_source_matches` |
+  | `set_view_title_visibility` returns the last segment of `current_url` | `test_set_view_title_visibility_returns_input_id_not_url_slug` |
+  | Drop the wrapper so a Playwright navigation error is not translated | `test_verify_stranger_access_translates_playwright_navigation_error` |
+  | Widen the navigate catch to `Exception` | `test_verify_stranger_access_propagates_navigate_runtime_error` |
+  | Allowlist as a suffix match | `test_verify_stranger_access_rejects_subdomain`, `test_verify_stranger_access_rejects_deep_nesting_notion_site` |
+  | Remove the single-label `*.notion.site` rule | `test_verify_stranger_access_accepts_single_label_notion_site` |
+  | Let a `close()` error propagate | `test_verify_stranger_access_close_error_doesnt_mask_original` |
+  | Build the view URL from the current page | `test_set_view_title_visibility_uses_given_database_not_current_page` |
+  | Remove `close()` from `finally` | `test_verify_stranger_access_close_called_on_error` |
+
+- **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w4b` and this log entry. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
+- **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. Exit 78 held.
+
+
+
 ## 2026-09-11 — Startup repair wave after recovery review
 
 - Repaired migration-head/schema compatibility readiness, encoded database credentials/IPv6, and production environment selection. Compose now carries raw passwords separately; a bounded independent review identified literal-percent and surrounding-whitespace cases, both reproduced and repaired with regression coverage. Development external-URL overrides retain their credentials.
@@ -333,37 +375,3 @@ Parallel control lane only (`docs/control/*`). No feature code, no scheduler Exi
 - Updated `head_sha` and `evidence_closure_commit_sha` to `14da7fe`.
 - W1–W9, Phase A, Lane C complete. No S05 features, no scheduler Exit 78 lift, no live production/Notion/Etsy claimed.
 - W10 control flip review recorded at `docs/control/reviews/2026-09-20-session-04-wave-10-control-flip.md`.
-
-## 2026-09-25 — Session 06 Wave 4b: BrowserNotionAdapter carry-forward fixes (PR #43, open awaiting review)
-
-- **SPEC CHANGE from initial direction** (decorator → wrapper class): TranslatingBrowserSession is now a wrapper class (not decorator) that wraps BOTH self._browser (in __init__) AND anon sessions from factory (in verify_stranger_access).
-- **Carry-forward fixes from W4a review** (NO new scope, Reviewer-conditioned):
-  - **(i) set_view_title_visibility database_id parameter**: Interface change across NotionAdapter base + fixture_adapter + api_adapter + browser_adapter. Method now takes `database_id` parameter and builds view URL directly: `https://www.notion.so/{normalized_db_id}?v={view_id}` where normalized_db_id is lowercase 32-hex with dashes stripped. Returns NotionView with normalized database_id in lowercase. fixture_adapter validation accepts both 12-hex fixture IDs (e.g. db_a1b2c3d4e5f6) and 32-hex real IDs; validates hex characters + minimum 12-char length; view-ownership check normalizes both sides (strip db_ prefix, dashes, lowercase).
-  - **(ii) close() on BrowserSession protocol**: Added `close()` method. verify_stranger_access closes anon session in finally with `contextlib.suppress(Exception)` to avoid masking original exceptions. Tests: close() called on success, blocked result, and error propagation; close error suppressed.
-  - **(iii) Translation boundary - TranslatingBrowserSession wrapper class**: Wraps both self._browser (in __init__) and anon sessions (in verify_stranger_access via wrapped factory lambda). Maps Playwright-style exceptions: playwright.*.TimeoutError → built-in TimeoutError; playwright.*.Error with navigation/connection/net::/network keywords → ConnectionError; unknown exceptions propagate unchanged. Tested with FAKE Playwright module/class only (no playwright import, zero uv.lock change).
-- **SHOULD-FIX (all required)**:
-  - **(1) fixture_adapter validation**: Accepts both 12-hex fixture IDs and 32-hex real IDs; validates hex + minimum 12 characters; view-ownership normalizes both sides.
-  - **(2) duplicate_page normalization**: Strip dashes, lowercase BOTH new and source IDs before equality check.
-  - **(4) URL allowlist**: notion.so, www.notion.so, notion.site, www.notion.site, AND single-label *.notion.site (omar.notion.site OK, a.b.notion.site rejected); https-only, no userinfo; six parametrized rejections (http, nested subdomains, userinfo, evil-notion.so, notionz.so, notionsite.com).
-- **Nits folded in**: empty ID test, Title-<id> URL parsing (trailing 32-hex with/without dashes).
-- **Test coverage**: BrowserNotionAdapter tests for anon timeout translation, anon navigation error translation, logged-in timeout translation, close() masking suppression, allowlist positive (notion.site variants, single-label subdomain) and negative (deep nesting, lookalikes), duplicate_page normalization (strip dashes, lowercase), fixture validation (exact 12-hex OK, exact 32-hex OK, 20-hex rejected, too-short rejected, non-hex rejected, view ownership enforced). CI: **1071 collected** (1070 passed, 1 skipped). Base comparison from W4a: **1043 collected** → **1071 collected** (+28).
-- **Per-file breakdown** (delta from W4a base 1043 collected):
-  - `test_browser_adapter.py`: +22 functions, +24 collected (17 translated-boundary/close/allowlist/normalization functions → 19 collected due to parametrization; base 37 functions/60 collected → 59 functions/84 collected)
-  - `test_fixture_adapter.py`: +2 functions, +2 collected (12/32-hex validation, 20-hex rejection; base 22 functions/22 collected → 24 functions/24 collected)
-  - **Reconciliation**: Base 1043 collected (browser 60 + fixture 22 + api 17 + combined 4 + other integration/unit/acceptance ~940) + 28 new (browser +24, fixture +2, ruff/pyright unit test updates +2) = 1071 collected.
-- **Interface changes**: NotionAdapter base + fixture_adapter + api_adapter + browser_adapter + combined_adapter now all have `set_view_title_visibility(database_id: str, view_id: str, visible: bool)` signature.
-- **Mutation checks** (ALL tested with real pytest evidence):
-  | Mutation | Result | Evidence |
-  |---|---|---|
-  | B1a: Remove TranslatingBrowserSession wrap on anon factory | **FAIL** ✓ | `test_verify_stranger_access_translates_playwright_timeout` FAILED (Playwright error not TimeoutError) |
-  | B1b: Remove TranslatingBrowserSession wrap on self._browser | **FAIL** ✓ | `test_publish_page_translates_playwright_timeout` FAILED (Playwright error not TimeoutError) |
-  | 1: Remove fixture validation | **FAIL** ✓ | `test_fixture_set_view_title_visibility_rejects_invalid_database_id` FAILED (DID NOT RAISE ValueError, 2 assertions) |
-  | 2: Remove lowercase normalization | **FAIL** ✓ | `test_duplicate_page_raises_when_uppercase_source_matches` FAILED (DID NOT RAISE) |
-  | 4a: Switch allowlist to suffix match | **FAIL** ✓ | `test_verify_stranger_access_rejects_subdomain` FAILED (DID NOT RAISE), `test_verify_stranger_access_rejects_deep_nesting_notion_site` FAILED (DID NOT RAISE) |
-  | 4b: Remove single-label *.notion.site rule | **FAIL** ✓ | `test_verify_stranger_access_accepts_single_label_notion_site` FAILED (raised ValueError instead of returning True) |
-  | close-mask: Let close() error propagate | **FAIL** ✓ | `test_verify_stranger_access_close_error_doesnt_mask_original` FAILED (raised "Close also failed!" instead of "Failed to navigate") |
-  | normalized-return: Return raw database_id | **FAIL** ✓ | `test_set_view_title_visibility_returns_normalized_id` FAILED (returned 'AABBCCDD-1122-3344-5566-778899AABBCC' instead of 'aabbccdd112233445566778899aabbcc') |
-  | i: URL built from session page | **FAIL** ✓ | `test_set_view_title_visibility_uses_given_database_not_current_page` FAILED (URL built from current page) |
-  | ii: Remove close() from finally | **FAIL** ✓ | `test_verify_stranger_access_close_called_on_error` FAILED (error_session.closed is False instead of True) |
-- **Control update**: docs/control/IMPLEMENTATION_STATE.json session_06_w4b updated. docs/control/IMPLEMENTATION_LOG.md W4b entry (this entry). Evidence keys: control_files_and_checkpoint_current stays FALSE, session stays incomplete.
-- **Hard boundaries preserved**: Fixtures/mocks only (no live Notion/Etsy, no real browser, no Playwright import). Fixture adapter stays default. orchestration/ untouched (0 diffs). uv.lock untouched (0 diffs). Exit 78 held.
