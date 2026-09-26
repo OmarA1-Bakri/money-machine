@@ -483,6 +483,15 @@ def test_each_personal_only_preset_generates_a_dashboard(kind: str) -> None:
     assert "buyer_name" not in generated.expressions
 
 
+def test_unknown_database_key_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="tasks") as raised:
+        generate_notification_dashboard_formulas({"tasks": {"Name": "title"}})
+    message = str(raised.value)
+    assert isinstance(raised.value, ValueError)
+    assert "Tasks" in message
+    assert "Invoices" in message
+
+
 def test_habits_formula_is_skipped_when_habits_is_not_verified() -> None:
     kinds = tuple(kind for kind in _PERSONAL_KINDS if kind != "Habits")
     generated = generate_notification_dashboard_formulas(_verified_from_presets(kinds))
@@ -519,8 +528,8 @@ def _month_day_comparison_matches(today: date, birthday: date) -> bool:
     """Compare the month-day strings named by the emitted birthday expression.
 
     The stub emits ``equal(formatDate(prop("Date"), "MM-DD"), formatDate(now(), "MM-DD"))``.
-    This helper compares those two strings. It does not evaluate ``prop``, ``and``,
-    or the Birthday checkbox, and it is not a formula interpreter.
+    The test helper compares those two strings only. The helper does not evaluate
+    the Birthday checkbox, ``prop``, or ``and``, and it is not a formula interpreter.
     """
     return today.strftime("%m-%d") == birthday.strftime("%m-%d")
 
@@ -577,6 +586,7 @@ def test_formula_unicode_whitespace_is_rejected(pad: str, side: str) -> None:
         pytest.param("Na\u200bme", id="zwsp"),
         pytest.param("\ufeffName", id="bom-leading"),
         pytest.param("Name\ufeff", id="bom-trailing"),
+        pytest.param("Na\ufeffme", id="bom-interior"),
     ],
 )
 def test_invisible_characters_in_names_are_rejected(name: str) -> None:

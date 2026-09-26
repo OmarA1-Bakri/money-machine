@@ -429,6 +429,18 @@ def test_cycle_behind_an_acyclic_formula_is_rejected() -> None:
         build_schema("Tasks", properties)
 
 
+def test_cycle_in_the_middle_of_the_formula_list_is_rejected() -> None:
+    properties = [
+        _title(),
+        _formula("Ok", 'prop("Name")', "text"),
+        _formula("A", 'prop("B")', "text"),
+        _formula("B", 'prop("A")', "text"),
+        _formula("Z", 'prop("Name")', "text"),
+    ]
+    with pytest.raises(SchemaBuilderError, match="formula cycle"):
+        build_schema("Tasks", properties)
+
+
 def test_acyclic_formula_chain_is_accepted() -> None:
     properties = [
         _title(),

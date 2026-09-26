@@ -25,7 +25,9 @@ date is today, otherwise 0, not a sum. A date property is never compared to
 ``now()`` directly. ``water_glasses_remaining`` is Goal minus Glasses on Habits
 and is omitted when Habits is not verified (water glasses only where relevant).
 Any dashboard formula is omitted when its database is not in the verified map,
-so each personal preset can be used alone.
+so each personal preset can be used alone. A key that is not in
+``schema_definitions()`` is rejected. A known database that is simply absent
+is still skipped, and an empty formula result is not an error.
 
 Surrounding whitespace is rejected, so it does not count toward the 128
 character limit. Characters inside the expression, including spaces between
@@ -236,6 +238,7 @@ def generate_notification_dashboard_formulas(
     verified = copy_verified_databases(verified_properties)
     if len(verified) < 1:
         raise SchemaBuilderError("verified property names must not be empty")
+    _require_known_databases(verified)
     expressions: dict[str, str] = {}
     result_types: dict[str, str] = {}
     databases: dict[str, str] = {}
@@ -257,6 +260,22 @@ def generate_notification_dashboard_formulas(
         databases=MappingProxyType(databases),
         verified_properties=MappingProxyType(frozen),
     )
+
+
+def _require_known_databases(verified: Mapping[str, Mapping[str, str]]) -> None:
+    """Reject a database key that is not a catalogue kind.
+
+    ``schema_builder`` imports this module, so the catalogue is imported here.
+    """
+    from .schema_builder import schema_definitions
+
+    known = tuple(schema_definitions())
+    unknown = sorted(name for name in verified if name not in known)
+    if not unknown:
+        return
+    listed = ", ".join(repr(name) for name in unknown)
+    valid = ", ".join(known)
+    raise SchemaBuilderError(f"unknown database {listed}; valid keys: {valid}")
 
 
 def copy_verified_properties(verified_properties: object) -> dict[str, str]:
