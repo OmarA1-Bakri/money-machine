@@ -169,6 +169,38 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 - **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. Exit 78 held.
 
 
+## 2026-09-26 — Session 06 Wave 5: combined adapter delegation, receipt stub, cause-test parametrization
+
+- **Combined adapter**: `CombinedNotionAdapter` routes API-tagged operations, including `get_public_url`, to the injected API adapter and browser-tagged operations to the injected browser adapter. If the preferred adapter reports the operation unsupported, or raises (including `NotImplementedError`), the same arguments go to the other adapter. `set_view_title_visibility(database_id, view_id, visible)` passes those three arguments through unchanged and returns the delegate's `NotionView`. The router still refuses browser and combined modes. The fixture adapter stays the default.
+- **Receipts stub**: `NotionOperationReceipt` and `NotionOperationReceiptLog` follow Session 06 prompt section "### 4. Implement Notion operation receipts" (`prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md`). Fields: job ID, operation, workspace, page/database target, pre-state when available, post-state, provider response, screenshot or response evidence, timestamp, idempotency key, status. A repeated idempotency key is rejected before append. Writes happen only at a path the caller injects. No database table and no network.
+- **Cause test**: `test_translating_session_keeps_original_playwright_error_as_cause` is parametrized over the eight `TranslatingBrowserSession` methods (`navigate`, `click`, `fill`, `get_attribute`, `is_visible`, `wait_for_selector`, `get_current_url`, `close`). No behaviour change in `browser_adapter.py`.
+- **Pytest**: 1148 collected. W4b baseline: 1088 collected, 1087 passed, 1 skipped. Delta +60 collected.
+- **Per-file counts**:
+
+  | File | Functions (base → tip) | Collected (base → tip) | Delta collected |
+  |---|---|---|---|
+  | `tests/unit/integrations/notion/test_browser_adapter.py` | 75 → 75 | 100 → 107 | +7 |
+  | `tests/unit/integrations/notion/test_stub_adapters.py` | 2 → 1 | 2 → 1 | -1 |
+  | `tests/unit/integrations/notion/test_combined_adapter.py` | 0 → 9 | 0 → 40 | +40 |
+  | `tests/unit/observability/test_receipts.py` | 0 → 8 | 0 → 14 | +14 |
+  | Remaining files | unchanged | 986 → 986 | 0 |
+  | **Total** | | **1088 → 1148** | **+60** |
+
+- **Mutation checks** (each applied, pytest run, then reverted):
+
+  | Mutation | Failing test |
+  |---|---|
+  | Swap `create_page` from the API operation set into the browser set | `test_operation_uses_api_adapter[create_page]` |
+  | Remove the exception fallback (re-raise instead of calling the other adapter) | `test_fallback_when_preferred_raises[create_page-api]` |
+  | Remove the `reports_unsupported` pre-check | `test_fallback_when_preferred_reports_unsupported[create_page-api]` |
+  | Drop `visible=` in `set_view_title_visibility` | `test_set_view_title_visibility_passes_arguments_and_returns_delegate_view` |
+  | Change `raise translated from e` to `raise translated from None` on `fill` | `test_translating_session_keeps_original_playwright_error_as_cause[fill]` |
+  | Change `raise translated from e` to `raise translated from None` on `close` | `test_translating_session_keeps_original_playwright_error_as_cause[close]` |
+  | Remove the `record()` duplicate idempotency-key guard | `test_duplicate_idempotency_key_is_rejected_and_not_appended` |
+
+- **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w5` and this log entry. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
+- **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. Exit 78 held.
+
 
 ## 2026-09-11 — Startup repair wave after recovery review
 

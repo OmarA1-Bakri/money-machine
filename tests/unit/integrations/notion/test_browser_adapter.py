@@ -1440,18 +1440,6 @@ async def test_translate_playwright_non_matching_error_propagates():
         await session.navigate("https://www.notion.so/page")
 
 
-@pytest.mark.asyncio
-async def test_translating_session_keeps_original_playwright_error_as_cause():
-    """A translated TimeoutError keeps the original Playwright error as __cause__."""
-    original = _fake_playwright_error("TimeoutError", "navigation timed out")
-    session = TranslatingBrowserSession(_NavigateRaisingSession(original))
-
-    with pytest.raises(TimeoutError, match="navigation timed out") as exc_info:
-        await session.navigate("https://www.notion.so/page")
-
-    assert exc_info.value.__cause__ is original
-
-
 _TRANSLATING_SESSION_METHODS = (
     "navigate",
     "click",
@@ -1525,6 +1513,58 @@ async def _call_translating_method(session: TranslatingBrowserSession, method_na
         await session.close()
     else:
         raise AssertionError(method_name)
+
+
+class _SelectivePlaywrightTimeoutSession:
+    """Raises one fake Playwright TimeoutError from a chosen BrowserSession method."""
+
+    def __init__(self, method_name: str, error: BaseException) -> None:
+        self._method_name = method_name
+        self._error = error
+
+    def _maybe_raise(self, method_name: str) -> None:
+        if method_name == self._method_name:
+            raise self._error
+
+    async def navigate(self, url: str) -> None:
+        self._maybe_raise("navigate")
+
+    async def click(self, selector: str) -> None:
+        self._maybe_raise("click")
+
+    async def fill(self, selector: str, value: str) -> None:
+        self._maybe_raise("fill")
+
+    async def get_attribute(self, selector: str, attribute: str) -> str | None:
+        self._maybe_raise("get_attribute")
+        return None
+
+    async def is_visible(self, selector: str) -> bool:
+        self._maybe_raise("is_visible")
+        return False
+
+    async def wait_for_selector(self, selector: str, timeout: int = 5000) -> None:
+        self._maybe_raise("wait_for_selector")
+
+    async def get_current_url(self) -> str:
+        self._maybe_raise("get_current_url")
+        return "https://www.notion.so/page"
+
+    async def close(self) -> None:
+        self._maybe_raise("close")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method_name", _TRANSLATING_SESSION_METHODS)
+async def test_translating_session_keeps_original_playwright_error_as_cause(method_name: str):
+    """Each translated method keeps the original Playwright error as __cause__."""
+    original = _fake_playwright_error("TimeoutError", "navigation timed out")
+    session = TranslatingBrowserSession(_SelectivePlaywrightTimeoutSession(method_name, original))
+
+    with pytest.raises(TimeoutError, match="navigation timed out") as exc_info:
+        await _call_translating_method(session, method_name)
+
+    assert exc_info.value.__cause__ is original
 
 
 @pytest.mark.asyncio
