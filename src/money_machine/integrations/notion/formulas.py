@@ -9,14 +9,20 @@ Expressions are call-shaped (``prop``, ``if``, ``and``, ``or``, ``not``,
 ``empty``, ``now``, ``formatDate``, ``equal``, ``subtract``). ``equal`` and
 ``subtract`` are the only additions, and only the dashboard formulas use them.
 
-A cross-row count or a rollup is out of scope, so keys that cannot be computed
-from one row are renamed. ``client_name`` is the Clients title. ``current_date``
-is ``now()`` on Tasks. ``task_open_and_due_today`` is this Tasks row, not a
-count of tasks, and it compares the Due calendar day to today.
-``birthday_status`` compares month and day so the Events row recurs yearly.
-``money_spent_today`` is this Finance row's amount when its calendar date is
-today, otherwise 0, not a sum. A date property is never compared to ``now()``
-directly. ``water_glasses_remaining`` is Goal minus Glasses on Habits.
+A cross-row count or a rollup is out of scope. ``buyer_name`` is the one
+configured buyer name for the single dashboard row (Session 07 section 4). It
+is deferred to section 6 / Session 07 and is not emitted here, so a verified
+map with no Clients database is valid. ``current_date`` is ``now()`` on Tasks.
+``task_open_and_due_today`` is this Tasks row, not a count of tasks, and it
+compares the Due calendar day to today. That per-row name is a justified
+correction: a formula evaluates per row, and the count belongs in a section 6
+rollup. ``birthday_status`` compares month and day so the Events row recurs
+yearly. A February 29 birthday matches only when today is February 29, so
+``Recurs yearly`` fires only in leap years. The expression does not special-case
+that date. ``money_spent_today`` is this Finance row's amount when its calendar
+date is today, otherwise 0, not a sum. A date property is never compared to
+``now()`` directly. ``water_glasses_remaining`` is Goal minus Glasses on Habits
+and is omitted when Habits is not verified (water glasses only where relevant).
 
 Surrounding whitespace is rejected, so it does not count toward the 128
 character limit. Characters inside the expression, including spaces between
@@ -64,8 +70,8 @@ _PROPERTY_VALUE_TYPES: dict[str, str] = {
 }
 
 # key, database, result type, expression.
+_OPTIONAL_DATABASES: frozenset[str] = frozenset({"Clients", "Habits"})
 _DASHBOARD: tuple[tuple[str, str, str, str], ...] = (
-    ("client_name", "Clients", "text", 'prop("Name")'),
     ("current_date", "Tasks", "date", "now()"),
     (
         "task_open_and_due_today",
@@ -96,7 +102,6 @@ _DASHBOARD: tuple[tuple[str, str, str, str], ...] = (
     ),
 )
 _EXPECTED_TYPES: dict[str, dict[str, str]] = {
-    "Clients": {"Name": "title"},
     "Tasks": {"Status": "select", "Due": "date"},
     "Events": {"Birthday": "checkbox", "Date": "date"},
     "Finance": {"Date": "date", "Amount": "number"},
@@ -224,6 +229,8 @@ def generate_notification_dashboard_formulas(
     result_types: dict[str, str] = {}
     databases: dict[str, str] = {}
     for key, database, result_type, expression in _DASHBOARD:
+        if database not in verified and database in _OPTIONAL_DATABASES:
+            continue
         properties = _properties_for(database, verified)
         compiled = compile_formula(expression, properties, result_type)
         _require_catalogue_types(database, properties, compiled.referenced_property_names)

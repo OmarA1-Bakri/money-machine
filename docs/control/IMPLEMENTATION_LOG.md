@@ -280,19 +280,19 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 ## 2026-09-26 — Session 06 Wave 6: formula and schema builders
 
 - **Heading**: `### 5. Implement formula and schema builders` in `prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md` and `hands-off-money-machine-full-implementation-workbook.md`.
-- **Narrow reading**: Reusable in-memory builders that return a typed schema for each named kind, each kind its own typed record rather than one agent prompt; plus a notification-dashboard formula generator. Each formula is attached to one catalogue database and may reference only properties of that database, with verified names and types. No relations, rollups, views, publishing, adapter calls, or live Notion. Formula language is the stub's call subset (`prop`, `if`, `and`, `or`, `not`, `empty`, `now`, `formatDate`, `equal`, `subtract`), not Notion's full formula language. `equal` and `subtract` exist only because the dashboard formulas need a comparison and a subtraction. Keys that cannot be computed from one row are named for the row they actually describe: `client_name` is the Clients title, `current_date` is `now()` on Tasks, `task_open_and_due_today` is this Tasks row (not a count) whose Due calendar day equals today, `birthday_status` is this Events row whose month and day equal today so it recurs yearly, `money_spent_today` is this Finance row's amount when its calendar date is today otherwise 0 (not a sum). Those three compare `formatDate` calendar values, and `water_glasses_remaining` is Goal minus Glasses on Habits. Surrounding whitespace is rejected and does not count toward the 128-character limit; characters inside the expression do. Section 6 (relations and linked views) and section 7 (publishing) are out of scope.
-- **Builders**: `build_database_schema` and `schema_definitions` return one frozen `DatabaseSchema` per kind, in heading order. Personal kinds are Tasks, Events, Habits, Finance, Meals, and Notes. Business kinds are Clients, Projects, Content, and Invoices. `build_schema` copies the caller property sequence and option sequence before validation. Names are strings of length 1 through 64 with no surrounding whitespace. A schema has 1 through 12 properties and exactly one title. Property types are title, text, number, select, multi_select, date, checkbox, formula, url, and email. Select and multi_select options number 1 through 8, are unique, and are rejected on every other type. A formula property requires an expression and a result type and is compiled against sibling property names and types, excluding its own name. Cycles across formula properties are rejected at build time. A non-formula property rejects those fields. `compile_formula` accepts expressions of length 5 through 128 and call depth 1 through 4. Surrounding whitespace is rejected. Result types are text, number, checkbox, and date, and the declared result type must match the expression for literals, `prop()` of a known type, and the top-level function return type. `prop` names must be in the copied verified mapping for that database. `generate_notification_dashboard_formulas` rejects an empty verified mapping, then compiles client_name, current_date, task_open_and_due_today, birthday_status, money_spent_today, and water_glasses_remaining against the properties of the database each formula is attached to. Due and money dates use `formatDate` with `YYYY-MM-DD`. Birthday uses `MM-DD`. A database missing from the verified mapping is rejected. Invalid input raises `SchemaBuilderError`. An unverified `prop` name raises `UnverifiedPropertyNameError`.
-- **Pytest collected**: 1408 collected, 1407 passed, 1 skipped. W5 baseline: 1257 collected, 1256 passed, 1 skipped. Delta +151 collected and +151 passed.
+- **Narrow reading**: Reusable in-memory builders that return a typed schema for each named kind, each kind its own typed record rather than one agent prompt; plus a notification-dashboard formula generator. Each formula is attached to one catalogue database and may reference only properties of that database, with verified names and types. No relations, rollups, views, publishing, adapter calls, or live Notion. Formula language is the stub's call subset (`prop`, `if`, `and`, `or`, `not`, `empty`, `now`, `formatDate`, `equal`, `subtract`), not Notion's full formula language. `equal` and `subtract` exist only because the dashboard formulas need a comparison and a subtraction. `buyer_name` is the one configured buyer name for the single dashboard row (Session 07 section 4). It is deferred to section 6 / Session 07 and is not emitted. That is the simpler faithful option: this wave does not add a configured text property. `current_date` is `now()` on Tasks. `task_open_and_due_today` is this Tasks row (not a count) whose Due calendar day equals today. That per-row rename is a justified correction because a formula evaluates per row and the count belongs in a section 6 rollup. `birthday_status` is this Events row whose month and day equal today so it recurs yearly. A February 29 birthday matches only when today is February 29, so it fires only in leap years; the expression does not special-case that date. `money_spent_today` is this Finance row's amount when its calendar date is today otherwise 0 (not a sum). Those three compare `formatDate` calendar values. `water_glasses_remaining` is Goal minus Glasses on Habits and is omitted when Habits is not verified. Clients and Habits formulas are skipped when that database is not verified. Tasks, Events, and Finance stay required. Surrounding whitespace is rejected and does not count toward the 128-character limit; characters inside the expression do. Section 6 (relations and linked views) and section 7 (publishing) are out of scope.
+- **Builders**: `build_database_schema` and `schema_definitions` return one frozen `DatabaseSchema` per kind, in heading order. Personal kinds are Tasks, Events, Habits, Finance, Meals, and Notes. Business kinds are Clients, Projects, Content, and Invoices. `build_schema` copies the caller property sequence and option sequence before validation. Names are strings of length 1 through 64 with no surrounding whitespace. A schema has 1 through 12 properties and exactly one title. Property types are title, text, number, select, multi_select, date, checkbox, formula, url, and email. Select and multi_select options number 1 through 8, are unique, and are rejected on every other type. A formula property requires an expression and a result type and is compiled against sibling property names and types, excluding its own name. Cycles across formula properties are rejected at build time. A non-formula property rejects those fields. `compile_formula` accepts expressions of length 5 through 128 and call depth 1 through 4. Surrounding whitespace is rejected. Result types are text, number, checkbox, and date, and the declared result type must match the expression for literals, `prop()` of a known type, and the top-level function return type. `prop` names must be in the copied verified mapping for that database. `generate_notification_dashboard_formulas` rejects an empty verified mapping, then compiles current_date, task_open_and_due_today, birthday_status, money_spent_today, and water_glasses_remaining against the properties of the database each formula is attached to. `buyer_name` is deferred to Session 07 section 4 / section 6 and is not compiled. Due and money dates use `formatDate` with `YYYY-MM-DD`. Birthday uses `MM-DD`, so a February 29 birthday fires only in leap years. Clients and Habits formulas are skipped when that database is not verified. A required database missing from the verified mapping is rejected. A formula property's result type propagates to formulas that reference it. Invalid input raises `SchemaBuilderError`. An unverified `prop` name raises `UnverifiedPropertyNameError`.
+- **Pytest collected**: 1418 collected, 1417 passed, 1 skipped. W5 baseline: 1257 collected, 1256 passed, 1 skipped. Delta +161 collected and +161 passed.
 - **Per-file counts**:
 
   | File | Functions (base → tip) | Collected (base → tip) | Delta collected |
   |---|---|---|---|
-  | `tests/unit/integrations/notion/test_schema_builder.py` | 0 → 54 | 0 → 90 | +90 |
-  | `tests/unit/integrations/notion/test_formulas.py` | 0 → 50 | 0 → 61 | +61 |
+  | `tests/unit/integrations/notion/test_schema_builder.py` | 0 → 56 | 0 → 92 | +92 |
+  | `tests/unit/integrations/notion/test_formulas.py` | 0 → 58 | 0 → 69 | +69 |
   | Remaining files | unchanged | 1257 → 1257 | 0 |
-  | **Total** | | **1257 → 1408** | **+151** |
+  | **Total** | | **1257 → 1418** | **+161** |
 
-- **Mutation checks** (131 rows; each applied, pytest run, then reverted):
+- **Mutation checks** (141 rows; each applied, pytest run, then reverted):
 
   | Mutation | Failing test |
   |---|---|
@@ -334,7 +334,7 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
   | Return a mutable result-type mapping | `test_dashboard_mappings_are_immutable` |
   | Return a mutable database mapping | `test_dashboard_mappings_are_immutable` |
   | Return a mutable per-database property mapping | `test_dashboard_mappings_are_immutable` |
-  | Write client_name as prop("Today") | `test_dashboard_formulas_use_verified_property_names` |
+  | Emit client_name from the Clients title | `test_dashboard_formulas_use_verified_property_names` |
   | Change current_date result type to text | `test_dashboard_formulas_use_verified_property_names` |
   | Replace task_open_and_due_today with prop("Due") | `test_dashboard_formulas_use_verified_property_names` |
   | Replace birthday_status with prop("Birthday") | `test_dashboard_formulas_use_verified_property_names` |
@@ -343,6 +343,7 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
   | Compare birthday date to raw now() | `test_dashboard_formulas_use_verified_property_names` |
   | Compare money date to raw now() | `test_dashboard_formulas_use_verified_property_names` |
   | Use YYYY-MM-DD for birthday_status | `test_dashboard_formulas_use_verified_property_names` |
+  | Compare a birthday to the literal 02-29 | `test_february_29_birthday_matches_only_in_a_leap_year` |
   | Replace water_glasses_remaining with prop("Glasses") | `test_dashboard_formulas_use_verified_property_names` |
   | Set prop() arity to 2 | `test_prop_rejects_two_arguments` |
   | Set now() arity to 1 | `test_now_rejects_an_argument` |
@@ -364,11 +365,18 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
   | Allow if() branches of different types | `test_if_branches_must_have_the_same_type` |
   | Allow equal() arguments of different types | `test_equal_rejects_different_types` |
   | Drop the subtract() number checks | `test_subtract_rejects_a_non_number` |
+  | Drop the formatDate() date check | `test_format_date_rejects_a_non_date` |
+  | Drop the formatDate() text check | `test_format_date_rejects_a_non_text_pattern` |
+  | Drop the and/or checkbox check | `test_and_rejects_a_non_checkbox` |
+  | Drop the not() checkbox check | `test_not_rejects_a_non_checkbox` |
+  | Drop the subtract() second number check | `test_subtract_rejects_a_non_number_subtrahend` |
   | Drop equal from the allowed functions | `test_dashboard_formulas_use_verified_property_names` |
   | Drop subtract from the allowed functions | `test_dashboard_formulas_use_verified_property_names` |
   | Accept surrounding whitespace on a formula | `test_formula_surrounding_whitespace_is_rejected` |
   | Look up a missing property on another database | `test_cross_database_property_is_rejected` |
   | Accept a dashboard formula on an unverified database | `test_unverified_database_is_rejected` |
+  | Require the Clients database for every dashboard | `test_personal_only_presets_generate_a_dashboard` |
+  | Require Habits when that database is not verified | `test_habits_formula_is_skipped_when_habits_is_not_verified` |
   | Skip the catalogue property-type check | `test_dashboard_property_type_must_match_the_catalogue` |
   | Drop property type title | `test_allowed_property_type_is_accepted[title]` |
   | Drop property type text | `test_allowed_property_type_is_accepted[text]` |
@@ -410,6 +418,8 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
   | Allow a formula property with no expression | `test_formula_property_requires_an_expression` |
   | Allow a formula property with no result type | `test_formula_property_requires_a_result_type` |
   | Treat a formula property name as verified for itself | `test_formula_property_rejects_its_own_name` |
+  | Treat every formula property as text | `test_number_formula_is_rejected_where_a_checkbox_is_required` |
+  | Treat every formula property as a number | `test_checkbox_formula_is_accepted_as_an_if_condition` |
   | Remove the formula cycle check | `test_two_formula_cycle_is_rejected` |
   | Only reject mutual formula pairs | `test_three_formula_cycle_is_rejected` |
   | Treat a non-formula reference as a cycle | `test_acyclic_formula_chain_is_accepted` |

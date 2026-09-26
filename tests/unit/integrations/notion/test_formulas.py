@@ -5,6 +5,7 @@ No network, no Notion, no browser.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import cast
 
 import pytest
@@ -17,7 +18,7 @@ from money_machine.integrations.notion.formulas import (
     compile_formula,
     generate_notification_dashboard_formulas,
 )
-from money_machine.integrations.notion.schema_builder import build_schema
+from money_machine.integrations.notion.schema_builder import build_schema, schema_definitions
 
 _VERIFIED: dict[str, dict[str, str]] = {
     "Clients": {"Name": "title"},
@@ -58,14 +59,14 @@ def _length_expr(length: int) -> tuple[str, dict[str, str], str]:
 def test_dashboard_formulas_use_verified_property_names() -> None:
     generated = generate_notification_dashboard_formulas(_VERIFIED)
     assert list(generated.expressions) == [
-        "client_name",
         "current_date",
         "task_open_and_due_today",
         "birthday_status",
         "money_spent_today",
         "water_glasses_remaining",
     ]
-    assert generated.expressions["client_name"] == 'prop("Name")'
+    assert "client_name" not in generated.expressions
+    assert "buyer_name" not in generated.expressions
     assert generated.expressions["current_date"] == "now()"
     assert generated.expressions["task_open_and_due_today"] == (
         'and(equal(prop("Status"), "Open"), '
@@ -84,7 +85,6 @@ def test_dashboard_formulas_use_verified_property_names() -> None:
         == 'subtract(prop("Goal"), prop("Glasses"))'
     )
     assert dict(generated.result_types) == {
-        "client_name": "text",
         "current_date": "date",
         "task_open_and_due_today": "checkbox",
         "birthday_status": "checkbox",
@@ -92,7 +92,6 @@ def test_dashboard_formulas_use_verified_property_names() -> None:
         "water_glasses_remaining": "number",
     }
     assert dict(generated.databases) == {
-        "client_name": "Clients",
         "current_date": "Tasks",
         "task_open_and_due_today": "Tasks",
         "birthday_status": "Events",
@@ -170,7 +169,7 @@ def test_caller_verified_names_are_isolated() -> None:
     names["Clients"]["Name"] = "text"
     assert "Injected" not in generated.verified_properties["Habits"]
     assert generated.verified_properties["Clients"]["Name"] == "title"
-    assert generated.expressions["client_name"] == 'prop("Name")'
+    assert generated.expressions["current_date"] == "now()"
 
 
 def test_caller_verified_set_is_isolated() -> None:
@@ -183,11 +182,11 @@ def test_caller_verified_set_is_isolated() -> None:
 def test_dashboard_mappings_are_immutable() -> None:
     generated = generate_notification_dashboard_formulas(_VERIFIED)
     with pytest.raises(TypeError):
-        cast(dict[str, str], generated.expressions)["client_name"] = "nope"
+        cast(dict[str, str], generated.expressions)["current_date"] = "nope"
     with pytest.raises(TypeError):
-        cast(dict[str, str], generated.result_types)["client_name"] = "number"
+        cast(dict[str, str], generated.result_types)["current_date"] = "number"
     with pytest.raises(TypeError):
-        cast(dict[str, str], generated.databases)["client_name"] = "Tasks"
+        cast(dict[str, str], generated.databases)["current_date"] = "Events"
     with pytest.raises(TypeError):
         cast(dict[str, str], generated.verified_properties["Clients"])["Name"] = "text"
 
@@ -427,3 +426,66 @@ def test_formula_result_type_must_be_a_string() -> None:
     ]
     with pytest.raises(SchemaBuilderError, match="formula result type must be a string"):
         build_schema("Tasks", properties)
+
+
+_PERSONAL_KINDS = ("Tasks", "Events", "Habits", "Finance", "Meals", "Notes")
+
+
+def _verified_from_presets(kinds: tuple[str, ...]) -> dict[str, dict[str, str]]:
+    definitions = schema_definitions()
+    return {kind: {prop.name: prop.type for prop in definitions[kind].properties} for kind in kinds}
+
+
+def test_personal_only_presets_generate_a_dashboard() -> None:
+    definitions = schema_definitions()
+    personal = tuple(kind for kind in definitions if definitions[kind].family == "personal")
+    assert personal == _PERSONAL_KINDS
+    generated = generate_notification_dashboard_formulas(_verified_from_presets(personal))
+    assert "client_name" not in generated.expressions
+    assert "buyer_name" not in generated.expressions
+    assert "Clients" not in generated.databases.values()
+    assert "water_glasses_remaining" in generated.expressions
+
+
+def test_habits_formula_is_skipped_when_habits_is_not_verified() -> None:
+    kinds = tuple(kind for kind in _PERSONAL_KINDS if kind != "Habits")
+    generated = generate_notification_dashboard_formulas(_verified_from_presets(kinds))
+    assert "water_glasses_remaining" not in generated.expressions
+    assert "Habits" not in generated.verified_properties
+
+
+def test_format_date_rejects_a_non_date() -> None:
+    with pytest.raises(SchemaBuilderError, match=r"formatDate\(\)"):
+        compile_formula('formatDate(prop("Name"), "MM")', {"Name": "title"}, "text")
+
+
+def test_format_date_rejects_a_non_text_pattern() -> None:
+    with pytest.raises(SchemaBuilderError, match=r"formatDate\(\)"):
+        compile_formula("formatDate(now(), 1)", {}, "text")
+
+
+def test_and_rejects_a_non_checkbox() -> None:
+    with pytest.raises(SchemaBuilderError, match=r"and\(\)"):
+        compile_formula('and(prop("Name"), prop("Name"))', {"Name": "title"}, "checkbox")
+
+
+def test_not_rejects_a_non_checkbox() -> None:
+    with pytest.raises(SchemaBuilderError, match=r"not\(\)"):
+        compile_formula('not(prop("Name"))', {"Name": "title"}, "checkbox")
+
+
+def test_subtract_rejects_a_non_number_subtrahend() -> None:
+    with pytest.raises(SchemaBuilderError, match=r"subtract\(\)"):
+        compile_formula('subtract(1, prop("Name"))', {"Name": "title"}, "number")
+
+
+def test_february_29_birthday_matches_only_in_a_leap_year() -> None:
+    generated = generate_notification_dashboard_formulas(_VERIFIED)
+    expression = generated.expressions["birthday_status"]
+    assert expression == (
+        'and(prop("Birthday"), '
+        'equal(formatDate(prop("Date"), "MM-DD"), formatDate(now(), "MM-DD")))'
+    )
+    assert "02-29" not in expression
+    assert date(2024, 2, 29).strftime("%m-%d") == "02-29"
+    assert date(2023, 3, 1).strftime("%m-%d") != "02-29"

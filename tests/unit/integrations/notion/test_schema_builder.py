@@ -484,3 +484,17 @@ def test_caller_option_list_mutation_does_not_change_the_schema() -> None:
     schema = build_schema("Tasks", properties)
     options.append("Later")
     assert schema.properties[1].options == ("Open", "Done")
+
+
+def test_number_formula_is_rejected_where_a_checkbox_is_required() -> None:
+    flag = _formula("Flag", 'equal(prop("N"), "x")', "checkbox")
+    properties = [_title(), _formula("N", "subtract(1, 0)", "number"), flag]
+    with pytest.raises(SchemaBuilderError, match="equal"):
+        build_schema("Tasks", properties)
+
+
+def test_checkbox_formula_is_accepted_as_an_if_condition() -> None:
+    number = _formula("N", 'if(prop("K"),1,0)', "number")
+    checkbox = _formula("K", 'empty(prop("Name"))', "checkbox")
+    schema = build_schema("Tasks", [_title(), checkbox, number])
+    assert schema.properties[2].formula_result_type == "number"
