@@ -5,7 +5,7 @@ No network and no writes except the path a test injects.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path
 
 import pytest
@@ -171,9 +171,27 @@ def test_reloaded_receipt_round_trips_every_field(tmp_path: Path) -> None:
     assert stored.status == "Unknown"
 
 
+class _NullOffset(tzinfo):
+    """A tzinfo whose utcoffset is None. That timestamp is not aware."""
+
+    def utcoffset(self, dt: datetime | None) -> timedelta | None:
+        return None
+
+    def tzname(self, dt: datetime | None) -> str | None:
+        return None
+
+    def dst(self, dt: datetime | None) -> timedelta | None:
+        return None
+
+
 def test_naive_timestamp_is_rejected() -> None:
     with pytest.raises(ValueError, match="timezone-aware"):
         _receipt(timestamp=datetime(2026, 9, 26, 1, 2, 3))
+
+
+def test_timestamp_with_null_utcoffset_is_rejected() -> None:
+    with pytest.raises(ValueError, match="timezone-aware"):
+        _receipt(timestamp=datetime(2026, 9, 26, 1, 2, 3, tzinfo=_NullOffset()))
 
 
 def test_timestamp_must_be_a_datetime() -> None:
@@ -184,6 +202,11 @@ def test_timestamp_must_be_a_datetime() -> None:
 def test_status_rejects_values_outside_the_enum() -> None:
     with pytest.raises(ValueError, match="status must be Success, Unknown, or Failure"):
         _receipt(status="CONFIRMED")
+
+
+def test_lowercase_success_status_is_rejected() -> None:
+    with pytest.raises(ValueError, match="status must be Success, Unknown, or Failure"):
+        _receipt(status="success")
 
 
 def test_post_state_must_be_a_mapping() -> None:
@@ -228,6 +251,62 @@ def test_two_logs_reject_a_duplicate_key_without_corrupting_the_file(tmp_path: P
     stored = reloaded.get("create_page:job_1")
     assert stored is not None
     assert stored.target == "page_1"
+
+
+def test_pre_state_snapshot_is_independent_of_the_caller() -> None:
+    """A later mutation of the caller's pre_state does not change the receipt."""
+    inner = {"n": 1}
+    pre_state = {"items": (inner,)}
+    receipt = _receipt(pre_state=pre_state)
+    log = NotionOperationReceiptLog()
+    log.record(receipt)
+    inner["n"] = 9
+
+    stored = log.get(receipt.idempotency_key)
+    assert stored is not None
+    assert stored.pre_state == {"items": ({"n": 1},)}
+
+
+def test_complete_json_tail_without_newline_is_kept(tmp_path: Path) -> None:
+    """A complete receipt that lacks a trailing newline is still loaded."""
+    path = tmp_path / "receipts.jsonl"
+    NotionOperationReceiptLog(path).record(_receipt())
+    path.write_text(path.read_text(encoding="utf-8").rstrip("\n"), encoding="utf-8")
+
+    reloaded = NotionOperationReceiptLog(path)
+    stored = reloaded.get("create_page:job_1")
+    assert stored is not None
+    assert stored.target == "page_1"
+
+
+def test_record_after_torn_tail_round_trips(tmp_path: Path) -> None:
+    """Appending after a torn fragment does not glue the next receipt onto it."""
+    path = tmp_path / "receipts.jsonl"
+    NotionOperationReceiptLog(path).record(_receipt())
+    path.write_text(path.read_text(encoding="utf-8") + '{"idem', encoding="utf-8")
+
+    NotionOperationReceiptLog(path).record(_receipt(idempotency_key="key-2", target="page_2"))
+    reloaded = NotionOperationReceiptLog(path)
+    assert reloaded.get("create_page:job_1") is not None
+    stored = reloaded.get("key-2")
+    assert stored is not None
+    assert stored.target == "page_2"
+
+
+def test_record_after_complete_line_without_newline_round_trips(tmp_path: Path) -> None:
+    """Appending after a complete line with no newline keeps both receipts."""
+    path = tmp_path / "receipts.jsonl"
+    NotionOperationReceiptLog(path).record(_receipt())
+    path.write_text(path.read_text(encoding="utf-8").rstrip("\n"), encoding="utf-8")
+
+    NotionOperationReceiptLog(path).record(_receipt(idempotency_key="key-2", target="page_2"))
+    reloaded = NotionOperationReceiptLog(path)
+    first = reloaded.get("create_page:job_1")
+    second = reloaded.get("key-2")
+    assert first is not None
+    assert first.target == "page_1"
+    assert second is not None
+    assert second.target == "page_2"
 
 
 def test_caller_dict_mutation_does_not_change_the_stored_receipt() -> None:

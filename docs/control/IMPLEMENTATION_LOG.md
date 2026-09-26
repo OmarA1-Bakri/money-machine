@@ -171,27 +171,28 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 
 ## 2026-09-26 — Session 06 Wave 5: combined adapter delegation, receipt stub, cause-test parametrization
 
-- **Combined adapter**: `CombinedNotionAdapter` routes API-tagged operations to the injected API adapter and browser-tagged operations to the injected browser adapter. Fallback runs only when the preferred adapter reports the operation unsupported (`reports_unsupported` or `NotImplementedError`). A write that raises, a `TypeError`, and an auth-style error propagate, and the other adapter is not called. When the fallback also fails, the second error is chained from the first. `get_public_url` is COMBINED: the API delegate returns the public URL, then the browser delegate verifies stranger access; `None` from the API skips the browser, and a failed stranger check returns `None`. `set_view_title_visibility(database_id, view_id, visible)` passes those three arguments through unchanged and returns the delegate's `NotionView`. The router still refuses browser and combined modes. The fixture adapter stays the default.
-- **Receipts stub**: `NotionOperationReceipt` and `NotionOperationReceiptLog` follow Session 06 prompt section "### 4. Implement Notion operation receipts" (`prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md`). Fields: job ID, operation, workspace, page/database target, pre-state when available, post-state, provider response, screenshot or response evidence, timestamp, idempotency key, status. Status is `Success`, `Unknown`, or `Failure`. Timestamps must be timezone-aware. A repeated idempotency key is rejected before append, including when a second log instance re-reads the same path. A torn trailing line that is not newline-terminated and is not JSON is skipped; a newline-terminated corrupt line is rejected. Caller mappings are copied before store. `NaN` and `Inf` are rejected. Writes happen only at a path the caller injects. No database table and no network.
+- **Combined adapter**: `CombinedNotionAdapter` routes API-tagged operations to the injected API adapter and browser-tagged operations to the injected browser adapter. Fallback runs only when the preferred adapter reports the operation unsupported (`reports_unsupported` or `NotImplementedError`). A write that raises (`RuntimeError`, `ValueError`, `ConnectionError`, `KeyError`, `AttributeError`, or any other exception that is not that signal), a `TypeError`, and an auth-style error propagate, and the other adapter is not called. When the fallback also fails, the second error is chained from the first. `get_public_url` is COMBINED: the API delegate returns the public URL, then the browser delegate verifies stranger access; `None` from the API skips the browser, and a failed stranger check returns `None`. `set_view_title_visibility(database_id, view_id, visible)` passes those three arguments through unchanged and returns the delegate's `NotionView`. The router still refuses browser and combined modes. The fixture adapter stays the default.
+- **Receipts stub**: `NotionOperationReceipt` and `NotionOperationReceiptLog` follow Session 06 prompt section "### 4. Implement Notion operation receipts" (`prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md`). Fields: job ID, operation, workspace, page/database target, pre-state when available, post-state, provider response, screenshot or response evidence, timestamp, idempotency key, status. Status is `Success`, `Unknown`, or `Failure`. Timestamps must be timezone-aware. A repeated idempotency key is rejected before append, including when a second log instance re-reads the same path. A torn trailing line that is not newline-terminated and is not JSON is skipped on load and truncated before the next append. A complete JSON line with no trailing newline is kept, and a newline is added before the next append. A newline-terminated corrupt line is rejected. Caller mappings are copied before store. `NaN` and `Inf` are rejected. Writes happen only at a path the caller injects. No database table and no network.
 - **Cause test**: `test_translating_session_keeps_original_playwright_error_as_cause` is parametrized over the eight `TranslatingBrowserSession` methods (`navigate`, `click`, `fill`, `get_attribute`, `is_visible`, `wait_for_selector`, `get_current_url`, `close`). No behaviour change in `browser_adapter.py`.
-- **Pytest collected**: 1195. W4b baseline: 1088 collected, 1087 passed, 1 skipped. Delta +107 collected.
+- **Pytest collected**: 1205. W4b baseline: 1088 collected, 1087 passed, 1 skipped. Delta +117 collected.
 - **Per-file counts**:
 
   | File | Functions (base → tip) | Collected (base → tip) | Delta collected |
   |---|---|---|---|
   | `tests/unit/integrations/notion/test_browser_adapter.py` | 75 → 75 | 100 → 107 | +7 |
   | `tests/unit/integrations/notion/test_stub_adapters.py` | 2 → 1 | 2 → 1 | -1 |
-  | `tests/unit/integrations/notion/test_combined_adapter.py` | 0 → 15 | 0 → 75 | +75 |
-  | `tests/unit/observability/test_receipts.py` | 0 → 18 | 0 → 26 | +26 |
+  | `tests/unit/integrations/notion/test_combined_adapter.py` | 0 → 15 | 0 → 79 | +79 |
+  | `tests/unit/observability/test_receipts.py` | 0 → 24 | 0 → 32 | +32 |
   | Remaining files | unchanged | 986 → 986 | 0 |
-  | **Total** | | **1088 → 1195** | **+107** |
+  | **Total** | | **1088 → 1205** | **+117** |
 
 - **Mutation checks** (each applied, pytest run, then reverted):
 
   | Mutation | Failing test |
   |---|---|
   | Swap `create_page` from the API operation set into the browser set | `test_operation_uses_api_adapter[create_page]` |
-  | Fall back on `except Exception` after a write raises | `test_write_error_is_not_retried_on_the_other_adapter[create_page]` |
+  | Fall back on `except Exception` after a write raises | `test_write_error_is_not_retried_on_the_other_adapter[RuntimeError]` |
+  | Widen the fallback `except` to `(NotImplementedError, RuntimeError)` | `test_write_error_is_not_retried_on_the_other_adapter[RuntimeError]` |
   | Fall back on `TypeError` | `test_type_error_propagates_unchanged` |
   | Fall back on `PermissionError` | `test_auth_error_propagates_unchanged` |
   | Remove the `reports_unsupported` pre-check | `test_fallback_when_preferred_reports_unsupported[create_page-api]` |
@@ -222,6 +223,12 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
   | Allow `NaN` in receipt JSON | `test_non_finite_numbers_are_rejected[nan]` |
   | Remove the `record()` duplicate idempotency-key guard | `test_duplicate_idempotency_key_is_rejected_and_not_appended` |
   | Store the caller mapping without copying it | `test_caller_dict_mutation_does_not_change_the_stored_receipt` |
+  | Remove `deepcopy` before freezing `pre_state` | `test_pre_state_snapshot_is_independent_of_the_caller` |
+  | Accept a timestamp whose `utcoffset()` is `None` | `test_timestamp_with_null_utcoffset_is_rejected` |
+  | Accept a case-folded status | `test_lowercase_success_status_is_rejected` |
+  | Skip a complete JSON tail that has no newline | `test_complete_json_tail_without_newline_is_kept` |
+  | Skip tail repair before append | `test_record_after_torn_tail_round_trips` |
+  | Skip tail repair before append | `test_record_after_complete_line_without_newline_round_trips` |
 
 - **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w5` and this log entry. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
 - **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. Exit 78 held.

@@ -246,16 +246,25 @@ async def test_operation_forwards_every_argument(operation: str) -> None:
     assert preferred.calls == [(operation, (), _EXPECTED_CALLS[operation])]
 
 
-@pytest.mark.parametrize("operation", ["create_page", "add_text_block"])
-async def test_write_error_is_not_retried_on_the_other_adapter(operation: str) -> None:
+class _WriteFailure(Exception):
+    """A custom write failure. It is not an unsupported signal."""
+
+
+@pytest.mark.parametrize(
+    "error_type",
+    [RuntimeError, ValueError, ConnectionError, KeyError, AttributeError, _WriteFailure],
+)
+async def test_write_error_is_not_retried_on_the_other_adapter(
+    error_type: type[Exception],
+) -> None:
     """A write that raises is not run again on the other adapter."""
     api, browser, combined = _adapters()
-    error = TimeoutError(f"{operation} timed out")
-    api.errors[operation] = error
-    _seed(browser, operation, _PAGE)
+    error = error_type("create_page failed")
+    api.errors["create_page"] = error
+    _seed(browser, "create_page", _PAGE)
 
-    with pytest.raises(TimeoutError) as caught:
-        await _invoke(combined, operation)
+    with pytest.raises(error_type) as caught:
+        await _invoke(combined, "create_page")
 
     assert caught.value is error
     assert len(api.calls) == 1

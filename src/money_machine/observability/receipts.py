@@ -7,7 +7,9 @@ timezone-aware. This module does not open network connections and does not
 write anywhere except a path the caller injects.
 
 A trailing partial line that is not valid JSON and is not newline-terminated
-is a torn write from a crash. That tail is skipped so the log can reopen.
+is a torn write from a crash. Load skips that tail, and the next append
+truncates it before writing. A complete JSON line that lacks a trailing
+newline is kept on load, and a newline is added before the next append.
 A newline-terminated line that is not JSON is rejected.
 
 Writers of one path in this process share a lock and re-read the file before
@@ -210,26 +212,51 @@ def _receipt_from_payload(payload: object) -> NotionOperationReceipt:
     )
 
 
+def _complete_json(line: str) -> bool:
+    try:
+        json.loads(line)
+    except json.JSONDecodeError:
+        return False
+    return True
+
+
 def _logical_lines(text: str) -> list[str]:
-    """Receipt lines, skipping a torn trailing fragment that is not JSON."""
+    """Receipt lines. A torn tail is skipped; a complete JSON tail is kept."""
     if not text:
         return []
     lines = text.splitlines()
     if text.endswith("\n") or not lines:
         return lines
-    try:
-        json.loads(lines[-1])
-    except json.JSONDecodeError:
-        return lines[:-1]
-    return lines
+    if _complete_json(lines[-1]):
+        return lines
+    return lines[:-1]
+
+
+def _repair_tail(path: Path) -> None:
+    """Truncate a torn fragment, or terminate a complete last line, before append."""
+    if not path.is_file():
+        return
+    text = path.read_text(encoding="utf-8")
+    if not text or text.endswith("\n"):
+        return
+    lines = text.splitlines()
+    if _complete_json(lines[-1]):
+        path.write_text(text + "\n", encoding="utf-8")
+        return
+    kept = "\n".join(lines[:-1])
+    if kept:
+        kept += "\n"
+    path.write_text(kept, encoding="utf-8")
 
 
 class NotionOperationReceiptLog:
     """In-memory receipt log. Persists only when ``path`` is injected.
 
     A torn trailing line (not valid JSON, and not newline-terminated) is
-    skipped on load. Complete corrupt lines are rejected. Instances that share
-    a path in this process lock that path and re-read it before appending.
+    skipped on load and truncated before the next append. A complete JSON line
+    with no trailing newline is kept, and a newline is written before the next
+    append. Complete corrupt lines are rejected. Instances that share a path
+    in this process lock that path and re-read it before appending.
     """
 
     def __init__(self, path: Path | None = None) -> None:
@@ -288,6 +315,7 @@ class NotionOperationReceiptLog:
 
     @staticmethod
     def _append(path: Path, receipt: NotionOperationReceipt) -> None:
+        _repair_tail(path)
         line = json.dumps(_json_payload(receipt), sort_keys=True, allow_nan=False)
         with path.open("a", encoding="utf-8") as handle:
             handle.write(line + "\n")
