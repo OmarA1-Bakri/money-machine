@@ -317,6 +317,57 @@ async def test_auth_error_propagates_unchanged() -> None:
     assert browser.calls == []
 
 
+@pytest.mark.parametrize(
+    "error_type",
+    [
+        RuntimeError,
+        ConnectionError,
+        ValueError,
+        KeyError,
+        AttributeError,
+        NotImplementedError,
+        LookupError,
+    ],
+)
+@pytest.mark.parametrize("operation", ["inspect_page", "rename_page"])
+async def test_read_and_idempotent_error_propagates(
+    operation: str, error_type: type[BaseException]
+) -> None:
+    """A read or idempotent operation propagates the same error object."""
+    api, browser, combined = _adapters()
+    error = error_type(f"{operation} failed")
+    api.errors[operation] = error
+    _seed(browser, operation, _PAGE)
+
+    with pytest.raises(error_type) as caught:
+        await _invoke(combined, operation)
+
+    assert caught.value is error
+    assert len(api.calls) == 1
+    assert browser.calls == []
+
+
+@pytest.mark.parametrize("error_type", [TypeError, PermissionError])
+@pytest.mark.parametrize("operation", ["create_page", "duplicate_page"])
+async def test_write_type_and_permission_errors_propagate(
+    operation: str, error_type: type[BaseException]
+) -> None:
+    """TypeError and PermissionError on a write are not retried."""
+    api, browser, combined = _adapters()
+    error = error_type(f"{operation} refused")
+    preferred = browser if operation in BROWSER_OPERATIONS else api
+    other = api if preferred is browser else browser
+    preferred.errors[operation] = error
+    _seed(other, operation, _PAGE)
+
+    with pytest.raises(error_type) as caught:
+        await _invoke(combined, operation)
+
+    assert caught.value is error
+    assert len(preferred.calls) == 1
+    assert other.calls == []
+
+
 class _PartialNotImplemented(NotImplementedError):
     """A NotImplementedError subclass other than OperationUnsupportedError."""
 

@@ -6,9 +6,11 @@ No network and no writes except the path a test injects.
 from __future__ import annotations
 
 import gc
+import os
 import threading
 from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path
+from types import MappingProxyType
 from typing import cast
 
 import pytest
@@ -271,6 +273,40 @@ def test_pre_state_snapshot_is_independent_of_the_caller() -> None:
     assert stored.pre_state == {"items": ({"n": 1},)}
 
 
+def test_tuple_nested_mapping_is_frozen() -> None:
+    """A mapping inside a tuple is copied and cannot be mutated in place."""
+    inner = {"title": "old"}
+    receipt = _receipt(post_state={"items": (inner,)})
+    log = NotionOperationReceiptLog()
+    log.record(receipt)
+    inner["title"] = "NEW"
+
+    stored = log.get(receipt.idempotency_key)
+    assert stored is not None
+    items = stored.post_state["items"]
+    assert isinstance(items, tuple)
+    nested = items[0]
+    assert isinstance(nested, MappingProxyType)
+    assert nested["title"] == "old"
+    assignment = cast(dict[str, object], nested)
+    with pytest.raises(TypeError):
+        assignment["title"] = "NEW"
+
+
+def test_non_string_mapping_keys_are_rejected() -> None:
+    """A mapping whose keys are not strings is rejected before store."""
+    ambiguous = cast(dict[str, object], {1: "int", "1": "str"})
+    with pytest.raises(ValueError, match="keys must be strings"):
+        _receipt(post_state=ambiguous)
+
+
+def test_nested_non_string_mapping_keys_are_rejected() -> None:
+    """A non-string key inside a nested mapping or tuple is rejected."""
+    nested = cast(dict[str, object], {"items": ({1: "int"},)})
+    with pytest.raises(ValueError, match="keys must be strings"):
+        _receipt(post_state=nested)
+
+
 def test_complete_json_tail_without_newline_is_kept(tmp_path: Path) -> None:
     """A complete receipt that lacks a trailing newline is still loaded."""
     path = tmp_path / "receipts.jsonl"
@@ -335,6 +371,19 @@ def test_caller_dict_mutation_does_not_change_the_stored_receipt() -> None:
 def test_non_finite_numbers_are_rejected(bad: float) -> None:
     with pytest.raises(ValueError, match="JSON-serializable"):
         _receipt(post_state={"n": bad})
+
+
+def test_same_resolved_path_shares_one_lock(tmp_path: Path) -> None:
+    """One resolved path has one lock. A different path has a different lock."""
+    path = tmp_path / "receipts.jsonl"
+    first = NotionOperationReceiptLog(path)
+    second = NotionOperationReceiptLog(Path(os.path.relpath(path)))
+    other = NotionOperationReceiptLog(tmp_path / "other.jsonl")
+    first_lock = first._lock  # pyright: ignore[reportPrivateUsage]
+    second_lock = second._lock  # pyright: ignore[reportPrivateUsage]
+    other_lock = other._lock  # pyright: ignore[reportPrivateUsage]
+    assert first_lock is second_lock
+    assert first_lock is not other_lock
 
 
 def test_record_waits_for_the_path_lock(tmp_path: Path) -> None:
