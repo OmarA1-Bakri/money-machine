@@ -19,7 +19,8 @@ holds those locks weakly. Each log keeps a strong reference for its lifetime,
 and a discarded path leaves the registry. The stub does not coordinate writers
 in other processes. The path must be a ``pathlib.Path`` whose parent directory
 already exists. Nested mappings, lists, and tuples are frozen before store.
-Mapping keys must be strings at every level.
+The receipt field counts as level 0. 33 nested containers are accepted; 34 are
+rejected. Mapping keys must be strings at every level.
 """
 
 from __future__ import annotations
@@ -273,6 +274,20 @@ def _complete_json(line: str) -> bool:
     return True
 
 
+def _log_text(data: bytes) -> str:
+    """Decode a receipt log, skipping a torn tail that is not valid UTF-8."""
+    if data.endswith(b"\n"):
+        return data.decode("utf-8")
+    newline = data.rfind(b"\n")
+    prefix = data[: newline + 1]
+    tail = data[newline + 1 :]
+    try:
+        tail_text = tail.decode("utf-8")
+    except UnicodeDecodeError:
+        return prefix.decode("utf-8")
+    return prefix.decode("utf-8") + tail_text
+
+
 def _logical_lines(text: str) -> list[str]:
     """Receipt lines. A torn tail is skipped; a complete JSON tail is kept."""
     if not text:
@@ -318,7 +333,8 @@ class NotionOperationReceiptLog:
     """In-memory receipt log. Persists only when ``path`` is injected.
 
     A torn trailing line (not valid JSON, and not newline-terminated) is
-    skipped on load and truncated before the next append. A complete JSON line
+    skipped on load and truncated before the next append. An incomplete UTF-8
+    tail is skipped the same way. A complete JSON line
     with no trailing newline is kept, and a newline is written before the next
     append. Complete corrupt lines are rejected.     Instances that share a path
     in this process lock that path and re-read it before appending. The log
@@ -369,14 +385,14 @@ class NotionOperationReceiptLog:
     def _load_new_keys(self, path: Path) -> None:
         if not path.is_file():
             return
-        text = path.read_text(encoding="utf-8")
+        text = _log_text(path.read_bytes())
         seen_in_file: set[str] = set()
         for line_number, line in enumerate(_logical_lines(text), start=1):
             if not line.strip():
                 continue
             try:
                 payload = json.loads(line)
-            except json.JSONDecodeError as exc:
+            except (json.JSONDecodeError, RecursionError) as exc:
                 raise ValueError(f"{path} line {line_number} is not a receipt") from exc
             receipt = _receipt_from_payload(payload)
             key = receipt.idempotency_key

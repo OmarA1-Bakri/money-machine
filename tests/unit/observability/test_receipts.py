@@ -356,6 +356,25 @@ def test_record_after_torn_tail_round_trips(tmp_path: Path) -> None:
     assert stored.target == "page_2"
 
 
+def test_incomplete_utf8_tail_is_skipped(tmp_path: Path) -> None:
+    """An incomplete UTF-8 tail is skipped on load and truncated before append."""
+    path = tmp_path / "receipts.jsonl"
+    NotionOperationReceiptLog(path).record(_receipt())
+    with path.open("ab") as handle:
+        handle.write(b"\xc3")
+
+    reloaded = NotionOperationReceiptLog(path)
+    assert reloaded.get("create_page:job_1") is not None
+    reloaded.record(_receipt(idempotency_key="key-2", target="page_2"))
+
+    assert b"\xc3" not in path.read_bytes()
+    again = NotionOperationReceiptLog(path)
+    assert again.get("create_page:job_1") is not None
+    stored = again.get("key-2")
+    assert stored is not None
+    assert stored.target == "page_2"
+
+
 def test_record_after_complete_line_without_newline_round_trips(tmp_path: Path) -> None:
     """Appending after a complete line with no newline keeps both receipts."""
     path = tmp_path / "receipts.jsonl"
@@ -477,6 +496,97 @@ def test_caller_mapping_proxy_list_mutation_does_not_change_the_receipt() -> Non
     stored_list = stored_nested["b"]
     assert isinstance(stored_list, tuple)
     assert stored_list is not nested_list
+
+
+def test_shared_subcontainers_round_trip(tmp_path: Path) -> None:
+    """The same sub-dict or list used twice is copied, not treated as a cycle."""
+    shared = {"x": 1}
+    shared_list = [1]
+    receipt = _receipt(post_state={"a": shared, "b": shared, "c": shared_list, "d": shared_list})
+    path = tmp_path / "receipts.jsonl"
+    NotionOperationReceiptLog(path).record(receipt)
+    shared["x"] = 9
+    shared_list.append(2)
+
+    stored = NotionOperationReceiptLog(path).get(receipt.idempotency_key)
+    assert stored is not None
+    assert stored.post_state == {"a": {"x": 1}, "b": {"x": 1}, "c": (1,), "d": (1,)}
+    stored_a = stored.post_state["a"]
+    stored_b = stored.post_state["b"]
+    assert isinstance(stored_a, MappingProxyType)
+    assert isinstance(stored_b, MappingProxyType)
+    assert stored_a is not stored_b
+    assert stored_a is not shared
+    stored_c = stored.post_state["c"]
+    stored_d = stored.post_state["d"]
+    assert isinstance(stored_c, tuple)
+    assert isinstance(stored_d, tuple)
+    assert stored_c is not stored_d
+    assert stored_c is not shared_list
+
+
+def _nested_mappings(count: int) -> dict[str, object]:
+    """count includes the receipt field mapping as container 1 (level 0)."""
+    node: dict[str, object] = {"leaf": 1}
+    for _ in range(count - 1):
+        node = {"child": node}
+    return node
+
+
+def _nested_lists(count: int) -> dict[str, object]:
+    """count includes the receipt field mapping, then count-1 lists."""
+    node: object = 1
+    for _ in range(count - 1):
+        node = [node]
+    return {"items": node}
+
+
+def test_nesting_accepts_33_containers_and_rejects_34() -> None:
+    """33 nested containers are accepted; 34 are rejected. The field is level 0."""
+    accepted = _receipt(post_state=_nested_mappings(33))
+    current: object = accepted.post_state
+    for _ in range(32):
+        assert isinstance(current, MappingProxyType)
+        current = current["child"]
+    assert isinstance(current, MappingProxyType)
+    assert current["leaf"] == 1
+
+    with pytest.raises(ValueError, match="too deep") as caught:
+        _receipt(idempotency_key="create_page:job_34", post_state=_nested_mappings(34))
+    assert type(caught.value) is ValueError
+
+    listed = _receipt(idempotency_key="create_page:job_lists", post_state=_nested_lists(33))
+    listed_current: object = listed.post_state["items"]
+    for _ in range(32):
+        assert isinstance(listed_current, tuple)
+        assert len(listed_current) == 1
+        listed_current = listed_current[0]
+    assert listed_current == 1
+
+    with pytest.raises(ValueError, match="too deep") as listed_caught:
+        _receipt(idempotency_key="create_page:job_lists_34", post_state=_nested_lists(34))
+    assert type(listed_caught.value) is ValueError
+
+
+def test_deep_list_nest_raises_value_error() -> None:
+    """A list-only nest well past the limit raises ValueError, not RecursionError."""
+    node: object = 1
+    for _ in range(200):
+        node = [node]
+    with pytest.raises(ValueError, match="too deep") as caught:
+        _receipt(post_state={"items": node})
+    assert type(caught.value) is ValueError
+
+
+def test_deeply_nested_json_line_raises_value_error(tmp_path: Path) -> None:
+    """A load line that makes json.loads recurse raises ValueError."""
+    path = tmp_path / "receipts.jsonl"
+    depth = 10000
+    path.write_text("[" * depth + "1" + "]" * depth + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="is not a receipt") as caught:
+        NotionOperationReceiptLog(path)
+    assert type(caught.value) is ValueError
+    assert isinstance(caught.value.__cause__, RecursionError)
 
 
 def test_cycles_and_deep_nesting_raise_value_error() -> None:
