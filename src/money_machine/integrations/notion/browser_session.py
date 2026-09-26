@@ -9,13 +9,15 @@ while it is authenticated, open, and healthy. A read retries a timeout and
 does not retry a connection failure. Any other read error is wrapped and
 taints the session. A mutation is not clicked twice. An uncertain click is
 reconciled by observing, and any observe error is Unknown. A click that
-raises RuntimeError, ValueError, OSError, or ConnectionError is observed
-once, recorded as Unknown, and taints the session. A KeyboardInterrupt,
-SystemExit, or GeneratorExit from click or observe still records Unknown
-before it propagates. A captcha, verification, or unknown page fails
-closed. An idempotency key is bound to the profile, operation, workspace,
-target, and job. A rejected session id is closed. If that close fails, the profile
-is locked and the session-id error is raised again with the close error
+raises any Exception is observed once, recorded as Unknown with the
+observe result, and taints the session. If that observe also raises, one
+Unknown receipt is still returned. A KeyboardInterrupt, SystemExit, or
+GeneratorExit from click or observe still records Unknown before it
+propagates. An interrupt from the screenshot propagates. A captcha,
+verification, or unknown page fails closed. An idempotency key is bound
+to the profile, operation, workspace, target, and job. A rejected session
+id is closed. If that close fails, the profile is locked and the
+session-id error is raised again with the close error
 as its cause. Each mutation records one receipt. This module does not
 launch a browser engine, open a network connection, or write a cookie file.
 A driver is injected.
@@ -90,8 +92,8 @@ class BrowserDriver(Protocol):
     def click(self, session_id: str, selector: str) -> str:
         """Click one selector. Return applied or uncertain.
 
-        A raised RuntimeError, ValueError, OSError, or ConnectionError is
-        observed once, recorded as Unknown, and taints the session.
+        Any raised Exception is observed once, recorded as Unknown, and
+        taints the session.
         """
         ...
 
@@ -258,8 +260,8 @@ class BrowserSessionManager:
         """Read a known selector.
 
         TimeoutError gets 3 attempts in total. ConnectionError is not retried.
-        Any other driver error is wrapped in BrowserSessionError and taints
-        the session.
+        Any other driver error is wrapped in BrowserSessionError, recorded
+        with screenshot reason error, and taints the session.
         """
         if selector_name not in _READ_SELECTORS:
             raise BrowserSessionError("selector is not readable")
@@ -389,10 +391,8 @@ class BrowserSessionManager:
             outcome = self._driver.click(session.session_id, selector)
         except TimeoutError:
             return "uncertain"
-        except (RuntimeError, ValueError, OSError):
-            return "raised"
         except Exception:
-            return "error"
+            return "raised"
         if outcome in {"applied", "uncertain"}:
             return outcome
         return "error"
@@ -409,10 +409,19 @@ class BrowserSessionManager:
         kind: str,
     ) -> NotionOperationReceipt:
         """Observe once, then record Unknown. The session is tainted."""
+        observed = "unknown"
         with suppress(Exception):
-            self._driver.observe(session.session_id)
+            observed = self._driver.observe(session.session_id)
         return self._record_unknown(
-            session, job, operation, workspace, target, key, timestamp, kind
+            session,
+            job,
+            operation,
+            workspace,
+            target,
+            key,
+            timestamp,
+            kind,
+            observed,
         )
 
     def _record_unknown(
@@ -425,11 +434,12 @@ class BrowserSessionManager:
         key: str,
         timestamp: datetime,
         kind: str,
+        observed: str = "unknown",
     ) -> NotionOperationReceipt:
         """Store one Unknown receipt and taint the session."""
         try:
             evidence = self._capture(session, "uncertain")
-        except BaseException:
+        except Exception:
             evidence = "screenshot-failed"
         return self._record(
             session,
@@ -442,7 +452,7 @@ class BrowserSessionManager:
             status="Unknown",
             evidence=evidence,
             click="uncertain",
-            observed="unknown",
+            observed=observed,
             kind=kind,
             taint=True,
         )

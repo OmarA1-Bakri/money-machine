@@ -41,7 +41,7 @@ class FakeDriver:
         self.read_results: list[str | Exception] = ["ok"]
         self.observe_result: str | BaseException = "applied"
         self.close_error: Exception | None = None
-        self.screenshot_error: Exception | None = None
+        self.screenshot_error: BaseException | None = None
         self.open_result: object | None = None
         self._session = 0
 
@@ -419,13 +419,18 @@ def test_observe_timeout_is_unknown() -> None:
         _mutate(manager, key="other")
 
 
-def test_connection_error_does_not_observe() -> None:
+class DriverError(Exception):
+    """Custom driver error outside the old RuntimeError, ValueError, OSError catch."""
+
+
+def test_connection_error_click_is_one_unknown_receipt() -> None:
     manager, driver = _manager()
     _open(manager)
     driver.click_result = ConnectionError("down")
     driver.observe_result = "applied"
     receipt = _mutate(manager)
     assert receipt.status == "Unknown"
+    assert receipt.post_state["observed"] == "applied"
     assert len(driver.clicks) == 1
     assert len(driver.observes) == 1
     assert len(manager.receipts) == 1
@@ -438,19 +443,55 @@ def test_connection_error_does_not_observe() -> None:
 
 @pytest.mark.parametrize(
     "error",
-    [RuntimeError("boom"), ValueError("boom"), OSError("boom")],
-    ids=["RuntimeError", "ValueError", "OSError"],
+    [
+        RuntimeError("boom"),
+        ValueError("boom"),
+        OSError("boom"),
+        DriverError("boom"),
+        LookupError("boom"),
+        TypeError("boom"),
+    ],
+    ids=["RuntimeError", "ValueError", "OSError", "DriverError", "LookupError", "TypeError"],
 )
-def test_click_runtime_error_is_one_failure_receipt(error: Exception) -> None:
+def test_raised_click_is_one_unknown_receipt(error: Exception) -> None:
     manager, driver = _manager()
     _open(manager)
     driver.click_result = error
     driver.observe_result = "applied"
     receipt = _mutate(manager)
     assert receipt.status == "Unknown"
+    assert receipt.post_state["observed"] == "applied"
     assert len(driver.clicks) == 1
     assert len(driver.observes) == 1
     assert len(manager.receipts) == 1
+    replay = _mutate(manager)
+    assert replay is receipt
+    assert len(driver.clicks) == 1
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        _mutate(manager, key="other")
+
+
+@pytest.mark.parametrize(
+    ("click_error", "observe_error"),
+    [
+        (RuntimeError("click"), RuntimeError("observe")),
+        (DriverError("click"), LookupError("observe")),
+    ],
+    ids=["RuntimeError-RuntimeError", "DriverError-LookupError"],
+)
+def test_raised_click_observe_error_returns_one_unknown_receipt(
+    click_error: Exception, observe_error: Exception
+) -> None:
+    manager, driver = _manager()
+    _open(manager)
+    driver.click_result = click_error
+    driver.observe_result = observe_error
+    receipt = _mutate(manager)
+    assert receipt.status == "Unknown"
+    assert receipt.post_state["observed"] == "unknown"
+    assert len(manager.receipts) == 1
+    assert len(driver.clicks) == 1
+    assert len(driver.observes) == 1
     replay = _mutate(manager)
     assert replay is receipt
     assert len(driver.clicks) == 1
@@ -599,6 +640,7 @@ def test_read_other_error_is_wrapped_and_taints() -> None:
         manager.read("shop-a", "public_url")
     assert isinstance(caught.value.__cause__, RuntimeError)
     assert len(driver.reads) == 1
+    assert driver.screenshots[0][1].endswith("-error.png")
     with pytest.raises(BrowserSessionError, match="restarted"):
         manager.read("shop-a", "public_url")
 
@@ -660,6 +702,17 @@ def test_tainted_session_is_not_reused_until_restart() -> None:
     assert _open(manager) == "session-2"
     receipt = _mutate(manager, key="after")
     assert receipt.status == "Success"
+
+
+@pytest.mark.parametrize("exc_type", [KeyboardInterrupt, SystemExit, GeneratorExit])
+def test_screenshot_interrupt_propagates(exc_type: type[BaseException]) -> None:
+    manager, driver = _manager()
+    _open(manager)
+    driver.click_result = RuntimeError("boom")
+    driver.observe_result = "applied"
+    driver.screenshot_error = exc_type("stop")
+    with pytest.raises(exc_type):
+        _mutate(manager)
 
 
 @pytest.mark.parametrize("exc_type", [KeyboardInterrupt, SystemExit, GeneratorExit])
