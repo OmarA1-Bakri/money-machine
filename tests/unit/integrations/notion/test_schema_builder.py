@@ -42,6 +42,7 @@ _CATALOGUE: dict[str, _CatalogueRow] = {
             ("Name", "title", ()),
             ("Glasses", "number", ()),
             ("Goal", "number", ()),
+            ("Date", "date", ()),
         ),
     ),
     "Finance": (

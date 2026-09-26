@@ -120,6 +120,7 @@ def _habits() -> tuple[Mapping[str, object], ...]:
         _field("Name", "title"),
         _field("Glasses", "number"),
         _field("Goal", "number"),
+        _field("Date", "date"),
     )
 
 

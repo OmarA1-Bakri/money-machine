@@ -5,6 +5,7 @@ No network, no Notion, no browser.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import cast
 
 import pytest
@@ -15,6 +16,7 @@ from money_machine.integrations.notion.relations import (
     VIEW_TYPES,
     CanonicalDatabase,
     CanonicalDatabases,
+    DashboardRelation,
     DashboardRollup,
     ViewFilter,
     build_canonical_databases,
@@ -61,7 +63,7 @@ def test_canonical_mapping_is_immutable() -> None:
 
 def test_hand_built_canonical_databases_are_rejected() -> None:
     made_up = ("Widgets",)
-    registry = {"Widgets": CanonicalDatabase(data_type="Widgets")}
+    registry = {"Widgets": _database_with_data_type("Widgets")}
     with pytest.raises(SchemaBuilderError):
         CanonicalDatabases(data_types=made_up, by_type=registry)
     with pytest.raises(SchemaBuilderError):
@@ -214,7 +216,7 @@ def test_three_filter_dimensions_are_accepted() -> None:
     canonical = build_canonical_databases(["Tasks"])
     filters = [
         build_filter("date", "Due", "equals", "today"),
-        build_filter("category", "Status", "equals", "Work"),
+        build_filter("category", "Status", "equals", "Done"),
         build_filter("status", "Status", "equals", "Open"),
     ]
     view = build_linked_view("Home", "Tasks", "table", "Open", filters, canonical)
@@ -265,6 +267,12 @@ def test_filters_reject_a_string() -> None:
         build_linked_view("Home", "Tasks", "table", "Open", "", canonical)
 
 
+def test_filters_reject_a_non_empty_string() -> None:
+    canonical = build_canonical_databases(["Tasks"])
+    with pytest.raises(SchemaBuilderError, match="sequence"):
+        build_linked_view("Home", "Tasks", "table", "Open", "ab", canonical)
+
+
 def test_filter_order_is_preserved() -> None:
     canonical = build_canonical_databases(["Tasks"])
     filters = (
@@ -303,6 +311,20 @@ def test_invalid_status_value_is_rejected() -> None:
         build_linked_view("Home", "Tasks", "table", "Open", filters, canonical)
 
 
+def test_invalid_category_value_is_rejected() -> None:
+    canonical = build_canonical_databases(["Tasks"])
+    filters = (build_filter("category", "Status", "equals", "Work"),)
+    with pytest.raises(SchemaBuilderError, match="category value"):
+        build_linked_view("Home", "Tasks", "table", "Open", filters, canonical)
+
+
+def test_date_filter_on_current_date_formula_is_rejected() -> None:
+    canonical = build_canonical_databases(["Tasks"])
+    filters = (build_filter("date", "current_date", "equals", "today"),)
+    with pytest.raises(SchemaBuilderError, match="formula"):
+        build_linked_view("Home", "Tasks", "table", "Open", filters, canonical)
+
+
 def test_calendar_view_requires_a_date_property() -> None:
     canonical = build_canonical_databases(["Notes"])
     with pytest.raises(SchemaBuilderError, match="date property"):
@@ -317,6 +339,36 @@ def test_missing_rollup_source_is_rejected() -> None:
 def test_mismatched_rollup_function_is_rejected() -> None:
     with pytest.raises(SchemaBuilderError, match="does not fit"):
         build_dashboard_rollup("Tasks", "open_tasks_due_today", "task_open_and_due_today", "sum")
+
+
+def test_unknown_rollup_function_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="does not fit"):
+        build_dashboard_rollup("Finance", "spent", "Amount", "average")
+
+
+def test_unknown_rollup_data_type_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="not canonical"):
+        build_dashboard_rollup("Bogus", "spent", "Amount", "sum")
+
+
+def test_unhashable_rollup_function_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="rollup function"):
+        build_dashboard_rollup("Finance", "spent", "Amount", ["average"])
+
+
+def test_rollup_name_must_be_present() -> None:
+    with pytest.raises(SchemaBuilderError, match="rollup name"):
+        build_dashboard_rollup("Finance", "", "Amount", "sum")
+
+
+def test_rollup_source_name_must_be_present() -> None:
+    with pytest.raises(SchemaBuilderError, match="property name"):
+        build_dashboard_rollup("Finance", "spent", " ", "sum")
+
+
+def test_finance_formula_rollup_is_rejected_on_tasks() -> None:
+    with pytest.raises(SchemaBuilderError, match="not on Tasks"):
+        build_dashboard_rollup("Tasks", "spent", "money_spent_today", "sum")
 
 
 def test_dashboard_today_view() -> None:
@@ -435,7 +487,10 @@ def test_each_dashboard_database_adds_its_rollup(kind: str) -> None:
 def test_habits_relation_links_only_todays_row() -> None:
     dashboard = build_notification_dashboard(build_canonical_databases(["Tasks", "Habits"]))
     by_type = {item.data_type: item for item in dashboard.relations}
-    assert by_type["Habits"].linked_rows == "today"
+    today = ViewFilter(dimension="date", property_name="Date", condition="equals", value="today")
+    assert by_type["Habits"].filters == (today,)
+    assert by_type["Habits"].linked_rows is None
+    assert by_type["Tasks"].filters == ()
     assert by_type["Tasks"].linked_rows is None
     habits = [item for item in dashboard.rollups if item.relation_name == "Habits"]
     assert habits == [
@@ -469,6 +524,118 @@ def test_notes_does_not_add_a_dashboard_relation() -> None:
 def test_notification_dashboard_requires_the_canonical_registry() -> None:
     with pytest.raises(SchemaBuilderError, match="canonical databases"):
         build_notification_dashboard({"Tasks": "Tasks"})
+
+
+def _database_with_data_type(data_type: str) -> CanonicalDatabase:
+    entry = object.__new__(CanonicalDatabase)
+    object.__setattr__(entry, "data_type", data_type)
+    return entry
+
+
+def test_canonical_database_rejects_an_unknown_data_type() -> None:
+    with pytest.raises(SchemaBuilderError, match="is not canonical"):
+        CanonicalDatabase(data_type="Bogus")
+
+
+def test_catalogue_data_type_must_be_a_string() -> None:
+    with pytest.raises(SchemaBuilderError, match="is not canonical"):
+        CanonicalDatabase(data_type=cast(str, ["Bogus"]))
+
+
+def test_canonical_key_must_be_catalogue() -> None:
+    with pytest.raises(SchemaBuilderError, match="canonical key"):
+        CanonicalDatabases(
+            data_types=("Tasks",),
+            by_type={"Bogus": CanonicalDatabase("Tasks")},
+        )
+
+
+def test_canonical_entry_data_type_must_be_catalogue() -> None:
+    with pytest.raises(SchemaBuilderError, match="entry data type"):
+        CanonicalDatabases(
+            data_types=("Tasks",),
+            by_type={"Tasks": _database_with_data_type("Bogus")},
+        )
+
+
+def test_canonical_key_must_match_entry_data_type() -> None:
+    with pytest.raises(SchemaBuilderError, match="does not match"):
+        CanonicalDatabases(
+            data_types=("Tasks",),
+            by_type={"Tasks": CanonicalDatabase("Events")},
+        )
+
+
+def test_canonical_data_types_must_not_repeat() -> None:
+    with pytest.raises(SchemaBuilderError, match="repeated"):
+        CanonicalDatabases(
+            data_types=("Tasks", "Tasks"),
+            by_type={"Tasks": CanonicalDatabase("Tasks")},
+        )
+
+
+def test_canonical_keys_must_match_data_types() -> None:
+    with pytest.raises(SchemaBuilderError, match="must match data types"):
+        CanonicalDatabases(data_types=("Tasks",), by_type={})
+
+
+def test_unhashable_canonical_data_type_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="is not canonical"):
+        CanonicalDatabases(
+            data_types=cast(tuple[str, ...], (["Tasks"],)),
+            by_type={},
+        )
+
+
+def test_canonical_data_types_must_be_a_tuple() -> None:
+    with pytest.raises(SchemaBuilderError, match="must be a tuple"):
+        CanonicalDatabases(
+            data_types=cast(tuple[str, ...], ["Tasks"]),
+            by_type={"Tasks": CanonicalDatabase("Tasks")},
+        )
+
+
+def test_canonical_by_type_must_be_a_mapping() -> None:
+    with pytest.raises(SchemaBuilderError, match="must be a mapping"):
+        CanonicalDatabases(
+            data_types=("Tasks",),
+            by_type=cast(Mapping[str, CanonicalDatabase], []),
+        )
+
+
+def test_canonical_entry_must_be_a_database() -> None:
+    with pytest.raises(SchemaBuilderError, match="CanonicalDatabase"):
+        CanonicalDatabases(
+            data_types=("Tasks",),
+            by_type=cast(Mapping[str, CanonicalDatabase], {"Tasks": "Tasks"}),
+        )
+
+
+def test_caller_by_type_mutation_has_no_effect() -> None:
+    original: dict[str, CanonicalDatabase] = {"Tasks": CanonicalDatabase("Tasks")}
+    registry = CanonicalDatabases(data_types=("Tasks",), by_type=original)
+    original["Events"] = CanonicalDatabase("Events")
+    assert tuple(registry.by_type) == ("Tasks",)
+
+
+def test_linked_rows_yesterday_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="yesterday is not allowed"):
+        DashboardRelation(name="Habits", data_type="Habits", linked_rows="yesterday")
+
+
+def test_linked_rows_must_not_be_empty() -> None:
+    with pytest.raises(SchemaBuilderError, match="must not be empty"):
+        DashboardRelation(name="Habits", data_type="Habits", linked_rows="")
+
+
+def test_linked_rows_must_be_a_string() -> None:
+    with pytest.raises(SchemaBuilderError, match="must be a string"):
+        DashboardRelation(name="Habits", data_type="Habits", linked_rows=cast(str, 123))
+
+
+def test_relation_data_type_must_be_canonical() -> None:
+    with pytest.raises(SchemaBuilderError, match="not canonical"):
+        DashboardRelation(name="Habits", data_type="Bogus")
 
 
 def test_rollup_names_the_canonical_database() -> None:

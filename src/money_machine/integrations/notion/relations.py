@@ -9,10 +9,10 @@ status, and each filter property must exist on that database. The home
 dashboard has a today view, a monthly calendar, and quick notes. The
 notification dashboard is one row of relations and rollups over the Tasks,
 Events, Finance, and Habits formulas from section 5. A missing database omits
-its relation and rollup. The Habits relation links only today's Habits row, so
-``water_glasses_remaining`` is that row. ``client_name``, the configured buyer
-name, and ``current_date`` are not relations. This module does not call
-Notion, the network, or a browser.
+its relation and rollup. The Habits relation carries a date-equals-today filter
+on the Habits Date property, so ``water_glasses_remaining`` is today's row.
+``client_name``, the configured buyer name, and ``current_date`` are not
+relations. This module does not call Notion, the network, or a browser.
 """
 
 from __future__ import annotations
@@ -38,6 +38,8 @@ _ROLLUP_FUNCTION_TYPES: dict[str, frozenset[str]] = {
     "checked": frozenset({"checkbox"}),
     "sum": frozenset({"number"}),
 }
+_CATALOGUE_KINDS: frozenset[str] = frozenset(DATABASE_KINDS)
+_PropertyFacts = tuple[str, tuple[str, ...], bool]
 
 # data type, rollup name, source property, function.
 _DASHBOARD_LINKS: tuple[tuple[str, str, str, str], ...] = (
@@ -54,9 +56,12 @@ class CanonicalDatabase:
 
     data_type: str
 
+    def __post_init__(self) -> None:
+        _require_catalogue_data_type(cast(object, self.data_type))
+
 
 def _is_unknown_data_type(item: str) -> bool:
-    if item not in DATABASE_KINDS:  # noqa: SIM103
+    if item not in _CATALOGUE_KINDS:  # noqa: SIM103
         return True
     return False
 
@@ -77,16 +82,30 @@ class CanonicalDatabases:
         data_types = cast(object, self.data_types)
         if isinstance(data_types, str) or not isinstance(data_types, tuple):
             raise SchemaBuilderError("canonical data types must be a tuple")
+        seen: set[str] = set()
         for item in data_types:
             _require_catalogue_data_type(item)
+            if item in seen:
+                raise SchemaBuilderError(f"data type {item!r} is repeated")
+            seen.add(item)
         by_type = cast(object, self.by_type)
         if not isinstance(by_type, Mapping):
             raise SchemaBuilderError("canonical databases must be a mapping")
+        copied: dict[str, CanonicalDatabase] = {}
         for key, database in by_type.items():
-            _require_catalogue_data_type(key)
+            if not isinstance(key, str) or _is_unknown_data_type(key):
+                raise SchemaBuilderError(f"canonical key {key!r} is not canonical")
             if not isinstance(database, CanonicalDatabase):
                 raise SchemaBuilderError("canonical entry must be a CanonicalDatabase")
-            _require_catalogue_data_type(cast(object, database.data_type))
+            entry_type = cast(object, database.data_type)
+            if not isinstance(entry_type, str) or _is_unknown_data_type(entry_type):
+                raise SchemaBuilderError(f"entry data type {entry_type!r} is not canonical")
+            if key != database.data_type:
+                raise SchemaBuilderError(f"key {key!r} does not match entry {database.data_type!r}")
+            copied[key] = database
+        if set(copied) != seen:
+            raise SchemaBuilderError("canonical database keys must match data types")
+        object.__setattr__(self, "by_type", MappingProxyType(dict(copied)))
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,13 +142,27 @@ class LinkedView:
 class DashboardRelation:
     """A relation from the one-row dashboard to one canonical database.
 
-    ``linked_rows`` is ``today`` only for Habits. That relation links today's
-    Habits row, so the water rollup is not a sum of every day.
+    Habits uses a date-equals-today filter on Date, so the water rollup is
+    today's row. ``linked_rows`` is not that filter and is rejected.
     """
 
     name: str
     data_type: str
+    filters: tuple[ViewFilter, ...] = ()
     linked_rows: str | None = None
+
+    def __post_init__(self) -> None:
+        _require_catalogue_data_type(cast(object, self.data_type))
+        linked = cast(object, self.linked_rows)
+        if linked is None:
+            return
+        if not isinstance(linked, str):
+            raise SchemaBuilderError("linked rows must be a string")
+        if linked == "":
+            raise SchemaBuilderError("linked rows must not be empty")
+        if linked == "yesterday":
+            raise SchemaBuilderError("linked rows yesterday is not allowed")
+        raise SchemaBuilderError(f"linked rows {linked!r} is not allowed")
 
 
 @dataclass(frozen=True, slots=True)
@@ -272,10 +305,8 @@ def build_notification_dashboard(canonical: object) -> NotificationDashboard:
     for data_type, rollup_name, property_name, function in _DASHBOARD_LINKS:
         if data_type not in canonical.by_type:
             continue
-        linked_rows = "today" if data_type == "Habits" else None
-        relations.append(
-            DashboardRelation(name=data_type, data_type=data_type, linked_rows=linked_rows)
-        )
+        filters = _relation_filters(data_type)
+        relations.append(DashboardRelation(name=data_type, data_type=data_type, filters=filters))
         rollups.append(build_dashboard_rollup(data_type, rollup_name, property_name, function))
     return NotificationDashboard(
         row_count=1,
@@ -302,22 +333,37 @@ def _copy_filters(filters: object) -> tuple[ViewFilter, ...]:
     return tuple(copied)
 
 
-def _catalogue_properties(data_type: str) -> dict[str, tuple[str, tuple[str, ...]]]:
-    """Schema properties plus the dashboard formulas attached to this data type."""
-    schema = schema_definitions()[data_type]
-    properties = {prop.name: (prop.type, prop.options) for prop in schema.properties}
-    verified = {data_type: {name: type_name for name, (type_name, _options) in properties.items()}}
+def _relation_filters(data_type: str) -> tuple[ViewFilter, ...]:
+    if data_type != "Habits":
+        return ()
+    today = build_filter("date", "Date", "equals", "today")
+    _require_filter(data_type, today, _catalogue_properties(data_type))
+    return (today,)
+
+
+def _catalogue_properties(data_type: str) -> dict[str, _PropertyFacts]:
+    """Schema properties plus this data type's own dashboard formulas."""
+    definitions = schema_definitions()
+    schema = definitions[data_type]
+    properties: dict[str, _PropertyFacts] = {
+        prop.name: (prop.type, prop.options, False) for prop in schema.properties
+    }
+    verified = {
+        kind: {prop.name: prop.type for prop in definition.properties}
+        for kind, definition in definitions.items()
+    }
     formulas = generate_notification_dashboard_formulas(verified)
     for key, result_type in formulas.result_types.items():
         if formulas.databases[key] == data_type:
-            properties[key] = (result_type, ())
+            properties[key] = (result_type, (), True)
     return properties
 
 
 def _require_view(data_type: str, view_type: str, filters: tuple[ViewFilter, ...]) -> None:
     properties = _catalogue_properties(data_type)
     if view_type == "calendar" and not any(
-        type_name == "date" for type_name, _opts in properties.values()
+        type_name == "date" and not from_formula
+        for type_name, _options, from_formula in properties.values()
     ):
         raise SchemaBuilderError(f"{data_type} has no date property for a calendar")
     for item in filters:
@@ -327,18 +373,24 @@ def _require_view(data_type: str, view_type: str, filters: tuple[ViewFilter, ...
 def _require_filter(
     data_type: str,
     item: ViewFilter,
-    properties: Mapping[str, tuple[str, tuple[str, ...]]],
+    properties: Mapping[str, _PropertyFacts],
 ) -> None:
     if item.property_name not in properties:
         raise SchemaBuilderError(f"property {item.property_name!r} is not on {data_type}")
-    type_name, options = properties[item.property_name]
+    type_name, options, from_formula = properties[item.property_name]
     if type_name not in _DIMENSION_TYPES[item.dimension]:
         raise SchemaBuilderError(
             f"filter dimension {item.dimension!r} does not fit property type {type_name!r}"
         )
+    if item.dimension == "date" and from_formula:
+        raise SchemaBuilderError(f"date filter on formula {item.property_name!r} is not allowed")
     if item.dimension == "status" and item.value not in options:
         raise SchemaBuilderError(
             f"status value {item.value!r} is not an option of {item.property_name}"
+        )
+    if item.dimension == "category" and item.value not in options:
+        raise SchemaBuilderError(
+            f"category value {item.value!r} is not an option of {item.property_name}"
         )
 
 
@@ -346,7 +398,7 @@ def _require_rollup(data_type: str, property_name: str, function: str) -> None:
     properties = _catalogue_properties(data_type)
     if property_name not in properties:
         raise SchemaBuilderError(f"rollup property {property_name!r} is not on {data_type}")
-    type_name, _options = properties[property_name]
+    type_name, _options, _from_formula = properties[property_name]
     allowed = _ROLLUP_FUNCTION_TYPES.get(function)
     if allowed is None or type_name not in allowed:
         raise SchemaBuilderError(
