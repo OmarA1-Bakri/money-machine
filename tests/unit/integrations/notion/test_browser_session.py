@@ -471,6 +471,21 @@ def test_raised_click_is_one_unknown_receipt(error: Exception) -> None:
         _mutate(manager, key="other")
 
 
+def test_raised_click_stays_unknown_when_observe_returns_applied() -> None:
+    manager, driver = _manager()
+    _open(manager)
+    driver.click_result = RuntimeError("boom")
+    driver.observe_result = "applied"
+    receipt = _mutate(manager)
+    assert receipt.post_state["observed"] == "applied"
+    assert receipt.status == "Unknown"
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        _mutate(manager, key="other")
+    replay = _mutate(manager)
+    assert replay is receipt
+    assert len(driver.clicks) == 1
+
+
 @pytest.mark.parametrize(
     ("click_error", "observe_error"),
     [

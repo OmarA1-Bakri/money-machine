@@ -9,11 +9,11 @@ while it is authenticated, open, and healthy. A read retries a timeout and
 does not retry a connection failure. Any other read error is wrapped and
 taints the session. A mutation is not clicked twice. An uncertain click is
 reconciled by observing, and any observe error is Unknown. A click that
-raises any Exception is observed once, recorded as Unknown with the
-observe result, and taints the session. If that observe also raises, one
-Unknown receipt is still returned. A KeyboardInterrupt, SystemExit, or
-GeneratorExit from click or observe still records Unknown before it
-propagates. An interrupt from the screenshot propagates. A captcha,
+raises any Exception is observed once and stays Unknown, even when the
+observe result is applied, and taints the session. If that observe also
+raises, one Unknown receipt is still returned. A KeyboardInterrupt,
+SystemExit, or GeneratorExit from click or observe still records Unknown
+before it propagates. An interrupt from the screenshot propagates. A captcha,
 verification, or unknown page fails closed. An idempotency key is bound
 to the profile, operation, workspace, target, and job. A rejected session
 id is closed. If that close fails, the profile is locked and the
@@ -92,8 +92,8 @@ class BrowserDriver(Protocol):
     def click(self, session_id: str, selector: str) -> str:
         """Click one selector. Return applied or uncertain.
 
-        Any raised Exception is observed once, recorded as Unknown, and
-        taints the session.
+        Any raised Exception stays Unknown when observe returns applied
+        and taints the session.
         """
         ...
 
@@ -408,7 +408,7 @@ class BrowserSessionManager:
         timestamp: datetime,
         kind: str,
     ) -> NotionOperationReceipt:
-        """Observe once, then record Unknown. The session is tainted."""
+        """Observe once, record Unknown, and taint. Applied is not Success."""
         observed = "unknown"
         with suppress(Exception):
             observed = self._driver.observe(session.session_id)
