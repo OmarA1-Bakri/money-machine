@@ -413,6 +413,11 @@ def test_secret_link_rejects_next_line() -> None:
         _publish(secret_link="https://fix\u0085ture.notion.site/Home")
 
 
+def test_secret_link_rejects_u009f() -> None:
+    with pytest.raises(SchemaBuilderError, match="control character"):
+        _publish(secret_link="https://fix\u009fture.notion.site/Home")
+
+
 def test_secret_link_rejects_a_zero_width_space() -> None:
     with pytest.raises(SchemaBuilderError, match="control character"):
         _publish(secret_link="https://fix\u200bture.notion.site/Home")
@@ -579,19 +584,35 @@ def test_page_url_rejects_an_empty_query() -> None:
         _publish(other_catalogue_pages=(value,))
 
 
-@pytest.mark.parametrize("char", ["\x1f", "\u200b", "\u2028", "\u2029"])
+@pytest.mark.parametrize(
+    "char",
+    [
+        "\x00",
+        "\t",
+        "\n",
+        "\x1f",
+        "\x7f",
+        "\x85",
+        "\x9f",
+        "\u00ad",
+        "\u200b",
+        "\u202e",
+        "\u2060",
+        "\ufeff",
+        "\u2028",
+        "\u2029",
+    ],
+)
 def test_page_reference_rejects_a_forbidden_character(char: str) -> None:
-    value = (
-        f"{char}https://www.notion.so/{_TODAY}"
-        if char == "\x1f"
-        else _TODAY[:16] + char + _TODAY[16:]
-    )
-    with pytest.raises(SchemaBuilderError, match="control character"):
-        _publish(page_id=value)
-    with pytest.raises(SchemaBuilderError, match="control character"):
-        _publish(links=(value,))
-    with pytest.raises(SchemaBuilderError, match="control character"):
-        _publish(other_catalogue_pages=(value,))
+    titled = f"https://www.notion.so/T{char}x-{_TODAY}"
+    plain = _TODAY[:16] + char + _TODAY[16:]
+    for value in (titled, plain):
+        with pytest.raises(SchemaBuilderError, match="control character"):
+            _publish(page_id=value)
+        with pytest.raises(SchemaBuilderError, match="control character"):
+            _publish(links=(value,))
+        with pytest.raises(SchemaBuilderError, match="control character"):
+            _publish(other_catalogue_pages=(value,))
 
 
 def test_deduped_link_order_is_preserved() -> None:

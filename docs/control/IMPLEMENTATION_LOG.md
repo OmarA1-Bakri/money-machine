@@ -610,17 +610,17 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 - **Narrow reading**: A catalogue page is top level, published to the web, duplicate as template is on, and search indexing is off. The secret link is captured. Public access is verified. No link reaches a page that belongs to another catalogue. No fixture-parity expansion, live connect, adapter calls, or Session 07 product build. No Notion, network, or browser calls.
 - **W7 cleanups folded in**: Deleted the unused `_decimal_digits` helper and the `unicodedata` import from `relations.py`. `_is_calendar_date` parses the original text with `date.fromisoformat`, so a non-ASCII digit is still rejected. The W7 row Accept non-ASCII digits in an ISO date is equivalent after that deletion, and that disposition is a new line in this entry. Deleted `isinstance(relations, str) or` from the notification-dashboard relations check. A string is not a tuple, so that clause changed no result; it is W8 row 1: re-add isinstance(relations, str) or. `NotificationDashboard` rejects a duplicated relation name, including a non-adjacent duplicate, with `SchemaBuilderError`. `DashboardRollup.__post_init__` rejects a blank name, a blank source, an unknown or non-string function, a data type outside the catalogue, a missing source, and a function that does not fit the source type. The unknown-function check says the function is not allowed. The fit check says the function does not fit or is not on the source type. Each check dies on its own test.
 - **Helpers**: `build_published_page` returns a `PublishedPage`. The parent must be `workspace`, matched exactly. Published to web, duplicate as template, and public access must be `True`. Search indexing must be `False`. The page id, each link, and each other-catalogue page are stored as a lowercase undashed 32-hex id. A plain id is 32 hex with no dashes, or exactly the 8-4-4-4-12 layout, lowercased. A page-id URL must be https, with no userinfo, no query string, no empty question mark, no fragment, no parameters, and a port of none or 443, on `notion.so` or `www.notion.so` only. A bare `https://notion.so/<id>` is accepted and stored as the canonical id. Page references reject Unicode categories Cc, Cf, Zl, and Zp, and they reject padding that urlsplit would strip. `notion.site` is rejected in those fields. The id is the last path segment: an undashed 32-hex slug, a title plus one 32-hex tail, or a trailing 8-4-4-4-12. Uppercase hex is lowercased before isolation. Hex from a title is not joined onto a short id. A non-id, a host outside that pair, and a page that lists itself as another catalogue page are rejected. The same page is one id across uppercase, dashed, and URL forms. The same link written three ways is stored once, in first-seen order. The secret link must be a trimmed https URL with no userinfo and no character in Unicode categories Cc, Cf, Zl, Zp, or Zs. Its host may be `notion.so`, `www.notion.so`, `notion.site`, or a single label under `notion.site`. Its port is none or 443, and its path is not empty after stripping slashes. A malformed URL and a bad port raise `SchemaBuilderError`. Link and other-catalogue sequences are copied in canonical form. A link whose canonical id is in the other-catalogue pages is rejected, including when it is not the first link. Invalid input raises `SchemaBuilderError`.
-- **Pytest collected**: 1705 collected, 1704 passed, 1 skipped. W7 baseline: 1558 collected, 1557 passed, 1 skipped. Delta +147 collected and +147 passed.
+- **Pytest collected**: 1716 collected, 1715 passed, 1 skipped. W7 baseline: 1558 collected, 1557 passed, 1 skipped. Delta +158 collected and +158 passed.
 - **Per-file counts**:
 
 | File | Functions (base → tip) | Collected (base → tip) | Passed (base → tip) | Failed (base → tip) | Skipped (base → tip) |
 |---|---|---|---|---|---|
 | `tests/unit/integrations/notion/test_relations.py` | 85 → 92 | 90 → 97 | 90 → 97 | 0 → 0 | 0 → 0 |
-| `tests/unit/integrations/notion/test_publishing.py` | 0 → 78 | 0 → 140 | 0 → 140 | 0 → 0 | 0 → 0 |
+| `tests/unit/integrations/notion/test_publishing.py` | 0 → 79 | 0 → 151 | 0 → 151 | 0 → 0 | 0 → 0 |
 | Remaining files | unchanged | 1468 → 1468 | 1467 → 1467 | 0 → 0 | 1 → 1 |
-| **Total** | | **1558 → 1705** | **1557 → 1704** | **0 → 0** | **1 → 1** |
+| **Total** | | **1558 → 1716** | **1557 → 1715** | **0 → 0** | **1 → 1** |
 
-- **Mutation checks** (105 rows; each applied, pytest run, then reverted; 103 killed and 2 equivalent):
+- **Mutation checks** (108 rows; each applied, pytest run, then reverted; 106 killed and 2 equivalent):
 
 | Mutation | Site | Failing test |
 |---|---|---|
@@ -729,6 +729,9 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 | Drop Zl from page-reference categories | `publishing.py:155` | `test_page_reference_rejects_a_forbidden_character` |
 | Drop Zp from page-reference categories | `publishing.py:155` | `test_page_reference_rejects_a_forbidden_character` |
 | Drop Unicode category Zs | `publishing.py:151` | `test_secret_link_rejects_a_space_separator` |
+| Cf reduced to U+200B only | `publishing.py:155` | `test_page_reference_rejects_a_forbidden_character` |
+| Exempt C1 0x80-0x9F | `publishing.py:155` | `test_page_reference_rejects_a_forbidden_character` |
+| Exempt U+009F in the secret link | `publishing.py:151` | `test_secret_link_rejects_u009f` |
 
 - **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w8` and this log entry. Against base, STATE changes only these things: `state_revision` 43 to 44, the `session_06_w7` trailing comma, `session_06_w8`, and `updated_at`. `updated_at` moves forward from `2026-09-26T17:46:39Z`. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
 - **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. `pyproject.toml` untouched. `src/money_machine/integrations/notion/router.py` untouched. Exit 78 held.
