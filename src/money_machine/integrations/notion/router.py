@@ -77,14 +77,14 @@ class NotionAdapterRouter:
         elif mode == "browser":
             raise NotImplementedError(
                 "Browser adapter requires Playwright session injection. "
-                "Production Playwright integration deferred to Session 06 Wave 4+. "
+                "Production Playwright integration is not selected by this router. "
                 "Use FixtureNotionAdapter for testing or "
                 "APINotionAdapter for API operations."
             )
         elif mode == "combined":
             raise NotImplementedError(
                 "Combined adapter requires both API and browser session setup. "
-                "Deferred to Session 06 Wave 4+. "
+                "That mode is not selected by this router. "
                 "Use FixtureNotionAdapter for testing or "
                 "APINotionAdapter for API operations."
             )
@@ -114,12 +114,12 @@ class NotionAdapterRouter:
         if mode == "browser":
             raise NotImplementedError(
                 "Browser adapter requires Playwright session injection. "
-                "Production Playwright integration deferred to Session 06 Wave 4+."
+                "Production Playwright integration is not selected by this router."
             )
         if mode == "combined":
             raise NotImplementedError(
                 "Combined adapter requires both API and browser session setup. "
-                "Deferred to Session 06 Wave 4+."
+                "That mode is not selected by this router."
             )
 
         # Clear cached adapter only after validation passes

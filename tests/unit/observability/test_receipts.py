@@ -5,11 +5,15 @@ No network and no writes except the path a test injects.
 
 from __future__ import annotations
 
+import gc
+import threading
 from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path
+from typing import cast
 
 import pytest
 
+from money_machine.observability import receipts as receipts_module
 from money_machine.observability.receipts import (
     DuplicateReceiptError,
     NotionOperationReceipt,
@@ -331,3 +335,50 @@ def test_caller_dict_mutation_does_not_change_the_stored_receipt() -> None:
 def test_non_finite_numbers_are_rejected(bad: float) -> None:
     with pytest.raises(ValueError, match="JSON-serializable"):
         _receipt(post_state={"n": bad})
+
+
+def test_record_waits_for_the_path_lock(tmp_path: Path) -> None:
+    """record() holds the path lock, so a second record waits until it is released."""
+    path = tmp_path / "receipts.jsonl"
+    log = NotionOperationReceiptLog(path)
+    lock = log._lock  # pyright: ignore[reportPrivateUsage]
+    assert lock is not None
+    assert lock.acquire(blocking=False)
+    finished = threading.Event()
+
+    def _record() -> None:
+        log.record(_receipt(idempotency_key="key-wait"))
+        finished.set()
+
+    thread = threading.Thread(target=_record)
+    thread.start()
+    assert finished.wait(timeout=0.2) is False
+    lock.release()
+    thread.join(timeout=2)
+    assert finished.is_set()
+    assert log.get("key-wait") is not None
+
+
+def test_discarded_log_drops_its_path_lock(tmp_path: Path) -> None:
+    """A log that is no longer referenced leaves the path lock registry."""
+    path = tmp_path / "receipts.jsonl"
+    log: NotionOperationReceiptLog | None = NotionOperationReceiptLog(path)
+    key = str(path.resolve())
+    registry = receipts_module._PATH_LOCKS  # pyright: ignore[reportPrivateUsage]
+    assert key in registry
+    del log
+    gc.collect()
+    assert key not in registry
+
+
+def test_missing_parent_directory_is_rejected(tmp_path: Path) -> None:
+    """A path whose parent directory does not exist is rejected."""
+    path = tmp_path / "missing" / "receipts.jsonl"
+    with pytest.raises(ValueError, match="parent"):
+        NotionOperationReceiptLog(path)
+
+
+def test_string_path_is_rejected() -> None:
+    """A str path is rejected. The log does not create directories for it."""
+    with pytest.raises(TypeError, match=r"pathlib\.Path"):
+        NotionOperationReceiptLog(cast(Path, "receipts.jsonl"))

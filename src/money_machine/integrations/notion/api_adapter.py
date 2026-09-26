@@ -14,6 +14,7 @@ from typing import Any
 from notion_client import AsyncClient
 
 from .adapter import NotionAdapter
+from .combined_adapter import BROWSER_OPERATIONS
 from .domain import (
     NotionCalloutBlock,
     NotionDatabase,
@@ -68,6 +69,14 @@ class APINotionAdapter(NotionAdapter):
         # Methods will fail with appropriate error if token is actually needed
         self.client = AsyncClient(auth=token or "")
         self._token_available = bool(token)
+
+    def reports_unsupported(self, operation: str) -> bool:
+        """True for browser-only operations this adapter does not implement.
+
+        CombinedNotionAdapter checks this before any call. A true result routes
+        to the other adapter because this method has not been invoked.
+        """
+        return operation in BROWSER_OPERATIONS
 
     async def connection_status(self) -> dict[str, bool | str | int]:
         """Check API token validity via /v1/users/me endpoint."""

@@ -14,7 +14,10 @@ rewritten. A newline-terminated line that is not JSON is rejected.
 
 Writers of one path in this process share a lock and re-read the file before
 appending, so two log instances cannot record the same idempotency key. The
-stub does not coordinate writers in other processes.
+lock registry holds those locks weakly. Each log keeps a strong reference for
+its lifetime, and a discarded path leaves the registry. The stub does not
+coordinate writers in other processes. The path must be a ``pathlib.Path``
+whose parent directory already exists.
 """
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ import copy
 import json
 import os
 import threading
+import weakref
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -33,7 +37,7 @@ from typing import Literal
 ReceiptStatus = Literal["Success", "Unknown", "Failure"]
 _STATUSES: frozenset[str] = frozenset({"Success", "Unknown", "Failure"})
 
-_PATH_LOCKS: dict[str, threading.Lock] = {}
+_PATH_LOCKS: weakref.WeakValueDictionary[str, threading.Lock] = weakref.WeakValueDictionary()
 _LOCKS_GUARD = threading.Lock()
 
 
@@ -43,6 +47,14 @@ class DuplicateReceiptError(ValueError):
     def __init__(self, idempotency_key: str) -> None:
         self.idempotency_key = idempotency_key
         super().__init__(f"idempotency key {idempotency_key!r} is already recorded")
+
+
+def _require_path(path: object) -> Path:
+    if not isinstance(path, Path):
+        raise TypeError("receipt path must be a pathlib.Path")
+    if not path.parent.is_dir():
+        raise ValueError(f"receipt path parent is not a directory: {path.parent}")
+    return path
 
 
 def _path_lock(path: Path) -> threading.Lock:
@@ -268,22 +280,30 @@ class NotionOperationReceiptLog:
     A torn trailing line (not valid JSON, and not newline-terminated) is
     skipped on load and truncated before the next append. A complete JSON line
     with no trailing newline is kept, and a newline is written before the next
-    append. Complete corrupt lines are rejected. Instances that share a path
-    in this process lock that path and re-read it before appending.
+    append. Complete corrupt lines are rejected.     Instances that share a path
+    in this process lock that path and re-read it before appending. The log
+    keeps that lock alive; discarding the log drops the path from the registry.
+    ``path`` must be a ``pathlib.Path`` whose parent directory already exists.
     """
 
     def __init__(self, path: Path | None = None) -> None:
-        self._path = path
         self._by_key: dict[str, NotionOperationReceipt] = {}
-        if path is not None and path.is_file():
-            with _path_lock(path):
-                self._load(path)
+        if path is None:
+            self._path: Path | None = None
+            self._lock: threading.Lock | None = None
+            return
+        checked = _require_path(path)
+        self._path = checked
+        self._lock = _path_lock(checked)
+        if checked.is_file():
+            with self._lock:
+                self._load(checked)
 
     def record(self, receipt: NotionOperationReceipt) -> NotionOperationReceipt:
         """Record one receipt. Rejects a repeated idempotency key."""
-        if self._path is None:
+        if self._path is None or self._lock is None:
             return self._store(receipt)
-        with _path_lock(self._path):
+        with self._lock:
             self._load_new_keys(self._path)
             return self._store(receipt)
 

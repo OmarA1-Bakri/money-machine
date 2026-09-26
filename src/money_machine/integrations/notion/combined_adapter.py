@@ -1,11 +1,12 @@
 """Combined Notion adapter: route each operation to the API or browser delegate.
 
 Preferred channel follows the method column in
-``docs/architecture/PLATFORM_COMPATIBILITY.md``. Fallback runs only when the
-preferred delegate reports the operation unsupported (``reports_unsupported``)
-or raises ``OperationUnsupportedError``. A bare ``NotImplementedError`` is not
-that signal. Any other error, including a write that raises, propagates and
-is not retried.
+``docs/architecture/PLATFORM_COMPATIBILITY.md``. ``reports_unsupported`` is
+checked before the call and may route to the other adapter, including for a
+write, because nothing has been invoked yet. ``OperationUnsupportedError`` is
+raised before any side effect and selects the other adapter only for a read or
+other idempotent operation. After a non-idempotent write has been invoked, no
+exception selects the other adapter.
 
 ``get_public_url`` is the COMBINED operation: the API delegate returns the
 public URL, then the browser delegate verifies stranger access.
@@ -35,11 +36,14 @@ from .domain import (
 
 
 class OperationUnsupportedError(NotImplementedError):
-    """Preferred adapter refused the operation before doing any work.
+    """Raised before any side effect when an adapter cannot perform an operation.
 
-    This class is the only exception that selects the other adapter. A bare
-    ``NotImplementedError`` is not that signal: a write may raise it after a
-    partial mutation, and that error propagates with the other adapter uncalled.
+    CombinedNotionAdapter treats this as a fallback signal only for a read or
+    other idempotent operation. A non-idempotent write that has already been
+    invoked never falls back, including when it raises this class,
+    ``NotImplementedError``, or another subclass of ``NotImplementedError``.
+    ``reports_unsupported`` is checked before the call, including for writes,
+    and may route to the other adapter because nothing has been called yet.
     """
 
 
@@ -84,6 +88,23 @@ BROWSER_OPERATIONS: frozenset[str] = frozenset(
         "set_search_indexing",
         "unpublish_page",
         "verify_stranger_access",
+    }
+)
+
+# Idempotent column ``false`` in PLATFORM_COMPATIBILITY.md. After one of these
+# has been invoked, no exception selects the other adapter.
+NON_IDEMPOTENT_OPERATIONS: frozenset[str] = frozenset(
+    {
+        "add_callout_block",
+        "add_child_page",
+        "add_text_block",
+        "create_board_view",
+        "create_calendar_view",
+        "create_database",
+        "create_linked_view",
+        "create_page",
+        "create_table_view",
+        "duplicate_page",
     }
 )
 
@@ -136,12 +157,12 @@ class CombinedNotionAdapter(NotionAdapter):
     """Route Notion operations to an API delegate or a browser delegate.
 
     The preferred delegate is selected from ``API_OPERATIONS`` and
-    ``BROWSER_OPERATIONS``. ``reports_unsupported(operation)`` and
-    ``OperationUnsupportedError`` are the only unsupported signals; the other
-    delegate then receives the same arguments. A bare ``NotImplementedError``
-    and every other exception are re-raised, and the other delegate is not
-    called. ``get_public_url`` follows the COMBINED contract instead of this
-    single-delegate route.
+    ``BROWSER_OPERATIONS``. ``reports_unsupported(operation)`` is checked
+    before the call. ``OperationUnsupportedError`` then selects the other
+    delegate only for a read or other idempotent operation, and only when it
+    is raised before any side effect. A non-idempotent write that has been
+    invoked is never retried. ``get_public_url`` follows the COMBINED contract
+    instead of this single-delegate route.
     """
 
     def __init__(self, api_adapter: NotionAdapter, browser_adapter: NotionAdapter) -> None:
@@ -171,6 +192,8 @@ class CombinedNotionAdapter(NotionAdapter):
                 *args,
                 **kwargs,
             )
+        if operation in NON_IDEMPOTENT_OPERATIONS:
+            return await _invoke(preferred, operation, *args, **kwargs)
         try:
             return await _invoke(preferred, operation, *args, **kwargs)
         except OperationUnsupportedError as first:

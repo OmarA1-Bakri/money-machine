@@ -5,15 +5,20 @@ Fakes only. No live Notion, no browser, no Playwright.
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
 from typing import cast
 
 import pytest
 
 from money_machine.integrations.notion.adapter import NotionAdapter
+from money_machine.integrations.notion.api_adapter import APINotionAdapter
+from money_machine.integrations.notion.browser_adapter import BrowserNotionAdapter, BrowserSession
 from money_machine.integrations.notion.combined_adapter import (
     API_OPERATIONS,
     BROWSER_OPERATIONS,
     COMBINED_OPERATIONS,
+    NON_IDEMPOTENT_OPERATIONS,
     CombinedNotionAdapter,
     OperationUnsupportedError,
 )
@@ -111,42 +116,47 @@ _EXPECTED_CALLS: dict[str, dict[str, object]] = {
     "verify_stranger_access": {"public_url": "https://www.notion.so/page-1"},
 }
 
-# Channels are fixed here so a source-map swap fails these cases.
-_EXPECTED_API = (
-    "add_callout_block",
-    "add_child_page",
-    "add_filter",
-    "add_property",
-    "add_sort",
-    "add_text_block",
-    "connection_status",
-    "create_database",
-    "create_page",
-    "create_relation",
-    "create_rollup",
-    "inspect_database",
-    "inspect_page",
-    "move_page",
-    "rename_page",
-    "set_cover",
-    "set_icon",
-    "workspace_discovery",
+_COMPAT_PATH = (
+    Path(__file__).resolve().parents[4] / "docs" / "architecture" / "PLATFORM_COMPATIBILITY.md"
 )
-_EXPECTED_BROWSER = (
-    "create_board_view",
-    "create_calendar_view",
-    "create_formula",
-    "create_linked_view",
-    "create_table_view",
-    "duplicate_page",
-    "publish_page",
-    "set_duplicate_as_template",
-    "set_search_indexing",
-    "set_view_title_visibility",
-    "unpublish_page",
-    "verify_stranger_access",
+_COMPAT_ROW = re.compile(
+    r"^\|\s*`([a-z_]+)`\s*\|\s*(DIRECT_API|BROWSER|COMBINED)\s*\|"
+    r"\s*(true|false)\s*\|\s*(true|false)\s*\|\s*(true|false)\s*\|",
+    re.MULTILINE,
 )
-_EXPECTED_COMBINED = ("get_public_url",)
+
+
+def _channels_from_compatibility_doc() -> tuple[
+    tuple[str, ...], tuple[str, ...], tuple[str, ...], frozenset[str]
+]:
+    """Read method and idempotency from the compatibility table, not from source."""
+    text = _COMPAT_PATH.read_text(encoding="utf-8")
+    api: list[str] = []
+    browser: list[str] = []
+    combined: list[str] = []
+    non_idempotent: list[str] = []
+    for match in _COMPAT_ROW.finditer(text):
+        name, method, _mutates, _requires_auth, idempotent = match.groups()
+        if method == "DIRECT_API":
+            api.append(name)
+        elif method == "BROWSER":
+            browser.append(name)
+        else:
+            combined.append(name)
+        if idempotent == "false":
+            non_idempotent.append(name)
+    return (
+        tuple(sorted(api)),
+        tuple(sorted(browser)),
+        tuple(sorted(combined)),
+        frozenset(non_idempotent),
+    )
+
+
+# Channels come from the doc so a source-map swap still fails these cases.
+_EXPECTED_API, _EXPECTED_BROWSER, _EXPECTED_COMBINED, _DOC_NON_IDEMPOTENT = (
+    _channels_from_compatibility_doc()
+)
 _DELEGATED = _EXPECTED_API + _EXPECTED_BROWSER
 
 
@@ -202,6 +212,7 @@ def test_operation_channels_partition_the_adapter_interface() -> None:
     assert set(_EXPECTED_API) == API_OPERATIONS
     assert set(_EXPECTED_BROWSER) == BROWSER_OPERATIONS
     assert set(_EXPECTED_COMBINED) == COMBINED_OPERATIONS
+    assert _DOC_NON_IDEMPOTENT == NON_IDEMPOTENT_OPERATIONS
 
 
 @pytest.mark.parametrize("operation", _EXPECTED_API)
@@ -258,7 +269,6 @@ class _WriteFailure(Exception):
         ConnectionError,
         KeyError,
         AttributeError,
-        NotImplementedError,
         _WriteFailure,
     ],
 )
@@ -307,17 +317,80 @@ async def test_auth_error_propagates_unchanged() -> None:
     assert browser.calls == []
 
 
-async def test_operation_unsupported_error_triggers_fallback() -> None:
-    """OperationUnsupportedError is the unsupported signal and falls back once."""
+class _PartialNotImplemented(NotImplementedError):
+    """A NotImplementedError subclass other than OperationUnsupportedError."""
+
+
+async def test_write_not_implemented_error_is_not_retried() -> None:
+    """A write that raises NotImplementedError is not run on the other adapter."""
     api, browser, combined = _adapters()
-    api.errors["create_page"] = OperationUnsupportedError("api refuses create_page")
+    error = NotImplementedError("create_page is not implemented")
+    api.errors["create_page"] = error
     _seed(browser, "create_page", _PAGE)
 
-    result = await _invoke(combined, "create_page")
+    with pytest.raises(NotImplementedError) as caught:
+        await _invoke(combined, "create_page")
+
+    assert caught.value is error
+    assert type(caught.value) is NotImplementedError
+    assert len(api.calls) == 1
+    assert browser.calls == []
+
+
+async def test_write_not_implemented_subclass_is_not_retried() -> None:
+    """A write that raises a NotImplementedError subclass is not retried."""
+    api, browser, combined = _adapters()
+    error = _PartialNotImplemented("create_page stopped partway")
+    api.errors["create_page"] = error
+    _seed(browser, "create_page", _PAGE)
+
+    with pytest.raises(_PartialNotImplemented) as caught:
+        await _invoke(combined, "create_page")
+
+    assert caught.value is error
+    assert len(api.calls) == 1
+    assert browser.calls == []
+
+
+async def test_write_operation_unsupported_error_is_not_retried() -> None:
+    """A write that raises OperationUnsupportedError after being invoked is not retried."""
+    api, browser, combined = _adapters()
+    error = OperationUnsupportedError("create_page refused after invoke")
+    api.errors["create_page"] = error
+    _seed(browser, "create_page", _PAGE)
+
+    with pytest.raises(OperationUnsupportedError) as caught:
+        await _invoke(combined, "create_page")
+
+    assert caught.value is error
+    assert len(api.calls) == 1
+    assert browser.calls == []
+
+
+async def test_read_operation_unsupported_error_falls_back() -> None:
+    """A read that raises OperationUnsupportedError falls back once, with full kwargs."""
+    api, browser, combined = _adapters()
+    api.errors["inspect_page"] = OperationUnsupportedError("api refuses inspect_page")
+    _seed(browser, "inspect_page", _PAGE)
+
+    result = await _invoke(combined, "inspect_page")
 
     assert result is _PAGE
     assert len(api.calls) == 1
-    assert browser.calls == [("create_page", (), _EXPECTED_CALLS["create_page"])]
+    assert browser.calls == [("inspect_page", (), _EXPECTED_CALLS["inspect_page"])]
+
+
+async def test_idempotent_operation_unsupported_error_falls_back() -> None:
+    """An idempotent write that raises OperationUnsupportedError falls back once."""
+    api, browser, combined = _adapters()
+    api.errors["rename_page"] = OperationUnsupportedError("api refuses rename_page")
+    _seed(browser, "rename_page", _PAGE)
+
+    result = await _invoke(combined, "rename_page")
+
+    assert result is _PAGE
+    assert len(api.calls) == 1
+    assert browser.calls == [("rename_page", (), _EXPECTED_CALLS["rename_page"])]
 
 
 async def test_browser_preferred_write_error_is_not_retried() -> None:
@@ -365,16 +438,17 @@ async def test_fallback_when_preferred_reports_unsupported(
 async def test_unsupported_fallback_error_is_chained_from_the_first_error(signal: str) -> None:
     """When the fallback also fails, its error's __cause__ is the first refusal."""
     api, browser, combined = _adapters()
-    browser.errors["create_page"] = RuntimeError("browser down")
+    operation = "inspect_page" if signal == "operation_unsupported" else "create_page"
+    browser.errors[operation] = RuntimeError("browser down")
     first: Exception | None = None
     if signal == "operation_unsupported":
-        first = OperationUnsupportedError("api refuses create_page")
-        api.errors["create_page"] = first
+        first = OperationUnsupportedError("api refuses inspect_page")
+        api.errors[operation] = first
     else:
-        api.unsupported.add("create_page")
+        api.unsupported.add(operation)
 
     with pytest.raises(RuntimeError, match="browser down") as caught:
-        await _invoke(combined, "create_page")
+        await _invoke(combined, operation)
 
     cause = caught.value.__cause__
     assert cause is not None
@@ -382,6 +456,31 @@ async def test_unsupported_fallback_error_is_chained_from_the_first_error(signal
         assert cause is first
     else:
         assert isinstance(cause, OperationUnsupportedError)
+
+
+def test_unknown_operation_is_rejected() -> None:
+    """An operation outside the compatibility table is not routed."""
+    _api, _browser, combined = _adapters()
+    with pytest.raises(ValueError, match="unknown Notion operation"):
+        combined._pair("not_a_notion_operation")  # pyright: ignore[reportPrivateUsage]
+
+
+def test_api_adapter_reports_browser_operations_unsupported() -> None:
+    """The API adapter reports browser operations unsupported before any call."""
+    adapter = APINotionAdapter(api_token="test-token")
+    for operation in _EXPECTED_BROWSER:
+        assert adapter.reports_unsupported(operation) is True
+    for operation in _EXPECTED_API + _EXPECTED_COMBINED:
+        assert adapter.reports_unsupported(operation) is False
+
+
+def test_browser_adapter_reports_api_and_combined_operations_unsupported() -> None:
+    """The browser adapter reports API and combined operations unsupported."""
+    adapter = BrowserNotionAdapter(browser_session=cast(BrowserSession, object()))
+    for operation in _EXPECTED_API + _EXPECTED_COMBINED:
+        assert adapter.reports_unsupported(operation) is True
+    for operation in _EXPECTED_BROWSER:
+        assert adapter.reports_unsupported(operation) is False
 
 
 async def test_set_view_title_visibility_returns_delegate_view() -> None:
