@@ -5,6 +5,8 @@ No network, no Notion, no browser.
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 
 from money_machine.integrations.notion.errors import SchemaBuilderError
@@ -12,6 +14,7 @@ from money_machine.integrations.notion.relations import (
     MAX_FILTERS,
     VIEW_TYPES,
     CanonicalDatabase,
+    CanonicalDatabases,
     DashboardRollup,
     ViewFilter,
     build_canonical_databases,
@@ -54,6 +57,24 @@ def test_canonical_mapping_is_immutable() -> None:
     canonical = build_canonical_databases(["Tasks"])
     with pytest.raises(TypeError):
         canonical.by_type["Notes"] = CanonicalDatabase("Notes")  # type: ignore[index]
+
+
+def test_hand_built_canonical_databases_are_rejected() -> None:
+    made_up = ("Widgets",)
+    registry = {"Widgets": CanonicalDatabase(data_type="Widgets")}
+    with pytest.raises(SchemaBuilderError):
+        CanonicalDatabases(data_types=made_up, by_type=registry)
+    with pytest.raises(SchemaBuilderError):
+        build_linked_view(
+            "Home",
+            "Widgets",
+            "table",
+            "Open",
+            (),
+            CanonicalDatabases(data_types=made_up, by_type=registry),
+        )
+    with pytest.raises(SchemaBuilderError):
+        CanonicalDatabases(data_types=cast(tuple[str, ...], ([],)), by_type={})
 
 
 def test_data_types_reject_a_string() -> None:

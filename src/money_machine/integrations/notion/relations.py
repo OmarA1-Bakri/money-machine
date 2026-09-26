@@ -55,12 +55,38 @@ class CanonicalDatabase:
     data_type: str
 
 
+def _is_unknown_data_type(item: str) -> bool:
+    if item not in DATABASE_KINDS:  # noqa: SIM103
+        return True
+    return False
+
+
+def _require_catalogue_data_type(value: object) -> None:
+    if not isinstance(value, str) or _is_unknown_data_type(value):
+        raise SchemaBuilderError(f"data type {value!r} is not canonical")
+
+
 @dataclass(frozen=True, slots=True)
 class CanonicalDatabases:
     """Canonical databases copied from the caller sequence."""
 
     data_types: tuple[str, ...]
     by_type: Mapping[str, CanonicalDatabase]
+
+    def __post_init__(self) -> None:
+        data_types = cast(object, self.data_types)
+        if isinstance(data_types, str) or not isinstance(data_types, tuple):
+            raise SchemaBuilderError("canonical data types must be a tuple")
+        for item in data_types:
+            _require_catalogue_data_type(item)
+        by_type = cast(object, self.by_type)
+        if not isinstance(by_type, Mapping):
+            raise SchemaBuilderError("canonical databases must be a mapping")
+        for key, database in by_type.items():
+            _require_catalogue_data_type(key)
+            if not isinstance(database, CanonicalDatabase):
+                raise SchemaBuilderError("canonical entry must be a CanonicalDatabase")
+            _require_catalogue_data_type(cast(object, database.data_type))
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,7 +163,7 @@ def build_canonical_databases(data_types: object) -> CanonicalDatabases:
     for item in raw:
         if not isinstance(item, str):
             raise SchemaBuilderError("data type must be a string")
-        if item not in DATABASE_KINDS:
+        if _is_unknown_data_type(item):
             valid = ", ".join(DATABASE_KINDS)
             raise SchemaBuilderError(f"unknown data type {item!r}; valid keys: {valid}")
         if item in ordered:
