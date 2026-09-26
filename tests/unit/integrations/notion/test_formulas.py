@@ -17,6 +17,7 @@ from money_machine.integrations.notion.errors import (
 from money_machine.integrations.notion.formulas import (
     compile_formula,
     generate_notification_dashboard_formulas,
+    validated_name,
 )
 from money_machine.integrations.notion.schema_builder import build_schema, schema_definitions
 
@@ -110,11 +111,12 @@ def test_missing_verified_name_is_rejected() -> None:
     assert raised.value.property_name == "Goal"
 
 
-def test_unverified_database_is_rejected() -> None:
+def test_missing_events_database_omits_birthday_status() -> None:
     names = _verified_copy()
     del names["Events"]
-    with pytest.raises(SchemaBuilderError, match="database 'Events' is not verified"):
-        generate_notification_dashboard_formulas(names)
+    generated = generate_notification_dashboard_formulas(names)
+    assert "birthday_status" not in generated.expressions
+    assert "task_open_and_due_today" in generated.expressions
 
 
 def test_cross_database_property_is_rejected() -> None:
@@ -447,6 +449,14 @@ def test_personal_only_presets_generate_a_dashboard() -> None:
     assert "water_glasses_remaining" in generated.expressions
 
 
+@pytest.mark.parametrize("kind", _PERSONAL_KINDS)
+def test_each_personal_only_preset_generates_a_dashboard(kind: str) -> None:
+    generated = generate_notification_dashboard_formulas(_verified_from_presets((kind,)))
+    assert set(generated.databases.values()) <= {kind}
+    assert "client_name" not in generated.expressions
+    assert "buyer_name" not in generated.expressions
+
+
 def test_habits_formula_is_skipped_when_habits_is_not_verified() -> None:
     kinds = tuple(kind for kind in _PERSONAL_KINDS if kind != "Habits")
     generated = generate_notification_dashboard_formulas(_verified_from_presets(kinds))
@@ -487,5 +497,72 @@ def test_february_29_birthday_matches_only_in_a_leap_year() -> None:
         'equal(formatDate(prop("Date"), "MM-DD"), formatDate(now(), "MM-DD")))'
     )
     assert "02-29" not in expression
+    assert "02-28" not in expression
+    assert "03-01" not in expression
     assert date(2024, 2, 29).strftime("%m-%d") == "02-29"
-    assert date(2023, 3, 1).strftime("%m-%d") != "02-29"
+    assert date(2020, 2, 29).strftime("%m-%d") == "02-29"
+    assert date(2023, 2, 28).strftime("%m-%d") == "02-28"
+    assert date(2023, 3, 1).strftime("%m-%d") == "03-01"
+    assert date(2023, 2, 28).strftime("%m-%d") != "02-29"
+
+
+_UNICODE_WHITESPACE = [
+    pytest.param("\t", id="tab"),
+    pytest.param("\n", id="newline"),
+    pytest.param("\u00a0", id="nbsp"),
+    pytest.param("\u3000", id="ideographic"),
+]
+
+
+@pytest.mark.parametrize("pad", _UNICODE_WHITESPACE)
+@pytest.mark.parametrize("side", ["leading", "trailing"])
+def test_name_unicode_whitespace_is_rejected(pad: str, side: str) -> None:
+    name = f"{pad}Name" if side == "leading" else f"Name{pad}"
+    with pytest.raises(SchemaBuilderError, match="surrounding whitespace"):
+        validated_name("property name", name)
+
+
+def test_name_trailing_space_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="surrounding whitespace"):
+        validated_name("property name", "Name ")
+
+
+@pytest.mark.parametrize("pad", _UNICODE_WHITESPACE)
+@pytest.mark.parametrize("side", ["leading", "trailing"])
+def test_formula_unicode_whitespace_is_rejected(pad: str, side: str) -> None:
+    expression = f"{pad}now()" if side == "leading" else f"now(){pad}"
+    with pytest.raises(SchemaBuilderError, match="surrounding whitespace"):
+        compile_formula(expression, {}, "date")
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        pytest.param("Na\u200bme", id="zwsp"),
+        pytest.param("\ufeffName", id="bom-leading"),
+        pytest.param("Name\ufeff", id="bom-trailing"),
+    ],
+)
+def test_invisible_characters_in_names_are_rejected(name: str) -> None:
+    with pytest.raises(SchemaBuilderError, match="invisible character"):
+        validated_name("property name", name)
+
+
+def test_arabic_indic_digit_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="unexpected character"):
+        compile_formula("subtract(\u0661, 0)", {}, "number")
+
+
+def test_fullwidth_digit_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="not closed"):
+        compile_formula("subtract(1\uff10, 0)", {}, "number")
+
+
+def test_multi_select_formula_value_is_text() -> None:
+    compiled = compile_formula('prop("Tags")', {"Tags": "multi_select"}, "text")
+    assert compiled.result_type == "text"
+
+
+def test_date_formula_value_is_date() -> None:
+    compiled = compile_formula('prop("Due")', {"Due": "date"}, "date")
+    assert compiled.result_type == "date"

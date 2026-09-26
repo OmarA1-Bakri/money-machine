@@ -23,6 +23,8 @@ that date. ``money_spent_today`` is this Finance row's amount when its calendar
 date is today, otherwise 0, not a sum. A date property is never compared to
 ``now()`` directly. ``water_glasses_remaining`` is Goal minus Glasses on Habits
 and is omitted when Habits is not verified (water glasses only where relevant).
+Any dashboard formula is omitted when its database is not in the verified map,
+so each personal preset can be used alone.
 
 Surrounding whitespace is rejected, so it does not count toward the 128
 character limit. Characters inside the expression, including spaces between
@@ -70,7 +72,6 @@ _PROPERTY_VALUE_TYPES: dict[str, str] = {
 }
 
 # key, database, result type, expression.
-_OPTIONAL_DATABASES: frozenset[str] = frozenset({"Clients", "Habits"})
 _DASHBOARD: tuple[tuple[str, str, str, str], ...] = (
     ("current_date", "Tasks", "date", "now()"),
     (
@@ -148,10 +149,19 @@ class NotificationDashboardFormulas:
     verified_properties: Mapping[str, Mapping[str, str]]
 
 
+_INVISIBLE_NAME_CHARACTERS = ("\u200b", "\ufeff")
+
+
+def _is_ascii_digit(char: str) -> bool:
+    return "0" <= char <= "9"
+
+
 def validated_name(label: str, value: object) -> str:
     """Return ``value`` when it is a usable schema or property name."""
     if not isinstance(value, str):
         raise SchemaBuilderError(f"{label} must be a string")
+    if any(char in value for char in _INVISIBLE_NAME_CHARACTERS):
+        raise SchemaBuilderError(f"{label} must not contain an invisible character")
     if value.strip() == "":
         raise SchemaBuilderError(f"{label} must not be empty")
     if value != value.strip():
@@ -163,12 +173,12 @@ def validated_name(label: str, value: object) -> str:
 
 def formula_value_type(property_type: str) -> str:
     """Return the formula value type for a property type or formula result type."""
+    mapped = _PROPERTY_VALUE_TYPES.get(property_type)
+    if mapped is not None:
+        return mapped
     if property_type in ALLOWED_FORMULA_TYPES:
         return property_type
-    mapped = _PROPERTY_VALUE_TYPES.get(property_type)
-    if mapped is None:
-        raise SchemaBuilderError(f"property type {property_type!r} has no formula value")
-    return mapped
+    raise SchemaBuilderError(f"property type {property_type!r} has no formula value")
 
 
 def compile_formula(
@@ -229,7 +239,7 @@ def generate_notification_dashboard_formulas(
     result_types: dict[str, str] = {}
     databases: dict[str, str] = {}
     for key, database, result_type, expression in _DASHBOARD:
-        if database not in verified and database in _OPTIONAL_DATABASES:
+        if database not in verified:
             continue
         properties = _properties_for(database, verified)
         compiled = compile_formula(expression, properties, result_type)
@@ -393,7 +403,7 @@ class _Parser:
         char = self._text[self._i]
         if char == '"':
             return self._parse_string()
-        if char.isdigit():
+        if _is_ascii_digit(char):
             return self._parse_number()
         if char.isalpha() or char == "_":
             return self._parse_call()
@@ -414,7 +424,7 @@ class _Parser:
 
     def _parse_number(self) -> _Literal:
         start = self._i
-        while self._i < len(self._text) and self._text[self._i].isdigit():
+        while self._i < len(self._text) and _is_ascii_digit(self._text[self._i]):
             self._i += 1
         return _Literal(text=self._text[start : self._i], kind="number")
 

@@ -368,6 +368,11 @@ def test_option_name_must_be_a_string() -> None:
         build_schema("Tasks", properties)
 
 
+def test_schema_family_defaults_to_personal() -> None:
+    schema = build_schema("Tasks", [_title()])
+    assert schema.family == "personal"
+
+
 def test_schema_family_must_be_personal_or_business() -> None:
     with pytest.raises(SchemaBuilderError, match="schema family"):
         build_schema("Tasks", [_title()], family=cast("str", "other"))  # type: ignore[arg-type]
@@ -408,6 +413,17 @@ def test_three_formula_cycle_is_rejected() -> None:
         _formula("A", 'prop("B")', "text"),
         _formula("B", 'prop("C")', "text"),
         _formula("C", 'prop("A")', "text"),
+    ]
+    with pytest.raises(SchemaBuilderError, match="formula cycle"):
+        build_schema("Tasks", properties)
+
+
+def test_cycle_behind_an_acyclic_formula_is_rejected() -> None:
+    properties = [
+        _title(),
+        _formula("Ok", 'prop("Name")', "text"),
+        _formula("A", 'prop("B")', "text"),
+        _formula("B", 'prop("A")', "text"),
     ]
     with pytest.raises(SchemaBuilderError, match="formula cycle"):
         build_schema("Tasks", properties)
