@@ -172,9 +172,10 @@ def test_secret_link_allows_port_443() -> None:
     assert page.secret_link == "https://fixture.notion.site:443/Home"
 
 
-def test_secret_link_rejects_a_control_character() -> None:
+@pytest.mark.parametrize("code", range(32))
+def test_secret_link_rejects_a_control_character(code: int) -> None:
     with pytest.raises(SchemaBuilderError, match="control character"):
-        _publish(secret_link="https://fix\tture.notion.site/Home")
+        _publish(secret_link=f"https://fix{chr(code)}ture.notion.site/Home")
 
 
 def test_links_must_be_a_sequence() -> None:
@@ -232,9 +233,19 @@ def test_isolation_catches_a_notion_so_url() -> None:
         _publish(links=(f"https://www.notion.so/Title-{_OTHER}",))
 
 
-def test_isolation_catches_a_notion_site_url() -> None:
-    with pytest.raises(SchemaBuilderError, match=_OTHER):
-        _publish(links=(f"https://x.notion.site/{_OTHER}",))
+def test_page_url_rejects_a_notion_site_host() -> None:
+    for value in (
+        f"https://notion.site/{_TODAY}",
+        f"https://www.notion.site/{_TODAY}",
+        f"https://x.notion.site/{_TODAY}",
+        f"https://fixture.notion.site/{_TODAY}",
+    ):
+        with pytest.raises(SchemaBuilderError, match="page id"):
+            _publish(page_id=value)
+        with pytest.raises(SchemaBuilderError, match="link"):
+            _publish(links=(value,))
+        with pytest.raises(SchemaBuilderError, match="other catalogue page"):
+            _publish(other_catalogue_pages=(value,))
 
 
 def test_page_reference_rejects_a_non_id() -> None:
@@ -313,7 +324,7 @@ def test_page_url_host_must_be_allowed() -> None:
 
 def test_isolation_lowercases_an_uppercase_url_id() -> None:
     for value in (
-        f"https://x.notion.site/{_OTHER.upper()}",
+        f"https://www.notion.so/{_OTHER.upper()}",
         f"https://www.notion.so/Title-{_OTHER.upper()}",
     ):
         with pytest.raises(SchemaBuilderError, match=_OTHER):
@@ -328,17 +339,17 @@ def test_isolation_lowercases_an_uppercase_slug() -> None:
 
 def test_isolation_keeps_a_trailing_slash_on_the_page_id() -> None:
     with pytest.raises(SchemaBuilderError, match=_OTHER):
-        _publish(links=(f"https://x.notion.site/{_OTHER}/",))
+        _publish(links=(f"https://www.notion.so/{_OTHER}/",))
 
 
 def test_page_url_rejects_a_slug_longer_than_32_hex() -> None:
     with pytest.raises(SchemaBuilderError, match="link"):
-        _publish(links=(f"https://x.notion.site/{'a' * 33}",))
+        _publish(links=(f"https://www.notion.so/{'a' * 33}",))
 
 
 def test_page_url_rejects_a_non_hex_slug() -> None:
     for value in (
-        f"https://x.notion.site/{'z' * 32}",
+        f"https://www.notion.so/{'z' * 32}",
         "https://www.notion.so/zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz",
     ):
         with pytest.raises(SchemaBuilderError, match="link"):
@@ -347,7 +358,7 @@ def test_page_url_rejects_a_non_hex_slug() -> None:
 
 def test_isolation_catches_a_notion_site_slug() -> None:
     with pytest.raises(SchemaBuilderError, match=_OTHER):
-        _publish(links=(f"https://x.notion.site/Title-{_OTHER}",))
+        _publish(links=(f"https://www.notion.so/Title-{_OTHER}",))
 
 
 def test_isolation_catches_a_nested_page_path() -> None:
@@ -424,6 +435,7 @@ def test_page_url_rejects_an_empty_port() -> None:
 
 def test_page_url_rejects_a_port() -> None:
     for value in (
+        f"https://www.notion.so:80/{_TODAY}",
         f"https://www.notion.so:8080/{_TODAY}",
         f"https://www.notion.so:abc/{_TODAY}",
     ):
@@ -437,13 +449,78 @@ def test_page_url_rejects_a_glued_hex_title() -> None:
 
 
 def test_plain_page_id_dashes_must_be_uuid_layout() -> None:
-    value = "a" * 4 + "-" + "a" * 28
+    for value in ("a" * 4 + "-" + "a" * 28, "cccc-cccccccc-cccc-cccc-cccccccccccc"):
+        with pytest.raises(SchemaBuilderError, match="32-hex"):
+            _publish(page_id=value)
+        with pytest.raises(SchemaBuilderError, match="32-hex"):
+            _publish(links=(value,))
+        with pytest.raises(SchemaBuilderError, match="32-hex"):
+            _publish(other_catalogue_pages=(value,))
+
+
+def test_isolation_catches_an_uppercase_dashed_id() -> None:
+    with pytest.raises(SchemaBuilderError, match=_OTHER):
+        _publish(links=("CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC",))
+
+
+def test_isolation_catches_a_titled_uuid() -> None:
+    with pytest.raises(SchemaBuilderError, match=_OTHER):
+        _publish(links=("https://www.notion.so/My-Title-cccccccc-cccc-cccc-cccc-cccccccccccc",))
+
+
+def test_page_url_rejects_a_bad_uuid_layout() -> None:
+    for value in (
+        "https://www.notion.so/T-cccc-cccccccc-cccc-cccc-cccccccccccc",
+        "https://www.notion.so/T-a-b-c-d-e",
+        "https://notion.so/Title-1234abcd-1234-abcd-1234-abcd1234abc",
+    ):
+        with pytest.raises(SchemaBuilderError, match="32-hex"):
+            _publish(page_id=value)
+        with pytest.raises(SchemaBuilderError, match="32-hex"):
+            _publish(links=(value,))
+        with pytest.raises(SchemaBuilderError, match="32-hex"):
+            _publish(other_catalogue_pages=(value,))
+
+
+def test_page_url_port_443_is_canonical() -> None:
+    with pytest.raises(SchemaBuilderError, match=_OTHER):
+        _publish(links=(f"https://www.notion.so:443/{_OTHER}",))
+
+
+def test_page_url_rejects_a_query() -> None:
+    value = f"https://www.notion.so/{_TODAY}?p={_OTHER}"
     with pytest.raises(SchemaBuilderError, match="page id"):
         _publish(page_id=value)
     with pytest.raises(SchemaBuilderError, match="link"):
         _publish(links=(value,))
     with pytest.raises(SchemaBuilderError, match="other catalogue page"):
         _publish(other_catalogue_pages=(value,))
+
+
+def test_deduped_link_order_is_preserved() -> None:
+    dashed_notes = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    page = _publish(links=(_TODAY, _NOTES, dashed_notes, _TODAY))
+    assert page.links == (_TODAY, _NOTES)
+
+
+def test_page_reference_rejects_g() -> None:
+    value = "g" + "a" * 31
+    with pytest.raises(SchemaBuilderError, match="page id"):
+        _publish(page_id=value)
+    with pytest.raises(SchemaBuilderError, match="link"):
+        _publish(links=(value,))
+    with pytest.raises(SchemaBuilderError, match="other catalogue page"):
+        _publish(other_catalogue_pages=(value,))
+
+
+def test_secret_link_rejects_a_line_separator() -> None:
+    with pytest.raises(SchemaBuilderError, match="control character"):
+        _publish(secret_link="https://fix\u2028ture.notion.site/Home")
+
+
+def test_secret_link_rejects_a_paragraph_separator() -> None:
+    with pytest.raises(SchemaBuilderError, match="control character"):
+        _publish(secret_link="https://fix\u2029ture.notion.site/Home")
 
 
 def test_repeated_link_forms_are_stored_once() -> None:

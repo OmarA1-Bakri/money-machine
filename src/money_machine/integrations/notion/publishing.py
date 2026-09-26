@@ -7,12 +7,14 @@ A page is ready when it is top level, published to the web, duplicate as
 template is on, and search indexing is off. The secret link is captured and
 public access must already be verified. A link must not reach a page that
 belongs to another catalogue. Page ids are compared as lowercase undashed
-32-hex ids. This module does not move, publish, or open a page. It does not
-call Notion, the network, or a browser.
+32-hex ids. A page-id URL is https on notion.so or www.notion.so and has no
+query string. The secret link may still use notion.site. This module does not
+move, publish, or open a page. It does not call Notion, the network, or a browser.
 """
 
 from __future__ import annotations
 
+import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import cast
@@ -22,7 +24,9 @@ from .errors import SchemaBuilderError
 
 _TOP_LEVEL_PARENT = "workspace"
 _EXACT_SECRET_HOSTS: frozenset[str] = frozenset({"notion.so", "www.notion.so", "notion.site"})
+_PAGE_URL_HOSTS: frozenset[str] = frozenset({"notion.so", "www.notion.so"})
 _NOTION_SITE_SUFFIX = ".notion.site"
+_FORBIDDEN_SECRET_CATEGORIES: frozenset[str] = frozenset({"Cc", "Cf", "Zl", "Zp"})
 _HEX = frozenset("0123456789abcdef")
 _PAGE_ID_LENGTH = 32
 
@@ -142,7 +146,7 @@ def _capture_secret_link(value: object) -> str:
 
 
 def _forbidden_secret_char(char: str) -> bool:
-    return ord(char) < 32 or ord(char) == 127 or char in "\u0085\u200b"
+    return unicodedata.category(char) in _FORBIDDEN_SECRET_CATEGORIES
 
 
 def _secret_port(parsed: ParseResult) -> int | None:
@@ -181,10 +185,9 @@ def _dedupe_page_ids(page_ids: tuple[str, ...]) -> tuple[str, ...]:
 def _canonical_page_id(value: object, label: str) -> str:
     if not isinstance(value, str) or value == "" or value != value.strip():
         raise _page_id_error(label)
-    text = value.strip()
-    if "://" in text:
-        return _page_id_from_url(text, label)
-    page_id = _plain_page_id(text)
+    if "://" in value:
+        return _page_id_from_url(value, label)
+    page_id = _plain_page_id(value)
     if page_id is None:
         raise _page_id_error(label)
     return page_id
@@ -212,8 +215,10 @@ def _page_id_from_url(value: str, label: str) -> str:
         raise _page_id_error(label)
     if parsed.netloc.endswith(":") or _page_port(parsed, label) not in (None, 443):
         raise _page_id_error(label)
+    if parsed.query:
+        raise _page_id_error(label)
     host = parsed.hostname
-    if parsed.scheme != "https" or not isinstance(host, str) or not _allowed_secret_host(host):
+    if parsed.scheme != "https" or not isinstance(host, str) or host not in _PAGE_URL_HOSTS:
         raise _page_id_error(label)
     segment = parsed.path.rstrip("/").split("/")[-1]
     page_id = _hex_from_segment(segment)
