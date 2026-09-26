@@ -713,6 +713,16 @@ def test_notification_dashboard_rejects_duplicate_relation_names() -> None:
         NotificationDashboard(row_count=1, relations=(first, second), rollups=())
 
 
+def test_notification_dashboard_rejects_non_adjacent_duplicate_relation_names() -> None:
+    relations = (
+        DashboardRelation(name="Tasks", data_type="Tasks"),
+        DashboardRelation(name="Events", data_type="Events"),
+        DashboardRelation(name="Tasks", data_type="Tasks"),
+    )
+    with pytest.raises(SchemaBuilderError, match="duplicated"):
+        NotificationDashboard(row_count=1, relations=relations, rollups=())
+
+
 def test_hand_built_rollup_name_must_be_present() -> None:
     with pytest.raises(SchemaBuilderError, match="rollup name"):
         DashboardRollup(
@@ -747,6 +757,23 @@ def test_hand_built_rollup_function_must_be_known() -> None:
             relation_name="Tasks",
             property_name="task_open_and_due_today",
             function=cast(str, []),
+        )
+
+
+def test_hand_built_rollup_source_must_fit() -> None:
+    with pytest.raises(SchemaBuilderError, match="not on"):
+        DashboardRollup(
+            name="open_tasks_due_today",
+            relation_name="Tasks",
+            property_name="missing_source",
+            function="checked",
+        )
+    with pytest.raises(SchemaBuilderError, match="does not fit"):
+        DashboardRollup(
+            name="money_spent_today",
+            relation_name="Finance",
+            property_name="money_spent_today",
+            function="checked",
         )
 
 

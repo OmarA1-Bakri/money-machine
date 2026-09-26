@@ -6,8 +6,9 @@ Session 06 prompt heading "### 7. Implement publishing and isolation helpers"
 A page is ready when it is top level, published to the web, duplicate as
 template is on, and search indexing is off. The secret link is captured and
 public access must already be verified. A link must not reach a page that
-belongs to another catalogue. This module does not move, publish, or open a
-page. It does not call Notion, the network, or a browser.
+belongs to another catalogue. Page ids are compared as lowercase undashed
+32-hex ids. This module does not move, publish, or open a page. It does not
+call Notion, the network, or a browser.
 """
 
 from __future__ import annotations
@@ -15,14 +16,19 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import cast
-from urllib.parse import urlparse
+from urllib.parse import ParseResult, urlparse
 
 from .errors import SchemaBuilderError
-from .formulas import validated_name
 
 _TOP_LEVEL_PARENT = "workspace"
 _EXACT_SECRET_HOSTS: frozenset[str] = frozenset({"notion.so", "www.notion.so", "notion.site"})
 _NOTION_SITE_SUFFIX = ".notion.site"
+_HEX = frozenset("0123456789abcdef")
+_PAGE_ID_LENGTH = 32
+
+
+def _page_id_error(label: str) -> SchemaBuilderError:
+    return SchemaBuilderError(f"{label} must be a 32-hex page id")
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,7 +46,7 @@ class PublishedPage:
     other_catalogue_pages: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        validated_name("page id", cast(object, self.page_id))
+        page_id = _canonical_page_id(cast(object, self.page_id), "page id")
         _ensure_top_level(cast(object, self.parent_type))
         _ensure_published_to_web(cast(object, self.published_to_web))
         _ensure_duplicate_as_template(cast(object, self.duplicate_as_template))
@@ -53,7 +59,8 @@ class PublishedPage:
             "other catalogue pages",
             "other catalogue page",
         )
-        _reject_other_catalogue_links(links, other)
+        _reject_other_catalogue_links(page_id, links, other)
+        object.__setattr__(self, "page_id", page_id)
         object.__setattr__(self, "links", links)
         object.__setattr__(self, "other_catalogue_pages", other)
 
@@ -111,6 +118,8 @@ def _ensure_public_access(value: object) -> None:
 def _capture_secret_link(value: object) -> str:
     if not isinstance(value, str):
         raise SchemaBuilderError("secret link must be a string")
+    if any(ord(char) < 32 or ord(char) == 127 for char in value):
+        raise SchemaBuilderError("secret link must not contain a control character")
     if value.strip() == "" or value != value.strip():
         raise SchemaBuilderError("secret link must be present")
     parsed = urlparse(value)
@@ -118,12 +127,21 @@ def _capture_secret_link(value: object) -> str:
         raise SchemaBuilderError("secret link must use https")
     if parsed.username is not None or parsed.password is not None:
         raise SchemaBuilderError("secret link must not contain userinfo")
+    if _secret_port(parsed) not in (None, 443):
+        raise SchemaBuilderError("secret link port is not allowed")
     host = parsed.hostname
     if not isinstance(host, str) or not _allowed_secret_host(host):
         raise SchemaBuilderError("secret link host is not allowed")
-    if parsed.path in ("", "/"):
+    if parsed.path in ("", "/", "//"):
         raise SchemaBuilderError("secret link must name a page")
     return value
+
+
+def _secret_port(parsed: ParseResult) -> int | None:
+    try:
+        return parsed.port
+    except ValueError as exc:
+        raise SchemaBuilderError("secret link port is not allowed") from exc
 
 
 def _allowed_secret_host(host: str) -> bool:
@@ -138,10 +156,57 @@ def _allowed_secret_host(host: str) -> bool:
 def _copy_page_ids(value: object, plural: str, singular: str) -> tuple[str, ...]:
     if isinstance(value, str) or not isinstance(value, Sequence):
         raise SchemaBuilderError(f"{plural} must be a sequence")
-    return tuple(validated_name(singular, item) for item in value)
+    return tuple(_canonical_page_id(item, singular) for item in value)
 
 
-def _reject_other_catalogue_links(links: tuple[str, ...], other: tuple[str, ...]) -> None:
+def _canonical_page_id(value: object, label: str) -> str:
+    if not isinstance(value, str) or value == "" or value != value.strip():
+        raise _page_id_error(label)
+    if "://" in value:
+        return _page_id_from_url(value, label)
+    compact = value.replace("-", "").lower()
+    if len(compact) == _PAGE_ID_LENGTH and all(char in _HEX for char in compact):
+        return compact
+    raise _page_id_error(label)
+
+
+def _page_id_from_url(value: str, label: str) -> str:
+    parsed = urlparse(value)
+    host = parsed.hostname
+    if parsed.scheme != "https" or not isinstance(host, str) or not _allowed_secret_host(host):
+        raise _page_id_error(label)
+    segment = parsed.path.rstrip("/").split("/")[-1]
+    page_id = _hex_from_segment(segment)
+    if page_id is None:
+        raise _page_id_error(label)
+    return page_id
+
+
+def _hex_from_segment(segment: str) -> str | None:
+    if "-" not in segment:
+        compact = segment.lower()
+        if len(compact) == _PAGE_ID_LENGTH and all(char in _HEX for char in compact):
+            return compact
+        return None
+    potential = ""
+    for part in reversed(segment.split("-")):
+        if part == "" or any(char not in "0123456789abcdefABCDEF" for char in part):
+            break
+        potential = part + potential
+        if len(potential) == _PAGE_ID_LENGTH:
+            return potential.lower()
+        if len(potential) > _PAGE_ID_LENGTH:
+            return None
+    return None
+
+
+def _reject_other_catalogue_links(
+    page_id: str,
+    links: tuple[str, ...],
+    other: tuple[str, ...],
+) -> None:
+    if page_id in other:
+        raise SchemaBuilderError(f"page {page_id!r} lists itself as another catalogue")
     blocked = set(other)
     for destination in links:
         if destination in blocked:

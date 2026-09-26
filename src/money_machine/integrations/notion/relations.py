@@ -201,6 +201,7 @@ class DashboardRollup:
         function = cast(object, self.function)
         if not isinstance(function, str) or function not in _ROLLUP_FUNCTION_TYPES:
             raise SchemaBuilderError(f"rollup function {function!r} is not allowed")
+        _require_rollup(self.relation_name, self.property_name, function)
 
 
 @dataclass(frozen=True, slots=True)

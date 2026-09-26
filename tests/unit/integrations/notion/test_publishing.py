@@ -13,19 +13,24 @@ from money_machine.integrations.notion.errors import SchemaBuilderError
 from money_machine.integrations.notion.publishing import PublishedPage, build_published_page
 
 _LINK = "https://fixture.notion.site/Home"
+_PAGE = "a" * 32
+_NOTES = "b" * 32
+_OTHER = "c" * 32
+_TODAY = "d" * 32
+_DASHED_OTHER = "cccccccc-cccc-cccc-cccc-cccccccccccc"
 
 
 def _publish(**overrides: object) -> PublishedPage:
     values: dict[str, object] = {
-        "page_id": "Home",
+        "page_id": _PAGE,
         "parent_type": "workspace",
         "published_to_web": True,
         "duplicate_as_template": True,
         "search_indexing": False,
         "secret_link": _LINK,
         "public_access": True,
-        "links": ("Notes",),
-        "other_catalogue_pages": ("OtherHome",),
+        "links": (_NOTES,),
+        "other_catalogue_pages": (_OTHER,),
     }
     values.update(overrides)
     return build_published_page(
@@ -43,19 +48,19 @@ def _publish(**overrides: object) -> PublishedPage:
 
 def test_published_page_records_the_settings() -> None:
     page = _publish()
-    assert page.page_id == "Home"
+    assert page.page_id == _PAGE
     assert page.parent_type == "workspace"
     assert page.published_to_web is True
     assert page.duplicate_as_template is True
     assert page.search_indexing is False
     assert page.secret_link == _LINK
     assert page.public_access is True
-    assert page.links == ("Notes",)
-    assert page.other_catalogue_pages == ("OtherHome",)
+    assert page.links == (_NOTES,)
+    assert page.other_catalogue_pages == (_OTHER,)
 
 
 def test_page_must_be_top_level() -> None:
-    for parent_type in ("page_id", "database_id", "", None):
+    for parent_type in ("page_id", "database_id", "", None, "Workspace", " workspace"):
         with pytest.raises(SchemaBuilderError, match="top level"):
             _publish(parent_type=parent_type)
 
@@ -90,8 +95,9 @@ def test_page_id_must_be_present() -> None:
 
 
 def test_secret_link_must_be_a_string() -> None:
-    with pytest.raises(SchemaBuilderError, match="secret link must be a string"):
-        _publish(secret_link=None)
+    for value in (None, 1):
+        with pytest.raises(SchemaBuilderError, match="secret link must be a string"):
+            _publish(secret_link=value)
 
 
 def test_secret_link_must_be_present() -> None:
@@ -145,6 +151,31 @@ def test_secret_link_must_name_a_page() -> None:
             _publish(secret_link=value)
 
 
+def test_secret_link_rejects_a_double_slash_path() -> None:
+    with pytest.raises(SchemaBuilderError, match="must name a page"):
+        _publish(secret_link="https://fixture.notion.site//")
+
+
+def test_secret_link_rejects_a_port_other_than_443() -> None:
+    for value in (
+        "https://fixture.notion.site:8080/Home",
+        "https://fixture.notion.site:abc/Home",
+        "https://fixture.notion.site:99999/Home",
+    ):
+        with pytest.raises(SchemaBuilderError, match="port is not allowed"):
+            _publish(secret_link=value)
+
+
+def test_secret_link_allows_port_443() -> None:
+    page = _publish(secret_link="https://fixture.notion.site:443/Home")
+    assert page.secret_link == "https://fixture.notion.site:443/Home"
+
+
+def test_secret_link_rejects_a_control_character() -> None:
+    with pytest.raises(SchemaBuilderError, match="control character"):
+        _publish(secret_link="https://fix\tture.notion.site/Home")
+
+
 def test_links_must_be_a_sequence() -> None:
     with pytest.raises(SchemaBuilderError, match="links must be a sequence"):
         _publish(links=None)
@@ -161,28 +192,67 @@ def test_link_must_be_a_page_id() -> None:
 
 
 def test_caller_link_list_is_copied() -> None:
-    links = ["Notes", "Today"]
+    links = [_NOTES, _TODAY]
     page = _publish(links=links)
-    links.append("OtherHome")
-    links[0] = "Changed"
-    assert page.links == ("Notes", "Today")
+    links.append(_OTHER)
+    links[0] = "changed"
+    assert page.links == (_NOTES, _TODAY)
 
 
 def test_caller_other_catalogue_list_is_copied() -> None:
-    other = ["OtherHome"]
+    other = [_OTHER]
     page = _publish(other_catalogue_pages=other)
-    other.append("Notes")
-    assert page.other_catalogue_pages == ("OtherHome",)
+    other.append(_NOTES)
+    assert page.other_catalogue_pages == (_OTHER,)
 
 
 def test_link_order_is_preserved() -> None:
-    page = _publish(links=("Notes", "Today"))
-    assert page.links == ("Notes", "Today")
+    page = _publish(links=(_NOTES, _TODAY))
+    assert page.links == (_NOTES, _TODAY)
 
 
 def test_a_later_link_to_another_catalogue_is_rejected() -> None:
-    with pytest.raises(SchemaBuilderError, match="OtherHome"):
-        _publish(links=("Notes", "OtherHome"))
+    with pytest.raises(SchemaBuilderError, match=_OTHER):
+        _publish(links=(_NOTES, _OTHER))
+
+
+def test_isolation_catches_an_uppercase_id() -> None:
+    with pytest.raises(SchemaBuilderError, match=_OTHER):
+        _publish(links=(_OTHER.upper(),))
+
+
+def test_isolation_catches_a_dashed_id() -> None:
+    with pytest.raises(SchemaBuilderError, match=_OTHER):
+        _publish(links=(_DASHED_OTHER,))
+
+
+def test_isolation_catches_a_notion_so_url() -> None:
+    with pytest.raises(SchemaBuilderError, match=_OTHER):
+        _publish(links=(f"https://www.notion.so/Title-{_OTHER}",))
+
+
+def test_isolation_catches_a_notion_site_url() -> None:
+    with pytest.raises(SchemaBuilderError, match=_OTHER):
+        _publish(links=(f"https://x.notion.site/{_OTHER}",))
+
+
+def test_page_reference_rejects_a_non_id() -> None:
+    for value in ("Home", "abcd", "https://www.notion.so/Home"):
+        with pytest.raises(SchemaBuilderError, match="page id"):
+            _publish(page_id=value)
+        with pytest.raises(SchemaBuilderError, match="link"):
+            _publish(links=(value,))
+        with pytest.raises(SchemaBuilderError, match="other catalogue page"):
+            _publish(other_catalogue_pages=(value,))
+
+
+def test_page_rejects_itself_as_another_catalogue_page() -> None:
+    with pytest.raises(SchemaBuilderError, match="lists itself"):
+        _publish(
+            page_id=_PAGE.upper(),
+            links=(_NOTES,),
+            other_catalogue_pages=(_PAGE,),
+        )
 
 
 def test_other_catalogue_pages_must_be_a_sequence() -> None:
