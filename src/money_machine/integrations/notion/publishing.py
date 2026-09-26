@@ -8,7 +8,7 @@ template is on, and search indexing is off. The secret link is captured and
 public access must already be verified. A link must not reach a page that
 belongs to another catalogue. Page ids are compared as lowercase undashed
 32-hex ids. A page-id URL is https on notion.so or www.notion.so, with no
-query, fragment, or parameters. The secret link may still use notion.site.
+query, fragment, or parameters. Zs is rejected. Secret links may use notion.site.
 This module does not move, publish, or open a page. It does not call Notion,
 the network, or a browser.
 """
@@ -27,7 +27,7 @@ _TOP_LEVEL_PARENT = "workspace"
 _EXACT_SECRET_HOSTS: frozenset[str] = frozenset({"notion.so", "www.notion.so", "notion.site"})
 _PAGE_URL_HOSTS: frozenset[str] = frozenset({"notion.so", "www.notion.so"})
 _NOTION_SITE_SUFFIX = ".notion.site"
-_FORBIDDEN_PAGE_CATEGORIES: frozenset[str] = frozenset({"Cc", "Cf", "Zl", "Zp"})
+_FORBIDDEN_PAGE_CATEGORIES: frozenset[str] = frozenset({"Cc", "Cf", "Zl", "Zp", "Zs"})
 _FORBIDDEN_SECRET_CATEGORIES: frozenset[str] = frozenset({"Cc", "Cf", "Zl", "Zp", "Zs"})
 _HEX = frozenset("0123456789abcdef")
 _PAGE_ID_LENGTH = 32
