@@ -148,10 +148,13 @@ def test_filter_value_must_be_present() -> None:
 def test_date_filter_value_must_be_today_or_an_iso_date() -> None:
     today = build_filter("date", "Due", "equals", "today")
     iso = build_filter("date", "Due", "equals", "2026-09-26")
+    leap = build_filter("date", "Due", "equals", "2028-02-29")
     assert today.value == "today"
     assert iso.value == "2026-09-26"
-    with pytest.raises(SchemaBuilderError, match="date filter value"):
-        build_filter("date", "Due", "equals", "banana")
+    assert leap.value == "2028-02-29"
+    for value in ("banana", "2026-13-40", "2026-02-30", "2026-9-1", "Today", "2026-09-26T00:00"):
+        with pytest.raises(SchemaBuilderError, match="date filter value"):
+            build_filter("date", "Due", "equals", value)
     status = build_filter("status", "Status", "equals", "banana")
     assert status.value == "banana"
 
@@ -624,8 +627,38 @@ def test_relation_data_type_must_be_canonical() -> None:
 
 
 def test_hand_built_notification_dashboard_rejects_a_row_count_other_than_one() -> None:
-    with pytest.raises(SchemaBuilderError, match="row count"):
-        NotificationDashboard(row_count=2, relations=(), rollups=())
+    for row_count in (2, 0, -1, True, 1.0):
+        with pytest.raises(SchemaBuilderError, match="row count"):
+            NotificationDashboard(row_count=cast(int, row_count), relations=(), rollups=())
+
+
+def test_hand_built_notification_dashboard_rejects_a_junk_relation() -> None:
+    with pytest.raises(SchemaBuilderError, match="DashboardRelation"):
+        NotificationDashboard(
+            row_count=1,
+            relations=cast(tuple[DashboardRelation, ...], ("junk",)),
+            rollups=(),
+        )
+
+
+def test_hand_built_notification_dashboard_rejects_null_rollups() -> None:
+    with pytest.raises(SchemaBuilderError, match="rollups"):
+        NotificationDashboard(
+            row_count=1,
+            relations=(),
+            rollups=cast(tuple[DashboardRollup, ...], None),
+        )
+
+
+def test_hand_built_notification_dashboard_rejects_a_rollup_with_no_relation() -> None:
+    rollup = DashboardRollup(
+        name="open_tasks_due_today",
+        relation_name="Tasks",
+        property_name="task_open_and_due_today",
+        function="checked",
+    )
+    with pytest.raises(SchemaBuilderError, match="does not match"):
+        NotificationDashboard(row_count=1, relations=(), rollups=(rollup,))
 
 
 def test_rollup_names_the_canonical_database() -> None:

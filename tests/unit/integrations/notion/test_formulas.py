@@ -83,8 +83,8 @@ def test_dashboard_formulas_use_verified_property_names() -> None:
         'prop("Amount"), 0)'
     )
     assert generated.expressions["water_glasses_remaining"] == (
-        'if(equal(formatDate(prop("Date"),"YYYY-MM-DD"), formatDate(now(),"YYYY-MM-DD")), '
-        'subtract(prop("Goal"),prop("Glasses")), 0)'
+        'if(equal(formatDate(prop("Date"), "YYYY-MM-DD"), formatDate(now(), "YYYY-MM-DD")), '
+        'subtract(prop("Goal"), prop("Glasses")), 0)'
     )
     assert dict(generated.result_types) == {
         "current_date": "date",
@@ -106,8 +106,8 @@ def test_dashboard_formulas_use_verified_property_names() -> None:
 
 def test_water_glasses_remaining_contributes_only_todays_row() -> None:
     expression = (
-        'if(equal(formatDate(prop("Date"),"YYYY-MM-DD"), formatDate(now(),"YYYY-MM-DD")), '
-        'subtract(prop("Goal"),prop("Glasses")), 0)'
+        'if(equal(formatDate(prop("Date"), "YYYY-MM-DD"), formatDate(now(), "YYYY-MM-DD")), '
+        'subtract(prop("Goal"), prop("Glasses")), 0)'
     )
     generated = generate_notification_dashboard_formulas(_VERIFIED)
     assert generated.expressions["water_glasses_remaining"] == expression
@@ -461,8 +461,8 @@ _MONEY_SPENT = (
     'prop("Amount"), 0)'
 )
 _WATER = (
-    'if(equal(formatDate(prop("Date"),"YYYY-MM-DD"), formatDate(now(),"YYYY-MM-DD")), '
-    'subtract(prop("Goal"),prop("Glasses")), 0)'
+    'if(equal(formatDate(prop("Date"), "YYYY-MM-DD"), formatDate(now(), "YYYY-MM-DD")), '
+    'subtract(prop("Goal"), prop("Glasses")), 0)'
 )
 _PRESET_EXPRESSIONS: dict[str, dict[str, str]] = {
     "Tasks": {"current_date": "now()", "task_open_and_due_today": _TASK_OPEN},

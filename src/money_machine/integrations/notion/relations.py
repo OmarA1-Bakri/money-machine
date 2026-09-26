@@ -9,7 +9,7 @@ status, and each filter property must exist on that database. The home
 dashboard has a today view, a monthly calendar, and quick notes. The
 notification dashboard is one row of relations and rollups over the Tasks,
 Events, Finance, and Habits formulas from section 5. A missing database omits
-its relation and rollup. The relation links all Habits rows, and the formula
+its relation and rollup. The relation must include today's row, and the formula
 contributes only today's row, so the rollup sum is today's value. Notion
 evaluates now() and formatDate in the viewer's local time zone, API reads
 return UTC, and 'today' can differ near midnight.
@@ -19,6 +19,7 @@ relations. This module does not call Notion, the network, or a browser.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -42,6 +43,7 @@ _ROLLUP_FUNCTION_TYPES: dict[str, frozenset[str]] = {
     "sum": frozenset({"number"}),
 }
 _CATALOGUE_KINDS: frozenset[str] = frozenset(DATABASE_KINDS)
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _PropertyFacts = tuple[str, tuple[str, ...], bool]
 
 # data type, rollup name, source property, function.
@@ -139,8 +141,12 @@ def _require_date_filter_value(value: str) -> None:
 
 
 def _is_iso_date(value: str) -> bool:
-    if len(value) != 10 or value[4] != "-" or value[7] != "-":
+    if _ISO_DATE.fullmatch(value) is None:
         return False
+    return _is_calendar_date(value)
+
+
+def _is_calendar_date(value: str) -> bool:
     try:
         parsed = date.fromisoformat(value)
     except ValueError:
@@ -163,7 +169,7 @@ class LinkedView:
 class DashboardRelation:
     """A relation from the one-row dashboard to one canonical database.
 
-    The relation links every Habits row. ``water_glasses_remaining`` contributes
+    The relation must include today's row. ``water_glasses_remaining`` contributes
     only today's row, so the rollup sum is today's value.
     """
 
@@ -194,8 +200,29 @@ class NotificationDashboard:
     rollups: tuple[DashboardRollup, ...]
 
     def __post_init__(self) -> None:
-        if self.row_count != 1:
+        if type(self.row_count) is not int or self.row_count != 1:
             raise SchemaBuilderError("notification dashboard row count must be 1")
+        relations = cast(object, self.relations)
+        if isinstance(relations, str) or not isinstance(relations, tuple):
+            raise SchemaBuilderError("notification dashboard relations must be a tuple")
+        linked: list[DashboardRelation] = []
+        for relation in relations:
+            if not isinstance(relation, DashboardRelation):
+                raise SchemaBuilderError(
+                    "notification dashboard relation must be a DashboardRelation"
+                )
+            linked.append(relation)
+        rollups = cast(object, self.rollups)
+        if not isinstance(rollups, tuple):
+            raise SchemaBuilderError("notification dashboard rollups must be a tuple")
+        names = {relation.name for relation in linked}
+        for rollup in rollups:
+            if not isinstance(rollup, DashboardRollup):
+                raise SchemaBuilderError("notification dashboard rollup must be a DashboardRollup")
+            if rollup.relation_name not in names:
+                raise SchemaBuilderError(
+                    f"rollup relation {rollup.relation_name!r} does not match a dashboard relation"
+                )
 
 
 def build_canonical_databases(data_types: object) -> CanonicalDatabases:

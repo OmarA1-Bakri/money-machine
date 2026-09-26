@@ -104,8 +104,8 @@ _DASHBOARD: tuple[tuple[str, str, str, str], ...] = (
         "water_glasses_remaining",
         "Habits",
         "number",
-        'if(equal(formatDate(prop("Date"),"YYYY-MM-DD"), formatDate(now(),"YYYY-MM-DD")), '
-        'subtract(prop("Goal"),prop("Glasses")), 0)',
+        'if(equal(formatDate(prop("Date"), "YYYY-MM-DD"), formatDate(now(), "YYYY-MM-DD")), '
+        'subtract(prop("Goal"), prop("Glasses")), 0)',
     ),
 )
 _EXPECTED_TYPES: dict[str, dict[str, str]] = {
