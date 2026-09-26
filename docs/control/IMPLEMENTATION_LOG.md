@@ -608,19 +608,19 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 
 - **Heading**: `### 7. Implement publishing and isolation helpers` in `prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md` and `hands-off-money-machine-full-implementation-workbook.md`.
 - **Narrow reading**: A catalogue page is top level, published to the web, duplicate as template is on, and search indexing is off. The secret link is captured. Public access is verified. No link reaches a page that belongs to another catalogue. No fixture-parity expansion, live connect, adapter calls, or Session 07 product build. No Notion, network, or browser calls.
-- **W7 cleanups folded in**: Deleted the unused `_decimal_digits` helper and the `unicodedata` import. `_is_calendar_date` parses the original text with `date.fromisoformat`, so a non-ASCII digit is still rejected. The W7 row Accept non-ASCII digits in an ISO date is equivalent after that deletion, and that disposition is a new line in this entry. Deleted `isinstance(relations, str) or` from the notification-dashboard relations check. A string is not a tuple, so that clause changed no result; it is W8 row 1: re-add isinstance(relations, str) or. `NotificationDashboard` rejects a duplicated relation name, including a non-adjacent duplicate, with `SchemaBuilderError`. `DashboardRollup.__post_init__` rejects a blank name, a blank source, an unknown or non-string function, a data type outside the catalogue, a missing source, and a function that does not fit the source type. The unknown-function check says the function is not allowed. The fit check says the function does not fit or is not on the source type. Each check dies on its own test.
-- **Helpers**: `build_published_page` returns a `PublishedPage`. The parent must be `workspace`, matched exactly. Published to web, duplicate as template, and public access must be `True`. Search indexing must be `False`. The page id, each link, and each other-catalogue page are stored as a lowercase undashed 32-hex id. A plain id is 32 hex with no dashes, or exactly the 8-4-4-4-12 layout, lowercased. A page-id URL must be https, with no userinfo, no query string, and a port of none or 443, on `notion.so` or `www.notion.so` only. `notion.site` is rejected in those fields. The id is the last path segment: an undashed 32-hex slug, a title plus one 32-hex tail, or a trailing 8-4-4-4-12. Uppercase hex is lowercased before isolation. Hex from a title is not joined onto a short id. A non-id, a host outside that pair, and a page that lists itself as another catalogue page are rejected. The same page is one id across uppercase, dashed, and URL forms. The same link written three ways is stored once, in first-seen order. The secret link must be a trimmed https URL with no userinfo and no character in Unicode categories Cc, Cf, Zl, or Zp. Its host may be `notion.so`, `www.notion.so`, `notion.site`, or a single label under `notion.site`. Its port is none or 443, and its path is not empty after stripping slashes. A malformed URL and a bad port raise `SchemaBuilderError`. Link and other-catalogue sequences are copied in canonical form. A link whose canonical id is in the other-catalogue pages is rejected, including when it is not the first link. Invalid input raises `SchemaBuilderError`. Dropping the page-id padding clause is equivalent, because a padded id still fails the 32-hex check.
-- **Pytest collected**: 1670 collected, 1669 passed, 1 skipped. W7 baseline: 1558 collected, 1557 passed, 1 skipped. Delta +112 collected and +112 passed.
+- **W7 cleanups folded in**: Deleted the unused `_decimal_digits` helper and the `unicodedata` import from `relations.py`. `_is_calendar_date` parses the original text with `date.fromisoformat`, so a non-ASCII digit is still rejected. The W7 row Accept non-ASCII digits in an ISO date is equivalent after that deletion, and that disposition is a new line in this entry. Deleted `isinstance(relations, str) or` from the notification-dashboard relations check. A string is not a tuple, so that clause changed no result; it is W8 row 1: re-add isinstance(relations, str) or. `NotificationDashboard` rejects a duplicated relation name, including a non-adjacent duplicate, with `SchemaBuilderError`. `DashboardRollup.__post_init__` rejects a blank name, a blank source, an unknown or non-string function, a data type outside the catalogue, a missing source, and a function that does not fit the source type. The unknown-function check says the function is not allowed. The fit check says the function does not fit or is not on the source type. Each check dies on its own test.
+- **Helpers**: `build_published_page` returns a `PublishedPage`. The parent must be `workspace`, matched exactly. Published to web, duplicate as template, and public access must be `True`. Search indexing must be `False`. The page id, each link, and each other-catalogue page are stored as a lowercase undashed 32-hex id. A plain id is 32 hex with no dashes, or exactly the 8-4-4-4-12 layout, lowercased. A page-id URL must be https, with no userinfo, no query string, no empty question mark, no fragment, no parameters, and a port of none or 443, on `notion.so` or `www.notion.so` only. A bare `https://notion.so/<id>` is accepted and stored as the canonical id. Page references reject Unicode categories Cc, Cf, Zl, and Zp, and they reject padding that urlsplit would strip. `notion.site` is rejected in those fields. The id is the last path segment: an undashed 32-hex slug, a title plus one 32-hex tail, or a trailing 8-4-4-4-12. Uppercase hex is lowercased before isolation. Hex from a title is not joined onto a short id. A non-id, a host outside that pair, and a page that lists itself as another catalogue page are rejected. The same page is one id across uppercase, dashed, and URL forms. The same link written three ways is stored once, in first-seen order. The secret link must be a trimmed https URL with no userinfo and no character in Unicode categories Cc, Cf, Zl, Zp, or Zs. Its host may be `notion.so`, `www.notion.so`, `notion.site`, or a single label under `notion.site`. Its port is none or 443, and its path is not empty after stripping slashes. A malformed URL and a bad port raise `SchemaBuilderError`. Link and other-catalogue sequences are copied in canonical form. A link whose canonical id is in the other-catalogue pages is rejected, including when it is not the first link. Invalid input raises `SchemaBuilderError`.
+- **Pytest collected**: 1705 collected, 1704 passed, 1 skipped. W7 baseline: 1558 collected, 1557 passed, 1 skipped. Delta +147 collected and +147 passed.
 - **Per-file counts**:
 
 | File | Functions (base → tip) | Collected (base → tip) | Passed (base → tip) | Failed (base → tip) | Skipped (base → tip) |
 |---|---|---|---|---|---|
 | `tests/unit/integrations/notion/test_relations.py` | 85 → 92 | 90 → 97 | 90 → 97 | 0 → 0 | 0 → 0 |
-| `tests/unit/integrations/notion/test_publishing.py` | 0 → 70 | 0 → 105 | 0 → 105 | 0 → 0 | 0 → 0 |
+| `tests/unit/integrations/notion/test_publishing.py` | 0 → 78 | 0 → 140 | 0 → 140 | 0 → 0 | 0 → 0 |
 | Remaining files | unchanged | 1468 → 1468 | 1467 → 1467 | 0 → 0 | 1 → 1 |
-| **Total** | | **1558 → 1670** | **1557 → 1669** | **0 → 0** | **1 → 1** |
+| **Total** | | **1558 → 1705** | **1557 → 1704** | **0 → 0** | **1 → 1** |
 
-- **Mutation checks** (95 rows; each applied, pytest run, then reverted; 92 killed and 3 equivalent):
+- **Mutation checks** (105 rows; each applied, pytest run, then reverted; 103 killed and 2 equivalent):
 
 | Mutation | Site | Failing test |
 |---|---|---|
@@ -631,96 +631,106 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 | Look up a rollup function before checking it is a string | `relations.py:202` | `test_hand_built_rollup_function_must_be_known` |
 | Accept an unknown rollup function on a hand-built rollup | `relations.py:202` | `test_hand_built_rollup_function_must_be_known` |
 | Skip hand-built rollup data-type validation | `relations.py:200` | `test_hand_built_rollup_data_type_must_be_canonical` |
-| Skip page id validation | `publishing.py:53` | `test_page_id_must_be_present` |
-| Accept a parent that is not the workspace | `publishing.py:99` | `test_page_must_be_top_level` |
-| Accept a published-to-web flag other than True | `publishing.py:104` | `test_page_must_be_published_to_web` |
-| Accept a duplicate-as-template flag other than True | `publishing.py:109` | `test_duplicate_as_template_must_be_on` |
-| Accept search indexing other than False | `publishing.py:114` | `test_search_indexing_must_be_off` |
-| Accept public access other than True | `publishing.py:119` | `test_public_access_must_be_verified` |
-| Accept a secret link that is not a string | `publishing.py:124` | `test_secret_link_must_be_a_string` |
+| Skip page id validation | `publishing.py:55` | `test_page_id_must_be_present` |
+| Accept a parent that is not the workspace | `publishing.py:101` | `test_page_must_be_top_level` |
+| Accept a published-to-web flag other than True | `publishing.py:106` | `test_page_must_be_published_to_web` |
+| Accept a duplicate-as-template flag other than True | `publishing.py:111` | `test_duplicate_as_template_must_be_on` |
+| Accept search indexing other than False | `publishing.py:116` | `test_search_indexing_must_be_off` |
+| Accept public access other than True | `publishing.py:121` | `test_public_access_must_be_verified` |
+| Accept a secret link that is not a string | `publishing.py:126` | `test_secret_link_must_be_a_string` |
 | Accept an empty secret link | `publishing.py:128` | `test_secret_link_must_be_present` |
 | Accept a padded secret link | `publishing.py:128` | `test_secret_link_must_be_present` |
-| Accept a secret link whose scheme is not https | `publishing.py:134` | `test_secret_link_must_use_https` |
-| Accept secret-link userinfo when only one of username or password is set | `publishing.py:136` | `test_secret_link_must_not_contain_userinfo` |
-| Accept a secret-link host outside the allowlist | `publishing.py:141` | `test_secret_link_host_must_be_allowed` |
-| Drop notion.so from the exact secret-link hosts | `publishing.py:26` | `test_secret_link_host_is_allowed[notion.so]` |
-| Drop www.notion.so from the exact secret-link hosts | `publishing.py:26` | `test_secret_link_host_is_allowed[www.notion.so]` |
-| Drop notion.site from the exact secret-link hosts | `publishing.py:26` | `test_secret_link_host_is_allowed[notion.site]` |
-| Reject every single-label notion.site host | `publishing.py:162` | `test_secret_link_host_is_allowed[fixture.notion.site]` |
-| Reject the www label on notion.site | `publishing.py:165` | `test_secret_link_host_is_allowed[www.notion.site]` |
-| Allow a dotted notion.site prefix | `publishing.py:165` | `test_secret_link_rejects_a_nested_notion_site_label` |
-| Allow an empty notion.site prefix | `publishing.py:165` | `test_secret_link_rejects_an_empty_notion_site_label` |
-| Accept a secret link with an empty path | `publishing.py:143` | `test_secret_link_must_name_a_page` |
-| Accept a secret link whose path is only / | `publishing.py:143` | `test_secret_link_must_name_a_page` |
-| Accept links that are not a sequence | `publishing.py:169` | `test_links_must_be_a_sequence` |
-| Accept a string of links | `publishing.py:169` | `test_links_reject_a_string` |
-| Skip link page-id validation | `publishing.py:60` | `test_link_must_be_a_page_id` |
-| Skip other-catalogue page-id validation | `publishing.py:62` | `test_other_catalogue_page_must_be_a_page_id` |
-| Accept other catalogue pages that are not a sequence | `publishing.py:62` | `test_other_catalogue_pages_must_be_a_sequence` |
-| Store the caller link sequence | `publishing.py:69` | `test_caller_link_list_is_copied` |
-| Store the caller other-catalogue sequence | `publishing.py:70` | `test_caller_other_catalogue_list_is_copied` |
-| Reverse the copied links | `publishing.py:69` | `test_link_order_is_preserved` |
-| Accept a link that reaches another catalogue | `publishing.py:279` | `test_a_later_link_to_another_catalogue_is_rejected` |
-| Check only the first link against other catalogue pages | `publishing.py:278` | `test_a_later_link_to_another_catalogue_is_rejected` |
+| Accept a secret link whose scheme is not https | `publishing.py:136` | `test_secret_link_must_use_https` |
+| Accept secret-link userinfo when only one of username or password is set | `publishing.py:138` | `test_secret_link_must_not_contain_userinfo` |
+| Accept a secret-link host outside the allowlist | `publishing.py:143` | `test_secret_link_host_must_be_allowed` |
+| Drop notion.so from the exact secret-link hosts | `publishing.py:27` | `test_secret_link_host_is_allowed[notion.so]` |
+| Drop www.notion.so from the exact secret-link hosts | `publishing.py:27` | `test_secret_link_host_is_allowed[www.notion.so]` |
+| Drop notion.site from the exact secret-link hosts | `publishing.py:27` | `test_secret_link_host_is_allowed[notion.site]` |
+| Reject every single-label notion.site host | `publishing.py:168` | `test_secret_link_host_is_allowed[fixture.notion.site]` |
+| Reject the www label on notion.site | `publishing.py:171` | `test_secret_link_host_is_allowed[www.notion.site]` |
+| Allow a dotted notion.site prefix | `publishing.py:171` | `test_secret_link_rejects_a_nested_notion_site_label` |
+| Allow an empty notion.site prefix | `publishing.py:171` | `test_secret_link_rejects_an_empty_notion_site_label` |
+| Accept a secret link with an empty path | `publishing.py:145` | `test_secret_link_must_name_a_page` |
+| Accept a secret link whose path is only / | `publishing.py:145` | `test_secret_link_must_name_a_page` |
+| Accept links that are not a sequence | `publishing.py:175` | `test_links_must_be_a_sequence` |
+| Accept a string of links | `publishing.py:175` | `test_links_reject_a_string` |
+| Skip link page-id validation | `publishing.py:62` | `test_link_must_be_a_page_id` |
+| Skip other-catalogue page-id validation | `publishing.py:64` | `test_other_catalogue_page_must_be_a_page_id` |
+| Accept other catalogue pages that are not a sequence | `publishing.py:64` | `test_other_catalogue_pages_must_be_a_sequence` |
+| Store the caller link sequence | `publishing.py:71` | `test_caller_link_list_is_copied` |
+| Store the caller other-catalogue sequence | `publishing.py:72` | `test_caller_other_catalogue_list_is_copied` |
+| Reverse the copied links | `publishing.py:71` | `test_link_order_is_preserved` |
+| Accept a link that reaches another catalogue | `publishing.py:295` | `test_a_later_link_to_another_catalogue_is_rejected` |
+| Check only the first link against other catalogue pages | `publishing.py:294` | `test_a_later_link_to_another_catalogue_is_rejected` |
 | W7 non-ASCII ISO date row | `relations.py:46` | equivalent: deleting _decimal_digits still rejects a non-ASCII digit |
 | Reset seen relation names instead of adding | `relations.py:230` | `test_notification_dashboard_rejects_non_adjacent_duplicate_relation_names` |
 | Skip the hand-built rollup source and fit check | `relations.py:204` | `test_hand_built_rollup_source_must_fit` |
-| Compare the parent case-insensitively | `publishing.py:99` | `test_page_must_be_top_level` |
-| Strip the parent before comparing it | `publishing.py:99` | `test_page_must_be_top_level` |
-| Treat only None as a non-string secret link | `publishing.py:124` | `test_secret_link_must_be_a_string` |
-| Accept a control character in the secret link | `publishing.py:126` | `test_secret_link_rejects_a_control_character` |
-| Accept a secret-link port other than 443 | `publishing.py:138` | `test_secret_link_rejects_a_port_other_than_443` |
-| Let a bad secret-link port raise ValueError | `publishing.py:155` | `test_secret_link_rejects_a_port_other_than_443` |
-| Reject secret-link port 443 | `publishing.py:138` | `test_secret_link_allows_port_443` |
-| Accept a secret link whose path is // | `publishing.py:143` | `test_secret_link_rejects_a_double_slash_path` |
-| Do not lowercase a page id | `publishing.py:203` | `test_isolation_catches_an_uppercase_id` |
-| Do not remove dashes from a page id | `publishing.py:201` | `test_isolation_catches_a_dashed_id` |
-| Do not read a page id from a URL | `publishing.py:188` | `test_isolation_catches_a_notion_so_url` |
-| Accept a notion.site page URL | `publishing.py:221` | `test_page_url_rejects_a_notion_site_host` |
-| Accept a page reference that is not a 32-hex id | `publishing.py:204` | `test_page_reference_rejects_a_non_id` |
-| Accept a page that lists itself as another catalogue | `publishing.py:275` | `test_page_rejects_itself_as_another_catalogue_page` |
-| Widen a plain page id to 31-33 characters | `publishing.py:204` | `test_plain_page_id_length_and_hex_are_required` |
-| Accept word characters as a plain page id | `publishing.py:204` | `test_plain_page_id_length_and_hex_are_required` |
-| Drop the plain page-id hex check | `publishing.py:204` | `test_plain_page_id_length_and_hex_are_required` |
-| Accept an http page URL | `publishing.py:221` | `test_page_url_must_use_https` |
-| Accept any page-id host | `publishing.py:221` | `test_page_url_host_must_be_allowed` |
-| Do not lowercase a page id taken from a URL | `publishing.py:248` | `test_isolation_lowercases_an_uppercase_url_id` |
-| Do not lowercase an uppercase-hex slug | `publishing.py:267` | `test_isolation_lowercases_an_uppercase_slug` |
-| Do not strip a trailing slash from a page URL | `publishing.py:223` | `test_isolation_keeps_a_trailing_slash_on_the_page_id` |
-| Read the first path segment as the page id | `publishing.py:223` | `test_isolation_catches_a_nested_page_path` |
-| Drop the longer-than-32 slug guard | `publishing.py:249` | `test_page_url_rejects_a_slug_longer_than_32_hex` |
-| Drop the undashed slug hex check | `publishing.py:253` | `test_page_url_rejects_a_non_hex_slug` |
-| Accept a non-hex slug part | `publishing.py:265` | `test_page_url_rejects_a_non_hex_slug` |
-| Reject a titled page slug | `publishing.py:242` | `test_isolation_catches_a_notion_site_slug` |
-| Store the original page id | `publishing.py:68` | `test_page_references_are_stored_in_canonical_form` |
-| Drop the page-id string check | `publishing.py:186` | `test_page_reference_must_be_a_string` |
-| Drop the page-id padding check | `publishing.py:186` | equivalent: a padded id still fails the 32-hex check |
-| Let a malformed secret link raise ValueError | `publishing.py:130` | `test_secret_link_rejects_a_malformed_url` |
-| Let a malformed page URL raise ValueError | `publishing.py:210` | `test_page_url_rejects_a_malformed_url` |
-| Let a bad page-url port raise ValueError | `publishing.py:231` | `test_page_url_rejects_a_port` |
-| Drop Unicode category Cc | `publishing.py:149` | `test_secret_link_rejects_del` |
-| Drop Unicode category Zl | `publishing.py:149` | `test_secret_link_rejects_a_line_separator` |
-| Drop Unicode category Cf | `publishing.py:149` | `test_secret_link_rejects_a_zero_width_space` |
-| Accept an empty secret-link port | `publishing.py:138` | `test_secret_link_rejects_an_empty_port` |
-| Accept secret-link port 80 | `publishing.py:138` | `test_secret_link_rejects_a_port_other_than_443` |
-| Accept a secret link whose path is /// | `publishing.py:143` | `test_secret_link_rejects_a_triple_slash_path` |
-| Accept page-url userinfo when only one of username or password is set | `publishing.py:214` | `test_page_url_rejects_userinfo` |
-| Accept a page-url port other than 443 | `publishing.py:216` | `test_page_url_rejects_a_port` |
-| Accept an empty page-url port | `publishing.py:216` | `test_page_url_rejects_an_empty_port` |
-| Join hex title words onto a short page id | `publishing.py:244` | `test_page_url_rejects_a_glued_hex_title` |
-| Accept dashes that are not the 8-4-4-4-12 layout | `publishing.py:199` | `test_plain_page_id_dashes_must_be_uuid_layout` |
-| Keep the same link each time it is repeated | `publishing.py:61` | `test_repeated_link_forms_are_stored_once` |
-| Accept a trailing slug whose groups are not 8-4-4-4-12 | `publishing.py:263` | `test_page_url_rejects_a_bad_uuid_layout` |
-| Do not lowercase a dashed plain page id | `publishing.py:201` | `test_isolation_catches_an_uppercase_dashed_id` |
-| Read six slug groups instead of the trailing uuid | `publishing.py:262` | `test_isolation_catches_a_titled_uuid` |
-| Accept page-url port 80 | `publishing.py:216` | `test_page_url_rejects_a_port` |
-| Reject page-url port 443 | `publishing.py:216` | `test_page_url_port_443_is_canonical` |
-| Drop Unicode category Zp | `publishing.py:149` | `test_secret_link_rejects_a_paragraph_separator` |
-| Accept a page-url query string | `publishing.py:218` | `test_page_url_rejects_a_query` |
-| Sort deduped links | `publishing.py:182` | `test_deduped_link_order_is_preserved` |
-| Treat g as a hex digit | `publishing.py:30` | `test_page_reference_rejects_g` |
+| Compare the parent case-insensitively | `publishing.py:101` | `test_page_must_be_top_level` |
+| Strip the parent before comparing it | `publishing.py:101` | `test_page_must_be_top_level` |
+| Treat only None as a non-string secret link | `publishing.py:126` | `test_secret_link_must_be_a_string` |
+| Accept a control character in the secret link | `publishing.py:130` | `test_secret_link_rejects_a_control_character` |
+| Accept a secret-link port other than 443 | `publishing.py:140` | `test_secret_link_rejects_a_port_other_than_443` |
+| Let a bad secret-link port raise ValueError | `publishing.py:161` | `test_secret_link_rejects_a_port_other_than_443` |
+| Reject secret-link port 443 | `publishing.py:140` | `test_secret_link_allows_port_443` |
+| Accept a secret link whose path is // | `publishing.py:145` | `test_secret_link_rejects_a_double_slash_path` |
+| Do not lowercase a page id | `publishing.py:213` | `test_isolation_catches_an_uppercase_id` |
+| Do not remove dashes from a page id | `publishing.py:211` | `test_isolation_catches_a_dashed_id` |
+| Do not read a page id from a URL | `publishing.py:198` | `test_isolation_catches_a_notion_so_url` |
+| Accept a notion.site page URL | `publishing.py:237` | `test_page_url_rejects_a_notion_site_host` |
+| Accept a page reference that is not a 32-hex id | `publishing.py:214` | `test_page_reference_rejects_a_non_id` |
+| Accept a page that lists itself as another catalogue | `publishing.py:291` | `test_page_rejects_itself_as_another_catalogue_page` |
+| Widen a plain page id to 31-33 characters | `publishing.py:214` | `test_plain_page_id_length_and_hex_are_required` |
+| Accept word characters as a plain page id | `publishing.py:214` | `test_plain_page_id_length_and_hex_are_required` |
+| Drop the plain page-id hex check | `publishing.py:214` | `test_plain_page_id_length_and_hex_are_required` |
+| Accept an http page URL | `publishing.py:237` | `test_page_url_must_use_https` |
+| Accept any page-id host | `publishing.py:237` | `test_page_url_host_must_be_allowed` |
+| Do not lowercase a page id taken from a URL | `publishing.py:264` | `test_isolation_lowercases_an_uppercase_url_id` |
+| Do not lowercase an uppercase-hex slug | `publishing.py:283` | `test_isolation_lowercases_an_uppercase_slug` |
+| Do not strip a trailing slash from a page URL | `publishing.py:239` | `test_isolation_keeps_a_trailing_slash_on_the_page_id` |
+| Read the first path segment as the page id | `publishing.py:239` | `test_isolation_catches_a_nested_page_path` |
+| Drop the longer-than-32 slug guard | `publishing.py:265` | `test_page_url_rejects_a_slug_longer_than_32_hex` |
+| Drop the undashed slug hex check | `publishing.py:269` | `test_page_url_rejects_a_non_hex_slug` |
+| Accept a non-hex slug part | `publishing.py:281` | `test_page_url_rejects_a_non_hex_slug` |
+| Reject a titled page slug | `publishing.py:258` | `test_isolation_catches_a_titled_slug` |
+| Store the original page id | `publishing.py:70` | `test_page_references_are_stored_in_canonical_form` |
+| Drop the page-id string check | `publishing.py:192` | `test_page_reference_must_be_a_string` |
+| Drop the page-id padding check | `publishing.py:196` | `test_page_url_rejects_padding` |
+| Let a malformed secret link raise ValueError | `publishing.py:132` | `test_secret_link_rejects_a_malformed_url` |
+| Let a malformed page URL raise ValueError | `publishing.py:220` | `test_page_url_rejects_a_malformed_url` |
+| Let a bad page-url port raise ValueError | `publishing.py:247` | `test_page_url_rejects_a_port` |
+| Drop Unicode category Cc | `publishing.py:151` | `test_secret_link_rejects_del` |
+| Drop Unicode category Zl | `publishing.py:151` | `test_secret_link_rejects_a_line_separator` |
+| Drop Unicode category Cf | `publishing.py:151` | `test_secret_link_rejects_a_format_character` |
+| Accept an empty secret-link port | `publishing.py:140` | `test_secret_link_rejects_an_empty_port` |
+| Accept secret-link port 80 | `publishing.py:140` | `test_secret_link_rejects_a_port_other_than_443` |
+| Accept a secret link whose path is /// | `publishing.py:145` | `test_secret_link_rejects_a_triple_slash_path` |
+| Accept page-url userinfo when only one of username or password is set | `publishing.py:224` | `test_page_url_rejects_userinfo` |
+| Accept a page-url port other than 443 | `publishing.py:226` | `test_page_url_rejects_a_port` |
+| Accept an empty page-url port | `publishing.py:226` | `test_page_url_rejects_an_empty_port` |
+| Join hex title words onto a short page id | `publishing.py:260` | `test_page_url_rejects_a_glued_hex_title` |
+| Accept dashes that are not the 8-4-4-4-12 layout | `publishing.py:209` | `test_plain_page_id_dashes_must_be_uuid_layout` |
+| Keep the same link each time it is repeated | `publishing.py:63` | `test_repeated_link_forms_are_stored_once` |
+| Accept a trailing slug whose groups are not 8-4-4-4-12 | `publishing.py:279` | `test_page_url_rejects_a_bad_uuid_layout` |
+| Do not lowercase a dashed plain page id | `publishing.py:211` | `test_isolation_catches_an_uppercase_dashed_id` |
+| Read six slug groups instead of the trailing uuid | `publishing.py:278` | `test_isolation_catches_a_titled_uuid` |
+| Accept page-url port 80 | `publishing.py:226` | `test_page_url_rejects_a_port` |
+| Reject page-url port 443 | `publishing.py:226` | `test_page_url_port_443_is_canonical` |
+| Drop Unicode category Zp | `publishing.py:151` | `test_secret_link_rejects_a_paragraph_separator` |
+| Accept a page-url query string | `publishing.py:234` | `test_page_url_rejects_a_query` |
+| Sort deduped links | `publishing.py:188` | `test_deduped_link_order_is_preserved` |
+| Treat g as a hex digit | `publishing.py:32` | `test_page_reference_rejects_g` |
+| Drop notion.so from the page-url hosts | `publishing.py:28` | `test_notion_so_page_url_is_canonical` |
+| Accept a page-url fragment | `publishing.py:228` | `test_page_url_rejects_a_fragment` |
+| Accept page-url parameters | `publishing.py:230` | `test_page_url_rejects_parameters` |
+| Accept an empty page-url query | `publishing.py:232` | `test_page_url_rejects_an_empty_query` |
+| Skip forbidden characters in a page reference | `publishing.py:194` | `test_page_reference_rejects_a_forbidden_character` |
+| Drop Cc from page-reference categories | `publishing.py:155` | `test_page_reference_rejects_a_forbidden_character` |
+| Drop Cf from page-reference categories | `publishing.py:155` | `test_page_reference_rejects_a_forbidden_character` |
+| Drop Zl from page-reference categories | `publishing.py:155` | `test_page_reference_rejects_a_forbidden_character` |
+| Drop Zp from page-reference categories | `publishing.py:155` | `test_page_reference_rejects_a_forbidden_character` |
+| Drop Unicode category Zs | `publishing.py:151` | `test_secret_link_rejects_a_space_separator` |
 
-- **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w8` and this log entry. Against the base control state, `state_revision` moves from 43 to 44, and `updated_at` moves forward from `2026-09-26T17:46:39Z`. This entry changes only `session_06_w8` and `updated_at`. The `session_06_w7` trailing comma stays. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
+- **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w8` and this log entry. Against base, STATE changes only these things: `state_revision` 43 to 44, the `session_06_w7` trailing comma, `session_06_w8`, and `updated_at`. `updated_at` moves forward from `2026-09-26T17:46:39Z`. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
 - **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. `pyproject.toml` untouched. `src/money_machine/integrations/notion/router.py` untouched. Exit 78 held.
 
 ## 2026-09-11 — Startup repair wave after recovery review

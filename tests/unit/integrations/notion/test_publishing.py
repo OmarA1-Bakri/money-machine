@@ -356,7 +356,7 @@ def test_page_url_rejects_a_non_hex_slug() -> None:
             _publish(links=(value,))
 
 
-def test_isolation_catches_a_notion_site_slug() -> None:
+def test_isolation_catches_a_titled_slug() -> None:
     with pytest.raises(SchemaBuilderError, match=_OTHER):
         _publish(links=(f"https://www.notion.so/Title-{_OTHER}",))
 
@@ -389,7 +389,7 @@ def test_page_reference_must_be_a_string() -> None:
 
 
 def test_page_reference_must_not_be_padded() -> None:
-    for value in (" " + _PAGE, _PAGE + " "):
+    for value in (" " + _PAGE, _PAGE + " ", " https://www.notion.so/" + _PAGE):
         with pytest.raises(SchemaBuilderError, match="page id"):
             _publish(page_id=value)
         with pytest.raises(SchemaBuilderError, match="link"):
@@ -487,13 +487,110 @@ def test_page_url_port_443_is_canonical() -> None:
         _publish(links=(f"https://www.notion.so:443/{_OTHER}",))
 
 
-def test_page_url_rejects_a_query() -> None:
-    value = f"https://www.notion.so/{_TODAY}?p={_OTHER}"
+@pytest.mark.parametrize(
+    "value",
+    [
+        f" https://www.notion.so/{_TODAY}",
+        f"\thttps://www.notion.so/T-{_TODAY}",
+        f"https://www.notion.so/{_TODAY}\n",
+        f"\rhttps://www.notion.so/{_TODAY}",
+        f"https://www.notion.so/{_TODAY}\r",
+        f"https://www.notion.so/\r{_TODAY}",
+        f"\x1fhttps://www.notion.so/{_TODAY}",
+        f"https://www.notion.so/{_TODAY}\x1f",
+        f"https://www.notion.so/\x1f{_TODAY}",
+    ],
+)
+def test_page_url_rejects_padding(value: str) -> None:
     with pytest.raises(SchemaBuilderError, match="page id"):
         _publish(page_id=value)
     with pytest.raises(SchemaBuilderError, match="link"):
         _publish(links=(value,))
     with pytest.raises(SchemaBuilderError, match="other catalogue page"):
+        _publish(other_catalogue_pages=(value,))
+
+
+@pytest.mark.parametrize(
+    "char",
+    ["\u00ad", "\u200b", "\u202e", "\u2060", "\ufeff", "\x7f", "\u2028", "\u2029"],
+)
+def test_secret_link_rejects_a_format_character(char: str) -> None:
+    with pytest.raises(SchemaBuilderError, match="control character"):
+        _publish(secret_link=f"https://fix{char}ture.notion.site/Home")
+
+
+@pytest.mark.parametrize("char", ["\u00a0", "\u2002", "\u2003", "\u202f", "\u3000"])
+def test_secret_link_rejects_a_space_separator(char: str) -> None:
+    with pytest.raises(SchemaBuilderError, match="control character"):
+        _publish(secret_link=f"https://fixture.notion.site/Ho{char}me")
+
+
+def test_notion_so_page_url_is_canonical() -> None:
+    page = _publish(
+        page_id=f"https://notion.so/{_PAGE}",
+        links=(f"https://notion.so/{_NOTES}",),
+        other_catalogue_pages=(f"https://notion.so/{_OTHER}",),
+    )
+    assert page.page_id == _PAGE
+    assert page.links == (_NOTES,)
+    assert page.other_catalogue_pages == (_OTHER,)
+
+
+@pytest.mark.parametrize("query", [f"p={_OTHER}", "pvs=4", f"v={_OTHER}", "a=b"])
+def test_page_url_rejects_a_query(query: str) -> None:
+    value = f"https://www.notion.so/{_TODAY}?{query}"
+    with pytest.raises(SchemaBuilderError, match="page id"):
+        _publish(page_id=value)
+    with pytest.raises(SchemaBuilderError, match="link"):
+        _publish(links=(value,))
+    with pytest.raises(SchemaBuilderError, match="other catalogue page"):
+        _publish(other_catalogue_pages=(value,))
+
+
+@pytest.mark.parametrize("suffix", ["#section", "#"])
+def test_page_url_rejects_a_fragment(suffix: str) -> None:
+    value = f"https://www.notion.so/{_TODAY}{suffix}"
+    with pytest.raises(SchemaBuilderError, match="page id"):
+        _publish(page_id=value)
+    with pytest.raises(SchemaBuilderError, match="link"):
+        _publish(links=(value,))
+    with pytest.raises(SchemaBuilderError, match="other catalogue page"):
+        _publish(other_catalogue_pages=(value,))
+
+
+@pytest.mark.parametrize("suffix", [";p=1", ";"])
+def test_page_url_rejects_parameters(suffix: str) -> None:
+    value = f"https://www.notion.so/{_TODAY}{suffix}"
+    with pytest.raises(SchemaBuilderError, match="page id"):
+        _publish(page_id=value)
+    with pytest.raises(SchemaBuilderError, match="link"):
+        _publish(links=(value,))
+    with pytest.raises(SchemaBuilderError, match="other catalogue page"):
+        _publish(other_catalogue_pages=(value,))
+
+
+def test_page_url_rejects_an_empty_query() -> None:
+    value = f"https://www.notion.so/{_TODAY}?"
+    with pytest.raises(SchemaBuilderError, match="page id"):
+        _publish(page_id=value)
+    with pytest.raises(SchemaBuilderError, match="link"):
+        _publish(links=(value,))
+    with pytest.raises(SchemaBuilderError, match="other catalogue page"):
+        _publish(other_catalogue_pages=(value,))
+
+
+@pytest.mark.parametrize("char", ["\x1f", "\u200b", "\u2028", "\u2029"])
+def test_page_reference_rejects_a_forbidden_character(char: str) -> None:
+    value = (
+        f"{char}https://www.notion.so/{_TODAY}"
+        if char == "\x1f"
+        else _TODAY[:16] + char + _TODAY[16:]
+    )
+    with pytest.raises(SchemaBuilderError, match="control character"):
+        _publish(page_id=value)
+    with pytest.raises(SchemaBuilderError, match="control character"):
+        _publish(links=(value,))
+    with pytest.raises(SchemaBuilderError, match="control character"):
         _publish(other_catalogue_pages=(value,))
 
 

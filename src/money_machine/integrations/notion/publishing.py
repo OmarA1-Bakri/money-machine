@@ -7,9 +7,10 @@ A page is ready when it is top level, published to the web, duplicate as
 template is on, and search indexing is off. The secret link is captured and
 public access must already be verified. A link must not reach a page that
 belongs to another catalogue. Page ids are compared as lowercase undashed
-32-hex ids. A page-id URL is https on notion.so or www.notion.so and has no
-query string. The secret link may still use notion.site. This module does not
-move, publish, or open a page. It does not call Notion, the network, or a browser.
+32-hex ids. A page-id URL is https on notion.so or www.notion.so, with no
+query, fragment, or parameters. The secret link may still use notion.site.
+This module does not move, publish, or open a page. It does not call Notion,
+the network, or a browser.
 """
 
 from __future__ import annotations
@@ -26,7 +27,8 @@ _TOP_LEVEL_PARENT = "workspace"
 _EXACT_SECRET_HOSTS: frozenset[str] = frozenset({"notion.so", "www.notion.so", "notion.site"})
 _PAGE_URL_HOSTS: frozenset[str] = frozenset({"notion.so", "www.notion.so"})
 _NOTION_SITE_SUFFIX = ".notion.site"
-_FORBIDDEN_SECRET_CATEGORIES: frozenset[str] = frozenset({"Cc", "Cf", "Zl", "Zp"})
+_FORBIDDEN_PAGE_CATEGORIES: frozenset[str] = frozenset({"Cc", "Cf", "Zl", "Zp"})
+_FORBIDDEN_SECRET_CATEGORIES: frozenset[str] = frozenset({"Cc", "Cf", "Zl", "Zp", "Zs"})
 _HEX = frozenset("0123456789abcdef")
 _PAGE_ID_LENGTH = 32
 
@@ -123,10 +125,10 @@ def _ensure_public_access(value: object) -> None:
 def _capture_secret_link(value: object) -> str:
     if not isinstance(value, str):
         raise SchemaBuilderError("secret link must be a string")
-    if any(_forbidden_secret_char(char) for char in value):
-        raise SchemaBuilderError("secret link must not contain a control character")
     if value.strip() == "" or value != value.strip():
         raise SchemaBuilderError("secret link must be present")
+    if any(_forbidden_secret_char(char) for char in value):
+        raise SchemaBuilderError("secret link must not contain a control character")
     try:
         parsed = urlparse(value)
     except ValueError as exc:
@@ -147,6 +149,10 @@ def _capture_secret_link(value: object) -> str:
 
 def _forbidden_secret_char(char: str) -> bool:
     return unicodedata.category(char) in _FORBIDDEN_SECRET_CATEGORIES
+
+
+def _forbidden_page_char(char: str) -> bool:
+    return unicodedata.category(char) in _FORBIDDEN_PAGE_CATEGORIES
 
 
 def _secret_port(parsed: ParseResult) -> int | None:
@@ -183,7 +189,11 @@ def _dedupe_page_ids(page_ids: tuple[str, ...]) -> tuple[str, ...]:
 
 
 def _canonical_page_id(value: object, label: str) -> str:
-    if not isinstance(value, str) or value == "" or value != value.strip():
+    if not isinstance(value, str) or value == "":
+        raise _page_id_error(label)
+    if any(_forbidden_page_char(char) for char in value):
+        raise SchemaBuilderError(f"{label} must not contain a control character")
+    if value != value.strip():
         raise _page_id_error(label)
     if "://" in value:
         return _page_id_from_url(value, label)
@@ -214,6 +224,12 @@ def _page_id_from_url(value: str, label: str) -> str:
     if parsed.username is not None or parsed.password is not None:
         raise _page_id_error(label)
     if parsed.netloc.endswith(":") or _page_port(parsed, label) not in (None, 443):
+        raise _page_id_error(label)
+    if "#" in value:
+        raise _page_id_error(label)
+    if ";" in value:
+        raise _page_id_error(label)
+    if "?" in value and not parsed.query:
         raise _page_id_error(label)
     if parsed.query:
         raise _page_id_error(label)
