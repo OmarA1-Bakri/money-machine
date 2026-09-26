@@ -40,6 +40,7 @@ _STATUSES: frozenset[str] = frozenset({"Success", "Unknown", "Failure"})
 
 _PATH_LOCKS: weakref.WeakValueDictionary[str, threading.Lock] = weakref.WeakValueDictionary()
 _LOCKS_GUARD = threading.Lock()
+_MAX_RECEIPT_DEPTH = 32
 
 
 class DuplicateReceiptError(ValueError):
@@ -91,26 +92,60 @@ def _require_mapping(field_name: str, value: object) -> Mapping[str, object]:
     return value
 
 
-def _freeze_value(value: object) -> object:
+def _freeze_value(value: object, *, depth: int, seen: set[int]) -> object:
     if isinstance(value, Mapping):
-        return _freeze_mapping(value)
+        return _freeze_mapping(value, depth=depth, seen=seen)
     if isinstance(value, list | tuple):
-        return tuple(_freeze_value(item) for item in value)
+        return _freeze_sequence(value, depth=depth, seen=seen)
     return value
 
 
-def _freeze_mapping[MappingKey](value: Mapping[MappingKey, object]) -> Mapping[str, object]:
-    frozen: dict[str, object] = {}
-    for key, item in value.items():
-        if not isinstance(key, str):
-            raise ValueError("receipt mapping keys must be strings")
-        frozen[key] = _freeze_value(item)
-    return MappingProxyType(frozen)
+def _reject_reentry(marker: int, seen: set[int]) -> None:
+    if marker in seen:
+        raise ValueError("receipt fields must be JSON-serializable")
+    seen.add(marker)
+
+
+def _freeze_sequence(
+    value: list[object] | tuple[object, ...],
+    *,
+    depth: int,
+    seen: set[int],
+) -> tuple[object, ...]:
+    if depth > _MAX_RECEIPT_DEPTH:
+        raise ValueError("receipt state nesting is too deep")
+    marker = id(value)
+    _reject_reentry(marker, seen)
+    try:
+        return tuple(_freeze_value(item, depth=depth + 1, seen=seen) for item in value)
+    finally:
+        seen.remove(marker)
+
+
+def _freeze_mapping[MappingKey](
+    value: Mapping[MappingKey, object],
+    *,
+    depth: int,
+    seen: set[int],
+) -> Mapping[str, object]:
+    if depth > _MAX_RECEIPT_DEPTH:
+        raise ValueError("receipt state nesting is too deep")
+    marker = id(value)
+    _reject_reentry(marker, seen)
+    try:
+        frozen: dict[str, object] = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise ValueError("receipt mapping keys must be strings")
+            frozen[key] = _freeze_value(item, depth=depth + 1, seen=seen)
+        return MappingProxyType(frozen)
+    finally:
+        seen.remove(marker)
 
 
 def _snapshot_mapping(field_name: str, value: object) -> Mapping[str, object]:
     mapping = _require_mapping(field_name, value)
-    return _freeze_mapping(mapping)
+    return _freeze_mapping(mapping, depth=0, seen=set())
 
 
 def _plain(value: object) -> object:

@@ -451,6 +451,50 @@ def test_caller_nested_dict_and_list_stay_outside_the_receipt() -> None:
     assert receipt.post_state is not post_state
 
 
+def test_caller_mapping_proxy_list_mutation_does_not_change_the_receipt() -> None:
+    """A caller proxy is copied, including a proxy nested inside another mapping."""
+    inner = [1]
+    top = MappingProxyType({"a": inner})
+    receipt = _receipt(post_state=top)
+    inner.append(2)
+
+    assert receipt.post_state == {"a": (1,)}
+    assert receipt.post_state is not top
+    stored = receipt.post_state["a"]
+    assert isinstance(stored, tuple)
+    assert stored is not inner
+
+    nested_list = [1]
+    nested = MappingProxyType({"b": nested_list})
+    wrapped: dict[str, object] = {"a": nested}
+    nested_receipt = _receipt(idempotency_key="create_page:job_2", post_state=wrapped)
+    nested_list.append(2)
+
+    assert nested_receipt.post_state == {"a": {"b": (1,)}}
+    stored_nested = nested_receipt.post_state["a"]
+    assert isinstance(stored_nested, MappingProxyType)
+    assert stored_nested is not nested
+    stored_list = stored_nested["b"]
+    assert isinstance(stored_list, tuple)
+    assert stored_list is not nested_list
+
+
+def test_cycles_and_deep_nesting_raise_value_error() -> None:
+    """A reference cycle or an excessive nest raises ValueError, not RecursionError."""
+    cycle: dict[str, object] = {}
+    cycle["self"] = cycle
+    with pytest.raises(ValueError, match="JSON-serializable") as caught:
+        _receipt(post_state=cycle)
+    assert type(caught.value) is ValueError
+
+    node: object = {"leaf": 1}
+    for _ in range(40):
+        node = {"child": node}
+    with pytest.raises(ValueError, match="too deep") as deep:
+        _receipt(post_state=node)
+    assert type(deep.value) is ValueError
+
+
 def test_reloaded_post_state_seeds_a_new_receipt(tmp_path: Path) -> None:
     """A reloaded post_state can be stored again as pre_state and post_state."""
     path = tmp_path / "receipts.jsonl"
