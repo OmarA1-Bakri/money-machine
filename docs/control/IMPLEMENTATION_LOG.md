@@ -277,6 +277,185 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 - **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. Exit 78 held.
 
 
+## 2026-09-26 — Session 06 Wave 6: formula and schema builders
+
+- **Heading**: `### 5. Implement formula and schema builders` in `prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md` and `hands-off-money-machine-full-implementation-workbook.md`.
+- **Narrow reading**: Reusable in-memory builders that return a typed schema for each named kind, each kind its own typed record rather than one agent prompt; plus a notification-dashboard formula generator. Each formula is attached to one catalogue database and may reference only properties of that database, with verified names and types. No relations, rollups, views, publishing, adapter calls, or live Notion. Formula language is a call subset (`prop`, `if`, `and`, `or`, `not`, `empty`, `now`, `formatDate`, `equal`, `subtract`), not Notion's full formula language. `equal` and `subtract` exist only because the dashboard formulas need a comparison and a subtraction. Session 07 section 4 names a configured buyer name and does not name `client_name`. That buyer name is deferred to Session 07 and is not emitted, and `client_name` is not emitted either. That is the simpler faithful option: this wave does not add a configured text property. `current_date` is `now()` on Tasks. `task_open_and_due_today` is this Tasks row (not a count) whose Due calendar day equals today. That per-row rename is a justified correction because a formula evaluates per row and the count belongs in a section 6 rollup. `birthday_status` is this Events row whose month and day equal today so it recurs yearly. A February 29 birthday matches only when today is February 29, so it fires only in leap years; the expression does not special-case that date. `money_spent_today` is this Finance row's amount when its calendar date is today otherwise 0 (not a sum). Those three compare `formatDate` calendar values. `water_glasses_remaining` is Goal minus Glasses on Habits and is omitted when Habits is not verified. A dashboard formula is omitted when its database is not in the verified map, so each personal-only preset generates a dashboard on its own and water glasses are omitted when Habits is absent. A database key that is not in schema_definitions() is rejected and the error names that key and the valid keys. A known database that is simply absent is still skipped, and an empty formula result is not an error. The February 29 test helper compares month-day strings only. The helper does not evaluate the Birthday checkbox. Names reject surrounding tab, newline, NBSP, and ideographic space, plus U+200B and U+FEFF anywhere in the name. Formula number literals accept only ASCII digits. A February 29 birthday matches only on February 29, so it does not fire on February 28 or March 1 in a non-leap year. Surrounding whitespace is rejected and does not count toward the 128-character limit; characters inside the expression do. Section 6 (relations and linked views) and section 7 (publishing) are out of scope.
+- **Builders**: `build_database_schema` and `schema_definitions` return one frozen `DatabaseSchema` per kind, in heading order. Personal kinds are Tasks, Events, Habits, Finance, Meals, and Notes. Business kinds are Clients, Projects, Content, and Invoices. `build_schema` copies the caller property sequence and option sequence before validation. Names are strings of length 1 through 64 with no surrounding whitespace. A schema has 1 through 12 properties and exactly one title. Property types are title, text, number, select, multi_select, date, checkbox, formula, url, and email. Select and multi_select options number 1 through 8, are unique, and are rejected on every other type. A formula property requires an expression and a result type and is compiled against sibling property names and types, excluding its own name. Cycles across formula properties are rejected at build time. A non-formula property rejects those fields. `compile_formula` accepts expressions of length 5 through 128 and call depth 1 through 4. Surrounding whitespace is rejected. Result types are text, number, checkbox, and date, and the declared result type must match the expression for literals, `prop()` of a known type, and the top-level function return type. `prop` names must be in the copied verified mapping for that database. `generate_notification_dashboard_formulas` rejects an empty verified mapping, then compiles current_date, task_open_and_due_today, birthday_status, money_spent_today, and water_glasses_remaining against the properties of the database each formula is attached to. Session 07 section 4 names a configured buyer name and does not name `client_name`. Neither name is compiled. Due and money dates use `formatDate` with `YYYY-MM-DD`. Birthday uses `MM-DD`, so a February 29 birthday fires only in leap years. A dashboard formula whose database is absent from the verified map is omitted. A database key outside schema_definitions() is rejected. An empty formula result is not an error. The cycle check visits every formula, including a cycle that the first formula does not reach. `multi_select` and `date` keep their formula value types. `build_schema` defaults the family to personal. A formula property's result type propagates to formulas that reference it. Invalid input raises `SchemaBuilderError`. An unverified `prop` name raises `UnverifiedPropertyNameError`.
+- **Pytest collected**: 1454 collected, 1453 passed, 1 skipped. W5 baseline: 1257 collected, 1256 passed, 1 skipped. Delta +197 collected and +197 passed.
+- **Per-file counts**:
+
+  | File | Functions (base → tip) | Collected (base → tip) | Delta collected |
+  |---|---|---|---|
+  | `tests/unit/integrations/notion/test_schema_builder.py` | 0 → 60 | 0 → 96 | +96 |
+  | `tests/unit/integrations/notion/test_formulas.py` | 0 → 68 | 0 → 101 | +101 |
+  | Remaining files | unchanged | 1257 → 1257 | 0 |
+  | **Total** | | **1257 → 1454** | **+197** |
+
+- **Mutation checks** (156 rows; each applied, pytest run, then reverted):
+
+  | Mutation | Failing test |
+  |---|---|
+  | Set the name length limit to 63 | `test_property_name_length_within_limit[64]` |
+  | Set the name length limit to 65 | `test_property_name_one_past_max_is_rejected` |
+  | Compare name length with >= | `test_property_name_length_within_limit[64]` |
+  | Remove the name length check | `test_property_name_one_past_max_is_rejected` |
+  | Remove the empty-name check | `test_empty_database_name_is_rejected` |
+  | Remove the surrounding-whitespace check | `test_property_name_whitespace_is_rejected` |
+  | Remove the name type check | `test_property_name_must_be_a_string` |
+  | Set the minimum formula length to 6 | `test_formula_length_within_limit[5]` |
+  | Set the minimum formula length to 4 | `test_formula_length_one_under_min_is_rejected` |
+  | Compare formula length with <= on the minimum | `test_formula_length_within_limit[5]` |
+  | Set the maximum formula length to 127 | `test_formula_length_within_limit[128]` |
+  | Set the maximum formula length to 129 | `test_formula_length_one_past_max_is_rejected` |
+  | Compare formula length with >= | `test_formula_length_within_limit[128]` |
+  | Remove the empty-expression check | `test_empty_formula_expression_is_rejected` |
+  | Remove the expression type check | `test_formula_expression_must_be_a_string` |
+  | Set the formula depth limit to 3 | `test_formula_depth_within_limit[4]` |
+  | Set the formula depth limit to 5 | `test_formula_depth_one_past_limit_is_rejected` |
+  | Compare formula depth with >= | `test_formula_depth_within_limit[4]` |
+  | Remove the formula depth check | `test_formula_depth_one_past_limit_is_rejected` |
+  | Remove the depth-zero rejection | `test_formula_literal_depth_zero_is_rejected` |
+  | Function calls do not add a depth level | `test_formula_depth_within_limit[1]` |
+  | Count an empty call as depth 0 | `test_now_call_is_accepted_at_depth_one` |
+  | Drop formula type text | `test_allowed_formula_type_is_accepted[text]` |
+  | Drop formula type number | `test_allowed_formula_type_is_accepted[number]` |
+  | Drop formula type checkbox | `test_allowed_formula_type_is_accepted[checkbox]` |
+  | Drop formula type date | `test_allowed_formula_type_is_accepted[date]` |
+  | Drop the allowed formula-type check | `test_disallowed_formula_type_is_rejected[select]` |
+  | Accept an unverified property name | `test_missing_verified_name_is_rejected` |
+  | Store the verified set as the referenced names | `test_referenced_names_are_the_prop_names_only` |
+  | Allow an empty verified-name set | `test_empty_verified_names_are_rejected` |
+  | Drop the verified-properties mapping check | `test_verified_names_reject_a_string` |
+  | Accept a list as the verified property mapping | `test_verified_properties_reject_a_list` |
+  | Accept a non-string verified name | `test_verified_names_must_be_strings` |
+  | Store the caller verified-name collection | `test_caller_verified_names_are_isolated` |
+  | Return a mutable expression mapping | `test_dashboard_mappings_are_immutable` |
+  | Return a mutable result-type mapping | `test_dashboard_mappings_are_immutable` |
+  | Return a mutable database mapping | `test_dashboard_mappings_are_immutable` |
+  | Return a mutable per-database property mapping | `test_dashboard_mappings_are_immutable` |
+  | Insert client_name into the dashboard key list | `test_dashboard_formulas_use_verified_property_names` |
+  | Change current_date result type to text | `test_dashboard_formulas_use_verified_property_names` |
+  | Replace task_open_and_due_today with prop("Due") | `test_dashboard_formulas_use_verified_property_names` |
+  | Replace birthday_status with prop("Birthday") | `test_dashboard_formulas_use_verified_property_names` |
+  | Replace money_spent_today with prop("Amount") | `test_dashboard_formulas_use_verified_property_names` |
+  | Compare task due date to raw now() | `test_dashboard_formulas_use_verified_property_names` |
+  | Compare birthday date to raw now() | `test_dashboard_formulas_use_verified_property_names` |
+  | Compare money date to raw now() | `test_dashboard_formulas_use_verified_property_names` |
+  | Use YYYY-MM-DD for birthday_status | `test_dashboard_formulas_use_verified_property_names` |
+  | Compare a birthday to the literal 02-29 | `test_february_29_birthday_matches_only_in_a_leap_year` |
+  | Match a February 29 birthday on February 28 | `test_february_29_birthday_matches_only_in_a_leap_year` |
+  | Replace water_glasses_remaining with prop("Glasses") | `test_dashboard_formulas_use_verified_property_names` |
+  | Set prop() arity to 2 | `test_prop_rejects_two_arguments` |
+  | Set now() arity to 1 | `test_now_rejects_an_argument` |
+  | Set not() arity to 0 | `test_formula_depth_within_limit[2]` |
+  | Set empty() arity to 0 | `test_format_date_and_empty_are_accepted` |
+  | Set if() arity to 2 | `test_if_rejects_two_arguments` |
+  | Drop formatDate from the allowed functions | `test_format_date_and_empty_are_accepted` |
+  | Drop or from the allowed functions | `test_or_accepts_two_arguments` |
+  | Allow and() with one argument | `test_and_rejects_one_argument` |
+  | Allow an unknown formula function | `test_unknown_function_is_rejected` |
+  | Accept trailing formula input | `test_trailing_input_is_rejected` |
+  | Allow escapes in formula strings | `test_formula_string_escape_is_rejected` |
+  | Accept an unclosed formula string | `test_unclosed_string_is_rejected` |
+  | Accept an unclosed formula call | `test_unclosed_call_is_rejected` |
+  | Allow a non-string prop() argument | `test_prop_requires_a_string` |
+  | Skip the result-type check | `test_result_type_must_match_the_expression` |
+  | Treat every prop() as text | `test_prop_uses_the_verified_type` |
+  | Drop the if() checkbox condition check | `test_if_condition_must_be_checkbox` |
+  | Allow if() branches of different types | `test_if_branches_must_have_the_same_type` |
+  | Allow equal() arguments of different types | `test_equal_rejects_different_types` |
+  | Drop the subtract() number checks | `test_subtract_rejects_a_non_number` |
+  | Drop the formatDate() date check | `test_format_date_rejects_a_non_date` |
+  | Drop the formatDate() text check | `test_format_date_rejects_a_non_text_pattern` |
+  | Drop the and/or checkbox check | `test_and_rejects_a_non_checkbox` |
+  | Drop the not() checkbox check | `test_not_rejects_a_non_checkbox` |
+  | Drop the subtract() second number check | `test_subtract_rejects_a_non_number_subtrahend` |
+  | Map multi_select to number | `test_multi_select_formula_value_is_text` |
+  | Map date to text | `test_date_formula_value_is_date` |
+  | Accept an Arabic-Indic digit as a number | `test_arabic_indic_digit_is_rejected` |
+  | Accept a fullwidth digit inside a number | `test_fullwidth_digit_is_rejected` |
+  | Drop equal from the allowed functions | `test_dashboard_formulas_use_verified_property_names` |
+  | Drop subtract from the allowed functions | `test_dashboard_formulas_use_verified_property_names` |
+  | Accept surrounding whitespace on a formula | `test_formula_surrounding_whitespace_is_rejected` |
+  | Strip only an ASCII space from a name | `test_name_unicode_whitespace_is_rejected[leading-nbsp]` |
+  | Ignore trailing whitespace on a name | `test_name_trailing_space_is_rejected` |
+  | Strip only an ASCII space from a formula | `test_formula_unicode_whitespace_is_rejected[trailing-tab]` |
+  | Allow U+200B in a name | `test_invisible_characters_in_names_are_rejected[zwsp]` |
+  | Reject a BOM only at the edges of a name | `test_invisible_characters_in_names_are_rejected[bom-interior]` |
+  | Look up a missing property on another database | `test_cross_database_property_is_rejected` |
+  | Skip a missing database only for Clients and Habits | `test_each_personal_only_preset_generates_a_dashboard[Meals]` |
+  | Require the Clients database for every dashboard | `test_personal_only_presets_generate_a_dashboard` |
+  | Drop the missing-database skip | `test_habits_formula_is_skipped_when_habits_is_not_verified` |
+  | Drop the unknown-database-key check | `test_unknown_database_key_is_rejected` |
+  | Skip every dashboard formula | `test_each_personal_only_preset_generates_a_dashboard[Tasks]` |
+  | Skip the catalogue property-type check | `test_dashboard_property_type_must_match_the_catalogue` |
+  | Drop property type title | `test_allowed_property_type_is_accepted[title]` |
+  | Drop property type text | `test_allowed_property_type_is_accepted[text]` |
+  | Drop property type number | `test_allowed_property_type_is_accepted[number]` |
+  | Drop property type select | `test_allowed_property_type_is_accepted[select]` |
+  | Drop property type multi_select | `test_allowed_property_type_is_accepted[multi_select]` |
+  | Drop property type date | `test_allowed_property_type_is_accepted[date]` |
+  | Drop property type checkbox | `test_allowed_property_type_is_accepted[checkbox]` |
+  | Drop property type formula | `test_allowed_property_type_is_accepted[formula]` |
+  | Drop property type url | `test_allowed_property_type_is_accepted[url]` |
+  | Drop property type email | `test_allowed_property_type_is_accepted[email]` |
+  | Accept a property type outside the allowed set | `test_disallowed_property_type_is_rejected[relation]` |
+  | Set the minimum property count to 2 | `test_property_count_within_limit[1]` |
+  | Set the minimum property count to 0 | `test_empty_properties_are_rejected` |
+  | Compare property count with <= on the minimum | `test_property_count_within_limit[1]` |
+  | Set the maximum property count to 11 | `test_property_count_within_limit[12]` |
+  | Set the maximum property count to 13 | `test_property_count_one_past_max_is_rejected` |
+  | Compare property count with >= | `test_property_count_within_limit[12]` |
+  | Set the minimum option count to 2 | `test_option_count_within_limit[1]` |
+  | Set the minimum option count to 0 | `test_empty_select_options_are_rejected` |
+  | Compare option count with <= on the minimum | `test_option_count_within_limit[1]` |
+  | Set the maximum option count to 7 | `test_option_count_within_limit[8]` |
+  | Set the maximum option count to 9 | `test_option_count_one_past_max_is_rejected` |
+  | Compare option count with >= | `test_option_count_within_limit[8]` |
+  | Allow duplicate select options | `test_duplicate_option_is_rejected` |
+  | Allow options on a non-select property | `test_options_on_a_non_select_are_rejected` |
+  | Reject an empty option tuple on every property | `test_property_count_within_limit[1]` |
+  | Drop multi_select from the option types | `test_multi_select_accepts_options` |
+  | Return the caller option sequence without copying | `test_caller_option_list_mutation_does_not_change_the_schema` |
+  | Accept a string as the property sequence | `test_properties_must_be_a_sequence_of_mappings` |
+  | Accept a property that is not a mapping | `test_property_must_be_a_mapping` |
+  | Accept an unknown property field | `test_unknown_property_field_is_rejected` |
+  | Accept a string as the option sequence | `test_options_must_be_a_sequence` |
+  | Allow a duplicated property name | `test_duplicate_property_name_is_rejected` |
+  | Allow a schema with no title | `test_schema_without_a_title_is_rejected` |
+  | Allow two title properties | `test_schema_with_two_titles_is_rejected` |
+  | Allow a formula expression on a text property | `test_formula_expression_on_text_is_rejected` |
+  | Allow a formula result type on a text property | `test_formula_result_type_on_text_is_rejected` |
+  | Allow a formula property with no expression | `test_formula_property_requires_an_expression` |
+  | Allow a formula property with no result type | `test_formula_property_requires_a_result_type` |
+  | Treat a formula property name as verified for itself | `test_formula_property_rejects_its_own_name` |
+  | Treat every formula property as text | `test_equal_rejects_a_number_formula_compared_with_text` |
+  | Treat every formula property as a number | `test_checkbox_formula_is_accepted_as_an_if_condition` |
+  | Visit only the first formula when checking cycles | `test_cycle_behind_an_acyclic_formula_is_rejected` |
+  | Visit only the last formula when checking cycles | `test_cycle_in_the_middle_of_the_formula_list_is_rejected` |
+  | Remove the formula cycle check | `test_two_formula_cycle_is_rejected` |
+  | Only reject mutual formula pairs | `test_three_formula_cycle_is_rejected` |
+  | Treat a non-formula reference as a cycle | `test_acyclic_formula_chain_is_accepted` |
+  | Accept a schema family outside personal and business | `test_schema_family_must_be_personal_or_business` |
+  | Default the schema family to business | `test_schema_family_defaults_to_personal` |
+  | Look up a database kind case-insensitively | `test_unknown_database_kind_is_rejected` |
+  | Swap personal and business families | `test_catalogue_schema[Clients]` |
+  | Return one prompt string instead of separate schema records | `test_each_database_definition_is_its_own_record` |
+  | Change the Tasks Status options | `test_catalogue_schema[Tasks]` |
+  | Change Events Birthday from checkbox to text | `test_catalogue_schema[Events]` |
+  | Change Habits Glasses from number to text | `test_catalogue_schema[Habits]` |
+  | Change Finance Amount from number to text | `test_catalogue_schema[Finance]` |
+  | Change Meals Day from date to text | `test_catalogue_schema[Meals]` |
+  | Change Notes Body from text to number | `test_catalogue_schema[Notes]` |
+  | Change Clients Email from email to text | `test_catalogue_schema[Clients]` |
+  | Change the Projects Status options | `test_catalogue_schema[Projects]` |
+  | Change Content URL from url to text | `test_catalogue_schema[Content]` |
+  | Change the Invoices Status options | `test_catalogue_schema[Invoices]` |
+
+- **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w6` and this log entry. `state_revision` 40 to 42 vs base. `updated_at` was refreshed. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
+- **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. `pyproject.toml` untouched. `src/money_machine/integrations/notion/router.py` untouched. Exit 78 held.
+
 ## 2026-09-11 — Startup repair wave after recovery review
 
 - Repaired migration-head/schema compatibility readiness, encoded database credentials/IPv6, and production environment selection. Compose now carries raw passwords separately; a bounded independent review identified literal-percent and surrounding-whitespace cases, both reproduced and repaired with regression coverage. Development external-URL overrides retain their credentials.

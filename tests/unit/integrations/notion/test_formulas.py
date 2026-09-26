@@ -1,0 +1,614 @@
+"""Notification-dashboard formula builder from Session 06 prompt section 5.
+
+No network, no Notion, no browser.
+"""
+
+from __future__ import annotations
+
+import re
+from datetime import date
+from typing import cast
+
+import pytest
+
+from money_machine.integrations.notion.errors import (
+    SchemaBuilderError,
+    UnverifiedPropertyNameError,
+)
+from money_machine.integrations.notion.formulas import (
+    compile_formula,
+    generate_notification_dashboard_formulas,
+    validated_name,
+)
+from money_machine.integrations.notion.schema_builder import build_schema, schema_definitions
+
+_VERIFIED: dict[str, dict[str, str]] = {
+    "Clients": {"Name": "title"},
+    "Tasks": {"Name": "title", "Status": "select", "Due": "date"},
+    "Events": {"Name": "title", "Date": "date", "Birthday": "checkbox"},
+    "Finance": {"Name": "title", "Amount": "number", "Date": "date"},
+    "Habits": {"Name": "title", "Glasses": "number", "Goal": "number"},
+}
+
+_ALLOWED_FORMULA_TYPES = ("text", "number", "checkbox", "date")
+_TYPE_CASES = {
+    "text": ('prop("Name")', {"Name": "text"}),
+    "number": ('prop("Amount")', {"Amount": "number"}),
+    "checkbox": ('prop("Flag")', {"Flag": "checkbox"}),
+    "date": ("now()", {}),
+}
+
+
+def _verified_copy() -> dict[str, dict[str, str]]:
+    return {database: dict(properties) for database, properties in _VERIFIED.items()}
+
+
+def _depth_expr(depth: int) -> str:
+    expression = 'prop("Flag")'
+    for _ in range(depth - 1):
+        expression = f"not({expression})"
+    return expression
+
+
+def _length_expr(length: int) -> tuple[str, dict[str, str], str]:
+    if length == 5:
+        return "now()", {}, "date"
+    prefix = 'formatDate(now(), "'
+    suffix = '")'
+    return prefix + ("Y" * (length - len(prefix) - len(suffix))) + suffix, {}, "text"
+
+
+def test_dashboard_formulas_use_verified_property_names() -> None:
+    generated = generate_notification_dashboard_formulas(_VERIFIED)
+    assert list(generated.expressions) == [
+        "current_date",
+        "task_open_and_due_today",
+        "birthday_status",
+        "money_spent_today",
+        "water_glasses_remaining",
+    ]
+    assert "client_name" not in generated.expressions
+    assert "buyer_name" not in generated.expressions
+    assert generated.expressions["current_date"] == "now()"
+    assert generated.expressions["task_open_and_due_today"] == (
+        'and(equal(prop("Status"), "Open"), '
+        'equal(formatDate(prop("Due"), "YYYY-MM-DD"), formatDate(now(), "YYYY-MM-DD")))'
+    )
+    assert generated.expressions["birthday_status"] == (
+        'and(prop("Birthday"), '
+        'equal(formatDate(prop("Date"), "MM-DD"), formatDate(now(), "MM-DD")))'
+    )
+    assert generated.expressions["money_spent_today"] == (
+        'if(equal(formatDate(prop("Date"), "YYYY-MM-DD"), formatDate(now(), "YYYY-MM-DD")), '
+        'prop("Amount"), 0)'
+    )
+    assert (
+        generated.expressions["water_glasses_remaining"]
+        == 'subtract(prop("Goal"), prop("Glasses"))'
+    )
+    assert dict(generated.result_types) == {
+        "current_date": "date",
+        "task_open_and_due_today": "checkbox",
+        "birthday_status": "checkbox",
+        "money_spent_today": "number",
+        "water_glasses_remaining": "number",
+    }
+    assert dict(generated.databases) == {
+        "current_date": "Tasks",
+        "task_open_and_due_today": "Tasks",
+        "birthday_status": "Events",
+        "money_spent_today": "Finance",
+        "water_glasses_remaining": "Habits",
+    }
+    assert generated.verified_properties["Clients"]["Name"] == "title"
+    assert generated.verified_properties["Habits"]["Goal"] == "number"
+
+
+def test_missing_verified_name_is_rejected() -> None:
+    names = _verified_copy()
+    del names["Habits"]["Goal"]
+    with pytest.raises(UnverifiedPropertyNameError, match="Goal") as raised:
+        generate_notification_dashboard_formulas(names)
+    assert raised.value.property_name == "Goal"
+
+
+def test_missing_events_database_omits_birthday_status() -> None:
+    names = _verified_copy()
+    del names["Events"]
+    generated = generate_notification_dashboard_formulas(names)
+    assert "birthday_status" not in generated.expressions
+    assert "task_open_and_due_today" in generated.expressions
+
+
+def test_cross_database_property_is_rejected() -> None:
+    names = _verified_copy()
+    names["Finance"]["Due"] = names["Tasks"].pop("Due")
+    with pytest.raises(UnverifiedPropertyNameError, match="Due") as raised:
+        generate_notification_dashboard_formulas(names)
+    assert raised.value.property_name == "Due"
+
+
+def test_dashboard_property_type_must_match_the_catalogue() -> None:
+    names = _verified_copy()
+    names["Tasks"]["Status"] = "text"
+    with pytest.raises(SchemaBuilderError, match="Status"):
+        generate_notification_dashboard_formulas(names)
+
+
+def test_empty_verified_names_are_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="must not be empty"):
+        generate_notification_dashboard_formulas({})
+
+
+def test_verified_names_reject_a_string() -> None:
+    with pytest.raises(SchemaBuilderError, match="mapping of names to types"):
+        generate_notification_dashboard_formulas(cast(dict[str, dict[str, str]], "Buyer Name"))
+
+
+def test_verified_properties_reject_a_list() -> None:
+    listed = list(_VERIFIED.items())
+    with pytest.raises(SchemaBuilderError, match="mapping of names to types"):
+        generate_notification_dashboard_formulas(cast(dict[str, dict[str, str]], listed))
+
+
+def test_verified_names_must_be_strings() -> None:
+    with pytest.raises(SchemaBuilderError, match="must be strings"):
+        compile_formula('prop("A")', {"A": 1}, "text")
+
+
+def test_extra_verified_name_is_not_copied_into_the_expression() -> None:
+    names = _verified_copy()
+    names["Habits"]["Secret"] = "text"
+    generated = generate_notification_dashboard_formulas(names)
+    assert generated.verified_properties["Habits"]["Secret"] == "text"
+    for expression in generated.expressions.values():
+        assert "Secret" not in expression
+
+
+def test_caller_verified_names_are_isolated() -> None:
+    names = _verified_copy()
+    generated = generate_notification_dashboard_formulas(names)
+    names["Habits"]["Injected"] = "text"
+    names["Clients"]["Name"] = "text"
+    assert "Injected" not in generated.verified_properties["Habits"]
+    assert generated.verified_properties["Clients"]["Name"] == "title"
+    assert generated.expressions["current_date"] == "now()"
+
+
+def test_caller_verified_set_is_isolated() -> None:
+    names = _verified_copy()
+    generated = generate_notification_dashboard_formulas(names)
+    names["Notes"] = {"Body": "text"}
+    assert "Notes" not in generated.verified_properties
+
+
+def test_dashboard_mappings_are_immutable() -> None:
+    generated = generate_notification_dashboard_formulas(_VERIFIED)
+    with pytest.raises(TypeError):
+        cast(dict[str, str], generated.expressions)["current_date"] = "nope"
+    with pytest.raises(TypeError):
+        cast(dict[str, str], generated.result_types)["current_date"] = "number"
+    with pytest.raises(TypeError):
+        cast(dict[str, str], generated.databases)["current_date"] = "Events"
+    with pytest.raises(TypeError):
+        cast(dict[str, str], generated.verified_properties["Clients"])["Name"] = "text"
+
+
+def test_referenced_names_are_the_prop_names_only() -> None:
+    compiled = compile_formula('prop("A")', {"A": "text", "B": "text"}, "text")
+    assert compiled.referenced_property_names == frozenset({"A"})
+    assert compiled.expression == 'prop("A")'
+
+
+def test_result_type_must_match_the_expression() -> None:
+    with pytest.raises(SchemaBuilderError, match="does not match expression type 'text'"):
+        compile_formula('prop("Name")', {"Name": "title"}, "number")
+
+
+def test_prop_uses_the_verified_type() -> None:
+    compiled = compile_formula('prop("Amount")', {"Amount": "number"}, "number")
+    assert compiled.result_type == "number"
+
+
+def test_if_condition_must_be_checkbox() -> None:
+    with pytest.raises(SchemaBuilderError, match="if\\(\\) condition"):
+        compile_formula(
+            'if(prop("Status"), prop("Due"), prop("Due"))',
+            {"Status": "select", "Due": "date"},
+            "date",
+        )
+
+
+def test_if_branches_must_have_the_same_type() -> None:
+    with pytest.raises(SchemaBuilderError, match="branches must have the same type"):
+        compile_formula(
+            'if(prop("Flag"), prop("Amount"), prop("Name"))',
+            {"Flag": "checkbox", "Amount": "number", "Name": "text"},
+            "number",
+        )
+
+
+def test_equal_rejects_different_types() -> None:
+    with pytest.raises(SchemaBuilderError, match="equal\\(\\) arguments"):
+        compile_formula('equal(prop("Status"), 1)', {"Status": "select"}, "checkbox")
+
+
+def test_subtract_rejects_a_non_number() -> None:
+    with pytest.raises(SchemaBuilderError, match="subtract\\(\\)"):
+        compile_formula(
+            'subtract(prop("Name"), prop("Glasses"))',
+            {"Name": "title", "Glasses": "number"},
+            "number",
+        )
+
+
+@pytest.mark.parametrize("result_type", _ALLOWED_FORMULA_TYPES)
+def test_allowed_formula_type_is_accepted(result_type: str) -> None:
+    expression, verified = _TYPE_CASES[result_type]
+    compiled = compile_formula(expression, verified, result_type)
+    assert compiled.result_type == result_type
+
+
+@pytest.mark.parametrize("result_type", ["select", "rollup", "Text", ""])
+def test_disallowed_formula_type_is_rejected(result_type: str) -> None:
+    with pytest.raises(SchemaBuilderError, match="is not allowed"):
+        compile_formula('prop("Name")', {"Name": "text"}, result_type)
+
+
+def test_formula_expression_must_be_a_string() -> None:
+    with pytest.raises(SchemaBuilderError, match="formula expression must be a string"):
+        compile_formula(cast(str, 1), {"Name": "text"}, "text")
+
+
+def test_empty_formula_expression_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="must not be empty"):
+        compile_formula("   ", {}, "text")
+
+
+def test_formula_surrounding_whitespace_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="surrounding whitespace"):
+        compile_formula("now() ", {}, "date")
+    with pytest.raises(SchemaBuilderError, match="surrounding whitespace"):
+        compile_formula(" now()", {}, "date")
+
+
+@pytest.mark.parametrize("length", [5, 127, 128])
+def test_formula_length_within_limit(length: int) -> None:
+    expression, verified, result_type = _length_expr(length)
+    compiled = compile_formula(expression, verified, result_type)
+    assert len(compiled.expression) == length
+    assert " " * 8 not in compiled.expression
+
+
+def test_formula_length_one_under_min_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="shorter than 5"):
+        compile_formula("now(", {}, "date")
+
+
+def test_formula_length_one_past_max_is_rejected() -> None:
+    expression, verified, result_type = _length_expr(129)
+    with pytest.raises(SchemaBuilderError, match="longer than 128"):
+        compile_formula(expression, verified, result_type)
+
+
+def test_formula_literal_depth_zero_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="function call"):
+        compile_formula('"hello"', {}, "text")
+
+
+@pytest.mark.parametrize("depth", [1, 2, 3, 4])
+def test_formula_depth_within_limit(depth: int) -> None:
+    compiled = compile_formula(_depth_expr(depth), {"Flag": "checkbox"}, "checkbox")
+    assert compiled.depth == depth
+
+
+def test_formula_depth_one_past_limit_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="deeper than 4"):
+        compile_formula(_depth_expr(5), {"Flag": "checkbox"}, "checkbox")
+
+
+def test_now_call_is_accepted_at_depth_one() -> None:
+    compiled = compile_formula("now()", {}, "date")
+    assert compiled.depth == 1
+    assert compiled.referenced_property_names == frozenset()
+
+
+def test_prop_name_length_accepts_64_and_rejects_65() -> None:
+    accepted = "N" * 64
+    compiled = compile_formula(f'prop("{accepted}")', {accepted: "text"}, "text")
+    assert compiled.referenced_property_names == frozenset({accepted})
+    rejected = "N" * 65
+    with pytest.raises(SchemaBuilderError, match="property name longer than 64"):
+        compile_formula(f'prop("{rejected}")', {rejected: "text"}, "text")
+
+
+def test_empty_prop_name_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="property name must not be empty"):
+        compile_formula('prop("")', {"": "text"}, "text")
+
+
+def test_prop_name_whitespace_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="surrounding whitespace"):
+        compile_formula('prop(" Name")', {" Name": "text"}, "text")
+
+
+def test_unverified_prop_name_is_rejected() -> None:
+    with pytest.raises(UnverifiedPropertyNameError, match="Missing") as raised:
+        compile_formula('prop("Missing")', {"Other": "text"}, "text")
+    assert raised.value.property_name == "Missing"
+
+
+def test_prop_rejects_two_arguments() -> None:
+    with pytest.raises(SchemaBuilderError, match=r"prop\(\) requires 1 arguments"):
+        compile_formula('prop("A", "B")', {"A": "text", "B": "text"}, "text")
+
+
+def test_prop_requires_a_string() -> None:
+    with pytest.raises(SchemaBuilderError, match="string property name"):
+        compile_formula("prop(1)", {"1": "text"}, "text")
+
+
+def test_if_rejects_two_arguments() -> None:
+    with pytest.raises(SchemaBuilderError, match=r"if\(\) requires 3 arguments"):
+        compile_formula('if(prop("A"), prop("B"))', {"A": "checkbox", "B": "text"}, "text")
+
+
+def test_and_rejects_one_argument() -> None:
+    with pytest.raises(SchemaBuilderError, match=r"and\(\) requires at least 2"):
+        compile_formula('and(prop("A"))', {"A": "checkbox"}, "checkbox")
+
+
+def test_now_rejects_an_argument() -> None:
+    with pytest.raises(SchemaBuilderError, match=r"now\(\) requires 0 arguments"):
+        compile_formula("now(1)", {}, "date")
+
+
+def test_unknown_function_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="not allowed"):
+        compile_formula("foo()", {}, "text")
+
+
+def test_trailing_input_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="trailing input"):
+        compile_formula("now() x", {}, "date")
+
+
+def test_unclosed_string_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="string is not closed"):
+        compile_formula('prop("ABC)', {"ABC": "text"}, "text")
+
+
+def test_unclosed_call_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="call is not closed"):
+        compile_formula('prop("ABC"', {"ABC": "text"}, "text")
+
+
+def test_formula_string_escape_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="escapes"):
+        compile_formula('prop("A\\\\")', {"A": "text"}, "text")
+
+
+def test_format_date_and_empty_are_accepted() -> None:
+    expression = 'empty(formatDate(prop("Due"), "YYYY-MM-DD"))'
+    compiled = compile_formula(expression, {"Due": "date"}, "checkbox")
+    assert compiled.depth == 3
+    assert compiled.referenced_property_names == frozenset({"Due"})
+
+
+def test_or_accepts_two_arguments() -> None:
+    compiled = compile_formula(
+        'or(prop("A"), prop("B"))',
+        {"A": "checkbox", "B": "checkbox"},
+        "checkbox",
+    )
+    assert compiled.depth == 2
+
+
+def _title() -> dict[str, object]:
+    return {"name": "Name", "type": "title"}
+
+
+def test_schema_formula_expression_must_be_a_string() -> None:
+    properties = [
+        _title(),
+        {"name": "Flag", "type": "formula", "formula_expression": 1, "formula_result_type": "text"},
+    ]
+    with pytest.raises(SchemaBuilderError, match="formula expression must be a string"):
+        build_schema("Tasks", properties)
+
+
+def test_formula_result_type_must_be_a_string() -> None:
+    properties = [
+        _title(),
+        {
+            "name": "Flag",
+            "type": "formula",
+            "formula_expression": 'prop("Name")',
+            "formula_result_type": 1,
+        },
+    ]
+    with pytest.raises(SchemaBuilderError, match="formula result type must be a string"):
+        build_schema("Tasks", properties)
+
+
+_PERSONAL_KINDS = ("Tasks", "Events", "Habits", "Finance", "Meals", "Notes")
+_TASK_OPEN = (
+    'and(equal(prop("Status"), "Open"), '
+    'equal(formatDate(prop("Due"), "YYYY-MM-DD"), formatDate(now(), "YYYY-MM-DD")))'
+)
+_BIRTHDAY = (
+    'and(prop("Birthday"), equal(formatDate(prop("Date"), "MM-DD"), formatDate(now(), "MM-DD")))'
+)
+_MONEY_SPENT = (
+    'if(equal(formatDate(prop("Date"), "YYYY-MM-DD"), formatDate(now(), "YYYY-MM-DD")), '
+    'prop("Amount"), 0)'
+)
+_WATER = 'subtract(prop("Goal"), prop("Glasses"))'
+_PRESET_EXPRESSIONS: dict[str, dict[str, str]] = {
+    "Tasks": {"current_date": "now()", "task_open_and_due_today": _TASK_OPEN},
+    "Events": {"birthday_status": _BIRTHDAY},
+    "Habits": {"water_glasses_remaining": _WATER},
+    "Finance": {"money_spent_today": _MONEY_SPENT},
+    "Meals": {},
+    "Notes": {},
+}
+_BIRTHDAY_MONTH_DAY = re.compile(
+    r'equal\(formatDate\(prop\("Date"\), "MM-DD"\), formatDate\(now\(\), "MM-DD"\)\)'
+)
+
+
+def _verified_from_presets(kinds: tuple[str, ...]) -> dict[str, dict[str, str]]:
+    definitions = schema_definitions()
+    return {kind: {prop.name: prop.type for prop in definitions[kind].properties} for kind in kinds}
+
+
+def test_personal_only_presets_generate_a_dashboard() -> None:
+    definitions = schema_definitions()
+    personal = tuple(kind for kind in definitions if definitions[kind].family == "personal")
+    assert personal == _PERSONAL_KINDS
+    generated = generate_notification_dashboard_formulas(_verified_from_presets(personal))
+    assert "client_name" not in generated.expressions
+    assert "buyer_name" not in generated.expressions
+    assert "Clients" not in generated.databases.values()
+    assert "water_glasses_remaining" in generated.expressions
+
+
+@pytest.mark.parametrize("kind", _PERSONAL_KINDS)
+def test_each_personal_only_preset_generates_a_dashboard(kind: str) -> None:
+    generated = generate_notification_dashboard_formulas(_verified_from_presets((kind,)))
+    expected = _PRESET_EXPRESSIONS[kind]
+    assert dict(generated.expressions) == expected
+    assert dict(generated.databases) == {key: kind for key in expected}
+    assert "client_name" not in generated.expressions
+    assert "buyer_name" not in generated.expressions
+
+
+def test_unknown_database_key_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="tasks") as raised:
+        generate_notification_dashboard_formulas({"tasks": {"Name": "title"}})
+    message = str(raised.value)
+    assert isinstance(raised.value, ValueError)
+    assert "Tasks" in message
+    assert "Invoices" in message
+
+
+def test_habits_formula_is_skipped_when_habits_is_not_verified() -> None:
+    kinds = tuple(kind for kind in _PERSONAL_KINDS if kind != "Habits")
+    generated = generate_notification_dashboard_formulas(_verified_from_presets(kinds))
+    assert "water_glasses_remaining" not in generated.expressions
+    assert "Habits" not in generated.verified_properties
+
+
+def test_format_date_rejects_a_non_date() -> None:
+    with pytest.raises(SchemaBuilderError, match=r"formatDate\(\)"):
+        compile_formula('formatDate(prop("Name"), "MM")', {"Name": "title"}, "text")
+
+
+def test_format_date_rejects_a_non_text_pattern() -> None:
+    with pytest.raises(SchemaBuilderError, match=r"formatDate\(\)"):
+        compile_formula("formatDate(now(), 1)", {}, "text")
+
+
+def test_and_rejects_a_non_checkbox() -> None:
+    with pytest.raises(SchemaBuilderError, match=r"and\(\)"):
+        compile_formula('and(prop("Name"), prop("Name"))', {"Name": "title"}, "checkbox")
+
+
+def test_not_rejects_a_non_checkbox() -> None:
+    with pytest.raises(SchemaBuilderError, match=r"not\(\)"):
+        compile_formula('not(prop("Name"))', {"Name": "title"}, "checkbox")
+
+
+def test_subtract_rejects_a_non_number_subtrahend() -> None:
+    with pytest.raises(SchemaBuilderError, match=r"subtract\(\)"):
+        compile_formula('subtract(1, prop("Name"))', {"Name": "title"}, "number")
+
+
+def _month_day_comparison_matches(today: date, birthday: date) -> bool:
+    """Compare the month-day strings named by the emitted birthday expression.
+
+    The stub emits ``equal(formatDate(prop("Date"), "MM-DD"), formatDate(now(), "MM-DD"))``.
+    The test helper compares those two strings only. The helper does not evaluate
+    the Birthday checkbox, ``prop``, or ``and``, and it is not a formula interpreter.
+    """
+    return today.strftime("%m-%d") == birthday.strftime("%m-%d")
+
+
+def test_february_29_birthday_matches_only_in_a_leap_year() -> None:
+    generated = generate_notification_dashboard_formulas(_VERIFIED)
+    expression = generated.expressions["birthday_status"]
+    assert expression == (
+        'and(prop("Birthday"), '
+        'equal(formatDate(prop("Date"), "MM-DD"), formatDate(now(), "MM-DD")))'
+    )
+    assert _BIRTHDAY_MONTH_DAY.search(expression) is not None
+    assert "02-29" not in expression
+    assert "02-28" not in expression
+    assert "03-01" not in expression
+    birthday = date(2028, 2, 29)
+    assert _month_day_comparison_matches(date(2027, 2, 28), birthday) is False
+    assert _month_day_comparison_matches(date(2027, 3, 1), birthday) is False
+    assert _month_day_comparison_matches(date(2028, 2, 29), birthday) is True
+
+
+_UNICODE_WHITESPACE = [
+    pytest.param("\t", id="tab"),
+    pytest.param("\n", id="newline"),
+    pytest.param("\u00a0", id="nbsp"),
+    pytest.param("\u3000", id="ideographic"),
+]
+
+
+@pytest.mark.parametrize("pad", _UNICODE_WHITESPACE)
+@pytest.mark.parametrize("side", ["leading", "trailing"])
+def test_name_unicode_whitespace_is_rejected(pad: str, side: str) -> None:
+    name = f"{pad}Name" if side == "leading" else f"Name{pad}"
+    with pytest.raises(SchemaBuilderError, match="surrounding whitespace"):
+        validated_name("property name", name)
+
+
+def test_name_trailing_space_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="surrounding whitespace"):
+        validated_name("property name", "Name ")
+
+
+@pytest.mark.parametrize("pad", _UNICODE_WHITESPACE)
+@pytest.mark.parametrize("side", ["leading", "trailing"])
+def test_formula_unicode_whitespace_is_rejected(pad: str, side: str) -> None:
+    expression = f"{pad}now()" if side == "leading" else f"now(){pad}"
+    with pytest.raises(SchemaBuilderError, match="surrounding whitespace"):
+        compile_formula(expression, {}, "date")
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        pytest.param("Na\u200bme", id="zwsp"),
+        pytest.param("\ufeffName", id="bom-leading"),
+        pytest.param("Name\ufeff", id="bom-trailing"),
+        pytest.param("Na\ufeffme", id="bom-interior"),
+    ],
+)
+def test_invisible_characters_in_names_are_rejected(name: str) -> None:
+    with pytest.raises(SchemaBuilderError, match="invisible character"):
+        validated_name("property name", name)
+
+
+def test_arabic_indic_digit_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="unexpected character"):
+        compile_formula("subtract(\u0661, 0)", {}, "number")
+
+
+def test_fullwidth_digit_is_rejected() -> None:
+    with pytest.raises(SchemaBuilderError, match="not closed"):
+        compile_formula("subtract(1\uff10, 0)", {}, "number")
+
+
+def test_multi_select_formula_value_is_text() -> None:
+    compiled = compile_formula('prop("Tags")', {"Tags": "multi_select"}, "text")
+    assert compiled.result_type == "text"
+
+
+def test_date_formula_value_is_date() -> None:
+    compiled = compile_formula('prop("Due")', {"Due": "date"}, "date")
+    assert compiled.result_type == "date"
