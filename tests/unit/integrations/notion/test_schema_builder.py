@@ -9,7 +9,7 @@ from typing import cast
 
 import pytest
 
-from money_machine.integrations.notion.errors import SchemaBuilderError
+from money_machine.integrations.notion.errors import SchemaBuilderError, UnverifiedPropertyNameError
 from money_machine.integrations.notion.schema_builder import (
     DATABASE_KINDS,
     build_database_schema,
@@ -381,6 +381,101 @@ def test_caller_property_mutation_does_not_change_the_schema() -> None:
     properties.append({"name": "Later", "type": "text"})
     assert [prop.name for prop in schema.properties] == ["Name", "Status"]
     assert schema.properties[1].options == ("Open", "Done")
+
+
+def _formula(name: str, expression: str, result_type: str) -> dict[str, object]:
+    return {
+        "name": name,
+        "type": "formula",
+        "formula_expression": expression,
+        "formula_result_type": result_type,
+    }
+
+
+def test_two_formula_cycle_is_rejected() -> None:
+    properties = [
+        _title(),
+        _formula("A", 'prop("B")', "text"),
+        _formula("B", 'prop("A")', "text"),
+    ]
+    with pytest.raises(SchemaBuilderError, match="formula cycle"):
+        build_schema("Tasks", properties)
+
+
+def test_three_formula_cycle_is_rejected() -> None:
+    properties = [
+        _title(),
+        _formula("A", 'prop("B")', "text"),
+        _formula("B", 'prop("C")', "text"),
+        _formula("C", 'prop("A")', "text"),
+    ]
+    with pytest.raises(SchemaBuilderError, match="formula cycle"):
+        build_schema("Tasks", properties)
+
+
+def test_acyclic_formula_chain_is_accepted() -> None:
+    properties = [
+        _title(),
+        _formula("B", 'prop("Name")', "text"),
+        _formula("A", 'prop("B")', "text"),
+    ]
+    schema = build_schema("Tasks", properties)
+    by_name = {prop.name: prop for prop in schema.properties}
+    assert by_name["B"].formula_expression == 'prop("Name")'
+    assert by_name["A"].formula_expression == 'prop("B")'
+    assert by_name["A"].formula_result_type == "text"
+
+
+def test_formula_property_uses_sibling_names() -> None:
+    schema = build_schema("Tasks", [_title(), _formula("Soon", 'prop("Name")', "text")])
+    assert schema.properties[1].formula_expression == 'prop("Name")'
+    assert schema.properties[1].formula_result_type == "text"
+
+
+def test_formula_property_rejects_an_unverified_name() -> None:
+    properties = [_title(), _formula("Flag", 'prop("Missing")', "checkbox")]
+    with pytest.raises(UnverifiedPropertyNameError, match="Missing") as raised:
+        build_schema("Tasks", properties)
+    assert raised.value.property_name == "Missing"
+
+
+def test_formula_property_rejects_its_own_name() -> None:
+    properties = [_title(), _formula("Flag", 'prop("Flag")', "checkbox")]
+    with pytest.raises(UnverifiedPropertyNameError, match="Flag"):
+        build_schema("Tasks", properties)
+
+
+def test_formula_property_requires_an_expression() -> None:
+    properties = [_title(), {"name": "Flag", "type": "formula", "formula_result_type": "text"}]
+    with pytest.raises(SchemaBuilderError, match="requires an expression"):
+        build_schema("Tasks", properties)
+
+
+def test_formula_property_requires_a_result_type() -> None:
+    properties = [
+        _title(),
+        {"name": "Flag", "type": "formula", "formula_expression": 'prop("Name")'},
+    ]
+    with pytest.raises(SchemaBuilderError, match="requires a result type"):
+        build_schema("Tasks", properties)
+
+
+def test_schema_empty_formula_expression_is_rejected() -> None:
+    properties = [_title(), _formula("Flag", "   ", "text")]
+    with pytest.raises(SchemaBuilderError, match="must not be empty"):
+        build_schema("Tasks", properties)
+
+
+def test_formula_expression_on_text_is_rejected() -> None:
+    properties = [_title(), {"name": "Note", "type": "text", "formula_expression": 'prop("Name")'}]
+    with pytest.raises(SchemaBuilderError, match="only allowed on formula"):
+        build_schema("Tasks", properties)
+
+
+def test_formula_result_type_on_text_is_rejected() -> None:
+    properties = [_title(), {"name": "Note", "type": "text", "formula_result_type": "text"}]
+    with pytest.raises(SchemaBuilderError, match="result type is only allowed"):
+        build_schema("Tasks", properties)
 
 
 def test_caller_option_list_mutation_does_not_change_the_schema() -> None:

@@ -331,7 +331,8 @@ def _require_one_title(properties: tuple[SchemaProperty, ...]) -> None:
 
 
 def _compile_formulas(properties: tuple[SchemaProperty, ...]) -> tuple[SchemaProperty, ...]:
-    names = [prop.name for prop in properties]
+    raw_types = {prop.name: _raw_type(prop) for prop in properties}
+    formula_refs: dict[str, frozenset[str]] = {}
     compiled: list[SchemaProperty] = []
     for prop in properties:
         if prop.type != "formula":
@@ -343,8 +344,9 @@ def _compile_formulas(properties: tuple[SchemaProperty, ...]) -> tuple[SchemaPro
             raise SchemaBuilderError("formula property requires an expression")
         if result_type is None:
             raise SchemaBuilderError("formula property requires a result type")
-        siblings = frozenset(name for name in names if name != prop.name)
+        siblings = {name: raw_types[name] for name in raw_types if name != prop.name}
         formula = compile_formula(expression, siblings, result_type)
+        formula_refs[prop.name] = formula.referenced_property_names
         compiled.append(
             SchemaProperty(
                 name=prop.name,
@@ -354,4 +356,29 @@ def _compile_formulas(properties: tuple[SchemaProperty, ...]) -> tuple[SchemaPro
                 formula_result_type=formula.result_type,
             )
         )
+    _require_acyclic_formulas(formula_refs)
     return tuple(compiled)
+
+
+def _raw_type(prop: SchemaProperty) -> str:
+    if prop.type == "formula":
+        return prop.formula_result_type or ""
+    return prop.type
+
+
+def _require_acyclic_formulas(refs: Mapping[str, frozenset[str]]) -> None:
+    done: set[str] = set()
+
+    def visit(name: str, path: tuple[str, ...]) -> None:
+        if name in path:
+            joined = " -> ".join((*path, name))
+            raise SchemaBuilderError(f"formula cycle {joined}")
+        if name in done or name not in refs:
+            return
+        extended = (*path, name)
+        for target in sorted(refs[name]):
+            visit(target, extended)
+        done.add(name)
+
+    for name in refs:
+        visit(name, ())
