@@ -21,6 +21,7 @@ from typing import Any, Protocol
 from urllib.parse import urlparse
 
 from .adapter import NotionAdapter
+from .combined_adapter import API_OPERATIONS, COMBINED_OPERATIONS
 from .domain import (
     NotionCalloutBlock,
     NotionDatabase,
@@ -240,6 +241,14 @@ class BrowserNotionAdapter(NotionAdapter):
             if anon_session_factory
             else None
         )
+
+    def reports_unsupported(self, operation: str) -> bool:
+        """True for API and combined operations this adapter does not implement.
+
+        CombinedNotionAdapter checks this before any call. A true result routes
+        to the other adapter because this method has not been invoked.
+        """
+        return operation in API_OPERATIONS or operation in COMBINED_OPERATIONS
 
     # DIRECT_API operations — not implemented in browser adapter
     async def connection_status(self) -> dict[str, bool | str | int]:

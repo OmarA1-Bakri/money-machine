@@ -3,25 +3,10 @@
 import pytest
 
 from money_machine.integrations.notion.api_adapter import APINotionAdapter
-from money_machine.integrations.notion.combined_adapter import CombinedNotionAdapter
 
 # Note: BrowserNotionAdapter tests removed - W3 implements real browser adapter
 # with dependency injection. See test_browser_adapter.py for full coverage.
-
-
-@pytest.mark.asyncio
-async def test_combined_adapter_raises_not_implemented():
-    """CombinedNotionAdapter raises NotImplementedError for all methods."""
-    adapter = CombinedNotionAdapter()
-
-    with pytest.raises(NotImplementedError, match="Real combined adapter deferred"):
-        await adapter.connection_status()
-
-    with pytest.raises(NotImplementedError, match="Real combined adapter deferred"):
-        await adapter.get_public_url(page_id="page_123")
-
-    with pytest.raises(NotImplementedError, match="Real combined adapter deferred"):
-        await adapter.verify_stranger_access(public_url="https://example.notion.site/Page-123")
+# CombinedNotionAdapter delegation is covered in test_combined_adapter.py.
 
 
 @pytest.mark.asyncio

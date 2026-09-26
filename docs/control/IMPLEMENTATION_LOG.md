@@ -120,7 +120,7 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 - **OUT OF SCOPE** (W4a hard boundaries): CombinedNotionAdapter implementation, receipts persistence, live Playwright integration, SESSION_06 COMPLETE marking.
 
 
-## 2026-09-25 — Session 06 Wave 4b: BrowserNotionAdapter carry-forward fixes (PR #43, open awaiting review)
+## 2026-09-25 — Session 06 Wave 4b: BrowserNotionAdapter carry-forward fixes (PR #43)
 
 - **SPEC CHANGE** (decorator removed): `TranslatingBrowserSession` wraps both `self._browser` in `__init__` and every anonymous session from the factory in `verify_stranger_access`. `translate_browser_exceptions` is gone from `browser_adapter.py`; the translation tests call the wrapper.
 - **Carry-forward from the W4a review** (no new scope):
@@ -168,6 +168,113 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 - **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w4b` and this log entry. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
 - **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. Exit 78 held.
 
+
+## 2026-09-26 — Session 06 Wave 5: combined adapter delegation, receipt stub, cause-test parametrization
+
+- **Combined adapter**: `CombinedNotionAdapter` routes API-tagged operations to the injected API adapter and browser-tagged operations to the injected browser adapter. `reports_unsupported` is checked before the call and may route to the other adapter, including for a non-idempotent write, because nothing has been invoked yet. `OperationUnsupportedError` is raised before any side effect and selects the other adapter only for a read or other idempotent operation. After a non-idempotent write has been invoked, no exception selects the other adapter, including `NotImplementedError`, its subclasses, and `OperationUnsupportedError`. A write that raises (`RuntimeError`, `ValueError`, `ConnectionError`, `KeyError`, `AttributeError`, or any other exception), a `TypeError`, and an auth-style error propagate, and the other adapter is not called. A read or other idempotent operation that raises `RuntimeError`, `ConnectionError`, `ValueError`, `KeyError`, `AttributeError`, `LookupError`, or `NotImplementedError` propagates that same error object, and the other adapter is not called. `TypeError` and `PermissionError` on a non-idempotent write, including a browser-preferred write, propagate the same way. The API adapter reports browser operations unsupported. The browser adapter reports API and combined operations unsupported. Expected channels are parsed from `PLATFORM_COMPATIBILITY.md`. When the fallback also fails, the second error is chained from the first. `get_public_url` is COMBINED: the API delegate returns the public URL, then the browser delegate verifies stranger access; `None` from the API skips the browser, and a failed stranger check returns `None`. `set_view_title_visibility(database_id, view_id, visible)` passes those three arguments through unchanged and returns the delegate's `NotionView`. A non-bool `reports_unsupported` result is rejected before either adapter runs. A public URL that is not a string is rejected before the browser runs. The fixture adapter stays the default.
+- **Receipts stub**: `NotionOperationReceipt` and `NotionOperationReceiptLog` follow Session 06 prompt section "### 4. Implement Notion operation receipts" (`prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md`). Fields: job ID, operation, workspace, page/database target, pre-state when available, post-state, provider response, screenshot or response evidence, timestamp, idempotency key, status. Status is `Success`, `Unknown`, or `Failure`. Timestamps must be timezone-aware. A repeated idempotency key is rejected before append, including when a second log instance re-reads the same path. A torn trailing line that is not newline-terminated and is not JSON is skipped on load and truncated before the next append, including when several valid lines precede it. An incomplete UTF-8 tail is skipped the same way. A torn tail of deeply nested brackets is skipped rather than raising `RecursionError`. A complete JSON line with no trailing newline is kept, and a newline is added before the next append. A newline-terminated corrupt line is rejected. Caller mappings are copied before store. Nested mappings, lists, and tuples are frozen at every depth into new containers, so a frozen mapping can be snapshotted again without deepcopy. `dataclasses.replace` keeps nested `pre_state`, `post_state`, and `provider_response` frozen and equal. Mutating the caller's nested dict and list leaves the receipt unchanged. A caller `MappingProxyType`, including one nested inside another mapping, is copied into fresh containers, so mutating its inner list leaves the receipt unchanged. A reference cycle raises `ValueError`. More than 32 levels below the field mapping is rejected (33 nested containers are accepted, counting the field mapping as level 0; 34 are rejected). `record()` writes pure ASCII, including when a field contains non-ASCII text. A `threading.Lock` inside state raises `ValueError`. Mapping keys must be strings at every level. `NaN` and `Inf` are rejected. The path must be a `pathlib.Path` whose parent directory already exists; a string path and a missing parent are rejected, and the stub does not create directories. Writers of one resolved path in this process share one lock object, held weakly in a registry: each log keeps a strong reference for its lifetime, a different path gets a different lock, and a discarded path leaves the registry. Writes happen only at a path the caller injects. No database table and no network.
+- **Cause test**: `test_translating_session_keeps_original_playwright_error_as_cause` is parametrized over the eight `TranslatingBrowserSession` methods (`navigate`, `click`, `fill`, `get_attribute`, `is_visible`, `wait_for_selector`, `get_current_url`, `close`). `TranslatingBrowserSession` is unchanged.
+- **Pytest collected**: 1257 collected, 1256 passed, 1 skipped. W4b baseline: 1088 collected, 1087 passed, 1 skipped. Delta +169 collected and +169 passed.
+- **Per-file counts**:
+
+  | File | Functions (base → tip) | Collected (base → tip) | Delta collected |
+  |---|---|---|---|
+  | `tests/unit/integrations/notion/test_browser_adapter.py` | 75 → 75 | 100 → 107 | +7 |
+  | `tests/unit/integrations/notion/test_stub_adapters.py` | 2 → 1 | 2 → 1 | -1 |
+  | `tests/unit/integrations/notion/test_combined_adapter.py` | 0 → 29 | 0 → 109 | +109 |
+  | `tests/unit/observability/test_receipts.py` | 0 → 46 | 0 → 54 | +54 |
+  | Remaining files | unchanged | 986 → 986 | 0 |
+  | **Total** | | **1088 → 1257** | **+169** |
+
+- **Mutation checks** (82 rows; each applied, pytest run, then reverted):
+
+  | Mutation | Failing test |
+  |---|---|
+  | Swap `create_page` from the API operation set into the browser set | `test_operation_uses_api_adapter[create_page]` |
+  | Fall back on `except Exception` after a non-idempotent write is invoked | `test_write_error_is_not_retried_on_the_other_adapter[RuntimeError]` |
+  | Catch `RuntimeError` after a non-idempotent write and fall back | `test_write_error_is_not_retried_on_the_other_adapter[RuntimeError]` |
+  | Catch `ValueError` after a non-idempotent write and fall back | `test_write_error_is_not_retried_on_the_other_adapter[ValueError]` |
+  | Fall back on `TypeError` from a read | `test_type_error_propagates_unchanged` |
+  | Fall back on `PermissionError` from a read | `test_auth_error_propagates_unchanged` |
+  | Remove the `reports_unsupported` pre-check | `test_fallback_when_preferred_reports_unsupported[create_page-api]` |
+  | Drop the `reports_unsupported` bool check | `test_reports_unsupported_must_return_bool` |
+  | Drop the `get_public_url` str check | `test_get_public_url_rejects_a_non_str_url` |
+  | Fall back on `NotImplementedError` after a non-idempotent write is invoked | `test_write_not_implemented_error_is_not_retried` |
+  | Fall back on a `NotImplementedError` subclass after a non-idempotent write is invoked | `test_write_not_implemented_subclass_is_not_retried` |
+  | Fall back on `OperationUnsupportedError` after a non-idempotent write is invoked | `test_write_operation_unsupported_error_is_not_retried` |
+  | Drop the read-side `OperationUnsupportedError` fallback | `test_read_operation_unsupported_error_falls_back` |
+  | Skip `OperationUnsupportedError` fallback for an idempotent write | `test_idempotent_operation_unsupported_error_falls_back` |
+  | Widen the read/idempotent `except` with `RuntimeError` | `test_read_and_idempotent_error_propagates[inspect_page-RuntimeError]` |
+  | Widen the read/idempotent `except` with `ConnectionError` | `test_read_and_idempotent_error_propagates[inspect_page-ConnectionError]` |
+  | Widen the read/idempotent `except` with `ValueError` | `test_read_and_idempotent_error_propagates[inspect_page-ValueError]` |
+  | Widen the read/idempotent `except` with `KeyError` | `test_read_and_idempotent_error_propagates[inspect_page-KeyError]` |
+  | Widen the read/idempotent `except` with `AttributeError` | `test_read_and_idempotent_error_propagates[inspect_page-AttributeError]` |
+  | Widen the read/idempotent `except` with `NotImplementedError` | `test_read_and_idempotent_error_propagates[inspect_page-NotImplementedError]` |
+  | Widen the read/idempotent `except` with `LookupError` | `test_read_and_idempotent_error_propagates[inspect_page-LookupError]` |
+  | Catch `TypeError` after a non-idempotent write and fall back | `test_write_type_and_permission_errors_propagate[create_page-TypeError]` |
+  | Catch `TypeError` after a browser-preferred write and fall back | `test_write_type_and_permission_errors_propagate[duplicate_page-TypeError]` |
+  | Catch `PermissionError` after a non-idempotent write and fall back | `test_write_type_and_permission_errors_propagate[create_page-PermissionError]` |
+  | Catch `PermissionError` after a browser-preferred write and fall back | `test_write_type_and_permission_errors_propagate[duplicate_page-PermissionError]` |
+  | Return the API public URL without stranger verification | `test_get_public_url_returns_none_when_stranger_access_fails` |
+  | Turn a stranger-check error into `None` | `test_get_public_url_does_not_hide_stranger_access_errors` |
+  | Drop the stranger-check bool type check | `test_get_public_url_rejects_a_non_bool_stranger_check` |
+  | Raise the fallback error without `from first` | `test_unsupported_fallback_error_is_chained_from_the_first_error[operation_unsupported]` |
+  | Pass `parent_id=None` from `create_page` | `test_operation_forwards_every_argument[create_page]` |
+  | Drop `icon=` in `create_page` | `test_operation_forwards_every_argument[create_page]` |
+  | Drop `new_parent_type=` in `move_page` | `test_operation_forwards_every_argument[move_page]` |
+  | Hard-code `enabled=True` in `set_search_indexing` | `test_operation_forwards_every_argument[set_search_indexing]` |
+  | Hard-code `icon="💡"` in `add_callout_block` | `test_operation_forwards_every_argument[add_callout_block]` |
+  | Pass `new_title=page_id` from `rename_page` | `test_operation_forwards_every_argument[rename_page]` |
+  | Drop `visible=` in `set_view_title_visibility` | `test_operation_forwards_every_argument[set_view_title_visibility]` |
+  | Change `raise translated from e` to `raise translated from None` on `fill` | `test_translating_session_keeps_original_playwright_error_as_cause[fill]` |
+  | Change `raise translated from e` to `raise translated from None` on `close` | `test_translating_session_keeps_original_playwright_error_as_cause[close]` |
+  | Write `job_id` from `operation` | `test_reloaded_receipt_round_trips_every_field` |
+  | Write `operation` from `workspace` | `test_reloaded_receipt_round_trips_every_field` |
+  | Write `workspace` from `target` | `test_reloaded_receipt_round_trips_every_field` |
+  | Write `target` from `job_id` | `test_reloaded_receipt_round_trips_every_field` |
+  | Write `idempotency_key` from `evidence` | `test_reloaded_receipt_round_trips_every_field` |
+  | Remove the in-file duplicate idempotency-key check | `test_load_rejects_duplicate_idempotency_key` |
+  | Remove the `timestamp` datetime check | `test_timestamp_must_be_a_datetime` |
+  | Store `post_state` without the mapping check | `test_post_state_must_be_a_mapping` |
+  | Accept a naive timestamp | `test_naive_timestamp_is_rejected` |
+  | Accept a timestamp whose `utcoffset()` is `None` | `test_timestamp_with_null_utcoffset_is_rejected` |
+  | Accept a status outside Success, Unknown, and Failure | `test_status_rejects_values_outside_the_enum` |
+  | Accept a case-folded status | `test_lowercase_success_status_is_rejected` |
+  | Reject a torn trailing line | `test_torn_trailing_line_is_skipped` |
+  | Skip a complete JSON tail that has no newline | `test_complete_json_tail_without_newline_is_kept` |
+  | Skip tail repair before append (torn tail) | `test_record_after_torn_tail_round_trips` |
+  | Skip tail repair before append (complete line without newline) | `test_record_after_complete_line_without_newline_round_trips` |
+  | Skip the pre-append re-read | `test_two_logs_reject_a_duplicate_key_without_corrupting_the_file` |
+  | Allow `NaN` in receipt JSON | `test_non_finite_numbers_are_rejected[nan]` |
+  | Remove the `record()` duplicate idempotency-key guard | `test_duplicate_idempotency_key_is_rejected_and_not_appended` |
+  | Store the caller mapping without copying it | `test_caller_dict_mutation_does_not_change_the_stored_receipt` |
+  | Return a tuple from `_freeze_value` without freezing its elements | `test_tuple_nested_mapping_is_frozen` |
+  | Leave nested lists mutable | `test_nested_list_and_mapping_are_frozen` |
+  | Re-introduce deepcopy of a frozen mapping | `test_replace_keeps_nested_state_frozen` |
+  | Accept non-string mapping keys | `test_non_string_mapping_keys_are_rejected` |
+  | Accept a non-string key nested in a tuple | `test_nested_non_string_mapping_keys_are_rejected` |
+  | per-instance lock instead of shared path lock | `test_same_resolved_path_shares_one_lock` |
+  | `record()` does not take the path lock | `test_record_waits_for_the_path_lock` |
+  | Keep discarded path locks in a strong registry | `test_discarded_log_drops_its_path_lock` |
+  | Accept a missing parent directory | `test_missing_parent_directory_is_rejected` |
+  | Accept a `str` path | `test_string_path_is_rejected` |
+  | Pass a caller MappingProxyType through unchanged | `test_caller_mapping_proxy_list_mutation_does_not_change_the_receipt` |
+  | Drop the receipt cycle and depth guards | `test_cycles_and_deep_nesting_raise_value_error` |
+  | Never discard ids from the cycle-tracking set | `test_shared_subcontainers_round_trip` |
+  | Set the nesting limit to 31 | `test_nesting_accepts_33_containers_and_rejects_34` |
+  | Set the nesting limit to 33 | `test_nesting_accepts_33_containers_and_rejects_34` |
+  | Set the nesting limit to 39 | `test_nesting_accepts_33_containers_and_rejects_34` |
+  | Compare nesting depth with `>=` instead of `>` | `test_nesting_accepts_33_containers_and_rejects_34` |
+  | Lists do not add a depth level | `test_deep_list_nest_raises_value_error` |
+  | Let `json.loads` `RecursionError` escape on load | `test_deeply_nested_json_line_raises_value_error` |
+  | Decode an incomplete UTF-8 tail as part of the log | `test_incomplete_utf8_tail_is_skipped` |
+  | Write receipts with ensure_ascii=False | `test_recorded_lines_are_ascii` |
+  | Use find instead of rfind when decoding a torn tail | `test_incomplete_utf8_tail_is_skipped` |
+  | Use find instead of rfind when repairing a torn tail | `test_record_after_torn_tail_round_trips` |
+  | Let a deeply nested torn tail raise RecursionError | `test_deeply_nested_torn_tail_is_skipped` |
+
+- **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w5` and this log entry. `state_revision` went from 38 to 40 against base. The `session_06_w4b` note was changed. `updated_at` was refreshed. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
+- **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. Exit 78 held.
 
 
 ## 2026-09-11 — Startup repair wave after recovery review
