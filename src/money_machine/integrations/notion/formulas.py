@@ -9,10 +9,11 @@ Expressions are call-shaped (``prop``, ``if``, ``and``, ``or``, ``not``,
 ``empty``, ``now``, ``formatDate``, ``equal``, ``subtract``). ``equal`` and
 ``subtract`` are the only additions, and only the dashboard formulas use them.
 
-A cross-row count or a rollup is out of scope. ``buyer_name`` is the one
-configured buyer name for the single dashboard row (Session 07 section 4). It
-is deferred to section 6 / Session 07 and is not emitted here, so a verified
-map with no Clients database is valid. ``current_date`` is ``now()`` on Tasks.
+A cross-row count or a rollup is out of scope. Session 07 section 4 names a
+configured buyer name and does not name ``client_name``. That buyer name is
+deferred to Session 07 and is not emitted here, and ``client_name`` is not
+emitted either, so a verified map with no Clients database is valid.
+``current_date`` is ``now()`` on Tasks.
 ``task_open_and_due_today`` is this Tasks row, not a count of tasks, and it
 compares the Due calendar day to today. That per-row name is a justified
 correction: a formula evaluates per row, and the count belongs in a section 6
@@ -241,7 +242,7 @@ def generate_notification_dashboard_formulas(
     for key, database, result_type, expression in _DASHBOARD:
         if database not in verified:
             continue
-        properties = _properties_for(database, verified)
+        properties = verified[database]
         compiled = compile_formula(expression, properties, result_type)
         _require_catalogue_types(database, properties, compiled.referenced_property_names)
         expressions[key] = compiled.expression
@@ -280,12 +281,6 @@ def copy_verified_databases(verified_properties: object) -> dict[str, dict[str, 
             raise SchemaBuilderError("verified properties must be strings")
         copied[database] = copy_verified_properties(properties)
     return copied
-
-
-def _properties_for(database: str, verified: Mapping[str, Mapping[str, str]]) -> Mapping[str, str]:
-    if database not in verified:
-        raise SchemaBuilderError(f"database {database!r} is not verified")
-    return verified[database]
 
 
 def _require_catalogue_types(

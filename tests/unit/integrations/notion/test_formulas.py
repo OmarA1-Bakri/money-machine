@@ -5,6 +5,7 @@ No network, no Notion, no browser.
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from typing import cast
 
@@ -431,6 +432,29 @@ def test_formula_result_type_must_be_a_string() -> None:
 
 
 _PERSONAL_KINDS = ("Tasks", "Events", "Habits", "Finance", "Meals", "Notes")
+_TASK_OPEN = (
+    'and(equal(prop("Status"), "Open"), '
+    'equal(formatDate(prop("Due"), "YYYY-MM-DD"), formatDate(now(), "YYYY-MM-DD")))'
+)
+_BIRTHDAY = (
+    'and(prop("Birthday"), equal(formatDate(prop("Date"), "MM-DD"), formatDate(now(), "MM-DD")))'
+)
+_MONEY_SPENT = (
+    'if(equal(formatDate(prop("Date"), "YYYY-MM-DD"), formatDate(now(), "YYYY-MM-DD")), '
+    'prop("Amount"), 0)'
+)
+_WATER = 'subtract(prop("Goal"), prop("Glasses"))'
+_PRESET_EXPRESSIONS: dict[str, dict[str, str]] = {
+    "Tasks": {"current_date": "now()", "task_open_and_due_today": _TASK_OPEN},
+    "Events": {"birthday_status": _BIRTHDAY},
+    "Habits": {"water_glasses_remaining": _WATER},
+    "Finance": {"money_spent_today": _MONEY_SPENT},
+    "Meals": {},
+    "Notes": {},
+}
+_BIRTHDAY_MONTH_DAY = re.compile(
+    r'equal\(formatDate\(prop\("Date"\), "MM-DD"\), formatDate\(now\(\), "MM-DD"\)\)'
+)
 
 
 def _verified_from_presets(kinds: tuple[str, ...]) -> dict[str, dict[str, str]]:
@@ -452,7 +476,9 @@ def test_personal_only_presets_generate_a_dashboard() -> None:
 @pytest.mark.parametrize("kind", _PERSONAL_KINDS)
 def test_each_personal_only_preset_generates_a_dashboard(kind: str) -> None:
     generated = generate_notification_dashboard_formulas(_verified_from_presets((kind,)))
-    assert set(generated.databases.values()) <= {kind}
+    expected = _PRESET_EXPRESSIONS[kind]
+    assert dict(generated.expressions) == expected
+    assert dict(generated.databases) == {key: kind for key in expected}
     assert "client_name" not in generated.expressions
     assert "buyer_name" not in generated.expressions
 
@@ -489,6 +515,16 @@ def test_subtract_rejects_a_non_number_subtrahend() -> None:
         compile_formula('subtract(1, prop("Name"))', {"Name": "title"}, "number")
 
 
+def _month_day_comparison_matches(today: date, birthday: date) -> bool:
+    """Compare the month-day strings named by the emitted birthday expression.
+
+    The stub emits ``equal(formatDate(prop("Date"), "MM-DD"), formatDate(now(), "MM-DD"))``.
+    This helper compares those two strings. It does not evaluate ``prop``, ``and``,
+    or the Birthday checkbox, and it is not a formula interpreter.
+    """
+    return today.strftime("%m-%d") == birthday.strftime("%m-%d")
+
+
 def test_february_29_birthday_matches_only_in_a_leap_year() -> None:
     generated = generate_notification_dashboard_formulas(_VERIFIED)
     expression = generated.expressions["birthday_status"]
@@ -496,14 +532,14 @@ def test_february_29_birthday_matches_only_in_a_leap_year() -> None:
         'and(prop("Birthday"), '
         'equal(formatDate(prop("Date"), "MM-DD"), formatDate(now(), "MM-DD")))'
     )
+    assert _BIRTHDAY_MONTH_DAY.search(expression) is not None
     assert "02-29" not in expression
     assert "02-28" not in expression
     assert "03-01" not in expression
-    assert date(2024, 2, 29).strftime("%m-%d") == "02-29"
-    assert date(2020, 2, 29).strftime("%m-%d") == "02-29"
-    assert date(2023, 2, 28).strftime("%m-%d") == "02-28"
-    assert date(2023, 3, 1).strftime("%m-%d") == "03-01"
-    assert date(2023, 2, 28).strftime("%m-%d") != "02-29"
+    birthday = date(2028, 2, 29)
+    assert _month_day_comparison_matches(date(2027, 2, 28), birthday) is False
+    assert _month_day_comparison_matches(date(2027, 3, 1), birthday) is False
+    assert _month_day_comparison_matches(date(2028, 2, 29), birthday) is True
 
 
 _UNICODE_WHITESPACE = [

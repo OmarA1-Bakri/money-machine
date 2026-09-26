@@ -503,10 +503,17 @@ def test_caller_option_list_mutation_does_not_change_the_schema() -> None:
 
 
 def test_number_formula_is_rejected_where_a_checkbox_is_required() -> None:
+    number = _formula("N", "subtract(1, 0)", "number")
+    gated = _formula("Flag", 'if(prop("N"), 1, 2)', "number")
+    with pytest.raises(SchemaBuilderError, match=r"if\(\) condition"):
+        build_schema("Tasks", [_title(), number, gated])
+
+
+def test_equal_rejects_a_number_formula_compared_with_text() -> None:
+    number = _formula("N", "subtract(1, 0)", "number")
     flag = _formula("Flag", 'equal(prop("N"), "x")', "checkbox")
-    properties = [_title(), _formula("N", "subtract(1, 0)", "number"), flag]
     with pytest.raises(SchemaBuilderError, match="equal"):
-        build_schema("Tasks", properties)
+        build_schema("Tasks", [_title(), number, flag])
 
 
 def test_checkbox_formula_is_accepted_as_an_if_condition() -> None:
