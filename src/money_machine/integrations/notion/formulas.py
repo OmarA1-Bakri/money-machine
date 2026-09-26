@@ -13,9 +13,10 @@ A cross-row count or a rollup is out of scope. Session 07 section 4 names a
 configured buyer name and does not name ``client_name``. That buyer name is
 deferred to Session 07 and is not emitted here, and ``client_name`` is not
 emitted either, so a verified map with no Clients database is valid.
-``current_date`` is ``now()`` on Tasks.
-``task_open_and_due_today`` is this Tasks row, not a count of tasks, and it
-compares the Due calendar day to today. That per-row name is a justified
+``current_date`` is ``now()`` on Tasks. Notion evaluates now() and formatDate in the
+viewer's local time zone, API reads return UTC, and 'today' can differ near
+midnight. ``task_open_and_due_today`` is this Tasks row, not a count
+of tasks, and it compares the Due calendar day to today. That per-row name is a justified
 correction: a formula evaluates per row, and the count belongs in a section 6
 rollup. ``birthday_status`` compares month and day so the Events row recurs
 yearly. A February 29 birthday matches only when today is February 29, so
@@ -23,7 +24,8 @@ yearly. A February 29 birthday matches only when today is February 29, so
 that date. ``money_spent_today`` is this Finance row's amount when its calendar
 date is today, otherwise 0, not a sum. A date property is never compared to
 ``now()`` directly. ``water_glasses_remaining`` is Goal minus Glasses on Habits
-and is omitted when Habits is not verified (water glasses only where relevant).
+when that row's calendar date is today, otherwise 0, and is omitted when Habits
+is not verified (water glasses only where relevant).
 Any dashboard formula is omitted when its database is not in the verified map,
 so each personal preset can be used alone. A key that is not in
 ``schema_definitions()`` is rejected. A known database that is simply absent
@@ -102,14 +104,15 @@ _DASHBOARD: tuple[tuple[str, str, str, str], ...] = (
         "water_glasses_remaining",
         "Habits",
         "number",
-        'subtract(prop("Goal"), prop("Glasses"))',
+        'if(equal(formatDate(prop("Date"), "YYYY-MM-DD"), formatDate(now(), "YYYY-MM-DD")), '
+        'subtract(prop("Goal"), prop("Glasses")), 0)',
     ),
 )
 _EXPECTED_TYPES: dict[str, dict[str, str]] = {
     "Tasks": {"Status": "select", "Due": "date"},
     "Events": {"Birthday": "checkbox", "Date": "date"},
     "Finance": {"Date": "date", "Amount": "number"},
-    "Habits": {"Goal": "number", "Glasses": "number"},
+    "Habits": {"Date": "date", "Goal": "number", "Glasses": "number"},
 }
 
 
@@ -152,7 +155,7 @@ class NotificationDashboardFormulas:
     verified_properties: Mapping[str, Mapping[str, str]]
 
 
-_INVISIBLE_NAME_CHARACTERS = ("\u200b", "\ufeff")
+_INVISIBLE_NAME_CHARACTERS = ("\u200b", "\ufeff", "\u200c", "\u200d", "\u2060", "\u00ad")
 
 
 def _is_ascii_digit(char: str) -> bool:
