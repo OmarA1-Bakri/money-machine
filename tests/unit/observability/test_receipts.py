@@ -435,7 +435,7 @@ def test_caller_nested_dict_and_list_stay_outside_the_receipt() -> None:
     """Mutating the caller's nested dict and list leaves the receipt unchanged."""
     inner = {"title": "old"}
     items = [inner]
-    post_state = {"items": items}
+    post_state: dict[str, object] = {"items": items}
     receipt = _receipt(post_state=post_state)
     inner["title"] = "NEW"
     items.append({"title": "extra"})
