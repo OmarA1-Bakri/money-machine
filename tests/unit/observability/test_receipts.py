@@ -8,6 +8,7 @@ from __future__ import annotations
 import gc
 import os
 import threading
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path
 from types import MappingProxyType
@@ -387,6 +388,63 @@ def test_caller_dict_mutation_does_not_change_the_stored_receipt() -> None:
     assert stored is not None
     assert stored.post_state == {"title": "Hello", "nested": {"n": 1}}
     assert stored.provider_response == {"id": "page_1"}
+
+
+def test_replace_keeps_nested_state_frozen() -> None:
+    """Replacing status keeps nested pre-state and post-state frozen and equal."""
+    receipt = _receipt(
+        status="Unknown",
+        pre_state={"items": [{"title": "before"}]},
+        post_state={"items": [{"title": "after"}]},
+    )
+    replaced = replace(receipt, status="Failure")
+
+    assert replaced.status == "Failure"
+    assert replaced.pre_state == receipt.pre_state
+    assert replaced.post_state == receipt.post_state
+    assert replaced.pre_state is not None
+    pre_items = replaced.pre_state["items"]
+    post_items = replaced.post_state["items"]
+    assert isinstance(pre_items, tuple)
+    assert isinstance(post_items, tuple)
+    pre_nested = pre_items[0]
+    post_nested = post_items[0]
+    assert isinstance(pre_nested, MappingProxyType)
+    assert isinstance(post_nested, MappingProxyType)
+    assert pre_nested["title"] == "before"
+    assert post_nested["title"] == "after"
+    assignment = cast(dict[str, object], post_nested)
+    with pytest.raises(TypeError):
+        assignment["title"] = "changed"
+    assert post_nested["title"] == "after"
+
+
+def test_reloaded_post_state_seeds_a_new_receipt(tmp_path: Path) -> None:
+    """A reloaded post_state can be stored again as pre_state and post_state."""
+    path = tmp_path / "receipts.jsonl"
+    NotionOperationReceiptLog(path).record(_receipt(post_state={"items": [{"title": "kept"}]}))
+    reloaded = NotionOperationReceiptLog(path).get("create_page:job_1")
+    assert reloaded is not None
+
+    follow = _receipt(
+        idempotency_key="create_page:job_2",
+        pre_state=reloaded.post_state,
+        post_state=reloaded.post_state,
+        status="Failure",
+    )
+    NotionOperationReceiptLog(path).record(follow)
+    stored = NotionOperationReceiptLog(path).get("create_page:job_2")
+    assert stored is not None
+    assert stored.pre_state == reloaded.post_state
+    assert stored.post_state == reloaded.post_state
+    assert stored.status == "Failure"
+
+
+def test_lock_inside_state_raises_value_error() -> None:
+    """A lock inside state is rejected as non-serializable, not as TypeError."""
+    with pytest.raises(ValueError, match="JSON-serializable") as caught:
+        _receipt(post_state={"lock": threading.Lock()})
+    assert type(caught.value) is ValueError
 
 
 @pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])

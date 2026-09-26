@@ -24,7 +24,6 @@ Mapping keys must be strings at every level.
 
 from __future__ import annotations
 
-import copy
 import json
 import os
 import threading
@@ -100,9 +99,7 @@ def _freeze_value(value: object) -> object:
     return value
 
 
-def _freeze_mapping(value: object) -> Mapping[str, object]:
-    if not isinstance(value, Mapping):
-        raise ValueError("receipt value must be a mapping")
+def _freeze_mapping[MappingKey](value: Mapping[MappingKey, object]) -> Mapping[str, object]:
     frozen: dict[str, object] = {}
     for key, item in value.items():
         if not isinstance(key, str):
@@ -113,12 +110,12 @@ def _freeze_mapping(value: object) -> Mapping[str, object]:
 
 def _snapshot_mapping(field_name: str, value: object) -> Mapping[str, object]:
     mapping = _require_mapping(field_name, value)
-    return _freeze_mapping(copy.deepcopy(dict(mapping)))
+    return _freeze_mapping(mapping)
 
 
 def _plain(value: object) -> object:
     if isinstance(value, Mapping):
-        return {str(key): _plain(item) for key, item in value.items()}
+        return {key: _plain(item) for key, item in value.items()}
     if isinstance(value, tuple):
         return [_plain(item) for item in value]
     return value
