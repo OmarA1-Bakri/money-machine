@@ -1441,40 +1441,100 @@ async def test_translate_playwright_non_matching_error_propagates():
 
 
 @pytest.mark.asyncio
-async def test_translating_session_preserves_cause_of_untranslated_exception():
-    """An untranslated exception keeps the __cause__ it was raised with."""
+async def test_translating_session_keeps_original_playwright_error_as_cause():
+    """A translated TimeoutError keeps the original Playwright error as __cause__."""
+    original = _fake_playwright_error("TimeoutError", "navigation timed out")
+    session = TranslatingBrowserSession(_NavigateRaisingSession(original))
 
-    class CausedSession:
-        async def navigate(self, url: str) -> None:
-            try:
-                raise KeyError("missing")
-            except KeyError as err:
-                raise RuntimeError("wrapped") from err
-
-        async def click(self, selector: str) -> None:
-            return None
-
-        async def fill(self, selector: str, value: str) -> None:
-            return None
-
-        async def get_attribute(self, selector: str, attribute: str) -> str | None:
-            return None
-
-        async def is_visible(self, selector: str) -> bool:
-            return False
-
-        async def wait_for_selector(self, selector: str, timeout: int = 5000) -> None:
-            return None
-
-        async def get_current_url(self) -> str:
-            return "https://www.notion.so/page"
-
-        async def close(self) -> None:
-            return None
-
-    session = TranslatingBrowserSession(CausedSession())
-    with pytest.raises(RuntimeError, match="wrapped") as exc_info:
+    with pytest.raises(TimeoutError, match="navigation timed out") as exc_info:
         await session.navigate("https://www.notion.so/page")
+
+    assert exc_info.value.__cause__ is original
+
+
+_TRANSLATING_SESSION_METHODS = (
+    "navigate",
+    "click",
+    "fill",
+    "get_attribute",
+    "is_visible",
+    "wait_for_selector",
+    "get_current_url",
+    "close",
+)
+
+
+class _SelectiveCauseSession:
+    """Raises a caused RuntimeError from one chosen BrowserSession method."""
+
+    def __init__(self, method_name: str) -> None:
+        self._method_name = method_name
+
+    def _maybe_raise(self, method_name: str) -> None:
+        if method_name != self._method_name:
+            return
+        try:
+            raise KeyError("missing")
+        except KeyError as err:
+            raise RuntimeError("wrapped") from err
+
+    async def navigate(self, url: str) -> None:
+        self._maybe_raise("navigate")
+
+    async def click(self, selector: str) -> None:
+        self._maybe_raise("click")
+
+    async def fill(self, selector: str, value: str) -> None:
+        self._maybe_raise("fill")
+
+    async def get_attribute(self, selector: str, attribute: str) -> str | None:
+        self._maybe_raise("get_attribute")
+        return None
+
+    async def is_visible(self, selector: str) -> bool:
+        self._maybe_raise("is_visible")
+        return False
+
+    async def wait_for_selector(self, selector: str, timeout: int = 5000) -> None:
+        self._maybe_raise("wait_for_selector")
+
+    async def get_current_url(self) -> str:
+        self._maybe_raise("get_current_url")
+        return "https://www.notion.so/page"
+
+    async def close(self) -> None:
+        self._maybe_raise("close")
+
+
+async def _call_translating_method(session: TranslatingBrowserSession, method_name: str) -> None:
+    if method_name == "navigate":
+        await session.navigate("https://www.notion.so/page")
+    elif method_name == "click":
+        await session.click("#target")
+    elif method_name == "fill":
+        await session.fill("#target", "value")
+    elif method_name == "get_attribute":
+        await session.get_attribute("#target", "id")
+    elif method_name == "is_visible":
+        await session.is_visible("#target")
+    elif method_name == "wait_for_selector":
+        await session.wait_for_selector("#target")
+    elif method_name == "get_current_url":
+        await session.get_current_url()
+    elif method_name == "close":
+        await session.close()
+    else:
+        raise AssertionError(method_name)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method_name", _TRANSLATING_SESSION_METHODS)
+async def test_translating_session_preserves_cause_of_untranslated_exception(method_name: str):
+    """Each wrapper method keeps an untranslated exception's original __cause__."""
+    session = TranslatingBrowserSession(_SelectiveCauseSession(method_name))
+
+    with pytest.raises(RuntimeError, match="wrapped") as exc_info:
+        await _call_translating_method(session, method_name)
 
     assert isinstance(exc_info.value.__cause__, KeyError)
 
