@@ -7,6 +7,7 @@ from money_machine.integrations.notion.domain import (
     NotionFilter,
     NotionPage,
     NotionSort,
+    NotionView,
 )
 from money_machine.integrations.notion.fixture_adapter import FixtureNotionAdapter
 
@@ -310,7 +311,7 @@ async def test_fixture_set_view_title_visibility_updates_visibility(adapter):
     database = await adapter.create_database(title="DB")
     view = await adapter.create_table_view(database.id, "View")
 
-    updated = await adapter.set_view_title_visibility(view.id, False)
+    updated = await adapter.set_view_title_visibility(database.id, view.id, False)
 
     assert updated.id == view.id
     assert updated.title_visible is False
@@ -438,3 +439,71 @@ async def test_fixture_verify_stranger_access_returns_false_for_invalid_url(adap
     accessible = await adapter.verify_stranger_access("https://example.com/page")
 
     assert accessible is False
+
+
+# Tests for set_view_title_visibility validation
+@pytest.mark.asyncio
+async def test_fixture_set_view_title_visibility_rejects_invalid_database_id(adapter):
+    """Fixture set_view_title_visibility rejects invalid database_id."""
+    database = await adapter.create_database(title="DB")
+    view = await adapter.create_table_view(database.id, "View")
+
+    # Too short
+    with pytest.raises(ValueError, match="Invalid database_id"):
+        await adapter.set_view_title_visibility("abc123", view.id, False)
+
+    # Not hex
+    with pytest.raises(ValueError, match="Invalid database_id"):
+        await adapter.set_view_title_visibility("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", view.id, False)
+
+
+@pytest.mark.asyncio
+async def test_fixture_set_view_title_visibility_accepts_12_hex(adapter):
+    """Fixture accepts a 12-hex database id (fixture ids, without the db_ prefix)."""
+    database = await adapter.create_database(title="DB")
+    view = await adapter.create_table_view(database.id, "View")
+    raw_12 = database.id.removeprefix("db_")
+
+    updated = await adapter.set_view_title_visibility(raw_12, view.id, False)
+
+    assert len(raw_12) == 12
+    assert updated.id == view.id
+    assert updated.title_visible is False
+
+
+@pytest.mark.asyncio
+async def test_fixture_set_view_title_visibility_accepts_32_hex_dashed_and_undashed(adapter):
+    """Fixture accepts a 32-hex database id with or without dashes."""
+    undashed = "aabbccdd112233445566778899aabbcc"
+    dashed = "AABBCCDD-1122-3344-5566-778899AABBCC"
+    view = NotionView(id="view_32hex", database_id=undashed, name="View", type="table")
+    adapter.views[view.id] = view
+
+    hidden = await adapter.set_view_title_visibility(dashed, view.id, False)
+    assert hidden.id == view.id
+    assert hidden.title_visible is False
+
+    shown = await adapter.set_view_title_visibility(undashed, view.id, True)
+    assert shown.title_visible is True
+
+
+@pytest.mark.asyncio
+async def test_fixture_set_view_title_visibility_rejects_20_hex(adapter):
+    """Fixture rejects a 20-hex id (neither exactly 12 nor exactly 32)."""
+    database = await adapter.create_database(title="DB")
+    view = await adapter.create_table_view(database.id, "View")
+
+    with pytest.raises(ValueError, match="Invalid database_id"):
+        await adapter.set_view_title_visibility("12345678901234567890", view.id, False)
+
+
+@pytest.mark.asyncio
+async def test_fixture_set_view_title_visibility_rejects_wrong_database(adapter):
+    """Fixture set_view_title_visibility rejects view from wrong database."""
+    database1 = await adapter.create_database(title="DB1")
+    database2 = await adapter.create_database(title="DB2")
+    view1 = await adapter.create_table_view(database1.id, "View1")
+
+    # Try to access view1 as if it belongs to database2
+    with pytest.raises(ValueError, match="does not belong to database"):
+        await adapter.set_view_title_visibility(database2.id, view1.id, False)

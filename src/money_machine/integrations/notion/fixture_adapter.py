@@ -419,11 +419,37 @@ class FixtureNotionAdapter(NotionAdapter):
         self.views[view_id] = view
         return view
 
-    async def set_view_title_visibility(self, view_id: str, visible: bool) -> NotionView:
+    async def set_view_title_visibility(
+        self, database_id: str, view_id: str, visible: bool
+    ) -> NotionView:
         """Set view title visibility."""
+        # Fixture adapter deliberately uses 12-hex IDs (e.g. db_a1b2c3d4e5f6) for
+        # in-memory testing, while real Notion IDs are always 32-hex (with or without
+        # dashes). This validates both formats: exactly 12 hex (fixture) or exactly
+        # 32 hex (real), rejecting intermediate lengths (13-31) including 20-hex UUIDs
+        # that might be passed accidentally.
+
+        # Normalize ID: strip prefix, dashes, lowercase
+        normalized_input = database_id.removeprefix("db_").replace("-", "").lower()
+
+        # Validate exactly 12 or 32 hex characters (no other lengths)
+        if (
+            not normalized_input
+            or len(normalized_input) not in (12, 32)
+            or not all(c in "0123456789abcdef" for c in normalized_input)
+        ):
+            raise ValueError(f"Invalid database_id: {database_id}")
+
         view = self.views.get(view_id)
         if not view:
             raise ValueError(f"View {view_id} not found")
+
+        # Normalize view's database_id for comparison
+        normalized_view_db = view.database_id.removeprefix("db_").replace("-", "").lower()
+
+        # Validate that the view belongs to the given database
+        if normalized_view_db != normalized_input:
+            raise ValueError(f"View {view_id} does not belong to database {database_id}")
 
         view.title_visible = visible
         return view

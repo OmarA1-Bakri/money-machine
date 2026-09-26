@@ -14,6 +14,7 @@ This adapter is injected with a browser session manager for testing flexibility.
 Production will use Playwright; tests inject a fake browser.
 """
 
+import contextlib
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, Protocol
@@ -72,6 +73,143 @@ class BrowserSession(Protocol):
         """Get current page URL."""
         ...
 
+    async def close(self) -> None:
+        """Close the browser session."""
+        ...
+
+
+class TranslatingBrowserSession:
+    """Wrapper that translates Playwright-style exceptions to built-in exceptions.
+
+    Wraps a BrowserSession and intercepts all method calls, translating any
+    Playwright-module exceptions to Python built-in exceptions:
+    - playwright.*.TimeoutError → TimeoutError
+    - playwright.*.Error (with navigation/connection keywords) → ConnectionError
+    - All other exceptions pass through unchanged
+
+    This is the adapter-owned translation boundary for production Playwright integration.
+    """
+
+    def __init__(self, wrapped_session: BrowserSession) -> None:
+        """Initialize with a session to wrap.
+
+        Args:
+            wrapped_session: The underlying BrowserSession (could be real Playwright or fake).
+        """
+        self._wrapped = wrapped_session
+
+    def _translate_exception(self, e: Exception) -> Exception:
+        """Translate a Playwright exception to a built-in exception if applicable.
+
+        Args:
+            e: The exception to potentially translate
+
+        Returns:
+            The translated exception (TimeoutError or ConnectionError) or the original
+        """
+        exc_type = type(e)
+        exc_module = exc_type.__module__
+        exc_name = exc_type.__name__
+
+        # Check if exception is from a playwright module
+        if exc_module and exc_module.startswith("playwright."):
+            # Map TimeoutError from playwright to built-in TimeoutError
+            if exc_name == "TimeoutError":
+                return TimeoutError(str(e))
+
+            # Map Error from playwright containing navigation/connection keywords
+            # to built-in ConnectionError
+            if exc_name == "Error":
+                error_message = str(e).lower()
+                if any(
+                    keyword in error_message
+                    for keyword in ["navigation", "connection", "net::", "network"]
+                ):
+                    return ConnectionError(str(e))
+
+        # All other exceptions return unchanged
+        return e
+
+    async def navigate(self, url: str) -> None:
+        """Navigate to URL, translating any Playwright exceptions."""
+        try:
+            await self._wrapped.navigate(url)
+        except Exception as e:
+            translated = self._translate_exception(e)
+            if translated is e:
+                raise
+            raise translated from e
+
+    async def click(self, selector: str) -> None:
+        """Click element, translating any Playwright exceptions."""
+        try:
+            await self._wrapped.click(selector)
+        except Exception as e:
+            translated = self._translate_exception(e)
+            if translated is e:
+                raise
+            raise translated from e
+
+    async def fill(self, selector: str, value: str) -> None:
+        """Fill input field, translating any Playwright exceptions."""
+        try:
+            await self._wrapped.fill(selector, value)
+        except Exception as e:
+            translated = self._translate_exception(e)
+            if translated is e:
+                raise
+            raise translated from e
+
+    async def get_attribute(self, selector: str, attribute: str) -> str | None:
+        """Get element attribute, translating any Playwright exceptions."""
+        try:
+            return await self._wrapped.get_attribute(selector, attribute)
+        except Exception as e:
+            translated = self._translate_exception(e)
+            if translated is e:
+                raise
+            raise translated from e
+
+    async def is_visible(self, selector: str) -> bool:
+        """Check if element is visible, translating any Playwright exceptions."""
+        try:
+            return await self._wrapped.is_visible(selector)
+        except Exception as e:
+            translated = self._translate_exception(e)
+            if translated is e:
+                raise
+            raise translated from e
+
+    async def wait_for_selector(self, selector: str, timeout: int = 5000) -> None:
+        """Wait for element to appear, translating any Playwright exceptions."""
+        try:
+            await self._wrapped.wait_for_selector(selector, timeout=timeout)
+        except Exception as e:
+            translated = self._translate_exception(e)
+            if translated is e:
+                raise
+            raise translated from e
+
+    async def get_current_url(self) -> str:
+        """Get current page URL, translating any Playwright exceptions."""
+        try:
+            return await self._wrapped.get_current_url()
+        except Exception as e:
+            translated = self._translate_exception(e)
+            if translated is e:
+                raise
+            raise translated from e
+
+    async def close(self) -> None:
+        """Close the browser session, translating any Playwright exceptions."""
+        try:
+            await self._wrapped.close()
+        except Exception as e:
+            translated = self._translate_exception(e)
+            if translated is e:
+                raise
+            raise translated from e
+
 
 class BrowserNotionAdapter(NotionAdapter):
     """Notion browser adapter (BROWSER method) — Wave 3 implementation.
@@ -95,8 +233,13 @@ class BrowserNotionAdapter(NotionAdapter):
                                  Required for verify_stranger_access.
                                  Tests can inject a factory returning a separate fake session.
         """
-        self._browser = browser_session
-        self._anon_session_factory = anon_session_factory
+        # Wrap sessions with exception translation boundary
+        self._browser = TranslatingBrowserSession(browser_session)
+        self._anon_session_factory = (
+            (lambda: TranslatingBrowserSession(anon_session_factory()))
+            if anon_session_factory
+            else None
+        )
 
     # DIRECT_API operations — not implemented in browser adapter
     async def connection_status(self) -> dict[str, bool | str | int]:
@@ -132,6 +275,10 @@ class BrowserNotionAdapter(NotionAdapter):
         Mutates: true
         Idempotent: false (always creates new page)
         """
+        # Validate page_id is not empty
+        if not page_id or not page_id.strip():
+            raise ValueError("page_id cannot be empty")
+
         # Navigate to page
         page_url = f"https://www.notion.so/{page_id}"
         await self._browser.navigate(page_url)
@@ -148,15 +295,64 @@ class BrowserNotionAdapter(NotionAdapter):
 
         # Extract new page ID from URL
         new_url = await self._browser.get_current_url()
-        new_page_id = new_url.split("/")[-1].split("?")[0]
-        if not new_page_id:
-            raise RuntimeError(f"Failed to read new page ID from URL after duplicating {page_id}")
 
-        # Verify new ID differs from source
-        if new_page_id == page_id:
+        # Parse the ID from the URL
+        # Notion URLs can be:
+        # - https://www.notion.so/32hexid
+        # - https://www.notion.so/Title-32hexid
+        # - https://www.notion.so/32-hex-id-with-dashes
+        # - https://www.notion.so/Title-32-hex-id-with-dashes
+        # Extract the last path segment
+        url_path = new_url.split("?")[0]  # Remove query params
+        last_segment = url_path.rstrip("/").split("/")[-1]
+
+        # If the segment contains a dash and looks like Title-ID, extract the trailing ID
+        if "-" in last_segment:
+            # Split by dash and look for the trailing 32-hex ID
+            parts = last_segment.split("-")
+            # Try to find a 32-character hex string (with or without dashes)
+            # Start from the end and reconstruct the ID
+            potential_id = ""
+            for i in range(len(parts) - 1, -1, -1):
+                part = parts[i]
+                # Check if this part contains only hex characters
+                if all(c in "0123456789abcdefABCDEF" for c in part):
+                    potential_id = part + potential_id
+                    # Check if we have 32 hex characters
+                    if len(potential_id) == 32:
+                        break
+                else:
+                    # If we hit a non-hex part, we've gone past the ID
+                    break
+
+            if len(potential_id) == 32:
+                new_page_id = potential_id
+            else:
+                raise RuntimeError(
+                    f"Failed to parse page ID from URL {new_url}: "
+                    f"expected 32-hex ID, got segment '{last_segment}'"
+                )
+        else:
+            # No dash, expect the whole segment to be a 32-hex ID
+            new_page_id = last_segment
+            if len(new_page_id) != 32 or not all(
+                c in "0123456789abcdefABCDEF" for c in new_page_id
+            ):
+                raise RuntimeError(
+                    f"Failed to parse page ID from URL {new_url}: "
+                    f"expected 32-hex ID, got '{last_segment}'"
+                )
+
+        # Normalize both IDs (strip dashes, lowercase) before comparing
+        new_page_id_normalized = new_page_id.replace("-", "").lower()
+        source_id_normalized = page_id.replace("-", "").lower()
+        if new_page_id_normalized == source_id_normalized:
             raise RuntimeError(
                 f"Duplicate page ID matches source ID ({page_id}). Duplication may have failed."
             )
+
+        # Return the normalized ID
+        new_page_id = new_page_id_normalized
 
         # Read the title from the duplicated page
         title_attr = await self._browser.get_attribute('[data-testid="page-title"]', "textContent")
@@ -541,55 +737,27 @@ class BrowserNotionAdapter(NotionAdapter):
             title_visible=True,
         )
 
-    async def set_view_title_visibility(self, view_id: str, visible: bool) -> NotionView:
+    async def set_view_title_visibility(
+        self, database_id: str, view_id: str, visible: bool
+    ) -> NotionView:
         """Set view title visibility via UI settings.
 
         Method: BROWSER (view settings are UI-only)
         Mutates: true
         Idempotent: true
         """
-        # Get current URL to extract database/page ID
-        current_url = await self._browser.get_current_url()
+        # Validate database_id (32-hex, with or without dashes)
+        # Normalize to undashed lowercase form
+        normalized_db_id = database_id.replace("-", "").lower()
+        if (
+            not normalized_db_id
+            or len(normalized_db_id) != 32
+            or not all(c in "0123456789abcdefABCDEF" for c in normalized_db_id)
+        ):
+            raise ValueError(f"Invalid database_id: {database_id}")
 
-        # Parse and validate the current URL
-        parsed = urlparse(current_url)
-
-        # Require https scheme
-        if parsed.scheme != "https":
-            raise RuntimeError(
-                f"Cannot construct view URL for {view_id}: "
-                f"current page must use https, not {parsed.scheme} ({current_url})"
-            )
-
-        # Require hostname to be exactly notion.so or end with .notion.so
-        hostname = parsed.hostname or ""
-        if hostname != "notion.so" and not hostname.endswith(".notion.so"):
-            raise RuntimeError(
-                f"Cannot construct view URL for {view_id}: "
-                f"current page hostname is not notion.so ({current_url})"
-            )
-
-        # Reject notion.so.evil.com and similar
-        if hostname.endswith(".notion.so") and hostname != "notion.so":
-            # Allow subdomains like www.notion.so, but reject notion.so.evil.com
-            # Check that there's only one more segment before .notion.so
-            parts = hostname.split(".")
-            if len(parts) != 3 or parts[-2:] != ["notion", "so"]:
-                raise RuntimeError(
-                    f"Cannot construct view URL for {view_id}: "
-                    f"invalid notion.so hostname ({current_url})"
-                )
-
-        # Require non-empty path (not just /, but /page_id)
-        path = parsed.path.strip("/")
-        if not path:
-            raise RuntimeError(
-                f"Cannot construct view URL for {view_id}: "
-                f"current notion.so URL has no database/page ID ({current_url})"
-            )
-
-        # Build view URL as scheme://netloc/path?v=view_id
-        view_url = f"{parsed.scheme}://{parsed.netloc}/{path}?v={view_id}"
+        # Build view URL directly from database_id
+        view_url = f"https://www.notion.so/{normalized_db_id}?v={view_id}"
         await self._browser.navigate(view_url)
 
         # Open view settings
@@ -612,15 +780,9 @@ class BrowserNotionAdapter(NotionAdapter):
         )
         view_type = view_type_attr or "unknown"
 
-        # Extract database_id from URL
-        current_url_after = await self._browser.get_current_url()
-        database_id = ""
-        if "/" in current_url_after:
-            database_id = current_url_after.split("/")[-1].split("?")[0]
-
         return NotionView(
             id=view_id,
-            database_id=database_id,
+            database_id=normalized_db_id,
             name=view_name,
             type=view_type,
             title_visible=visible,
@@ -799,6 +961,50 @@ class BrowserNotionAdapter(NotionAdapter):
         Mutates: false
         Idempotent: true
         """
+        # Validate URL is HTTPS and has an allowed Notion host:
+        # notion.so, www.notion.so, notion.site, www.notion.site,
+        # or a single non-empty label under notion.site.
+        parsed = urlparse(public_url)
+
+        # Must be HTTPS
+        if parsed.scheme != "https":
+            raise ValueError(f"URL must use HTTPS: {public_url}")
+
+        # Reject userinfo in URL (https://user:pass@host or https://user@host)
+        if parsed.username or parsed.password:
+            raise ValueError(f"URL must not contain userinfo: {public_url}")
+
+        # Allow notion.so, www.notion.so, notion.site, www.notion.site,
+        # and single-label *.notion.site (e.g. omar.notion.site)
+        # Reject:
+        # - evil.notion.so (subdomain of notion.so)
+        # - a.b.notion.site (deeper nesting)
+        # - notion.so.evil.com, notion.site.evil.com (lookalikes)
+        # - xnotion.site (lookalike)
+        # - https://notion.so@evil.com (userinfo trick)
+        hostname = parsed.hostname
+        if not hostname:
+            raise ValueError(f"URL must have a valid hostname: {public_url}")
+
+        # Exact matches
+        if hostname in {"notion.so", "www.notion.so", "notion.site", "www.notion.site"}:
+            pass  # Allowed
+        # Single-label subdomain of notion.site (e.g., omar.notion.site)
+        elif hostname.endswith(".notion.site"):
+            # Extract the part before .notion.site
+            prefix = hostname[: -len(".notion.site")]
+            # Reject an empty label (https://.notion.site) and deeper nesting.
+            if not prefix or "." in prefix:
+                raise ValueError(
+                    f"URL host must be notion.so, www.notion.so, notion.site, "
+                    f"www.notion.site, or single-label.notion.site, got: {hostname}"
+                )
+        else:
+            raise ValueError(
+                f"URL host must be notion.so, www.notion.so, notion.site, "
+                f"www.notion.site, or single-label.notion.site, got: {hostname}"
+            )
+
         if self._anon_session_factory is None:
             raise RuntimeError(
                 "verify_stranger_access requires an anonymous session factory. "
@@ -806,19 +1012,27 @@ class BrowserNotionAdapter(NotionAdapter):
             )
 
         # Create a separate anonymous (logged-out) session
+        # (translation happens at the boundary via TranslatingBrowserSession wrapper)
         anon_session = self._anon_session_factory()
 
-        # Navigate to public URL in anonymous context
         try:
-            await anon_session.navigate(public_url)
-        except (ConnectionError, TimeoutError, ValueError) as e:
-            # Network, navigation, or value failures
-            raise RuntimeError(f"Failed to navigate to {public_url}: {e}") from e
+            # Navigate to public URL in anonymous context.
+            # Only connection, timeout, and value errors are wrapped. A plain
+            # RuntimeError from navigate propagates unwrapped.
+            try:
+                await anon_session.navigate(public_url)
+            except (ConnectionError, TimeoutError, ValueError) as e:
+                raise RuntimeError(f"Failed to navigate to {public_url}: {e}") from e
 
-        # Check if page content is visible (not login wall)
-        try:
-            await anon_session.wait_for_selector('[data-testid="page-content"]', timeout=3000)
-            return True
-        except TimeoutError:
-            # Timeout means page content didn't appear (likely login wall)
-            return False
+            # Check if page content is visible (not login wall)
+            try:
+                await anon_session.wait_for_selector('[data-testid="page-content"]', timeout=3000)
+                return True
+            except TimeoutError:
+                # Timeout means page content didn't appear (likely login wall)
+                return False
+        finally:
+            # Always close the anonymous session
+            # Suppress close() errors to avoid masking the original exception
+            with contextlib.suppress(Exception):
+                await anon_session.close()

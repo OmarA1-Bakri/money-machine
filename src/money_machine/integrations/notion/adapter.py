@@ -472,7 +472,9 @@ class NotionAdapter(ABC):
         """
 
     @abstractmethod
-    async def set_view_title_visibility(self, view_id: str, visible: bool) -> NotionView:
+    async def set_view_title_visibility(
+        self, database_id: str, view_id: str, visible: bool
+    ) -> NotionView:
         """Set whether view title is visible.
 
         Method: BROWSER (view settings UI-only)
@@ -482,6 +484,7 @@ class NotionAdapter(ABC):
         Reconcilable: true
 
         Args:
+            database_id: Database containing the view
             view_id: Target view
             visible: Show or hide title
 

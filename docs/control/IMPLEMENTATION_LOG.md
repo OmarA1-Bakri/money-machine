@@ -120,6 +120,56 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 - **OUT OF SCOPE** (W4a hard boundaries): CombinedNotionAdapter implementation, receipts persistence, live Playwright integration, SESSION_06 COMPLETE marking.
 
 
+## 2026-09-25 — Session 06 Wave 4b: BrowserNotionAdapter carry-forward fixes (PR #43, open awaiting review)
+
+- **SPEC CHANGE** (decorator removed): `TranslatingBrowserSession` wraps both `self._browser` in `__init__` and every anonymous session from the factory in `verify_stranger_access`. `translate_browser_exceptions` is gone from `browser_adapter.py`; the translation tests call the wrapper.
+- **Carry-forward from the W4a review** (no new scope):
+  - **(i)** `set_view_title_visibility(database_id, view_id, visible)` on `adapter.py`, `fixture_adapter.py`, `api_adapter.py`, `browser_adapter.py`, and `combined_adapter.py`. The view URL is built from the normalized database id. The returned `NotionView.database_id` is that input-derived lowercase undashed id, including when the post-navigate URL is a `Title-<id>` slug whose last segment differs.
+  - **(ii)** `BrowserSession` gains `close()`. `verify_stranger_access` closes the anonymous session in `finally` under `contextlib.suppress(Exception)`, so a close error does not mask the original error.
+  - **(iii)** The wrapper maps a Playwright-style `TimeoutError` to built-in `TimeoutError`, and a Playwright-style `Error` whose message mentions navigation, connection, `net::`, or network to `ConnectionError`. `verify_stranger_access` catches only `(ConnectionError, TimeoutError, ValueError)` around `navigate` and re-raises those as `RuntimeError` with that exception as `__cause__`. A plain `RuntimeError` from `navigate` propagates unwrapped. Tests use fake Playwright classes only (no `playwright` import, `uv.lock` untouched).
+- **SHOULD-FIX**:
+  - **(1)** Fixture `database_id` validation requires exactly 12 or 32 hex characters after stripping a `db_` prefix and dashes and lowercasing. Fixture ids are 12-hex on purpose; real Notion ids are 32-hex. A 20-hex id is rejected. View ownership compares the normalized ids.
+  - **(2)** `duplicate_page` strips dashes and lowercases the id read from the page URL before comparing it with the source and before returning it. An upper-case dashed URL returns the lower-case undashed id.
+  - **(4)** Host allowlist, covered by separate tests: accepts `notion.so`, `www.notion.so`, `notion.site`, `www.notion.site`, and a single-label `*.notion.site` (`omar.notion.site`). Rejects `http`, `evil.notion.so`, `notion.so.evil.com`, userinfo, a non-URL, `a.b.notion.site`, and an empty label (`https://.notion.site/x`). HTTPS only.
+- **Pytest**: 1088 collected, 1087 passed, 1 skipped. W4a baseline: 1043 collected, 1042 passed, 1 skipped. Delta +45 collected.
+- **Cause tests**: `test_translating_session_keeps_original_playwright_error_as_cause` is 1 function and 1 collected case. A fake Playwright `TimeoutError` raised through `TranslatingBrowserSession.navigate` comes out as a built-in `TimeoutError` whose `__cause__` is that same Playwright error object. `test_translating_session_preserves_cause_of_untranslated_exception` is 1 parametrized function with 8 collected cases, one per `TranslatingBrowserSession` method: `navigate`, `click`, `fill`, `get_attribute`, `is_visible`, `wait_for_selector`, `get_current_url`, `close`. Each case raises an untranslated `RuntimeError` that already has a `KeyError` `__cause__` and asserts that cause is still a `KeyError`.
+- **Per-file counts**:
+
+  | File | Functions (base → tip) | Collected (base → tip) | Delta collected |
+  |---|---|---|---|
+  | `tests/unit/integrations/notion/test_browser_adapter.py` | 37 → 75 | 60 → 100 | +40 |
+  | `tests/unit/integrations/notion/test_fixture_adapter.py` | 35 → 40 | 35 → 40 | +5 |
+  | `tests/unit/integrations/notion/test_api_adapter.py` | 21 → 21 | 21 → 21 | 0 |
+  | Remaining files | unchanged | 927 → 927 | 0 |
+  | **Total** | | **1043 → 1088** | **+45** |
+- **Mutation checks** (each applied, pytest run, then reverted):
+
+  | Mutation | Failing test |
+  |---|---|
+  | B1a: drop the wrapper on the anonymous factory | `test_verify_stranger_access_translates_playwright_timeout` |
+  | B1b: drop the wrapper on `self._browser` | `test_publish_page_translates_playwright_timeout` |
+  | Fixture length check widened to `12<=len<=32` | `test_fixture_set_view_title_visibility_rejects_20_hex` |
+  | Fixture length check narrowed to `len<12` | `test_fixture_set_view_title_visibility_rejects_20_hex` |
+  | Remove fixture id validation | `test_fixture_set_view_title_visibility_rejects_20_hex`, `test_fixture_set_view_title_visibility_rejects_invalid_database_id` |
+  | `duplicate_page` returns the raw URL segment | `test_duplicate_page_returns_lowercase_undashed_from_uppercase_dashed_url` |
+  | `duplicate_page` compare skips lowercase | `test_duplicate_page_raises_when_uppercase_source_matches` |
+  | `set_view_title_visibility` returns the last segment of `current_url` | `test_set_view_title_visibility_returns_input_id_not_url_slug` |
+  | Drop the wrapper so a Playwright navigation error is not translated | `test_verify_stranger_access_translates_playwright_navigation_error` |
+  | Widen the navigate catch to `Exception` | `test_verify_stranger_access_propagates_navigate_runtime_error` |
+  | Allowlist as a suffix match | `test_verify_stranger_access_rejects_subdomain`, `test_verify_stranger_access_rejects_deep_nesting_notion_site` |
+  | Remove the single-label `*.notion.site` rule | `test_verify_stranger_access_accepts_single_label_notion_site` |
+  | Let a `close()` error propagate | `test_verify_stranger_access_close_error_doesnt_mask_original` |
+  | Build the view URL from the current page | `test_set_view_title_visibility_uses_given_database_not_current_page` |
+  | Remove `close()` from `finally` | `test_verify_stranger_access_close_called_on_error` |
+  | Remove `TimeoutError` from the navigate catch tuple | `test_verify_stranger_access_wraps_playwright_navigate_timeout` |
+  | Re-raise an untranslated exception with `raise translated from e` on one method | `test_translating_session_preserves_cause_of_untranslated_exception[<method>]` for that method (`navigate`, `click`, `fill`, `get_attribute`, `is_visible`, `wait_for_selector`, `get_current_url`, `close`) |
+  | Change `raise translated from e` to `raise translated from None` | `test_translating_session_keeps_original_playwright_error_as_cause` |
+
+- **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w4b` and this log entry. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
+- **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. Exit 78 held.
+
+
+
 ## 2026-09-11 — Startup repair wave after recovery review
 
 - Repaired migration-head/schema compatibility readiness, encoded database credentials/IPv6, and production environment selection. Compose now carries raw passwords separately; a bounded independent review identified literal-percent and surrounding-whitespace cases, both reproduced and repaired with regression coverage. Development external-URL overrides retain their credentials.
