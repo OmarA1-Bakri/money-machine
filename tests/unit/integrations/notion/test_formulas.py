@@ -68,13 +68,16 @@ def test_dashboard_formulas_use_verified_property_names() -> None:
     assert generated.expressions["client_name"] == 'prop("Name")'
     assert generated.expressions["current_date"] == "now()"
     assert generated.expressions["task_open_and_due_today"] == (
-        'and(equal(prop("Status"), "Open"), equal(prop("Due"), now()))'
+        'and(equal(prop("Status"), "Open"), '
+        'equal(formatDate(prop("Due"), "YYYY-MM-DD"), formatDate(now(), "YYYY-MM-DD")))'
     )
     assert generated.expressions["birthday_status"] == (
-        'and(prop("Birthday"), equal(prop("Date"), now()))'
+        'and(prop("Birthday"), '
+        'equal(formatDate(prop("Date"), "MM-DD"), formatDate(now(), "MM-DD")))'
     )
     assert generated.expressions["money_spent_today"] == (
-        'if(equal(prop("Date"), now()), prop("Amount"), 0)'
+        'if(equal(formatDate(prop("Date"), "YYYY-MM-DD"), formatDate(now(), "YYYY-MM-DD")), '
+        'prop("Amount"), 0)'
     )
     assert (
         generated.expressions["water_glasses_remaining"]
@@ -106,6 +109,13 @@ def test_missing_verified_name_is_rejected() -> None:
     with pytest.raises(UnverifiedPropertyNameError, match="Goal") as raised:
         generate_notification_dashboard_formulas(names)
     assert raised.value.property_name == "Goal"
+
+
+def test_unverified_database_is_rejected() -> None:
+    names = _verified_copy()
+    del names["Events"]
+    with pytest.raises(SchemaBuilderError, match="database 'Events' is not verified"):
+        generate_notification_dashboard_formulas(names)
 
 
 def test_cross_database_property_is_rejected() -> None:

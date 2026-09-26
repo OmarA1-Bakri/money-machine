@@ -12,9 +12,11 @@ Expressions are call-shaped (``prop``, ``if``, ``and``, ``or``, ``not``,
 A cross-row count or a rollup is out of scope, so keys that cannot be computed
 from one row are renamed. ``client_name`` is the Clients title. ``current_date``
 is ``now()`` on Tasks. ``task_open_and_due_today`` is this Tasks row, not a
-count of tasks. ``birthday_status`` is this Events row. ``money_spent_today``
-is this Finance row's amount when its date is today, otherwise 0, not a sum.
-``water_glasses_remaining`` is Goal minus Glasses on Habits.
+count of tasks, and it compares the Due calendar day to today.
+``birthday_status`` compares month and day so the Events row recurs yearly.
+``money_spent_today`` is this Finance row's amount when its calendar date is
+today, otherwise 0, not a sum. A date property is never compared to ``now()``
+directly. ``water_glasses_remaining`` is Goal minus Glasses on Habits.
 
 Surrounding whitespace is rejected, so it does not count toward the 128
 character limit. Characters inside the expression, including spaces between
@@ -69,19 +71,22 @@ _DASHBOARD: tuple[tuple[str, str, str, str], ...] = (
         "task_open_and_due_today",
         "Tasks",
         "checkbox",
-        'and(equal(prop("Status"), "Open"), equal(prop("Due"), now()))',
+        'and(equal(prop("Status"), "Open"), '
+        'equal(formatDate(prop("Due"), "YYYY-MM-DD"), formatDate(now(), "YYYY-MM-DD")))',
     ),
     (
         "birthday_status",
         "Events",
         "checkbox",
-        'and(prop("Birthday"), equal(prop("Date"), now()))',
+        'and(prop("Birthday"), '
+        'equal(formatDate(prop("Date"), "MM-DD"), formatDate(now(), "MM-DD")))',
     ),
     (
         "money_spent_today",
         "Finance",
         "number",
-        'if(equal(prop("Date"), now()), prop("Amount"), 0)',
+        'if(equal(formatDate(prop("Date"), "YYYY-MM-DD"), formatDate(now(), "YYYY-MM-DD")), '
+        'prop("Amount"), 0)',
     ),
     (
         "water_glasses_remaining",
