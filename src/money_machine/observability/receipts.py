@@ -19,8 +19,9 @@ holds those locks weakly. Each log keeps a strong reference for its lifetime,
 and a discarded path leaves the registry. The stub does not coordinate writers
 in other processes. The path must be a ``pathlib.Path`` whose parent directory
 already exists. Nested mappings, lists, and tuples are frozen before store.
-The receipt field counts as level 0. 33 nested containers are accepted; 34 are
-rejected. Mapping keys must be strings at every level.
+More than 32 levels below the field mapping is rejected. That is 33 nested
+containers accepted, counting the field mapping as level 0, and 34 rejected.
+Mapping keys must be strings at every level. Recorded lines are pure ASCII.
 """
 
 from __future__ import annotations
@@ -114,7 +115,7 @@ def _freeze_sequence(
     seen: set[int],
 ) -> tuple[object, ...]:
     if depth > _MAX_RECEIPT_DEPTH:
-        raise ValueError("receipt state nesting is too deep")
+        raise ValueError("more than 32 levels below the field mapping is rejected")
     marker = id(value)
     _reject_reentry(marker, seen)
     try:
@@ -130,7 +131,7 @@ def _freeze_mapping[MappingKey](
     seen: set[int],
 ) -> Mapping[str, object]:
     if depth > _MAX_RECEIPT_DEPTH:
-        raise ValueError("receipt state nesting is too deep")
+        raise ValueError("more than 32 levels below the field mapping is rejected")
     marker = id(value)
     _reject_reentry(marker, seen)
     try:
@@ -405,6 +406,11 @@ class NotionOperationReceiptLog:
     @staticmethod
     def _append(path: Path, receipt: NotionOperationReceipt) -> None:
         _repair_tail(path)
-        line = json.dumps(_json_payload(receipt), sort_keys=True, allow_nan=False)
+        line = json.dumps(
+            _json_payload(receipt),
+            sort_keys=True,
+            allow_nan=False,
+            ensure_ascii=True,
+        )
         with path.open("a", encoding="utf-8") as handle:
             handle.write(line + "\n")

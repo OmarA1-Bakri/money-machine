@@ -375,6 +375,25 @@ def test_incomplete_utf8_tail_is_skipped(tmp_path: Path) -> None:
     assert stored.target == "page_2"
 
 
+def test_recorded_lines_are_ascii(tmp_path: Path) -> None:
+    """record() writes pure ASCII even when the receipt contains non-ASCII text."""
+    path = tmp_path / "receipts.jsonl"
+    receipt = _receipt(
+        target="café",
+        evidence="💡",
+        post_state={"title": "café", "icon": "💡"},
+    )
+    NotionOperationReceiptLog(path).record(receipt)
+
+    raw = path.read_bytes()
+    assert raw.isascii()
+    stored = NotionOperationReceiptLog(path).get(receipt.idempotency_key)
+    assert stored is not None
+    assert stored.target == "café"
+    assert stored.evidence == "💡"
+    assert stored.post_state == {"title": "café", "icon": "💡"}
+
+
 def test_record_after_complete_line_without_newline_round_trips(tmp_path: Path) -> None:
     """Appending after a complete line with no newline keeps both receipts."""
     path = tmp_path / "receipts.jsonl"
@@ -542,7 +561,11 @@ def _nested_lists(count: int) -> dict[str, object]:
 
 
 def test_nesting_accepts_33_containers_and_rejects_34() -> None:
-    """33 nested containers are accepted; 34 are rejected. The field is level 0."""
+    """More than 32 levels below the field mapping is rejected.
+
+    33 nested containers are accepted, counting the field mapping as level 0;
+    34 are rejected.
+    """
     accepted = _receipt(post_state=_nested_mappings(33))
     current: object = accepted.post_state
     for _ in range(32):
@@ -551,7 +574,7 @@ def test_nesting_accepts_33_containers_and_rejects_34() -> None:
     assert isinstance(current, MappingProxyType)
     assert current["leaf"] == 1
 
-    with pytest.raises(ValueError, match="too deep") as caught:
+    with pytest.raises(ValueError, match="more than 32 levels below the field mapping") as caught:
         _receipt(idempotency_key="create_page:job_34", post_state=_nested_mappings(34))
     assert type(caught.value) is ValueError
 
@@ -563,7 +586,9 @@ def test_nesting_accepts_33_containers_and_rejects_34() -> None:
         listed_current = listed_current[0]
     assert listed_current == 1
 
-    with pytest.raises(ValueError, match="too deep") as listed_caught:
+    with pytest.raises(
+        ValueError, match="more than 32 levels below the field mapping"
+    ) as listed_caught:
         _receipt(idempotency_key="create_page:job_lists_34", post_state=_nested_lists(34))
     assert type(listed_caught.value) is ValueError
 
@@ -573,7 +598,7 @@ def test_deep_list_nest_raises_value_error() -> None:
     node: object = 1
     for _ in range(200):
         node = [node]
-    with pytest.raises(ValueError, match="too deep") as caught:
+    with pytest.raises(ValueError, match="more than 32 levels below the field mapping") as caught:
         _receipt(post_state={"items": node})
     assert type(caught.value) is ValueError
 
@@ -600,7 +625,7 @@ def test_cycles_and_deep_nesting_raise_value_error() -> None:
     node: object = {"leaf": 1}
     for _ in range(40):
         node = {"child": node}
-    with pytest.raises(ValueError, match="too deep") as deep:
+    with pytest.raises(ValueError, match="more than 32 levels below the field mapping") as deep:
         _receipt(post_state=node)
     assert type(deep.value) is ValueError
 
