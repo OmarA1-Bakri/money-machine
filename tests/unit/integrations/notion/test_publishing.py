@@ -317,6 +317,8 @@ def test_page_url_host_must_be_allowed() -> None:
         f"https://notion.so.evil.com/{_TODAY}",
         f"https://evilnotion.so/{_TODAY}",
         f"https://a.b.notion.site/{_TODAY}",
+        f"https://app.notion.so/{_TODAY}",
+        f"https://www.notion.so./{_TODAY}",
     ):
         with pytest.raises(SchemaBuilderError, match="link"):
             _publish(links=(value,))
@@ -359,6 +361,17 @@ def test_page_url_rejects_a_non_hex_slug() -> None:
 def test_isolation_catches_a_titled_slug() -> None:
     with pytest.raises(SchemaBuilderError, match=_OTHER):
         _publish(links=(f"https://www.notion.so/Title-{_OTHER}",))
+
+
+def test_page_url_accepts_a_multi_word_slug() -> None:
+    page = _publish(
+        page_id=f"https://www.notion.so/My-Page-Title-{_PAGE}",
+        links=(f"https://www.notion.so/My-Notes-Title-{_NOTES}",),
+        other_catalogue_pages=(f"https://www.notion.so/My-Other-Title-{_OTHER}",),
+    )
+    assert page.page_id == _PAGE
+    assert page.links == (_NOTES,)
+    assert page.other_catalogue_pages == (_OTHER,)
 
 
 def test_isolation_catches_a_nested_page_path() -> None:
@@ -421,6 +434,11 @@ def test_secret_link_rejects_u009f() -> None:
 def test_secret_link_rejects_a_zero_width_space() -> None:
     with pytest.raises(SchemaBuilderError, match="control character"):
         _publish(secret_link="https://fix\u200bture.notion.site/Home")
+
+
+def test_secret_link_rejects_a_trailing_zero_width_space() -> None:
+    with pytest.raises(SchemaBuilderError, match="control character"):
+        _publish(secret_link="https://fixture.notion.site/Home\u200b")
 
 
 def test_secret_link_rejects_a_triple_slash_path() -> None:
