@@ -20,7 +20,6 @@ relations. This module does not call Notion, the network, or a browser.
 from __future__ import annotations
 
 import re
-import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -147,21 +146,12 @@ def _is_iso_date(value: str) -> bool:
     return _is_calendar_date(value)
 
 
-def _decimal_digits(value: str) -> str:
-    pieces: list[str] = []
-    for char in value:
-        digit = unicodedata.digit(char, -1)
-        pieces.append(str(digit) if digit >= 0 else char)
-    return "".join(pieces)
-
-
 def _is_calendar_date(value: str) -> bool:
-    normalized = _decimal_digits(value)
     try:
-        parsed = date.fromisoformat(normalized)
+        parsed = date.fromisoformat(value)
     except ValueError:
         return False
-    return parsed.isoformat() == normalized
+    return parsed.isoformat() == value
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,12 +183,24 @@ class DashboardRelation:
 
 @dataclass(frozen=True, slots=True)
 class DashboardRollup:
-    """A rollup over one dashboard relation."""
+    """A rollup over one dashboard relation.
+
+    ``relation_name`` is the catalogue data type. ``property_name`` is the
+    source. ``function`` must be a known rollup function.
+    """
 
     name: str
     relation_name: str
     property_name: str
     function: str
+
+    def __post_init__(self) -> None:
+        validated_name("rollup name", cast(object, self.name))
+        validated_name("rollup source", cast(object, self.property_name))
+        _require_catalogue_data_type(cast(object, self.relation_name))
+        function = cast(object, self.function)
+        if not isinstance(function, str) or function not in _ROLLUP_FUNCTION_TYPES:
+            raise SchemaBuilderError(f"rollup function {function!r} is not allowed")
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,14 +215,18 @@ class NotificationDashboard:
         if type(self.row_count) is not int or self.row_count != 1:
             raise SchemaBuilderError("notification dashboard row count must be 1")
         relations = cast(object, self.relations)
-        if isinstance(relations, str) or not isinstance(relations, tuple):
+        if not isinstance(relations, tuple):
             raise SchemaBuilderError("notification dashboard relations must be a tuple")
         linked: list[DashboardRelation] = []
+        seen_names: set[str] = set()
         for relation in relations:
             if not isinstance(relation, DashboardRelation):
                 raise SchemaBuilderError(
                     "notification dashboard relation must be a DashboardRelation"
                 )
+            if relation.name in seen_names:
+                raise SchemaBuilderError(f"relation name {relation.name!r} is duplicated")
+            seen_names.add(relation.name)
             linked.append(relation)
         rollups = cast(object, self.rollups)
         if not isinstance(rollups, tuple):

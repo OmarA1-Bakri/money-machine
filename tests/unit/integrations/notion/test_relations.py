@@ -706,6 +706,60 @@ def test_hand_built_notification_dashboard_rejects_a_rollup_with_no_relation() -
         NotificationDashboard(row_count=1, relations=(), rollups=(rollup,))
 
 
+def test_notification_dashboard_rejects_duplicate_relation_names() -> None:
+    first = DashboardRelation(name="Tasks", data_type="Tasks")
+    second = DashboardRelation(name="Tasks", data_type="Events")
+    with pytest.raises(SchemaBuilderError, match="duplicated"):
+        NotificationDashboard(row_count=1, relations=(first, second), rollups=())
+
+
+def test_hand_built_rollup_name_must_be_present() -> None:
+    with pytest.raises(SchemaBuilderError, match="rollup name"):
+        DashboardRollup(
+            name=" ",
+            relation_name="Tasks",
+            property_name="task_open_and_due_today",
+            function="checked",
+        )
+
+
+def test_hand_built_rollup_source_must_be_present() -> None:
+    with pytest.raises(SchemaBuilderError, match="rollup source"):
+        DashboardRollup(
+            name="open_tasks_due_today",
+            relation_name="Tasks",
+            property_name=" ",
+            function="checked",
+        )
+
+
+def test_hand_built_rollup_function_must_be_known() -> None:
+    with pytest.raises(SchemaBuilderError, match="rollup function"):
+        DashboardRollup(
+            name="open_tasks_due_today",
+            relation_name="Tasks",
+            property_name="task_open_and_due_today",
+            function="average",
+        )
+    with pytest.raises(SchemaBuilderError, match="rollup function"):
+        DashboardRollup(
+            name="open_tasks_due_today",
+            relation_name="Tasks",
+            property_name="task_open_and_due_today",
+            function=cast(str, []),
+        )
+
+
+def test_hand_built_rollup_data_type_must_be_canonical() -> None:
+    with pytest.raises(SchemaBuilderError, match="not canonical"):
+        DashboardRollup(
+            name="open_tasks_due_today",
+            relation_name="Nope",
+            property_name="task_open_and_due_today",
+            function="checked",
+        )
+
+
 def test_rollup_names_the_canonical_database() -> None:
     canonical = build_canonical_databases(["Tasks"])
     dashboard = build_notification_dashboard(canonical)

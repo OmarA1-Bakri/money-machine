@@ -604,6 +604,68 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 - **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w7` and this log entry. `state_revision` 42 to 43 vs base. `updated_at` was refreshed. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
 - **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. `pyproject.toml` untouched. `src/money_machine/integrations/notion/router.py` untouched. Exit 78 held.
 
+## 2026-09-26 — Session 06 Wave 8: publishing and isolation helpers
+
+- **Heading**: `### 7. Implement publishing and isolation helpers` in `prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md` and `hands-off-money-machine-full-implementation-workbook.md`.
+- **Narrow reading**: A catalogue page is top level, published to the web, duplicate as template is on, and search indexing is off. The secret link is captured. Public access is verified. No link reaches a page that belongs to another catalogue. No fixture-parity expansion, live connect, adapter calls, or Session 07 product build. No Notion, network, or browser calls.
+- **W7 cleanups folded in**: Deleted the unused `_decimal_digits` helper and the `unicodedata` import. `_is_calendar_date` parses the original text with `date.fromisoformat`, so a non-ASCII digit is still rejected. Deleted `isinstance(relations, str) or` from the notification-dashboard relations check. A string is not a tuple, so that clause changed no result; it is the equivalent row below. `NotificationDashboard` rejects a duplicated relation name with `SchemaBuilderError`. `DashboardRollup.__post_init__` rejects a blank name, a blank source, an unknown or non-string function, and a data type outside the catalogue.
+- **Helpers**: `build_published_page` returns a `PublishedPage`. The parent must be `workspace`. Published to web, duplicate as template, and public access must be `True`. Search indexing must be `False`. The page id, each link, and each other-catalogue page id are validated names. The secret link must be a trimmed https URL with no userinfo, an allowed host, and a non-empty path. Allowed hosts are `notion.so`, `www.notion.so`, `notion.site`, and a single label under `notion.site` (`fixture.notion.site`, `www.notion.site`). A nested label and an empty label are rejected. Link and other-catalogue sequences are copied. A link whose id is in the other-catalogue pages is rejected, including when it is not the first link. Invalid input raises `SchemaBuilderError`.
+- **Pytest collected**: 1592 collected, 1591 passed, 1 skipped. W7 baseline: 1558 collected, 1557 passed, 1 skipped. Delta +34 collected and +34 passed.
+- **Per-file counts**:
+
+| File | Functions (base → tip) | Collected (base → tip) | Passed (base → tip) | Failed (base → tip) | Skipped (base → tip) |
+|---|---|---|---|---|---|
+| `tests/unit/integrations/notion/test_relations.py` | 85 → 90 | 90 → 95 | 90 → 95 | 0 → 0 | 0 → 0 |
+| `tests/unit/integrations/notion/test_publishing.py` | 0 → 25 | 0 → 29 | 0 → 29 | 0 → 0 | 0 → 0 |
+| Remaining files | unchanged | 1468 → 1468 | 1467 → 1467 | 0 → 0 | 1 → 1 |
+| **Total** | | **1558 → 1592** | **1557 → 1591** | **0 → 0** | **1 → 1** |
+
+- **Mutation checks** (38 rows; each applied, pytest run, then reverted; 37 killed and 1 equivalent):
+
+| Mutation | Site | Failing test |
+|---|---|---|
+| W7 string clause `isinstance(relations, str) or` on the relations tuple check | `relations.py:218` | equivalent: a string is not a tuple, so the remaining check already rejects it |
+| Accept a duplicated dashboard relation name | `relations.py:227` | `test_notification_dashboard_rejects_duplicate_relation_names` |
+| Skip hand-built rollup name validation | `relations.py:198` | `test_hand_built_rollup_name_must_be_present` |
+| Skip hand-built rollup source validation | `relations.py:199` | `test_hand_built_rollup_source_must_be_present` |
+| Look up a rollup function before checking it is a string | `relations.py:202` | `test_hand_built_rollup_function_must_be_known` |
+| Accept an unknown rollup function on a hand-built rollup | `relations.py:202` | `test_hand_built_rollup_function_must_be_known` |
+| Skip hand-built rollup data-type validation | `relations.py:200` | `test_hand_built_rollup_data_type_must_be_canonical` |
+| Skip page id validation | `publishing.py:43` | `test_page_id_must_be_present` |
+| Accept a parent that is not the workspace | `publishing.py:87` | `test_page_must_be_top_level` |
+| Accept a published-to-web flag other than True | `publishing.py:92` | `test_page_must_be_published_to_web` |
+| Accept a duplicate-as-template flag other than True | `publishing.py:97` | `test_duplicate_as_template_must_be_on` |
+| Accept search indexing other than False | `publishing.py:102` | `test_search_indexing_must_be_off` |
+| Accept public access other than True | `publishing.py:107` | `test_public_access_must_be_verified` |
+| Accept a secret link that is not a string | `publishing.py:112` | `test_secret_link_must_be_a_string` |
+| Accept an empty secret link | `publishing.py:114` | `test_secret_link_must_be_present` |
+| Accept a padded secret link | `publishing.py:114` | `test_secret_link_must_be_present` |
+| Accept a secret link whose scheme is not https | `publishing.py:117` | `test_secret_link_must_use_https` |
+| Accept secret-link userinfo when only one of username or password is set | `publishing.py:119` | `test_secret_link_must_not_contain_userinfo` |
+| Accept a secret-link host outside the allowlist | `publishing.py:122` | `test_secret_link_host_must_be_allowed` |
+| Drop notion.so from the exact secret-link hosts | `publishing.py:24` | `test_secret_link_host_is_allowed[notion.so]` |
+| Drop www.notion.so from the exact secret-link hosts | `publishing.py:24` | `test_secret_link_host_is_allowed[www.notion.so]` |
+| Drop notion.site from the exact secret-link hosts | `publishing.py:24` | `test_secret_link_host_is_allowed[notion.site]` |
+| Reject every single-label notion.site host | `publishing.py:132` | `test_secret_link_host_is_allowed[fixture.notion.site]` |
+| Reject the www label on notion.site | `publishing.py:135` | `test_secret_link_host_is_allowed[www.notion.site]` |
+| Allow a dotted notion.site prefix | `publishing.py:135` | `test_secret_link_rejects_a_nested_notion_site_label` |
+| Allow an empty notion.site prefix | `publishing.py:135` | `test_secret_link_rejects_an_empty_notion_site_label` |
+| Accept a secret link with an empty path | `publishing.py:124` | `test_secret_link_must_name_a_page` |
+| Accept a secret link whose path is only / | `publishing.py:124` | `test_secret_link_must_name_a_page` |
+| Accept links that are not a sequence | `publishing.py:139` | `test_links_must_be_a_sequence` |
+| Accept a string of links | `publishing.py:139` | `test_links_reject_a_string` |
+| Skip link page-id validation | `publishing.py:50` | `test_link_must_be_a_page_id` |
+| Skip other-catalogue page-id validation | `publishing.py:51` | `test_other_catalogue_page_must_be_a_page_id` |
+| Accept other catalogue pages that are not a sequence | `publishing.py:51` | `test_other_catalogue_pages_must_be_a_sequence` |
+| Store the caller link sequence | `publishing.py:57` | `test_caller_link_list_is_copied` |
+| Store the caller other-catalogue sequence | `publishing.py:58` | `test_caller_other_catalogue_list_is_copied` |
+| Reverse the copied links | `publishing.py:57` | `test_link_order_is_preserved` |
+| Accept a link that reaches another catalogue | `publishing.py:147` | `test_a_later_link_to_another_catalogue_is_rejected` |
+| Check only the first link against other catalogue pages | `publishing.py:146` | `test_a_later_link_to_another_catalogue_is_rejected` |
+
+- **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w8` and this log entry. `state_revision` 43 to 44 vs base. `updated_at` is unchanged. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
+- **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. `pyproject.toml` untouched. `src/money_machine/integrations/notion/router.py` untouched. Exit 78 held.
+
 ## 2026-09-11 — Startup repair wave after recovery review
 
 - Repaired migration-head/schema compatibility readiness, encoded database credentials/IPv6, and production environment selection. Compose now carries raw passwords separately; a bounded independent review identified literal-percent and surrounding-whitespace cases, both reproduced and repaired with regression coverage. Development external-URL overrides retain their credentials.
