@@ -233,9 +233,12 @@ def test_open_rejects_a_bad_session_id_when_close_fails() -> None:
     manager, driver = _manager()
     driver.open_result = "../escape"
     driver.close_error = ConnectionError("down")
-    with pytest.raises(BrowserSessionError, match="session id"):
+    with pytest.raises(BrowserSessionError, match="session id") as caught:
         _open(manager)
+    assert isinstance(caught.value.__cause__, ConnectionError)
     assert driver.closes == ["../escape"]
+    with pytest.raises(BrowserSessionError, match="profile is locked"):
+        _open(manager)
     assert driver.opens == ["shop-a"]
 
 

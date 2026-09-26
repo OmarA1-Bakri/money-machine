@@ -10,7 +10,9 @@ does not retry a connection failure. A mutation is not clicked twice. An
 uncertain click is reconciled by observing, and any observe error is
 Unknown. A captcha, verification, or unknown page fails closed. An
 idempotency key is bound to the profile, operation, workspace, target, and
-job. Each mutation records one receipt. This module does not
+job. A rejected session id is closed. If that close fails, the profile
+is locked and the session-id error is raised again with the close error
+as its cause. Each mutation records one receipt. This module does not
 launch a browser engine, open a network connection, or write a cookie file.
 A driver is injected.
 """
@@ -18,7 +20,6 @@ A driver is injected.
 from __future__ import annotations
 
 import unicodedata
-from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -189,7 +190,12 @@ class BrowserSessionManager:
         return tuple(self._receipts)
 
     def open_session(self, profile_name: str, status: ProfileStatus) -> str:
-        """Open an authenticated profile, or reuse its healthy session."""
+        """Open an authenticated profile, or reuse its healthy session.
+
+        A rejected session id is closed. If that close fails, the profile is
+        locked and the original session-id error is raised with the close
+        error as its cause. A successful close leaves the profile unlocked.
+        """
         profile_path(profile_name)
         if status is not ProfileStatus.AUTHENTICATED:
             raise BrowserSessionError("profile is not authenticated")
@@ -203,9 +209,18 @@ class BrowserSessionManager:
         opened = self._driver.open(profile_name)
         try:
             session_id = _require_session_id(opened)
-        except BrowserSessionError:
-            with suppress(Exception):
+        except BrowserSessionError as session_error:
+            try:
                 self._driver.close(opened)
+            except Exception as close_error:
+                session_id = opened if isinstance(opened, str) and opened != "" else "unusable"
+                self._open[profile_name] = _OpenSession(
+                    profile_name=profile_name,
+                    session_id=session_id,
+                    healthy=False,
+                    locked=True,
+                )
+                raise session_error from close_error
             raise
         self._open[profile_name] = _OpenSession(
             profile_name=profile_name,
