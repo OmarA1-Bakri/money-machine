@@ -25,8 +25,9 @@ EXIT_MISSING = 78
 
 _TOKEN_RE = re.compile(r"(?:secret_|ntn_)[A-Za-z0-9]{43,}")
 # Workspace names stay inside this set. Zero-width marks and base64 punctuation
-# fall outside it. Hex, reversed, rot13, base64, and sha copies are a non-goal:
-# only an injected probe can produce them, and this check does not scan them.
+# fall outside it. Hex, reversed, rot13, base64, and sha copies are a non-goal,
+# as are 11-character fragments and non-contiguous fragments: only an injected
+# probe can produce the encoded copies, and this check does not scan them.
 _WORKSPACE_RE = re.compile(r"[A-Za-z0-9 _.-]{1,100}")
 _BODY_WINDOW = 12
 _SEPARATORS = "-._ "
@@ -145,16 +146,31 @@ def _bad_steps(steps: object) -> bool:
     return steps != SANDBOX_STEPS
 
 
+def _keyboard_interrupt_in(exc: BaseException) -> bool:
+    if isinstance(exc, KeyboardInterrupt):
+        return True
+    nested = getattr(exc, "exceptions", None)
+    if not isinstance(nested, tuple):
+        return False
+    return any(isinstance(item, BaseException) and _keyboard_interrupt_in(item) for item in nested)
+
+
 def _reraise_without_token(exc: BaseException) -> NoReturn:
-    """Re-raise a token-free interrupt. Context and cause do not keep the original."""
+    """Re-raise a token-free interrupt. Context and cause do not keep the original.
+
+    A no-arg constructor that embeds the token is a boundary. ``type(exc)()``
+    would rebuild that message, and this helper does not scan it.
+    """
     if isinstance(exc, SystemExit):
-        code = exc.code if isinstance(exc.code, int) else 1
-        blank: BaseException = SystemExit(code)
+        status = exc.code
+        if type(status) is not int or status == 0:
+            status = 1
+        blank: BaseException = SystemExit(status)
     else:
         try:
             blank = type(exc)()
-        except TypeError:
-            if isinstance(exc, KeyboardInterrupt):
+        except Exception:
+            if _keyboard_interrupt_in(exc):
                 blank = KeyboardInterrupt()
             elif isinstance(exc, GeneratorExit):
                 blank = GeneratorExit()

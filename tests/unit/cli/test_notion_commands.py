@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import socket
+import subprocess
+import sys
 import traceback
 from pathlib import Path
 
@@ -14,6 +17,9 @@ from money_machine.cli.main import main
 from money_machine.cli.notion import SANDBOX_STEPS, FakeNotionProbe
 
 _SECRET = "secret_" + ("a" * 43)
+# The sample body is 42 characters, short of the shape check, so one letter is added.
+_MIXED = "ntn_Q7xK2mP9aZ4bR8cW1dY6eT3fU5gV0hNsJ2kL4oI8uEM"
+_MIXED_BODY = _MIXED[4:]
 _NTN = "ntn_" + ("b" * 43)
 _SHORT = "secret_" + ("a" * 42)
 _URL = "https://evil.example/?token=" + _SECRET
@@ -283,6 +289,10 @@ def _base_error(kind: str) -> tuple[BaseException, type[BaseException], int | No
         return SystemExit(_SECRET), SystemExit, 1
     if kind == "exit-2":
         return SystemExit(2), SystemExit, 2
+    if kind == "exit-0":
+        return SystemExit(0), SystemExit, 1
+    if kind == "exit-false":
+        return SystemExit(False), SystemExit, 1
     if kind == "subclass":
         return _TokenInterrupt(_SECRET), _TokenInterrupt, None
     if kind == "generator":
@@ -322,6 +332,8 @@ def _exception_text(error: BaseException) -> str:
         "keyboard",
         "system",
         "exit-2",
+        "exit-0",
+        "exit-false",
         "subclass",
         "generator",
         "needs-arg",
@@ -601,3 +613,101 @@ def test_workspace_str_subclass_is_rejected(
     assert _SECRET not in out
     assert _SECRET not in err
     assert _SECRET not in logs
+
+
+_MIXED_WORKSPACES = (
+    _MIXED_BODY,
+    _MIXED_BODY[:12],
+    _MIXED_BODY[-12:],
+    _MIXED_BODY[16:28],
+    "shop secret_x",
+    "x NTN_y",
+)
+
+
+@pytest.mark.parametrize(
+    "workspace",
+    _MIXED_WORKSPACES,
+    ids=["body", "head", "tail", "middle", "shop-secret", "ntn-mid"],
+)
+def test_mixed_token_workspace_is_rejected(
+    notion_env: None,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    workspace: str,
+) -> None:
+    del notion_env
+    probe = FakeNotionProbe(workspace=workspace)
+    code, out, err, logs = _invoke(
+        monkeypatch, capsys, caplog, "connect", token=_MIXED, probe=probe
+    )
+    assert code == 69
+    assert out == ""
+    assert err == "notion api error\n"
+    assert _MIXED not in out
+    assert _MIXED not in err
+    assert _MIXED not in logs
+    assert workspace not in out
+    assert workspace not in err
+
+
+_INTERRUPT_SCRIPT = """
+import os
+import sys
+
+from money_machine.cli.main import main
+from money_machine.cli.notion import FakeNotionProbe
+
+token = os.environ["NOTION_API_KEY"]
+kind = os.environ["MM_KIND"]
+command = os.environ["MM_COMMAND"]
+
+
+class _ValueKeyboard(KeyboardInterrupt):
+    def __init__(self, secret: str | None = None) -> None:
+        if secret is None:
+            raise ValueError("constructor")
+        super().__init__(secret)
+
+
+if kind == "value-keyboard":
+    error = _ValueKeyboard(token)
+elif kind == "group-keyboard":
+    error = BaseExceptionGroup("group", (KeyboardInterrupt(token),))
+else:
+    raise AssertionError(kind)
+
+probe = FakeNotionProbe(error=error)
+sys.exit(main(["integrations", "notion", command], notion_probe=probe))
+"""
+
+
+def _shell_status(code: int) -> int:
+    """Map a signal death to the status a shell reports. Signal 2 is 130."""
+    if code < 0:
+        return 128 - code
+    return code
+
+
+@pytest.mark.parametrize("command", ["connect", "test"])
+@pytest.mark.parametrize("kind", ["value-keyboard", "group-keyboard"])
+def test_keyboard_interrupt_still_exits_130(notion_env: None, command: str, kind: str) -> None:
+    del notion_env
+    result = subprocess.run(
+        [sys.executable, "-c", _INTERRUPT_SCRIPT],
+        capture_output=True,
+        text=True,
+        env={
+            "APP_ENV": "test",
+            "NOTION_API_KEY": _SECRET,
+            "MM_KIND": kind,
+            "MM_COMMAND": command,
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PATH": os.environ.get("PATH", ""),
+        },
+        check=False,
+    )
+    assert _shell_status(result.returncode) == 130
+    assert _SECRET not in result.stdout
+    assert _SECRET not in result.stderr
