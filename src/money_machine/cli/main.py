@@ -4,9 +4,9 @@ Separate from ``money-machine-control``, which is the fail-closed repository-con
 utility and must not be used for routine operation.
 
 Commands are read-only or database-local, except ``integrations notion``
-connect, status, and test. Those read the Notion token only to check its shape,
-pass it to an injected fake probe, and never print or log the token. No command
-performs a live provider call or publishes anything.
+connect, status, and test. Connect and test pass the token to an injected fake
+probe. Status only checks the token shape. No command prints or logs the token,
+performs a live provider call, or publishes anything.
 """
 
 from __future__ import annotations
@@ -623,6 +623,8 @@ def main(argv: Sequence[str] | None = None, *, notion_probe: object | None = Non
     except RuntimeSettingsError as error:
         return _fail(f"configuration error: {error}")
     except Exception as error:  # the CLI reports failures, it does not raise tracebacks
+        if getattr(arguments, "notion_command", None) is not None:
+            return _fail(f"command failed: {type(error).__name__}")
         return _fail(f"command failed: {type(error).__name__}: {error}")
 
 

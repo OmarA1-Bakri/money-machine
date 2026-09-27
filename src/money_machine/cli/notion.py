@@ -24,6 +24,11 @@ EXIT_API = 69
 EXIT_MISSING = 78
 
 _TOKEN_RE = re.compile(r"(?:secret_|ntn_)[A-Za-z0-9]{43,}")
+# Workspace names stay inside this set. Zero-width marks and base64 punctuation
+# fall outside it. Hex and reversed copies are not scanned: an injected probe
+# is the test boundary, and the checked copies are the token, its uppercase
+# form, and the secret body.
+_WORKSPACE_RE = re.compile(r"[A-Za-z0-9 _.-]{1,100}")
 SANDBOX_STEPS = ("page", "database", "publish", "unpublish", "archive")
 
 
@@ -107,12 +112,47 @@ def _require_token() -> str | int:
     return token
 
 
+def _secret_markers(token: str) -> tuple[str, ...]:
+    body = token
+    folded = token.casefold()
+    for prefix in ("secret_", "ntn_"):
+        if folded.startswith(prefix):
+            body = token[len(prefix) :]
+            break
+    markers: list[str] = []
+    for marker in (token, token.upper(), body, body.upper(), "secret_" + body, "ntn_" + body):
+        if marker and marker not in markers:
+            markers.append(marker)
+    return tuple(markers)
+
+
+def _contains_secret(value: str, token: str) -> bool:
+    folded = value.casefold()
+    return any(marker.casefold() in folded for marker in _secret_markers(token))
+
+
 def _leaks(value: object, token: str) -> bool:
     if isinstance(value, str):
-        return value == "" or token in value
+        return value == "" or _contains_secret(value, token)
     if isinstance(value, tuple):
         return any(_leaks(item, token) for item in value)
     return True
+
+
+def _bad_workspace(workspace: object, token: str) -> bool:
+    if type(workspace) is not str:
+        return True
+    if re.fullmatch(_WORKSPACE_RE, workspace) is None:
+        return True
+    return _contains_secret(workspace, token)
+
+
+def _bad_steps(steps: object, token: str) -> bool:
+    if type(steps) is not tuple:
+        return True
+    if any(type(item) is not str for item in steps):
+        return True
+    return steps != SANDBOX_STEPS or _leaks(steps, token)
 
 
 def command_notion_connect(arguments: object) -> int:
@@ -124,7 +164,9 @@ def command_notion_connect(arguments: object) -> int:
         workspace = _probe(arguments).connect(prepared)
     except Exception:
         return _fail("notion api error", EXIT_API)
-    if _leaks(workspace, prepared):
+    except BaseException as exc:
+        raise type(exc)() from None
+    if _bad_workspace(workspace, prepared):
         return _fail("notion api error", EXIT_API)
     LOGGER.info("notion connect ok")
     _emit(
@@ -165,8 +207,10 @@ def command_notion_test(arguments: object) -> int:
         steps = _probe(arguments).run_sandbox(prepared)
     except Exception:
         return _fail("notion api error", EXIT_API)
-    if steps != SANDBOX_STEPS or _leaks(steps, prepared):
+    except BaseException as exc:
+        raise type(exc)() from None
+    if _bad_steps(steps, prepared):
         return _fail("notion api error", EXIT_API)
     LOGGER.info("notion test ok")
-    _emit({"command": "test", "mode": "fake", "steps": list(steps)})
+    _emit({"command": "test", "mode": "fake", "steps": list(SANDBOX_STEPS)})
     return EXIT_OK

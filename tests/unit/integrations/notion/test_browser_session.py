@@ -572,6 +572,7 @@ def test_finally_does_not_write_a_second_receipt_after_unknown() -> None:
     with pytest.raises(KeyboardInterrupt):
         _mutate(manager)
     assert len(manager.receipts) == 1
+    assert len(driver.screenshots) == 1
     receipt = manager.receipts[0]
     assert receipt.status == "Unknown"
     assert receipt.evidence == "screenshot-failed"
@@ -579,40 +580,52 @@ def test_finally_does_not_write_a_second_receipt_after_unknown() -> None:
     replay = _mutate(manager)
     assert replay is receipt
     assert len(manager.receipts) == 1
+    assert len(driver.screenshots) == 1
     assert len(driver.clicks) == 1
 
 
-def test_interrupt_during_append_keeps_the_seen_key() -> None:
-    """An interrupt on append leaves the key set and does not click again."""
+def test_interrupt_during_store_keeps_receipts_aligned() -> None:
+    """A store interrupt cannot leave the seen key out of receipts."""
 
-    class _AppendRaises(list[NotionOperationReceipt]):
-        def append(self, item: NotionOperationReceipt) -> None:
-            raise KeyboardInterrupt("append")
+    class _StoreThenInterrupt(dict[str, NotionOperationReceipt]):
+        def __setitem__(self, key: str, value: NotionOperationReceipt) -> None:
+            super().__setitem__(key, value)
+            raise KeyboardInterrupt("store")
 
     manager, driver = _manager()
     _open(manager)
-    manager._receipts = _AppendRaises()  # pyright: ignore[reportPrivateUsage]
+    manager._seen = _StoreThenInterrupt()  # pyright: ignore[reportPrivateUsage]
     with pytest.raises(KeyboardInterrupt):
         _mutate(manager)
-    assert manager.receipts == ()
+    assert len(manager.receipts) == 1
+    assert manager.receipts == tuple(manager._seen.values())  # pyright: ignore[reportPrivateUsage]
     replay = _mutate(manager)
+    assert replay is manager.receipts[0]
     assert replay.status == "Success"
     assert len(driver.clicks) == 1
-    assert manager.receipts == ()
+    assert len(manager.receipts) == 1
 
 
-def test_raised_click_screenshot_runtime_error_does_not_propagate() -> None:
-    """A screenshot RuntimeError after a raised click stays one Unknown receipt."""
+def test_forged_observe_subclass_is_unknown() -> None:
+    """A str subclass with a forged equality stays unknown and stores no token."""
+
+    class _Forged(str):
+        def __eq__(self, other: object) -> bool:
+            return other == "applied"
+
+        def __hash__(self) -> int:
+            return hash("applied")
+
+    token = "secret_" + ("z" * 43)
     manager, driver = _manager()
     _open(manager)
     driver.click_result = RuntimeError("boom")
-    driver.observe_result = "applied"
-    driver.screenshot_error = RuntimeError("disk")
+    driver.observe_result = _Forged(token)
     receipt = _mutate(manager)
     assert receipt.status == "Unknown"
-    assert receipt.evidence == "screenshot-failed"
-    assert receipt.post_state["observed"] == "applied"
-    assert len(manager.receipts) == 1
+    assert receipt.post_state["observed"] == "unknown"
+    assert type(receipt.post_state["observed"]) is str
+    assert token not in str(receipt.post_state["observed"])
     replay = _mutate(manager)
     assert replay is receipt
     assert len(driver.clicks) == 1
@@ -620,7 +633,8 @@ def test_raised_click_screenshot_runtime_error_does_not_propagate() -> None:
         _mutate(manager, key="other")
 
 
-def test_unknown_path_screenshot_runtime_error_records_one_receipt() -> None:
+def test_raised_click_screenshot_runtime_error_does_not_propagate() -> None:
+    """A screenshot RuntimeError after a raised click stays one Unknown receipt."""
     manager, driver = _manager()
     _open(manager)
     driver.click_result = RuntimeError("boom")

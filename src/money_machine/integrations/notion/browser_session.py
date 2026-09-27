@@ -192,13 +192,12 @@ class BrowserSessionManager:
     def __init__(self, driver: BrowserDriver) -> None:
         self._driver = driver
         self._open: dict[str, _OpenSession] = {}
-        self._receipts: list[NotionOperationReceipt] = []
         self._seen: dict[str, NotionOperationReceipt] = {}
 
     @property
     def receipts(self) -> tuple[NotionOperationReceipt, ...]:
-        """Receipts recorded by this manager, in order."""
-        return tuple(self._receipts)
+        """Receipts recorded by this manager, in insertion order."""
+        return tuple(self._seen.values())
 
     def open_session(self, profile_name: str, status: ProfileStatus) -> str:
         """Open an authenticated profile, or reuse its healthy session.
@@ -408,7 +407,7 @@ class BrowserSessionManager:
         raw: object = "unknown"
         with suppress(Exception):
             raw = cast("object", self._driver.observe(session.session_id))
-        if isinstance(raw, str) and raw in {"applied", "absent", "unknown"}:
+        if type(raw) is str and raw in {"applied", "absent", "unknown"}:
             observed = raw
         else:
             observed = "unknown"
@@ -604,12 +603,9 @@ class BrowserSessionManager:
             idempotency_key=key,
             status=status,
         )
-        # The key is stored before the list append. An interrupt between these
-        # two lines cannot leave a receipt in the list without its key. The
-        # remaining window is a stored key whose append has not finished; a
-        # replay still returns that receipt and does not click again.
+        # _seen is the only receipt store. receipts reads it, so a store
+        # interrupt cannot leave a key that receipts does not show.
         self._seen[key] = receipt
-        self._receipts.append(receipt)
         return receipt
 
 
