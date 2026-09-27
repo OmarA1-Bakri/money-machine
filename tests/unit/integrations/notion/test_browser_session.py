@@ -601,6 +601,25 @@ def test_interrupt_during_append_keeps_the_seen_key() -> None:
     assert manager.receipts == ()
 
 
+def test_raised_click_screenshot_runtime_error_does_not_propagate() -> None:
+    """A screenshot RuntimeError after a raised click stays one Unknown receipt."""
+    manager, driver = _manager()
+    _open(manager)
+    driver.click_result = RuntimeError("boom")
+    driver.observe_result = "applied"
+    driver.screenshot_error = RuntimeError("disk")
+    receipt = _mutate(manager)
+    assert receipt.status == "Unknown"
+    assert receipt.evidence == "screenshot-failed"
+    assert receipt.post_state["observed"] == "applied"
+    assert len(manager.receipts) == 1
+    replay = _mutate(manager)
+    assert replay is receipt
+    assert len(driver.clicks) == 1
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        _mutate(manager, key="other")
+
+
 def test_unknown_path_screenshot_runtime_error_records_one_receipt() -> None:
     manager, driver = _manager()
     _open(manager)

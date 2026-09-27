@@ -438,7 +438,7 @@ class BrowserSessionManager:
     ) -> NotionOperationReceipt:
         """Store one Unknown receipt and taint. An interrupt still stores it."""
         try:
-            evidence = self._capture(session, "uncertain")
+            evidence = self._capture(session, "uncertain", raise_errors=True)
         except Exception:
             evidence = "screenshot-failed"
         except BaseException:
@@ -560,13 +560,15 @@ class BrowserSessionManager:
         session.healthy = False
         self._capture(session, reason)
 
-    def _capture(self, session: _OpenSession, reason: str) -> str:
+    def _capture(self, session: _OpenSession, reason: str, *, raise_errors: bool = False) -> str:
         if reason not in _SCREENSHOT_REASONS:
             raise BrowserSessionError("screenshot reason is not known")
         path = f"{SCREENSHOT_ROOT}/{session.session_id}-{reason}.png"
         try:
             self._driver.screenshot(session.session_id, path)
         except Exception:
+            if raise_errors:
+                raise
             return "screenshot-failed"
         return path
 

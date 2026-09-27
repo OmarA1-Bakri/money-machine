@@ -863,18 +863,18 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 - **Heading**: `### 9. Live connection path` in `prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md` and `hands-off-money-machine-full-implementation-workbook.md`. Wave 9 deferred browser-session items are included.
 - **Narrow reading**: `integrations notion connect`, `status`, and `test` read the notion token only to check its shape and pass it to an injected probe. The default probe is in-process and does not open a network connection, a browser, or a live Notion workspace. A missing token exits 78. A token that is not `secret_` or `ntn_` plus 43 or more ASCII alphanumerics exits 64. A probe error, a workspace that is empty, non-text, or contains the token, or sandbox steps other than page, database, publish, unpublish, and archive, exits 69. Success prints JSON with mode fake and does not print or log the token. The prompt-integrity review at `docs/control/reviews/2026-09-24-session-06-prompt-integrity.md` is not rewritten. S-01 still holds: no live Notion mutation.
 - **W9 deferred**: A raised-click observe value is kept only when it is a string in applied, absent, or unknown. A dict, a list, or a token URL is stored as unknown, the session is tainted, and a replay does not click again. The recorded flag is gone. The finally block writes a receipt only when the key is not already stored, including after `_record_unknown` on BaseException. The seen key is stored before the receipt list append. An interrupt on append leaves the key set, so a replay does not click again. The remaining window is a stored key whose append has not finished; replay still returns that receipt.
-- **Review 5328166056**: The unhashable observe read is the isinstance check. The redundant recorded flag is removed. A screenshot RuntimeError on the Unknown path records evidence screenshot-failed, one receipt, taint, and clicks at 1 on replay. Deleting the Unknown-path Exception handler still passes because `_capture` already returns screenshot-failed. A reconcile screenshot interrupt still stores observed unknown rather than absent. That path stays fail-safe.
-- **Pytest collected**: 1886 collected, 1885 passed, 1 skipped. W9 baseline: 1854 collected, 1853 passed, 1 skipped. Delta +32 collected and +32 passed.
+- **Review 5328166056**: The unhashable observe read is the isinstance check. The redundant recorded flag is removed. A screenshot RuntimeError after a raised click is caught in `_record_unknown` and does not propagate. The receipt is Unknown, evidence is screenshot-failed, the observed value is kept, the session is tainted, and a replay does not click again. A reconcile screenshot interrupt still stores observed unknown rather than absent. That path stays fail-safe.
+- **Pytest collected**: 1887 collected, 1886 passed, 1 skipped. W9 baseline: 1854 collected, 1853 passed, 1 skipped. Delta +33 collected and +33 passed.
 - **Per-file counts**:
 
 | File | Functions (base → tip) | Collected (base → tip) | Passed (base → tip) | Failed (base → tip) | Skipped (base → tip) |
 |---|---|---|---|---|---|
-| `tests/unit/integrations/notion/test_browser_session.py` | 61 → 64 | 111 → 117 | 111 → 117 | 0 → 0 | 0 → 0 |
+| `tests/unit/integrations/notion/test_browser_session.py` | 61 → 65 | 111 → 118 | 111 → 118 | 0 → 0 | 0 → 0 |
 | `tests/unit/cli/test_notion_commands.py` | 0 → 8 | 0 → 26 | 0 → 26 | 0 → 0 | 0 → 0 |
 | Remaining files | unchanged | 1743 → 1743 | 1742 → 1742 | 0 → 0 | 1 → 1 |
-| **Total** | | **1854 → 1886** | **1853 → 1885** | **0 → 0** | **1 → 1** |
+| **Total** | | **1854 → 1887** | **1853 → 1886** | **0 → 0** | **1 → 1** |
 
-- **Mutation checks** (36 rows; each applied, pytest run, then reverted; 31 killed and 5 equivalent):
+- **Mutation checks** (36 rows; each applied, pytest run, then reverted; 32 killed and 4 equivalent):
 
 | Mutation | Site | Test | Result |
 |---|---|---|---|
@@ -883,8 +883,8 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 | Drop unknown from the observe whitelist | `browser_session.py:411` | `test_raised_click_observe_value_is_whitelisted` | equivalent: the string unknown is stored as unknown by the else branch, and the browser-session file still passes |
 | Finally always records a receipt | `browser_session.py:372` | `test_finally_does_not_write_a_second_receipt_after_unknown` | killed |
 | Restore the recorded flag beside the seen-key guard | `browser_session.py:372` | `test_finally_does_not_write_a_second_receipt_after_unknown` | equivalent: the flag is set only after the key is stored, and the browser-session file still passes |
-| Append the receipt before storing the seen key | `browser_session.py:609` | `test_interrupt_during_append_keeps_the_seen_key` | killed |
-| Drop the Exception handler on the Unknown screenshot path | `browser_session.py:442` | `test_unknown_path_screenshot_runtime_error_records_one_receipt` | equivalent: _capture already returns screenshot-failed for Exception, so this handler is not reached |
+| Append the receipt before storing the seen key | `browser_session.py:611` | `test_interrupt_during_append_keeps_the_seen_key` | killed |
+| Drop except Exception in _record_unknown | `browser_session.py:442` | `test_raised_click_screenshot_runtime_error_does_not_propagate` | killed |
 | Skip the missing-token check | `notion.py:103` | `test_notion_commands_fail_when_config_is_missing[connect]` | killed |
 | Skip the token-shape check | `notion.py:105` | `test_bad_token_shape_is_redacted[plain-connect]` | killed |
 | Match the token with search instead of fullmatch | `notion.py:74` | `test_bad_token_shape_is_redacted[token-url-connect]` | killed |
