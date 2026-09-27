@@ -858,6 +858,66 @@ Parallel control lane only (`docs/control/*`). No feature code, no S06 features,
 - **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w9` and this log entry. Against base, STATE changes only these things: `state_revision` 44 to 45, the `session_06_w8` trailing comma, `session_06_w9`, and `updated_at`. `updated_at` moves forward from `2026-09-26T20:41:44Z`. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
 - **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. `pyproject.toml` untouched. `src/money_machine/integrations/notion/router.py` untouched. Exit 78 held.
 
+## 2026-09-27 — Session 06 Wave 10: observe whitelist, receipt recording, and notion CLI
+
+- **Heading**: `### 9. Live connection path` in `prompts/implementation/09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md` and `hands-off-money-machine-full-implementation-workbook.md`. Wave 9 deferred browser-session items are included.
+- **Narrow reading**: `integrations notion connect`, `status`, and `test` read the notion token only to check its shape and pass it to an injected probe. The default probe is in-process and does not open a network connection, a browser, or a live Notion workspace. A missing token exits 78. A token that is not `secret_` or `ntn_` plus 43 or more ASCII alphanumerics exits 64. A probe error, a workspace that is empty, non-text, or contains the token, or sandbox steps other than page, database, publish, unpublish, and archive, exits 69. Success prints JSON with mode fake and does not print or log the token. The prompt-integrity review at `docs/control/reviews/2026-09-24-session-06-prompt-integrity.md` is not rewritten. S-01 still holds: no live Notion mutation.
+- **W9 deferred**: A raised-click observe value is kept only when it is a string in applied, absent, or unknown. A dict, a list, or a token URL is stored as unknown, the session is tainted, and a replay does not click again. The recorded flag is gone. The finally block writes a receipt only when the key is not already stored, including after `_record_unknown` on BaseException. The seen key is stored before the receipt list append. An interrupt on append leaves the key set, so a replay does not click again. The remaining window is a stored key whose append has not finished; replay still returns that receipt.
+- **Review 5328166056**: The unhashable observe read is the isinstance check. The redundant recorded flag is removed. A screenshot RuntimeError on the Unknown path records evidence screenshot-failed, one receipt, taint, and clicks at 1 on replay. Deleting the Unknown-path Exception handler still passes because `_capture` already returns screenshot-failed. A reconcile screenshot interrupt still stores observed unknown rather than absent. That path stays fail-safe.
+- **Pytest collected**: 1886 collected, 1885 passed, 1 skipped. W9 baseline: 1854 collected, 1853 passed, 1 skipped. Delta +32 collected and +32 passed.
+- **Per-file counts**:
+
+| File | Functions (base → tip) | Collected (base → tip) | Passed (base → tip) | Failed (base → tip) | Skipped (base → tip) |
+|---|---|---|---|---|---|
+| `tests/unit/integrations/notion/test_browser_session.py` | 61 → 64 | 111 → 117 | 111 → 117 | 0 → 0 | 0 → 0 |
+| `tests/unit/cli/test_notion_commands.py` | 0 → 8 | 0 → 26 | 0 → 26 | 0 → 0 | 0 → 0 |
+| Remaining files | unchanged | 1743 → 1743 | 1742 → 1742 | 0 → 0 | 1 → 1 |
+| **Total** | | **1854 → 1886** | **1853 → 1885** | **0 → 0** | **1 → 1** |
+
+- **Mutation checks** (36 rows; each applied, pytest run, then reverted; 31 killed and 5 equivalent):
+
+| Mutation | Site | Test | Result |
+|---|---|---|---|
+| Drop isinstance on the observe whitelist | `browser_session.py:411` | `test_raised_click_observe_value_is_whitelisted[dict]` | killed |
+| Accept every string as an observe value | `browser_session.py:411` | `test_raised_click_observe_value_is_whitelisted[token-url]` | killed |
+| Drop unknown from the observe whitelist | `browser_session.py:411` | `test_raised_click_observe_value_is_whitelisted` | equivalent: the string unknown is stored as unknown by the else branch, and the browser-session file still passes |
+| Finally always records a receipt | `browser_session.py:372` | `test_finally_does_not_write_a_second_receipt_after_unknown` | killed |
+| Restore the recorded flag beside the seen-key guard | `browser_session.py:372` | `test_finally_does_not_write_a_second_receipt_after_unknown` | equivalent: the flag is set only after the key is stored, and the browser-session file still passes |
+| Append the receipt before storing the seen key | `browser_session.py:609` | `test_interrupt_during_append_keeps_the_seen_key` | killed |
+| Drop the Exception handler on the Unknown screenshot path | `browser_session.py:442` | `test_unknown_path_screenshot_runtime_error_records_one_receipt` | equivalent: _capture already returns screenshot-failed for Exception, so this handler is not reached |
+| Skip the missing-token check | `notion.py:103` | `test_notion_commands_fail_when_config_is_missing[connect]` | killed |
+| Skip the token-shape check | `notion.py:105` | `test_bad_token_shape_is_redacted[plain-connect]` | killed |
+| Match the token with search instead of fullmatch | `notion.py:74` | `test_bad_token_shape_is_redacted[token-url-connect]` | killed |
+| Match the token with match instead of fullmatch | `notion.py:74` | `test_bad_token_shape_is_redacted[suffix-connect]` | killed |
+| Drop ntn_ from the token pattern | `notion.py:26` | `test_notion_commands_succeed[status]` | killed |
+| Drop secret_ from the token pattern | `notion.py:26` | `test_notion_commands_succeed[connect]` | killed |
+| Allow a 42-character token body | `notion.py:26` | `test_bad_token_shape_is_redacted[short-connect]` | killed |
+| Require a 44-character token body | `notion.py:26` | `test_notion_commands_succeed[connect]` | killed |
+| Require a token body of exactly 43 characters | `notion.py:26` | `test_notion_commands_succeed[connect-44]` | killed |
+| Echo the connect exception | `notion.py:125` | `test_fake_api_error_is_redacted[connect]` | killed |
+| Echo the test exception | `notion.py:166` | `test_fake_api_error_is_redacted[test]` | killed |
+| Log the raw token when the shape is invalid | `notion.py:105` | `test_bad_token_shape_is_redacted[plain-connect]` | killed |
+| Put the token in the connect payload | `notion.py:135` | `test_notion_commands_succeed[connect]` | killed |
+| Skip the workspace leak check | `notion.py:127` | `test_probe_workspace_that_echoes_the_token_is_redacted` | killed |
+| Accept a non-string workspace | `notion.py:115` | `test_unsafe_workspace_is_an_api_error[non-string]` | killed |
+| Accept an empty workspace | `notion.py:112` | `test_unsafe_workspace_is_an_api_error[empty]` | killed |
+| Skip the sandbox step check | `notion.py:168` | `test_incomplete_sandbox_steps_fail` | killed |
+| Drop the step leak check | `notion.py:168` | `test_incomplete_sandbox_steps_fail` | equivalent: steps that differ from SANDBOX_STEPS already fail, and SANDBOX_STEPS cannot contain the caller token |
+| Report an API error as success | `notion.py:23` | `test_fake_api_error_is_redacted[connect]` | killed |
+| Report missing config as success | `notion.py:24` | `test_notion_commands_fail_when_config_is_missing[connect]` | killed |
+| Report a bad token as success | `notion.py:22` | `test_bad_token_shape_is_redacted[plain-connect]` | killed |
+| Return the sandbox steps without calling the probe | `notion.py:165` | `test_notion_commands_succeed[test]` | killed |
+| Hardcode the connect workspace | `notion.py:124` | `test_notion_commands_succeed[connect]` | killed |
+| Status calls the probe | `notion.py:143` | `test_notion_commands_succeed[status]` | killed |
+| Drop archive from the sandbox steps | `notion.py:27` | `test_notion_commands_succeed[test]` | killed |
+| Label connect mode as live | `notion.py:134` | `test_notion_commands_succeed[connect]` | killed |
+| Treat a tuple leak as safe | `notion.py:114` | `test_notion_commands_succeed[test]` | equivalent: the only tuple passed to _leaks is sandbox steps, and that call is skipped once the steps already differ |
+| Do not pass the injected probe | `main.py:619` | `test_notion_commands_succeed[connect]` | killed |
+| Wire connect to the status handler | `main.py:593` | `test_notion_commands_succeed[connect]` | killed |
+
+- **Control update**: `docs/control/IMPLEMENTATION_STATE.json` `session_06_w10` and this log entry. Against base, STATE changes only these things: `state_revision` 45 to 46, the `session_06_w9` trailing comma, `session_06_w10`, and `updated_at`. `updated_at` moves forward from `2026-09-26T23:45:13Z`. `control_files_and_checkpoint_current` stays false. The session stays incomplete.
+- **Hard boundaries**: fixtures and mocks only. No live Notion or Etsy, no real browser, no Playwright import. Fixture adapter stays the default. `src/money_machine/orchestration/` untouched. `uv.lock` untouched. `pyproject.toml` untouched. `src/money_machine/integrations/notion/router.py` untouched. Exit 78 held.
+
 ## 2026-09-11 — Startup repair wave after recovery review
 
 - Repaired migration-head/schema compatibility readiness, encoded database credentials/IPv6, and production environment selection. Compose now carries raw passwords separately; a bounded independent review identified literal-percent and surrounding-whitespace cases, both reproduced and repaired with regression coverage. Development external-URL overrides retain their credentials.

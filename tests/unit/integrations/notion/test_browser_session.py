@@ -516,8 +516,8 @@ def test_raised_click_stays_unknown_for_any_observe_result(observed: str) -> Non
 
 @pytest.mark.parametrize(
     "raw",
-    [object(), None, "x" * 5000],
-    ids=["object", "none", "long-string"],
+    [object(), None, "x" * 5000, {"a": 1}, ["applied"], "https://x/?token=SECRET"],
+    ids=["object", "none", "long-string", "dict", "list", "token-url"],
 )
 def test_raised_click_observe_value_is_whitelisted(raw: object) -> None:
     manager, driver = _manager()
@@ -555,6 +555,63 @@ def test_raised_click_observe_error_returns_one_unknown_receipt(
     assert len(manager.receipts) == 1
     assert len(driver.clicks) == 1
     assert len(driver.observes) == 1
+    replay = _mutate(manager)
+    assert replay is receipt
+    assert len(driver.clicks) == 1
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        _mutate(manager, key="other")
+
+
+def test_finally_does_not_write_a_second_receipt_after_unknown() -> None:
+    """After _record_unknown stores the key, finally must not write again."""
+    manager, driver = _manager()
+    _open(manager)
+    driver.click_result = RuntimeError("boom")
+    driver.observe_result = "applied"
+    driver.screenshot_error = KeyboardInterrupt("stop")
+    with pytest.raises(KeyboardInterrupt):
+        _mutate(manager)
+    assert len(manager.receipts) == 1
+    receipt = manager.receipts[0]
+    assert receipt.status == "Unknown"
+    assert receipt.evidence == "screenshot-failed"
+    assert receipt.post_state["observed"] == "applied"
+    replay = _mutate(manager)
+    assert replay is receipt
+    assert len(manager.receipts) == 1
+    assert len(driver.clicks) == 1
+
+
+def test_interrupt_during_append_keeps_the_seen_key() -> None:
+    """An interrupt on append leaves the key set and does not click again."""
+
+    class _AppendRaises(list[NotionOperationReceipt]):
+        def append(self, item: NotionOperationReceipt) -> None:
+            raise KeyboardInterrupt("append")
+
+    manager, driver = _manager()
+    _open(manager)
+    manager._receipts = _AppendRaises()  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(KeyboardInterrupt):
+        _mutate(manager)
+    assert manager.receipts == ()
+    replay = _mutate(manager)
+    assert replay.status == "Success"
+    assert len(driver.clicks) == 1
+    assert manager.receipts == ()
+
+
+def test_unknown_path_screenshot_runtime_error_records_one_receipt() -> None:
+    manager, driver = _manager()
+    _open(manager)
+    driver.click_result = RuntimeError("boom")
+    driver.observe_result = "applied"
+    driver.screenshot_error = RuntimeError("disk")
+    receipt = _mutate(manager)
+    assert receipt.status == "Unknown"
+    assert receipt.evidence == "screenshot-failed"
+    assert receipt.post_state["observed"] == "applied"
+    assert len(manager.receipts) == 1
     replay = _mutate(manager)
     assert replay is receipt
     assert len(driver.clicks) == 1

@@ -3,8 +3,10 @@
 Separate from ``money-machine-control``, which is the fail-closed repository-control
 utility and must not be used for routine operation.
 
-Every command is read-only or database-local. No command performs a provider call, reads a
-credential value, or publishes anything.
+Commands are read-only or database-local, except ``integrations notion``
+connect, status, and test. Those read the Notion token only to check its shape,
+pass it to an injected fake probe, and never print or log the token. No command
+performs a live provider call or publishes anything.
 """
 
 from __future__ import annotations
@@ -17,6 +19,11 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any, Final
 
+from money_machine.cli.notion import (
+    command_notion_connect,
+    command_notion_status,
+    command_notion_test,
+)
 from money_machine.config.runtime import (
     RuntimeSettings,
     RuntimeSettingsError,
@@ -580,6 +587,14 @@ def _parser() -> argparse.ArgumentParser:
         help="report configured or not configured, without reading any credential",
     )
     integrations_status.set_defaults(handler=command_integrations_status)
+    notion = integration_actions.add_parser("notion", help="notion connection commands")
+    notion_actions = notion.add_subparsers(dest="notion_command", required=True)
+    notion_connect = notion_actions.add_parser("connect", help="check the notion token")
+    notion_connect.set_defaults(handler=command_notion_connect)
+    notion_status = notion_actions.add_parser("status", help="report notion token shape")
+    notion_status.set_defaults(handler=command_notion_status)
+    notion_test = notion_actions.add_parser("test", help="run sandbox steps on the fake probe")
+    notion_test.set_defaults(handler=command_notion_test)
 
     scheduler = subparsers.add_parser("scheduler", help="scheduler operations")
     scheduler_actions = scheduler.add_subparsers(dest="scheduler_command", required=True)
@@ -598,9 +613,10 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(argv: Sequence[str] | None = None, *, notion_probe: object | None = None) -> int:
     """Run one operator command."""
     arguments = _parser().parse_args(argv)
+    arguments.notion_probe = notion_probe
     handler: Handler = arguments.handler
     try:
         return handler(arguments)

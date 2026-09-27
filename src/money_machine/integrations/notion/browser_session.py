@@ -30,7 +30,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Protocol
+from typing import Protocol, cast
 
 from money_machine.observability.receipts import NotionOperationReceipt, ReceiptStatus
 
@@ -341,11 +341,10 @@ class BrowserSessionManager:
             return self._block(
                 session, job, operation, space, page, key, moment, kind, "unknown-page"
             )
-        recorded = False
         try:
             outcome = self._click(session, selector)
             if outcome == "applied":
-                receipt = self._record(
+                return self._record(
                     session,
                     job,
                     operation,
@@ -360,20 +359,17 @@ class BrowserSessionManager:
                     kind=kind,
                     taint=False,
                 )
-            elif outcome == "uncertain":
-                receipt = self._reconcile(session, job, operation, space, page, key, moment, kind)
-            elif outcome == "raised":
-                receipt = self._record_raised_click(
+            if outcome == "uncertain":
+                return self._reconcile(session, job, operation, space, page, key, moment, kind)
+            if outcome == "raised":
+                return self._record_raised_click(
                     session, job, operation, space, page, key, moment, kind
                 )
-            else:
-                receipt = self._block(
-                    session, job, operation, space, page, key, moment, kind, outcome
-                )
-            recorded = True
-            return receipt
+            return self._block(session, job, operation, space, page, key, moment, kind, outcome)
         finally:
-            if not recorded and key not in self._seen:
+            # The seen-key guard is enough. A path that stored the key, including
+            # _record_unknown on BaseException, must not write a second receipt.
+            if key not in self._seen:
                 self._record_unknown(session, job, operation, space, page, key, moment, kind)
 
     def _require_open(self, profile_name: str) -> _OpenSession:
@@ -411,8 +407,11 @@ class BrowserSessionManager:
         """Observe once, whitelist it, record Unknown, and taint."""
         raw: object = "unknown"
         with suppress(Exception):
-            raw = self._driver.observe(session.session_id)
-        observed = raw if raw in {"applied", "absent", "unknown"} else "unknown"
+            raw = cast("object", self._driver.observe(session.session_id))
+        if isinstance(raw, str) and raw in {"applied", "absent", "unknown"}:
+            observed = raw
+        else:
+            observed = "unknown"
         return self._record_unknown(
             session,
             job,
@@ -603,8 +602,12 @@ class BrowserSessionManager:
             idempotency_key=key,
             status=status,
         )
-        self._receipts.append(receipt)
+        # The key is stored before the list append. An interrupt between these
+        # two lines cannot leave a receipt in the list without its key. The
+        # remaining window is a stored key whose append has not finished; a
+        # replay still returns that receipt and does not click again.
         self._seen[key] = receipt
+        self._receipts.append(receipt)
         return receipt
 
 
