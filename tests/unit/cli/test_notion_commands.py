@@ -255,18 +255,81 @@ class _TokenInterrupt(KeyboardInterrupt):
     """KeyboardInterrupt subclass whose message would leak the token."""
 
 
-def _base_error(kind: str) -> BaseException:
+class _NeedsArgument(BaseException):
+    """BaseException whose constructor requires the token."""
+
+    def __init__(self, secret: str) -> None:
+        super().__init__(secret)
+
+
+class _NeedsKeyboard(KeyboardInterrupt):
+    """KeyboardInterrupt whose constructor requires the token."""
+
+    def __init__(self, secret: str) -> None:
+        super().__init__(secret)
+
+
+class _NeedsGenerator(GeneratorExit):
+    """GeneratorExit whose constructor requires the token."""
+
+    def __init__(self, secret: str) -> None:
+        super().__init__(secret)
+
+
+def _base_error(kind: str) -> tuple[BaseException, type[BaseException], int | None]:
     if kind == "keyboard":
-        return KeyboardInterrupt(_SECRET)
+        return KeyboardInterrupt(_SECRET), KeyboardInterrupt, None
     if kind == "system":
-        return SystemExit(_SECRET)
+        return SystemExit(_SECRET), SystemExit, 1
+    if kind == "exit-2":
+        return SystemExit(2), SystemExit, 2
     if kind == "subclass":
-        return _TokenInterrupt(_SECRET)
+        return _TokenInterrupt(_SECRET), _TokenInterrupt, None
+    if kind == "generator":
+        return GeneratorExit(_SECRET), GeneratorExit, None
+    if kind == "needs-arg":
+        return _NeedsArgument(_SECRET), BaseException, None
+    if kind == "group":
+        return BaseExceptionGroup(_SECRET, [BaseException(_SECRET)]), BaseException, None
+    if kind == "needs-keyboard":
+        return _NeedsKeyboard(_SECRET), KeyboardInterrupt, None
+    if kind == "needs-generator":
+        return _NeedsGenerator(_SECRET), GeneratorExit, None
     raise AssertionError(kind)
 
 
+def _exception_text(error: BaseException) -> str:
+    chunks = ["".join(traceback.format_exception(error)), repr(error)]
+    if error.__context__ is not None:
+        chunks.append(repr(error.__context__))
+        chunks.append("".join(traceback.format_exception(error.__context__)))
+    if error.__cause__ is not None:
+        chunks.append(repr(error.__cause__))
+        chunks.append("".join(traceback.format_exception(error.__cause__)))
+    nested = getattr(error, "exceptions", ())
+    if isinstance(nested, tuple):
+        for item in nested:
+            if isinstance(item, BaseException):
+                chunks.append(repr(item))
+                chunks.append("".join(traceback.format_exception(item)))
+    return "\n".join(chunks)
+
+
 @pytest.mark.parametrize("command", ["connect", "test"])
-@pytest.mark.parametrize("kind", ["keyboard", "system", "subclass"])
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "keyboard",
+        "system",
+        "exit-2",
+        "subclass",
+        "generator",
+        "needs-arg",
+        "group",
+        "needs-keyboard",
+        "needs-generator",
+    ],
+)
 def test_probe_base_exception_traceback_has_no_token(
     notion_env: None,
     monkeypatch: pytest.MonkeyPatch,
@@ -276,15 +339,18 @@ def test_probe_base_exception_traceback_has_no_token(
     kind: str,
 ) -> None:
     del notion_env
-    error = _base_error(kind)
+    error, expected_type, expected_code = _base_error(kind)
     probe = FakeNotionProbe(error=error)
     with pytest.raises(BaseException) as caught:
         _invoke(monkeypatch, capsys, caplog, command, token=_SECRET, probe=probe)
-    assert type(caught.value) is type(error)
-    assert caught.value.args == ()
+    assert type(caught.value) is expected_type
     assert caught.value.__cause__ is None
+    assert caught.value.__context__ is None
     assert caught.value.__suppress_context__ is True
-    text = "".join(traceback.format_exception(caught.value))
+    if expected_code is not None:
+        assert isinstance(caught.value, SystemExit)
+        assert caught.value.code == expected_code
+    text = _exception_text(caught.value)
     captured = capsys.readouterr()
     assert _SECRET not in text
     assert _SECRET not in captured.out
@@ -419,10 +485,52 @@ def test_main_does_not_echo_a_notion_exception(
     assert _SECRET not in caplog.text
 
 
+def _separated_body(separator: str) -> str:
+    body = "a" * 43
+    parts = [body[index : index + 6] for index in range(0, len(body), 6)]
+    return separator.join(parts)
+
+
 @pytest.mark.parametrize(
     "workspace",
-    ["ws-" + _SECRET, _SECRET.upper(), "a" * 43, "fixt\u200bure", "fix+ture"],
-    ids=["ws-token", "upper", "partial", "zero-width", "base64-mark"],
+    [
+        "ws-" + _SECRET,
+        _SECRET.upper(),
+        _SECRET[:40],
+        "a" * 42,
+        "a" * 21,
+        "a" * 12,
+        _separated_body("-"),
+        _separated_body("."),
+        _separated_body("_"),
+        _separated_body(" "),
+        "secret_shop",
+        "SeCrEt_shop",
+        "ntn_shop",
+        "NtN_shop",
+        "fixt\u200bure",
+        "fix+ture",
+        "w" * 101,
+    ],
+    ids=[
+        "ws-token",
+        "upper",
+        "partial",
+        "body-42",
+        "half",
+        "body-12",
+        "dash",
+        "dot",
+        "underscore",
+        "space",
+        "lower",
+        "mixed",
+        "ntn-lower",
+        "ntn-mixed",
+        "zero-width",
+        "base64-mark",
+        "len-101",
+    ],
 )
 def test_workspace_token_variant_is_rejected(
     notion_env: None,
@@ -443,3 +551,53 @@ def test_workspace_token_variant_is_rejected(
     assert _SECRET not in err
     assert _SECRET not in logs
     assert workspace not in out
+
+
+@pytest.mark.parametrize(
+    "workspace",
+    ["a" * 11, "w" * 100],
+    ids=["body-11", "len-100"],
+)
+def test_bounded_workspace_names_connect(
+    notion_env: None,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    workspace: str,
+) -> None:
+    del notion_env
+    probe = FakeNotionProbe(workspace=workspace)
+    code, out, err, logs = _invoke(
+        monkeypatch, capsys, caplog, "connect", token=_SECRET, probe=probe
+    )
+    assert code == 0
+    assert err == ""
+    payload = json.loads(out)
+    assert payload["workspace"] == workspace
+    assert _SECRET not in out
+    assert _SECRET not in err
+    assert _SECRET not in logs
+
+
+def test_workspace_str_subclass_is_rejected(
+    notion_env: None,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    del notion_env
+
+    class _Name(str):
+        def __str__(self) -> str:
+            return _SECRET
+
+    probe = FakeNotionProbe(workspace=_Name("fixture"))
+    code, out, err, logs = _invoke(
+        monkeypatch, capsys, caplog, "connect", token=_SECRET, probe=probe
+    )
+    assert code == 69
+    assert out == ""
+    assert err == "notion api error\n"
+    assert _SECRET not in out
+    assert _SECRET not in err
+    assert _SECRET not in logs

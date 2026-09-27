@@ -12,7 +12,7 @@ import json
 import logging
 import re
 import sys
-from typing import Protocol
+from typing import NoReturn, Protocol
 
 from money_machine.config.runtime import load_runtime_settings
 
@@ -25,10 +25,11 @@ EXIT_MISSING = 78
 
 _TOKEN_RE = re.compile(r"(?:secret_|ntn_)[A-Za-z0-9]{43,}")
 # Workspace names stay inside this set. Zero-width marks and base64 punctuation
-# fall outside it. Hex and reversed copies are not scanned: an injected probe
-# is the test boundary, and the checked copies are the token, its uppercase
-# form, and the secret body.
+# fall outside it. Hex, reversed, rot13, base64, and sha copies are a non-goal:
+# only an injected probe can produce them, and this check does not scan them.
 _WORKSPACE_RE = re.compile(r"[A-Za-z0-9 _.-]{1,100}")
+_BODY_WINDOW = 12
+_SEPARATORS = "-._ "
 SANDBOX_STEPS = ("page", "database", "publish", "unpublish", "archive")
 
 
@@ -112,31 +113,12 @@ def _require_token() -> str | int:
     return token
 
 
-def _secret_markers(token: str) -> tuple[str, ...]:
-    body = token
+def _token_body(token: str) -> str:
     folded = token.casefold()
     for prefix in ("secret_", "ntn_"):
         if folded.startswith(prefix):
-            body = token[len(prefix) :]
-            break
-    markers: list[str] = []
-    for marker in (token, token.upper(), body, body.upper(), "secret_" + body, "ntn_" + body):
-        if marker and marker not in markers:
-            markers.append(marker)
-    return tuple(markers)
-
-
-def _contains_secret(value: str, token: str) -> bool:
-    folded = value.casefold()
-    return any(marker.casefold() in folded for marker in _secret_markers(token))
-
-
-def _leaks(value: object, token: str) -> bool:
-    if isinstance(value, str):
-        return value == "" or _contains_secret(value, token)
-    if isinstance(value, tuple):
-        return any(_leaks(item, token) for item in value)
-    return True
+            return token[len(prefix) :]
+    return token
 
 
 def _bad_workspace(workspace: object, token: str) -> bool:
@@ -144,15 +126,47 @@ def _bad_workspace(workspace: object, token: str) -> bool:
         return True
     if re.fullmatch(_WORKSPACE_RE, workspace) is None:
         return True
-    return _contains_secret(workspace, token)
+    folded = workspace.casefold()
+    if "secret_" in folded or "ntn_" in folded:
+        return True
+    stripped = "".join(character for character in folded if character not in _SEPARATORS)
+    body = _token_body(token).casefold()
+    if len(body) < _BODY_WINDOW:
+        return False
+    window = _BODY_WINDOW
+    return any(body[start : start + window] in stripped for start in range(len(body) - window + 1))
 
 
-def _bad_steps(steps: object, token: str) -> bool:
+def _bad_steps(steps: object) -> bool:
     if type(steps) is not tuple:
         return True
     if any(type(item) is not str for item in steps):
         return True
-    return steps != SANDBOX_STEPS or _leaks(steps, token)
+    return steps != SANDBOX_STEPS
+
+
+def _reraise_without_token(exc: BaseException) -> NoReturn:
+    """Re-raise a token-free interrupt. Context and cause do not keep the original."""
+    if isinstance(exc, SystemExit):
+        code = exc.code if isinstance(exc.code, int) else 1
+        blank: BaseException = SystemExit(code)
+    else:
+        try:
+            blank = type(exc)()
+        except TypeError:
+            if isinstance(exc, KeyboardInterrupt):
+                blank = KeyboardInterrupt()
+            elif isinstance(exc, GeneratorExit):
+                blank = GeneratorExit()
+            else:
+                blank = BaseException()
+    try:
+        raise blank from None
+    except BaseException as surfaced:
+        surfaced.__context__ = None
+        surfaced.__cause__ = None
+        surfaced.__suppress_context__ = True
+        raise
 
 
 def command_notion_connect(arguments: object) -> int:
@@ -165,7 +179,7 @@ def command_notion_connect(arguments: object) -> int:
     except Exception:
         return _fail("notion api error", EXIT_API)
     except BaseException as exc:
-        raise type(exc)() from None
+        _reraise_without_token(exc)
     if _bad_workspace(workspace, prepared):
         return _fail("notion api error", EXIT_API)
     LOGGER.info("notion connect ok")
@@ -208,8 +222,8 @@ def command_notion_test(arguments: object) -> int:
     except Exception:
         return _fail("notion api error", EXIT_API)
     except BaseException as exc:
-        raise type(exc)() from None
-    if _bad_steps(steps, prepared):
+        _reraise_without_token(exc)
+    if _bad_steps(steps):
         return _fail("notion api error", EXIT_API)
     LOGGER.info("notion test ok")
     _emit({"command": "test", "mode": "fake", "steps": list(SANDBOX_STEPS)})

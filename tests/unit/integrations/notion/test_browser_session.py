@@ -741,6 +741,15 @@ def test_receipts_property_is_a_tuple() -> None:
     assert isinstance(manager.receipts, tuple)
 
 
+def test_receipts_follow_insertion_order() -> None:
+    """receipts yields the seen map in insertion order."""
+    manager, _driver = _manager()
+    _open(manager)
+    first = _mutate(manager, key="first")
+    second = _mutate(manager, key="second")
+    assert manager.receipts == (first, second)
+
+
 def test_read_retries_timeout_then_returns() -> None:
     manager, driver = _manager()
     _open(manager)
