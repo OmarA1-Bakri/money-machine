@@ -1,6 +1,8 @@
 # Next Session
 
-**Session 05 is COMPLETE** (2026-09-24, W11 control flip @ `9b791d45`) — domain agent implementation delivered L1-L4 (Etsy adapters, A03 research, A05 scoring/ProductSpec, A06 dedupe/workflow linking). Exit 78 unchanged: worker conditional lift (D-0028 gates), scheduler held.
+**Session 06 close candidacy** (2026-10-02, post-W10 @ `0f94d585`). Seven of eight evidence keys are true. `evidence_closure_commit_recorded` is still false, so the session stays incomplete, `completed_sessions` stays `[0, 1, 2, 3, 4, 5]`, and `next_session` stays 6. Exit 78 unchanged: worker conditional lift (D-0028 gates), scheduler held. No production Notion or Etsy mutation.
+
+**Session 05 is COMPLETE** (2026-09-24, W11 control flip @ `9b791d45`) — domain agent implementation delivered L1-L4 (Etsy adapters, A03 research, A05 scoring/ProductSpec, A06 dedupe/workflow linking).
 
 ## Session 05 completion status (post-W11 @ `9b791d45`)
 
@@ -20,9 +22,9 @@
 
 **Parked L2-L4 nits (non-blocking):** concept_fingerprint drift, evidence SHA self-dump, differentiation self-desc, fail-open suppress, result_id=spec_id. Noted as carry-forward improvement opportunities.
 
-## Session 06 — (Future work)
+## Session 06 — close candidacy, not complete
 
-**Status**: Not started. Session 06 prompt: `09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md`.
+**Status**: Incomplete. Prompt: `09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md`. W1–W10 are merged (#39–#49) at `0f94d585`. The closure flag is still false, so this file does not advance to Session 07.
 
 **Session 05 delivered scope**:
 - L1: Etsy fixture adapter, browser/API stubs, config-driven seed phrases, comprehensive tests
@@ -70,6 +72,11 @@ Session 03 closed 2026-09-19 after Verifier FINAL PASS (#17). Gap-close implemen
   3. **Differentiation self-description**: Dedupe differentiation_evidence describes candidate's own fields (dedupe.py:216-225) rather than comparative differentiation from catalogue
   4. **Fail-open suppression**: A06 uses contextlib.suppress(Exception) on invalid spec parsing (catalogue_dedupe.py:115) instead of fail-closed refusal
   5. **Result ID reuse**: Dedupe result_id = spec_id (dedupe.py:231) — could use distinct UUID for audit trail clarity
+- **S06 #49 parked nits** (non-blocking, not fixed in the close):
+  1. An int-subclass SystemExit code maps to 1
+  2. The False SystemExit row needs an isinstance-style mutant
+  3. Backtick formatting of `__context__` in the #49 PR body
+  4. CodeRabbit APPROVED tip lag on #49
 
 ## Environment notes
 

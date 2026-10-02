@@ -1,5 +1,16 @@
 # Implementation Log
 
+## 2026-10-02 — Session 06 W11: control closure candidacy (post-W10 @ 0f94d585)
+
+Parallel control lane only (`docs/control/*`). No feature code, no Session 07 features, no Exit 78 scheduler lift, no production Notion or Etsy mutation. The default Notion CLI probe remains `FakeNotionProbe` (no network).
+
+- Refreshed `head_sha` and `evidence_closure_commit_sha` to `0f94d585f23d79e5ac18479f01e14f67cbaad332` (W10 squash tip, #49, on `build/full-automation`). `last_verified_commit` stays at bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`: `tests/bootstrap/test_control_state.py` requires it to equal the bootstrap commit, and #38 kept the same pointer. State revision 46 → 47. `updated_at` is `2026-10-02T00:40:00Z`, which is not later than the W10 commit time `2026-10-02T00:51:41Z`.
+- Evidence keys confirmed in tree and set true: `notion_capability_inspected` (`docs/architecture/PLATFORM_COMPATIBILITY.md` method matrix, API limits, Composio absent, browser-only ops); `platform_compatibility_documented` (31 tagged operations); `notion_adapter_interface_defined` (`NotionAdapter`, 31 async operations); `fixture_adapter_implemented` (`FixtureNotionAdapter` in-memory CRUD; `config/integrations.yaml` `adapter_mode: fixture`); `adapter_router_implemented` (`NotionAdapterRouter` selects fixture and API; browser and combined config modes still raise `NotImplementedError` per the W4a contract). `adapter_unit_tests_pass` stays true (W10 recorded 1959 collected, 1958 passed, 1 skipped). `control_files_and_checkpoint_current` set true by this candidacy. `evidence_closure_commit_recorded` stays false.
+- Session 06 stays `incomplete`. `completed_sessions` stays `[0, 1, 2, 3, 4, 5]`. `next_session` stays 6. `next_prompt` stays `09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md`. `transition_contract.completion_requires_next_session` stays 4, matching the S04 and S05 closes.
+- External sandbox smoke, run once outside the repo and not re-run here (Grok, `2026-10-02T22:13:12Z`, repo tip `0f94d585`): workspace display name "MM S06 Sandbox"; bot "MM S06 Smoke"; parent page `3ed82fb0-af94-80dc-8272-f40b16376b81`; created then archived page `3ed82fb0-af94-81af-87c4-e302ca06f973` and database `3ed82fb0-af94-8166-bb5c-d91e42dc2234`; `before_count` 0; `after_count` 0; `call_count` 9/15; all HTTP 200; `pass` true. This is the approved one-shot for the live-connection criterion. It does not make production Notion or Etsy true. No token is recorded.
+- Parked #49 nits, non-blocking, not fixed in this close: (1) an int-subclass `SystemExit` code maps to 1; (2) the False `SystemExit` row needs an isinstance-style mutant; (3) backtick formatting of `__context__` in the #49 PR body; (4) CodeRabbit APPROVED tip lag on #49.
+- Exit 78: worker remains conditionally lifted (D-0028 gates). Scheduler stays HELD.
+
 ## 2026-09-20 — Session 05 Lane 1: Etsy research adapters
 
 - **Session 05 minimal activation** (revision 28→29): `current_session` advanced to 5, `session_status` set to incomplete, ten Session 05 evidence keys installed all-false per state.py contract addition.
