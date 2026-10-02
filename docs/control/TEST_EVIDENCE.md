@@ -1,22 +1,21 @@
 # Test Evidence
 
-## 2026-10-02 — Session 06 W11: control closure candidacy (post-W10 @ 0f94d585)
+## 2026-10-02 — Session 06 W11: SESSION_06 COMPLETE control flip (post-W10 @ 0f94d585)
 
 **Verification scope**: Control file updates only. No feature code, no runtime gate, no live HTTP, no new pytest run in this close. `adapter_unit_tests_pass` stays the W10-recorded result (1959 collected, 1958 passed, 1 skipped).
 
 | Claim | Evidence | Verdict |
 |---|---|---|
-| Tip SHA | `head_sha` and `evidence_closure_commit_sha` set to `0f94d585f23d79e5ac18479f01e14f67cbaad332` | PASS |
+| All eight evidence keys TRUE | Capability matrix, compatibility doc, `NotionAdapter`, `FixtureNotionAdapter`, `NotionAdapterRouter`, W10 unit-test record, this control flip, closure flag | PASS |
+| Session 06 status | `session_status` incomplete → complete; `completed_sessions` gains 6; `next_session` 6 → 7; `next_prompt` SESSION_07 | PASS |
+| State revision | Candidacy 46 → 47 (`f946772`), this flip 47 → 48 | PASS |
+| Tip SHA | `head_sha` and `evidence_closure_commit_sha` stay `0f94d585f23d79e5ac18479f01e14f67cbaad332` and do not name this commit | PASS |
 | Last verified continuity | `last_verified_commit` remains bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d` | PASS |
-| Design artifacts | Capability matrix, 31-op compatibility doc, `NotionAdapter` (31 async methods), `FixtureNotionAdapter`, `NotionAdapterRouter` (fixture default; API selectable; browser/combined config modes still `NotImplementedError`) | EARNED |
-| Unit-test key | Already true; W10 count recorded above. This close did not re-run the suite | UNCHANGED TRUE |
-| Control files | This candidacy updates state, log, test evidence, and next-session. `control_files_and_checkpoint_current` true | PASS |
-| Closure flag | `evidence_closure_commit_recorded` remains false. Session stays incomplete. `completed_sessions` stays `[0, 1, 2, 3, 4, 5]`. `next_session` stays 6 | HELD |
 | External sandbox smoke | Outside the repo, `2026-10-02T22:13:12Z`, tip `0f94d585`. Workspace "MM S06 Sandbox", bot "MM S06 Smoke", parent `3ed82fb0-af94-80dc-8272-f40b16376b81`, archived page `3ed82fb0-af94-81af-87c4-e302ca06f973`, archived database `3ed82fb0-af94-8166-bb5c-d91e42dc2234`, before 0, after 0, calls 9/15, HTTP 200, pass true. Not re-run. No token stored | RECORDED |
 | Exit 78 | Scheduler held. Worker conditional lift unchanged. No production Notion or Etsy mutation | HELD |
 | #49 nits | int-subclass SystemExit maps to 1; False-row isinstance-style mutant; backtick `__context__` in the #49 PR body; CodeRabbit APPROVED tip lag. Not fixed | PARKED |
 
-**Status**: Session 06 remains incomplete. Seven of eight evidence keys are true. The closure flag waits for the later state-pointer commit.
+**Status**: Session 06 COMPLETE. All eight evidence keys TRUE. Docs/control only.
 
 ## 2026-09-20 — Session 05 Lane 1: Etsy adapter tests written
 

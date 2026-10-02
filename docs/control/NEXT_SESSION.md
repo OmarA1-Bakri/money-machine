@@ -1,6 +1,6 @@
 # Next Session
 
-**Session 06 close candidacy** (2026-10-02, post-W10 @ `0f94d585`). Seven of eight evidence keys are true. `evidence_closure_commit_recorded` is still false, so the session stays incomplete, `completed_sessions` stays `[0, 1, 2, 3, 4, 5]`, and `next_session` stays 6. Exit 78 unchanged: worker conditional lift (D-0028 gates), scheduler held. No production Notion or Etsy mutation.
+**Session 06 is COMPLETE** (2026-10-02, W11 control flip @ `0f94d585`) — Notion integration foundation delivered W1–W10 (#39–#49). All eight evidence keys TRUE. Exit 78 unchanged: worker conditional lift (D-0028 gates), scheduler held. No production Notion or Etsy mutation. Default CLI probe remains `FakeNotionProbe`.
 
 **Session 05 is COMPLETE** (2026-09-24, W11 control flip @ `9b791d45`) — domain agent implementation delivered L1-L4 (Etsy adapters, A03 research, A05 scoring/ProductSpec, A06 dedupe/workflow linking).
 
@@ -22,9 +22,21 @@
 
 **Parked L2-L4 nits (non-blocking):** concept_fingerprint drift, evidence SHA self-dump, differentiation self-desc, fail-open suppress, result_id=spec_id. Noted as carry-forward improvement opportunities.
 
-## Session 06 — close candidacy, not complete
+## Session 06 completion status (post-W11 @ `0f94d585`)
 
-**Status**: Incomplete. Prompt: `09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md`. W1–W10 are merged (#39–#49) at `0f94d585`. The closure flag is still false, so this file does not advance to Session 07.
+| Wave | Status | Evidence key(s) |
+|---|---|---|
+| W1 — capability matrix, interface, fixture, router | **COMPLETE** | `notion_capability_inspected`, `platform_compatibility_documented`, `notion_adapter_interface_defined`, `fixture_adapter_implemented`, `adapter_router_implemented` |
+| W2–W10 — adapters, builders, browser session, fake CLI | **COMPLETE** | `adapter_unit_tests_pass` (1958 passed, 1 skipped at W10) |
+| W11 — control flip | **COMPLETE** | `control_files_and_checkpoint_current`, `evidence_closure_commit_recorded` |
+
+Router browser and combined config modes still raise `NotImplementedError` (W4a). Fixture mode stays the default.
+
+## Session 07 — (Future work)
+
+**Status**: Not started. Session 07 prompt: `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`.
+
+## Later sessions
 
 **Session 05 delivered scope**:
 - L1: Etsy fixture adapter, browser/API stubs, config-driven seed phrases, comprehensive tests
@@ -32,7 +44,7 @@
 - L3: A05 Product Strategy scorer (four-criterion: price/demand/young-fast shops/thin evidence), qualification gate (≥20/40), ProductSpec generation
 - L4: A06 Catalogue Dedupe agent (three-rule: exact identity×category, title Jaccard ≥0.7, concept fingerprint), PASS/TOO_CLOSE branching, EventDispatcher workflow linking, fixture teardown
 
-**Remaining domain agent scope** (Session 06+):
+**Remaining domain agent scope** (Session 07+):
 - Concept agent (A04): concept definition, differentiation, design specification
 - Notion Build agent (A07): workspace setup, database schema, draft pages (successor to DEDUPE_PASSED)
 - Variant agent (A08): colour/hub expansion, SKU generation
@@ -42,14 +54,14 @@
 - Publisher agent (A12): Etsy draft creation, publication, link verification
 - Analytics agent (A14): metrics collection, performance analysis
 
-Session 06+ will promote remaining domain agents from DESIGNED to TESTED with:
+Later sessions will promote remaining domain agents from DESIGNED to TESTED with:
 - Agent-specific prompts (v1)
 - Integration tests (real database, fake providers)
 - Contract tests (prompt integrity, tool permissions, commissioning refusal)
 - Commissioning evidence gates per D-0028
 - No live Notion/Etsy mutations until commissioning approval
 
-Session 06+ does NOT include:
+Those sessions do NOT include:
 - Scheduler Exit 78 lift (deferred; promote/stalled-detection/rebalance cycle scope)
 - Live production claims
 - Commissioning approval to COMMISSIONED state (requires operator decision record)
