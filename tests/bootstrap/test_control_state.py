@@ -183,6 +183,12 @@ def incomplete_session_six_state() -> ControlState:
     state["session_status"] = "incomplete"
     state["current_session"] = 6
     state["completed_sessions"] = list(range(6))
+    state["next_session"] = 6
+    state["next_prompt"] = control_state.SESSION_PROMPTS[6]
+    state["transition_contract"] = {
+        **state["transition_contract"],
+        "completion_requires_next_session": 6,
+    }
     state["head_sha"] = SESSION_06_PRIOR_WAVE_TIP
     state["evidence_closure_commit_sha"] = SESSION_06_PRIOR_WAVE_TIP
     return state
@@ -353,13 +359,22 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
                 assert closure != close_commit
 
 
-def test_incomplete_session_six_closure_pin() -> None:
-    """Run the session 6 SHA pin on an incomplete session, not only the checked-in file."""
+def test_incomplete_session_six_closure_pin(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Incomplete session 6 must enter the continuity test's `if session == 6` call."""
+
+    def check(state: ControlState) -> None:
+        monkeypatch.setattr(
+            sys.modules[__name__],
+            "load_state",
+            lambda *_args, bound=state: bound,
+        )
+        test_checked_in_state_is_a_valid_session_continuity_shape()
+
     passing = incomplete_session_six_state()
     assert passing["session_status"] != "complete"
     assert passing["current_session"] == 6
     assert passing["completed_sessions"] == [0, 1, 2, 3, 4, 5]
-    assert_session_six_closure_pins(passing)
+    check(passing)
 
     close_commit = state_pointer_commit()
     for field in ("head_sha", "evidence_closure_commit_sha"):
@@ -369,7 +384,7 @@ def test_incomplete_session_six_closure_pin() -> None:
         else:
             mutant["evidence_closure_commit_sha"] = close_commit
         with pytest.raises(AssertionError):
-            assert_session_six_closure_pins(mutant)
+            check(mutant)
 
 
 def test_real_entrypoint_atomically_applies_git_backed_transition(tmp_path: Path) -> None:
