@@ -306,9 +306,7 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
         evidence = state["required_completion_evidence"]
         assert evidence.keys() == control_state.SESSION_EVIDENCE_KEYS[session]
         assert all(evidence.values())
-    assert (
-        state["transition_contract"]["completion_requires_next_session"] == state["next_session"]
-    )
+    assert state["transition_contract"]["completion_requires_next_session"] == state["next_session"]
     if session >= 6 or state["state_revision"] >= 48:
         assert 6 in state["completed_sessions"]
     if session >= 0 and state["bootstrap_commit_sha"] is not None:
