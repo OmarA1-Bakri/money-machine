@@ -14,6 +14,8 @@
 | External sandbox smoke | Outside the repo, `2026-10-02T22:13:12Z`, tip `0f94d585`. Workspace "MM S06 Sandbox", bot "MM S06 Smoke", parent `3ed82fb0-af94-80dc-8272-f40b16376b81`, archived page `3ed82fb0-af94-81af-87c4-e302ca06f973`, archived database `3ed82fb0-af94-8166-bb5c-d91e42dc2234`, before 0, after 0, calls 9/15, HTTP 200, pass true. Not re-run. No token stored | RECORDED |
 | Exit 78 | Scheduler held. Worker conditional lift unchanged. No production Notion or Etsy mutation | HELD |
 | #49 nits | int-subclass SystemExit maps to 1; False-row isinstance-style mutant; backtick `__context__` in the #49 PR body; CodeRabbit APPROVED tip lag. Not fixed | PARKED |
+| Review 5328507848 nits | `connected: true` in fake mode (`notion.py` connect payload); argparse echoing a token passed as an extra argument. Omitted from the first close list, not fixed | PARKED |
+| Closure SHA pin | `test_checked_in_state_is_a_valid_session_continuity_shape` pins `last_verified_commit` to bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`, and pins complete session 6 `head_sha` and `evidence_closure_commit_sha` to `0f94d585f23d79e5ac18479f01e14f67cbaad332` rather than the commit that contains the state file | PASS |
 
 **Status**: Session 06 COMPLETE. All eight evidence keys TRUE. Docs/control only.
 

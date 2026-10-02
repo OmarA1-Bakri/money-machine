@@ -84,11 +84,13 @@ Session 03 closed 2026-09-19 after Verifier FINAL PASS (#17). Gap-close implemen
   3. **Differentiation self-description**: Dedupe differentiation_evidence describes candidate's own fields (dedupe.py:216-225) rather than comparative differentiation from catalogue
   4. **Fail-open suppression**: A06 uses contextlib.suppress(Exception) on invalid spec parsing (catalogue_dedupe.py:115) instead of fail-closed refusal
   5. **Result ID reuse**: Dedupe result_id = spec_id (dedupe.py:231) — could use distinct UUID for audit trail clarity
-- **S06 #49 parked nits** (non-blocking, not fixed in the close):
+- **S06 parked nits** (non-blocking, not fixed in the close):
   1. An int-subclass SystemExit code maps to 1
   2. The False SystemExit row needs an isinstance-style mutant
   3. Backtick formatting of `__context__` in the #49 PR body
   4. CodeRabbit APPROVED tip lag on #49
+  5. `connected: true` in fake mode (`notion.py` connect payload), still open from review 5328507848
+  6. argparse echoing a token passed as an extra argument, still open from review 5328507848
 
 ## Environment notes
 

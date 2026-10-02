@@ -31,6 +31,11 @@ BOOTSTRAP_SUBJECT = "chore(bootstrap): initialise money machine autonomous monor
 OUTER_GATES_BLOCKER = "SESSION_00_OUTER_GATES_PENDING"
 CLOSURE_EVIDENCE_KEY = "evidence_closure_commit_recorded"
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
+# Continuity rule: last_verified_commit names the bootstrap commit, not the
+# closure tip and not the commit that records a later completion.
+BOOTSTRAP_COMMIT_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
+# Session 06 close records the W10 squash (#49), not the state-pointer commit.
+SESSION_06_PRIOR_WAVE_TIP = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
 
 
 class ControlState(TypedDict):
@@ -154,6 +159,11 @@ def git(repo: Path, *arguments: str, stdin: str | None = None) -> str:
         input=stdin,
         timeout=control_state.GIT_TIMEOUT_SECONDS,
     ).stdout.strip()
+
+
+def state_pointer_commit() -> str:
+    """Commit that contains the checked-in continuity file (the close commit)."""
+    return git(ROOT, "log", "-1", "--format=%H", "--", STATE_PATH.relative_to(ROOT).as_posix())
 
 
 def completed_candidate(state: ControlState, bootstrap: str, closure: str) -> ControlState:
@@ -303,10 +313,22 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
         assert FULL_SHA.fullmatch(closure or "")
         assert bootstrap != closure
         assert state["last_verified_commit"] == bootstrap
+        assert state["last_verified_commit"] == BOOTSTRAP_COMMIT_SHA
+        assert bootstrap == BOOTSTRAP_COMMIT_SHA
         # head_sha must equal closure for complete sessions (evidence finalized)
         # For incomplete sessions, head_sha may be ahead of closure (work in progress)
         if state["session_status"] == "complete":
             assert state["head_sha"] == closure
+            # The close commit is the one that contains this state file. Pointing
+            # head_sha and evidence_closure_commit_sha at that commit still
+            # satisfies head_sha == closure, so the prior-wave tip is pinned too.
+            close_commit = state_pointer_commit()
+            assert FULL_SHA.fullmatch(close_commit)
+            assert state["head_sha"] != close_commit
+            assert closure != close_commit
+            if session == 6:
+                assert state["head_sha"] == SESSION_06_PRIOR_WAVE_TIP
+                assert closure == SESSION_06_PRIOR_WAVE_TIP
 
 
 def test_real_entrypoint_atomically_applies_git_backed_transition(tmp_path: Path) -> None:

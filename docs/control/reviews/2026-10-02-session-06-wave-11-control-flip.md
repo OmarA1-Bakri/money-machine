@@ -60,12 +60,14 @@ No token is stored. This does not make production Notion or Etsy true.
 - **Worker**: LIFTED conditionally (D-0028 commissioning gates).
 - **Scheduler**: HELD.
 
-## Parked #49 nits (non-blocking, not fixed)
+## Parked nits (non-blocking, not fixed)
 
 1. An int-subclass SystemExit code maps to 1.
 2. The False SystemExit row needs an isinstance-style mutant.
 3. Backtick formatting of `__context__` in the #49 PR body.
 4. CodeRabbit APPROVED tip lag on #49.
+5. `connected: true` in fake mode (`notion.py` connect payload). Still open from review 5328507848. Omitted from the first close list, not fixed.
+6. argparse echoing a token passed as an extra argument. Still open from review 5328507848. Omitted from the first close list, not fixed.
 
 ## Out of scope
 
