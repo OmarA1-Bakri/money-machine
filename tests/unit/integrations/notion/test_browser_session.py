@@ -516,8 +516,8 @@ def test_raised_click_stays_unknown_for_any_observe_result(observed: str) -> Non
 
 @pytest.mark.parametrize(
     "raw",
-    [object(), None, "x" * 5000],
-    ids=["object", "none", "long-string"],
+    [object(), None, "x" * 5000, {"a": 1}, ["applied"], "https://x/?token=SECRET"],
+    ids=["object", "none", "long-string", "dict", "list", "token-url"],
 )
 def test_raised_click_observe_value_is_whitelisted(raw: object) -> None:
     manager, driver = _manager()
@@ -555,6 +555,96 @@ def test_raised_click_observe_error_returns_one_unknown_receipt(
     assert len(manager.receipts) == 1
     assert len(driver.clicks) == 1
     assert len(driver.observes) == 1
+    replay = _mutate(manager)
+    assert replay is receipt
+    assert len(driver.clicks) == 1
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        _mutate(manager, key="other")
+
+
+def test_finally_does_not_write_a_second_receipt_after_unknown() -> None:
+    """After _record_unknown stores the key, finally must not write again."""
+    manager, driver = _manager()
+    _open(manager)
+    driver.click_result = RuntimeError("boom")
+    driver.observe_result = "applied"
+    driver.screenshot_error = KeyboardInterrupt("stop")
+    with pytest.raises(KeyboardInterrupt):
+        _mutate(manager)
+    assert len(manager.receipts) == 1
+    assert len(driver.screenshots) == 1
+    receipt = manager.receipts[0]
+    assert receipt.status == "Unknown"
+    assert receipt.evidence == "screenshot-failed"
+    assert receipt.post_state["observed"] == "applied"
+    replay = _mutate(manager)
+    assert replay is receipt
+    assert len(manager.receipts) == 1
+    assert len(driver.screenshots) == 1
+    assert len(driver.clicks) == 1
+
+
+def test_interrupt_during_store_keeps_receipts_aligned() -> None:
+    """A store interrupt cannot leave the seen key out of receipts."""
+
+    class _StoreThenInterrupt(dict[str, NotionOperationReceipt]):
+        def __setitem__(self, key: str, value: NotionOperationReceipt) -> None:
+            super().__setitem__(key, value)
+            raise KeyboardInterrupt("store")
+
+    manager, driver = _manager()
+    _open(manager)
+    manager._seen = _StoreThenInterrupt()  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(KeyboardInterrupt):
+        _mutate(manager)
+    assert len(manager.receipts) == 1
+    assert manager.receipts == tuple(manager._seen.values())  # pyright: ignore[reportPrivateUsage]
+    replay = _mutate(manager)
+    assert replay is manager.receipts[0]
+    assert replay.status == "Success"
+    assert len(driver.clicks) == 1
+    assert len(manager.receipts) == 1
+
+
+def test_forged_observe_subclass_is_unknown() -> None:
+    """A str subclass with a forged equality stays unknown and stores no token."""
+
+    class _Forged(str):
+        def __eq__(self, other: object) -> bool:
+            return other == "applied"
+
+        def __hash__(self) -> int:
+            return hash("applied")
+
+    token = "secret_" + ("z" * 43)
+    manager, driver = _manager()
+    _open(manager)
+    driver.click_result = RuntimeError("boom")
+    driver.observe_result = _Forged(token)
+    receipt = _mutate(manager)
+    assert receipt.status == "Unknown"
+    assert receipt.post_state["observed"] == "unknown"
+    assert type(receipt.post_state["observed"]) is str
+    assert token not in str(receipt.post_state["observed"])
+    replay = _mutate(manager)
+    assert replay is receipt
+    assert len(driver.clicks) == 1
+    with pytest.raises(BrowserSessionError, match="restarted"):
+        _mutate(manager, key="other")
+
+
+def test_raised_click_screenshot_runtime_error_does_not_propagate() -> None:
+    """A screenshot RuntimeError after a raised click stays one Unknown receipt."""
+    manager, driver = _manager()
+    _open(manager)
+    driver.click_result = RuntimeError("boom")
+    driver.observe_result = "applied"
+    driver.screenshot_error = RuntimeError("disk")
+    receipt = _mutate(manager)
+    assert receipt.status == "Unknown"
+    assert receipt.evidence == "screenshot-failed"
+    assert receipt.post_state["observed"] == "applied"
+    assert len(manager.receipts) == 1
     replay = _mutate(manager)
     assert replay is receipt
     assert len(driver.clicks) == 1
@@ -649,6 +739,15 @@ def test_receipts_property_is_a_tuple() -> None:
     _open(manager)
     _mutate(manager)
     assert isinstance(manager.receipts, tuple)
+
+
+def test_receipts_follow_insertion_order() -> None:
+    """receipts yields the seen map in insertion order."""
+    manager, _driver = _manager()
+    _open(manager)
+    first = _mutate(manager, key="first")
+    second = _mutate(manager, key="second")
+    assert manager.receipts == (first, second)
 
 
 def test_read_retries_timeout_then_returns() -> None:
