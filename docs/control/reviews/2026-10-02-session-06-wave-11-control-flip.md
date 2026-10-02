@@ -40,7 +40,7 @@ Same shape as #37 then #38. The candidacy commit records the W10 tip and leaves 
 - `head_sha` and `evidence_closure_commit_sha`: `0f94d585f23d79e5ac18479f01e14f67cbaad332`
 - `last_verified_commit`: unchanged bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`
 - `updated_at`: `2026-10-02T00:51:41Z` (the W10 commit time)
-- `transition_contract.completion_requires_next_session`: stays 4, as on the S04 and S05 closes
+- `transition_contract.completion_requires_next_session`: corrected from 4 to 7 so it matches `next_session`. Leaving it at 4 was drift. It was not the S04 or S05 precedent. `state.py` rejects a completion unless the contract equals `next_session`.
 
 ## External sandbox smoke (not re-run)
 

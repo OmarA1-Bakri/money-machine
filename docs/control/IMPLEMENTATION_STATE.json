@@ -119,7 +119,7 @@
   "transition_contract": {
     "completion_requires_all_evidence_true": true,
     "completion_requires_current_session_in_completed_sessions": true,
-    "completion_requires_next_session": 4,
+    "completion_requires_next_session": 7,
     "completion_requires_distinct_commit_shas": true,
     "completion_requires_existing_git_commits": true,
     "completion_requires_bootstrap_ancestor_of_closure": true,
