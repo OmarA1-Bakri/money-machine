@@ -288,6 +288,16 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
     assert required <= state.keys()
     session = state["current_session"]
     assert session in control_state.SESSION_PROMPTS
+    # Session 6 pins the W10 tip even when session_status is incomplete.
+    # An incomplete revert must still reject the close commit.
+    if session == 6:
+        closure_sha = state["evidence_closure_commit_sha"]
+        close_commit = state_pointer_commit()
+        assert FULL_SHA.fullmatch(close_commit)
+        assert state["head_sha"] != close_commit
+        assert closure_sha != close_commit
+        assert state["head_sha"] == SESSION_06_PRIOR_WAVE_TIP
+        assert closure_sha == SESSION_06_PRIOR_WAVE_TIP
     if state["session_status"] == "incomplete":
         assert state["completed_sessions"] == list(range(session))
         assert state["next_session"] == session
@@ -322,16 +332,11 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
         # For incomplete sessions, head_sha may be ahead of closure (work in progress)
         if state["session_status"] == "complete":
             assert state["head_sha"] == closure
-            # The close commit is the one that contains this state file. Pointing
-            # head_sha and evidence_closure_commit_sha at that commit still
-            # satisfies head_sha == closure, so the prior-wave tip is pinned too.
-            close_commit = state_pointer_commit()
-            assert FULL_SHA.fullmatch(close_commit)
-            assert state["head_sha"] != close_commit
-            assert closure != close_commit
-            if session == 6:
-                assert state["head_sha"] == SESSION_06_PRIOR_WAVE_TIP
-                assert closure == SESSION_06_PRIOR_WAVE_TIP
+            if session != 6:
+                close_commit = state_pointer_commit()
+                assert FULL_SHA.fullmatch(close_commit)
+                assert state["head_sha"] != close_commit
+                assert closure != close_commit
 
 
 def test_real_entrypoint_atomically_applies_git_backed_transition(tmp_path: Path) -> None:
