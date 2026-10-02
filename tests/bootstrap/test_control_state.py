@@ -166,6 +166,28 @@ def state_pointer_commit() -> str:
     return git(ROOT, "log", "-1", "--format=%H", "--", STATE_PATH.relative_to(ROOT).as_posix())
 
 
+def assert_session_six_closure_pins(state: ControlState) -> None:
+    """Fail unless session 6 records the W10 tip and not the close commit."""
+    closure_sha = state["evidence_closure_commit_sha"]
+    close_commit = state_pointer_commit()
+    assert FULL_SHA.fullmatch(close_commit)
+    assert state["head_sha"] != close_commit
+    assert closure_sha != close_commit
+    assert state["head_sha"] == SESSION_06_PRIOR_WAVE_TIP
+    assert closure_sha == SESSION_06_PRIOR_WAVE_TIP
+
+
+def incomplete_session_six_state() -> ControlState:
+    """Session 6 still incomplete: sessions 0-5 are done, and 6 is not."""
+    state = copy.deepcopy(load_state())
+    state["session_status"] = "incomplete"
+    state["current_session"] = 6
+    state["completed_sessions"] = list(range(6))
+    state["head_sha"] = SESSION_06_PRIOR_WAVE_TIP
+    state["evidence_closure_commit_sha"] = SESSION_06_PRIOR_WAVE_TIP
+    return state
+
+
 def completed_candidate(state: ControlState, bootstrap: str, closure: str) -> ControlState:
     candidate = copy.deepcopy(state)
     candidate["transition_contract"] = {
@@ -288,16 +310,8 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
     assert required <= state.keys()
     session = state["current_session"]
     assert session in control_state.SESSION_PROMPTS
-    # Session 6 pins the W10 tip even when session_status is incomplete.
-    # An incomplete revert must still reject the close commit.
     if session == 6:
-        closure_sha = state["evidence_closure_commit_sha"]
-        close_commit = state_pointer_commit()
-        assert FULL_SHA.fullmatch(close_commit)
-        assert state["head_sha"] != close_commit
-        assert closure_sha != close_commit
-        assert state["head_sha"] == SESSION_06_PRIOR_WAVE_TIP
-        assert closure_sha == SESSION_06_PRIOR_WAVE_TIP
+        assert_session_six_closure_pins(state)
     if state["session_status"] == "incomplete":
         assert state["completed_sessions"] == list(range(session))
         assert state["next_session"] == session
@@ -317,7 +331,7 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
         assert evidence.keys() == control_state.SESSION_EVIDENCE_KEYS[session]
         assert all(evidence.values())
     assert state["transition_contract"]["completion_requires_next_session"] == state["next_session"]
-    if session >= 6 or state["state_revision"] >= 48:
+    if state["session_status"] == "complete" and (session >= 6 or state["state_revision"] >= 48):
         assert 6 in state["completed_sessions"]
     if session >= 0 and state["bootstrap_commit_sha"] is not None:
         bootstrap = state["bootstrap_commit_sha"]
@@ -337,6 +351,25 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
                 assert FULL_SHA.fullmatch(close_commit)
                 assert state["head_sha"] != close_commit
                 assert closure != close_commit
+
+
+def test_incomplete_session_six_closure_pin() -> None:
+    """Run the session 6 SHA pin on an incomplete session, not only the checked-in file."""
+    passing = incomplete_session_six_state()
+    assert passing["session_status"] != "complete"
+    assert passing["current_session"] == 6
+    assert passing["completed_sessions"] == [0, 1, 2, 3, 4, 5]
+    assert_session_six_closure_pins(passing)
+
+    close_commit = state_pointer_commit()
+    for field in ("head_sha", "evidence_closure_commit_sha"):
+        mutant = incomplete_session_six_state()
+        if field == "head_sha":
+            mutant["head_sha"] = close_commit
+        else:
+            mutant["evidence_closure_commit_sha"] = close_commit
+        with pytest.raises(AssertionError):
+            assert_session_six_closure_pins(mutant)
 
 
 def test_real_entrypoint_atomically_applies_git_backed_transition(tmp_path: Path) -> None:
