@@ -363,11 +363,10 @@ def test_incomplete_session_six_closure_pin(monkeypatch: pytest.MonkeyPatch) -> 
     """Incomplete session 6 must enter the continuity test's `if session == 6` call."""
 
     def check(state: ControlState) -> None:
-        monkeypatch.setattr(
-            sys.modules[__name__],
-            "load_state",
-            lambda *_args, bound=state: bound,
-        )
+        def load_bound(_path: Path = STATE_PATH) -> ControlState:
+            return state
+
+        monkeypatch.setattr(sys.modules[__name__], "load_state", load_bound)
         test_checked_in_state_is_a_valid_session_continuity_shape()
 
     passing = incomplete_session_six_state()
