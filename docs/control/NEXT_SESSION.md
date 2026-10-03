@@ -1,6 +1,8 @@
 # Next Session
 
-**Session 05 is COMPLETE** (2026-09-24, W11 control flip @ `9b791d45`) — domain agent implementation delivered L1-L4 (Etsy adapters, A03 research, A05 scoring/ProductSpec, A06 dedupe/workflow linking). Exit 78 unchanged: worker conditional lift (D-0028 gates), scheduler held.
+**Session 06 is COMPLETE** (2026-10-02, W11 control flip @ `0f94d585`) — Notion integration foundation delivered W1–W10 (#39–#49). All eight evidence keys TRUE. Exit 78 unchanged: worker conditional lift (D-0028 gates), scheduler held. No production Notion or Etsy mutation. Default CLI probe remains `FakeNotionProbe`.
+
+**Session 05 is COMPLETE** (2026-09-24, W11 control flip @ `9b791d45`) — domain agent implementation delivered L1-L4 (Etsy adapters, A03 research, A05 scoring/ProductSpec, A06 dedupe/workflow linking).
 
 ## Session 05 completion status (post-W11 @ `9b791d45`)
 
@@ -20,9 +22,21 @@
 
 **Parked L2-L4 nits (non-blocking):** concept_fingerprint drift, evidence SHA self-dump, differentiation self-desc, fail-open suppress, result_id=spec_id. Noted as carry-forward improvement opportunities.
 
-## Session 06 — (Future work)
+## Session 06 completion status (post-W11 @ `0f94d585`)
 
-**Status**: Not started. Session 06 prompt: `09_SESSION_06_NOTION_INTEGRATION_FOUNDATION.md`.
+| Wave | Status | Evidence key(s) |
+|---|---|---|
+| W1 — capability matrix, interface, fixture, router | **COMPLETE** | `notion_capability_inspected`, `platform_compatibility_documented`, `notion_adapter_interface_defined`, `fixture_adapter_implemented`, `adapter_router_implemented` |
+| W2–W10 — adapters, builders, browser session, fake CLI | **COMPLETE** | `adapter_unit_tests_pass` (1958 passed, 1 skipped at W10) |
+| W11 — control flip | **COMPLETE** | `control_files_and_checkpoint_current`, `evidence_closure_commit_recorded` |
+
+Router browser and combined config modes still raise `NotImplementedError` (W4a). Fixture mode stays the default.
+
+## Session 07 — (Future work)
+
+**Status**: Not started. Session 07 prompt: `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`.
+
+## Later sessions
 
 **Session 05 delivered scope**:
 - L1: Etsy fixture adapter, browser/API stubs, config-driven seed phrases, comprehensive tests
@@ -30,7 +44,7 @@
 - L3: A05 Product Strategy scorer (four-criterion: price/demand/young-fast shops/thin evidence), qualification gate (≥20/40), ProductSpec generation
 - L4: A06 Catalogue Dedupe agent (three-rule: exact identity×category, title Jaccard ≥0.7, concept fingerprint), PASS/TOO_CLOSE branching, EventDispatcher workflow linking, fixture teardown
 
-**Remaining domain agent scope** (Session 06+):
+**Remaining domain agent scope** (Session 07+):
 - Concept agent (A04): concept definition, differentiation, design specification
 - Notion Build agent (A07): workspace setup, database schema, draft pages (successor to DEDUPE_PASSED)
 - Variant agent (A08): colour/hub expansion, SKU generation
@@ -40,14 +54,14 @@
 - Publisher agent (A12): Etsy draft creation, publication, link verification
 - Analytics agent (A14): metrics collection, performance analysis
 
-Session 06+ will promote remaining domain agents from DESIGNED to TESTED with:
+Later sessions will promote remaining domain agents from DESIGNED to TESTED with:
 - Agent-specific prompts (v1)
 - Integration tests (real database, fake providers)
 - Contract tests (prompt integrity, tool permissions, commissioning refusal)
 - Commissioning evidence gates per D-0028
 - No live Notion/Etsy mutations until commissioning approval
 
-Session 06+ does NOT include:
+Those sessions do NOT include:
 - Scheduler Exit 78 lift (deferred; promote/stalled-detection/rebalance cycle scope)
 - Live production claims
 - Commissioning approval to COMMISSIONED state (requires operator decision record)
@@ -70,6 +84,13 @@ Session 03 closed 2026-09-19 after Verifier FINAL PASS (#17). Gap-close implemen
   3. **Differentiation self-description**: Dedupe differentiation_evidence describes candidate's own fields (dedupe.py:216-225) rather than comparative differentiation from catalogue
   4. **Fail-open suppression**: A06 uses contextlib.suppress(Exception) on invalid spec parsing (catalogue_dedupe.py:115) instead of fail-closed refusal
   5. **Result ID reuse**: Dedupe result_id = spec_id (dedupe.py:231) — could use distinct UUID for audit trail clarity
+- **S06 parked nits** (non-blocking, not fixed in the close):
+  1. An int-subclass SystemExit code maps to 1
+  2. The False SystemExit row needs an isinstance-style mutant
+  3. Backtick formatting of `__context__` in the #49 PR body
+  4. CodeRabbit APPROVED tip lag on #49
+  5. `connected: true` in fake mode (`notion.py` connect payload), still open from review 5328507848
+  6. argparse echoing a token passed as an extra argument, still open from review 5328507848
 
 ## Environment notes
 

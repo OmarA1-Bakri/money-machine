@@ -31,6 +31,11 @@ BOOTSTRAP_SUBJECT = "chore(bootstrap): initialise money machine autonomous monor
 OUTER_GATES_BLOCKER = "SESSION_00_OUTER_GATES_PENDING"
 CLOSURE_EVIDENCE_KEY = "evidence_closure_commit_recorded"
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
+# Continuity rule: last_verified_commit names the bootstrap commit, not the
+# closure tip and not the commit that records a later completion.
+BOOTSTRAP_COMMIT_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
+# Session 06 close records the W10 squash (#49), not the state-pointer commit.
+SESSION_06_PRIOR_WAVE_TIP = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
 
 
 class ControlState(TypedDict):
@@ -156,6 +161,39 @@ def git(repo: Path, *arguments: str, stdin: str | None = None) -> str:
     ).stdout.strip()
 
 
+def state_pointer_commit() -> str:
+    """Commit that contains the checked-in continuity file (the close commit)."""
+    return git(ROOT, "log", "-1", "--format=%H", "--", STATE_PATH.relative_to(ROOT).as_posix())
+
+
+def assert_session_six_closure_pins(state: ControlState) -> None:
+    """Fail unless session 6 records the W10 tip and not the close commit."""
+    closure_sha = state["evidence_closure_commit_sha"]
+    close_commit = state_pointer_commit()
+    assert FULL_SHA.fullmatch(close_commit)
+    assert state["head_sha"] != close_commit
+    assert closure_sha != close_commit
+    assert state["head_sha"] == SESSION_06_PRIOR_WAVE_TIP
+    assert closure_sha == SESSION_06_PRIOR_WAVE_TIP
+
+
+def incomplete_session_six_state() -> ControlState:
+    """Session 6 still incomplete: sessions 0-5 are done, and 6 is not."""
+    state = copy.deepcopy(load_state())
+    state["session_status"] = "incomplete"
+    state["current_session"] = 6
+    state["completed_sessions"] = list(range(6))
+    state["next_session"] = 6
+    state["next_prompt"] = control_state.SESSION_PROMPTS[6]
+    state["transition_contract"] = {
+        **state["transition_contract"],
+        "completion_requires_next_session": 6,
+    }
+    state["head_sha"] = SESSION_06_PRIOR_WAVE_TIP
+    state["evidence_closure_commit_sha"] = SESSION_06_PRIOR_WAVE_TIP
+    return state
+
+
 def completed_candidate(state: ControlState, bootstrap: str, closure: str) -> ControlState:
     candidate = copy.deepcopy(state)
     candidate["transition_contract"] = {
@@ -278,6 +316,8 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
     assert required <= state.keys()
     session = state["current_session"]
     assert session in control_state.SESSION_PROMPTS
+    if session == 6:
+        assert_session_six_closure_pins(state)
     if state["session_status"] == "incomplete":
         assert state["completed_sessions"] == list(range(session))
         assert state["next_session"] == session
@@ -296,6 +336,9 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
         evidence = state["required_completion_evidence"]
         assert evidence.keys() == control_state.SESSION_EVIDENCE_KEYS[session]
         assert all(evidence.values())
+    assert state["transition_contract"]["completion_requires_next_session"] == state["next_session"]
+    if state["session_status"] == "complete" and (session >= 6 or state["state_revision"] >= 48):
+        assert 6 in state["completed_sessions"]
     if session >= 0 and state["bootstrap_commit_sha"] is not None:
         bootstrap = state["bootstrap_commit_sha"]
         closure = state["evidence_closure_commit_sha"]
@@ -303,10 +346,44 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
         assert FULL_SHA.fullmatch(closure or "")
         assert bootstrap != closure
         assert state["last_verified_commit"] == bootstrap
+        assert state["last_verified_commit"] == BOOTSTRAP_COMMIT_SHA
+        assert bootstrap == BOOTSTRAP_COMMIT_SHA
         # head_sha must equal closure for complete sessions (evidence finalized)
         # For incomplete sessions, head_sha may be ahead of closure (work in progress)
         if state["session_status"] == "complete":
             assert state["head_sha"] == closure
+            if session != 6:
+                close_commit = state_pointer_commit()
+                assert FULL_SHA.fullmatch(close_commit)
+                assert state["head_sha"] != close_commit
+                assert closure != close_commit
+
+
+def test_incomplete_session_six_closure_pin(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Incomplete session 6 must enter the continuity test's `if session == 6` call."""
+
+    def check(state: ControlState) -> None:
+        def load_bound(_path: Path = STATE_PATH) -> ControlState:
+            return state
+
+        monkeypatch.setattr(sys.modules[__name__], "load_state", load_bound)
+        test_checked_in_state_is_a_valid_session_continuity_shape()
+
+    passing = incomplete_session_six_state()
+    assert passing["session_status"] != "complete"
+    assert passing["current_session"] == 6
+    assert passing["completed_sessions"] == [0, 1, 2, 3, 4, 5]
+    check(passing)
+
+    close_commit = state_pointer_commit()
+    for field in ("head_sha", "evidence_closure_commit_sha"):
+        mutant = incomplete_session_six_state()
+        if field == "head_sha":
+            mutant["head_sha"] = close_commit
+        else:
+            mutant["evidence_closure_commit_sha"] = close_commit
+        with pytest.raises(AssertionError):
+            check(mutant)
 
 
 def test_real_entrypoint_atomically_applies_git_backed_transition(tmp_path: Path) -> None:
