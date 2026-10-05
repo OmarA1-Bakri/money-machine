@@ -32,9 +32,11 @@
 
 Router browser and combined config modes still raise `NotImplementedError` (W4a). Fixture mode stays the default.
 
-## Session 07 — (Future work)
+## Session 07 — Wave 1 in progress
 
-**Status**: Not started. Session 07 prompt: `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`.
+**Status**: Activated and incomplete (2026-10-03, W1, state revision 49). This is not a session close. Twelve evidence keys are installed and each one is false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty.
+
+W1 delivers fixture-only phase 1: one unpublished top-level page and one palette design-shell callout from a validated `product_spec.ProductSpec`, persisted so a later wave can resume at `shared_databases`. Shared databases, dashboards, hubs, the notification dashboard, variants, QA, the fact ledger, and the workflow link are later waves. Exit 78 scheduler stays HELD. No live Notion or Etsy mutation. Parked S06 nits stay parked.
 
 ## Later sessions
 
