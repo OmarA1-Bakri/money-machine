@@ -145,6 +145,8 @@ class NotionLinkedView:
     source_database_id: str
     parent_page_id: str
     view_type: str = "table"  # table | board | calendar
+    name: str = ""
+    filters: tuple[tuple[str, str, str], ...] = ()
 
 
 @dataclass
