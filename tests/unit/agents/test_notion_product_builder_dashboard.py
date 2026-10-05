@@ -51,7 +51,7 @@ WHEN = datetime(2026, 10, 3, 0, 30, tzinfo=UTC)
 PHASE_TWO_AT = datetime(2026, 10, 5, 20, 0, tzinfo=UTC)
 LATER = datetime(2026, 10, 5, 22, 30, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "676fabef5bd1b36018f1d2d539d282225d860a99"
+HEAD_SHA = "0f67dc92d5c4bdc105a3801ed5b5f7b517c66283"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 _PHASES = (
     PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL,
@@ -665,5 +665,5 @@ def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     evidence = state["required_completion_evidence"]
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
     assert all(value is False for value in evidence.values())
-    assert state["state_revision"] == 51
+    assert state["state_revision"] == 52
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")

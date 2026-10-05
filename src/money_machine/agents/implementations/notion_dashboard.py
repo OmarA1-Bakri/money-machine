@@ -194,6 +194,11 @@ def _load_checkpoint(path: Path) -> ProductBuildCheckpoint:
     raise ProductBuildError("dashboard requires the shared databases checkpoint")
 
 
+def parse_dashboard_checkpoint(payload: dict[object, object]) -> ProductBuildCheckpoint:
+    """Parse a checkpoint that records the home dashboard."""
+    return _parse_dashboard_checkpoint(payload)
+
+
 def _parse_dashboard_checkpoint(payload: dict[object, object]) -> ProductBuildCheckpoint:
     if not exact_keys(payload, CHECKPOINT_KEYS):
         raise ProductBuildError("checkpoint fields are missing or unsupported")
@@ -268,6 +273,15 @@ def _one_workspace(probe: FixtureNotionAdapter) -> str:
 def _require_one_page(probe: FixtureNotionAdapter) -> None:
     if len(probe.pages) > 1:
         raise ProductBuildError("dashboard page is unexpected")
+
+
+def require_home_page(
+    probe: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+) -> NotionPage:
+    """Return the saved top-level page, or raise when it does not match."""
+    return _require_home_page(probe, stored, spec)
 
 
 def _require_home_page(
@@ -512,18 +526,17 @@ def _view_id(views: dict[str, NotionLinkedView | None], kind: str) -> str:
     return view.id
 
 
-def _require_resumed_dashboard(
+def require_dashboard_pieces(
     probe: FixtureNotionAdapter,
     page: NotionPage,
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
 ) -> None:
+    """Check each saved dashboard piece. Other pages are left for the caller."""
     kinds = tuple(kind for kind, _database_id in stored.database_ids)
     if tuple(kind for kind, _value in stored.dashboard_pieces) != _piece_kinds(kinds):
         raise ProductBuildError("checkpoint dashboard does not match the ProductSpec")
-    by_kind: dict[str, list[str]] = {}
-    for kind, value in stored.dashboard_pieces:
-        by_kind.setdefault(kind, []).append(value)
+    by_kind = _pieces_by_kind(stored)
     if page.cover != palette_cover(spec) or by_kind["cover"] != [palette_cover(spec)]:
         raise ProductBuildError("dashboard piece is missing")
     if page.icon != palette_header(spec) or by_kind["header"] != [palette_header(spec)]:
@@ -535,6 +548,40 @@ def _require_resumed_dashboard(
     database_ids = dict(stored.database_ids)
     for kind, view in _linked_views(kinds):
         _require_view(probe, page, by_kind[kind][0], database_ids[view.data_type], view)
+
+
+def dashboard_provider_references(checkpoint: ProductBuildCheckpoint) -> dict[str, object]:
+    """Provider ids recorded for the home dashboard checkpoint."""
+    return {
+        _DASHBOARD_KEY: [
+            {"kind": kind, _PIECE_FIELDS[kind]: value}
+            for kind, value in checkpoint.dashboard_pieces
+        ],
+        "design_shell_block_id": checkpoint.shell_block_id,
+        _SHARED_KEY: [
+            {"database_id": database_id, "kind": kind}
+            for kind, database_id in checkpoint.database_ids
+        ],
+        "top_level_page_id": checkpoint.page_id,
+        "workspace_id": checkpoint.workspace_id,
+    }
+
+
+def _pieces_by_kind(stored: ProductBuildCheckpoint) -> dict[str, list[str]]:
+    by_kind: dict[str, list[str]] = {}
+    for kind, value in stored.dashboard_pieces:
+        by_kind.setdefault(kind, []).append(value)
+    return by_kind
+
+
+def _require_resumed_dashboard(
+    probe: FixtureNotionAdapter,
+    page: NotionPage,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+) -> None:
+    require_dashboard_pieces(probe, page, stored, spec)
+    by_kind = _pieces_by_kind(stored)
     expected_blocks = {
         stored.shell_block_id,
         by_kind["greeting"][0],
@@ -608,19 +655,7 @@ def _write_dashboard_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) 
         "palette_name": checkpoint.palette_name,
         "palette_tokens": [list(token) for token in checkpoint.palette_tokens],
         "product_id": checkpoint.product_id,
-        "provider_object_references": {
-            _DASHBOARD_KEY: [
-                {"kind": kind, _PIECE_FIELDS[kind]: value}
-                for kind, value in checkpoint.dashboard_pieces
-            ],
-            "design_shell_block_id": checkpoint.shell_block_id,
-            _SHARED_KEY: [
-                {"database_id": database_id, "kind": kind}
-                for kind, database_id in checkpoint.database_ids
-            ],
-            "top_level_page_id": checkpoint.page_id,
-            "workspace_id": checkpoint.workspace_id,
-        },
+        "provider_object_references": dashboard_provider_references(checkpoint),
         "recorded_at": checkpoint.recorded_at.isoformat(),
         "spec_id": checkpoint.spec_id,
     }

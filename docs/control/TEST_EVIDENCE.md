@@ -1,5 +1,21 @@
 # Test Evidence
 
+## 2026-10-05 — Session 07 W4: fixture identity hubs
+
+**Verification scope**: Fixture-only identity hubs, resumed from the dashboard checkpoint, plus the incomplete-session tip-sync. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Postgres, Alembic, pnpm, and Compose were not required for this slice and were not run.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `completed_sessions` `[0, 1, 2, 3, 4, 5, 6]`, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`, including `home_dashboard_built`, `identity_hubs_built`, `notification_dashboard_built`, and `product_build_tests_pass` | PASS |
+| Tip-sync | `head_sha` is `0f67dc92d5c4bdc105a3801ed5b5f7b517c66283`. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. `state_revision` is 52 | PASS |
+| Identity hubs | `tests/unit/agents/test_notion_product_builder_hubs.py`, the dashboard file, the shared-database file, the phase-1 file, and `tests/bootstrap/test_prompt_integrity.py`: 115 passed. Mass and business tiers are both covered. `ruff format`, `ruff check`, and `pyright` are clean on the changed paths. 40 mutations of `notion_hubs.py` were each applied, tested, and reverted; all 40 were killed | PASS for this slice |
+| Next phase | Checkpoint `next_phase` is `notification_dashboard`. That phase is not executed | PASS |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+| Parked items | S06 nits, the #51 published-page mutant, the #52 shared-database nits, and the #53 dashboard nits stay parked | PARKED |
+
+**Status**: Session 07 Wave 4. The session stays incomplete. Exit 78 stays HELD. No session exit code is recorded.
+
 ## 2026-10-05 — Session 07 W3: fixture dashboard and navigation
 
 **Verification scope**: Fixture-only home dashboard, resumed from the shared-databases checkpoint, plus the incomplete-session tip-sync. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Postgres, Alembic, pnpm, and Compose were not required for this slice and were not run.
