@@ -2,6 +2,7 @@
 
 Session 07 prompt action 1. This module stores the top-level page and design
 shell. Shared databases resume that checkpoint from notion_shared_databases.
+The home dashboard resumes the shared-database checkpoint from notion_dashboard.
 A07, A08, and A09 stay DESIGNED. This module does not commission an agent,
 open a network connection, or run a later build phase. The catalogue
 ProductSpec is not an input.
@@ -81,6 +82,7 @@ class ProductBuildCheckpoint:
     palette_tokens: tuple[tuple[str, str], ...]
     recorded_at: datetime
     database_ids: tuple[tuple[str, str], ...] = ()
+    dashboard_pieces: tuple[tuple[str, str], ...] = ()
 
 
 def design_shell_content(spec: ProductSpec) -> str:

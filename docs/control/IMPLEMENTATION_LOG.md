@@ -1,5 +1,56 @@
 # Implementation Log
 
+## 2026-10-05 — Session 07 W3: tip-sync and fixture dashboard
+
+Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision 50 → 51. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. `head_sha` moves to the post-merge W2 tip `676fabef5bd1b36018f1d2d539d282225d860a99`. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`: an incomplete session may record a later `head_sha`, and this wave is not the completion candidacy that would move the closure SHA. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-05T22:30:00Z`.
+
+Twelve session 7 evidence keys stay false, including `shared_databases_built`, `home_dashboard_built`, `notification_dashboard_built`, `product_build_tests_pass`, `control_files_and_checkpoint_current`, and `evidence_closure_commit_recorded`. No session exit code is recorded. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty.
+
+Home dashboard only, in `notion_dashboard.py`, resuming the checkpoint `top_level_page_and_design_shell` + `shared_databases` on an exact `FixtureNotionAdapter` from an exact `product_spec.ProductSpec`. The page gains a palette cover and header, a greeting, hub navigation as text, a Today linked view on Tasks, a Quick notes linked view on Notes, and two identity callouts. The mass tier also stores a Month calendar linked to Events. The business tier has no Events database and no monthly calendar. A second call does not create another block or view. A missing page, database, or dashboard piece behind the saved checkpoint is an error. The checkpoint records `dashboard_and_navigation`. The next phase is `identity_specific_hubs` and this wave does not run it. The one-row notification dashboard, identity hubs, variants, QA, the fact ledger, and the workflow link are not built. No live HTTP, no real Notion workspace, no Etsy listing.
+
+Prompt-integrity review: `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md`. Focused tests: 80 passed across the dashboard, shared-database, and phase-1 files. `ruff format`, `ruff check`, and `pyright` are clean on the touched paths.
+
+Mutation checks (34 rows; each applied to `notion_dashboard.py`, the dashboard test file run, then reverted; 34 killed):
+
+| Mutation | Site | Failing test |
+|---|---|---|
+| Greeting drops the identity | `notion_dashboard.py:116` | `test_mass_tier_builds_the_home_dashboard_once` |
+| Greeting is hardcoded to Weekly Planner | `notion_dashboard.py:116` | `test_business_tier_omits_the_event_calendar` |
+| Navigation returns only the word navigate | `notion_dashboard.py:121` | `test_mass_tier_builds_the_home_dashboard_once` |
+| Cover uses an https URL | `notion_dashboard.py:105` | `test_mass_tier_builds_the_home_dashboard_once` |
+| Header is the design-shell icon | `notion_dashboard.py:111` | `test_mass_tier_builds_the_home_dashboard_once` |
+| Monthly calendar is never linked | `notion_dashboard.py:324` | `test_mass_tier_builds_the_home_dashboard_once` |
+| Monthly calendar is linked for every tier | `notion_dashboard.py:324` | `test_business_tier_omits_the_event_calendar` |
+| Linked view stores no filters | `notion_dashboard.py:476` | `test_mass_tier_builds_the_home_dashboard_once` |
+| Every linked view is a table | `notion_dashboard.py:474` | `test_mass_tier_builds_the_home_dashboard_once` |
+| Every linked view is created from Tasks | `notion_dashboard.py:466` | `test_mass_tier_builds_the_home_dashboard_once` |
+| Classify matches a linked view against Tasks | `notion_dashboard.py:415` | `test_matching_month_view_is_adopted` |
+| Callout icon is the design shell icon | `notion_dashboard.py:62` | `test_mass_tier_builds_the_home_dashboard_once` |
+| Skip the fixture probe check | `notion_dashboard.py:143` | `test_catalogue_spec_and_live_probes_are_rejected` |
+| Skip resume of a stored dashboard | `notion_dashboard.py:153` | `test_replay_does_not_create_another_dashboard` |
+| Skip the stored database check | `notion_dashboard.py:152` | `test_missing_database_is_not_rebuilt` |
+| Accept a published page | `notion_dashboard.py:294` | `test_published_page_is_rejected` |
+| Skip the single-line field check | `notion_dashboard.py:146` | `test_newline_in_the_buyer_problem_creates_nothing` |
+| Allow a second page | `notion_dashboard.py:269` | `test_hub_page_is_not_created` |
+| Resume ignores tampered filters | `notion_dashboard.py:598` | `test_tampered_today_filter_is_not_rewritten` |
+| Always create a new greeting | `notion_dashboard.py:454` | `test_matching_pieces_are_adopted` |
+| Skip the ProductSpec check | `notion_dashboard.py:142` | `test_catalogue_spec_and_live_probes_are_rejected` |
+| Skip the same-spec check | `notion_dashboard.py:148` | `test_other_spec_does_not_build_a_dashboard` |
+| Accept a naive recorded_at | `notion_dashboard.py:145` | `test_naive_recorded_at_leaves_the_checkpoint_unchanged` |
+| Linked view name is blank | `notion_dashboard.py:475` | `test_mass_tier_builds_the_home_dashboard_once` |
+| Resume rejects the stored view set | `notion_dashboard.py:555` | `test_replay_does_not_create_another_dashboard` |
+| Checkpoint always records a month piece | `notion_dashboard.py:497` | `test_business_tier_omits_the_event_calendar` |
+| Next phase skips identity hubs | `notion_dashboard.py:252` | `test_mass_tier_builds_the_home_dashboard_once` |
+| Wrong cover is overwritten | `notion_dashboard.py:434` | `test_wrong_cover_is_not_rewritten` |
+| Quick notes view is omitted | `notion_dashboard.py:325` | `test_mass_tier_builds_the_home_dashboard_once` |
+| Piece kinds always follow the mass tier | `notion_dashboard.py:307` | `test_business_tier_omits_the_event_calendar` |
+| A duplicate greeting is adopted | `notion_dashboard.py:375` | `test_duplicate_greeting_is_rejected` |
+| Module names notion_client | `notion_dashboard.py:630` | `test_dashboard_module_does_not_name_a_live_client` |
+| Module names publish_page | `notion_dashboard.py:630` | `test_dashboard_module_does_not_name_a_live_client` |
+| Module names create_database | `notion_dashboard.py:630` | `test_dashboard_module_does_not_name_a_live_client` |
+
+Exit 78 scheduler stays HELD. Parked S06 nits stay parked. The #51 published-page mutant and the #52 shared-database nits stay parked.
+
 ## 2026-10-05 — Session 07 W2: tip-sync and fixture shared databases
 
 Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision 49 → 50. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. `head_sha` moves to the post-merge W1 tip `b0536cd0fea41018be8f7561a7f2193752cd5f24`. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`: an incomplete session may record a later `head_sha`, and this wave is not the completion candidacy that would move the closure SHA. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-05T20:00:00Z`.

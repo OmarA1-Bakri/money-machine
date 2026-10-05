@@ -32,11 +32,11 @@
 
 Router browser and combined config modes still raise `NotImplementedError` (W4a). Fixture mode stays the default.
 
-## Session 07 — Wave 2 in progress
+## Session 07 — Wave 3 in progress
 
-**Status**: Incomplete (2026-10-05, W2, state revision 50). This is not a session close. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. `head_sha` is the W1 post-merge tip `b0536cd0fea41018be8f7561a7f2193752cd5f24`. `evidence_closure_commit_sha` stays the Session 06 closure tip.
+**Status**: Incomplete (2026-10-05, W3, state revision 51). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. `head_sha` is the W2 post-merge tip `676fabef5bd1b36018f1d2d539d282225d860a99`. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap.
 
-W1 delivered fixture-only phase 1: one unpublished top-level page and one palette design-shell callout. W2 resumes that checkpoint and stores the canonical shared databases on `FixtureNotionAdapter`. The next phase is `dashboard_and_navigation` and is not run. Dashboards, hubs, the notification dashboard, variants, QA, the fact ledger, and the workflow link are later waves. Exit 78 scheduler stays HELD. No live Notion or Etsy mutation. Parked S06 nits stay parked.
+W1 delivered fixture-only phase 1: one unpublished top-level page and one palette design-shell callout. W2 resumes that checkpoint and stores the canonical shared databases on `FixtureNotionAdapter`. W3 resumes those two phases and stores the home dashboard: palette cover and header, greeting, hub navigation, today's priorities, quick notes, and two identity callouts. The mass tier also stores a monthly calendar on Events. The business tier has no Events database and no monthly calendar. The checkpoint records `dashboard_and_navigation`. The next phase is `identity_specific_hubs` and is not run. The one-row notification dashboard, variants, QA, the fact ledger, and the workflow link are later waves. Exit 78 scheduler stays HELD. No live Notion or Etsy mutation. Parked S06 nits, the #51 published-page mutant, and the #52 shared-database nits stay parked.
 
 ## Later sessions
 

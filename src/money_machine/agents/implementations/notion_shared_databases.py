@@ -68,6 +68,11 @@ _PHASE_ONE_NAMES = (PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL,)
 _PHASE_TWO_NAMES = (PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL, PHASE_SHARED_DATABASES)
 
 
+def shared_database_kinds(spec: ProductSpec) -> tuple[str, ...]:
+    """Mass and business catalogue sets. A named subset must match the tier."""
+    return _shared_database_kinds(spec)
+
+
 def _shared_database_kinds(spec: ProductSpec) -> tuple[str, ...]:
     """Playbook defaults for mass, the business set for business, both canonical."""
     if spec.tier == _TIER_MASS:
@@ -130,6 +135,11 @@ def _read_product_checkpoint(path: Path) -> ProductBuildCheckpoint | None:
     names = payload.get("checkpoint_names")
     if names == list(_PHASE_ONE_NAMES):
         return parse_checkpoint(decoded)
+    return _parse_shared_checkpoint(payload)
+
+
+def parse_shared_databases_checkpoint(payload: dict[object, object]) -> ProductBuildCheckpoint:
+    """Parse a checkpoint that records phase 1 and the shared databases."""
     return _parse_shared_checkpoint(payload)
 
 
@@ -312,6 +322,16 @@ async def _ensure_databases(
             existing = await _create_shared_database(probe, page.id, kind)
         created.append((kind, existing.id))
     return tuple(created)
+
+
+def require_checkpoint_databases(
+    probe: FixtureNotionAdapter,
+    page: NotionPage,
+    stored: ProductBuildCheckpoint,
+    kinds: tuple[str, ...],
+) -> None:
+    """Reject a checkpoint whose databases are missing, duplicated, or off-schema."""
+    _require_resumed_databases(probe, page, stored, kinds)
 
 
 def _require_resumed_databases(
