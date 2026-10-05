@@ -1,5 +1,20 @@
 # Test Evidence
 
+## 2026-10-05 — Session 07 W2: fixture shared databases
+
+**Verification scope**: Fixture-only shared databases, resumed from the W1 checkpoint, plus the incomplete-session tip-sync. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Postgres, Alembic, pnpm, and Compose were not required for this slice and were not run.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `completed_sessions` `[0, 1, 2, 3, 4, 5, 6]`, `next_session` 7, `next_prompt` unchanged | PASS |
+| Evidence keys | Twelve session 7 keys remain `false` | PASS |
+| Tip-sync | `head_sha` is `b0536cd0fea41018be8f7561a7f2193752cd5f24`. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap | PASS |
+| Shared databases | `tests/unit/agents/test_notion_product_builder_shared_databases.py` and `tests/unit/agents/test_notion_product_builder_phase1.py`: 56 passed. The shared-database file covers create, resume, no duplicate store, fixture-only rejection of a live probe, and the source ban. `ruff format`, `ruff check`, and `pyright` are clean on the changed paths | PASS for this slice |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+| S06 parked nits | Left parked | PARKED |
+
+**Status**: Session 07 Wave 2. The session stays incomplete. No session exit code is recorded.
+
 ## 2026-10-03 — Session 07 W1: fixture phase 1
 
 **Verification scope**: Fixture-only phase 1 and the session-7 activation. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Postgres, Alembic, pnpm, and Compose were not required for this slice and were not run.

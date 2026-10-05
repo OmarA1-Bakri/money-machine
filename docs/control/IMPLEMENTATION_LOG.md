@@ -1,5 +1,15 @@
 # Implementation Log
 
+## 2026-10-05 — Session 07 W2: tip-sync and fixture shared databases
+
+Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision 49 → 50. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. `head_sha` moves to the post-merge W1 tip `b0536cd0fea41018be8f7561a7f2193752cd5f24`. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`: an incomplete session may record a later `head_sha`, and this wave is not the completion candidacy that would move the closure SHA. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-05T20:00:00Z`.
+
+Twelve session 7 evidence keys stay false, including `shared_databases_built`, `product_build_tests_pass`, `control_files_and_checkpoint_current`, and `evidence_closure_commit_recorded`. No session exit code is recorded. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty.
+
+Shared databases only, in `notion_shared_databases.py`, resuming the W1 checkpoint `top_level_page_and_design_shell` on `FixtureNotionAdapter` from an exact `product_spec.ProductSpec`. Mass tier stores Tasks, Events, Habits, Finance, Meals, and Notes. Business tier stores Clients, Projects, Content, Invoices, Tasks, and Notes. Each database is parented to the unpublished top-level page and uses the catalogue schema. A second call does not create another database. A missing database behind the saved checkpoint is an error. The checkpoint records both phase names and the provider ids. The next phase is `dashboard_and_navigation` and this wave does not run it. Dashboards, hubs, the notification dashboard, variants, QA, the fact ledger, and the workflow link are not built. No live HTTP, no real Notion workspace, no Etsy listing.
+
+Exit 78 scheduler stays HELD. Parked S06 nits stay parked. The published-page mutant from #51 stays parked.
+
 ## 2026-10-03 — Session 07 W1: activation and fixture phase 1
 
 Session 07 is activated and incomplete. This wave does not close the session. State revision 48 → 49. `current_session` is 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. `head_sha` and `evidence_closure_commit_sha` stay the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-03T00:30:00Z`.

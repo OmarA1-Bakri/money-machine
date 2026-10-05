@@ -1,8 +1,10 @@
-"""A07 phase 1: top-level page and design shell on the fixture Notion probe.
+"""A07 fixture phase 1: top-level page and design shell.
 
-Session 07 prompt action 1, phase 1 only. A07, A08, and A09 stay DESIGNED.
-This module does not commission an agent, open a network connection, or run a
-later build phase. The catalogue ProductSpec is not this phase's input.
+Session 07 prompt action 1. This module stores the top-level page and design
+shell. Shared databases resume that checkpoint from notion_shared_databases.
+A07, A08, and A09 stay DESIGNED. This module does not commission an agent,
+open a network connection, or run a later build phase. The catalogue
+ProductSpec is not an input.
 """
 
 from __future__ import annotations
@@ -25,10 +27,11 @@ from money_machine.integrations.notion.fixture_adapter import FixtureNotionAdapt
 
 PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL = "top_level_page_and_design_shell"
 PHASE_SHARED_DATABASES = "shared_databases"
+PHASE_DASHBOARD_AND_NAVIGATION = "dashboard_and_navigation"
 BUILD_PHASES: tuple[str, ...] = (
     PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL,
     PHASE_SHARED_DATABASES,
-    "dashboard_and_navigation",
+    PHASE_DASHBOARD_AND_NAVIGATION,
     "identity_specific_hubs",
     "notification_dashboard",
     "aesthetics_and_content_completion",
@@ -41,7 +44,7 @@ PRODUCT_ID_PROPERTY = "product_id"
 SHELL_BLOCK_PROPERTY = "design_shell_block_id"
 _TOP_LEVEL_PARENT = "workspace"
 _PATH_TYPES = (PosixPath, WindowsPath)
-_CHECKPOINT_KEYS = frozenset(
+CHECKPOINT_KEYS = frozenset(
     {
         "build_kind",
         "build_version",
@@ -54,16 +57,16 @@ _CHECKPOINT_KEYS = frozenset(
         "spec_id",
     }
 )
-_PROVIDER_KEYS = frozenset({"design_shell_block_id", "top_level_page_id", "workspace_id"})
+PROVIDER_KEYS = frozenset({"design_shell_block_id", "top_level_page_id", "workspace_id"})
 
 
 class ProductBuildError(ValueError):
-    """Raised when phase 1 cannot proceed on the fixture probe."""
+    """Raised when a fixture product-build phase cannot proceed."""
 
 
 @dataclass(frozen=True, slots=True)
 class ProductBuildCheckpoint:
-    """Persisted phase-1 progress. The next phase is not executed."""
+    """Persisted build progress. The next phase is not executed."""
 
     spec_id: str
     product_id: str
@@ -77,11 +80,12 @@ class ProductBuildCheckpoint:
     palette_name: str
     palette_tokens: tuple[tuple[str, str], ...]
     recorded_at: datetime
+    database_ids: tuple[tuple[str, str], ...] = ()
 
 
 def design_shell_content(spec: ProductSpec) -> str:
     """Palette shell only. Hubs, databases, and variants are later phases."""
-    _require_spec(spec)
+    require_spec(spec)
     _reject_shell_line_breaks(spec)
     lines = [f"identity:{spec.identity}", f"palette:{spec.palette_name}"]
     lines.extend(f"{token.name} {token.hex}" for token in spec.palette_tokens)
@@ -96,17 +100,17 @@ async def build_top_level_page_and_design_shell(
     recorded_at: object,
 ) -> ProductBuildCheckpoint:
     """Create the phase-1 page and shell, or resume when that phase is already stored."""
-    validated = _require_spec(spec)
-    fixture = _require_probe(probe)
-    path = _require_path(checkpoint_path)
-    moment = _require_datetime(recorded_at)
+    validated = require_spec(spec)
+    fixture = require_probe(probe)
+    path = require_path(checkpoint_path)
+    moment = require_datetime(recorded_at)
     _reject_shell_line_breaks(validated)
     stored = _read_checkpoint(path)
     if stored is not None:
-        _require_same_spec(stored, validated)
-    page = _find_spec_page(fixture, str(validated.spec_id))
+        require_same_spec(stored, validated)
+    page = find_spec_page(fixture, str(validated.spec_id))
     if stored is not None:
-        return _resume_stored(fixture, stored, page, validated)
+        return resume_stored(fixture, stored, page, validated)
     if page is None:
         page = await _create_top_level_page(fixture, validated)
     else:
@@ -122,19 +126,19 @@ async def build_top_level_page_and_design_shell(
     return checkpoint
 
 
-def _require_spec(spec: object) -> ProductSpec:
+def require_spec(spec: object) -> ProductSpec:
     if type(spec) is not ProductSpec:
         raise ProductBuildError("phase 1 requires a validated ProductSpec")
     return spec
 
 
-def _require_probe(probe: object) -> FixtureNotionAdapter:
+def require_probe(probe: object) -> FixtureNotionAdapter:
     if type(probe) is not FixtureNotionAdapter:
         raise ProductBuildError("phase 1 requires the fixture Notion probe")
     return probe
 
 
-def _require_path(checkpoint_path: object) -> Path:
+def require_path(checkpoint_path: object) -> Path:
     if type(checkpoint_path) not in _PATH_TYPES:
         raise ProductBuildError("checkpoint path must be a path")
     path = cast(Path, checkpoint_path)
@@ -145,7 +149,7 @@ def _require_path(checkpoint_path: object) -> Path:
     return path
 
 
-def _require_datetime(value: object) -> datetime:
+def require_datetime(value: object) -> datetime:
     if type(value) is not datetime:
         raise ProductBuildError("recorded_at must be a datetime")
     if value.tzinfo is None or value.utcoffset() is None:
@@ -160,7 +164,7 @@ def _reject_shell_line_breaks(spec: ProductSpec) -> None:
         raise ProductBuildError("design shell fields must be single lines")
 
 
-def _require_same_spec(stored: ProductBuildCheckpoint, spec: ProductSpec) -> None:
+def require_same_spec(stored: ProductBuildCheckpoint, spec: ProductSpec) -> None:
     if stored.spec_id != str(spec.spec_id) or stored.product_id != str(spec.product_id):
         raise ProductBuildError("checkpoint belongs to a different ProductSpec")
     if stored.palette_name != spec.palette_name or stored.palette_tokens != _palette(spec):
@@ -181,7 +185,7 @@ def _workspace_id(probe: FixtureNotionAdapter) -> str:
     return workspace_id
 
 
-def _find_spec_page(probe: FixtureNotionAdapter, spec_id: str) -> NotionPage | None:
+def find_spec_page(probe: FixtureNotionAdapter, spec_id: str) -> NotionPage | None:
     matches = [
         page
         for page in probe.pages.values()
@@ -264,7 +268,7 @@ def _find_shell(
     return None
 
 
-def _resume_stored(
+def resume_stored(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
     page: NotionPage | None,
@@ -334,14 +338,14 @@ def _read_checkpoint(path: Path) -> ProductBuildCheckpoint | None:
         decoded = cast(object, json.loads(text))
     except json.JSONDecodeError as error:
         raise ProductBuildError("checkpoint is not JSON") from error
-    return _parse_checkpoint(decoded)
+    return parse_checkpoint(decoded)
 
 
-def _parse_checkpoint(decoded: object) -> ProductBuildCheckpoint:
+def parse_checkpoint(decoded: object) -> ProductBuildCheckpoint:
     if type(decoded) is not dict:
         raise ProductBuildError("checkpoint must be an object")
     payload = cast(dict[object, object], decoded)
-    if not _exact_keys(payload, _CHECKPOINT_KEYS):
+    if not exact_keys(payload, CHECKPOINT_KEYS):
         raise ProductBuildError("checkpoint fields are missing or unsupported")
     if payload["build_kind"] != BUILD_KIND_PRIMARY:
         raise ProductBuildError("checkpoint build kind must be PRIMARY")
@@ -354,14 +358,14 @@ def _parse_checkpoint(decoded: object) -> ProductBuildCheckpoint:
     if type(references) is not dict:
         raise ProductBuildError("provider references must be an object")
     refs = cast(dict[object, object], references)
-    if not _exact_keys(refs, _PROVIDER_KEYS):
+    if not exact_keys(refs, PROVIDER_KEYS):
         raise ProductBuildError("provider references are missing or unsupported")
-    page_id = _require_token(refs["top_level_page_id"], "top_level_page_id")
-    workspace_id = _require_token(refs["workspace_id"], "workspace_id")
-    shell_block_id = _require_token(refs["design_shell_block_id"], "design_shell_block_id")
+    page_id = require_token(refs["top_level_page_id"], "top_level_page_id")
+    workspace_id = require_token(refs["workspace_id"], "workspace_id")
+    shell_block_id = require_token(refs["design_shell_block_id"], "design_shell_block_id")
     spec_id = _require_uuid(payload["spec_id"], "spec_id")
     product_id = _require_uuid(payload["product_id"], "product_id")
-    palette_name = _require_token(payload["palette_name"], "palette_name")
+    palette_name = require_token(payload["palette_name"], "palette_name")
     tokens = _require_tokens(payload["palette_tokens"])
     recorded_at = _require_stored_datetime(payload["recorded_at"])
     return ProductBuildCheckpoint(
@@ -380,7 +384,7 @@ def _parse_checkpoint(decoded: object) -> ProductBuildCheckpoint:
     )
 
 
-def _exact_keys(mapping: dict[object, object], expected: frozenset[str]) -> bool:
+def exact_keys(mapping: dict[object, object], expected: frozenset[str]) -> bool:
     found: set[str] = set()
     for key in mapping:
         if type(key) is not str:
@@ -389,14 +393,14 @@ def _exact_keys(mapping: dict[object, object], expected: frozenset[str]) -> bool
     return found == set(expected)
 
 
-def _require_token(value: object, field: str) -> str:
+def require_token(value: object, field: str) -> str:
     if type(value) is not str or value == "" or value.strip() != value:
         raise ProductBuildError(f"checkpoint {field} must be a non-empty string")
     return value
 
 
 def _require_uuid(value: object, field: str) -> str:
-    text = _require_token(value, field)
+    text = require_token(value, field)
     try:
         parsed = UUID(text)
     except ValueError as error:
@@ -414,8 +418,8 @@ def _require_tokens(value: object) -> tuple[tuple[str, str], ...]:
         if type(item) is not list or len(item) != 2:
             raise ProductBuildError("checkpoint palette token must be a name and hex")
         pair = cast(list[object], item)
-        name = _require_token(pair[0], "palette token name")
-        hex_value = _require_token(pair[1], "palette token hex")
+        name = require_token(pair[0], "palette token name")
+        hex_value = require_token(pair[1], "palette token hex")
         tokens.append((name, hex_value))
     return tuple(tokens)
 

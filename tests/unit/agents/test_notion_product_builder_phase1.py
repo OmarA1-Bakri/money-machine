@@ -32,6 +32,7 @@ MODULE_PATH = ROOT / "src/money_machine/agents/implementations/notion_product_bu
 WHEN = datetime(2026, 10, 3, 0, 30, tzinfo=UTC)
 LATER = datetime(2026, 10, 3, 1, 0, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
+W1_TIP = "b0536cd0fea41018be8f7561a7f2193752cd5f24"
 
 
 def _spec(
@@ -501,10 +502,10 @@ def test_session_seven_stays_incomplete_with_false_evidence() -> None:
     assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6]
     assert state["next_session"] == 7
     assert state["next_prompt"] == "10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md"
-    assert state["head_sha"] == CLOSURE_SHA
+    assert state["head_sha"] == W1_TIP
     assert state["evidence_closure_commit_sha"] == CLOSURE_SHA
     assert state["commissioned_agents"] == []
     evidence = state["required_completion_evidence"]
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
     assert all(value is False for value in evidence.values())
-    assert state["state_revision"] == 49
+    assert state["state_revision"] == 50

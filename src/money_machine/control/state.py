@@ -161,8 +161,9 @@ SESSION_EVIDENCE_KEYS: Mapping[int, frozenset[str]] = MappingProxyType(
         ),
         7: frozenset(
             {
-                # Session 07 wave 1 installs the contract and leaves every key false.
-                # Phase 1 of the fixture product build is not a completed builder.
+                # Session 07 installs the contract and leaves every key false.
+                # Wave 1 is the fixture design shell. Wave 2 stores shared databases.
+                # Neither wave completes the builder.
                 "notion_product_builder_implemented",
                 "shared_databases_built",
                 "home_dashboard_built",
