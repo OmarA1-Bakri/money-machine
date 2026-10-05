@@ -1,5 +1,15 @@
 # Implementation Log
 
+## 2026-10-03 — Session 07 W1: activation and fixture phase 1
+
+Session 07 is activated and incomplete. This wave does not close the session. State revision 48 → 49. `current_session` is 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. `head_sha` and `evidence_closure_commit_sha` stay the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-03T00:30:00Z`.
+
+Twelve session 7 evidence keys are installed and each one is false, including `notion_product_builder_implemented`, `product_build_tests_pass`, `control_files_and_checkpoint_current`, and `evidence_closure_commit_recorded`. No session exit code is recorded. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty.
+
+Phase 1 only, on `FixtureNotionAdapter`: one unpublished workspace-parent page titled from `product_spec.ProductSpec`, plus one palette callout. The checkpoint records `top_level_page_and_design_shell` and the provider ids. A second call does not create another page. A missing page behind that checkpoint is an error. The catalogue `products.ProductSpec` is rejected. Shared databases, dashboards, hubs, the notification dashboard, variants, QA, the fact ledger, and the workflow link are not built. No live HTTP, no real Notion workspace, no Etsy listing.
+
+Exit 78 scheduler stays HELD. Parked S06 nits stay parked. Prompt-integrity review: `docs/control/reviews/2026-10-03-session-07-prompt-integrity.md`.
+
 ## 2026-10-02 — Session 06 W11: SESSION_06 COMPLETE control flip (post-W10 @ 0f94d585)
 
 Parallel control lane only (`docs/control/*`). No feature code, no Session 07 features, no Exit 78 scheduler lift, no production Notion or Etsy mutation. The default Notion CLI probe remains `FakeNotionProbe` (no network).

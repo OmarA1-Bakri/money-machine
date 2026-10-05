@@ -191,6 +191,10 @@ def incomplete_session_six_state() -> ControlState:
     }
     state["head_sha"] = SESSION_06_PRIOR_WAVE_TIP
     state["evidence_closure_commit_sha"] = SESSION_06_PRIOR_WAVE_TIP
+    # The checked-in file is a later session. This synthetic row is still session 6.
+    state["required_completion_evidence"] = {
+        key: False for key in control_state.SESSION_EVIDENCE_KEYS[6]
+    }
     return state
 
 

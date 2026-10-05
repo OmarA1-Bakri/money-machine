@@ -159,6 +159,24 @@ SESSION_EVIDENCE_KEYS: Mapping[int, frozenset[str]] = MappingProxyType(
                 "evidence_closure_commit_recorded",
             }
         ),
+        7: frozenset(
+            {
+                # Session 07 wave 1 installs the contract and leaves every key false.
+                # Phase 1 of the fixture product build is not a completed builder.
+                "notion_product_builder_implemented",
+                "shared_databases_built",
+                "home_dashboard_built",
+                "notification_dashboard_built",
+                "identity_hubs_built",
+                "variant_builder_implemented",
+                "product_qa_implemented",
+                "product_fact_ledger_persisted",
+                "build_workflow_linked",
+                "product_build_tests_pass",
+                "control_files_and_checkpoint_current",
+                "evidence_closure_commit_recorded",
+            }
+        ),
     }
 )
 """Each session's completion-evidence contract (D-0010). A session without an entry cannot be
