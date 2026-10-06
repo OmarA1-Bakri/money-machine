@@ -77,6 +77,20 @@ class IdentityHubRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class NotificationDashboardRecord:
+    """The one-row fixture notification database, its formulas, and its sample rows."""
+
+    database_id: str
+    row_page_id: str
+    buyer_name_property_id: str
+    current_date_property_id: str
+    relations: tuple[tuple[str, str], ...]
+    rollups: tuple[tuple[str, str], ...]
+    formulas: tuple[tuple[str, str, str], ...]
+    samples: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
 class ProductBuildCheckpoint:
     """Persisted build progress. The next phase is not executed."""
 
@@ -95,6 +109,7 @@ class ProductBuildCheckpoint:
     database_ids: tuple[tuple[str, str], ...] = ()
     dashboard_pieces: tuple[tuple[str, str], ...] = ()
     identity_hubs: tuple[IdentityHubRecord, ...] = ()
+    notification_dashboard: NotificationDashboardRecord | None = None
 
 
 def design_shell_content(spec: ProductSpec) -> str:

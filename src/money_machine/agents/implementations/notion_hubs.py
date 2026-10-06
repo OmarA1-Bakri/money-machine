@@ -8,8 +8,10 @@ an agent.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
@@ -47,6 +49,7 @@ from money_machine.domain.models.product_spec import ProductSpec
 from money_machine.integrations.notion.domain import NotionLinkedView, NotionPage, NotionTextBlock
 from money_machine.integrations.notion.errors import SchemaBuilderError
 from money_machine.integrations.notion.fixture_adapter import FixtureNotionAdapter
+from money_machine.integrations.notion.formulas import MAX_NAME_LENGTH
 from money_machine.integrations.notion.relations import (
     LinkedView,
     build_canonical_databases,
@@ -140,8 +143,27 @@ def navigation_content(spec: ProductSpec, hub_name: str) -> str:
 
 
 def linked_view_name(spec: ProductSpec, hub_name: str, slug: str) -> str:
-    """View name for this identity and hub. It is not a shared filler label."""
-    return f"{spec.identity} {hub_name} {slug}"
+    """View name for this identity and hub. It is not a shared filler label.
+
+    A name longer than Notion's 64-character cap is shortened. The slug and a
+    hash of the full name stay on the end so two hubs that differ past the cut
+    do not collide.
+    """
+    full = f"{spec.identity} {hub_name} {slug}"
+    if len(full) <= MAX_NAME_LENGTH:
+        return full
+    token = hashlib.sha256(full.encode("utf-8")).hexdigest()[:8]
+    suffix = f"{slug} {token}"
+    if len(suffix) > MAX_NAME_LENGTH:
+        keep = MAX_NAME_LENGTH - 8 - 1
+        suffix = f"{slug[:keep].rstrip()} {token}"
+    room = MAX_NAME_LENGTH - len(suffix) - 1
+    if room < 1:
+        return suffix
+    head = f"{spec.identity} {hub_name}"[:room].rstrip()
+    if head == "":
+        return suffix
+    return f"{head} {suffix}"
 
 
 async def build_identity_specific_hubs(
@@ -171,6 +193,8 @@ async def build_identity_specific_hubs(
 
 
 def _reject_hub_fields(spec: ProductSpec) -> None:
+    if len(spec.hubs) < 6 or len(spec.hubs) > 8:
+        raise ProductBuildError("hubs must be six to eight")
     fields = [spec.identity, spec.title, spec.buyer_problem, spec.flagship_feature]
     fields.extend(hub.name for hub in spec.hubs)
     fields.extend(hub.description for hub in spec.hubs)
@@ -243,6 +267,11 @@ def _load_checkpoint(path: Path) -> ProductBuildCheckpoint:
     if names == list(_PHASE_FOUR):
         return _parse_hubs_checkpoint(payload)
     raise ProductBuildError("identity hubs require the dashboard checkpoint")
+
+
+def parse_identity_hubs_checkpoint(payload: dict[object, object]) -> ProductBuildCheckpoint:
+    """Parse a checkpoint that records the identity hubs."""
+    return _parse_hubs_checkpoint(payload)
 
 
 def _parse_hubs_checkpoint(payload: dict[object, object]) -> ProductBuildCheckpoint:
@@ -346,14 +375,51 @@ def _require_view_rows(value: object) -> tuple[tuple[str, str], ...]:
     return tuple(rows)
 
 
+def require_identity_hubs(
+    probe: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+    *,
+    extra_page_ids: tuple[str, ...] = (),
+    extra_database_ids: tuple[str, ...] = (),
+    formula_suffixes: Mapping[str, tuple[tuple[str, str], ...]] | None = None,
+    formulas_optional: bool = False,
+) -> NotionPage:
+    """Check the saved hubs. Extra pages and databases belong to a later phase."""
+    kinds = shared_database_kinds(spec)
+    page = _require_prior_dashboard(
+        probe,
+        stored,
+        spec,
+        kinds,
+        extra_database_ids=extra_database_ids,
+        formula_suffixes=formula_suffixes,
+        formulas_optional=formulas_optional,
+    )
+    _require_saved_hubs(probe, page, stored, spec, kinds, extra_page_ids=extra_page_ids)
+    return page
+
+
 def _require_prior_dashboard(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
     kinds: tuple[str, ...],
+    *,
+    extra_database_ids: tuple[str, ...] = (),
+    formula_suffixes: Mapping[str, tuple[tuple[str, str], ...]] | None = None,
+    formulas_optional: bool = False,
 ) -> NotionPage:
     page = require_home_page(probe, stored, spec)
-    require_checkpoint_databases(probe, page, stored, kinds)
+    require_checkpoint_databases(
+        probe,
+        page,
+        stored,
+        kinds,
+        extra_database_ids=extra_database_ids,
+        formula_suffixes=formula_suffixes,
+        formulas_optional=formulas_optional,
+    )
     require_dashboard_pieces(probe, page, stored, spec)
     if probe.views:
         raise ProductBuildError("hub view is unexpected")
@@ -631,6 +697,8 @@ def _require_saved_hubs(
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
     kinds: tuple[str, ...],
+    *,
+    extra_page_ids: tuple[str, ...] = (),
 ) -> None:
     names = tuple(hub.name for hub in spec.hubs)
     if tuple(record.name for record in stored.identity_hubs) != names:
@@ -639,7 +707,7 @@ def _require_saved_hubs(
     database_ids = dict(stored.database_ids)
     for planned, record in zip(plan, stored.identity_hubs, strict=True):
         _require_hub(probe, home, spec, planned, record, database_ids)
-    _require_exact_hubs(probe, home, stored)
+    _require_exact_hubs(probe, home, stored, extra_page_ids=extra_page_ids)
 
 
 def _require_hub(
@@ -708,11 +776,15 @@ def _require_linked_view(
 
 
 def _require_exact_hubs(
-    probe: FixtureNotionAdapter, home: NotionPage, stored: ProductBuildCheckpoint
+    probe: FixtureNotionAdapter,
+    home: NotionPage,
+    stored: ProductBuildCheckpoint,
+    *,
+    extra_page_ids: tuple[str, ...] = (),
 ) -> None:
     _home_pages(probe, home)
     _require_home_objects(probe, home, stored)
-    pages = {home.id, *(record.page_id for record in stored.identity_hubs)}
+    pages = {home.id, *(record.page_id for record in stored.identity_hubs), *extra_page_ids}
     actual_pages = {page.id for page in probe.pages.values() if type(page) is NotionPage}
     if actual_pages != pages or len(probe.pages) != len(pages):
         raise ProductBuildError("hub page is unexpected")
@@ -734,7 +806,8 @@ def _require_exact_hubs(
         raise ProductBuildError("hub view is unexpected")
 
 
-def _write_hubs_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> None:
+def hub_provider_references(checkpoint: ProductBuildCheckpoint) -> dict[str, object]:
+    """Provider ids recorded for the identity-hub checkpoint."""
     references = dict(dashboard_provider_references(checkpoint))
     references[_HUBS_KEY] = [
         {
@@ -748,6 +821,11 @@ def _write_hubs_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> No
         }
         for record in checkpoint.identity_hubs
     ]
+    return references
+
+
+def _write_hubs_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> None:
+    references = hub_provider_references(checkpoint)
     payload = {
         "build_kind": checkpoint.build_kind,
         "build_version": checkpoint.build_version,

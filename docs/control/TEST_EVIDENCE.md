@@ -1,5 +1,24 @@
 # Test Evidence
 
+## 2026-10-06 — Session 07 W5: fixture notification dashboard
+
+**Verification scope**: Fixture-only notification dashboard, resumed from the identity-hubs checkpoint, plus the hub view-name cap and design-shell resume checks. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Postgres, Alembic, pnpm, and Compose were not required for this slice and were not run.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `completed_sessions` `[0, 1, 2, 3, 4, 5, 6]`, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`, including `notification_dashboard_built`, `identity_hubs_built`, `home_dashboard_built`, and `product_build_tests_pass` | PASS |
+| Tip-sync | `head_sha` is `91a33eba7961ea2819dcc695f73ffe9a45e37b33`. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. `state_revision` is 53 | PASS |
+| Notification dashboard | `tests/unit/agents/test_notion_product_builder_notifications.py`, the hubs file, the dashboard file, the shared-database file, the phase-1 file, `tests/bootstrap/test_prompt_integrity.py`, and `tests/bootstrap/test_control_state.py`: 207 passed, 1 skipped. The skip is the pre-existing case-variant control-state case on this case-sensitive filesystem. Mass and business tiers are both covered. `ruff format`, `ruff check`, and `pyright` are clean on the changed paths. 25 mutations were each applied, tested, and reverted; all 25 were killed | PASS for this slice |
+| View-name cap | `notion_hubs.py:153`. A realistic long spec whose raw names share a 64-character prefix stays unique and within 64 characters. Removing the cap and naive truncation were both killed by `test_a_realistic_long_view_name_stays_unique_and_within_the_cap` | PASS |
+| Design-shell resume | `notion_dashboard.py:311` and `notion_dashboard.py:313`. Deleting the shell and tampering with its content each raise on hub resume and on notification entry, and nothing is rebuilt. Both mutations were killed by `test_deleted_design_shell_is_not_rebuilt` and `test_tampered_design_shell_is_not_rebuilt` in the hubs file and the notification file | PASS |
+| Next phase | Checkpoint `next_phase` is `aesthetics_and_content_completion`. That phase is not executed | PASS |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+| Landed optionals | Hub count six to eight is enforced in the builder (`notion_hubs.py:196`). Navigation delete-and-resume is tested (`notion_hubs.py:746`). Vacuous hub asserts were removed | LANDED |
+| Parked items | A separate section-block delete test stays parked. S06 nits stay parked | PARKED |
+
+**Status**: Session 07 Wave 5. The session stays incomplete. Exit 78 stays HELD. No session exit code is recorded.
+
 ## 2026-10-05 — Session 07 W4: fixture identity hubs
 
 **Verification scope**: Fixture-only identity hubs, resumed from the dashboard checkpoint, plus the incomplete-session tip-sync. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Postgres, Alembic, pnpm, and Compose were not required for this slice and were not run.

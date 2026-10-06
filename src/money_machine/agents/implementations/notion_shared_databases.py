@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Mapping
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
@@ -38,10 +39,11 @@ from money_machine.domain.models.product_spec import ProductSpec
 from money_machine.integrations.notion.domain import (
     NotionDatabase,
     NotionDatabaseProperty,
+    NotionFormula,
     NotionPage,
 )
 from money_machine.integrations.notion.fixture_adapter import FixtureNotionAdapter
-from money_machine.integrations.notion.schema_builder import build_database_schema
+from money_machine.integrations.notion.schema_builder import DatabaseSchema, build_database_schema
 
 PLANNER_SHARED_DATABASES: tuple[str, ...] = (
     "Tasks",
@@ -253,22 +255,58 @@ def _property_config(options: tuple[str, ...]) -> dict[str, list[str]]:
     return {}
 
 
-def _schema_matches(database: NotionDatabase, kind: str) -> bool:
+def _schema_matches(
+    database: NotionDatabase,
+    kind: str,
+    *,
+    formula_suffix: tuple[tuple[str, str], ...] = (),
+    formulas_optional: bool = False,
+) -> bool:
     schema = build_database_schema(kind)
     properties = database.properties
-    if type(properties) is not list or len(properties) != len(schema.properties):
+    if type(properties) is not list:
         return False
-    for found, expected in zip(properties, schema.properties, strict=True):
+    catalogue = len(schema.properties)
+    if len(properties) < catalogue or not _catalogue_prefix(properties, schema):
+        return False
+    if (
+        database.parent_type != _DATABASE_PARENT
+        or database.icon is not None
+        or database.cover is not None
+    ):
+        return False
+    extra = properties[catalogue:]
+    if formula_suffix and formulas_optional and not extra:
+        return True
+    if len(extra) != len(formula_suffix):
+        return False
+    return all(
+        _formula_property(found, name, expression)
+        for found, (name, expression) in zip(extra, formula_suffix, strict=True)
+    )
+
+
+def _catalogue_prefix(properties: list[NotionDatabaseProperty], schema: DatabaseSchema) -> bool:
+    catalogue = len(schema.properties)
+    for found, expected in zip(properties[:catalogue], schema.properties, strict=True):
         if type(found) is not NotionDatabaseProperty:
             return False
         if found.name != expected.name or found.type != expected.type:
             return False
         if found.config != _property_config(expected.options):
             return False
+    return True
+
+
+def _formula_property(prop: NotionDatabaseProperty, name: str, expression: str) -> bool:
+    formula = prop.config.get("formula")
     return (
-        database.parent_type == _DATABASE_PARENT
-        and database.icon is None
-        and database.cover is None
+        prop.name == name
+        and prop.type == "formula"
+        and type(formula) is NotionFormula
+        and formula.name == name
+        and formula.expression == expression
+        and formula.id == prop.id
     )
 
 
@@ -329,9 +367,21 @@ def require_checkpoint_databases(
     page: NotionPage,
     stored: ProductBuildCheckpoint,
     kinds: tuple[str, ...],
+    *,
+    extra_database_ids: tuple[str, ...] = (),
+    formula_suffixes: Mapping[str, tuple[tuple[str, str], ...]] | None = None,
+    formulas_optional: bool = False,
 ) -> None:
     """Reject a checkpoint whose databases are missing, duplicated, or off-schema."""
-    _require_resumed_databases(probe, page, stored, kinds)
+    _require_resumed_databases(
+        probe,
+        page,
+        stored,
+        kinds,
+        extra_database_ids=extra_database_ids,
+        formula_suffixes=formula_suffixes or {},
+        formulas_optional=formulas_optional,
+    )
 
 
 def _require_resumed_databases(
@@ -339,17 +389,27 @@ def _require_resumed_databases(
     page: NotionPage,
     stored: ProductBuildCheckpoint,
     kinds: tuple[str, ...],
+    *,
+    extra_database_ids: tuple[str, ...] = (),
+    formula_suffixes: Mapping[str, tuple[tuple[str, str], ...]] | None = None,
+    formulas_optional: bool = False,
 ) -> None:
     if tuple(kind for kind, _database_id in stored.database_ids) != kinds:
         raise ProductBuildError("checkpoint databases do not match the ProductSpec")
     seen: list[str] = []
     for kind, database_id in stored.database_ids:
         database = probe.databases.get(database_id)
+        suffix = () if formula_suffixes is None else formula_suffixes.get(kind, ())
         if (
             type(database) is not NotionDatabase
             or database.title != kind
             or database.id != database_id
-            or not _schema_matches(database, kind)
+            or not _schema_matches(
+                database,
+                kind,
+                formula_suffix=suffix,
+                formulas_optional=formulas_optional,
+            )
             or database.parent_id != page.id
         ):
             raise ProductBuildError("checkpoint shared database is missing")
@@ -359,5 +419,6 @@ def _require_resumed_databases(
         seen.append(database_id)
     children = _page_databases(probe, page.id)
     child_ids = {database.id for database in children}
-    if child_ids != set(seen) or len(children) != len(seen):
+    allowed = set(seen) | set(extra_database_ids)
+    if child_ids != allowed or len(children) != len(allowed):
         raise ProductBuildError("checkpoint page has an unexpected database")

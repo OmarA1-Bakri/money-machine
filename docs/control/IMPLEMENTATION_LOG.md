@@ -1,5 +1,49 @@
 # Implementation Log
 
+## 2026-10-06 — Session 07 W5: tip-sync and fixture notification dashboard
+
+Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision 52 → 53. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. `head_sha` moves to the post-merge W4 tip `91a33eba7961ea2819dcc695f73ffe9a45e37b33`. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`: an incomplete session may record a later `head_sha`, and this wave is not the completion candidacy that would move the closure SHA. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-06T00:30:00Z`.
+
+Twelve session 7 evidence keys stay false, including `notification_dashboard_built`, `identity_hubs_built`, `home_dashboard_built`, `product_build_tests_pass`, `control_files_and_checkpoint_current`, and `evidence_closure_commit_recorded`. No session exit code is recorded. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty.
+
+Notification dashboard only, in `notion_notifications.py`, resuming the checkpoint `top_level_page_and_design_shell` + `shared_databases` + `dashboard_and_navigation` + `identity_specific_hubs` on an exact `FixtureNotionAdapter` from an exact `product_spec.ProductSpec`. One database, title `Notification dashboard`, holds one buyer row. Buyer name is the ProductSpec identity. Current date is the formula `now()`. Open tasks due today are always present. Birthday status, money spent today, and water glasses remaining appear only when that catalogue database is in the tier. Sample rows are titled `SAMPLE {kind}` and carry `sample_marker` `SAMPLE`. The buyer row is not a sample and does not store `client_name`. A second call keeps the same checkpoint bytes and ids. A missing prior checkpoint object is an error and nothing is rebuilt. The checkpoint records `notification_dashboard`. The next phase is `aesthetics_and_content_completion` and this wave does not run it.
+
+Hub view names that would exceed Notion's 64-character cap are shortened in `linked_view_name` (`notion_hubs.py:145`). The slug and an 8-character hash of the full name stay on the end, so two realistic hubs that share a 64-character prefix do not collide. The builder rejects a hub list outside six to eight before it loads a checkpoint (`notion_hubs.py:196`), including a `model_copy` that skips the field bounds. A deleted navigation block on resume is an error (`notion_hubs.py:746`). A deleted design shell (`notion_dashboard.py:311`) and a tampered design shell (`notion_dashboard.py:313`) are errors on hub resume and on notification entry, and nothing is rebuilt. A separate section-block delete test stays parked.
+
+Prompt-integrity review: `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md` (Wave 5 addendum). Focused tests: 207 passed, 1 skipped across the notification, hubs, dashboard, shared-database, phase-1, prompt-integrity, and control-state files. The skip is the pre-existing case-variant control-state case on this case-sensitive filesystem. `ruff format`, `ruff check`, and `pyright` are clean on the touched paths.
+
+Mutation checks (25 rows; each applied, the owning test file run, then reverted; 25 killed). The two design-shell rows were killed by both `test_notion_product_builder_notifications.py` and `test_notion_product_builder_hubs.py`.
+
+| Mutation | Site | Failing test |
+|---|---|---|
+| Skip replay return | `notion_notifications.py:108` | `test_replay_keeps_the_same_checkpoint_bytes_and_ids` |
+| Drop the buyer property | `notion_notifications.py:794` | `test_mass_tier_builds_one_notification_row` |
+| Date expression becomes today() | `notion_notifications.py:69` | `test_mass_tier_builds_one_notification_row` |
+| Drop the sample marker | `notion_notifications.py:778` | `test_mass_tier_builds_one_notification_row` |
+| Sample title drops SAMPLE | `notion_notifications.py:774` | `test_mass_tier_builds_one_notification_row` |
+| Buyer row marked SAMPLE | `notion_notifications.py:840` | `test_mass_tier_builds_one_notification_row` |
+| Buyer row stores client_name | `notion_notifications.py:840` | `test_mass_tier_builds_one_notification_row` |
+| Every rollup uses sum | `notion_notifications.py:807` | `test_mass_tier_builds_one_notification_row` |
+| Skip the water rollup | `notion_notifications.py:801` | `test_mass_tier_builds_one_notification_row` |
+| Skip the open-tasks rollup | `notion_notifications.py:801` | `test_mass_tier_builds_one_notification_row` |
+| Missing checkpoint is not an error | `notion_notifications.py:138` | `test_missing_checkpoint_creates_nothing` |
+| Write next_phase is the current phase | `notion_notifications.py:259` | `test_mass_tier_builds_one_notification_row` |
+| Parse next_phase is the current phase | `notion_notifications.py:179` | `test_replay_keeps_the_same_checkpoint_bytes_and_ids` |
+| Create a second notification row | `notion_notifications.py:839` | `test_mass_tier_builds_one_notification_row` |
+| Plan always includes Events | `notion_notifications.py:129` | `test_business_tier_omits_unsupported_claims` |
+| Never adopt existing formulas | `notion_notifications.py:666` | `test_existing_formulas_are_adopted` |
+| Junk formula shape is ignored | `notion_notifications.py:610` | `test_junk_property_creates_no_notification_database` |
+| Missing sample is ignored | `notion_notifications.py:501` | `test_deleted_sample_on_resume_is_not_rebuilt` |
+| Deleted formula is ignored | `notion_notifications.py:371` | `test_deleted_formula_on_resume_is_not_rebuilt` |
+| View name ignores the 64 cap | `notion_hubs.py:153` | `test_a_realistic_long_view_name_stays_unique_and_within_the_cap` |
+| View name truncates without a token | `notion_hubs.py:153` | `test_a_realistic_long_view_name_stays_unique_and_within_the_cap` |
+| Hub count is not enforced | `notion_hubs.py:196` | `test_fewer_or_more_than_six_to_eight_hubs_create_nothing` |
+| Deleted navigation is accepted | `notion_hubs.py:746` | `test_deleted_navigation_block_is_not_rebuilt` |
+| Missing design shell is accepted | `notion_dashboard.py:311` | `test_deleted_design_shell_is_not_rebuilt` |
+| Tampered design shell is accepted | `notion_dashboard.py:313` | `test_tampered_design_shell_is_not_rebuilt` |
+
+Exit 78 scheduler stays HELD. A separate section-block delete test stays parked. Parked S06 nits stay parked.
+
 ## 2026-10-05 — Session 07 W4: tip-sync and fixture identity hubs
 
 Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision 51 → 52. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. `head_sha` moves to the post-merge W3 tip `0f67dc92d5c4bdc105a3801ed5b5f7b517c66283`. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`: an incomplete session may record a later `head_sha`, and this wave is not the completion candidacy that would move the closure SHA. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-05T23:45:00Z`.
