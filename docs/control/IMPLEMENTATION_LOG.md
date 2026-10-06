@@ -55,7 +55,7 @@ Mutation checks. 47 mutations were each applied, the owning test files were run,
 | Hubs always add a child page | `notion_hubs.py:669` | hub failure and replay tests | 2 |
 | Notification always creates a database | `notion_notifications.py:791` | notification failure and replay tests | 3 |
 | Shared databases always create | `notion_shared_databases.py:419` | shared-database failure and replay tests | 3 |
-| Aesthetics always add accents | `notion_aesthetics.py:459` | aesthetics failure and replay tests | 3 |
+| Aesthetics always add accents | `notion_aesthetics.py:564` | aesthetics failure and replay tests | 3 |
 | Page counts are zero | `notion_progress_record.py:258` | `test_phase1_only_rebuild_continues_through_phase_6` (mass and business) | 2 |
 | Buyer mapping is omitted | `notion_progress_record.py:235` | `test_phase1_only_rebuild_continues_through_phase_6` (mass and business) | 2 |
 | Formula state is empty | `notion_progress_record.py:263` | `test_phase1_only_rebuild_continues_through_phase_6` (mass and business) | 2 |
