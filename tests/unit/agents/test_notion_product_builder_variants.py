@@ -15,6 +15,8 @@ import pytest
 
 from money_machine.agents.implementations import notion_variants as notion_variants_module
 from money_machine.agents.implementations.notion_aesthetics import (
+    AESTHETIC_ICON,
+    accent_content,
     build_aesthetics_and_content_completion,
 )
 from money_machine.agents.implementations.notion_dashboard import build_dashboard_and_navigation
@@ -36,7 +38,11 @@ from money_machine.agents.implementations.notion_progress import (
 )
 from money_machine.agents.implementations.notion_progress_record import CheckpointView
 from money_machine.agents.implementations.notion_shared_databases import build_shared_databases
-from money_machine.agents.implementations.notion_variants import PHASE_QA, build_variants
+from money_machine.agents.implementations.notion_variants import (
+    PHASE_QA,
+    build_variants,
+    vocabulary_content,
+)
 from money_machine.control.state import SESSION_EVIDENCE_KEYS
 from money_machine.domain.models.common import EvidenceReference
 from money_machine.domain.models.product_spec import ColourToken, Hub, ProductSpec
@@ -497,6 +503,11 @@ def _tamper_created(document: dict[str, object], kind: str) -> None:
         assert type(databases) is list and type(databases[0]) is dict
         databases[0]["database_id"] = "db_missing"
         return
+    if kind == "notification":
+        notification = created["notification"]
+        assert type(notification) is dict
+        notification["database_id"] = "db_missing"
+        return
     raise AssertionError(kind)
 
 
@@ -561,7 +572,7 @@ async def _plant_leftover_spec_id(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("stage", ["empty", "stored"])
-@pytest.mark.parametrize("kind", ["hub", "database", "accent"])
+@pytest.mark.parametrize("kind", ["hub", "database", "accent", "notification"])
 @pytest.mark.parametrize("shape", ["titled", "copy"])
 async def test_leftover_spec_id_tamper_writes_nothing(
     tmp_path: Path, stage: str, kind: str, shape: str
@@ -679,6 +690,128 @@ async def test_copy_with_a_nested_child_writes_nothing(tmp_path: Path, kind: str
     assert SPEC_ID_PROPERTY in copy.properties
     assert copy.is_published is False
     assert copy.duplicate_as_template is False
+
+
+def _block_parent(
+    probe: FixtureNotionAdapter, page: NotionPage, spec: ProductSpec, block_kind: str
+) -> str:
+    colour = spec.colour_variants[0]
+    token = spec.palette_tokens[0]
+    if block_kind == "accent":
+        block = probe.blocks.get(
+            next(
+                (
+                    item.id
+                    for item in probe.blocks.values()
+                    if type(item) is NotionCalloutBlock
+                    and item.parent_id == page.id
+                    and item.content == accent_content(token.name, token.hex)
+                    and item.icon == AESTHETIC_ICON
+                ),
+                "",
+            )
+        )
+        if type(block) is not NotionCalloutBlock:
+            return ""
+        return block.id
+    if block_kind == "vocabulary":
+        expected = vocabulary_content(spec, colour, token)
+        block = next(
+            (
+                item
+                for item in probe.blocks.values()
+                if type(item) is NotionTextBlock
+                and item.parent_id == page.id
+                and item.content == expected
+            ),
+            None,
+        )
+        if type(block) is not NotionTextBlock:
+            return ""
+        return block.id
+    accent_id = _block_parent(probe, page, spec, "accent")
+    if accent_id == "":
+        return ""
+    nested_id = f"block-{uuid4().hex}"
+    if block_kind == "text":
+        probe.blocks[nested_id] = NotionTextBlock(
+            id=nested_id,
+            parent_id=accent_id,
+            type="paragraph",
+            content="nested note",
+            created_at=WHEN,
+        )
+        return nested_id
+    if block_kind == "callout":
+        probe.blocks[nested_id] = NotionCalloutBlock(
+            id=nested_id,
+            parent_id=accent_id,
+            type="callout",
+            content="nested callout",
+            icon="!",
+            created_at=WHEN,
+        )
+        return nested_id
+    raise AssertionError(block_kind)
+
+
+async def _plant_block_child(
+    probe: FixtureNotionAdapter,
+    page: NotionPage,
+    spec: ProductSpec,
+    block_kind: str,
+    child_kind: str,
+) -> None:
+    colour = spec.colour_variants[0]
+    token = spec.palette_tokens[0]
+    if block_kind == "accent" and _block_parent(probe, page, spec, "accent") == "":
+        await probe.add_callout_block(
+            page.id, accent_content(token.name, token.hex), icon=AESTHETIC_ICON
+        )
+    if block_kind == "vocabulary" and _block_parent(probe, page, spec, "vocabulary") == "":
+        await probe.add_text_block(page.id, vocabulary_content(spec, colour, token))
+    if block_kind in {"text", "callout"} and _block_parent(probe, page, spec, "accent") == "":
+        await probe.add_callout_block(
+            page.id, accent_content(token.name, token.hex), icon=AESTHETIC_ICON
+        )
+    parent_id = _block_parent(probe, page, spec, block_kind)
+    assert parent_id != ""
+    if child_kind == "database":
+        await probe.create_database("Private", parent_id=parent_id, parent_type="block_id")
+        return
+    if child_kind == "page":
+        await probe.create_page("Nested", parent_id=parent_id, parent_type="block_id")
+        return
+    raise AssertionError(child_kind)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("block_kind", ["accent", "vocabulary", "text", "callout"])
+@pytest.mark.parametrize("child_kind", ["database", "page"])
+@pytest.mark.parametrize("stage", ["empty", "stored"])
+async def test_child_under_a_page_block_writes_nothing(
+    tmp_path: Path, block_kind: str, child_kind: str, stage: str
+) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    home = _home(probe, spec)
+    if stage == "stored":
+        checkpoint = await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+        page = probe.pages[checkpoint.variants[0].page_id]
+    else:
+        page = await probe.duplicate_page(home.id)
+        page = await probe.rename_page(page.id, f"{spec.title} / {spec.colour_variants[0]}")
+    await _plant_block_child(probe, page, spec, block_kind, child_kind)
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
 
 
 @pytest.mark.asyncio
@@ -833,6 +966,60 @@ async def test_replay_refuses_a_database_under_a_variant(tmp_path: Path) -> None
     assert calls == []
     assert path.read_bytes() == raw
     assert page.is_published is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("title_kind", ["copy", "blue"])
+async def test_replay_refuses_a_hub_child_with_a_variant_title(
+    tmp_path: Path, title_kind: str
+) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    checkpoint = await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    hub_id = checkpoint.identity_hubs[0].page_id
+    home = _home(probe, spec)
+    title = f"{home.title} (Copy)" if title_kind == "copy" else f"{spec.title} / Blue"
+    await probe.create_page(title, parent_id=hub_id, parent_type="page_id")
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="hub page is unexpected"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("title_kind", ["blue", "purple", "copy"])
+async def test_replay_pins_extra_workspace_variant_titles_as_a_known_limit(
+    tmp_path: Path, title_kind: str
+) -> None:
+    """Known limit: extra workspace-level variant titles pass replay with zero writes."""
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    home = _home(probe, spec)
+    if title_kind == "copy":
+        title = f"{home.title} (Copy)"
+    elif title_kind == "blue":
+        title = f"{spec.title} / Blue"
+    elif title_kind == "purple":
+        title = f"{spec.title} / Purple"
+    else:
+        raise AssertionError(title_kind)
+    await probe.create_page(title, parent_id=home.parent_id, parent_type="workspace")
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
 
 
 @pytest.mark.asyncio
@@ -1137,6 +1324,8 @@ async def test_crash_inside_write_checkpoint_before_the_file_lands(
     started = len(probe.pages)
     raw = path.read_bytes()
     original = notion_variants_module.write_checkpoint
+    calls = _watch(probe)
+    checkpoint_writes = {"count": 0}
 
     def _boom(
         path: Path,
@@ -1147,18 +1336,44 @@ async def test_crash_inside_write_checkpoint_before_the_file_lands(
         progress: Mapping[str, object] | None = None,
         retained_created_ids: Mapping[str, object] | None = None,
     ) -> None:
+        checkpoint_writes["count"] += 1
         raise RuntimeError("checkpoint write crashed")
 
     monkeypatch.setattr(notion_variants_module, "write_checkpoint", _boom)
     with pytest.raises(RuntimeError, match="checkpoint write crashed"):
         await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    assert checkpoint_writes["count"] == 1
+    assert calls.count("duplicate_page") == len(spec.colour_variants)
     assert path.read_bytes() == raw
     written = len(probe.pages)
     assert written == started + len(spec.colour_variants)
+    resume_calls = len(calls)
 
-    monkeypatch.setattr(notion_variants_module, "write_checkpoint", original)
+    def _count_write(
+        path: Path,
+        checkpoint: CheckpointView | None = None,
+        references: Mapping[str, object] | None = None,
+        *,
+        preserved_payload: Mapping[str, object] | None = None,
+        progress: Mapping[str, object] | None = None,
+        retained_created_ids: Mapping[str, object] | None = None,
+    ) -> None:
+        checkpoint_writes["count"] += 1
+        original(
+            path,
+            checkpoint,
+            references,
+            preserved_payload=preserved_payload,
+            progress=progress,
+            retained_created_ids=retained_created_ids,
+        )
+
+    monkeypatch.setattr(notion_variants_module, "write_checkpoint", _count_write)
     checkpoint = await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
 
+    assert checkpoint_writes["count"] == 2
+    assert calls.count("duplicate_page") == len(spec.colour_variants)
+    assert len(calls) == resume_calls
     assert len(probe.pages) == written
     assert len(checkpoint.variants) == len(spec.colour_variants)
     _assert_finished(spec, probe, started)

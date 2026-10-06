@@ -161,7 +161,7 @@ def _check_earlier_phases(
 ) -> None:
     workspace_ids, block_ids, nested_ids = _open_variant_ids(probe, stored, spec)
     # Ignore only this run's open pages, so a leftover spec id can be released
-    # before the bind. Any other workspace page stays unexpected.
+    # before the bind. A workspace page outside an open variant title stays unexpected.
     ignored = (*workspace_ids, *nested_ids) if ignore_spec_copies else ()
     require_completed_aesthetics(
         probe,
@@ -301,36 +301,50 @@ def _open_variant_ids(
     source_spec = source.properties.get(SPEC_ID_PROPERTY)
     workspace_ids: list[str] = []
     nested_ids: list[str] = []
-    for page in probe.pages.values():
-        if type(page) is not NotionPage or page.id == source.id:
-            continue
-        # A renamed page that still holds this product's spec id stays open.
-        # Validate ignores it; the release title filter keeps it out of the drop.
+
+    def _title_open(page: NotionPage) -> bool:
         holds_source_spec = (
             source_spec is not None and page.properties.get(SPEC_ID_PROPERTY) == source_spec
         )
-        if (
-            page.id not in recorded
-            and page.title not in titles
-            and page.title != copy_title
-            and not holds_source_spec
-        ):
+        return page.title in titles or page.title == copy_title or holds_source_spec
+
+    for page in probe.pages.values():
+        if type(page) is not NotionPage or page.id == source.id:
+            continue
+        if page.id in recorded:
+            if page.parent_type == "workspace":
+                workspace_ids.append(page.id)
+            else:
+                nested_ids.append(page.id)
+            continue
+        # Stored path: a variant or nested id is a recorded page id.
+        # A hub child with a variant title is not that id.
+        # Extra workspace-level titles stay open. That limit is parked.
+        if stored.variants:
+            if page.parent_type == "workspace" and _title_open(page):
+                workspace_ids.append(page.id)
+            continue
+        # Empty path: an unrecorded copy is open so resume can adopt it.
+        if not _title_open(page):
             continue
         if page.parent_type == "workspace":
             workspace_ids.append(page.id)
         else:
             nested_ids.append(page.id)
     known = set(workspace_ids) | set(nested_ids)
-    for page in probe.pages.values():
-        if (
-            type(page) is NotionPage
-            and page.parent_type == "page_id"
-            and page.parent_id in known
-            and page.id not in known
-        ):
-            nested_ids.append(page.id)
-            known.add(page.id)
-    block_ids = [block.id for block in probe.blocks.values() if block.parent_id in known]
+    block_ids: list[str] = []
+    for page_id in tuple(known):
+        page = probe.pages.get(page_id)
+        if type(page) is not NotionPage:
+            continue
+        owned = _page_block_ids(probe, page)
+        block_ids.extend(block_id for block_id in owned if block_id not in block_ids)
+        parents = {page.id, *owned}
+        for child in probe.pages.values():
+            if type(child) is not NotionPage or child.id in known or child.parent_id not in parents:
+                continue
+            nested_ids.append(child.id)
+            known.add(child.id)
     return tuple(workspace_ids), tuple(block_ids), tuple(nested_ids)
 
 
@@ -408,14 +422,33 @@ def _require_shell_copy(source: NotionPage, page: NotionPage) -> None:
         raise ProductBuildError("variant page does not match")
 
 
+def _page_block_ids(probe: FixtureNotionAdapter, page: NotionPage) -> set[str]:
+    """Every block of this page, including blocks nested under other blocks."""
+    owned: set[str] = set()
+    parents = {page.id}
+    while parents:
+        found = {
+            block.id
+            for block in probe.blocks.values()
+            if block.id not in owned and block.parent_id in parents
+        }
+        if not found:
+            break
+        owned.update(found)
+        parents = found
+    return owned
+
+
 def _has_nested_child(probe: FixtureNotionAdapter, page: NotionPage) -> bool:
+    """A database or page whose parent is this page or any of its blocks."""
+    parents = {page.id, *_page_block_ids(probe, page)}
     if any(
-        type(database) is NotionDatabase and database.parent_id == page.id
+        type(database) is NotionDatabase and database.parent_id in parents
         for database in probe.databases.values()
     ):
         return True
     return any(
-        type(child) is NotionPage and child.parent_id == page.id and child.parent_type == "page_id"
+        type(child) is NotionPage and child.id != page.id and child.parent_id in parents
         for child in probe.pages.values()
     )
 
@@ -478,7 +511,7 @@ def _require_adoptable(
     colour: str,
     token: ColourToken,
 ) -> None:
-    """Shell fields, then no nested page or database and no extra block."""
+    """Shell fields, then no nested page or database under the page or its blocks."""
     _require_shell_copy(source, page)
     found = page.properties.get(SPEC_ID_PROPERTY)
     if found is not None and found != source.properties.get(SPEC_ID_PROPERTY):

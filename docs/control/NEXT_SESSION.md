@@ -39,13 +39,35 @@ Router browser and combined config modes still raise `NotImplementedError` (W4a)
 W8 handoff. Counts and sites are in `IMPLEMENTATION_LOG.md` and `TEST_EVIDENCE.md`.
 
 - Fixture-only variants. Two-pass release: refuse every candidate, then drop. The order is validate, release, then the ProductSpec uniqueness bind. Replay does not release.
-- Product-build tests: 290 passed. Full local pytest figures are in `TEST_EVIDENCE.md`. The failures are the known local docker failures. CI is the gate.
-- Mutation checks: 45 rows, all killed. The Failed column sums to 360. Replacing the validate call with the uniqueness bind failed 27 and includes the 12 leftover tampers. Swapping release and bind inside the try failed 14, and those leftover tampers stayed green.
+- Product-build tests: 315 passed. Full local pytest figures are in `TEST_EVIDENCE.md`. The failures are the known local docker failures. CI is the gate. Prior tip `2c5b6beb` CI verify run `37454174393`, job `112237594389`, SUCCESS. This commit's CI run id is unknown until CI runs.
+- Mutation checks: 47 rows, all killed. The Failed column sums to 514. Replacing the validate call with the uniqueness bind failed 39 and includes the 16 leftover tampers. Swapping release and bind inside the try failed 22, and those leftover tampers stayed green. Q1 (`notion_variants.py:463-464`) failed 8. Q7 (`notion_variants.py:323-326`) failed 2. Nested-child body (`:442`) failed 20.
 - State revision is 55 to 56. This wave is not SESSION_07 COMPLETE. Exit 78 stays HELD. Narrative `next_phase` is `qa` (A09) and is not started. It is not a top-level state field. QA, the fact ledger, and the workflow link are not started.
-- `test_replay_refuses_a_restored_spec_id_without_a_write` refuses with zero writes. `test_crash_after_write_checkpoint_resumes_without_a_second_page` pins the stored path. `test_crash_inside_write_checkpoint_before_the_file_lands` resumes when the crash happens before the file lands.
+- `test_replay_refuses_a_restored_spec_id_without_a_write` refuses with zero writes. `test_crash_after_write_checkpoint_resumes_without_a_second_page` pins the stored path. `test_crash_inside_write_checkpoint_before_the_file_lands` asserts one `write_checkpoint` call on the crash and one more on resume, with no further adapter writes. The eleven-step crash-resume matrix, the provider-failure resume, and the drop and rename crashes are green. Resume still adopts a provable `{title} (Copy)` or `/ <Colour>` page through `_find_titled` (`notion_variants.py:277`) and `_find_copy` (`:278-279`).
+- A database or page parented under an accent, vocabulary, text, or callout block writes nothing on the empty path and the stored path (`test_child_under_a_page_block_writes_nothing`). A hub child with a variant title is refused (`test_replay_refuses_a_hub_child_with_a_variant_title`).
+- Known limit, pinned: extra workspace-level `/ Blue`, `/ Purple`, or `(Copy)` pages pass replay with zero writes (`test_replay_pins_extra_workspace_variant_titles_as_a_known_limit`). Not closed this wave.
 - `write_checkpoint` stays the only progress writer. A provider failure still records a repair job when a prior record exists. A refusal does not.
 - Provenance is the title plus the copyable shell fields. An unrelated empty workspace page with the source `product_id` and shell block id would be adopted, and `parent_id` compares equal when both are `None`. PARKED for the live wave. Not a proven lineage.
-- Docstring coverage stays 10.88% (W6, stale; not remeasured). No live Notion or Etsy mutation. The socket test is a tripwire, not a sandbox.
+- Docstring coverage stays 10.88% (W6, stale; not remeasured). No live Notion or Etsy mutation. The socket test is a tripwire, not a sandbox. It does not patch `sendto` or `getaddrinfo`.
+
+W9 must-fix. These are the reviewer's survivors on unchanged code from review 5427897657. They are parked. This wave does not add killing tests for them.
+
+1. `notion_variants.py:667` — `if link != record.secret_link`.
+2. `notion_variants.py:664` — `accent_id != record.accent_block_id or vocabulary_id != record.vocabulary_block_id`.
+3. `notion_variants.py:681` — `page.title != _variant_title`.
+4. `notion_variants.py:728` `_require_original`, and the call in `_require_saved` at `:657`.
+5. `notion_aesthetics.py:343` — `type(block) is not NotionTextBlock or block.parent_id != page_id`. Reviewer cited `:345`.
+6. `notion_aesthetics.py:262-266` — `_require_created_ids` signature. Reviewer cited `:263`.
+7. `notion_aesthetics.py:196-204` — `_require_pairs` row construction through `reject_duplicate_labels`. The delete-the-call mutant at `:203` is already killed. This survivor is a different edit in that span.
+8. `notion_variants.py:575-576` — `type(link) is not str or link == ""`.
+9. `notion_variants.py:715` — `len(children) != 2`.
+10. `notion_variants.py:724` — `home is None or home.id != stored.page_id`.
+11. `notion_variants.py:379` — `parent_type != "workspace"` in `_source_page`.
+12. `notion_variants.py:394` — `len(matches) > 1` in `_find_titled`.
+13. `notion_variants.py:408` — `len(matches) > 1` in `_find_copy`.
+14. `notion_variants.py:592` — `len(matches) > 1` in `_matching_accent`.
+15. `notion_variants.py:616` — `len(matches) > 1` in `_matching_vocabulary`.
+16. Publish-before-blocks. A mutant that publishes before the accent and vocabulary blocks are added. No killing test this wave.
+17. `notion_progress_record.py:180` — `if retained_created_ids is not None`.
 
 ## Later sessions
 
