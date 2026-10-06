@@ -1,5 +1,62 @@
 # Implementation Log
 
+## 2026-10-05 — Session 07 W4: tip-sync and fixture identity hubs
+
+Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision 51 → 52. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. `head_sha` moves to the post-merge W3 tip `0f67dc92d5c4bdc105a3801ed5b5f7b517c66283`. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`: an incomplete session may record a later `head_sha`, and this wave is not the completion candidacy that would move the closure SHA. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-05T23:45:00Z`.
+
+Twelve session 7 evidence keys stay false, including `home_dashboard_built`, `identity_hubs_built`, `notification_dashboard_built`, `product_build_tests_pass`, `control_files_and_checkpoint_current`, and `evidence_closure_commit_recorded`. No session exit code is recorded. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty.
+
+Identity hubs only, in `notion_hubs.py`, resuming the checkpoint `top_level_page_and_design_shell` + `shared_databases` + `dashboard_and_navigation` on an exact `FixtureNotionAdapter` from an exact `product_spec.ProductSpec`. Each spec hub is one unpublished child of the dashboard. It stores two linked views of canonical databases that exist for the tier, three static sections (purpose, practice, buyer) in that product's vocabulary, and one navigation block back to the dashboard title. The mass tier can link Events. The business tier has no Events database and no Events view. A second call does not create another hub, view, or page. A missing page, database, dashboard piece, or hub piece behind the saved checkpoint is an error. The checkpoint records `identity_specific_hubs`. The next phase is `notification_dashboard` and this wave does not run it. Aesthetics, variants, QA, the fact ledger, and the workflow link are not built. No live HTTP, no real Notion workspace, no Etsy listing.
+
+Prompt-integrity review: `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md` (Wave 4 addendum). Focused tests: 115 passed across the hubs, dashboard, shared-database, phase-1, and prompt-integrity files. `ruff format`, `ruff check`, and `pyright` are clean on the touched paths.
+
+Mutation checks (40 rows; each applied to `notion_hubs.py`, the hubs test file run, then reverted; 40 killed):
+
+| Mutation | Site | Failing test |
+|---|---|---|
+| Section drops the identity | `notion_hubs.py:134` | `test_business_tier_does_not_invent_events` |
+| Navigation drops the dashboard title | `notion_hubs.py:139` | `test_mass_tier_builds_identity_hubs_once` |
+| View name drops the identity | `notion_hubs.py:144` | `test_mass_tier_builds_identity_hubs_once` |
+| Linked view stores no filters | `notion_hubs.py:624` | `test_mass_tier_builds_identity_hubs_once` |
+| Events recipe is used on every tier | `notion_hubs.py:185` | `test_business_tier_does_not_invent_events` |
+| Skip resume of stored hubs | `notion_hubs.py:164` | `test_replay_does_not_create_another_hub` |
+| Skip the stored database check | `notion_hubs.py:356` | `test_missing_database_is_not_rebuilt` |
+| Skip the stored dashboard check | `notion_hubs.py:357` | `test_missing_dashboard_view_is_not_rebuilt` |
+| Skip the single-line field check | `notion_hubs.py:178` | `test_newline_in_a_hub_description_creates_nothing` |
+| Skip unique hub names | `notion_hubs.py:181` | `test_duplicate_hub_names_are_rejected` |
+| Accept a published hub page | `notion_hubs.py:447` | `test_published_hub_page_is_rejected` |
+| Linked view name is blank | `notion_hubs.py:623` | `test_mass_tier_builds_identity_hubs_once` |
+| Next phase on write skips hubs | `notion_hubs.py:372` | `test_mass_tier_builds_identity_hubs_once` |
+| Next phase on parse skips hubs | `notion_hubs.py:271` | `test_replay_does_not_create_another_hub` |
+| Module names notification_dashboard | `notion_hubs.py:765` | `test_hubs_module_does_not_name_a_live_client_or_later_phase` |
+| Module names publish_page | `notion_hubs.py:765` | `test_hubs_module_does_not_name_a_live_client_or_later_phase` |
+| Module names create_database | `notion_hubs.py:765` | `test_hubs_module_does_not_name_a_live_client_or_later_phase` |
+| Module names notion_client | `notion_hubs.py:765` | `test_hubs_module_does_not_name_a_live_client_or_later_phase` |
+| Section roles drop buyer | `notion_hubs.py:62` | `test_mass_tier_builds_identity_hubs_once` |
+| Resume requires three views | `notion_hubs.py:333` | `test_replay_does_not_create_another_hub` |
+| Always create a hub page | `notion_hubs.py:591` | `test_matching_section_is_adopted` |
+| Always create a section block | `notion_hubs.py:594` | `test_matching_section_is_adopted` |
+| Junk hub block is ignored | `notion_hubs.py:511` | `test_unexpected_hub_block_is_not_rewritten` |
+| A duplicate hub page is adopted | `notion_hubs.py:441` | `test_duplicate_hub_page_is_rejected` |
+| Skip the ProductSpec check | `notion_hubs.py:155` | `test_catalogue_spec_and_live_probes_are_rejected` |
+| Skip the fixture probe check | `notion_hubs.py:156` | `test_catalogue_spec_and_live_probes_are_rejected` |
+| Skip the same-spec check | `notion_hubs.py:161` | `test_other_spec_does_not_build_hubs` |
+| Accept a naive recorded_at | `notion_hubs.py:158` | `test_naive_recorded_at_leaves_the_checkpoint_unchanged` |
+| Resume ignores tampered filters | `notion_hubs.py:705` | `test_tampered_hub_filter_is_not_rewritten` |
+| An extra page is allowed | `notion_hubs.py:717` | `test_extra_page_on_resume_is_not_removed` |
+| A missing hub page is ignored | `notion_hubs.py:655` | `test_missing_hub_page_on_resume_is_not_rebuilt` |
+| Checkpoint may omit identity hubs | `notion_hubs.py:258` | `test_hubs_checkpoint_without_records_is_rejected` |
+| Swapped section roles are accepted | `notion_hubs.py:327` | `test_swapped_section_roles_are_rejected` |
+| Every linked view is a table | `notion_hubs.py:622` | `test_mass_tier_builds_identity_hubs_once` |
+| Every hub view is created from Tasks | `notion_hubs.py:604` | `test_mass_tier_builds_identity_hubs_once` |
+| Project views are tables | `notion_hubs.py:95` | `test_business_tier_does_not_invent_events` |
+| Five hub records are accepted | `notion_hubs.py:279` | `test_five_hub_records_are_rejected` |
+| Checkpoint omits the identity hubs key | `notion_hubs.py:739` | `test_mass_tier_builds_identity_hubs_once` |
+| A phase-2 checkpoint is parsed as a dashboard | `notion_hubs.py:245` | `test_dashboard_phase_is_required` |
+| Skip the home page check | `notion_hubs.py:355` | `test_missing_page_is_not_rebuilt` |
+
+Exit 78 scheduler stays HELD. Parked S06 nits stay parked. The #51 published-page mutant, the #52 shared-database nits, and the #53 dashboard nits stay parked.
+
 ## 2026-10-05 — Session 07 W3: tip-sync and fixture dashboard
 
 Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision 50 → 51. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. `head_sha` moves to the post-merge W2 tip `676fabef5bd1b36018f1d2d539d282225d860a99`. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`: an incomplete session may record a later `head_sha`, and this wave is not the completion candidacy that would move the closure SHA. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-05T22:30:00Z`.

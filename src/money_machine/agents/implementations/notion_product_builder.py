@@ -66,6 +66,17 @@ class ProductBuildError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class IdentityHubRecord:
+    """One fixture hub page, its static sections, and its linked views."""
+
+    name: str
+    page_id: str
+    sections: tuple[tuple[str, str], ...]
+    navigation_block_id: str
+    views: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
 class ProductBuildCheckpoint:
     """Persisted build progress. The next phase is not executed."""
 
@@ -83,6 +94,7 @@ class ProductBuildCheckpoint:
     recorded_at: datetime
     database_ids: tuple[tuple[str, str], ...] = ()
     dashboard_pieces: tuple[tuple[str, str], ...] = ()
+    identity_hubs: tuple[IdentityHubRecord, ...] = ()
 
 
 def design_shell_content(spec: ProductSpec) -> str:
