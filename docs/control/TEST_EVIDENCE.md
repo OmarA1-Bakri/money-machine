@@ -1,5 +1,25 @@
 # Test Evidence
 
+## 2026-10-06 — Session 07 W7: progress and repair
+
+**Verification scope**: Fixture-only progress record and repair for the six product-build phases, plus the should-fix sweep named in the W7 brief. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Postgres, Alembic, pnpm, and Compose were not required for this slice and were not run.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `completed_sessions` `[0, 1, 2, 3, 4, 5, 6]`, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`. A07–A09 stay DESIGNED. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | `head_sha` is `3f0a30a8e52b183f10799128d4fd7b17c1b74495`. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. `state_revision` is 55 | PASS |
+| Progress and repair | `tests/unit/agents/test_notion_product_build_progress.py` and the six phase files: 198 passed. A failure injected at each of the six phases stores a repair job of kind `provider_response` and resume changes only the failed operation onward, including a block-count delta. A forged digest, an extra key, and kind `screenshot` write nothing. An unrecoverable record rebuilds phase 1 only. Later phases do not rebuild. Full local pytest: 2158 collected, 1953 passed, 193 skipped, 12 failed. The 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` for the `docker` binary | PASS for this slice |
+| Mutations | 23 mutations applied, owning tests run, then reverted. 23 killed. 46 failing-test occurrences. Counts are in `IMPLEMENTATION_LOG.md` | PASS |
+| Lint and types | `ruff format --check` and `ruff check` are clean. `pyright` reports 0 errors with SQLAlchemy 2.0.52. SQLAlchemy 2.1.3 locally reported 2 errors in `persistence/repositories/_base.py`; those are absent on the lockfile version and are outside this wave | PASS |
+| Next phase | Checkpoint `next_phase` stays `build_phases_complete`. Variants (A08), QA, the fact ledger, and the workflow link are not executed | PASS |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+| Closed this wave | One progress writer, phase-6 tamper, catalogue gaps, re-parent, forged business checkpoint, block-count delta, `ubuntu-24.04`, real mutation counts, adopt checks, `view_matches`, `require_workspace_id`, `_ensure` order, icon/cover resume, `sample_marker`, Buyer variants, O1/O7/O8/O9, sample text, casefold bans | CLOSED |
+| Partial this wave | `_require_pairs` still has two parsers. Both reject duplicate labels | PARTIAL |
+| Parked items | Fixture property-value shortcut, fixed `SAMPLE_DATE` `"2026-10-06"`, docstring coverage 10.88% (not remeasured), nav as a page link, one home page per probe (`notion_dashboard.py:275`, `notion_hubs.py:494`), S04–S06 nits | PARKED |
+
+**Status**: Session 07 Wave 7. The session stays incomplete. Exit 78 stays HELD. No session exit code is recorded.
+
 ## 2026-10-06 — Session 07 W6: fixture aesthetics and content completion
 
 **Verification scope**: Fixture-only aesthetics and content completion, resumed from the notification-dashboard checkpoint, plus the Notion product-build fixes from #51–#55 that this wave closed. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Postgres, Alembic, pnpm, and Compose were not required for this slice and were not run.

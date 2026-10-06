@@ -32,11 +32,11 @@
 
 Router browser and combined config modes still raise `NotImplementedError` (W4a). Fixture mode stays the default.
 
-## Session 07 — Wave 6 in progress
+## Session 07 — Wave 7 in progress
 
-**Status**: Incomplete (2026-10-06, W6, state revision 54). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. `head_sha` is the W5 post-merge tip `0793e73147c0a3e50b6e27be2c74d3084ab1bfd5`. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD.
+**Status**: Incomplete (2026-10-06, W7, state revision 55). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. `head_sha` is the W6 squash `3f0a30a8e52b183f10799128d4fd7b17c1b74495`. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD.
 
-W1 through W5 stored the fixture page, shared databases, home dashboard, identity hubs, and notification dashboard. W6 resumes that checkpoint and stores palette accent callouts and SAMPLE hub text. `next_phase` is `build_phases_complete`. Variants, QA, the fact ledger, and the workflow link are not started. Navigation stays paragraph text because the fixture has no page-link block. A second top-level product page is still rejected by the dashboard and hub builders. No live Notion or Etsy mutation.
+W1 through W6 stored the fixture page, shared databases, home dashboard, identity hubs, notification dashboard, and palette accents. W7 persists those six phases in one signed progress record. A recoverable provider failure stores `kind=provider_response` and resumes from the failed operation. The whole product is rebuilt only when the progress record is unrecoverable, and only phase 1 is rebuilt. Checkpoint `next_phase` stays `build_phases_complete`. The next phase after this wave is variants (A08) and it is not started. QA, the fact ledger, and the workflow link are not started. Navigation stays paragraph text because the fixture has no page-link block. A second top-level product page is still rejected. No live Notion or Etsy mutation.
 
 ## Later sessions
 
