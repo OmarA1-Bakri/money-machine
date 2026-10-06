@@ -371,6 +371,7 @@ def require_completed_aesthetics(
     *,
     extra_top_level_ids: tuple[str, ...] = (),
     extra_block_ids: tuple[str, ...] = (),
+    ignored_page_ids: tuple[str, ...] = (),
 ) -> None:
     """Check the saved aesthetics phase, including when variants already exist."""
     view = stored
@@ -382,6 +383,7 @@ def require_completed_aesthetics(
         spec,
         extra_top_level_ids=extra_top_level_ids,
         extra_block_ids=extra_block_ids,
+        ignored_page_ids=ignored_page_ids,
     )
 
 
@@ -401,11 +403,12 @@ def _require_saved(
     *,
     extra_top_level_ids: tuple[str, ...] = (),
     extra_block_ids: tuple[str, ...] = (),
+    ignored_page_ids: tuple[str, ...] = (),
 ) -> None:
     record = stored.aesthetics
     if record is None or stored.next_phase != BUILD_PHASES_COMPLETE:
         raise ProductBuildError("aesthetics record is missing")
-    home = require_home_page(probe, stored, spec)
+    home = require_home_page(probe, stored, spec, ignored_page_ids=ignored_page_ids)
     _require_contents(probe, home, stored, spec, record)
     marks = {page_id: (icon, cover) for page_id, icon, cover in record.marks}
     accent_ids = tuple(block_id for _name, block_id in (*record.accents, *record.samples))
@@ -416,6 +419,7 @@ def _require_saved(
         extra_block_ids=(*accent_ids, *extra_block_ids),
         extra_top_level_ids=extra_top_level_ids,
         page_marks=marks,
+        ignored_page_ids=ignored_page_ids,
     )
 
 

@@ -399,6 +399,7 @@ def require_identity_hubs(
     page_marks: Mapping[str, tuple[str, str]] | None = None,
     formula_suffixes: Mapping[str, tuple[tuple[str, str], ...]] | None = None,
     formulas_optional: bool = False,
+    ignored_page_ids: tuple[str, ...] = (),
 ) -> NotionPage:
     """Check the saved hubs. Extra pages and databases belong to a later phase."""
     kinds = shared_database_kinds(spec)
@@ -410,6 +411,7 @@ def require_identity_hubs(
         extra_database_ids=extra_database_ids,
         formula_suffixes=formula_suffixes,
         formulas_optional=formulas_optional,
+        ignored_page_ids=ignored_page_ids,
     )
     _require_saved_hubs(
         probe,
@@ -434,8 +436,9 @@ def _require_prior_dashboard(
     extra_database_ids: tuple[str, ...] = (),
     formula_suffixes: Mapping[str, tuple[tuple[str, str], ...]] | None = None,
     formulas_optional: bool = False,
+    ignored_page_ids: tuple[str, ...] = (),
 ) -> NotionPage:
-    page = require_home_page(probe, stored, spec)
+    page = require_home_page(probe, stored, spec, ignored_page_ids=ignored_page_ids)
     require_checkpoint_databases(
         probe,
         page,

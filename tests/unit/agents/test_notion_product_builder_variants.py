@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Awaitable, Callable
+import socket
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -11,6 +12,7 @@ from uuid import uuid4
 
 import pytest
 
+from money_machine.agents.implementations import notion_variants as notion_variants_module
 from money_machine.agents.implementations.notion_aesthetics import (
     build_aesthetics_and_content_completion,
 )
@@ -29,6 +31,7 @@ from money_machine.agents.implementations.notion_progress import (
     ProviderFailure,
     stamp_integrity_digest,
 )
+from money_machine.agents.implementations.notion_progress_record import CheckpointView
 from money_machine.agents.implementations.notion_shared_databases import build_shared_databases
 from money_machine.agents.implementations.notion_variants import PHASE_QA, build_variants
 from money_machine.control.state import SESSION_EVIDENCE_KEYS
@@ -531,6 +534,186 @@ async def test_earlier_phase_tamper_writes_nothing(tmp_path: Path, stage: str, k
     assert path.read_bytes() == raw
 
 
+async def _plant_leftover_spec_id(
+    probe: FixtureNotionAdapter, spec: ProductSpec, shape: str
+) -> None:
+    home = _home(probe, spec)
+    spec_value = home.properties[SPEC_ID_PROPERTY]
+    assert type(spec_value) is str
+    if shape == "copy":
+        copy = await probe.duplicate_page(home.id)
+        assert copy.title == f"{home.title} (Copy)"
+        assert copy.properties.get(SPEC_ID_PROPERTY) == spec_value
+        return
+    if shape == "titled":
+        title = f"{spec.title} / {spec.colour_variants[0]}"
+        titled = next((page for page in probe.pages.values() if page.title == title), None)
+        if titled is None:
+            created = await probe.duplicate_page(home.id)
+            titled = await probe.rename_page(created.id, title)
+        titled.properties[SPEC_ID_PROPERTY] = spec_value
+        return
+    raise AssertionError(shape)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stage", ["empty", "stored"])
+@pytest.mark.parametrize("kind", ["hub", "database", "accent"])
+@pytest.mark.parametrize("shape", ["titled", "copy"])
+async def test_leftover_spec_id_tamper_writes_nothing(
+    tmp_path: Path, stage: str, kind: str, shape: str
+) -> None:
+    spec = _four_spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    if stage == "stored":
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    if kind == "accent":
+        _drop_home_accent(probe, spec)
+    else:
+        _restamp(path, lambda document: _tamper_created(document, kind))
+    await _plant_leftover_spec_id(probe, spec, shape)
+    raw = path.read_bytes()
+    calls = _watch(probe)
+    message = "aesthetics accent" if kind == "accent" else "progress created ids do not match"
+
+    with pytest.raises(ProductBuildError, match=message):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("shape", ["titled", "copy"])
+@pytest.mark.parametrize("body", ["empty", "private"])
+async def test_unrelated_page_is_not_adopted(tmp_path: Path, shape: str, body: str) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    home = _home(probe, spec)
+    title = f"{spec.title} / Blue" if shape == "titled" else f"{home.title} (Copy)"
+    if body == "private":
+        page = await probe.duplicate_page(home.id)
+        if shape == "titled":
+            page = await probe.rename_page(page.id, title)
+        await probe.add_text_block(page.id, "private note")
+    else:
+        page = await probe.create_page(title, parent_id=home.parent_id, parent_type="workspace")
+    raw = path.read_bytes()
+    pages = set(probe.pages)
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+    assert set(probe.pages) == pages
+    stored = json.loads(path.read_text(encoding="ascii"))
+    assert "variants" not in stored["provider_object_references"]
+    assert page.is_published is False
+    assert page.title == title
+
+
+@pytest.mark.asyncio
+async def test_release_provider_failure_records_a_repair_job(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    home = _home(probe, spec)
+    copy = await probe.duplicate_page(home.id)
+    before = json.loads(path.read_text(encoding="ascii"))
+
+    async def _boom(page_id: str, name: str) -> NotionPage:
+        raise ProviderFailure(OP_VARIANTS, "drop refused")
+
+    probe.drop_page_property = _boom  # type: ignore[method-assign]
+
+    with pytest.raises(ProductBuildError, match="drop refused"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert SPEC_ID_PROPERTY in copy.properties
+    assert copy.is_published is False
+    stored = json.loads(path.read_text(encoding="ascii"))
+    progress = stored["progress"]
+    before_progress = before["progress"]
+    assert type(progress) is dict and type(before_progress) is dict
+    jobs = progress["repair_jobs"]
+    before_jobs = before_progress["repair_jobs"]
+    assert type(jobs) is list and type(before_jobs) is list
+    assert len(jobs) == len(before_jobs) + 1
+    job = jobs[-1]
+    assert type(job) is dict
+    assert job["kind"] == "provider_response"
+    assert job["response"] == "drop refused"
+    assert "variants" not in stored["provider_object_references"]
+
+
+@pytest.mark.asyncio
+async def test_replay_refuses_a_restored_spec_id_without_a_write(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    checkpoint = await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    page = probe.pages[checkpoint.variants[0].page_id]
+    page.properties[SPEC_ID_PROPERTY] = str(spec.spec_id)
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+    assert SPEC_ID_PROPERTY in page.properties
+
+
+@pytest.mark.asyncio
+async def test_release_keeps_another_products_spec_id_on_private_notes(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    home = _home(probe, spec)
+    notes = await probe.create_page(
+        "Private Notes", parent_id=home.parent_id, parent_type="workspace"
+    )
+    notes.properties[SPEC_ID_PROPERTY] = "other-spec"
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="hub page is unexpected"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert notes.properties[SPEC_ID_PROPERTY] == "other-spec"
+    assert notes.title == "Private Notes"
+    assert notes.is_published is False
+
+
+@pytest.mark.asyncio
+async def test_finish_does_not_record_a_page_that_stays_indexed(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    raw = path.read_bytes()
+
+    async def _keep(page_id: str, enabled: bool) -> NotionPage:
+        return probe.pages[page_id]
+
+    probe.set_search_indexing = _keep  # type: ignore[method-assign]
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert path.read_bytes() == raw
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "step",
@@ -593,6 +776,95 @@ async def test_each_variant_step_crash_resumes_without_a_second_page(
 
 
 @pytest.mark.asyncio
+async def test_drop_crash_then_tamper_writes_nothing_and_clean_resume_finishes(
+    tmp_path: Path,
+) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    started = len(probe.pages)
+    original = probe.drop_page_property
+    failed = {"done": False}
+
+    async def _boom(page_id: str, name: str) -> NotionPage:
+        if not failed["done"]:
+            failed["done"] = True
+            raise RuntimeError("step crashed")
+        return await original(page_id, name)
+
+    probe.drop_page_property = _boom  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError, match="step crashed"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    copy = next(page for page in probe.pages.values() if page.title.endswith(" (Copy)"))
+    assert SPEC_ID_PROPERTY in copy.properties
+    clean = path.read_bytes()
+
+    _restamp(path, lambda document: _tamper_created(document, "hub"))
+    raw = path.read_bytes()
+    calls = _watch(probe)
+    with pytest.raises(ProductBuildError, match="progress created ids do not match"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    assert calls == []
+    assert path.read_bytes() == raw
+    assert SPEC_ID_PROPERTY in copy.properties
+
+    path.write_bytes(clean)
+    probe.drop_page_property = original  # type: ignore[method-assign]
+    checkpoint = await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert len(checkpoint.variants) == len(spec.colour_variants)
+    _assert_finished(spec, probe, started)
+    assert SPEC_ID_PROPERTY not in copy.properties
+
+
+@pytest.mark.asyncio
+async def test_crash_after_write_checkpoint_resumes_without_a_second_page(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    original = notion_variants_module.write_checkpoint
+
+    def _boom(
+        path: Path,
+        checkpoint: CheckpointView | None = None,
+        references: Mapping[str, object] | None = None,
+        *,
+        preserved_payload: Mapping[str, object] | None = None,
+        progress: Mapping[str, object] | None = None,
+        retained_created_ids: Mapping[str, object] | None = None,
+    ) -> None:
+        original(
+            path,
+            checkpoint,
+            references,
+            preserved_payload=preserved_payload,
+            progress=progress,
+            retained_created_ids=retained_created_ids,
+        )
+        raise RuntimeError("checkpoint write crashed")
+
+    monkeypatch.setattr(notion_variants_module, "write_checkpoint", _boom)
+    with pytest.raises(RuntimeError, match="checkpoint write crashed"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    written = len(probe.pages)
+    stored = json.loads(path.read_text(encoding="ascii"))
+    assert "variants" in stored["provider_object_references"]
+
+    monkeypatch.setattr(notion_variants_module, "write_checkpoint", original)
+    checkpoint = await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert len(probe.pages) == written
+    assert len(checkpoint.variants) == len(spec.colour_variants)
+    titles = [page.title for page in probe.pages.values()]
+    for colour in spec.colour_variants:
+        assert titles.count(f"{spec.title} / {colour}") == 1
+
+
+@pytest.mark.asyncio
 async def test_secret_link_comes_from_get_public_url(tmp_path: Path) -> None:
     spec = _spec()
     probe = FixtureNotionAdapter()
@@ -652,9 +924,13 @@ async def test_replay_rejects_a_dropped_colour(tmp_path: Path) -> None:
     raw = path.read_bytes()
     calls = _watch(probe)
 
-    with pytest.raises(ProductBuildError, match="checkpoint variants do not match the ProductSpec"):
+    with pytest.raises(
+        ProductBuildError, match="checkpoint variants do not match the ProductSpec"
+    ) as caught:
         await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
 
+    assert type(caught.value) is ProductBuildError
+    assert str(caught.value) == "checkpoint variants do not match the ProductSpec"
     assert calls == []
     assert path.read_bytes() == raw
 
@@ -748,7 +1024,21 @@ async def test_catalogue_spec_and_live_probes_are_rejected(tmp_path: Path) -> No
     assert path.read_bytes() == raw
 
 
-def test_variants_module_does_not_name_a_live_client() -> None:
+@pytest.mark.asyncio
+async def test_variant_build_does_not_open_a_socket(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _refuse(*_args: object, **_kwargs: object) -> None:
+        raise OSError("socket connect is refused")
+
+    monkeypatch.setattr(socket.socket, "connect", _refuse)
+    monkeypatch.setattr(socket, "create_connection", _refuse)
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    checkpoint = await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    assert len(checkpoint.variants) == len(spec.colour_variants)
     source = MODULE_PATH.read_text(encoding="utf-8")
     for token in (
         "notion_client",

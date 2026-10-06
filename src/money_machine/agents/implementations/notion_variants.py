@@ -27,6 +27,8 @@ from money_machine.agents.implementations.notion_aesthetics import (
 )
 from money_machine.agents.implementations.notion_product_builder import (
     BUILD_PHASES,
+    PRODUCT_ID_PROPERTY,
+    SHELL_BLOCK_PROPERTY,
     SPEC_ID_PROPERTY,
     ProductBuildCheckpoint,
     ProductBuildError,
@@ -90,12 +92,15 @@ async def build_variants(
     moment = require_datetime(recorded_at)
     stored, created = _load_checkpoint(path)
     require_same_spec(stored, validated)
-    await _release_copied_spec_ids(fixture, stored, validated)
-    _bind_earlier_phases(fixture, stored, validated, created)
+    # Created ids and saved aesthetics first. ProductSpec uniqueness waits until
+    # a copied spec id has been released, or a crashed drop looks like two pages.
+    _validate_earlier_phases(fixture, stored, validated, created)
     if stored.variants:
         await _require_saved(fixture, stored, validated)
         return stored
     try:
+        await _release_copied_spec_ids(fixture, stored, validated)
+        _bind_earlier_phases(fixture, stored, validated, created)
         records = await _ensure(fixture, stored, validated)
     except ProviderFailure as failure:
         raise_recorded(path, BUILD_PHASES[-1], failure)
@@ -125,20 +130,59 @@ def _load_checkpoint(path: Path) -> tuple[ProductBuildCheckpoint, Mapping[str, o
     return replace(base, next_phase=PHASE_QA, variants=records), created
 
 
+def _validate_earlier_phases(
+    probe: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+    created: Mapping[str, object],
+) -> None:
+    """Created ids and saved aesthetics, without ProductSpec uniqueness."""
+    _check_earlier_phases(probe, stored, spec, created, ignore_spec_copies=True)
+
+
 def _bind_earlier_phases(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
     created: Mapping[str, object],
 ) -> None:
-    """Aesthetics saved state, then created ids, before any variant branch."""
-    page_ids, block_ids = _open_variant_ids(probe, stored, spec)
+    """ProductSpec uniqueness after copied spec ids have been released."""
+    _check_earlier_phases(probe, stored, spec, created, ignore_spec_copies=False)
+
+
+def _check_earlier_phases(
+    probe: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+    created: Mapping[str, object],
+    *,
+    ignore_spec_copies: bool,
+) -> None:
+    open_pages, open_blocks = _open_variant_ids(probe, stored, spec)
+    if ignore_spec_copies:
+        # Saved checks see every current page. Uniqueness does not, so a copy
+        # that still holds product_spec_id can be released before the bind.
+        page_ids = tuple(
+            page.id
+            for page in probe.pages.values()
+            if type(page) is NotionPage
+            and page.id != stored.page_id
+            and page.parent_type == "workspace"
+        )
+        known = set(page_ids)
+        block_ids = tuple(block.id for block in probe.blocks.values() if block.parent_id in known)
+        ignored = open_pages
+    else:
+        page_ids = open_pages
+        block_ids = open_blocks
+        ignored = ()
     require_completed_aesthetics(
         probe,
         stored,
         spec,
         extra_top_level_ids=page_ids,
         extra_block_ids=block_ids,
+        ignored_page_ids=ignored,
     )
     require_aesthetics_created_ids(probe, created, stored)
 
@@ -249,7 +293,7 @@ async def _ensure(
             if records:
                 guard_operation(probe, OP_VARIANTS)
             existing = await probe.duplicate_page(source.id)
-        records.append(await _finish_variant(probe, spec, existing, colour, token))
+        records.append(await _finish_variant(probe, spec, source, existing, colour, token))
     _require_one_spec_page(probe, spec, stored)
     _require_original(source)
     return tuple(records)
@@ -293,8 +337,10 @@ async def _release_copied_spec_ids(
             continue
         if page.title not in titles and page.title != copy_title:
             continue
-        if SPEC_ID_PROPERTY in page.properties:
-            await probe.drop_page_property(page.id, SPEC_ID_PROPERTY)
+        if SPEC_ID_PROPERTY not in page.properties:
+            continue
+        _refuse_unadoptable_release(probe, source, spec, page)
+        await probe.drop_page_property(page.id, SPEC_ID_PROPERTY)
 
 
 def _source_page(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -> NotionPage:
@@ -335,13 +381,102 @@ def _find_copy(probe: FixtureNotionAdapter, source: NotionPage) -> NotionPage | 
     return matches[0]
 
 
-async def _finish_variant(
+def _require_shell_copy(source: NotionPage, page: NotionPage) -> None:
+    if (
+        page.parent_type != "workspace"
+        or page.parent_id != source.parent_id
+        or page.properties.get(PRODUCT_ID_PROPERTY) != source.properties.get(PRODUCT_ID_PROPERTY)
+        or page.properties.get(SHELL_BLOCK_PROPERTY) != source.properties.get(SHELL_BLOCK_PROPERTY)
+    ):
+        raise ProductBuildError("variant page does not match")
+
+
+def _has_foreign_child(
     probe: FixtureNotionAdapter,
     spec: ProductSpec,
     page: NotionPage,
     colour: str,
     token: ColourToken,
+) -> bool:
+    accent = _matching_accent(probe, page, token)
+    vocabulary = _matching_vocabulary(probe, spec, page, colour, token)
+    allowed = {block.id for block in (accent, vocabulary) if block is not None}
+    return any(
+        block.parent_id == page.id and block.id not in allowed for block in probe.blocks.values()
+    )
+
+
+def _has_unrecognized_child(
+    probe: FixtureNotionAdapter, spec: ProductSpec, page: NotionPage
+) -> bool:
+    children = [block for block in probe.blocks.values() if block.parent_id == page.id]
+    pairs = _aligned_pairs(spec)
+    for block in children:
+        matched = False
+        for colour, token in pairs:
+            accent_ok = (
+                type(block) is NotionCalloutBlock
+                and block.content == accent_content(token.name, token.hex)
+                and block.icon == AESTHETIC_ICON
+            )
+            vocabulary_ok = type(block) is NotionTextBlock and block.content == vocabulary_content(
+                spec, colour, token
+            )
+            if accent_ok or vocabulary_ok:
+                matched = True
+                break
+        if not matched:
+            return True
+    return False
+
+
+def _colour_from_title(spec: ProductSpec, page: NotionPage) -> str | None:
+    for colour in spec.colour_variants:
+        if page.title == _variant_title(spec, colour):
+            return colour
+    return None
+
+
+def _require_adoptable(
+    probe: FixtureNotionAdapter,
+    source: NotionPage,
+    page: NotionPage,
+    spec: ProductSpec,
+    colour: str,
+    token: ColourToken,
+) -> None:
+    """A copy is adoptable only when it is the source shell and has no foreign blocks."""
+    _require_shell_copy(source, page)
+    if _has_foreign_child(probe, spec, page, colour, token):
+        raise ProductBuildError("variant page does not match")
+
+
+def _refuse_unadoptable_release(
+    probe: FixtureNotionAdapter,
+    source: NotionPage,
+    spec: ProductSpec,
+    page: NotionPage,
+) -> None:
+    _require_shell_copy(source, page)
+    colour = _colour_from_title(spec, page)
+    if colour is None:
+        if _has_unrecognized_child(probe, spec, page):
+            raise ProductBuildError("variant page does not match")
+        return
+    token = next(item for name, item in _aligned_pairs(spec) if name == colour)
+    if _has_foreign_child(probe, spec, page, colour, token):
+        raise ProductBuildError("variant page does not match")
+
+
+async def _finish_variant(
+    probe: FixtureNotionAdapter,
+    spec: ProductSpec,
+    source: NotionPage,
+    page: NotionPage,
+    colour: str,
+    token: ColourToken,
 ) -> VariantRecord:
+    _require_adoptable(probe, source, page, spec, colour, token)
     title = _variant_title(spec, colour)
     if SPEC_ID_PROPERTY in page.properties:
         page = await probe.drop_page_property(page.id, SPEC_ID_PROPERTY)

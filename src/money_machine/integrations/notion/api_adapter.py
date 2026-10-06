@@ -209,6 +209,11 @@ class APINotionAdapter(NotionAdapter):
             "Deferred to Session 06 Wave 3+. Use FixtureNotionAdapter for testing."
         )
 
+    async def drop_page_property(self, page_id: str, name: str) -> NotionPage:
+        raise NotImplementedError(
+            "drop_page_property is fixture-only in this wave. Use FixtureNotionAdapter for testing."
+        )
+
     async def rename_page(self, page_id: str, new_title: str) -> NotionPage:
         """Rename a page via PATCH /v1/pages/{id}."""
         properties = {"title": {"title": [{"text": {"content": new_title}}]}}

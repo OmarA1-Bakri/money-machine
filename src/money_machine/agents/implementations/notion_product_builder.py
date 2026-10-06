@@ -331,11 +331,19 @@ def require_workspace_id(probe: FixtureNotionAdapter) -> str:
     return workspace_id
 
 
-def find_spec_page(probe: FixtureNotionAdapter, spec_id: str) -> NotionPage | None:
+def find_spec_page(
+    probe: FixtureNotionAdapter,
+    spec_id: str,
+    *,
+    ignored_page_ids: tuple[str, ...] = (),
+) -> NotionPage | None:
+    ignored = set(ignored_page_ids)
     matches = [
         page
         for page in probe.pages.values()
-        if type(page) is NotionPage and _property(page, SPEC_ID_PROPERTY) == spec_id
+        if type(page) is NotionPage
+        and page.id not in ignored
+        and _property(page, SPEC_ID_PROPERTY) == spec_id
     ]
     if len(matches) > 1:
         raise ProductBuildError("fixture probe has more than one page for this ProductSpec")

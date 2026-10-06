@@ -345,6 +345,7 @@ def require_notification_dashboard(
     extra_block_ids: tuple[str, ...] = (),
     extra_top_level_ids: tuple[str, ...] = (),
     page_marks: Mapping[str, tuple[str, str]] | None = None,
+    ignored_page_ids: tuple[str, ...] = (),
 ) -> NotionPage:
     """Check the saved notification dashboard. Later blocks and hub marks are allowed."""
     kinds = shared_database_kinds(spec)
@@ -358,6 +359,7 @@ def require_notification_dashboard(
         extra_block_ids=extra_block_ids,
         extra_top_level_ids=extra_top_level_ids,
         page_marks=page_marks,
+        ignored_page_ids=ignored_page_ids,
     )
 
 
@@ -371,11 +373,12 @@ def _require_saved(
     extra_block_ids: tuple[str, ...] = (),
     extra_top_level_ids: tuple[str, ...] = (),
     page_marks: Mapping[str, tuple[str, str]] | None = None,
+    ignored_page_ids: tuple[str, ...] = (),
 ) -> NotionPage:
     record = stored.notification_dashboard
     if record is None:
         raise ProductBuildError("notification dashboard is missing")
-    require_home_page(probe, stored, spec)
+    require_home_page(probe, stored, spec, ignored_page_ids=ignored_page_ids)
     plan = _plan(kinds)
     _require_objects(probe, stored, spec, record, plan, suffixes)
     return require_identity_hubs(
@@ -393,6 +396,7 @@ def _require_saved(
         page_marks=page_marks,
         formula_suffixes=suffixes,
         formulas_optional=False,
+        ignored_page_ids=ignored_page_ids,
     )
 
 

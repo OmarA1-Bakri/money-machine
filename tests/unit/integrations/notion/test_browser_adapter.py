@@ -195,6 +195,10 @@ DIRECT_API_OPERATIONS: list[tuple[str, Callable[[NotionAdapter], Awaitable[objec
     ("connection_status", lambda adapter: adapter.connection_status()),
     ("workspace_discovery", lambda adapter: adapter.workspace_discovery()),
     ("create_page", lambda adapter: adapter.create_page("Test")),
+    (
+        "drop_page_property",
+        lambda adapter: adapter.drop_page_property("page_123", "product_spec_id"),
+    ),
     ("rename_page", lambda adapter: adapter.rename_page("page_123", "New Title")),
     ("move_page", lambda adapter: adapter.move_page("page_123", "page_parent")),
     ("set_icon", lambda adapter: adapter.set_icon("page_123", "📄")),
