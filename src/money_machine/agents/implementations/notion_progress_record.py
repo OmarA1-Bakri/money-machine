@@ -65,6 +65,26 @@ class _Aesthetics(Protocol):
     def samples(self) -> tuple[tuple[str, str], ...]: ...
 
 
+class _Variant(Protocol):
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def token_name(self) -> str: ...
+
+    @property
+    def page_id(self) -> str: ...
+
+    @property
+    def accent_block_id(self) -> str: ...
+
+    @property
+    def vocabulary_block_id(self) -> str: ...
+
+    @property
+    def secret_link(self) -> str: ...
+
+
 class CheckpointView(Protocol):
     """The checkpoint fields the progress record stores. Read-only for frozen records."""
 
@@ -118,6 +138,9 @@ class CheckpointView(Protocol):
 
     @property
     def aesthetics(self) -> _Aesthetics | None: ...
+
+    @property
+    def variants(self) -> tuple[_Variant, ...]: ...
 
 
 def write_checkpoint(
@@ -222,6 +245,18 @@ def _created_ids(checkpoint: CheckpointView) -> dict[str, object]:
             ],
             "samples": [{"block_id": block_id, "hub": hub} for hub, block_id in record.samples],
         }
+    if checkpoint.variants:
+        created["variants"] = [
+            {
+                "accent_block_id": variant.accent_block_id,
+                "name": variant.name,
+                "page_id": variant.page_id,
+                "secret_link": variant.secret_link,
+                "token": variant.token_name,
+                "vocabulary_block_id": variant.vocabulary_block_id,
+            }
+            for variant in checkpoint.variants
+        ]
     return created
 
 
@@ -255,6 +290,8 @@ def _counts(checkpoint: CheckpointView) -> dict[str, int]:
     record = checkpoint.aesthetics
     if record is not None:
         blocks += len(record.accents) + len(record.samples)
+    pages += len(checkpoint.variants)
+    blocks += 2 * len(checkpoint.variants)
     return {"blocks": blocks, "databases": databases, "pages": pages}
 
 

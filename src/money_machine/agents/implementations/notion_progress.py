@@ -44,6 +44,7 @@ OP_DASHBOARD_COVER = "dashboard_and_navigation.cover"
 OP_HUBS_CREATE = "identity_specific_hubs.create"
 OP_NOTIFICATION_DATABASE = "notification_dashboard.database"
 OP_AESTHETICS_SAMPLES = "aesthetics_and_content_completion.samples"
+OP_VARIANTS = "variants.duplicate"
 OP_REBUILD = "top_level_page_and_design_shell.rebuild"
 REBUILD_REFUSED = "rebuild_refused"
 _ACCEPTED_JOB_KINDS = frozenset({"provider_response", REBUILD_REFUSED})
@@ -71,6 +72,7 @@ _CREATED_KEYS = frozenset(
         "hubs",
         "notification",
         "top_level_page_id",
+        "variants",
         "workspace_id",
     }
 )
@@ -291,6 +293,7 @@ def empty_created_ids() -> dict[str, object]:
         "hubs": [],
         "notification": None,
         "top_level_page_id": "",
+        "variants": None,
         "workspace_id": "",
     }
 
@@ -387,6 +390,8 @@ def _require_created(value: object) -> None:
     if found["notification"] is not None and type(found["notification"]) is not dict:
         raise ProductBuildError("progress record is tampered")
     if found["aesthetics"] is not None and type(found["aesthetics"]) is not dict:
+        raise ProductBuildError("progress record is tampered")
+    if found["variants"] is not None and type(found["variants"]) is not list:
         raise ProductBuildError("progress record is tampered")
     if not json.dumps(found, sort_keys=True).isascii():
         raise ProductBuildError("progress record is tampered")

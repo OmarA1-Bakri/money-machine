@@ -1,5 +1,26 @@
 # Test Evidence
 
+## 2026-10-06 — Session 07 W8: variants
+
+**Verification scope**: Fixture-only A08 product variants, plus the must-fixes carried from Wave 7. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Postgres, Alembic, pnpm, and Compose were not required for this slice and were not run.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `completed_sessions` `[0, 1, 2, 3, 4, 5, 6]`, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`, including `variant_builder_implemented`. A07–A09 stay DESIGNED. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | `head_sha` is `9bc56b2c839f66fce13bebf55cb30e88474f526e`. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. `state_revision` is 56 | PASS |
+| Variants | `tests/unit/agents/test_notion_product_builder_variants.py` plus the progress file and the six phase files: 232 passed. One shallow `duplicate_page` per colour, secret link from `get_public_url`, original page unchanged, replay writes nothing, a provider failure resumes without a second copy. `write_checkpoint` stays the only progress writer | PASS for this slice |
+| Mutations | 21 mutations applied, owning tests run, then reverted. 20 killed. 1 PARTIAL (Failed 0) at `notion_aesthetics.py:301-302`. The Failed column sums to 46. Counts are in `IMPLEMENTATION_LOG.md` | PASS |
+| Lint and types | `ruff format --check` and `ruff check` are clean. `pyright` 1.1.411 (`uv.lock` and CI) reports 0 errors on the changed modules with SQLAlchemy 2.0.52 | PASS |
+| Full local pytest | 2192 collected, 1987 passed, 193 skipped, 12 failed. The 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` for the `docker` binary. Local-only | PASS for this slice |
+| Next phase | Narrative `next_phase` is `qa` (A09) and is not started. QA, the fact ledger, and the workflow link are not executed | PASS |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+| Closed this wave | CI-1 `notion_aesthetics.py:104` (Failed 6), CI-2 `:276-277` (Failed 1), CI-3 `:281-282` (Failed 2), CI-4 `:299-300` (Failed 1), `navigation_block_id` `:278-280` and `:349` (Failed 1), `reject_duplicate_labels` `:203` (Failed 1), `_ensure_row` `client_name` `notion_notifications.py:1179` (Failed 1), `_adopted_database` `title.type` `:908` (Failed 1). The W7 created-ids prose partial is closed | CLOSED |
+| Partial this wave | Deleting the accent and sample block-membership loop at `notion_aesthetics.py:301-302` survived (Failed 0). `_require_saved` already requires those blocks, and the accent tamper points at an existing shell block, so the loop is unreachable once the pair check passes | PARTIAL |
+| Parked items | Docstring coverage 10.88% (W6, stale; not remeasured), one home page per probe for the dashboard and hub builders, deep clone of databases (rejected; `duplicate_page` is shallow), QA (A09), the fact ledger, the workflow link, commissioning, keyed HMAC, fixed `SAMPLE_DATE`, nav as a page link, S04–S06 nits | PARKED |
+
+**Status**: Session 07 Wave 8. The session stays incomplete. This is not SESSION_07 COMPLETE. Exit 78 stays HELD. No session exit code is recorded.
+
 ## 2026-10-06 — Session 07 W7: progress and repair
 
 **Verification scope**: Fixture-only progress record and repair for the six product-build phases, plus the should-fix sweep named in the W7 brief. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Postgres, Alembic, pnpm, and Compose were not required for this slice and were not run.
@@ -15,7 +36,7 @@
 | Next phase | Checkpoint `next_phase` stays `build_phases_complete`. Variants (A08), QA, the fact ledger, and the workflow link are not executed | PASS |
 | Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
 | Closed this wave | One progress writer (`write_checkpoint` only), phase-6 tamper, catalogue gaps, re-parent, forged business checkpoint, block-count delta after a completed object, `ubuntu-24.04`, real mutation counts (47 rows, Failed column sums to 97), saved-path adopt checks (title type, buyer config, icon) and saved-row `client_name`, `view_matches`, `require_workspace_id`, `_ensure` order, icon/cover resume, `sample_marker` resume (`notion_shared_databases.py:287`), Buyer variants, O1/O7/O8/O9, sample text, casefold bans, whole-payload integrity digest (not a signature), B2 emptying mutants of created notion ids (`notion_progress_record.py:183`, `:189`, `:225`) stay killed, rebuild `ProviderFailure` repair job when a prior record exists | CLOSED |
-| Partial this wave | Deleting `reject_duplicate_labels(names, ...)` in aesthetics `_require_pairs` (`notion_aesthetics.py:198`) survived. `_ensure_row` `client_name` at `notion_notifications.py:1179` survived (0 failures). `_adopted_database` title type at `notion_notifications.py:908` survived (0 failures). skipping _require_created_ids or any of its checks (CI-1..CI-4) survives; phase-6 replay test with tampered created_notion_ids is a W8 must-fix | PARTIAL |
+| Partial this wave | Deleting `reject_duplicate_labels(names, ...)` in aesthetics `_require_pairs` (`notion_aesthetics.py:198`) survived. `_ensure_row` `client_name` at `notion_notifications.py:1179` survived (0 failures). `_adopted_database` title type at `notion_notifications.py:908` survived (0 failures). Skipping _require_created_ids or any of its checks (CI-1..CI-4) survives; phase-6 replay test with tampered created_notion_ids is a W8 must-fix | PARTIAL |
 | Parked items | Fixture property-value shortcut, fixed `SAMPLE_DATE` `"2026-10-06"`, docstring coverage (not remeasured), nav as a page link, one home page per probe (`notion_dashboard.py:275`, `notion_hubs.py:494`), keyed HMAC for the live-credentials wave (a recomputed integrity digest is accepted by design until then), S04–S06 nits | PARKED |
 
 **Status**: Session 07 Wave 7. The session stays incomplete. Exit 78 stays HELD. No session exit code is recorded.

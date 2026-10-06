@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -51,7 +52,7 @@ HUBS_AT = datetime(2026, 10, 5, 23, 45, tzinfo=UTC)
 NOTIFICATION_AT = datetime(2026, 10, 6, 0, 30, tzinfo=UTC)
 LATER = datetime(2026, 10, 6, 1, 30, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "3f0a30a8e52b183f10799128d4fd7b17c1b74495"
+HEAD_SHA = "9bc56b2c839f66fce13bebf55cb30e88474f526e"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 
 
@@ -128,6 +129,24 @@ async def _build(
 
 def _home(probe: FixtureNotionAdapter) -> NotionPage:
     return next(page for page in probe.pages.values() if page.parent_type == "workspace")
+
+
+def _resign(path: Path, mutate: Callable[[dict[str, object]], None]) -> None:
+    document = json.loads(path.read_text(encoding="ascii"))
+    mutate(document)
+    stamped = stamp_integrity_digest(document)
+    path.write_text(
+        json.dumps(stamped, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="ascii",
+    )
+
+
+def _created(document: dict[str, object]) -> dict[str, object]:
+    progress = document["progress"]
+    assert type(progress) is dict
+    created = progress["created_notion_ids"]
+    assert type(created) is dict
+    return created
 
 
 @pytest.mark.asyncio
@@ -384,6 +403,151 @@ async def test_aesthetics_checkpoint_parser_rejects_bad_inputs(tmp_path: Path) -
     assert set(probe.blocks) == blocks
 
 
+@pytest.mark.asyncio
+async def test_replay_rejects_a_tampered_top_level_page_id(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await _build(spec, probe, path)
+
+    def mutate(document: dict[str, object]) -> None:
+        _created(document)["top_level_page_id"] = "page_missing"
+
+    _resign(path, mutate)
+    with pytest.raises(ProductBuildError, match="progress created ids do not match"):
+        await _build(spec, probe, path)
+
+
+@pytest.mark.asyncio
+async def test_replay_rejects_a_tampered_database_id(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await _build(spec, probe, path)
+
+    def mutate(document: dict[str, object]) -> None:
+        databases = _created(document)["databases"]
+        assert type(databases) is list and databases
+        assert type(databases[0]) is dict
+        databases[0]["database_id"] = "db_missing"
+
+    _resign(path, mutate)
+    with pytest.raises(ProductBuildError, match="progress created ids do not match"):
+        await _build(spec, probe, path)
+
+
+@pytest.mark.asyncio
+async def test_replay_rejects_a_tampered_hub_page_id(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await _build(spec, probe, path)
+
+    def mutate(document: dict[str, object]) -> None:
+        hubs = _created(document)["hubs"]
+        assert type(hubs) is list and hubs
+        assert type(hubs[0]) is dict
+        hubs[0]["page_id"] = "page_missing"
+
+    _resign(path, mutate)
+    with pytest.raises(ProductBuildError, match="progress created ids do not match"):
+        await _build(spec, probe, path)
+
+
+@pytest.mark.asyncio
+async def test_replay_rejects_a_tampered_navigation_block_id(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await _build(spec, probe, path)
+
+    def mutate(document: dict[str, object]) -> None:
+        hubs = _created(document)["hubs"]
+        assert type(hubs) is list and hubs
+        hub = hubs[0]
+        assert type(hub) is dict
+        sections = hub["sections"]
+        assert type(sections) is list and sections
+        section = sections[0]
+        assert type(section) is dict
+        hub["navigation_block_id"] = section["block_id"]
+
+    _resign(path, mutate)
+    with pytest.raises(ProductBuildError, match="progress created ids do not match"):
+        await _build(spec, probe, path)
+
+
+@pytest.mark.asyncio
+async def test_replay_rejects_a_tampered_notification_database_id(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await _build(spec, probe, path)
+
+    def mutate(document: dict[str, object]) -> None:
+        created = _created(document)
+        databases = created["databases"]
+        notice = created["notification"]
+        assert type(databases) is list and databases
+        assert type(databases[0]) is dict
+        assert type(notice) is dict
+        notice["database_id"] = databases[0]["database_id"]
+
+    _resign(path, mutate)
+    with pytest.raises(ProductBuildError, match="progress created ids do not match"):
+        await _build(spec, probe, path)
+
+
+@pytest.mark.asyncio
+async def test_replay_rejects_a_tampered_accent_block_id(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await _build(spec, probe, path)
+
+    def mutate(document: dict[str, object]) -> None:
+        created = _created(document)
+        aesthetics = created["aesthetics"]
+        assert type(aesthetics) is dict
+        accents = aesthetics["accents"]
+        assert type(accents) is list and accents
+        assert type(accents[0]) is dict
+        accents[0]["block_id"] = created["design_shell_block_id"]
+
+    _resign(path, mutate)
+    with pytest.raises(ProductBuildError, match="progress created ids do not match"):
+        await _build(spec, probe, path)
+
+
+@pytest.mark.asyncio
+async def test_replay_rejects_a_duplicated_accent_token(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await _build(spec, probe, path)
+
+    def mutate(document: dict[str, object]) -> None:
+        references = document["provider_object_references"]
+        assert type(references) is dict
+        aesthetics = references["aesthetics"]
+        assert type(aesthetics) is dict
+        accents = aesthetics["accents"]
+        assert type(accents) is list and len(accents) > 1
+        assert type(accents[0]) is dict and type(accents[1]) is dict
+        accents[1]["token"] = accents[0]["token"]
+
+    _resign(path, mutate)
+    with pytest.raises(ProductBuildError, match="duplicated"):
+        await _build(spec, probe, path)
+
+
 def test_aesthetics_module_does_not_name_a_live_client() -> None:
     source = MODULE_PATH.read_text(encoding="utf-8")
     for token in (
@@ -423,5 +587,5 @@ def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
     assert all(value is False for value in evidence.values())
     assert evidence["notification_dashboard_built"] is False
-    assert state["state_revision"] == 55
+    assert state["state_revision"] == 56
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")

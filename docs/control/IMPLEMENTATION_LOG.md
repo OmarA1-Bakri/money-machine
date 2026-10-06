@@ -1,5 +1,66 @@
 # Implementation Log
 
+## 2026-10-06 — Session 07 W8: variants
+
+Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision 55 → 56. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. `head_sha` is the W7 squash `9bc56b2c839f66fce13bebf55cb30e88474f526e`. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-06T08:40:00Z`.
+
+Twelve session 7 evidence keys stay false, including `variant_builder_implemented`. No session exit code is recorded. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. Exit 78 scheduler stays HELD. Narrative `next_phase` is `qa` (A09) and it is not started. There is no top-level `next_phase` field.
+
+Fixture variants live in `notion_variants.py`. `build_variants` (`notion_variants.py:77`) writes one shallow `duplicate_page` per `colour_variants` entry, zipped in index order with `palette_tokens`. Lengths must match and must be 3 or 4. `page.properties.pop` (`notion_variants.py:260`) drops `product_spec_id` immediately. `publish_page` (`notion_variants.py:270`), `set_duplicate_as_template` (`notion_variants.py:271`), and `set_search_indexing` (`notion_variants.py:272`) run only on the variant page. The secret link is `get_public_url`. The module does not contain an `https://` literal. Checkpoint names stay the six build phases. `created_notion_ids["variants"]` stays `None` until `provider_object_references["variants"]` exists, then `notion_progress_record.py:248` writes the list. Page and block counts add the variant pages at `notion_progress_record.py:293-294`. `write_document` is still called only from `write_checkpoint`. A provider failure of `variants.duplicate` leaves a `provider_response` job only when a prior record exists. A first phase-1 failure with no record raises and writes no job and no file (`notion_progress.py:248`). The job phase stays `aesthetics_and_content_completion`. Resume adopts an existing variant by title. Re-entering `build_aesthetics` after variants raises `hub page is unexpected` and does not rewrite the file. The aesthetics parser strips the `variants` key at `notion_aesthetics.py:150` so that file can still be parsed.
+
+Prompt-integrity review: `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md` (Wave 8 addendum). Product-build tests: 232 passed across the variants file, the progress file, and the six phase files. Full local pytest: 2192 collected, 1987 passed, 193 skipped, 12 failed. The 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` for the `docker` binary. Those failures are local-only. `ruff format --check` and `ruff check` are clean. `pyright` 1.1.411 (`uv.lock` and CI) reports 0 errors on the changed modules with SQLAlchemy 2.0.52. Docstring coverage stays 10.88% (W6, stale; not remeasured).
+
+Carried must-fixes. CI-1 is the replay call `_require_created_ids` at `notion_aesthetics.py:104`. CI-2 is the database pair check at `notion_aesthetics.py:276-277`. CI-3 is the hub pair check at `notion_aesthetics.py:281-282`. CI-4 is the accent and sample inequality at `notion_aesthetics.py:299-300`. Each has one killing test in the table below. Replay compares `hubs[].navigation_block_id` on both sides of the hub tuple (`notion_aesthetics.py:278-280` and `notion_aesthetics.py:349`). `reject_duplicate_labels` in aesthetics `_require_pairs` (`notion_aesthetics.py:203`), `_ensure_row` `client_name` (`notion_notifications.py:1179`), and `_adopted_database` `title.type` (`notion_notifications.py:908`) are killed. The W7 created-ids prose partial is closed: CI-1 through CI-4 no longer survive.
+
+Mutation checks. 21 mutations were each applied, the owning test files were run, and the edit was reverted. 20 were killed. One survivor is named PARTIAL. A row is killed only when at least one test failed. The Failed column is the real pytest failure count for that mutant. The Failed column sums to 46.
+
+| Mutation | Site (file:line) | Failing tests | Failed |
+|---|---|---|---|
+| CI-1 delete the replay call | `notion_aesthetics.py:104` | `test_replay_rejects_a_tampered_top_level_page_id`, `test_replay_rejects_a_tampered_database_id`, `test_replay_rejects_a_tampered_hub_page_id`, `test_replay_rejects_a_tampered_navigation_block_id`, `test_replay_rejects_a_tampered_notification_database_id`, `test_replay_rejects_a_tampered_accent_block_id` | 6 |
+| delete the page, workspace, and shell id check | `notion_aesthetics.py:268-275` | `test_replay_rejects_a_tampered_top_level_page_id` | 1 |
+| CI-2 delete the database pair check | `notion_aesthetics.py:276-277` | `test_replay_rejects_a_tampered_database_id` | 1 |
+| CI-3 delete the hub pair check | `notion_aesthetics.py:281-282` | `test_replay_rejects_a_tampered_hub_page_id`, `test_replay_rejects_a_tampered_navigation_block_id` | 2 |
+| delete the notification database id check | `notion_aesthetics.py:285-291` | `test_replay_rejects_a_tampered_notification_database_id` | 1 |
+| CI-4 delete the accent and sample pair check | `notion_aesthetics.py:299-300` | `test_replay_rejects_a_tampered_accent_block_id` | 1 |
+| delete the accent and sample block-membership loop | `notion_aesthetics.py:301-302` | (none) PARTIAL | 0 |
+| drop `navigation_block_id` from both hub tuples | `notion_aesthetics.py:278-280` and `:349` | `test_replay_rejects_a_tampered_navigation_block_id` | 1 |
+| delete `reject_duplicate_labels` in aesthetics `_require_pairs` | `notion_aesthetics.py:203` | `test_replay_rejects_a_duplicated_accent_token` | 1 |
+| delete the variants reference strip | `notion_aesthetics.py:150` | `test_replay_keeps_the_same_bytes_and_ids`, `test_aesthetics_replay_after_variants_writes_nothing`, `test_replay_rejects_a_tampered_variant_page_id` | 3 |
+| delete `_ensure_row` `client_name` | `notion_notifications.py:1179` | `test_ensure_row_rejects_client_name_on_an_adopted_database` | 1 |
+| delete `_adopted_database` `title.type` | `notion_notifications.py:908` | `test_adopted_database_rejects_a_text_title` | 1 |
+| delete the variants created-id comparison | `notion_variants.py:119` | `test_replay_rejects_a_tampered_variant_page_id` | 1 |
+| delete the `product_spec_id` pop | `notion_variants.py:260` | `test_mass_tier_publishes_one_page_per_colour`, `test_business_tier_keeps_its_identity_in_the_vocabulary`, `test_four_colour_spec_publishes_four_variants`, `test_replay_keeps_the_same_bytes_and_ids`, `test_aesthetics_replay_after_variants_writes_nothing`, `test_provider_failure_resumes_without_a_second_copy`, `test_replay_rejects_a_tampered_variant_page_id` | 7 |
+| delete `publish_page` | `notion_variants.py:270` | `test_mass_tier_publishes_one_page_per_colour`, `test_business_tier_keeps_its_identity_in_the_vocabulary`, `test_four_colour_spec_publishes_four_variants`, `test_replay_keeps_the_same_bytes_and_ids`, `test_aesthetics_replay_after_variants_writes_nothing`, `test_provider_failure_resumes_without_a_second_copy`, `test_replay_rejects_a_tampered_variant_page_id` | 7 |
+| delete `set_duplicate_as_template` | `notion_variants.py:271` | `test_mass_tier_publishes_one_page_per_colour`, `test_replay_keeps_the_same_bytes_and_ids`, `test_provider_failure_resumes_without_a_second_copy` | 3 |
+| delete `set_search_indexing` False | `notion_variants.py:272` | `test_mass_tier_publishes_one_page_per_colour`, `test_replay_keeps_the_same_bytes_and_ids`, `test_provider_failure_resumes_without_a_second_copy` | 3 |
+| delete the variants guard | `notion_variants.py:220-221` | `test_provider_failure_resumes_without_a_second_copy` | 1 |
+| delete variant adopt-by-title | `notion_variants.py:216-219` | `test_provider_failure_resumes_without_a_second_copy` | 1 |
+| skip writing variants into created ids | `notion_progress_record.py:248` | `test_mass_tier_publishes_one_page_per_colour`, `test_replay_keeps_the_same_bytes_and_ids`, `test_replay_rejects_a_tampered_variant_page_id` | 3 |
+| skip variant page and block counts | `notion_progress_record.py:293-294` | `test_mass_tier_publishes_one_page_per_colour` | 1 |
+| Total | | | 46 |
+
+PARTIAL, still named: deleting the accent and sample block-membership loop at `notion_aesthetics.py:301-302` survived with Failed 0. `_require_saved` already requires those blocks, and the accent tamper points at an existing shell block, so the loop is unreachable once the pair check passes.
+
+| Item | Disposition | Reason |
+|---|---|---|
+| CI-1 replay call `_require_created_ids` | Closed | `notion_aesthetics.py:104`. Deleting the call failed 6 tests. |
+| CI-2 database pair check | Closed | `notion_aesthetics.py:276-277`. Failed 1. |
+| CI-3 hub pair check | Closed | `notion_aesthetics.py:281-282`. Failed 2. |
+| CI-4 accent and sample inequality | Closed | `notion_aesthetics.py:299-300`. Failed 1. |
+| `navigation_block_id` on both hub tuples | Closed | `notion_aesthetics.py:278-280` and `:349`. Failed 1. |
+| `reject_duplicate_labels` in aesthetics `_require_pairs` | Closed | `notion_aesthetics.py:203`. Failed 1. |
+| `_ensure_row` `client_name` | Closed | `notion_notifications.py:1179`. Failed 1. |
+| `_adopted_database` `title.type` | Closed | `notion_notifications.py:908`. Failed 1. |
+| W7 created-ids prose partial | Closed | CI-1 through CI-4 are killed. The historical W7 sentence stays as history. |
+| Accent and sample block-membership loop | PARTIAL | `notion_aesthetics.py:301-302`. Failed 0. Unreachable after `_require_saved` and the pair equality. |
+| Single writer through `write_checkpoint` | Closed | `test_write_checkpoint_is_the_only_progress_writer` still passes. `notion_variants.py` calls `write_checkpoint` and does not call `write_document`. |
+| Refused rebuild | Closed | Unchanged from W7. Zero Notion writes. One `write_checkpoint`, appending one `rebuild_refused` job. Every other field stays byte-identical except the recomputed digest. |
+| A08 commissioning | Closed as not done | `commissioned_agents` stays `[]`. A08 stays DESIGNED. `variant_builder_implemented` stays false. |
+| Docstring coverage | Parked | 10.88% (W6, stale; not remeasured). |
+| One home page per probe | Parked | Dashboard and hub builders still require one top-level page. Variants resume is `build_variants`. |
+| Deep clone of databases | Parked | Rejected. `duplicate_page` is shallow. |
+| QA, fact ledger, workflow, commissioning | Parked | Narrative next phase is `qa` (A09), not started. |
+
 ## 2026-10-06 — Session 07 W7: progress and repair
 
 Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision 54 → 55. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. `head_sha` is the W6 squash `3f0a30a8e52b183f10799128d4fd7b17c1b74495`. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-06T03:44:56Z`.

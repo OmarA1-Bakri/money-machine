@@ -109,6 +109,18 @@ class AestheticsRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class VariantRecord:
+    """One published fixture copy of the top-level product."""
+
+    name: str
+    token_name: str
+    page_id: str
+    accent_block_id: str
+    vocabulary_block_id: str
+    secret_link: str
+
+
+@dataclass(frozen=True, slots=True)
 class ProductBuildCheckpoint:
     """Persisted build progress. The next phase is not executed."""
 
@@ -129,6 +141,7 @@ class ProductBuildCheckpoint:
     identity_hubs: tuple[IdentityHubRecord, ...] = ()
     notification_dashboard: NotificationDashboardRecord | None = None
     aesthetics: AestheticsRecord | None = None
+    variants: tuple[VariantRecord, ...] = ()
 
 
 def design_shell_content(spec: ProductSpec) -> str:

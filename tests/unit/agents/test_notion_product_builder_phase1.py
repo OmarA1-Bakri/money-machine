@@ -34,7 +34,7 @@ MODULE_PATH = ROOT / "src/money_machine/agents/implementations/notion_product_bu
 WHEN = datetime(2026, 10, 3, 0, 30, tzinfo=UTC)
 LATER = datetime(2026, 10, 3, 1, 0, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "3f0a30a8e52b183f10799128d4fd7b17c1b74495"
+HEAD_SHA = "9bc56b2c839f66fce13bebf55cb30e88474f526e"
 
 
 def _spec(
@@ -589,4 +589,4 @@ def test_session_seven_stays_incomplete_with_false_evidence() -> None:
     evidence = state["required_completion_evidence"]
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
     assert all(value is False for value in evidence.values())
-    assert state["state_revision"] == 55
+    assert state["state_revision"] == 56
