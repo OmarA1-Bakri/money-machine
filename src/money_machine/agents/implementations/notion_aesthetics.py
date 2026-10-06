@@ -371,6 +371,7 @@ def require_completed_aesthetics(
     *,
     extra_top_level_ids: tuple[str, ...] = (),
     extra_block_ids: tuple[str, ...] = (),
+    extra_page_ids: tuple[str, ...] = (),
     ignored_page_ids: tuple[str, ...] = (),
 ) -> None:
     """Check the saved aesthetics phase, including when variants already exist."""
@@ -383,6 +384,7 @@ def require_completed_aesthetics(
         spec,
         extra_top_level_ids=extra_top_level_ids,
         extra_block_ids=extra_block_ids,
+        extra_page_ids=extra_page_ids,
         ignored_page_ids=ignored_page_ids,
     )
 
@@ -403,6 +405,7 @@ def _require_saved(
     *,
     extra_top_level_ids: tuple[str, ...] = (),
     extra_block_ids: tuple[str, ...] = (),
+    extra_page_ids: tuple[str, ...] = (),
     ignored_page_ids: tuple[str, ...] = (),
 ) -> None:
     record = stored.aesthetics
@@ -418,6 +421,7 @@ def _require_saved(
         spec,
         extra_block_ids=(*accent_ids, *extra_block_ids),
         extra_top_level_ids=extra_top_level_ids,
+        extra_page_ids=extra_page_ids,
         page_marks=marks,
         ignored_page_ids=ignored_page_ids,
     )

@@ -54,6 +54,7 @@ from money_machine.agents.implementations.notion_progress_record import write_ch
 from money_machine.domain.models.product_spec import ColourToken, ProductSpec
 from money_machine.integrations.notion.domain import (
     NotionCalloutBlock,
+    NotionDatabase,
     NotionPage,
     NotionTextBlock,
 )
@@ -158,30 +159,17 @@ def _check_earlier_phases(
     *,
     ignore_spec_copies: bool,
 ) -> None:
-    open_pages, open_blocks = _open_variant_ids(probe, stored, spec)
-    if ignore_spec_copies:
-        # Saved checks see every current page. Uniqueness does not, so a copy
-        # that still holds product_spec_id can be released before the bind.
-        page_ids = tuple(
-            page.id
-            for page in probe.pages.values()
-            if type(page) is NotionPage
-            and page.id != stored.page_id
-            and page.parent_type == "workspace"
-        )
-        known = set(page_ids)
-        block_ids = tuple(block.id for block in probe.blocks.values() if block.parent_id in known)
-        ignored = open_pages
-    else:
-        page_ids = open_pages
-        block_ids = open_blocks
-        ignored = ()
+    workspace_ids, block_ids, nested_ids = _open_variant_ids(probe, stored, spec)
+    # Ignore only this run's open pages, so a leftover spec id can be released
+    # before the bind. Any other workspace page stays unexpected.
+    ignored = (*workspace_ids, *nested_ids) if ignore_spec_copies else ()
     require_completed_aesthetics(
         probe,
         stored,
         spec,
-        extra_top_level_ids=page_ids,
+        extra_top_level_ids=workspace_ids,
         extra_block_ids=block_ids,
+        extra_page_ids=nested_ids,
         ignored_page_ids=ignored,
     )
     require_aesthetics_created_ids(probe, created, stored)
@@ -303,23 +291,47 @@ def _open_variant_ids(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
-) -> tuple[tuple[str, ...], tuple[str, ...]]:
+) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
     source = probe.pages.get(stored.page_id)
     if type(source) is not NotionPage:
-        return (), ()
+        return (), (), ()
     titles = {_variant_title(spec, colour) for colour in spec.colour_variants}
     copy_title = f"{source.title} (Copy)"
     recorded = {record.page_id for record in stored.variants}
-    page_ids = [
-        page.id
-        for page in probe.pages.values()
-        if type(page) is NotionPage
-        and page.id != source.id
-        and page.parent_type == "workspace"
-        and (page.id in recorded or page.title in titles or page.title == copy_title)
-    ]
-    block_ids = [block.id for block in probe.blocks.values() if block.parent_id in set(page_ids)]
-    return tuple(page_ids), tuple(block_ids)
+    source_spec = source.properties.get(SPEC_ID_PROPERTY)
+    workspace_ids: list[str] = []
+    nested_ids: list[str] = []
+    for page in probe.pages.values():
+        if type(page) is not NotionPage or page.id == source.id:
+            continue
+        # A renamed page that still holds this product's spec id stays open.
+        # Validate ignores it; the release title filter keeps it out of the drop.
+        holds_source_spec = (
+            source_spec is not None and page.properties.get(SPEC_ID_PROPERTY) == source_spec
+        )
+        if (
+            page.id not in recorded
+            and page.title not in titles
+            and page.title != copy_title
+            and not holds_source_spec
+        ):
+            continue
+        if page.parent_type == "workspace":
+            workspace_ids.append(page.id)
+        else:
+            nested_ids.append(page.id)
+    known = set(workspace_ids) | set(nested_ids)
+    for page in probe.pages.values():
+        if (
+            type(page) is NotionPage
+            and page.parent_type == "page_id"
+            and page.parent_id in known
+            and page.id not in known
+        ):
+            nested_ids.append(page.id)
+            known.add(page.id)
+    block_ids = [block.id for block in probe.blocks.values() if block.parent_id in known]
+    return tuple(workspace_ids), tuple(block_ids), tuple(nested_ids)
 
 
 async def _release_copied_spec_ids(
@@ -332,14 +344,19 @@ async def _release_copied_spec_ids(
         return
     titles = {_variant_title(spec, colour) for colour in spec.colour_variants}
     copy_title = f"{source.title} (Copy)"
+    source_spec = source.properties.get(SPEC_ID_PROPERTY)
+    pending: list[NotionPage] = []
     for page in list(probe.pages.values()):
         if type(page) is not NotionPage or page.id == source.id:
             continue
         if page.title not in titles and page.title != copy_title:
             continue
-        if SPEC_ID_PROPERTY not in page.properties:
+        if page.properties.get(SPEC_ID_PROPERTY) != source_spec:
             continue
+        pending.append(page)
+    for page in pending:
         _refuse_unadoptable_release(probe, source, spec, page)
+    for page in pending:
         await probe.drop_page_property(page.id, SPEC_ID_PROPERTY)
 
 
@@ -391,6 +408,18 @@ def _require_shell_copy(source: NotionPage, page: NotionPage) -> None:
         raise ProductBuildError("variant page does not match")
 
 
+def _has_nested_child(probe: FixtureNotionAdapter, page: NotionPage) -> bool:
+    if any(
+        type(database) is NotionDatabase and database.parent_id == page.id
+        for database in probe.databases.values()
+    ):
+        return True
+    return any(
+        type(child) is NotionPage and child.parent_id == page.id and child.parent_type == "page_id"
+        for child in probe.pages.values()
+    )
+
+
 def _has_foreign_child(
     probe: FixtureNotionAdapter,
     spec: ProductSpec,
@@ -398,6 +427,8 @@ def _has_foreign_child(
     colour: str,
     token: ColourToken,
 ) -> bool:
+    if _has_nested_child(probe, page):
+        return True
     accent = _matching_accent(probe, page, token)
     vocabulary = _matching_vocabulary(probe, spec, page, colour, token)
     allowed = {block.id for block in (accent, vocabulary) if block is not None}
@@ -409,6 +440,8 @@ def _has_foreign_child(
 def _has_unrecognized_child(
     probe: FixtureNotionAdapter, spec: ProductSpec, page: NotionPage
 ) -> bool:
+    if _has_nested_child(probe, page):
+        return True
     children = [block for block in probe.blocks.values() if block.parent_id == page.id]
     pairs = _aligned_pairs(spec)
     for block in children:
@@ -445,8 +478,11 @@ def _require_adoptable(
     colour: str,
     token: ColourToken,
 ) -> None:
-    """A copy is adoptable only when it is the source shell and has no foreign blocks."""
+    """Shell fields, then no nested page or database and no extra block."""
     _require_shell_copy(source, page)
+    found = page.properties.get(SPEC_ID_PROPERTY)
+    if found is not None and found != source.properties.get(SPEC_ID_PROPERTY):
+        raise ProductBuildError("variant page does not match")
     if _has_foreign_child(probe, spec, page, colour, token):
         raise ProductBuildError("variant page does not match")
 
@@ -616,6 +652,7 @@ def _require_variant_page(
         or page.duplicate_as_template is not True
         or page.search_indexing is not False
         or SPEC_ID_PROPERTY in page.properties
+        or _has_nested_child(probe, page)
     ):
         raise ProductBuildError("variant page does not match")
     _block_ids(probe, spec, page, colour, token)

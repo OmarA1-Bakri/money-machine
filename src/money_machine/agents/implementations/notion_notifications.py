@@ -344,6 +344,7 @@ def require_notification_dashboard(
     *,
     extra_block_ids: tuple[str, ...] = (),
     extra_top_level_ids: tuple[str, ...] = (),
+    extra_page_ids: tuple[str, ...] = (),
     page_marks: Mapping[str, tuple[str, str]] | None = None,
     ignored_page_ids: tuple[str, ...] = (),
 ) -> NotionPage:
@@ -358,6 +359,7 @@ def require_notification_dashboard(
         suffixes,
         extra_block_ids=extra_block_ids,
         extra_top_level_ids=extra_top_level_ids,
+        extra_page_ids=extra_page_ids,
         page_marks=page_marks,
         ignored_page_ids=ignored_page_ids,
     )
@@ -372,6 +374,7 @@ def _require_saved(
     *,
     extra_block_ids: tuple[str, ...] = (),
     extra_top_level_ids: tuple[str, ...] = (),
+    extra_page_ids: tuple[str, ...] = (),
     page_marks: Mapping[str, tuple[str, str]] | None = None,
     ignored_page_ids: tuple[str, ...] = (),
 ) -> NotionPage:
@@ -389,6 +392,7 @@ def _require_saved(
             record.row_page_id,
             *(page_id for _kind, page_id in record.samples),
             *extra_top_level_ids,
+            *extra_page_ids,
         ),
         extra_top_level_ids=extra_top_level_ids,
         extra_database_ids=(record.database_id,),
