@@ -45,6 +45,10 @@ from money_machine.integrations.notion.domain import (
 from money_machine.integrations.notion.fixture_adapter import FixtureNotionAdapter
 from money_machine.integrations.notion.schema_builder import DatabaseSchema, build_database_schema
 
+SAMPLE_MARKER = "sample_marker"
+SAMPLE_MARKER_VALUE = "SAMPLE"
+_SAMPLE_MARKER_CONFIG = {"options": [SAMPLE_MARKER_VALUE]}
+
 PLANNER_SHARED_DATABASES: tuple[str, ...] = (
     "Tasks",
     "Events",
@@ -231,12 +235,18 @@ def _write_shared_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> 
     os.replace(temporary, path)
 
 
-def _databases_named(probe: FixtureNotionAdapter, title: str) -> list[NotionDatabase]:
-    return [
-        database
-        for database in probe.databases.values()
-        if type(database) is NotionDatabase and database.title == title
-    ]
+def _databases_named(probe: FixtureNotionAdapter, title: str, page_id: str) -> list[NotionDatabase]:
+    return [database for database in _page_databases(probe, page_id) if database.title == title]
+
+
+def marker_property(prop: object) -> bool:
+    """True when the property is the sample-marker select column."""
+    return (
+        type(prop) is NotionDatabaseProperty
+        and prop.name == SAMPLE_MARKER
+        and prop.type == "select"
+        and prop.config == _SAMPLE_MARKER_CONFIG
+    )
 
 
 def _page_databases(probe: FixtureNotionAdapter, page_id: str) -> list[NotionDatabase]:
@@ -275,15 +285,44 @@ def _schema_matches(
         or database.cover is not None
     ):
         return False
-    extra = properties[catalogue:]
-    if formula_suffix and formulas_optional and not extra:
-        return True
-    if len(extra) != len(formula_suffix):
+    formulas, marker, marker_last = _formula_rows(properties, catalogue)
+    if formulas is None or marker is False:
         return False
-    return all(
-        _formula_property(found, name, expression)
-        for found, (name, expression) in zip(extra, formula_suffix, strict=True)
-    )
+    if formula_suffix and formulas_optional:
+        if len(formulas) > len(formula_suffix):
+            return False
+        return all(
+            _formula_property(found, name, expression)
+            for found, (name, expression) in zip(formulas, formula_suffix, strict=False)
+        )
+    if formula_suffix:
+        if marker is None or not marker_last or len(formulas) != len(formula_suffix):
+            return False
+        return all(
+            _formula_property(found, name, expression)
+            for found, (name, expression) in zip(formulas, formula_suffix, strict=True)
+        )
+    return not formulas and marker is None
+
+
+def _formula_rows(
+    properties: list[NotionDatabaseProperty], catalogue: int
+) -> tuple[list[NotionDatabaseProperty] | None, bool | None, bool]:
+    """Formulas after the catalogue, whether a valid marker is present, and if it is last.
+
+    A return of ``(None, False, ...)`` means the extra columns are not a formula
+    list plus at most one sample marker.
+    """
+    extra = properties[catalogue:]
+    markers = [prop for prop in extra if prop.name == SAMPLE_MARKER]
+    if len(markers) > 1:
+        return None, False, False
+    if len(markers) == 1 and not marker_property(markers[0]):
+        return None, False, False
+    formulas = [prop for prop in extra if prop.name != SAMPLE_MARKER]
+    if not markers:
+        return formulas, None, True
+    return formulas, True, extra[-1] is markers[0]
 
 
 def _catalogue_prefix(properties: list[NotionDatabaseProperty], schema: DatabaseSchema) -> bool:
@@ -296,6 +335,35 @@ def _catalogue_prefix(properties: list[NotionDatabaseProperty], schema: Database
         if found.config != _property_config(expected.options):
             return False
     return True
+
+
+def _repairable_catalogue(database: NotionDatabase, kind: str) -> bool:
+    schema = build_database_schema(kind)
+    properties = database.properties
+    if (
+        type(properties) is not list
+        or len(properties) >= len(schema.properties)
+        or database.parent_type != _DATABASE_PARENT
+        or database.icon is not None
+        or database.cover is not None
+    ):
+        return False
+    for found, expected in zip(properties, schema.properties, strict=False):
+        if type(found) is not NotionDatabaseProperty:
+            return False
+        if found.name != expected.name or found.type != expected.type:
+            return False
+        if found.config != _property_config(expected.options):
+            return False
+    return True
+
+
+async def _append_catalogue(
+    probe: FixtureNotionAdapter, database: NotionDatabase, kind: str
+) -> None:
+    schema = build_database_schema(kind)
+    for prop in schema.properties[len(database.properties) :]:
+        await probe.add_property(database.id, prop.name, prop.type, _property_config(prop.options))
 
 
 def _formula_property(prop: NotionDatabaseProperty, name: str, expression: str) -> bool:
@@ -344,20 +412,26 @@ async def _ensure_databases(
         raise ProductBuildError("page has a database outside the shared set")
     planned: list[tuple[str, NotionDatabase | None]] = []
     for kind in kinds:
-        matches = _databases_named(probe, kind)
+        matches = _databases_named(probe, kind, page.id)
         if len(matches) > 1:
             raise ProductBuildError("shared database title is duplicated")
         if not matches:
             planned.append((kind, None))
             continue
         found = matches[0]
-        if found.parent_id != page.id or not _schema_matches(found, kind):
-            raise ProductBuildError("existing shared database does not match the schema")
-        planned.append((kind, found))
+        if _schema_matches(found, kind):
+            planned.append((kind, found))
+            continue
+        if _repairable_catalogue(found, kind):
+            planned.append((kind, found))
+            continue
+        raise ProductBuildError("shared database schema cannot be repaired")
     created: list[tuple[str, str]] = []
     for kind, existing in planned:
         if existing is None:
             existing = await _create_shared_database(probe, page.id, kind)
+        elif not _schema_matches(existing, kind):
+            await _append_catalogue(probe, existing, kind)
         created.append((kind, existing.id))
     return tuple(created)
 
@@ -413,7 +487,7 @@ def _require_resumed_databases(
             or database.parent_id != page.id
         ):
             raise ProductBuildError("checkpoint shared database is missing")
-        matches = _databases_named(probe, kind)
+        matches = _databases_named(probe, kind, page.id)
         if len(matches) != 1 or matches[0].id != database_id:
             raise ProductBuildError("checkpoint shared database is duplicated")
         seen.append(database_id)

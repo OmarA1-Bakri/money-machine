@@ -12,7 +12,11 @@ import pytest
 
 from money_machine.agents.implementations.notion_dashboard import build_dashboard_and_navigation
 from money_machine.agents.implementations.notion_hubs import build_identity_specific_hubs
-from money_machine.agents.implementations.notion_notifications import build_notification_dashboard
+from money_machine.agents.implementations.notion_notifications import (
+    SAMPLE_DATE,
+    build_notification_dashboard,
+    sample_field_values,
+)
 from money_machine.agents.implementations.notion_product_builder import (
     BUILD_PHASES,
     PHASE_DASHBOARD_AND_NAVIGATION,
@@ -31,7 +35,12 @@ from money_machine.control.state import SESSION_EVIDENCE_KEYS
 from money_machine.domain.models.common import EvidenceReference
 from money_machine.domain.models.product_spec import ColourToken, Hub, ProductSpec
 from money_machine.integrations.notion.api_adapter import APINotionAdapter
-from money_machine.integrations.notion.domain import NotionDatabase, NotionFormula, NotionPage
+from money_machine.integrations.notion.domain import (
+    NotionCalloutBlock,
+    NotionDatabase,
+    NotionFormula,
+    NotionPage,
+)
 from money_machine.integrations.notion.fixture_adapter import FixtureNotionAdapter
 from money_machine.integrations.notion.formulas import generate_notification_dashboard_formulas
 from money_machine.integrations.notion.schema_builder import schema_definitions
@@ -46,7 +55,7 @@ DASHBOARD_AT = datetime(2026, 10, 5, 22, 30, tzinfo=UTC)
 HUBS_AT = datetime(2026, 10, 5, 23, 45, tzinfo=UTC)
 LATER = datetime(2026, 10, 6, 0, 30, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "91a33eba7961ea2819dcc695f73ffe9a45e37b33"
+HEAD_SHA = "0793e73147c0a3e50b6e27be2c74d3084ab1bfd5"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 _PHASES = (
     PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL,
@@ -204,7 +213,9 @@ async def test_mass_tier_builds_one_notification_row(tmp_path: Path) -> None:
     assert len(rows) == 1
     row = rows[0]
     assert row.title == spec.identity
+    assert row.properties["Name"] == spec.identity
     assert row.properties["Buyer name"] == spec.identity
+    assert row.properties["Buyer name"] != "Buyer"
     assert "sample_marker" not in row.properties
     assert "client_name" not in row.properties
     assert "client_name" not in {prop.name for prop in dashboard.properties}
@@ -212,10 +223,18 @@ async def test_mass_tier_builds_one_notification_row(tmp_path: Path) -> None:
         samples = _rows(probe, _database(probe, kind).id)
         assert len(samples) == 1
         assert samples[0].title == f"SAMPLE {kind}"
-        assert samples[0].properties["sample_marker"] == "SAMPLE"
+        assert samples[0].properties == {
+            **sample_field_values(kind),
+            "sample_marker": "SAMPLE",
+        }
+        database = _database(probe, kind)
+        assert database.properties[-1].name == "sample_marker"
+        assert database.properties[-1].type == "select"
+        assert database.properties[-1].config == {"options": ["SAMPLE"]}
         assert row.properties[kind] == samples[0].id
     for kind in ("Meals", "Notes"):
         assert _rows(probe, _database(probe, kind).id) == []
+        assert all(prop.name != "sample_marker" for prop in _database(probe, kind).properties)
     assert {block.id for block in probe.blocks.values()} == blocks
     assert {view.id for view in probe.linked_views.values()} == views
     record = checkpoint.notification_dashboard
@@ -240,9 +259,16 @@ async def test_business_tier_omits_unsupported_claims(tmp_path: Path) -> None:
     assert names == ["Name", "Buyer name", "current_date", "Tasks", "open_tasks_due_today"]
     assert all(claim not in names for claim in _BUSINESS_OMITTED)
     assert _rows(probe, _database(probe, "Tasks").id)[0].title == "SAMPLE Tasks"
+    tasks = _database(probe, "Tasks")
+    assert tasks.properties[-1].name == "sample_marker"
+    assert _rows(probe, tasks.id)[0].properties["Name"] == "SAMPLE Tasks"
+    assert _rows(probe, tasks.id)[0].properties["Status"] == "Open"
+    assert _rows(probe, tasks.id)[0].properties["Due"] == SAMPLE_DATE
     for kind in ("Clients", "Projects", "Content", "Invoices", "Notes"):
         assert _rows(probe, _database(probe, kind).id) == []
+        assert all(prop.name != "sample_marker" for prop in _database(probe, kind).properties)
     row = _rows(probe, dashboard.id)[0]
+    assert row.properties["Name"] == "Studio Ledger"
     assert row.properties["Buyer name"] == "Studio Ledger"
     assert "client_name" not in row.properties
 
@@ -311,7 +337,7 @@ async def test_deleted_design_shell_is_not_rebuilt(tmp_path: Path) -> None:
     before = path.read_bytes()
     pages = set(probe.pages)
 
-    with pytest.raises(ProductBuildError, match="design shell"):
+    with pytest.raises(ProductBuildError, match="is missing"):
         await _build(spec, probe, path)
 
     assert shell_id not in probe.blocks
@@ -331,7 +357,7 @@ async def test_tampered_design_shell_is_not_rebuilt(tmp_path: Path) -> None:
     probe.blocks[shell_id].content = "tampered shell"
     before = path.read_bytes()
 
-    with pytest.raises(ProductBuildError, match="design shell"):
+    with pytest.raises(ProductBuildError, match="does not match"):
         await _build(spec, probe, path)
 
     assert probe.blocks[shell_id].content == "tampered shell"
@@ -497,6 +523,233 @@ def test_notification_module_does_not_name_a_live_client() -> None:
         assert token not in source
 
 
+@pytest.mark.asyncio
+async def test_icon_only_design_shell_tamper_is_not_rebuilt(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    payload = json.loads(path.read_text(encoding="ascii"))
+    shell_id = payload["provider_object_references"]["design_shell_block_id"]
+    shell = probe.blocks[shell_id]
+    assert isinstance(shell, NotionCalloutBlock)
+    shell.icon = "💡"
+    before = path.read_bytes()
+    pages = set(probe.pages)
+
+    with pytest.raises(ProductBuildError, match="does not match"):
+        await _build(spec, probe, path)
+
+    assert shell.icon == "💡"
+    assert set(probe.pages) == pages
+    assert path.read_bytes() == before
+    assert "Notification dashboard" not in {database.title for database in probe.databases.values()}
+
+
+@pytest.mark.asyncio
+async def test_formula_prefix_is_completed_and_keeps_the_first_id(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    tasks = _database(probe, "Tasks")
+    definitions = schema_definitions()
+    verified = {
+        kind: {prop.name: prop.type for prop in definitions[kind].properties}
+        for kind in PLANNER_SHARED_DATABASES
+    }
+    generated = generate_notification_dashboard_formulas(verified)
+    first_name = next(name for name, database in generated.databases.items() if database == "Tasks")
+    formula = await probe.create_formula(tasks.id, first_name, generated.expressions[first_name])
+
+    await _build(spec, probe, path)
+
+    formulas = [prop for prop in _database(probe, "Tasks").properties if prop.type == "formula"]
+    assert formulas[0].id == formula.id
+    assert len(formulas) == 2
+    assert _database(probe, "Tasks").properties[-1].name == "sample_marker"
+
+
+@pytest.mark.asyncio
+async def test_non_prefix_formula_is_not_repaired(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    tasks = _database(probe, "Tasks")
+    definitions = schema_definitions()
+    verified = {
+        kind: {prop.name: prop.type for prop in definitions[kind].properties}
+        for kind in PLANNER_SHARED_DATABASES
+    }
+    generated = generate_notification_dashboard_formulas(verified)
+    names = [name for name, database in generated.databases.items() if database == "Tasks"]
+    await probe.create_formula(tasks.id, names[1], generated.expressions[names[1]])
+    before = path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match="notification formula"):
+        await _build(spec, probe, path)
+
+    assert path.read_bytes() == before
+    assert "Notification dashboard" not in {database.title for database in probe.databases.values()}
+
+
+@pytest.mark.asyncio
+async def test_notification_database_prefix_is_repaired_in_place(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    page = next(item for item in probe.pages.values() if item.parent_type == "workspace")
+    database = await probe.create_database(
+        title="Notification dashboard", parent_id=page.id, parent_type="page_id"
+    )
+    await probe.add_property(database.id, "Name", "title", {})
+
+    await _build(spec, probe, path)
+
+    found = _database(probe, "Notification dashboard")
+    assert found.id == database.id
+    assert [prop.name for prop in found.properties] == ["Name", *_MASS_CLAIMS]
+
+
+@pytest.mark.asyncio
+async def test_notification_database_junk_cannot_be_repaired(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    page = next(item for item in probe.pages.values() if item.parent_type == "workspace")
+    database = await probe.create_database(
+        title="Notification dashboard", parent_id=page.id, parent_type="page_id"
+    )
+    await probe.add_property(database.id, "Name", "text", {})
+    before = path.read_bytes()
+    pages = set(probe.pages)
+
+    with pytest.raises(ProductBuildError, match="cannot be repaired"):
+        await _build(spec, probe, path)
+
+    assert path.read_bytes() == before
+    assert set(probe.pages) == pages
+    assert _database(probe, "Notification dashboard").id == database.id
+    assert [prop.name for prop in database.properties] == ["Name"]
+
+
+@pytest.mark.asyncio
+async def test_missing_sample_values_are_filled_and_wrong_values_are_not(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    tasks = _database(probe, "Tasks")
+    page = await probe.create_page("SAMPLE Tasks", parent_id=tasks.id, parent_type="database_id")
+
+    await _build(spec, probe, path)
+
+    assert page.properties["Name"] == "SAMPLE Tasks"
+    assert page.properties["Status"] == "Open"
+    assert page.properties["Due"] == SAMPLE_DATE
+    assert page.properties["sample_marker"] == "SAMPLE"
+    assert _rows(probe, tasks.id) == [page]
+
+    events = _database(probe, "Events")
+    wrong = await probe.create_page("SAMPLE Events", parent_id=events.id, parent_type="database_id")
+    wrong.properties["Birthday"] = False
+    stored = path.read_bytes()
+    path.write_bytes(stored)
+    # The completed checkpoint must not overwrite a later wrong value on a new probe path.
+    # Rebuild from the hubs checkpoint with the wrong value already present.
+    fresh = FixtureNotionAdapter()
+    fresh_path = tmp_path / "fresh.json"
+    await _prepare(spec, fresh, fresh_path)
+    events = _database(fresh, "Events")
+    bad = await fresh.create_page("SAMPLE Events", parent_id=events.id, parent_type="database_id")
+    bad.properties["Name"] = "SAMPLE Events"
+    bad.properties["Date"] = SAMPLE_DATE
+    bad.properties["Birthday"] = False
+    before = fresh_path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match="notification sample does not match"):
+        await _build(spec, fresh, fresh_path)
+
+    assert bad.properties["Birthday"] is False
+    assert fresh_path.read_bytes() == before
+    assert "Notification dashboard" not in {item.title for item in fresh.databases.values()}
+
+
+@pytest.mark.asyncio
+async def test_buyer_name_placeholder_is_rejected_on_resume(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await _build(spec, probe, path)
+    row = _rows(probe, _database(probe, "Notification dashboard").id)[0]
+    row.properties["Buyer name"] = "Buyer"
+    before = path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match="notification row"):
+        await _build(spec, probe, path)
+
+    assert row.properties["Buyer name"] == "Buyer"
+    assert path.read_bytes() == before
+
+
+@pytest.mark.asyncio
+async def test_buyer_name_placeholder_on_an_existing_row_is_not_overwritten(
+    tmp_path: Path,
+) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    page = next(item for item in probe.pages.values() if item.parent_type == "workspace")
+    database = await probe.create_database(
+        title="Notification dashboard", parent_id=page.id, parent_type="page_id"
+    )
+    await probe.add_property(database.id, "Name", "title", {})
+    await probe.add_property(database.id, "Buyer name", "text", {})
+    row = await probe.create_page(spec.identity, parent_id=database.id, parent_type="database_id")
+    row.properties["Name"] = spec.identity
+    row.properties["Buyer name"] = "Buyer"
+    before = path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match="notification row"):
+        await _build(spec, probe, path)
+
+    assert row.properties["Buyer name"] == "Buyer"
+    assert row.properties["Name"] == spec.identity
+    assert path.read_bytes() == before
+    assert _database(probe, "Notification dashboard").id == database.id
+
+
+@pytest.mark.asyncio
+async def test_notification_checkpoint_parser_rejects_bad_inputs(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await _build(spec, probe, path)
+    pages = set(probe.pages)
+    original = path.read_text(encoding="ascii")
+    path.write_text("{\n", encoding="utf-8")
+
+    with pytest.raises(ProductBuildError, match="not JSON"):
+        await _build(spec, probe, path)
+
+    payload = json.loads(original)
+    payload["provider_object_references"]["notification_dashboard"] = {"database_id": "x"}
+    path.write_text(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="ascii"
+    )
+
+    with pytest.raises(ProductBuildError, match="missing or unsupported"):
+        await _build(spec, probe, path)
+
+    assert set(probe.pages) == pages
+
+
 def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert state["current_session"] == 7
@@ -513,5 +766,5 @@ def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
     assert all(value is False for value in evidence.values())
     assert evidence["notification_dashboard_built"] is False
-    assert state["state_revision"] == 53
+    assert state["state_revision"] == 54
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")

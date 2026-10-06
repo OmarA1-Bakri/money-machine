@@ -15,6 +15,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import cast
 
+from money_machine.agents.implementations.notion_linked_views import (
+    create_named_linked_view as _create_linked_view,
+)
+from money_machine.agents.implementations.notion_linked_views import (
+    filter_pairs as _filter_pairs,
+)
 from money_machine.agents.implementations.notion_product_builder import (
     BUILD_PHASES,
     CHECKPOINT_KEYS,
@@ -340,10 +346,6 @@ def _linked_views(kinds: tuple[str, ...]) -> tuple[tuple[str, LinkedView], ...]:
     return tuple(views)
 
 
-def _filter_pairs(view: LinkedView) -> tuple[tuple[str, str, str], ...]:
-    return tuple((item.property_name, item.condition, item.value) for item in view.filters)
-
-
 def _page_blocks(
     probe: FixtureNotionAdapter, page_id: str
 ) -> list[NotionTextBlock | NotionCalloutBlock]:
@@ -480,15 +482,6 @@ async def _ensure_dashboard(
                 probe, page.id, database_ids[view.data_type], view
             )
     return _pieces(spec, kinds, greeting, navigation, identity, flagship, created)
-
-
-async def _create_linked_view(
-    probe: FixtureNotionAdapter, page_id: str, source_id: str, view: LinkedView
-) -> NotionLinkedView:
-    created = await probe.create_linked_view(source_id, page_id, view.view_type)
-    created.name = view.name
-    created.filters = _filter_pairs(view)
-    return created
 
 
 def _pieces(

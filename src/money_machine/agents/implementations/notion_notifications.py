@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Mapping
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
@@ -34,7 +35,12 @@ from money_machine.agents.implementations.notion_product_builder import (
     require_spec,
     require_token,
 )
-from money_machine.agents.implementations.notion_shared_databases import shared_database_kinds
+from money_machine.agents.implementations.notion_shared_databases import (
+    SAMPLE_MARKER,
+    SAMPLE_MARKER_VALUE,
+    marker_property,
+    shared_database_kinds,
+)
 from money_machine.domain.models.product_spec import ProductSpec
 from money_machine.integrations.notion.domain import (
     NotionDatabase,
@@ -67,8 +73,9 @@ _DATABASE_TITLE = "Notification dashboard"
 _BUYER_PROPERTY = "Buyer name"
 _DATE_PROPERTY = "current_date"
 _DATE_EXPRESSION = "now()"
-_SAMPLE_MARKER = "sample_marker"
-_SAMPLE_VALUE = "SAMPLE"
+_SAMPLE_MARKER = SAMPLE_MARKER
+_SAMPLE_VALUE = SAMPLE_MARKER_VALUE
+SAMPLE_DATE = "2026-10-06"
 _DATABASE_PARENT = "page_id"
 _ROW_PARENT = "database_id"
 _RECORD_KEYS = frozenset(
@@ -155,6 +162,11 @@ def _load_checkpoint(path: Path) -> ProductBuildCheckpoint:
     raise ProductBuildError("notification dashboard requires the identity hubs checkpoint")
 
 
+def parse_notification_checkpoint(payload: dict[object, object]) -> ProductBuildCheckpoint:
+    """Parse a checkpoint that records the notification dashboard."""
+    return _parse_notification_checkpoint(payload)
+
+
 def _parse_notification_checkpoint(payload: dict[object, object]) -> ProductBuildCheckpoint:
     if not exact_keys(payload, CHECKPOINT_KEYS):
         raise ProductBuildError("checkpoint fields are missing or unsupported")
@@ -166,7 +178,7 @@ def _parse_notification_checkpoint(payload: dict[object, object]) -> ProductBuil
         raise ProductBuildError("provider references must be an object")
     refs = cast(dict[object, object], references)
     phase_four_keys = set(refs) - {_NOTIFICATION_KEY}
-    if _NOTIFICATION_KEY not in refs or len(phase_four_keys) + 1 != len(refs):
+    if _NOTIFICATION_KEY not in refs:
         raise ProductBuildError("provider references are missing or unsupported")
     record = _require_record(refs[_NOTIFICATION_KEY])
     phase_four = dict(payload)
@@ -262,7 +274,8 @@ def _checkpoint_with_notification(
     )
 
 
-def _write_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> None:
+def notification_provider_references(checkpoint: ProductBuildCheckpoint) -> dict[str, object]:
+    """Provider ids recorded for the notification-dashboard checkpoint."""
     record = checkpoint.notification_dashboard
     if record is None:
         raise ProductBuildError("notification dashboard is missing")
@@ -285,6 +298,11 @@ def _write_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> None:
         "row_page_id": record.row_page_id,
         "samples": [{"kind": kind, "page_id": page_id} for kind, page_id in record.samples],
     }
+    return references
+
+
+def _write_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> None:
+    references = notification_provider_references(checkpoint)
     payload = {
         "build_kind": checkpoint.build_kind,
         "build_version": checkpoint.build_version,
@@ -302,25 +320,52 @@ def _write_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> None:
     os.replace(temporary, path)
 
 
+def require_notification_dashboard(
+    probe: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+    *,
+    extra_block_ids: tuple[str, ...] = (),
+    page_marks: Mapping[str, tuple[str, str]] | None = None,
+) -> NotionPage:
+    """Check the saved notification dashboard. Later blocks and hub marks are allowed."""
+    kinds = shared_database_kinds(spec)
+    suffixes = _formula_suffixes(kinds)
+    return _require_saved(
+        probe,
+        stored,
+        spec,
+        kinds,
+        suffixes,
+        extra_block_ids=extra_block_ids,
+        page_marks=page_marks,
+    )
+
+
 def _require_saved(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
     kinds: tuple[str, ...],
     suffixes: dict[str, tuple[tuple[str, str], ...]],
-) -> None:
+    *,
+    extra_block_ids: tuple[str, ...] = (),
+    page_marks: Mapping[str, tuple[str, str]] | None = None,
+) -> NotionPage:
     record = stored.notification_dashboard
     if record is None:
         raise ProductBuildError("notification dashboard is missing")
     require_home_page(probe, stored, spec)
     plan = _plan(kinds)
     _require_objects(probe, stored, spec, record, plan, suffixes)
-    require_identity_hubs(
+    return require_identity_hubs(
         probe,
         stored,
         spec,
         extra_page_ids=(record.row_page_id, *(page_id for _kind, page_id in record.samples)),
         extra_database_ids=(record.database_id,),
+        extra_block_ids=extra_block_ids,
+        page_marks=page_marks,
         formula_suffixes=suffixes,
         formulas_optional=False,
     )
@@ -516,14 +561,49 @@ def _require_row(
         raise ProductBuildError("notification row does not match")
 
 
+def sample_field_values(kind: str) -> dict[str, str | int | bool]:
+    """Catalogue values stored on one sample row. The title stays marked SAMPLE."""
+    title = f"SAMPLE {kind}"
+    if kind == "Tasks":
+        return {"Name": title, "Status": "Open", "Due": SAMPLE_DATE}
+    if kind == "Events":
+        return {"Name": title, "Date": SAMPLE_DATE, "Birthday": True}
+    if kind == "Finance":
+        return {"Name": title, "Amount": 0, "Date": SAMPLE_DATE}
+    if kind == "Habits":
+        return {"Name": title, "Glasses": 0, "Goal": 8, "Date": SAMPLE_DATE}
+    raise ProductBuildError("notification sample is unexpected")
+
+
 def _sample_ok(page: object, kind: str, database_id: str) -> bool:
+    if not _sample_identity(page, kind, database_id):
+        return False
+    assert type(page) is NotionPage
+    expected = sample_field_values(kind)
+    if page.properties.get(_SAMPLE_MARKER) != _SAMPLE_VALUE:
+        return False
+    return all(page.properties.get(key) == value for key, value in expected.items())
+
+
+def _sample_repairable(page: object, kind: str, database_id: str) -> bool:
+    if not _sample_identity(page, kind, database_id):
+        return False
+    assert type(page) is NotionPage
+    expected = sample_field_values(kind)
+    for key, value in expected.items():
+        if key in page.properties and page.properties[key] != value:
+            return False
+    marker = page.properties.get(_SAMPLE_MARKER)
+    return not (_SAMPLE_MARKER in page.properties and marker != _SAMPLE_VALUE)
+
+
+def _sample_identity(page: object, kind: str, database_id: str) -> bool:
     return (
         type(page) is NotionPage
         and page.title == f"SAMPLE {kind}"
         and page.parent_id == database_id
         and page.parent_type == _ROW_PARENT
         and page.is_published is False
-        and page.properties.get(_SAMPLE_MARKER) == _SAMPLE_VALUE
     )
 
 
@@ -535,6 +615,7 @@ def _row_ok(page: object, spec: ProductSpec, record: NotificationDashboardRecord
         or page.parent_type != _ROW_PARENT
         or page.is_published is not False
         or _SAMPLE_MARKER in page.properties
+        or page.properties.get("Name") != spec.identity
         or page.properties.get(_BUYER_PROPERTY) != spec.identity
         or "client_name" in page.properties
     ):
@@ -578,17 +659,21 @@ async def _ensure(
     database_ids = dict(stored.database_ids)
     _reject_formula_shape(probe, database_ids, suffixes)
     existing = _find_notification_database(probe, page, kinds)
-    if existing is not None and not _sources_complete(probe, database_ids, suffixes):
-        raise ProductBuildError("notification database does not match")
     _reject_foreign_rows(probe, database_ids, plan, existing)
     _require_prior_objects(probe, stored, spec, database_ids, plan, suffixes, existing)
     formula_ids = await _ensure_formulas(probe, database_ids, suffixes)
-    if existing is not None and not _adopted_database(existing, plan, database_ids, formula_ids):
-        raise ProductBuildError("notification database does not match")
+    if existing is None:
+        database = await _create_database(probe, page, plan, database_ids, formula_ids)
+    elif _adopted_database(existing, plan, database_ids, formula_ids):
+        _require_adopted_ids(existing, plan)
+        database = existing
+    elif _repairable_notification(existing, plan, database_ids, formula_ids):
+        database = await _complete_notification_database(
+            probe, existing, plan, database_ids, formula_ids
+        )
+    else:
+        raise ProductBuildError("notification database cannot be repaired")
     samples = await _ensure_samples(probe, plan, database_ids)
-    database = existing or await _create_database(probe, page, plan, database_ids, formula_ids)
-    if existing is not None:
-        _require_adopted_ids(database, plan)
     row = await _ensure_row(probe, spec, database, plan, samples)
     return _record_from(database, row, plan, formula_ids, samples)
 
@@ -605,30 +690,27 @@ def _reject_formula_shape(
         suffix = suffixes.get(kind, ())
         catalogue = len(build_database_schema(kind).properties)
         extra = database.properties[catalogue:]
-        if not extra:
+        markers = [prop for prop in extra if prop.name == _SAMPLE_MARKER]
+        if len(markers) > 1 or (markers and not marker_property(markers[0])):
+            raise ProductBuildError("notification formula does not match")
+        formulas = [prop for prop in extra if prop.name != _SAMPLE_MARKER]
+        if not suffix:
+            if formulas or markers:
+                raise ProductBuildError("notification formula does not match")
             continue
-        if len(extra) != len(suffix) or not all(
-            _formula_property(prop, name, expression)
-            for prop, (name, expression) in zip(extra, suffix, strict=True)
-        ):
+        if not _formula_prefix(formulas, suffix):
             raise ProductBuildError("notification formula does not match")
 
 
-def _sources_complete(
-    probe: FixtureNotionAdapter,
-    database_ids: dict[str, str],
-    suffixes: dict[str, tuple[tuple[str, str], ...]],
+def _formula_prefix(
+    formulas: list[NotionDatabaseProperty], suffix: tuple[tuple[str, str], ...]
 ) -> bool:
-    for kind, rows in suffixes.items():
-        if not rows:
-            continue
-        database = probe.databases.get(database_ids[kind])
-        if type(database) is not NotionDatabase:
-            return False
-        catalogue = len(build_database_schema(kind).properties)
-        if len(database.properties) - catalogue != len(rows):
-            return False
-    return True
+    if len(formulas) > len(suffix):
+        return False
+    return all(
+        _formula_property(prop, name, expression)
+        for prop, (name, expression) in zip(formulas, suffix, strict=False)
+    )
 
 
 def _find_notification_database(
@@ -661,17 +743,29 @@ async def _ensure_formulas(
             saved[kind] = ()
             continue
         database = probe.databases[database_id]
+        marker = _detach_marker(database)
         catalogue = len(build_database_schema(kind).properties)
         extra = database.properties[catalogue:]
-        if extra:
-            saved[kind] = tuple((prop.name, prop.id) for prop in extra)
-            continue
-        created: list[tuple[str, str]] = []
-        for name, expression in suffix:
+        if not _formula_prefix(extra, suffix):
+            raise ProductBuildError("notification formula does not match")
+        created = [(prop.name, prop.id) for prop in extra]
+        for name, expression in suffix[len(extra) :]:
             formula = await probe.create_formula(database_id, name, expression)
             created.append((name, formula.id))
+        if marker is not None:
+            database.properties.append(marker)
         saved[kind] = tuple(created)
     return saved
+
+
+def _detach_marker(database: NotionDatabase) -> NotionDatabaseProperty | None:
+    matches = [prop for prop in database.properties if prop.name == _SAMPLE_MARKER]
+    if not matches:
+        return None
+    if len(matches) != 1 or not marker_property(matches[0]):
+        raise ProductBuildError("notification formula does not match")
+    database.properties = [prop for prop in database.properties if prop.name != _SAMPLE_MARKER]
+    return matches[0]
 
 
 def _adopted_database(
@@ -746,8 +840,9 @@ def _reject_foreign_rows(
         pages = _database_pages(probe, database_ids[relation.data_type])
         if len(pages) > 1:
             raise ProductBuildError("notification sample is unexpected")
-        if len(pages) == 1 and not _sample_ok(
-            pages[0], relation.data_type, database_ids[relation.data_type]
+        if len(pages) == 1 and not (
+            _sample_ok(pages[0], relation.data_type, database_ids[relation.data_type])
+            or _sample_repairable(pages[0], relation.data_type, database_ids[relation.data_type])
         ):
             raise ProductBuildError("notification sample does not match")
 
@@ -766,18 +861,50 @@ async def _ensure_samples(
 ) -> tuple[tuple[str, str], ...]:
     samples: list[tuple[str, str]] = []
     for relation in plan.relations:
-        pages = _database_pages(probe, database_ids[relation.data_type])
+        database_id = database_ids[relation.data_type]
+        await _ensure_sample_column(probe, database_id)
+        pages = _database_pages(probe, database_id)
+        if len(pages) > 1:
+            raise ProductBuildError("notification sample is unexpected")
         if pages:
-            samples.append((relation.data_type, pages[0].id))
+            page = pages[0]
+            if not _sample_ok(page, relation.data_type, database_id):
+                if not _sample_repairable(page, relation.data_type, database_id):
+                    raise ProductBuildError("notification sample does not match")
+                _fill_sample(page, relation.data_type)
+            samples.append((relation.data_type, page.id))
             continue
         page = await probe.create_page(
             f"SAMPLE {relation.data_type}",
-            parent_id=database_ids[relation.data_type],
+            parent_id=database_id,
             parent_type=_ROW_PARENT,
         )
-        page.properties[_SAMPLE_MARKER] = _SAMPLE_VALUE
+        _fill_sample(page, relation.data_type)
         samples.append((relation.data_type, page.id))
     return tuple(samples)
+
+
+async def _ensure_sample_column(probe: FixtureNotionAdapter, database_id: str) -> None:
+    database = probe.databases[database_id]
+    existing = next((prop for prop in database.properties if prop.name == _SAMPLE_MARKER), None)
+    if existing is None:
+        await probe.add_property(
+            database_id, _SAMPLE_MARKER, "select", {"options": [_SAMPLE_VALUE]}
+        )
+        return
+    if not marker_property(existing):
+        raise ProductBuildError("notification sample does not match")
+    if database.properties[-1] is not existing:
+        database.properties = [prop for prop in database.properties if prop is not existing]
+        database.properties.append(existing)
+
+
+def _fill_sample(page: NotionPage, kind: str) -> None:
+    for key, value in sample_field_values(kind).items():
+        if key not in page.properties:
+            page.properties[key] = value
+    if _SAMPLE_MARKER not in page.properties:
+        page.properties[_SAMPLE_MARKER] = _SAMPLE_VALUE
 
 
 async def _create_database(
@@ -790,24 +917,106 @@ async def _create_database(
     database = await probe.create_database(
         title=_DATABASE_TITLE, parent_id=page.id, parent_type=_DATABASE_PARENT
     )
-    await probe.add_property(database.id, "Name", "title", {})
-    await probe.add_property(database.id, _BUYER_PROPERTY, "text", {})
-    await probe.create_formula(database.id, _DATE_PROPERTY, _DATE_EXPRESSION)
-    for relation in plan.relations:
+    return await _complete_notification_database(probe, database, plan, database_ids, formula_ids)
+
+
+def _repairable_notification(
+    database: NotionDatabase,
+    plan: NotificationDashboard,
+    database_ids: dict[str, str],
+    formula_ids: dict[str, tuple[tuple[str, str], ...]],
+) -> bool:
+    expected = _expected_names(plan)
+    if (
+        database.title != _DATABASE_TITLE
+        or database.icon is not None
+        or database.cover is not None
+        or len(database.properties) >= len(expected)
+    ):
+        return False
+    return all(
+        _notification_property_ok(prop, index, plan, database, database_ids, formula_ids)
+        for index, prop in enumerate(database.properties)
+    )
+
+
+async def _complete_notification_database(
+    probe: FixtureNotionAdapter,
+    database: NotionDatabase,
+    plan: NotificationDashboard,
+    database_ids: dict[str, str],
+    formula_ids: dict[str, tuple[tuple[str, str], ...]],
+) -> NotionDatabase:
+    expected = _expected_names(plan)
+    start = len(database.properties)
+    for index in range(start, len(expected)):
+        await _add_notification_property(probe, database, plan, database_ids, formula_ids, index)
+    return database
+
+
+async def _add_notification_property(
+    probe: FixtureNotionAdapter,
+    database: NotionDatabase,
+    plan: NotificationDashboard,
+    database_ids: dict[str, str],
+    formula_ids: dict[str, tuple[tuple[str, str], ...]],
+    index: int,
+) -> None:
+    if index == 0:
+        await probe.add_property(database.id, "Name", "title", {})
+        return
+    if index == 1:
+        await probe.add_property(database.id, _BUYER_PROPERTY, "text", {})
+        return
+    if index == 2:
+        await probe.create_formula(database.id, _DATE_PROPERTY, _DATE_EXPRESSION)
+        return
+    relation_count = len(plan.relations)
+    if index < 3 + relation_count:
+        relation = plan.relations[index - 3]
         await probe.create_relation(
             database.id, relation.data_type, database_ids[relation.data_type]
         )
+        return
+    rollup = plan.rollups[index - 3 - relation_count]
     relation_ids = {prop.name: prop.id for prop in database.properties if prop.type == "relation"}
-    for rollup in plan.rollups:
-        formula_id = dict(formula_ids[rollup.relation_name])[rollup.property_name]
-        await probe.create_rollup(
-            database.id,
-            rollup.name,
-            relation_ids[rollup.relation_name],
-            formula_id,
-            rollup.function,
-        )
-    return database
+    formula_id = dict(formula_ids[rollup.relation_name])[rollup.property_name]
+    await probe.create_rollup(
+        database.id,
+        rollup.name,
+        relation_ids[rollup.relation_name],
+        formula_id,
+        rollup.function,
+    )
+
+
+def _notification_property_ok(
+    prop: NotionDatabaseProperty,
+    index: int,
+    plan: NotificationDashboard,
+    database: NotionDatabase,
+    database_ids: dict[str, str],
+    formula_ids: dict[str, tuple[tuple[str, str], ...]],
+) -> bool:
+    expected = _expected_names(plan)
+    if prop.name != expected[index]:
+        return False
+    if index == 0:
+        return prop.type == "title" and prop.config == {}
+    if index == 1:
+        return prop.type == "text" and prop.config == {}
+    if index == 2:
+        return _formula_property(prop, _DATE_PROPERTY, _DATE_EXPRESSION)
+    relation_count = len(plan.relations)
+    if index < 3 + relation_count:
+        relation = plan.relations[index - 3]
+        return _relation_property(prop, relation.data_type, database_ids[relation.data_type])
+    rollup = plan.rollups[index - 3 - relation_count]
+    relation_ids = {item.name: item.id for item in database.properties if item.type == "relation"}
+    if rollup.relation_name not in relation_ids:
+        return False
+    formula_id = dict(formula_ids[rollup.relation_name]).get(rollup.property_name, "")
+    return _rollup_property(prop, rollup, relation_ids[rollup.relation_name], formula_id)
 
 
 def _require_adopted_ids(database: NotionDatabase, plan: NotificationDashboard) -> None:
@@ -828,15 +1037,28 @@ async def _ensure_row(
     sample_ids = dict(samples)
     if pages:
         page = pages[0]
-        if page.title != spec.identity or page.properties.get(_BUYER_PROPERTY) != spec.identity:
+        if page.title != spec.identity:
             raise ProductBuildError("notification row does not match")
         if _SAMPLE_MARKER in page.properties or "client_name" in page.properties:
             raise ProductBuildError("notification row does not match")
+        if "Name" in page.properties and page.properties["Name"] != spec.identity:
+            raise ProductBuildError("notification row does not match")
+        if _BUYER_PROPERTY in page.properties and page.properties[_BUYER_PROPERTY] != spec.identity:
+            raise ProductBuildError("notification row does not match")
+        if "Name" not in page.properties:
+            page.properties["Name"] = spec.identity
+        if _BUYER_PROPERTY not in page.properties:
+            page.properties[_BUYER_PROPERTY] = spec.identity
         for relation in plan.relations:
-            if page.properties.get(relation.data_type) != sample_ids[relation.data_type]:
+            expected_id = sample_ids[relation.data_type]
+            if relation.data_type not in page.properties:
+                page.properties[relation.data_type] = expected_id
+                continue
+            if page.properties[relation.data_type] != expected_id:
                 raise ProductBuildError("notification row does not match")
         return page
     page = await probe.create_page(spec.identity, parent_id=database.id, parent_type=_ROW_PARENT)
+    page.properties["Name"] = spec.identity
     page.properties[_BUYER_PROPERTY] = spec.identity
     for relation in plan.relations:
         page.properties[relation.data_type] = sample_ids[relation.data_type]

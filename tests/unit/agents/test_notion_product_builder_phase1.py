@@ -14,6 +14,8 @@ from money_machine.agents.implementations.notion_product_builder import (
     DESIGN_SHELL_ICON,
     PHASE_SHARED_DATABASES,
     PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL,
+    PRODUCT_ID_PROPERTY,
+    SPEC_ID_PROPERTY,
     ProductBuildCheckpoint,
     ProductBuildError,
     build_top_level_page_and_design_shell,
@@ -32,7 +34,7 @@ MODULE_PATH = ROOT / "src/money_machine/agents/implementations/notion_product_bu
 WHEN = datetime(2026, 10, 3, 0, 30, tzinfo=UTC)
 LATER = datetime(2026, 10, 3, 1, 0, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "91a33eba7961ea2819dcc695f73ffe9a45e37b33"
+HEAD_SHA = "0793e73147c0a3e50b6e27be2c74d3084ab1bfd5"
 
 
 def _spec(
@@ -495,6 +497,75 @@ def test_phase_one_module_does_not_name_a_live_client() -> None:
         assert token not in source
 
 
+@pytest.mark.asyncio
+async def test_existing_published_page_is_rejected(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "phase1.json"
+    page = await probe.create_page(spec.title, parent_id="ws_default", parent_type="workspace")
+    page.properties[SPEC_ID_PROPERTY] = str(spec.spec_id)
+    page.properties[PRODUCT_ID_PROPERTY] = str(spec.product_id)
+    page.is_published = True
+
+    with pytest.raises(ProductBuildError, match="must stay unpublished"):
+        await _build(spec, probe, path)
+
+    assert path.exists() is False
+    assert len(probe.blocks) == 0
+    assert page.is_published is True
+
+
+@pytest.mark.asyncio
+async def test_published_checkpoint_page_is_not_rebuilt(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "phase1.json"
+    await _build(spec, probe, path)
+    page = next(iter(probe.pages.values()))
+    page.is_published = True
+    before = path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match="must stay unpublished"):
+        await _build(spec, probe, path)
+
+    assert page.is_published is True
+    assert len(probe.pages) == 1
+    assert path.read_bytes() == before
+
+
+@pytest.mark.asyncio
+async def test_icon_only_design_shell_tamper_is_not_rebuilt(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "phase1.json"
+    await _build(spec, probe, path)
+    shell = next(iter(probe.blocks.values()))
+    assert isinstance(shell, NotionCalloutBlock)
+    shell.icon = "💡"
+    before = path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match="does not match"):
+        await _build(spec, probe, path)
+
+    assert shell.icon == "💡"
+    assert len(probe.pages) == 1
+    assert path.read_bytes() == before
+
+
+@pytest.mark.asyncio
+async def test_phase_one_checkpoint_parser_rejects_bad_inputs(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "phase1.json"
+    await _build(spec, probe, path)
+    path.write_text("{\n", encoding="utf-8")
+
+    with pytest.raises(ProductBuildError, match="not JSON"):
+        await _build(spec, probe, path)
+
+    assert len(probe.pages) == 1
+
+
 def test_session_seven_stays_incomplete_with_false_evidence() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert state["current_session"] == 7
@@ -508,4 +579,4 @@ def test_session_seven_stays_incomplete_with_false_evidence() -> None:
     evidence = state["required_completion_evidence"]
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
     assert all(value is False for value in evidence.values())
-    assert state["state_revision"] == 53
+    assert state["state_revision"] == 54

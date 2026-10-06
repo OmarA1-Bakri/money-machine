@@ -42,7 +42,7 @@ MODULE_PATHS = (
 WHEN = datetime(2026, 10, 3, 0, 30, tzinfo=UTC)
 LATER = datetime(2026, 10, 5, 20, 0, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "91a33eba7961ea2819dcc695f73ffe9a45e37b33"
+HEAD_SHA = "0793e73147c0a3e50b6e27be2c74d3084ab1bfd5"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 
 
@@ -304,20 +304,26 @@ async def test_existing_matching_database_is_not_duplicated(tmp_path: Path) -> N
 
 
 @pytest.mark.asyncio
-async def test_existing_database_on_the_wrong_parent_is_not_copied(tmp_path: Path) -> None:
+async def test_foreign_tasks_database_does_not_collide(tmp_path: Path) -> None:
     spec = _spec()
     probe = FixtureNotionAdapter()
     path = tmp_path / "build.json"
     await _phase_one(spec, probe, path)
-    await _seed(probe, "ws_default", "Tasks")
-    before = path.read_bytes()
+    foreign = await _seed(probe, "ws_default", "Tasks")
 
-    with pytest.raises(ProductBuildError, match="does not match the schema"):
-        await _build(spec, probe, path)
+    checkpoint = await _build(spec, probe, path)
 
-    assert _titles(probe) == ["Tasks"]
-    assert next(iter(probe.databases.values())).parent_id == "ws_default"
-    assert path.read_bytes() == before
+    page = _page(probe)
+    owned = [
+        database
+        for database in probe.databases.values()
+        if database.title == "Tasks" and database.parent_id == page.id
+    ]
+    assert len(owned) == 1
+    assert owned[0].id != foreign.id
+    assert foreign.parent_id == "ws_default"
+    assert dict(checkpoint.database_ids)["Tasks"] == owned[0].id
+    assert len(probe.databases) == len(PLANNER_SHARED_DATABASES) + 1
 
 
 @pytest.mark.asyncio
@@ -331,9 +337,10 @@ async def test_wrong_schema_does_not_create_a_second_database(tmp_path: Path) ->
         title="Finance", parent_id=page.id, parent_type="page_id"
     )
     await probe.add_property(database.id, "Name", "title", {})
+    await probe.add_property(database.id, "Junk", "text", {})
     before = path.read_bytes()
 
-    with pytest.raises(ProductBuildError, match="does not match the schema"):
+    with pytest.raises(ProductBuildError, match="cannot be repaired"):
         await _build(spec, probe, path)
 
     assert len(probe.databases) == 1
@@ -511,6 +518,41 @@ def test_shared_databases_module_does_not_name_a_live_client() -> None:
         assert token not in source
 
 
+@pytest.mark.asyncio
+async def test_catalogue_prefix_is_repaired_in_place(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _phase_one(spec, probe, path)
+    page = _page(probe)
+    database = await probe.create_database(
+        title="Finance", parent_id=page.id, parent_type="page_id"
+    )
+    await probe.add_property(database.id, "Name", "title", {})
+
+    checkpoint = await _build(spec, probe, path)
+
+    finance = [item for item in probe.databases.values() if item.title == "Finance"]
+    assert len(finance) == 1
+    assert finance[0].id == database.id
+    assert [prop.name for prop in finance[0].properties] == ["Name", "Amount", "Date"]
+    assert dict(checkpoint.database_ids)["Finance"] == database.id
+
+
+@pytest.mark.asyncio
+async def test_shared_checkpoint_parser_rejects_bad_inputs(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _phase_one(spec, probe, path)
+    path.write_text("not-json\n", encoding="utf-8")
+
+    with pytest.raises(ProductBuildError, match="not JSON"):
+        await _build(spec, probe, path)
+
+    assert len(probe.databases) == 0
+
+
 def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert state["current_session"] == 7
@@ -526,5 +568,5 @@ def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     evidence = state["required_completion_evidence"]
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
     assert all(value is False for value in evidence.values())
-    assert state["state_revision"] == 53
+    assert state["state_revision"] == 54
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")

@@ -37,6 +37,7 @@ BUILD_PHASES: tuple[str, ...] = (
     "notification_dashboard",
     "aesthetics_and_content_completion",
 )
+BUILD_PHASES_COMPLETE = "build_phases_complete"
 BUILD_KIND_PRIMARY = "PRIMARY"
 BUILD_VERSION = 1
 DESIGN_SHELL_ICON = "🎨"
@@ -91,6 +92,15 @@ class NotificationDashboardRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class AestheticsRecord:
+    """Palette accents, sample blocks, and hub palette marks for the last build phase."""
+
+    accents: tuple[tuple[str, str], ...]
+    samples: tuple[tuple[str, str], ...]
+    marks: tuple[tuple[str, str, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
 class ProductBuildCheckpoint:
     """Persisted build progress. The next phase is not executed."""
 
@@ -110,6 +120,7 @@ class ProductBuildCheckpoint:
     dashboard_pieces: tuple[tuple[str, str], ...] = ()
     identity_hubs: tuple[IdentityHubRecord, ...] = ()
     notification_dashboard: NotificationDashboardRecord | None = None
+    aesthetics: AestheticsRecord | None = None
 
 
 def design_shell_content(spec: ProductSpec) -> str:
