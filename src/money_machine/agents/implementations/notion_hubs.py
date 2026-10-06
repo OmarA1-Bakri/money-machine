@@ -23,6 +23,12 @@ from money_machine.agents.implementations.notion_dashboard import (
     require_dashboard_pieces,
     require_home_page,
 )
+from money_machine.agents.implementations.notion_linked_views import (
+    create_named_linked_view as _create_linked_view,
+)
+from money_machine.agents.implementations.notion_linked_views import (
+    filter_pairs as _filter_pairs,
+)
 from money_machine.agents.implementations.notion_product_builder import (
     BUILD_PHASES,
     CHECKPOINT_KEYS,
@@ -200,6 +206,8 @@ def _reject_hub_fields(spec: ProductSpec) -> None:
     fields.extend(hub.description for hub in spec.hubs)
     if any("\n" in field or "\r" in field for field in fields):
         raise ProductBuildError("hub fields must be single lines")
+    if any(len(hub.name) > MAX_NAME_LENGTH for hub in spec.hubs):
+        raise ProductBuildError("hub name must be at most 64 characters")
     names = [hub.name for hub in spec.hubs]
     if len(names) != len(set(names)):
         raise ProductBuildError("hub names must be unique")
@@ -382,6 +390,8 @@ def require_identity_hubs(
     *,
     extra_page_ids: tuple[str, ...] = (),
     extra_database_ids: tuple[str, ...] = (),
+    extra_block_ids: tuple[str, ...] = (),
+    page_marks: Mapping[str, tuple[str, str]] | None = None,
     formula_suffixes: Mapping[str, tuple[tuple[str, str], ...]] | None = None,
     formulas_optional: bool = False,
 ) -> NotionPage:
@@ -396,7 +406,16 @@ def require_identity_hubs(
         formula_suffixes=formula_suffixes,
         formulas_optional=formulas_optional,
     )
-    _require_saved_hubs(probe, page, stored, spec, kinds, extra_page_ids=extra_page_ids)
+    _require_saved_hubs(
+        probe,
+        page,
+        stored,
+        spec,
+        kinds,
+        extra_page_ids=extra_page_ids,
+        extra_block_ids=extra_block_ids,
+        page_marks=page_marks,
+    )
     return page
 
 
@@ -525,11 +544,20 @@ def _classify(
 
 
 def _require_home_objects(
-    probe: FixtureNotionAdapter, home: NotionPage, stored: ProductBuildCheckpoint
+    probe: FixtureNotionAdapter,
+    home: NotionPage,
+    stored: ProductBuildCheckpoint,
+    *,
+    extra_block_ids: tuple[str, ...] = (),
 ) -> None:
     blocks = [block for block in probe.blocks.values() if block.parent_id == home.id]
     expected_blocks = _dashboard_block_ids(stored)
-    if {block.id for block in blocks} != expected_blocks or len(blocks) != len(expected_blocks):
+    home_ids = {block.id for block in blocks}
+    if (
+        len(blocks) != len(home_ids)
+        or not expected_blocks <= home_ids
+        or not home_ids <= expected_blocks | set(extra_block_ids)
+    ):
         raise ProductBuildError("hub block is unexpected")
     views = [
         view
@@ -638,10 +666,6 @@ def _classify_views(
     return first, second
 
 
-def _filter_pairs(view: LinkedView) -> tuple[tuple[str, str, str], ...]:
-    return tuple((item.property_name, item.condition, item.value) for item in view.filters)
-
-
 async def _ensure_hubs(
     probe: FixtureNotionAdapter,
     home: NotionPage,
@@ -682,15 +706,6 @@ async def _ensure_hubs(
     return tuple(records)
 
 
-async def _create_linked_view(
-    probe: FixtureNotionAdapter, page_id: str, source_id: str, view: LinkedView
-) -> NotionLinkedView:
-    created = await probe.create_linked_view(source_id, page_id, view.view_type)
-    created.name = view.name
-    created.filters = _filter_pairs(view)
-    return created
-
-
 def _require_saved_hubs(
     probe: FixtureNotionAdapter,
     home: NotionPage,
@@ -699,6 +714,8 @@ def _require_saved_hubs(
     kinds: tuple[str, ...],
     *,
     extra_page_ids: tuple[str, ...] = (),
+    extra_block_ids: tuple[str, ...] = (),
+    page_marks: Mapping[str, tuple[str, str]] | None = None,
 ) -> None:
     names = tuple(hub.name for hub in spec.hubs)
     if tuple(record.name for record in stored.identity_hubs) != names:
@@ -706,8 +723,10 @@ def _require_saved_hubs(
     plan = _plan(spec, kinds)
     database_ids = dict(stored.database_ids)
     for planned, record in zip(plan, stored.identity_hubs, strict=True):
-        _require_hub(probe, home, spec, planned, record, database_ids)
-    _require_exact_hubs(probe, home, stored, extra_page_ids=extra_page_ids)
+        _require_hub(probe, home, spec, planned, record, database_ids, page_marks=page_marks)
+    _require_exact_hubs(
+        probe, home, stored, extra_page_ids=extra_page_ids, extra_block_ids=extra_block_ids
+    )
 
 
 def _require_hub(
@@ -717,6 +736,8 @@ def _require_hub(
     planned: _PlannedHub,
     record: IdentityHubRecord,
     database_ids: dict[str, str],
+    *,
+    page_marks: Mapping[str, tuple[str, str]] | None = None,
 ) -> None:
     page = probe.pages.get(record.page_id)
     if (
@@ -725,8 +746,7 @@ def _require_hub(
         or page.parent_id != home.id
         or page.parent_type != _CHILD_PARENT
         or page.is_published is not False
-        or page.icon is not None
-        or page.cover is not None
+        or not _hub_mark_ok(page, record.page_id, page_marks)
     ):
         raise ProductBuildError("hub piece is missing")
     if tuple(role for role, _block_id in record.sections) != _SECTION_ROLES:
@@ -775,15 +795,27 @@ def _require_linked_view(
         raise ProductBuildError("hub piece is missing")
 
 
+def _hub_mark_ok(
+    page: NotionPage,
+    page_id: str,
+    page_marks: Mapping[str, tuple[str, str]] | None,
+) -> bool:
+    if page_marks is not None and page_id in page_marks:
+        icon, cover = page_marks[page_id]
+        return page.icon == icon and page.cover == cover
+    return page.icon is None and page.cover is None
+
+
 def _require_exact_hubs(
     probe: FixtureNotionAdapter,
     home: NotionPage,
     stored: ProductBuildCheckpoint,
     *,
     extra_page_ids: tuple[str, ...] = (),
+    extra_block_ids: tuple[str, ...] = (),
 ) -> None:
     _home_pages(probe, home)
-    _require_home_objects(probe, home, stored)
+    _require_home_objects(probe, home, stored, extra_block_ids=extra_block_ids)
     pages = {home.id, *(record.page_id for record in stored.identity_hubs), *extra_page_ids}
     actual_pages = {page.id for page in probe.pages.values() if type(page) is NotionPage}
     if actual_pages != pages or len(probe.pages) != len(pages):
@@ -794,6 +826,7 @@ def _require_exact_hubs(
         blocks.add(record.navigation_block_id)
         blocks.update(block_id for _role, block_id in record.sections)
         views.update(view_id for _slug, view_id in record.views)
+    blocks.update(extra_block_ids)
     actual_blocks = {block.id for block in probe.blocks.values()}
     if actual_blocks != blocks or len(probe.blocks) != len(blocks):
         raise ProductBuildError("hub block is unexpected")

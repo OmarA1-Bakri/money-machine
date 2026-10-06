@@ -35,7 +35,12 @@ from money_machine.control.state import SESSION_EVIDENCE_KEYS
 from money_machine.domain.models.common import EvidenceReference
 from money_machine.domain.models.product_spec import ColourToken, Hub, ProductSpec
 from money_machine.integrations.notion.api_adapter import APINotionAdapter
-from money_machine.integrations.notion.domain import NotionLinkedView, NotionPage, NotionTextBlock
+from money_machine.integrations.notion.domain import (
+    NotionCalloutBlock,
+    NotionLinkedView,
+    NotionPage,
+    NotionTextBlock,
+)
 from money_machine.integrations.notion.fixture_adapter import FixtureNotionAdapter
 from tests.fixtures.products import create_fixture_product_spec
 
@@ -47,7 +52,7 @@ PHASE_TWO_AT = datetime(2026, 10, 5, 20, 0, tzinfo=UTC)
 DASHBOARD_AT = datetime(2026, 10, 5, 22, 30, tzinfo=UTC)
 LATER = datetime(2026, 10, 5, 23, 45, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "91a33eba7961ea2819dcc695f73ffe9a45e37b33"
+HEAD_SHA = "0793e73147c0a3e50b6e27be2c74d3084ab1bfd5"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 _PHASES = (
     PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL,
@@ -432,10 +437,12 @@ async def test_unexpected_hub_block_is_not_rewritten(tmp_path: Path) -> None:
 async def test_missing_checkpoint_creates_nothing(tmp_path: Path) -> None:
     spec = _spec()
     probe = FixtureNotionAdapter()
+    path = tmp_path / "missing.json"
 
     with pytest.raises(ProductBuildError, match="dashboard checkpoint"):
-        await _build(spec, probe, tmp_path / "missing.json")
+        await _build(spec, probe, path)
 
+    assert path.exists() is False
     assert probe.pages == {}
     assert probe.linked_views == {}
 
@@ -708,7 +715,7 @@ async def test_deleted_design_shell_is_not_rebuilt(tmp_path: Path) -> None:
     del probe.blocks[shell_id]
     before = path.read_bytes()
 
-    with pytest.raises(ProductBuildError, match="design shell"):
+    with pytest.raises(ProductBuildError, match="is missing"):
         await _build(spec, probe, path)
 
     assert shell_id not in probe.blocks
@@ -728,7 +735,7 @@ async def test_tampered_design_shell_is_not_rebuilt(tmp_path: Path) -> None:
     shell.content = "tampered shell"
     before = path.read_bytes()
 
-    with pytest.raises(ProductBuildError, match="design shell"):
+    with pytest.raises(ProductBuildError, match="does not match"):
         await _build(spec, probe, path)
 
     assert probe.blocks[shell_id].content == "tampered shell"
@@ -915,8 +922,121 @@ def test_hubs_module_does_not_name_a_live_client_or_later_phase() -> None:
         "aesthetics_and_content_completion",
         "https://",
         "http://",
+        "etsy",
     ):
         assert token not in source
+
+
+@pytest.mark.asyncio
+async def test_icon_only_design_shell_tamper_is_not_rebuilt(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    payload = json.loads(path.read_text(encoding="ascii"))
+    shell_id = payload["provider_object_references"]["design_shell_block_id"]
+    shell = probe.blocks[shell_id]
+    assert isinstance(shell, NotionCalloutBlock)
+    shell.icon = "💡"
+    before = path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match="does not match"):
+        await _build(spec, probe, path)
+
+    assert shell.icon == "💡"
+    assert len(probe.pages) == 1
+    assert path.read_bytes() == before
+
+
+def test_linked_view_name_token_is_the_sha256_prefix() -> None:
+    identity = "Organized Working Parent Command Center"
+    hub_name = "School And Activities Planner"
+    spec = _spec(identity=identity, hub_name=hub_name, hub_count=6)
+    named = linked_view_name(spec, spec.hubs[0].name, "open tasks")
+    assert named == "Organized Working Parent Command Center Scho open tasks 447d8579"
+    assert linked_view_name(spec, spec.hubs[0].name, "open tasks") == named
+
+
+@pytest.mark.asyncio
+async def test_long_view_name_replay_keeps_the_same_bytes_and_ids(tmp_path: Path) -> None:
+    identity = "Organized Working Parent Command Center"
+    hub_name = "School And Activities Planner"
+    spec = _spec(identity=identity, hub_name=hub_name, hub_count=6)
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    checkpoint = await _build(spec, probe, path)
+    before = path.read_bytes()
+    view_ids = set(probe.linked_views)
+
+    again = await _build(spec, probe, path, recorded_at=datetime(2026, 10, 6, 1, tzinfo=UTC))
+
+    assert again == checkpoint
+    assert path.read_bytes() == before
+    assert set(probe.linked_views) == view_ids
+
+
+@pytest.mark.asyncio
+async def test_deleted_section_block_on_resume_is_not_rebuilt(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    checkpoint = await _build(spec, probe, path)
+    block_id = checkpoint.identity_hubs[0].sections[0][1]
+    del probe.blocks[block_id]
+    before = path.read_bytes()
+    pages = set(probe.pages)
+
+    with pytest.raises(ProductBuildError, match="hub piece is missing"):
+        await _build(spec, probe, path)
+
+    assert block_id not in probe.blocks
+    assert set(probe.pages) == pages
+    assert path.read_bytes() == before
+
+
+@pytest.mark.asyncio
+async def test_hub_checkpoint_parser_rejects_bad_inputs(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await _build(spec, probe, path)
+    pages = set(probe.pages)
+    original = path.read_text(encoding="ascii")
+    path.write_text("[]\n", encoding="utf-8")
+
+    with pytest.raises(ProductBuildError, match="must be an object"):
+        await _build(spec, probe, path)
+
+    payload = json.loads(original)
+    payload["provider_object_references"]["identity_hubs"][0].pop("page_id")
+    path.write_text(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="ascii"
+    )
+
+    with pytest.raises(ProductBuildError, match="missing or unsupported"):
+        await _build(spec, probe, path)
+
+    assert set(probe.pages) == pages
+
+
+@pytest.mark.asyncio
+async def test_hub_name_longer_than_64_characters_creates_nothing(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    before = path.read_bytes()
+    cloned = spec.hubs[0].model_copy(update={"name": "N" * 65})
+    long = spec.model_copy(update={"hubs": (cloned, *spec.hubs[1:])})
+
+    with pytest.raises(ProductBuildError, match="at most 64"):
+        await _build(long, probe, path)
+
+    assert len(probe.pages) == 1
+    assert path.read_bytes() == before
 
 
 def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
@@ -937,5 +1057,5 @@ def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     assert evidence["identity_hubs_built"] is False
     assert evidence["notification_dashboard_built"] is False
     assert evidence["home_dashboard_built"] is False
-    assert state["state_revision"] == 53
+    assert state["state_revision"] == 54
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")

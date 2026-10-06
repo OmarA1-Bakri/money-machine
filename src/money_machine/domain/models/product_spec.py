@@ -26,7 +26,7 @@ class ColourToken(ContractModel):
 class Hub(ContractModel):
     """One hub (chapter/section) in the product specification."""
 
-    name: NonEmptyStr
+    name: NonEmptyStr = Field(max_length=64)
     description: NonEmptyStr = Field(max_length=500)
     page_count: PositiveInt
 

@@ -1,5 +1,59 @@
 # Implementation Log
 
+## 2026-10-06 — Session 07 W6: fixture aesthetics and content completion
+
+Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision 53 → 54. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. `head_sha` moves to the post-merge W5 tip `0793e73147c0a3e50b6e27be2c74d3084ab1bfd5`. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`: an incomplete session may record a later `head_sha`, and this wave is not the completion candidacy that would move the closure SHA. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-06T03:00:00Z`.
+
+Twelve session 7 evidence keys stay false. No session exit code is recorded. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty.
+
+Aesthetics and content completion only, in `notion_aesthetics.py`, resuming the notification-dashboard checkpoint on an exact `FixtureNotionAdapter` from an exact `product_spec.ProductSpec`. The home page gains one callout per palette token. Each hub page gains one text block that starts with `SAMPLE` and uses that hub's name and description. Hub icon and cover are set from the palette token. The home page icon and cover from the dashboard phase are left as stored. Sample rows stay marked SAMPLE. A second call keeps the same checkpoint bytes and ids. A missing notification checkpoint is an error and nothing is rebuilt. `next_phase` is `build_phases_complete`. This is the last `BUILD_PHASES` entry. Variants, QA, the fact ledger, and the workflow link are not started.
+
+The hashed view-name token is `sha256` of the full UTF-8 name, first 8 hex characters, at `notion_hubs.py:161`. A `hash()` substitute and an `id()` substitute both fail. A long-name replay keeps the same bytes and view ids. Design-shell resume requires the icon: missing shell says `is missing` (`notion_dashboard.py:318`, `notion_product_builder.py:335`); content or icon mismatch says `does not match` (`notion_dashboard.py:319`, `notion_product_builder.py:336`). The dead notification reference-length check is gone; the remaining guard is `notion_notifications.py:181`.
+
+Shared database titles are looked up on the parent page (`notion_shared_databases.py:239`). A proper catalogue prefix is repaired in place (`notion_shared_databases.py:425`). A non-prefix schema raises `shared database schema cannot be repaired`. Notification formula prefixes are completed and the sample marker stays last (`notion_notifications.py:752`). A proper notification-database prefix is repaired in place (`notion_notifications.py:670`); junk raises `notification database cannot be repaired`. `sample_marker` is a select column (`notion_notifications.py:891`). Sample rows store catalogue values (`notion_notifications.py:902`). Buyer name on the saved row and on an existing row must equal the ProductSpec identity (`notion_notifications.py:619`, `notion_notifications.py:1046`). Hub names longer than 64 characters are rejected (`notion_hubs.py:209`). `filter_pairs` and `create_named_linked_view` live in `notion_linked_views.py`. That dedupe is partial: `_view_matches` and `_one_workspace` / `_workspace_id` are still duplicated, and six checkpoint writers remain. A deleted hub section block is an error (`notion_hubs.py:763`). Published pages are rejected in phase 1 (`notion_product_builder.py:259`, `notion_product_builder.py:331`). A missing checkpoint file stays absent: each later phase asserts that after the error (`notion_aesthetics.py:103`, `notion_notifications.py:145`, `notion_dashboard.py:183`, `notion_hubs.py:260`, `notion_shared_databases.py:129`). Phase 1 already asserts that in `test_existing_published_page_is_rejected` (`notion_product_builder.py:372`).
+
+Prompt-integrity review: `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md` (Wave 6 addendum). Focused tests, re-run on this fix: 242 passed, 1 skipped across the aesthetics, notification, hubs, dashboard, shared-database, phase-1, prompt-integrity, and control-state files. The skip is the pre-existing case-variant control-state case on this case-sensitive filesystem. Full local pytest: 2125 collected, 1920 passed, 193 skipped, 12 failed. The 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` for the `docker` binary. They are outside this wave's files. `ruff format --check`, `ruff check`, and `pyright` are clean.
+
+Mutation checks. The prior wave applied 21 mutations; each owning test failed and each edit was reverted. Those 21 were not re-run on this fix. This fix re-applied 12 missing-checkpoint writes on the `if not path.exists()` branch: write `{}` plus a newline and then raise the same `ProductBuildError`, and write `{}` plus a newline and then fall through. Each of the 12 failed the owning test (pytest exit 1, one failed) and was reverted. The earlier row that recorded a missing-checkpoint empty-object write at `notion_aesthetics.py:104` as killed was wrong: that write survived until the post-raise absence assert. 33 rows: 21 from the prior wave, 12 from this fix.
+
+| Mutation | Site | Failing test |
+|---|---|---|
+| Skip aesthetics replay return | `notion_aesthetics.py:95` | `test_replay_keeps_the_same_checkpoint_bytes_and_ids` |
+| Sample text drops SAMPLE | `notion_aesthetics.py:66` | `test_mass_tier_adds_palette_accents_and_sample_hub_text` |
+| Drop the last palette accent | `notion_aesthetics.py:463` | `test_mass_tier_adds_palette_accents_and_sample_hub_text` |
+| next_phase stays the phase name | `notion_aesthetics.py:225` | `test_mass_tier_adds_palette_accents_and_sample_hub_text` |
+| Hub icon ignores the token | `notion_aesthetics.py:71` | `test_mass_tier_adds_palette_accents_and_sample_hub_text` |
+| Hub cover ignores the token | `notion_aesthetics.py:76` | `test_mass_tier_adds_palette_accents_and_sample_hub_text` |
+| View token uses hash() | `notion_hubs.py:161` | `test_linked_view_name_token_is_the_sha256_prefix` |
+| View token uses id() | `notion_hubs.py:161` | `test_linked_view_name_token_is_the_sha256_prefix` and `test_long_view_name_replay_keeps_the_same_bytes_and_ids` |
+| Drop the dashboard shell icon check | `notion_dashboard.py:319` | `test_icon_only_design_shell_tamper_is_not_rebuilt` |
+| Drop the phase-1 shell icon check | `notion_product_builder.py:336` | `test_icon_only_design_shell_tamper_is_not_rebuilt` |
+| Database title lookup is probe-global | `notion_shared_databases.py:239` | `test_foreign_tasks_database_does_not_collide` |
+| Catalogue prefix is not repaired | `notion_shared_databases.py:425` | `test_catalogue_prefix_is_repaired_in_place` |
+| sample_marker column is not added | `notion_notifications.py:891` | `test_mass_tier_builds_one_notification_row` |
+| Sample values are not filled | `notion_notifications.py:902` | `test_mass_tier_builds_one_notification_row` |
+| Formula prefix is not completed | `notion_notifications.py:752` | `test_formula_prefix_is_completed_and_keeps_the_first_id` |
+| Notification database prefix is not repaired | `notion_notifications.py:670` | `test_notification_database_prefix_is_repaired_in_place` |
+| Existing-row Buyer name is not checked | `notion_notifications.py:1046` | `test_buyer_name_placeholder_on_an_existing_row_is_not_overwritten` |
+| Saved Buyer name is not checked | `notion_notifications.py:619` | `test_buyer_name_placeholder_is_rejected_on_resume` |
+| Hub name length is not enforced | `notion_hubs.py:209` | `test_hub_name_longer_than_64_characters_creates_nothing` |
+| Existing published page is accepted | `notion_product_builder.py:259` | `test_existing_published_page_is_rejected` |
+| Checkpoint published page is accepted | `notion_product_builder.py:331` | `test_published_checkpoint_page_is_not_rebuilt` |
+| Missing aesthetics checkpoint writes `{}` then raises | `notion_aesthetics.py:103` | `test_missing_checkpoint_creates_nothing` |
+| Missing aesthetics checkpoint writes `{}` then falls through | `notion_aesthetics.py:103` | `test_missing_checkpoint_creates_nothing` |
+| Missing notification checkpoint writes `{}` then raises | `notion_notifications.py:145` | `test_missing_checkpoint_creates_nothing` |
+| Missing notification checkpoint writes `{}` then falls through | `notion_notifications.py:145` | `test_missing_checkpoint_creates_nothing` |
+| Missing dashboard checkpoint writes `{}` then raises | `notion_dashboard.py:183` | `test_missing_checkpoint_creates_nothing` |
+| Missing dashboard checkpoint writes `{}` then falls through | `notion_dashboard.py:183` | `test_missing_checkpoint_creates_nothing` |
+| Missing hubs checkpoint writes `{}` then raises | `notion_hubs.py:260` | `test_missing_checkpoint_creates_nothing` |
+| Missing hubs checkpoint writes `{}` then falls through | `notion_hubs.py:260` | `test_missing_checkpoint_creates_nothing` |
+| Missing shared-database checkpoint writes `{}` then returns None | `notion_shared_databases.py:129` | `test_missing_checkpoint_does_not_create_databases` |
+| Missing shared-database checkpoint writes `{}` then falls through | `notion_shared_databases.py:129` | `test_missing_checkpoint_does_not_create_databases` |
+| Missing phase-1 checkpoint writes `{}` then returns None | `notion_product_builder.py:372` | `test_existing_published_page_is_rejected` |
+| Missing phase-1 checkpoint writes `{}` then falls through | `notion_product_builder.py:372` | `test_existing_published_page_is_rejected` |
+
+Exit 78 scheduler stays HELD. Linked-view helper dedupe is PARTIAL: `_view_matches` and `_one_workspace` / `_workspace_id` are still duplicated, and six checkpoint writers remain. Partial notification-database repair is PARTIAL: the prefix repair works, and `_ensure` still writes before the junk-database and Buyer checks. Notification tamper and parser tests are PARTIAL. Parked for the next wave: navigation stays paragraph text because the fixture has paragraph and callout blocks and no page-link block; dashboard build still rejects a probe with more than one page (`notion_dashboard.py:279`); hub build still requires exactly one top-level page (`notion_hubs.py:484`, `notion_hubs.py:510`); S04–S06 nits; CodeRabbit docstring coverage at 10.88%; notification `_ensure` writing before the junk-database and Buyer checks; loose adopt checks (`_adopted_database` / `_database_ok`); the stuck window between `set_icon` and `set_cover`, and the notification-database icon/cover window; the `sample_marker` resume test, Buyer variants, and repair-path mutants.
+
 ## 2026-10-06 — Session 07 W5: tip-sync and fixture notification dashboard
 
 Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision 52 → 53. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. `head_sha` moves to the post-merge W4 tip `91a33eba7961ea2819dcc695f73ffe9a45e37b33`. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`: an incomplete session may record a later `head_sha`, and this wave is not the completion candidacy that would move the closure SHA. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-06T00:30:00Z`.
@@ -8,7 +62,7 @@ Twelve session 7 evidence keys stay false, including `notification_dashboard_bui
 
 Notification dashboard only, in `notion_notifications.py`, resuming the checkpoint `top_level_page_and_design_shell` + `shared_databases` + `dashboard_and_navigation` + `identity_specific_hubs` on an exact `FixtureNotionAdapter` from an exact `product_spec.ProductSpec`. One database, title `Notification dashboard`, holds one buyer row. Buyer name is the ProductSpec identity. Current date is the formula `now()`. Open tasks due today are always present. Birthday status, money spent today, and water glasses remaining appear only when that catalogue database is in the tier. Sample rows are titled `SAMPLE {kind}` and carry `sample_marker` `SAMPLE`. The buyer row is not a sample and does not store `client_name`. A second call keeps the same checkpoint bytes and ids. A missing prior checkpoint object is an error and nothing is rebuilt. The checkpoint records `notification_dashboard`. The next phase is `aesthetics_and_content_completion` and this wave does not run it.
 
-Hub view names that would exceed Notion's 64-character cap are shortened in `linked_view_name` (`notion_hubs.py:145`). The slug and an 8-character hash of the full name stay on the end, so two realistic hubs that share a 64-character prefix do not collide. The builder rejects a hub list outside six to eight before it loads a checkpoint (`notion_hubs.py:196`), including a `model_copy` that skips the field bounds. A deleted navigation block on resume is an error (`notion_hubs.py:746`). A deleted design shell (`notion_dashboard.py:311`) and a tampered design shell (`notion_dashboard.py:313`) are errors on hub resume and on notification entry, and nothing is rebuilt. A separate section-block delete test stays parked.
+Hub view names that would exceed Notion's 64-character cap are shortened in `linked_view_name` (`notion_hubs.py:161`). The slug and an 8-character hash of the full name stay on the end, so two realistic hubs that share a 64-character prefix do not collide. The builder rejects a hub list outside six to eight before it loads a checkpoint (`notion_hubs.py:202`), including a `model_copy` that skips the field bounds. A deleted navigation block on resume is an error (`notion_hubs.py:765`). A deleted design shell (`notion_dashboard.py:318`) and a tampered design shell (`notion_dashboard.py:319`) are errors on hub resume and on notification entry, and nothing is rebuilt. The section-block delete test landed in Wave 6 (`test_deleted_section_block_on_resume_is_not_rebuilt`, `notion_hubs.py:763`).
 
 Prompt-integrity review: `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md` (Wave 5 addendum). Focused tests: 207 passed, 1 skipped across the notification, hubs, dashboard, shared-database, phase-1, prompt-integrity, and control-state files. The skip is the pre-existing case-variant control-state case on this case-sensitive filesystem. `ruff format`, `ruff check`, and `pyright` are clean on the touched paths.
 
@@ -23,9 +77,9 @@ Mutation checks (25 rows; each applied, the owning test file run, then reverted;
 | Sample title drops SAMPLE | `notion_notifications.py:774` | `test_mass_tier_builds_one_notification_row` |
 | Buyer row marked SAMPLE | `notion_notifications.py:840` | `test_mass_tier_builds_one_notification_row` |
 | Buyer row stores client_name | `notion_notifications.py:840` | `test_mass_tier_builds_one_notification_row` |
-| Every rollup uses sum | `notion_notifications.py:807` | `test_mass_tier_builds_one_notification_row` |
-| Skip the water rollup | `notion_notifications.py:801` | `test_mass_tier_builds_one_notification_row` |
-| Skip the open-tasks rollup | `notion_notifications.py:801` | `test_mass_tier_builds_one_notification_row` |
+| Every rollup uses sum | `notion_notifications.py:984` | `test_mass_tier_builds_one_notification_row` |
+| Skip the water rollup | `notion_notifications.py:984` | `test_mass_tier_builds_one_notification_row` |
+| Skip the open-tasks rollup | `notion_notifications.py:984` | `test_mass_tier_builds_one_notification_row` |
 | Missing checkpoint is not an error | `notion_notifications.py:138` | `test_missing_checkpoint_creates_nothing` |
 | Write next_phase is the current phase | `notion_notifications.py:259` | `test_mass_tier_builds_one_notification_row` |
 | Parse next_phase is the current phase | `notion_notifications.py:179` | `test_replay_keeps_the_same_checkpoint_bytes_and_ids` |
@@ -35,14 +89,14 @@ Mutation checks (25 rows; each applied, the owning test file run, then reverted;
 | Junk formula shape is ignored | `notion_notifications.py:610` | `test_junk_property_creates_no_notification_database` |
 | Missing sample is ignored | `notion_notifications.py:501` | `test_deleted_sample_on_resume_is_not_rebuilt` |
 | Deleted formula is ignored | `notion_notifications.py:371` | `test_deleted_formula_on_resume_is_not_rebuilt` |
-| View name ignores the 64 cap | `notion_hubs.py:153` | `test_a_realistic_long_view_name_stays_unique_and_within_the_cap` |
-| View name truncates without a token | `notion_hubs.py:153` | `test_a_realistic_long_view_name_stays_unique_and_within_the_cap` |
+| View name ignores the 64 cap | `notion_hubs.py:159` | `test_a_realistic_long_view_name_stays_unique_and_within_the_cap` |
+| View name truncates without a token | `notion_hubs.py:161` | `test_a_realistic_long_view_name_stays_unique_and_within_the_cap` |
 | Hub count is not enforced | `notion_hubs.py:196` | `test_fewer_or_more_than_six_to_eight_hubs_create_nothing` |
 | Deleted navigation is accepted | `notion_hubs.py:746` | `test_deleted_navigation_block_is_not_rebuilt` |
-| Missing design shell is accepted | `notion_dashboard.py:311` | `test_deleted_design_shell_is_not_rebuilt` |
-| Tampered design shell is accepted | `notion_dashboard.py:313` | `test_tampered_design_shell_is_not_rebuilt` |
+| Missing design shell is accepted | `notion_dashboard.py:318` | `test_deleted_design_shell_is_not_rebuilt` |
+| Tampered design shell is accepted | `notion_dashboard.py:319` | `test_tampered_design_shell_is_not_rebuilt` |
 
-Exit 78 scheduler stays HELD. A separate section-block delete test stays parked. Parked S06 nits stay parked.
+Exit 78 scheduler stays HELD. The section-block delete test landed in Wave 6. Parked S06 nits stay parked.
 
 ## 2026-10-05 — Session 07 W4: tip-sync and fixture identity hubs
 

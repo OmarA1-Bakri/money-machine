@@ -51,7 +51,7 @@ WHEN = datetime(2026, 10, 3, 0, 30, tzinfo=UTC)
 PHASE_TWO_AT = datetime(2026, 10, 5, 20, 0, tzinfo=UTC)
 LATER = datetime(2026, 10, 5, 22, 30, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "91a33eba7961ea2819dcc695f73ffe9a45e37b33"
+HEAD_SHA = "0793e73147c0a3e50b6e27be2c74d3084ab1bfd5"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 _PHASES = (
     PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL,
@@ -341,10 +341,12 @@ async def test_wrong_cover_is_not_rewritten(tmp_path: Path) -> None:
 async def test_missing_checkpoint_creates_nothing(tmp_path: Path) -> None:
     spec = _spec()
     probe = FixtureNotionAdapter()
+    path = tmp_path / "missing.json"
 
     with pytest.raises(ProductBuildError, match="shared databases checkpoint"):
-        await _build(spec, probe, tmp_path / "missing.json")
+        await _build(spec, probe, path)
 
+    assert path.exists() is False
     assert probe.pages == {}
     assert probe.linked_views == {}
     assert probe.databases == {}
@@ -491,7 +493,7 @@ async def test_published_page_is_rejected(tmp_path: Path) -> None:
     _page(probe).is_published = True
     before = path.read_bytes()
 
-    with pytest.raises(ProductBuildError, match="unpublished"):
+    with pytest.raises(ProductBuildError, match="must stay unpublished"):
         await _build(spec, probe, path)
 
     assert probe.linked_views == {}
@@ -646,8 +648,35 @@ def test_dashboard_module_does_not_name_a_live_client() -> None:
         "http://",
         "notification_dashboard",
         "identity_specific_hubs",
+        "etsy",
     ):
         assert token not in source
+
+
+@pytest.mark.asyncio
+async def test_dashboard_piece_parser_rejects_bad_inputs(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await _build(spec, probe, path)
+    pages = len(probe.pages)
+    original = path.read_text(encoding="ascii")
+    path.write_text("{\n", encoding="utf-8")
+
+    with pytest.raises(ProductBuildError, match="not JSON"):
+        await _build(spec, probe, path)
+
+    payload = json.loads(original)
+    payload["provider_object_references"]["dashboard"][0]["kind"] = "nope"
+    path.write_text(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="ascii"
+    )
+
+    with pytest.raises(ProductBuildError, match="unsupported"):
+        await _build(spec, probe, path)
+
+    assert len(probe.pages) == pages
 
 
 def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
@@ -665,5 +694,5 @@ def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     evidence = state["required_completion_evidence"]
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
     assert all(value is False for value in evidence.values())
-    assert state["state_revision"] == 53
+    assert state["state_revision"] == 54
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")
