@@ -336,3 +336,88 @@ This addendum governs Wave 6. The prompt remains the unamended source of record.
 | Action 12 commissioning | Operator decision after full implementation | S-02 |
 | Navigation as a page-link block | Unowned until the fixture grows a link block | Fixture blocks are paragraph and callout only |
 | Twelve evidence keys | Session close, after the prompt's own criteria | Fixture phase is not that gate |
+
+# Session 07 Prompt Integrity Review — Wave 7
+
+**Date:** 2026-10-06
+**Prompt:** `prompts/implementation/10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`
+**Verified SHA-256:** `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`
+**Workbook authority:** `hands-off-money-machine-full-implementation-workbook.md` appendix row for this prompt (5,255 bytes, 237 lines)
+**Scope:** Wave 7 only. Tip-sync the incomplete session, then fixture-only phase `progress_and_repair` (prompt section 6) plus the should-fix sweep named by the operator. The Wave 1 record at `docs/control/reviews/2026-10-03-session-07-prompt-integrity.md` still governs phase 1. Waves 3–6 above still govern their phases. This record is the corrective addendum for Wave 7.
+
+The prompt file is not amended.
+
+## 1. Prompt authenticity
+
+**Status:** VERIFIED
+
+- The extracted file's SHA-256 equals the workbook appendix value `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`.
+- The workbook copy between `COPY START` and `COPY END` is the same extract the appendix hashes.
+- The prompt stays the unamended source of record.
+
+## 2. Three-dimensional review
+
+### Fidelity
+
+**Verdict:** CONDITIONAL APPROVE. One high finding, resolved by the addendum.
+
+**F-01 [HIGH] — Section 6 says capture a screenshot or provider response and do not rebuild unless required**
+
+- **Prompt lines:** 88–104, against actions 7–13 at lines 106–206 and the six `BUILD_PHASES` names.
+- **Authority:** `BUILD_PHASES` has six phases and names no seventh. The fixture adapter has no screenshot capture. `build_phases_complete` is the checkpoint sentinel after phase 6, not a variant phase. The next narrative phase is A08 variants, which this wave must not start.
+- **Consequence of literal execution:** A failure could rebuild the whole product, a repair record could claim a screenshot the fixture cannot take, or the wave could start A08, A09, the fact ledger, or the workflow link.
+- **Amendment:** Persist one typed progress record across the six phases. On a provider failure, store the response with evidence kind `provider_response` and a repair job, and resume from the failed operation, only when a prior record exists. Never rebuild the whole product unless the progress record is unrecoverable. A missing prior record is an error and writes nothing. A failure leaves a repair job only when a prior record exists. A first phase-1 failure with no record raises and writes no job and no file (notion_progress.py:248), which narrows prompt §6's 'create a repair job'. Checkpoint `next_phase` stays `build_phases_complete`. The narrative next phase is variants (A08), not started.
+
+**What the prompt already gets right**
+
+- Progress is persisted so a later run can resume (line 26 and lines 90–97).
+- A failed operation captures provider evidence, creates a repair job, and does not rebuild the whole product unless required (lines 99–104). A failure leaves a repair job only when a prior record exists. A first phase-1 failure with no record raises and writes no job and no file (notion_progress.py:248), which narrows prompt §6's 'create a repair job'.
+- Variants, QA, the fact ledger, the workflow link, and commissioning are later actions (lines 106–206).
+
+### Safety and executability
+
+**Verdict:** CONDITIONAL APPROVE. The Wave 1 critical and high findings still apply and stay in force.
+
+**S-01 [CRITICAL] — Action 11 live sandbox.** Still deferred. This wave uses `FixtureNotionAdapter` only. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Do not import `httpx`, `requests`, `notion_client`, or `APINotionAdapter`.
+
+**S-02 [HIGH] — Action 12 commissioning.** A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty.
+
+**S-03 [HIGH] — Two ProductSpec types.** This phase accepts only `product_spec.ProductSpec`. The catalogue spec is rejected.
+
+**S-04 [HIGH] — Tip-sync must not look like completion.** `head_sha` moves to the post-merge Wave 6 tip `3f0a30a8e52b183f10799128d4fd7b17c1b74495`. `evidence_closure_commit_sha` stays the Session 06 tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. All twelve session 7 evidence keys stay false. `session_status` stays `incomplete`. This wave does not print `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE`.
+
+### Gameability
+
+**Verdict:** CONDITIONAL APPROVE. One high finding, resolved by the addendum.
+
+**G-01 [HIGH] — A repair-job string, a self-compared sample, or a case-sensitive source ban satisfies a careless reading**
+
+- **Prompt lines:** 90–104, read against lines 74–76.
+- **Cheap fake:** Append a repair-job label with no provider response, resume by rebuilding completed operations, compare sample text to `sample_content()` so a `client_name` suffix survives, or ban only the lowercase token `etsy`.
+- **Ungameable for this wave:** A failure injected at each of the six phases leaves a repair job whose kind is `provider_response` and whose response text is the provider response. A failure leaves a repair job only when a prior record exists. A first phase-1 failure with no record raises and writes no job and no file (notion_progress.py:248), which narrows prompt §6's 'create a repair job'. Resume keeps completed block and database ids and adds only the failed operation onward. A recomputed digest is accepted. Legacy progress files with no progress fail closed. Sample text is asserted as the literal identity, hub name, and hub description, and `client_name` is absent without calling `sample_content()`. `Etsy` and `ETSY` fail the source ban. A junk notification database and a placeholder Buyer name are rejected before any adapter write.
+
+## 3. Corrective addendum
+
+This addendum governs Wave 7. The prompt remains the unamended source of record.
+
+1. Prove the prompt hash, then implement only the slice below.
+2. Tip-sync only: `head_sha` becomes `3f0a30a8e52b183f10799128d4fd7b17c1b74495`. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. Advance `state_revision` from 54 to 55. `session_status` stays `incomplete`. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays this prompt.
+3. Leave all twelve session 7 evidence keys false. Do not set `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE`.
+4. Keep A07, A08, and A09 DESIGNED. `commissioned_agents` stays empty. Exit 78 stays HELD.
+5. Persist one typed progress record for all six build phases: completed operations, deferred operations, created Notion ids, property mappings, page counts, and formula state. One schema, one reader, and one writer. A missing prior record is an error and writes nothing. A recomputed digest is accepted. Legacy progress files with no progress fail closed.
+6. On a provider failure, store the response with kind `provider_response`, create a repair job, and resume from the failed operation. A failure leaves a repair job only when a prior record exists. A first phase-1 failure with no record raises and writes no job and no file (notion_progress.py:248), which narrows prompt §6's 'create a repair job'. Never rebuild the whole product unless the progress record is unrecoverable. State that rule in code and docs. Test a recoverable resume and an unrecoverable rebuild. The fixture has no screenshots, so the record must not claim one.
+7. Close the operator must-fixes and the should-fixes that this fixture can close. Park, with a reason, the ones the fixture cannot close: navigation as a page link, one home page per probe, CodeRabbit docstring coverage, the fixed sample date, and assigning page properties through a separate provider write.
+8. Tests use the fixture only. Do not start A08, A09, the fact ledger, the workflow link, or commissioning.
+
+## 4. Deferrals
+
+| Finding | Owner | Reason |
+|---|---|---|
+| Actions 7–13 | Later Session 07 waves or the session close | Not this slice. Narrative next phase is variants (A08), not started |
+| Action 11 live sandbox | Later wave with explicit authorization | S-01 |
+| Action 12 commissioning | Operator decision after full implementation | S-02 |
+| Navigation as a page-link block | Unowned until the fixture grows a link block | Fixture blocks are paragraph and callout only |
+| One home page per probe | Unowned until a second top-level page is in scope | Dashboard and hub builders still require one top-level page |
+| CodeRabbit docstring coverage 10.88% (W6, stale; not remeasured) | Unowned | Not re-measured this wave |
+| Fixed sample catalogue date | Unowned | Sample rows stay on the deterministic catalogue date; the buyer current-date formula stays `now()` |
+| Twelve evidence keys | Session close, after the prompt's own criteria | Fixture phase is not that gate |

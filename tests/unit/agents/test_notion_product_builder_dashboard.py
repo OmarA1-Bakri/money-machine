@@ -26,6 +26,7 @@ from money_machine.agents.implementations.notion_product_builder import (
     ProductBuildError,
     build_top_level_page_and_design_shell,
 )
+from money_machine.agents.implementations.notion_progress import stamp_integrity_digest
 from money_machine.agents.implementations.notion_shared_databases import (
     BUSINESS_SHARED_DATABASES,
     PLANNER_SHARED_DATABASES,
@@ -51,7 +52,7 @@ WHEN = datetime(2026, 10, 3, 0, 30, tzinfo=UTC)
 PHASE_TWO_AT = datetime(2026, 10, 5, 20, 0, tzinfo=UTC)
 LATER = datetime(2026, 10, 5, 22, 30, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "0793e73147c0a3e50b6e27be2c74d3084ab1bfd5"
+HEAD_SHA = "3f0a30a8e52b183f10799128d4fd7b17c1b74495"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 _PHASES = (
     PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL,
@@ -205,7 +206,7 @@ async def test_mass_tier_builds_the_home_dashboard_once(tmp_path: Path) -> None:
     ]
     assert "identity_specific_hubs" not in stored["checkpoint_names"]
     assert "notification_dashboard" not in stored["checkpoint_names"]
-    assert "notification_dashboard" not in path.read_text(encoding="ascii")
+    assert "notification_dashboard" in stored["progress"]["deferred_operations"]
 
 
 @pytest.mark.asyncio
@@ -221,10 +222,10 @@ async def test_replay_does_not_create_another_dashboard(tmp_path: Path) -> None:
 
     second = await _build(spec, probe, path, recorded_at=datetime(2026, 10, 6, tzinfo=UTC))
 
-    assert second == first
-    assert path.read_bytes() == before
     assert set(probe.blocks) == block_ids
     assert set(probe.linked_views) == view_ids
+    assert second == first
+    assert path.read_bytes() == before
     assert len(probe.pages) == 1
     assert len(probe.databases) == len(PLANNER_SHARED_DATABASES)
 
@@ -611,6 +612,7 @@ async def test_dashboard_checkpoint_without_pieces_is_rejected(tmp_path: Path) -
     await _build(spec, probe, path)
     payload = json.loads(path.read_text(encoding="ascii"))
     del payload["provider_object_references"]["dashboard"]
+    payload = stamp_integrity_digest(payload)
     path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="ascii")
     before_views = set(probe.linked_views)
 
@@ -649,8 +651,10 @@ def test_dashboard_module_does_not_name_a_live_client() -> None:
         "notification_dashboard",
         "identity_specific_hubs",
         "etsy",
+        "Etsy",
+        "ETSY",
     ):
-        assert token not in source
+        assert token.casefold() not in source.casefold()
 
 
 @pytest.mark.asyncio
@@ -669,6 +673,7 @@ async def test_dashboard_piece_parser_rejects_bad_inputs(tmp_path: Path) -> None
 
     payload = json.loads(original)
     payload["provider_object_references"]["dashboard"][0]["kind"] = "nope"
+    payload = stamp_integrity_digest(payload)
     path.write_text(
         json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="ascii"
     )
@@ -694,5 +699,5 @@ def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     evidence = state["required_completion_evidence"]
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
     assert all(value is False for value in evidence.values())
-    assert state["state_revision"] == 54
+    assert state["state_revision"] == 55
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")

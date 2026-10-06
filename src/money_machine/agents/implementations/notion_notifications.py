@@ -7,8 +7,6 @@ does not open a network connection or commission an agent.
 
 from __future__ import annotations
 
-import json
-import os
 from collections.abc import Mapping
 from dataclasses import replace
 from datetime import datetime
@@ -35,6 +33,15 @@ from money_machine.agents.implementations.notion_product_builder import (
     require_spec,
     require_token,
 )
+from money_machine.agents.implementations.notion_progress import (
+    OP_NOTIFICATION_DATABASE,
+    ProviderFailure,
+    guard_operation,
+    load_payload,
+    raise_recorded,
+    reject_duplicate_labels,
+)
+from money_machine.agents.implementations.notion_progress_record import write_checkpoint
 from money_machine.agents.implementations.notion_shared_databases import (
     SAMPLE_MARKER,
     SAMPLE_MARKER_VALUE,
@@ -76,6 +83,32 @@ _DATE_EXPRESSION = "now()"
 _SAMPLE_MARKER = SAMPLE_MARKER
 _SAMPLE_VALUE = SAMPLE_MARKER_VALUE
 SAMPLE_DATE = "2026-10-06"
+NOTIFICATION_ICON = "bell"
+NOTIFICATION_COVER = "fixture://palette/notification"
+_BUYER_PLACEHOLDERS = frozenset(
+    {
+        "buyer",
+        "buyer name",
+        "client",
+        "client name",
+        "your name",
+        "placeholder",
+        "tbd",
+        "todo",
+    }
+)
+_BUYER_COMPACT = frozenset(
+    {
+        "buyer",
+        "buyername",
+        "client",
+        "clientname",
+        "yourname",
+        "placeholder",
+        "tbd",
+        "todo",
+    }
+)
 _DATABASE_PARENT = "page_id"
 _ROW_PARENT = "database_id"
 _RECORD_KEYS = frozenset(
@@ -115,7 +148,10 @@ async def build_notification_dashboard(
     if stored.checkpoint_names == _PHASE_FIVE:
         _require_saved(fixture, stored, validated, kinds, suffixes)
         return stored
-    record = await _ensure(fixture, stored, validated, kinds, suffixes)
+    try:
+        record = await _ensure(fixture, stored, validated, kinds, suffixes)
+    except ProviderFailure as failure:
+        raise_recorded(path, _PHASE_FIVE[-1], failure)
     checkpoint = _checkpoint_with_notification(stored, record, moment)
     _write_checkpoint(path, checkpoint)
     return checkpoint
@@ -142,18 +178,10 @@ def _plan(kinds: tuple[str, ...]) -> NotificationDashboard:
 
 
 def _load_checkpoint(path: Path) -> ProductBuildCheckpoint:
-    if not path.exists():
+    envelope = load_payload(path)
+    if envelope.payload is None:
         raise ProductBuildError("notification dashboard requires the identity hubs checkpoint")
-    text = path.read_text(encoding="utf-8")
-    if text == "" or not text.endswith("\n"):
-        raise ProductBuildError("checkpoint is incomplete")
-    try:
-        decoded = cast(object, json.loads(text))
-    except json.JSONDecodeError as error:
-        raise ProductBuildError("checkpoint is not JSON") from error
-    if type(decoded) is not dict:
-        raise ProductBuildError("checkpoint must be an object")
-    payload = cast(dict[object, object], decoded)
+    payload = envelope.payload
     names = payload.get("checkpoint_names")
     if names == list(_PHASE_FOUR):
         return parse_identity_hubs_checkpoint(payload)
@@ -235,6 +263,10 @@ def _require_pairs(
                 ),
             )
         )
+    reject_duplicate_labels(
+        [label for label, _value in rows],
+        f"checkpoint notification {field} is duplicated",
+    )
     return tuple(rows)
 
 
@@ -302,22 +334,7 @@ def notification_provider_references(checkpoint: ProductBuildCheckpoint) -> dict
 
 
 def _write_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> None:
-    references = notification_provider_references(checkpoint)
-    payload = {
-        "build_kind": checkpoint.build_kind,
-        "build_version": checkpoint.build_version,
-        "checkpoint_names": list(checkpoint.checkpoint_names),
-        "palette_name": checkpoint.palette_name,
-        "palette_tokens": [list(token) for token in checkpoint.palette_tokens],
-        "product_id": checkpoint.product_id,
-        "provider_object_references": references,
-        "recorded_at": checkpoint.recorded_at.isoformat(),
-        "spec_id": checkpoint.spec_id,
-    }
-    text = json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n"
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    temporary.write_text(text, encoding="ascii")
-    os.replace(temporary, path)
+    write_checkpoint(path, checkpoint, notification_provider_references(checkpoint))
 
 
 def require_notification_dashboard(
@@ -451,11 +468,19 @@ def _database_ok(
         or database.id != record.database_id
         or database.title != _DATABASE_TITLE
         or database.parent_type != _DATABASE_PARENT
-        or database.icon is not None
-        or database.cover is not None
+        or database.icon != NOTIFICATION_ICON
+        or database.cover != NOTIFICATION_COVER
     ):
         return False
     properties = database.properties
+    title = properties[0] if properties else None
+    if (
+        type(title) is not NotionDatabaseProperty
+        or title.name != "Name"
+        or title.type != "title"
+        or title.config != {}
+    ):
+        return False
     expected = _expected_names(plan)
     if [prop.name for prop in properties] != expected:
         return False
@@ -647,6 +672,101 @@ def _database_pages(probe: FixtureNotionAdapter, database_id: str) -> list[Notio
     ]
 
 
+def buyer_name_is_placeholder(value: object) -> bool:
+    """True when a buyer field is a placeholder rather than the product identity."""
+    if type(value) is not str:
+        return False
+    folded = " ".join(value.casefold().split())
+    if folded in _BUYER_PLACEHOLDERS:
+        return True
+    compact = "".join(character for character in folded if character.isalnum())
+    if compact in _BUYER_COMPACT:
+        return True
+    stripped = folded
+    while stripped[:1] in "{[<" and stripped[-1:] in "}]>":
+        stripped = stripped[1:-1].strip()
+    return stripped in {"buyer", "client"}
+
+
+def _reject_present_buyer_names(
+    probe: FixtureNotionAdapter,
+    spec: ProductSpec,
+    existing: NotionDatabase | None,
+) -> None:
+    if existing is None:
+        return
+    for page in _database_pages(probe, existing.id):
+        if _BUYER_PROPERTY not in page.properties:
+            continue
+        value = page.properties[_BUYER_PROPERTY]
+        if buyer_name_is_placeholder(value) or value != spec.identity:
+            raise ProductBuildError("notification row does not match")
+
+
+def _recorded_formula_ids(
+    probe: FixtureNotionAdapter,
+    database_ids: dict[str, str],
+    suffixes: dict[str, tuple[tuple[str, str], ...]],
+) -> dict[str, tuple[tuple[str, str], ...]]:
+    saved: dict[str, tuple[tuple[str, str], ...]] = {}
+    for kind, database_id in database_ids.items():
+        suffix = suffixes.get(kind, ())
+        database = probe.databases.get(database_id)
+        if type(database) is not NotionDatabase or not suffix:
+            saved[kind] = ()
+            continue
+        catalogue = len(build_database_schema(kind).properties)
+        extra = [prop for prop in database.properties[catalogue:] if prop.name != _SAMPLE_MARKER]
+        saved[kind] = tuple((prop.name, prop.id) for prop in extra)
+    return saved
+
+
+def _notification_can_continue(
+    database: NotionDatabase,
+    plan: NotificationDashboard,
+    database_ids: dict[str, str],
+    recorded: dict[str, tuple[tuple[str, str], ...]],
+) -> bool:
+    if _repairable_notification(database, plan, database_ids, recorded):
+        return True
+    if [prop.name for prop in database.properties] != _expected_names(plan):
+        return False
+    for rollup in plan.rollups:
+        rows = dict(recorded.get(rollup.relation_name, ()))
+        if rollup.property_name not in rows:
+            return False
+    return _adopted_database(database, plan, database_ids, recorded)
+
+
+def _marks_resumable(database: NotionDatabase) -> bool:
+    if database.icon is None and database.cover is None:
+        return True
+    if database.icon == NOTIFICATION_ICON and database.cover is None:
+        return True
+    return database.icon == NOTIFICATION_ICON and database.cover == NOTIFICATION_COVER
+
+
+def set_notification_icon(database: NotionDatabase) -> None:
+    database.icon = NOTIFICATION_ICON
+
+
+def set_notification_cover(database: NotionDatabase) -> None:
+    database.cover = NOTIFICATION_COVER
+
+
+def _apply_notification_marks(database: NotionDatabase) -> None:
+    if database.icon is None and database.cover is None:
+        set_notification_icon(database)
+        set_notification_cover(database)
+        return
+    if database.icon == NOTIFICATION_ICON and database.cover is None:
+        set_notification_cover(database)
+        return
+    if database.icon == NOTIFICATION_ICON and database.cover == NOTIFICATION_COVER:
+        return
+    raise ProductBuildError("notification database does not match")
+
+
 async def _ensure(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
@@ -661,6 +781,12 @@ async def _ensure(
     existing = _find_notification_database(probe, page, kinds)
     _reject_foreign_rows(probe, database_ids, plan, existing)
     _require_prior_objects(probe, stored, spec, database_ids, plan, suffixes, existing)
+    _reject_present_buyer_names(probe, spec, existing)
+    recorded = _recorded_formula_ids(probe, database_ids, suffixes)
+    if existing is not None and not _notification_can_continue(
+        existing, plan, database_ids, recorded
+    ):
+        raise ProductBuildError("notification database cannot be repaired")
     formula_ids = await _ensure_formulas(probe, database_ids, suffixes)
     if existing is None:
         database = await _create_database(probe, page, plan, database_ids, formula_ids)
@@ -673,6 +799,8 @@ async def _ensure(
         )
     else:
         raise ProductBuildError("notification database cannot be repaired")
+    _apply_notification_marks(database)
+    guard_operation(probe, OP_NOTIFICATION_DATABASE)
     samples = await _ensure_samples(probe, plan, database_ids)
     row = await _ensure_row(probe, spec, database, plan, samples)
     return _record_from(database, row, plan, formula_ids, samples)
@@ -776,7 +904,16 @@ def _adopted_database(
 ) -> bool:
     if [prop.name for prop in database.properties] != _expected_names(plan):
         return False
-    if database.properties[1].type != "text" or database.properties[1].name != _BUYER_PROPERTY:
+    title = database.properties[0]
+    if title.name != "Name" or title.type != "title" or title.config != {}:
+        return False
+    if (
+        database.properties[1].type != "text"
+        or database.properties[1].name != _BUYER_PROPERTY
+        or database.properties[1].config != {}
+    ):
+        return False
+    if not _marks_resumable(database):
         return False
     if not _formula_property(database.properties[2], _DATE_PROPERTY, _DATE_EXPRESSION):
         return False

@@ -8,8 +8,6 @@ network connection, or commission an agent.
 
 from __future__ import annotations
 
-import json
-import os
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
@@ -20,6 +18,9 @@ from money_machine.agents.implementations.notion_linked_views import (
 )
 from money_machine.agents.implementations.notion_linked_views import (
     filter_pairs as _filter_pairs,
+)
+from money_machine.agents.implementations.notion_linked_views import (
+    view_matches as _view_matches,
 )
 from money_machine.agents.implementations.notion_product_builder import (
     BUILD_PHASES,
@@ -42,7 +43,16 @@ from money_machine.agents.implementations.notion_product_builder import (
     require_same_spec,
     require_spec,
     require_token,
+    require_workspace_id,
 )
+from money_machine.agents.implementations.notion_progress import (
+    OP_DASHBOARD_COVER,
+    ProviderFailure,
+    guard_operation,
+    load_payload,
+    raise_recorded,
+)
+from money_machine.agents.implementations.notion_progress_record import write_checkpoint
 from money_machine.agents.implementations.notion_shared_databases import (
     parse_shared_databases_checkpoint,
     require_checkpoint_databases,
@@ -159,7 +169,10 @@ async def build_dashboard_and_navigation(
     if stored.checkpoint_names == _PHASE_THREE:
         _require_resumed_dashboard(fixture, page, stored, validated)
         return stored
-    pieces = await _ensure_dashboard(fixture, page, stored, validated)
+    try:
+        pieces = await _ensure_dashboard(fixture, page, stored, validated)
+    except ProviderFailure as failure:
+        raise_recorded(path, PHASE_DASHBOARD_AND_NAVIGATION, failure)
     checkpoint = _checkpoint_with_dashboard(stored, pieces, moment)
     _write_dashboard_checkpoint(path, checkpoint)
     return checkpoint
@@ -180,18 +193,10 @@ def _reject_line_breaks(spec: ProductSpec) -> None:
 
 
 def _load_checkpoint(path: Path) -> ProductBuildCheckpoint:
-    if not path.exists():
+    envelope = load_payload(path)
+    if envelope.payload is None:
         raise ProductBuildError("dashboard requires the shared databases checkpoint")
-    text = path.read_text(encoding="utf-8")
-    if text == "" or not text.endswith("\n"):
-        raise ProductBuildError("checkpoint is incomplete")
-    try:
-        decoded = cast(object, json.loads(text))
-    except json.JSONDecodeError as error:
-        raise ProductBuildError("checkpoint is not JSON") from error
-    if type(decoded) is not dict:
-        raise ProductBuildError("checkpoint must be an object")
-    payload = cast(dict[object, object], decoded)
+    payload = envelope.payload
     names = payload.get("checkpoint_names")
     if names == list(_PHASE_TWO):
         return parse_shared_databases_checkpoint(payload)
@@ -266,16 +271,6 @@ def _checkpoint_with_dashboard(
     )
 
 
-def _one_workspace(probe: FixtureNotionAdapter) -> str:
-    workspaces = list(probe.workspaces.values())
-    if len(workspaces) != 1:
-        raise ProductBuildError("fixture probe must have exactly one workspace")
-    workspace_id = workspaces[0].id
-    if type(workspace_id) is not str or workspace_id.strip() != workspace_id or workspace_id == "":
-        raise ProductBuildError("fixture workspace id is invalid")
-    return workspace_id
-
-
 def _require_one_page(probe: FixtureNotionAdapter) -> None:
     if len(probe.pages) > 1:
         raise ProductBuildError("dashboard page is unexpected")
@@ -295,7 +290,7 @@ def _require_home_page(
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
 ) -> NotionPage:
-    if stored.workspace_id != _one_workspace(probe):
+    if stored.workspace_id != require_workspace_id(probe):
         raise ProductBuildError("checkpoint workspace does not match the fixture probe")
     page = find_spec_page(probe, str(spec.spec_id))
     if page is None or page.id != stored.page_id:
@@ -403,22 +398,6 @@ def _classify_blocks(
     )
 
 
-def _view_matches(
-    probe: FixtureNotionAdapter, page_id: str, source_id: str, view: LinkedView
-) -> list[NotionLinkedView]:
-    filters = _filter_pairs(view)
-    return [
-        item
-        for item in probe.linked_views.values()
-        if type(item) is NotionLinkedView
-        and item.parent_page_id == page_id
-        and item.source_database_id == source_id
-        and item.view_type == view.view_type
-        and item.name == view.name
-        and item.filters == filters
-    ]
-
-
 def _classify_views(
     probe: FixtureNotionAdapter,
     page: NotionPage,
@@ -469,6 +448,7 @@ async def _ensure_dashboard(
         await probe.set_icon(page.id, palette_header(spec))
     if greeting is None:
         greeting = await probe.add_text_block(page.id, greeting_content(spec))
+    guard_operation(probe, OP_DASHBOARD_COVER)
     if navigation is None:
         navigation = await probe.add_text_block(page.id, navigation_content(spec))
     if identity is None:
@@ -641,18 +621,4 @@ def _require_view(
 
 
 def _write_dashboard_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> None:
-    payload = {
-        "build_kind": checkpoint.build_kind,
-        "build_version": checkpoint.build_version,
-        "checkpoint_names": list(checkpoint.checkpoint_names),
-        "palette_name": checkpoint.palette_name,
-        "palette_tokens": [list(token) for token in checkpoint.palette_tokens],
-        "product_id": checkpoint.product_id,
-        "provider_object_references": dashboard_provider_references(checkpoint),
-        "recorded_at": checkpoint.recorded_at.isoformat(),
-        "spec_id": checkpoint.spec_id,
-    }
-    text = json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n"
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    temporary.write_text(text, encoding="ascii")
-    os.replace(temporary, path)
+    write_checkpoint(path, checkpoint, dashboard_provider_references(checkpoint))

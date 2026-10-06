@@ -14,6 +14,7 @@ from money_machine.agents.implementations.notion_dashboard import build_dashboar
 from money_machine.agents.implementations.notion_hubs import build_identity_specific_hubs
 from money_machine.agents.implementations.notion_notifications import (
     SAMPLE_DATE,
+    _ensure_sample_column,  # pyright: ignore[reportPrivateUsage]
     build_notification_dashboard,
     sample_field_values,
 )
@@ -26,6 +27,7 @@ from money_machine.agents.implementations.notion_product_builder import (
     ProductBuildError,
     build_top_level_page_and_design_shell,
 )
+from money_machine.agents.implementations.notion_progress import stamp_integrity_digest
 from money_machine.agents.implementations.notion_shared_databases import (
     BUSINESS_SHARED_DATABASES,
     PLANNER_SHARED_DATABASES,
@@ -55,7 +57,7 @@ DASHBOARD_AT = datetime(2026, 10, 5, 22, 30, tzinfo=UTC)
 HUBS_AT = datetime(2026, 10, 5, 23, 45, tzinfo=UTC)
 LATER = datetime(2026, 10, 6, 0, 30, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "0793e73147c0a3e50b6e27be2c74d3084ab1bfd5"
+HEAD_SHA = "3f0a30a8e52b183f10799128d4fd7b17c1b74495"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 _PHASES = (
     PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL,
@@ -287,11 +289,11 @@ async def test_replay_keeps_the_same_checkpoint_bytes_and_ids(tmp_path: Path) ->
 
     again = await _build(spec, probe, path, recorded_at=datetime(2026, 10, 6, 1, tzinfo=UTC))
 
-    assert again == checkpoint
-    assert path.read_bytes() == before
     assert set(probe.pages) == pages
     assert set(probe.databases) == databases
     assert _formula(_database(probe, "Tasks"), "current_date").id == formula_id
+    assert again == checkpoint
+    assert path.read_bytes() == before
     assert len(_rows(probe, _database(probe, "Notification dashboard").id)) == 1
 
 
@@ -522,8 +524,10 @@ def test_notification_module_does_not_name_a_live_client() -> None:
         "http://",
         "aesthetics_and_content_completion",
         "etsy",
+        "Etsy",
+        "ETSY",
     ):
-        assert token not in source
+        assert token.casefold() not in source.casefold()
 
 
 @pytest.mark.asyncio
@@ -721,6 +725,43 @@ async def test_buyer_name_placeholder_on_an_existing_row_is_not_overwritten(
 
 
 @pytest.mark.asyncio
+async def test_sample_marker_not_last_is_rejected_on_resume(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await _build(spec, probe, path)
+    tasks = _database(probe, "Tasks")
+    assert tasks.properties[-1].name == "sample_marker"
+    tasks.properties[-1], tasks.properties[-2] = tasks.properties[-2], tasks.properties[-1]
+    assert tasks.properties[-1].name != "sample_marker"
+    before = path.read_bytes()
+    pages = set(probe.pages)
+
+    with pytest.raises(ProductBuildError, match="checkpoint shared database is missing"):
+        await _build(spec, probe, path)
+
+    assert path.read_bytes() == before
+    assert set(probe.pages) == pages
+    assert tasks.properties[-1].name != "sample_marker"
+
+
+@pytest.mark.asyncio
+async def test_sample_marker_column_is_moved_to_the_end() -> None:
+    probe = FixtureNotionAdapter()
+    database = await probe.create_database(
+        title="Tasks", parent_id="ws_default", parent_type="workspace"
+    )
+    await probe.add_property(database.id, "sample_marker", "select", {"options": ["SAMPLE"]})
+    await probe.add_property(database.id, "Name", "title", {})
+    assert database.properties[-1].name == "Name"
+
+    await _ensure_sample_column(probe, database.id)
+
+    assert database.properties[-1].name == "sample_marker"
+
+
+@pytest.mark.asyncio
 async def test_notification_checkpoint_parser_rejects_bad_inputs(tmp_path: Path) -> None:
     spec = _spec()
     probe = FixtureNotionAdapter()
@@ -736,6 +777,7 @@ async def test_notification_checkpoint_parser_rejects_bad_inputs(tmp_path: Path)
 
     payload = json.loads(original)
     payload["provider_object_references"]["notification_dashboard"] = {"database_id": "x"}
+    payload = stamp_integrity_digest(payload)
     path.write_text(
         json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="ascii"
     )
@@ -762,5 +804,5 @@ def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
     assert all(value is False for value in evidence.values())
     assert evidence["notification_dashboard_built"] is False
-    assert state["state_revision"] == 54
+    assert state["state_revision"] == 55
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")

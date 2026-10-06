@@ -26,6 +26,7 @@ from money_machine.agents.implementations.notion_product_builder import (
     ProductBuildError,
     build_top_level_page_and_design_shell,
 )
+from money_machine.agents.implementations.notion_progress import stamp_integrity_digest
 from money_machine.agents.implementations.notion_shared_databases import build_shared_databases
 from money_machine.control.state import SESSION_EVIDENCE_KEYS
 from money_machine.domain.models.common import EvidenceReference
@@ -50,7 +51,7 @@ HUBS_AT = datetime(2026, 10, 5, 23, 45, tzinfo=UTC)
 NOTIFICATION_AT = datetime(2026, 10, 6, 0, 30, tzinfo=UTC)
 LATER = datetime(2026, 10, 6, 1, 30, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "0793e73147c0a3e50b6e27be2c74d3084ab1bfd5"
+HEAD_SHA = "3f0a30a8e52b183f10799128d4fd7b17c1b74495"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 
 
@@ -166,6 +167,8 @@ async def test_mass_tier_adds_palette_accents_and_sample_hub_text(tmp_path: Path
     for hub_name, block_id in record.samples:
         block = probe.blocks[block_id]
         assert type(block) is NotionTextBlock
+        assert block.content == f"SAMPLE {spec.identity} / {hub_name}: {hubs[hub_name].description}"
+        assert "client_name" not in block.content
         assert block.content == sample_content(spec, hub_name)
         assert block.content.startswith("SAMPLE ")
         assert hubs[hub_name].description in block.content
@@ -207,10 +210,10 @@ async def test_replay_keeps_the_same_checkpoint_bytes_and_ids(tmp_path: Path) ->
 
     again = await _build(spec, probe, path, recorded_at=datetime(2026, 10, 6, 2, tzinfo=UTC))
 
-    assert again == checkpoint
-    assert path.read_bytes() == before
     assert set(probe.blocks) == blocks
     assert {page.id: (page.icon, page.cover) for page in probe.pages.values()} == pages
+    assert again == checkpoint
+    assert path.read_bytes() == before
 
 
 @pytest.mark.asyncio
@@ -370,6 +373,7 @@ async def test_aesthetics_checkpoint_parser_rejects_bad_inputs(tmp_path: Path) -
 
     payload = json.loads(original)
     payload["provider_object_references"]["aesthetics"]["accents"] = []
+    payload = stamp_integrity_digest(payload)
     path.write_text(
         json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="ascii"
     )
@@ -397,8 +401,10 @@ def test_aesthetics_module_does_not_name_a_live_client() -> None:
         "http://",
         "client_name",
         "etsy",
+        "Etsy",
+        "ETSY",
     ):
-        assert token not in source
+        assert token.casefold() not in source.casefold()
 
 
 def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
@@ -417,5 +423,5 @@ def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
     assert all(value is False for value in evidence.values())
     assert evidence["notification_dashboard_built"] is False
-    assert state["state_revision"] == 54
+    assert state["state_revision"] == 55
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")
