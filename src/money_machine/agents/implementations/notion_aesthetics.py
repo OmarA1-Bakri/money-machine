@@ -8,6 +8,7 @@ network connection, or commission an agent.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
@@ -47,6 +48,7 @@ from money_machine.agents.implementations.notion_progress_record import write_ch
 from money_machine.domain.models.product_spec import ColourToken, ProductSpec
 from money_machine.integrations.notion.domain import (
     NotionCalloutBlock,
+    NotionDatabase,
     NotionPage,
     NotionTextBlock,
 )
@@ -95,10 +97,11 @@ async def build_aesthetics_and_content_completion(
     fixture = require_probe(probe)
     path = require_path(checkpoint_path)
     moment = require_datetime(recorded_at)
-    stored = _load_checkpoint(path)
+    stored, created = _load_checkpoint(path)
     require_same_spec(stored, validated)
     if stored.checkpoint_names == BUILD_PHASES:
         _require_saved(fixture, stored, validated)
+        _require_created_ids(fixture, created, stored)
         return stored
     try:
         record = await _ensure(fixture, stored, validated)
@@ -109,16 +112,17 @@ async def build_aesthetics_and_content_completion(
     return checkpoint
 
 
-def _load_checkpoint(path: Path) -> ProductBuildCheckpoint:
+def _load_checkpoint(path: Path) -> tuple[ProductBuildCheckpoint, Mapping[str, object]]:
     envelope = load_payload(path)
-    if envelope.payload is None:
+    if envelope.payload is None or envelope.created_notion_ids is None:
         raise ProductBuildError("aesthetics require the notification dashboard checkpoint")
     payload = envelope.payload
+    created = envelope.created_notion_ids
     names = payload.get("checkpoint_names")
     if names == list(_PHASE_FIVE):
-        return parse_notification_checkpoint(payload)
+        return parse_notification_checkpoint(payload), created
     if names == list(BUILD_PHASES):
-        return _parse_aesthetics_checkpoint(payload)
+        return _parse_aesthetics_checkpoint(payload), created
     raise ProductBuildError("aesthetics require the notification dashboard checkpoint")
 
 
@@ -243,6 +247,107 @@ def _write_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> None:
         "samples": [{"block_id": block_id, "hub": hub} for hub, block_id in record.samples],
     }
     write_checkpoint(path, checkpoint, references)
+
+
+def _require_created_ids(
+    probe: FixtureNotionAdapter,
+    created: Mapping[str, object],
+    stored: ProductBuildCheckpoint,
+) -> None:
+    """Resume binds databases, hubs, and the rest of the persisted created ids."""
+    if (
+        created.get("top_level_page_id") != stored.page_id
+        or created.get("workspace_id") != stored.workspace_id
+        or created.get("design_shell_block_id") != stored.shell_block_id
+        or stored.page_id not in probe.pages
+        or stored.shell_block_id not in probe.blocks
+    ):
+        raise ProductBuildError("progress created ids do not match the checkpoint")
+    if _created_database_pairs(created, probe) != stored.database_ids:
+        raise ProductBuildError("progress created ids do not match the checkpoint")
+    hub_ids = tuple((hub.name, hub.page_id) for hub in stored.identity_hubs)
+    if _created_hub_pairs(created, probe) != hub_ids:
+        raise ProductBuildError("progress created ids do not match the checkpoint")
+    notice = stored.notification_dashboard
+    notification = created.get("notification")
+    if (
+        notice is None
+        or type(notification) is not dict
+        or cast(dict[object, object], notification).get("database_id") != notice.database_id
+        or notice.database_id not in probe.databases
+    ):
+        raise ProductBuildError("progress created ids do not match the checkpoint")
+    record = stored.aesthetics
+    aesthetics = created.get("aesthetics")
+    if record is None or type(aesthetics) is not dict:
+        raise ProductBuildError("progress created ids do not match the checkpoint")
+    body = cast(dict[object, object], aesthetics)
+    accents = _created_pairs(body.get("accents"), "token", "block_id")
+    samples = _created_pairs(body.get("samples"), "hub", "block_id")
+    if accents != record.accents or samples != record.samples:
+        raise ProductBuildError("progress created ids do not match the checkpoint")
+    if any(block_id not in probe.blocks for _label, block_id in (*accents, *samples)):
+        raise ProductBuildError("progress created ids do not match the checkpoint")
+
+
+def _created_database_pairs(
+    created: Mapping[str, object], probe: FixtureNotionAdapter
+) -> tuple[tuple[str, str], ...]:
+    rows = created.get("databases")
+    if type(rows) is not list:
+        raise ProductBuildError("progress created ids do not match the checkpoint")
+    pairs: list[tuple[str, str]] = []
+    for item in rows:
+        if type(item) is not dict:
+            raise ProductBuildError("progress created ids do not match the checkpoint")
+        entry = cast(dict[object, object], item)
+        kind = entry.get("kind")
+        database_id = entry.get("database_id")
+        if type(kind) is not str or type(database_id) is not str:
+            raise ProductBuildError("progress created ids do not match the checkpoint")
+        database = probe.databases.get(database_id)
+        if type(database) is not NotionDatabase or database.title != kind:
+            raise ProductBuildError("progress created ids do not match the checkpoint")
+        pairs.append((kind, database_id))
+    return tuple(pairs)
+
+
+def _created_hub_pairs(
+    created: Mapping[str, object], probe: FixtureNotionAdapter
+) -> tuple[tuple[str, str], ...]:
+    rows = created.get("hubs")
+    if type(rows) is not list:
+        raise ProductBuildError("progress created ids do not match the checkpoint")
+    pairs: list[tuple[str, str]] = []
+    for item in rows:
+        if type(item) is not dict:
+            raise ProductBuildError("progress created ids do not match the checkpoint")
+        entry = cast(dict[object, object], item)
+        name = entry.get("name")
+        page_id = entry.get("page_id")
+        if type(name) is not str or type(page_id) is not str:
+            raise ProductBuildError("progress created ids do not match the checkpoint")
+        page = probe.pages.get(page_id)
+        if type(page) is not NotionPage or page.title != name or page.parent_type != "page_id":
+            raise ProductBuildError("progress created ids do not match the checkpoint")
+        pairs.append((name, page_id))
+    return tuple(pairs)
+
+
+def _created_pairs(value: object, label_key: str, id_key: str) -> tuple[tuple[str, str], ...]:
+    if type(value) is not list:
+        raise ProductBuildError("progress created ids do not match the checkpoint")
+    pairs: list[tuple[str, str]] = []
+    for item in value:
+        if type(item) is not dict:
+            raise ProductBuildError("progress created ids do not match the checkpoint")
+        entry = cast(dict[object, object], item)
+        label = entry.get(label_key)
+        identifier = entry.get(id_key)
+        if type(label) is not str or type(identifier) is not str:
+            raise ProductBuildError("progress created ids do not match the checkpoint")
+        pairs.append((label, identifier))
+    return tuple(pairs)
 
 
 def _require_saved(

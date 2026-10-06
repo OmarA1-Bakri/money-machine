@@ -210,10 +210,10 @@ async def test_replay_keeps_the_same_checkpoint_bytes_and_ids(tmp_path: Path) ->
 
     again = await _build(spec, probe, path, recorded_at=datetime(2026, 10, 6, 2, tzinfo=UTC))
 
-    assert again == checkpoint
-    assert path.read_bytes() == before
     assert set(probe.blocks) == blocks
     assert {page.id: (page.icon, page.cover) for page in probe.pages.values()} == pages
+    assert again == checkpoint
+    assert path.read_bytes() == before
 
 
 @pytest.mark.asyncio

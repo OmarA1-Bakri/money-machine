@@ -361,6 +361,11 @@ async def test_notification_failure_adds_one_database_and_no_blocks(tmp_path: Pa
     await _through_hubs(spec, probe, path)
     before_blocks = _block_ids(probe)
     before_databases = _database_ids(probe)
+    before_pages = _page_ids(probe)
+    before_properties = {
+        database_id: tuple(prop.name for prop in probe.databases[database_id].properties)
+        for database_id in before_databases
+    }
     probe.fail_operation = OP_NOTIFICATION_DATABASE  # type: ignore[attr-defined]
     probe.fail_response = "notice refused"  # type: ignore[attr-defined]
 
@@ -372,12 +377,22 @@ async def test_notification_failure_adds_one_database_and_no_blocks(tmp_path: Pa
     assert len(created) == 1
     notice_id = next(iter(created))
     assert _block_ids(probe) == before_blocks
+    assert _page_ids(probe) == before_pages
+    for database_id, names in before_properties.items():
+        current = probe.databases[database_id].properties
+        assert tuple(prop.name for prop in current[: len(names)]) == names
+        added = current[len(names) :]
+        assert all(prop.type == "formula" for prop in added)
+        assert all(prop.name != "sample_marker" for prop in added)
     del probe.fail_operation  # type: ignore[attr-defined]
     await build_notification_dashboard(spec, probe, path, recorded_at=NOTIFICATION_AT)
     assert notice_id in _database_ids(probe)
     assert _block_ids(probe) == before_blocks
     assert len(_database_ids(probe) - before_databases) == 1
     assert before_databases < _database_ids(probe)
+    assert before_pages < _page_ids(probe)
+    tasks = next(database for database in probe.databases.values() if database.title == "Tasks")
+    assert tasks.properties[-1].name == "sample_marker"
 
 
 @pytest.mark.asyncio
@@ -636,10 +651,75 @@ async def test_phase1_only_rebuild_continues_through_phase_6(
     assert progress["property_mappings"]["buyer_name"] == "Buyer name"
     assert progress["formula_state"]
     assert {entry["kind"] for entry in progress["formula_state"]}
+    created = progress["created_notion_ids"]
+    _assert_created_ids(created, probe, home)
+    pages = _page_ids(probe)
+    databases = _database_ids(probe)
+
+    await build_aesthetics_and_content_completion(spec, probe, path, recorded_at=LATER)
+
+    assert _page_ids(probe) == pages
+    assert _database_ids(probe) == databases
+    resumed = json.loads(path.read_text(encoding="ascii"))["progress"]["created_notion_ids"]
+    assert resumed == created
+    assert {row["database_id"] for row in resumed["databases"]} <= databases
+    assert {hub["page_id"] for hub in resumed["hubs"]} <= pages
+    assert resumed["top_level_page_id"] in pages
+
+
+def _assert_created_ids(created: object, probe: FixtureNotionAdapter, home: NotionPage) -> None:
+    """Persisted created ids match the probe, including databases, hubs, and the whole field."""
+    assert type(created) is dict
+    databases = created["databases"]
+    hubs = created["hubs"]
+    assert type(databases) is list and type(hubs) is list
+    catalogue = {
+        (database.title, database.id)
+        for database in probe.databases.values()
+        if type(database) is NotionDatabase and database.title != "Notification dashboard"
+    }
+    assert {(row["kind"], row["database_id"]) for row in databases} == catalogue
+    children = {
+        (page.title, page.id)
+        for page in probe.pages.values()
+        if type(page) is NotionPage and page.parent_type == "page_id" and page.parent_id == home.id
+    }
+    assert {(hub["name"], hub["page_id"]) for hub in hubs} == children
+    notice = next(
+        database
+        for database in probe.databases.values()
+        if type(database) is NotionDatabase and database.title == "Notification dashboard"
+    )
+    notification = created["notification"]
+    aesthetics = created["aesthetics"]
+    assert type(notification) is dict and type(aesthetics) is dict
+    assert notification["database_id"] == notice.id
+    assert notice.id in probe.databases
+    shell_id = home.properties["design_shell_block_id"]
+    assert type(shell_id) is str
+    assert created["top_level_page_id"] == home.id
+    assert created["workspace_id"] == home.parent_id
+    assert created["design_shell_block_id"] == shell_id
+    assert home.id in probe.pages
+    assert shell_id in probe.blocks
+    for row in aesthetics["accents"]:
+        assert row["block_id"] in probe.blocks
+    for row in aesthetics["samples"]:
+        assert row["block_id"] in probe.blocks
+    dashboard = created["dashboard"]
+    assert type(dashboard) is list and dashboard
+    live_values = set(probe.blocks) | set(probe.linked_views)
+    for page in probe.pages.values():
+        if page.icon is not None:
+            live_values.add(page.icon)
+        if page.cover is not None:
+            live_values.add(page.cover)
+    for piece in dashboard:
+        assert piece["value"] in live_values
 
 
 def test_write_checkpoint_is_the_only_progress_writer() -> None:
-    root = Path("src/money_machine/agents/implementations")
+    root = Path(__file__).resolve().parents[3] / "src/money_machine/agents/implementations"
     calls = [
         (path.name, line.strip())
         for path in sorted(root.glob("*.py"))
@@ -650,6 +730,48 @@ def test_write_checkpoint_is_the_only_progress_writer() -> None:
         ("notion_progress.py", "def write_document("),
         ("notion_progress_record.py", "write_document(path, payload, body)"),
     ]
+
+
+@pytest.mark.asyncio
+async def test_phase1_rebuild_failure_records_a_repair_job(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _phase_one(spec, probe, path)
+    pages = _page_ids(probe)
+    blocks = _block_ids(probe)
+    databases = _database_ids(probe)
+    _mark_unrecoverable(path)
+    before = json.loads(path.read_text(encoding="ascii"))
+    probe.fail_operation = OP_REBUILD  # type: ignore[attr-defined]
+    probe.fail_response = "rebuild provider refused"  # type: ignore[attr-defined]
+
+    with pytest.raises(ProductBuildError, match="rebuild provider refused"):
+        await _phase_one(spec, probe, path)
+
+    assert _page_ids(probe) == pages
+    assert _block_ids(probe) == blocks
+    assert _database_ids(probe) == databases
+    after = json.loads(path.read_text(encoding="ascii"))
+    assert set(before) == set(after)
+    for key, value in before.items():
+        if key != "progress":
+            assert after[key] == value
+    before_progress = before["progress"]
+    after_progress = after["progress"]
+    assert type(before_progress) is dict and type(after_progress) is dict
+    for key, value in before_progress.items():
+        if key in {"repair_jobs", "record_digest"}:
+            continue
+        assert after_progress[key] == value
+    assert after_progress["recovery"] == "unrecoverable"
+    assert after_progress["record_digest"] != before_progress["record_digest"]
+    jobs = after_progress["repair_jobs"]
+    assert type(jobs) is list and len(jobs) == len(before_progress["repair_jobs"]) + 1
+    job = jobs[-1]
+    assert job["kind"] == "provider_response"
+    assert job["operation"] == OP_REBUILD
+    assert job["response"] == "rebuild provider refused"
 
 
 def test_provider_failure_with_no_prior_record_leaves_the_file_absent(tmp_path: Path) -> None:

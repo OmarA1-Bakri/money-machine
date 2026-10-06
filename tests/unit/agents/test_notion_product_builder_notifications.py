@@ -289,11 +289,11 @@ async def test_replay_keeps_the_same_checkpoint_bytes_and_ids(tmp_path: Path) ->
 
     again = await _build(spec, probe, path, recorded_at=datetime(2026, 10, 6, 1, tzinfo=UTC))
 
-    assert again == checkpoint
-    assert path.read_bytes() == before
     assert set(probe.pages) == pages
     assert set(probe.databases) == databases
     assert _formula(_database(probe, "Tasks"), "current_date").id == formula_id
+    assert again == checkpoint
+    assert path.read_bytes() == before
     assert len(_rows(probe, _database(probe, "Notification dashboard").id)) == 1
 
 
@@ -722,6 +722,28 @@ async def test_buyer_name_placeholder_on_an_existing_row_is_not_overwritten(
     assert row.properties["Name"] == spec.identity
     assert path.read_bytes() == before
     assert _database(probe, "Notification dashboard").id == database.id
+
+
+@pytest.mark.asyncio
+async def test_sample_marker_not_last_is_rejected_on_resume(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await _build(spec, probe, path)
+    tasks = _database(probe, "Tasks")
+    assert tasks.properties[-1].name == "sample_marker"
+    tasks.properties[-1], tasks.properties[-2] = tasks.properties[-2], tasks.properties[-1]
+    assert tasks.properties[-1].name != "sample_marker"
+    before = path.read_bytes()
+    pages = set(probe.pages)
+
+    with pytest.raises(ProductBuildError, match="checkpoint shared database is missing"):
+        await _build(spec, probe, path)
+
+    assert path.read_bytes() == before
+    assert set(probe.pages) == pages
+    assert tasks.properties[-1].name != "sample_marker"
 
 
 @pytest.mark.asyncio

@@ -12,6 +12,7 @@ kind is provider_response.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -103,6 +104,7 @@ class CheckpointEnvelope:
     payload: dict[object, object] | None
     recovery: str
     repair_jobs: tuple[object, ...]
+    created_notion_ids: dict[str, object] | None = None
 
 
 def reject_duplicate_labels(labels: list[str], message: str) -> None:
@@ -168,7 +170,10 @@ def load_payload(path: Path, *, allow_unrecoverable: bool = False) -> Checkpoint
     jobs = progress["repair_jobs"]
     if type(jobs) is not list:
         raise ProductBuildError("progress record is tampered")
-    return CheckpointEnvelope(payload, recovery, tuple(jobs))
+    created = progress["created_notion_ids"]
+    if type(created) is not dict:
+        raise ProductBuildError("progress record is tampered")
+    return CheckpointEnvelope(payload, recovery, tuple(jobs), cast(dict[str, object], created))
 
 
 def stamp_integrity_digest(document: Mapping[str, object]) -> dict[str, object]:
@@ -210,8 +215,13 @@ def write_document(
     body[PROGRESS_KEY] = stored
     text = json.dumps(body, sort_keys=True, separators=(",", ":")) + "\n"
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    temporary.write_text(text, encoding="ascii")
-    os.replace(temporary, path)
+    try:
+        temporary.write_text(text, encoding="ascii")
+        os.replace(temporary, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            temporary.unlink(missing_ok=True)
+        raise
 
 
 def record_provider_failure(path: Path, operation: str, response: str, phase: str) -> None:

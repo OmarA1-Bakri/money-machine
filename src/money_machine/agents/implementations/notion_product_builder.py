@@ -204,8 +204,8 @@ async def _rebuild_unrecoverable(
         reason = "rebuild refused: " + ", ".join(later)
         append_refused_rebuild(path, reason)
         raise ProductBuildError(reason) from error
-    guard_operation(probe, OP_REBUILD)
     try:
+        guard_operation(probe, OP_REBUILD)
         page = find_spec_page(probe, str(spec.spec_id))
         if page is None:
             page = await _create_top_level_page(probe, spec)

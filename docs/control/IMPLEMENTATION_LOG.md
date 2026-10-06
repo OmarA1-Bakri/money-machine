@@ -16,9 +16,9 @@ A phase-1-only record (no later-phase objects) rebuilds in place on the same pag
 
 O1, O7, O8, and O9 were named in the W6 verifier/reviewer notes and were not defined there as source edits. This wave defines them as `_repairable_catalogue` edits: O1 deletes the `len(properties) >= len(schema.properties)` guard (`notion_shared_databases.py:333`); O7 skips `found.type != expected.type` (`notion_shared_databases.py:342`); O8 skips `found.config != _property_config(...)` (`notion_shared_databases.py:344`); O9 drops `database.icon is not None` (`notion_shared_databases.py:335`).
 
-Prompt-integrity review: `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md` (Wave 7 addendum). Product-build tests: 209 passed across the progress file and the six phase files. Full local pytest: 2169 collected, 1964 passed, 193 skipped, 12 failed. The 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` for the `docker` binary. `ruff format --check` and `ruff check` are clean. `pyright` 1.1.411 (`uv.lock` and CI) reports 0 errors on the changed modules with SQLAlchemy 2.0.52. A local SQLAlchemy 2.1.3 install reported 2 errors in `persistence/repositories/_base.py`; those are outside this wave and are absent on 2.0.52.
+Prompt-integrity review: `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md` (Wave 7 addendum). A recomputed digest is accepted. Legacy progress files with no progress fail closed. Product-build tests: 211 passed across the progress file and the six phase files. Full local pytest: 2171 collected, 1966 passed, 193 skipped, 12 failed. The 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` for the `docker` binary. `ruff format --check` and `ruff check` are clean. `pyright` 1.1.411 (`uv.lock` and CI) reports 0 errors on the changed modules with SQLAlchemy 2.0.52. A local SQLAlchemy 2.1.3 install reported 2 errors in `persistence/repositories/_base.py`; those are outside this wave and are absent on 2.0.52.
 
-Mutation checks. 42 mutations were each applied, the owning test files were run, and the edit was reverted. 42 were killed. A row is killed only when at least one test failed. The Failed column is the real pytest failure count for that mutant. The Failed column sums to 84.
+Mutation checks. 47 mutations were each applied, the owning test files were run, and the edit was reverted. 47 were killed. A row is killed only when at least one test failed. The Failed column is the real pytest failure count for that mutant. The Failed column sums to 97.
 
 | Mutation | Site | Failing tests | Failed |
 |---|---|---|---|
@@ -27,28 +27,28 @@ Mutation checks. 42 mutations were each applied, the owning test files were run,
 | O8 skip `found.config != _property_config(...)` | `notion_shared_databases.py:344` | `test_wrong_catalogue_options_cannot_be_repaired` | 1 |
 | O9 drop `database.icon is not None` | `notion_shared_databases.py:335` | `test_catalogue_icon_cannot_be_repaired` | 1 |
 | Notification repair ignores a junk icon | `notion_notifications.py:1069` | `test_notification_junk_icon_cannot_be_repaired` | 1 |
-| `sample_content` appends `client_` + `name` | `notion_aesthetics.py:73` | `test_mass_tier_adds_palette_accents_and_sample_hub_text` | 1 |
+| `sample_content` appends `client_` + `name` | `notion_aesthetics.py:75` | `test_mass_tier_adds_palette_accents_and_sample_hub_text` | 1 |
 | Phase-1 source contains `ETSY` | `notion_product_builder.py:527` | `test_phase_one_module_does_not_name_a_live_client`, `test_shared_databases_module_does_not_name_a_live_client` | 2 |
 | Shared-database source contains `ETSY` | `notion_shared_databases.py:488` | `test_shared_databases_module_does_not_name_a_live_client` | 1 |
 | Dashboard source contains `ETSY` | `notion_dashboard.py:625` | `test_dashboard_module_does_not_name_a_live_client` | 1 |
 | Hubs source contains `ETSY` | `notion_hubs.py:853` | `test_hubs_module_does_not_name_a_live_client_or_later_phase` | 1 |
 | Notification source contains `ETSY` | `notion_notifications.py:1230` | `test_notification_module_does_not_name_a_live_client` | 1 |
 | Aesthetics source contains `ETSY` | `notion_aesthetics.py:507` | `test_aesthetics_module_does_not_name_a_live_client` | 1 |
-| Skip `_require_contents` | `notion_aesthetics.py:257` | `test_phase6_resume_rejects_tampered_accent_content` | 1 |
+| Skip `_require_contents` | `notion_aesthetics.py:362` | `test_phase6_resume_rejects_tampered_accent_content` | 1 |
 | Buyer check is the literal `Buyer` only | `notion_notifications.py:702` | `test_buyer_placeholder_variants_write_nothing` (7 parameter rows) | 7 |
 | Junk and Buyer checks run after formula writes | `notion_notifications.py:784` | the 7 Buyer rows plus `test_junk_notification_database_writes_nothing` | 8 |
-| Hub icon/cover window is not resumed | `notion_aesthetics.py:501` | `test_hub_icon_cover_crash_resumes` | 1 |
+| Hub icon/cover window is not resumed | `notion_aesthetics.py:606` | `test_hub_icon_cover_crash_resumes` | 1 |
 | Notification icon/cover window is not resumed | `notion_notifications.py:762` | `test_notification_icon_cover_crash_resumes` | 1 |
-| Provider failure writes no repair job | `notion_progress.py:223` | shared, dashboard, hub, notification, and aesthetics resume tests, plus `test_provider_failure_with_no_prior_record_leaves_the_file_absent` | 6 |
-| Unrecoverable phase 1 does not rebuild | `notion_product_builder.py:207` | `test_unrecoverable_phase1_rebuilds_in_place_and_later_phases_do_not`, `test_phase1_only_rebuild_continues_through_phase_6` (mass and business) | 3 |
+| Provider failure writes no repair job | `notion_progress.py:233` | shared, dashboard, hub, notification, and aesthetics resume tests, `test_phase1_rebuild_failure_records_a_repair_job`, plus `test_provider_failure_with_no_prior_record_leaves_the_file_absent` | 7 |
+| Unrecoverable phase 1 does not rebuild | `notion_product_builder.py:208` replace `guard_operation(probe, OP_REBUILD)` with a raise | `test_unrecoverable_phase1_rebuilds_in_place_and_later_phases_do_not`, `test_phase1_only_rebuild_continues_through_phase_6` (mass and business), `test_phase1_rebuild_failure_records_a_repair_job` | 4 |
 | Any phase-1 failure rebuilds the product | `notion_product_builder.py:178` | `test_phase1_page_failure_resumes_without_rebuilding_prior_ids`, `test_phase1_shell_failure_keeps_the_page_and_adds_one_block` | 2 |
-| Screenshot evidence kind is accepted | `notion_progress.py:48` | `test_screenshot_kind_is_forged` | 1 |
-| Progress digest is not checked | `notion_progress.py:319` | `test_forged_and_tampered_progress_records_are_rejected`, `test_payload_edit_with_a_stale_digest_is_forged`, `test_forged_unrecoverable_flag_with_a_stale_digest_does_not_rebuild` | 3 |
+| Screenshot evidence kind is accepted | `notion_progress.py:49` | `test_screenshot_kind_is_forged` | 1 |
+| Progress digest is not checked | `notion_progress.py:329` | `test_forged_and_tampered_progress_records_are_rejected`, `test_payload_edit_with_a_stale_digest_is_forged`, `test_forged_unrecoverable_flag_with_a_stale_digest_does_not_rebuild` | 3 |
 | Sample marker is not required | `notion_notifications.py:622` | `test_sample_marker_tamper_is_not_overwritten` | 1 |
-| No-prior-record writes a file | `notion_progress.py:237` | `test_provider_failure_with_no_prior_record_leaves_the_file_absent` | 1 |
+| No-prior-record writes a file | `notion_progress.py:248` | `test_provider_failure_with_no_prior_record_leaves_the_file_absent` | 1 |
 | `write_document` called outside `write_checkpoint` | `notion_progress_record.py:156` | `test_write_checkpoint_is_the_only_progress_writer` | 1 |
-| Missing progress key is accepted | `notion_progress.py:160` | `test_deleted_progress_key_is_rejected` | 1 |
-| Alignment is not checked | `notion_progress.py:360` | `test_progress_alignment_with_checkpoint_names_is_required` | 1 |
+| Missing progress key is accepted | `notion_progress.py:163` | `test_deleted_progress_key_is_rejected` | 1 |
+| Alignment is not checked | `notion_progress.py:370` | `test_progress_alignment_with_checkpoint_names_is_required` | 1 |
 | Refused rebuild still rebuilds | `notion_product_builder.py:203` | `test_refused_rebuild_appends_one_job_and_writes_no_fixture_objects` | 1 |
 | Phase 1 always creates a page | `notion_product_builder.py:166` | phase-1 create and shell-failure tests | 8 |
 | Dashboard always adds a greeting | `notion_dashboard.py:449` | dashboard failure and replay tests | 2 |
@@ -64,6 +64,11 @@ Mutation checks. 42 mutations were each applied, the owning test files were run,
 | Saved database skips buyer config | `notion_notifications.py:489` | `test_saved_notification_rejects_loose_adopt_fields_and_client_name` | 1 |
 | Saved database skips icon | `notion_notifications.py:471` | `test_saved_notification_rejects_loose_adopt_fields_and_client_name` | 1 |
 | Sample marker is not moved last | `notion_notifications.py:1034` | `test_sample_marker_column_is_moved_to_the_end` | 1 |
+| Sample marker is not last on resume | `notion_shared_databases.py:287` delete `not marker_last` | `test_sample_marker_not_last_is_rejected_on_resume` | 1 |
+| Created database ids are emptied | `notion_progress_record.py:183` `created["databases"] = []` | `test_phase1_only_rebuild_continues_through_phase_6` (mass and business), aesthetics `test_replay_keeps_the_same_checkpoint_bytes_and_ids` | 3 |
+| Created hub ids are emptied | `notion_progress_record.py:189` `created["hubs"] = []` | `test_phase1_only_rebuild_continues_through_phase_6` (mass and business), aesthetics `test_replay_keeps_the_same_checkpoint_bytes_and_ids` | 3 |
+| Created notion ids field is emptied | `notion_progress_record.py:225` `return empty_created_ids()` | `test_phase1_only_rebuild_continues_through_phase_6` (mass and business), aesthetics `test_replay_keeps_the_same_checkpoint_bytes_and_ids` | 3 |
+| Rebuild guard is deleted | `notion_product_builder.py:208` delete `guard_operation(probe, OP_REBUILD)` | `test_phase1_rebuild_failure_records_a_repair_job` | 1 |
 
 Should-fix dispositions for the Reviewer #56 list:
 
@@ -75,23 +80,23 @@ Should-fix dispositions for the Reviewer #56 list:
 | `_repairable_catalogue` gaps | Closed | Full catalogue plus junk, wrong type, wrong options, and a junk icon each fail and leave bytes unchanged. |
 | #55 re-parent | Closed | `test_reparented_design_shell_is_not_rebuilt`. |
 | #55 forged business checkpoint | Closed | `test_forged_business_events_relation_is_rejected`. |
-| #55 `_require_pairs` duplicates | PARTIAL | Both parsers call `reject_duplicate_labels`. The functions stay separate because aesthetics pairs and notification pairs use different id fields. `test_duplicate_notification_relation_is_rejected` covers the notification path. |
+| #55 `_require_pairs` duplicates | PARTIAL | Deleting `reject_duplicate_labels(names, ...)` in aesthetics `_require_pairs` (`notion_aesthetics.py:198`) survived. The notification call at `notion_notifications.py:266` is killed by `test_duplicate_notification_relation_is_rejected`. |
 | Block-count delta | Closed | Each phase injects the failure after at least one object exists. Resume asserts zero new objects for operations that had already completed, and the id of that completed object stays stable. |
 | CI runner pin | Closed | `ci.yml`, `release.yml`, and `e2e.yml` use `ubuntu-24.04`. |
-| Mutation-log failure counts | Closed | The table above records the real pytest failure count for each mutant. 42 killed rows. The Failed column sums to 84. |
+| Mutation-log failure counts | Closed | The table above records the real pytest failure count for each mutant. 47 killed rows. The Failed column sums to 97. |
 | Loose adopt checks on the saved path | Closed | `_database_ok` title type (`notion_notifications.py:480`), Buyer name config `{}` (`:489`), and icon (`:471`) each killed 1. `_row_ok` rejects `client_name` (`:645`) and that mutant killed 1. |
 | `_view_matches` dedupe | Closed | `notion_linked_views.view_matches`. Dashboard and hubs call it. |
 | `_one_workspace` / `_workspace_id` dedupe | Closed | `require_workspace_id` in `notion_product_builder.py`. The dashboard calls it. |
 | Notification `_ensure` ordering | Closed | Junk-database and Buyer checks run before any write. Moving them after formula writes failed 8 tests. |
 | Icon/cover stuck windows | Closed | Hub `set_icon` then `set_cover`, and the notification database icon then cover, both resume. Dropping either branch failed 1 test. |
-| `sample_marker` resume | Closed | `test_sample_marker_tamper_is_not_overwritten` killed the "marker not required" mutant (1). `test_sample_marker_column_is_moved_to_the_end` killed the "marker is not moved last" mutant (1). |
+| `sample_marker` resume | Closed | Deleting `not marker_last` in `_schema_matches` (`notion_shared_databases.py:287`) failed `test_sample_marker_not_last_is_rejected_on_resume` (1). The column move at `notion_notifications.py:1034` is a separate killed row. |
 | Buyer variants | Closed | `BUYER`, ` Buyer `, `buyer name`, `client`, `{{buyer}}`, `[buyer]`, `<buyer>`. Narrowing the check to the literal `Buyer` failed 7 tests. |
 | Repair-path mutants O1, O7, O8, O9 | Closed | Defined above. Each killed 1 test. |
 | Sample text excludes `client_name` | Closed | The aesthetics test compares the literal sample string and asserts `client_name` is absent. Appending `client_` + `name` failed 1 test. |
 | Case-insensitive source bans | Closed | All six module ban lists use `casefold`. Inserting `ETSY` failed the owning ban test in each module. |
 | Fixture-only shortcuts | Parked | The fixture stores values on `page.properties`. It has no separate property-value write. The zero-write test wraps the adapter methods that do exist. |
 | Fixed `SAMPLE_DATE` | Parked | `SAMPLE_DATE` stays `"2026-10-06"`. This wave did not replace that constant with a clock. |
-| CodeRabbit docstring coverage (10.88%) | Parked | Not remeasured. The #56 review reported 10.88%. |
+| CodeRabbit docstring coverage | Parked | Not remeasured this wave. |
 | Nav as a page link | Parked | Fixture blocks are paragraph and callout only. Navigation stays paragraph text. |
 | One home page per probe | Parked | `notion_dashboard.py:275` rejects a probe with more than one page. `notion_hubs.py:494` requires the only top-level page to be the home page. The phase-1 rebuild stays on that page. |
 | `_ensure_row` `client_name` disjunct | PARTIAL | Removing `"client_name" in page.properties` from `_ensure_row` (`notion_notifications.py:1179`) failed 0 tests. The saved-row check in `_row_ok` is the killed row. |
