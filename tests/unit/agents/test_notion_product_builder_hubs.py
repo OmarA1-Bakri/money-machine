@@ -47,7 +47,7 @@ PHASE_TWO_AT = datetime(2026, 10, 5, 20, 0, tzinfo=UTC)
 DASHBOARD_AT = datetime(2026, 10, 5, 22, 30, tzinfo=UTC)
 LATER = datetime(2026, 10, 5, 23, 45, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "0f67dc92d5c4bdc105a3801ed5b5f7b517c66283"
+HEAD_SHA = "91a33eba7961ea2819dcc695f73ffe9a45e37b33"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 _PHASES = (
     PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL,
@@ -195,17 +195,15 @@ async def test_mass_tier_builds_identity_hubs_once(tmp_path: Path) -> None:
             navigation_content(spec, hub.name)
         ]
         assert len(texts) == 4
-        assert 2 <= len(_ROLES) <= 4
         assert spec.identity in texts[0]
         assert hub.description in texts[0]
         assert spec.title in texts[-1]
         views = _hub_views(probe, page.id)
         assert len(views) == 2
-        assert 2 <= len(views) <= 5
         assert any(view.filters for view in views)
         assert {view.source_database_id for view in views} <= database_ids
         assert all(spec.identity in view.name and hub.name in view.name for view in views)
-        assert index
+        assert hub.name == f"Hub {index}"
     events = _hub_views(probe, _hub_page(probe, "Hub 3").id)
     by_name = {view.name: view for view in events}
     events_view = by_name[linked_view_name(spec, "Hub 3", "events today")]
@@ -329,9 +327,11 @@ async def test_eight_hubs_stay_on_canonical_databases(tier: str, tmp_path: Path)
         for page in probe.pages.values()
         if page.parent_type == "page_id"
     )
-    assert (
-        "Events" not in {database.title for database in probe.databases.values()} or tier == "mass"
-    )
+    titles = {database.title for database in probe.databases.values()}
+    if tier == "business":
+        assert "Events" not in titles
+    else:
+        assert "Events" in titles
 
 
 @pytest.mark.asyncio
@@ -645,17 +645,112 @@ async def test_duplicate_hub_names_are_rejected(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_a_long_view_name_creates_nothing(tmp_path: Path) -> None:
-    spec = _spec(identity="A" * 50)
+async def test_a_realistic_long_view_name_stays_unique_and_within_the_cap(tmp_path: Path) -> None:
+    identity = "Organized Working Parent Command Center"
+    hub_name = "School And Activities Planner"
+    spec = _spec(identity=identity, hub_name=hub_name, hub_count=6)
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+
+    checkpoint = await _build(spec, probe, path)
+
+    raw = [f"{identity} {hub.name} open tasks" for hub in spec.hubs[:2]]
+    assert all(len(name) > 64 for name in raw)
+    assert raw[0][:64] == raw[1][:64]
+    capped = [linked_view_name(spec, hub.name, "open tasks") for hub in spec.hubs[:2]]
+    assert capped[0] != capped[1]
+    assert all(len(name) <= 64 for name in capped)
+    for name in capped:
+        token = name.split()[-1]
+        assert len(token) == 8
+        assert name.endswith(f"open tasks {token}")
+    names = [
+        view.name for hub in spec.hubs for view in _hub_views(probe, _hub_page(probe, hub.name).id)
+    ]
+    assert len(names) == len(set(names))
+    assert all(len(name) <= 64 for name in names)
+    assert checkpoint.next_phase == "notification_dashboard"
+    assert len(probe.pages) == 7
+
+
+@pytest.mark.asyncio
+async def test_fewer_or_more_than_six_to_eight_hubs_create_nothing(tmp_path: Path) -> None:
+    spec = _spec()
     probe = FixtureNotionAdapter()
     path = tmp_path / "build.json"
     await _prepare(spec, probe, path)
     before = path.read_bytes()
+    short = spec.model_copy(update={"hubs": spec.hubs[:5]})
+    extra = tuple(
+        Hub(name=f"Extra {index}", description=f"Extra copy {index}", page_count=3)
+        for index in range(3)
+    )
+    long = spec.model_copy(update={"hubs": spec.hubs + extra})
 
-    with pytest.raises(ProductBuildError, match="not valid"):
-        await _build(spec, probe, path)
+    with pytest.raises(ProductBuildError, match=r"^hubs must be six to eight$"):
+        await _build(short, probe, path)
+    with pytest.raises(ProductBuildError, match=r"^hubs must be six to eight$"):
+        await _build(long, probe, path)
 
     assert len(probe.pages) == 1
+    assert path.read_bytes() == before
+
+
+@pytest.mark.asyncio
+async def test_deleted_design_shell_is_not_rebuilt(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    payload = json.loads(path.read_text(encoding="ascii"))
+    shell_id = payload["provider_object_references"]["design_shell_block_id"]
+    del probe.blocks[shell_id]
+    before = path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match="design shell"):
+        await _build(spec, probe, path)
+
+    assert shell_id not in probe.blocks
+    assert len(probe.pages) == 1
+    assert path.read_bytes() == before
+
+
+@pytest.mark.asyncio
+async def test_tampered_design_shell_is_not_rebuilt(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    payload = json.loads(path.read_text(encoding="ascii"))
+    shell_id = payload["provider_object_references"]["design_shell_block_id"]
+    shell = probe.blocks[shell_id]
+    shell.content = "tampered shell"
+    before = path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match="design shell"):
+        await _build(spec, probe, path)
+
+    assert probe.blocks[shell_id].content == "tampered shell"
+    assert len(probe.pages) == 1
+    assert path.read_bytes() == before
+
+
+@pytest.mark.asyncio
+async def test_deleted_navigation_block_is_not_rebuilt(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    checkpoint = await _build(spec, probe, path)
+    navigation_id = checkpoint.identity_hubs[0].navigation_block_id
+    del probe.blocks[navigation_id]
+    before = path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match="hub piece is missing"):
+        await _build(spec, probe, path, recorded_at=datetime(2026, 10, 6, tzinfo=UTC))
+
+    assert navigation_id not in probe.blocks
     assert path.read_bytes() == before
 
 
@@ -842,5 +937,5 @@ def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     assert evidence["identity_hubs_built"] is False
     assert evidence["notification_dashboard_built"] is False
     assert evidence["home_dashboard_built"] is False
-    assert state["state_revision"] == 52
+    assert state["state_revision"] == 53
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")
