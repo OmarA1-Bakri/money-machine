@@ -101,6 +101,7 @@ Should-fix dispositions for the Reviewer #56 list:
 | One home page per probe | Parked | `notion_dashboard.py:275` rejects a probe with more than one page. `notion_hubs.py:494` requires the only top-level page to be the home page. The phase-1 rebuild stays on that page. |
 | `_ensure_row` `client_name` disjunct | PARTIAL | Removing `"client_name" in page.properties` from `_ensure_row` (`notion_notifications.py:1179`) failed 0 tests. The saved-row check in `_row_ok` is the killed row. |
 | `_adopted_database` title type | PARTIAL | Removing `title.type != "title"` from `_adopted_database` (`notion_notifications.py:908`) failed 0 tests. Buyer-config and icon on that adopt function were not separately measured. |
+| `_require_created_ids` (`notion_aesthetics.py:104`, `:252-337`) | PARTIAL | skipping _require_created_ids or any of its checks (CI-1..CI-4) survives; phase-6 replay test with tampered created_notion_ids is a W8 must-fix |
 | Keyed HMAC | Parked | Keyed HMAC waits for the live-credentials wave. A recomputed integrity digest is accepted by design until then. |
 | S04–S06 nits | Parked | Unchanged from prior waves. |
 
