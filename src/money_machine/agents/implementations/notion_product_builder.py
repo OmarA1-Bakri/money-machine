@@ -19,9 +19,11 @@ from uuid import UUID
 from money_machine.agents.implementations.notion_progress import (
     OP_PHASE1_PAGE,
     OP_PHASE1_SHELL,
+    OP_REBUILD,
     ProductBuildError,
     ProviderFailure,
     UnrecoverableCheckpoint,
+    append_refused_rebuild,
     guard_operation,
     load_payload,
     raise_recorded,
@@ -30,6 +32,7 @@ from money_machine.agents.implementations.notion_progress_record import write_ch
 from money_machine.domain.models.product_spec import ProductSpec
 from money_machine.integrations.notion.domain import (
     NotionCalloutBlock,
+    NotionDatabase,
     NotionPage,
     NotionTextBlock,
 )
@@ -186,23 +189,68 @@ async def _rebuild_unrecoverable(
     recorded_at: datetime,
     error: UnrecoverableCheckpoint,
 ) -> ProductBuildCheckpoint:
-    """Rebuild phase 1 only. Later phases refuse an unrecoverable record."""
+    """Rebuild phase 1 only when it is the only fixture object.
+
+    Later-phase objects refuse the rebuild: zero adapter writes, and exactly one
+    write_checkpoint that appends kind rebuild_refused. The integrity digest is
+    recomputed because it covers the whole payload. That is the only other
+    permitted difference. Every other field stays byte-identical.
+    """
     spec_id = error.payload.get("spec_id")
     if spec_id is not None and spec_id != str(spec.spec_id):
         raise ProductBuildError("checkpoint belongs to a different ProductSpec") from error
-    stale = find_spec_page(probe, str(spec.spec_id))
-    if stale is not None:
-        stale.properties.pop(SPEC_ID_PROPERTY, None)
-        stale.properties.pop(PRODUCT_ID_PROPERTY, None)
-        stale.properties.pop(SHELL_BLOCK_PROPERTY, None)
-    page = await _create_top_level_page(probe, spec)
-    shell = await probe.add_callout_block(
-        page.id, design_shell_content(spec), icon=DESIGN_SHELL_ICON
-    )
-    page.properties[SHELL_BLOCK_PROPERTY] = shell.id
+    later = _later_phase_object_names(probe, str(spec.spec_id))
+    if later:
+        reason = "rebuild refused: " + ", ".join(later)
+        append_refused_rebuild(path, reason)
+        raise ProductBuildError(reason) from error
+    guard_operation(probe, OP_REBUILD)
+    try:
+        page = find_spec_page(probe, str(spec.spec_id))
+        if page is None:
+            page = await _create_top_level_page(probe, spec)
+        else:
+            _drop_page_blocks(probe, page.id)
+        shell = await probe.add_callout_block(
+            page.id, design_shell_content(spec), icon=DESIGN_SHELL_ICON
+        )
+        page.properties[SHELL_BLOCK_PROPERTY] = shell.id
+    except ProviderFailure as failure:
+        raise_recorded(path, PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL, failure)
     checkpoint = _checkpoint_for(spec, page, shell, recorded_at)
     _write_checkpoint(path, checkpoint)
     return checkpoint
+
+
+def _later_phase_object_names(probe: FixtureNotionAdapter, spec_id: str) -> tuple[str, ...]:
+    """Names of shared databases, hubs, the notification database, and dashboard pieces."""
+    names: list[str] = []
+    for database in probe.databases.values():
+        if type(database) is NotionDatabase and database.title != "":
+            names.append(database.title)
+    for candidate in probe.pages.values():
+        if type(candidate) is NotionPage and candidate.parent_type == "page_id":
+            names.append(candidate.title)
+    page = find_spec_page(probe, spec_id)
+    if page is not None:
+        shell_id = page.properties.get(SHELL_BLOCK_PROPERTY)
+        for block in probe.blocks.values():
+            if block.parent_id != page.id:
+                continue
+            if type(shell_id) is str and block.id == shell_id:
+                continue
+            names.append(f"dashboard:{block.id}")
+        if page.icon is not None:
+            names.append("dashboard icon")
+        if page.cover is not None:
+            names.append("dashboard cover")
+    return tuple(sorted(names))
+
+
+def _drop_page_blocks(probe: FixtureNotionAdapter, page_id: str) -> None:
+    for block_id, block in list(probe.blocks.items()):
+        if block.parent_id == page_id:
+            del probe.blocks[block_id]
 
 
 def require_spec(spec: object) -> ProductSpec:

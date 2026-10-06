@@ -2,8 +2,12 @@
 
 Never rebuild the whole product unless the progress record is unrecoverable.
 A recoverable provider failure stores a repair job and resumes from the failed
-operation. A missing prior record is an error and writes nothing. The fixture
-has no screenshots; captured evidence kind is provider_response.
+operation. A missing prior record is an error and writes nothing. A refused
+rebuild makes no fixture writes and appends one rebuild_refused job through
+write_checkpoint. The integrity digest covers the whole payload. It detects
+accidental corruption. It is not a signature and it is not tamper-proof against
+someone who can recompute it. The fixture has no screenshots; captured evidence
+kind is provider_response.
 """
 
 from __future__ import annotations
@@ -28,8 +32,9 @@ PHASES_COMPLETE = "build_phases_complete"
 RECOVERY_RULE = (
     "Never rebuild the whole product unless the progress record is unrecoverable. "
     "A recoverable provider failure stores a repair job and resumes from the failed "
-    "operation. A missing prior record is an error and writes nothing. The fixture "
-    "has no screenshots; captured evidence kind is provider_response."
+    "operation. A missing prior record is an error and writes nothing. "
+    "A refused rebuild appends one rebuild_refused job and does not mutate the fixture. "
+    "The fixture has no screenshots; captured evidence kind is provider_response."
 )
 PROGRESS_KEY = "progress"
 OP_PHASE1_PAGE = "top_level_page_and_design_shell.create_page"
@@ -38,6 +43,9 @@ OP_DASHBOARD_COVER = "dashboard_and_navigation.cover"
 OP_HUBS_CREATE = "identity_specific_hubs.create"
 OP_NOTIFICATION_DATABASE = "notification_dashboard.database"
 OP_AESTHETICS_SAMPLES = "aesthetics_and_content_completion.samples"
+OP_REBUILD = "top_level_page_and_design_shell.rebuild"
+REBUILD_REFUSED = "rebuild_refused"
+_ACCEPTED_JOB_KINDS = frozenset({"provider_response", REBUILD_REFUSED})
 _RECOVERIES = frozenset({"recoverable", "unrecoverable"})
 _PROGRESS_FIELDS = (
     "completed_operations",
@@ -81,7 +89,7 @@ class ProviderFailure(Exception):
 
 
 class UnrecoverableCheckpoint(Exception):
-    """A signed progress record says the product must be rebuilt from phase 1."""
+    """An integrity digest says the product must be rebuilt from phase 1."""
 
     def __init__(self, payload: dict[object, object]) -> None:
         self.payload = payload
@@ -119,8 +127,12 @@ def shared_create_operation(kind: str) -> str:
 
 
 def raise_recorded(path: Path, phase: str, failure: ProviderFailure) -> NoReturn:
-    """Store the provider response and raise it as a product-build error."""
-    record_provider_failure(path, failure.operation, failure.response, phase)
+    """Store the provider response and raise it as a product-build error.
+
+    A missing prior record raises the provider response and writes nothing.
+    """
+    if path.exists():
+        record_provider_failure(path, failure.operation, failure.response, phase)
     raise ProductBuildError(failure.response) from failure
 
 
@@ -145,9 +157,9 @@ def load_payload(path: Path, *, allow_unrecoverable: bool = False) -> Checkpoint
     raw = cast(dict[object, object], decoded)
     progress_value = raw.get(PROGRESS_KEY)
     payload = {key: value for key, value in raw.items() if key != PROGRESS_KEY}
-    if progress_value is None:
-        return CheckpointEnvelope(payload, "recoverable", ())
-    progress = _validate_progress(progress_value, payload.get("checkpoint_names"))
+    if PROGRESS_KEY not in raw or progress_value is None:
+        raise ProductBuildError("progress record is missing")
+    progress = _validate_progress(progress_value, payload.get("checkpoint_names"), raw)
     recovery = progress["recovery"]
     if type(recovery) is not str:
         raise ProductBuildError("progress record is tampered")
@@ -159,21 +171,43 @@ def load_payload(path: Path, *, allow_unrecoverable: bool = False) -> Checkpoint
     return CheckpointEnvelope(payload, recovery, tuple(jobs))
 
 
-def sign_progress(body: Mapping[str, object]) -> dict[str, object]:
-    """Return a copy of the progress body with its record digest."""
-    unsigned = _unsigned_body(body)
+def stamp_integrity_digest(document: Mapping[str, object]) -> dict[str, object]:
+    """Return a copy of the checkpoint with a recomputed integrity digest.
+
+    The digest covers the whole payload except ``record_digest``. It detects
+    accidental corruption. It is not a signature and it is not tamper-proof
+    against someone who can recompute it. A recomputed digest is accepted.
+    """
+    raw = dict(document)
+    progress = raw.get(PROGRESS_KEY)
+    if type(progress) is not dict:
+        raise ProductBuildError("progress record is missing")
+    unsigned_source = {
+        key: value
+        for key, value in cast(Mapping[object, object], progress).items()
+        if key != "record_digest"
+    }
+    unsigned = _unsigned_body(cast(Mapping[str, object], unsigned_source))
     _require_shape(unsigned)
-    signed = dict(unsigned)
-    signed["record_digest"] = _digest(unsigned)
-    return signed
+    raw[PROGRESS_KEY] = unsigned
+    digest = _digest(raw)
+    stored = dict(unsigned)
+    stored["record_digest"] = digest
+    raw[PROGRESS_KEY] = stored
+    return raw
 
 
 def write_document(
     path: Path, payload: Mapping[str, object], progress: Mapping[str, object]
 ) -> None:
-    """Atomically write one checkpoint payload and its signed progress record."""
+    """Atomically write one checkpoint. Called only from write_checkpoint."""
+    unsigned = _unsigned_body(progress)
+    _require_shape(unsigned)
     body = dict(payload)
-    body[PROGRESS_KEY] = sign_progress(progress)
+    body[PROGRESS_KEY] = unsigned
+    stored = dict(unsigned)
+    stored["record_digest"] = _digest(body)
+    body[PROGRESS_KEY] = stored
     text = json.dumps(body, sort_keys=True, separators=(",", ":")) + "\n"
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     temporary.write_text(text, encoding="ascii")
@@ -181,13 +215,50 @@ def write_document(
 
 
 def record_provider_failure(path: Path, operation: str, response: str, phase: str) -> None:
-    """Append one repair job. The checkpoint phase list is not advanced."""
-    job = _repair_job(operation, response, phase)
+    """Append one provider_response job through write_checkpoint.
+
+    The checkpoint phase list is not advanced. A missing file raises and writes
+    nothing.
+    """
+    _append_job(path, _repair_job(operation, response, phase))
+
+
+def append_refused_rebuild(path: Path, reason: str) -> None:
+    """Append one rebuild_refused job through write_checkpoint.
+
+    Every other field of the record stays byte-identical. The integrity digest
+    covers the whole payload, so it is recomputed. That recomputed digest is the
+    only other permitted difference.
+    """
+    _append_job(path, _repair_job(OP_REBUILD, reason, PHASES[0], kind=REBUILD_REFUSED))
+
+
+def _append_job(path: Path, job: Mapping[str, str]) -> None:
     if not path.exists():
-        progress = _empty_progress()
-        progress["repair_jobs"] = [job]
-        write_document(path, {"checkpoint_names": []}, progress)
-        return
+        raise ProductBuildError("a provider failure with no prior record writes nothing")
+    raw = _load_object(path)
+    progress_value = raw.get(PROGRESS_KEY)
+    if PROGRESS_KEY not in raw or progress_value is None:
+        raise ProductBuildError("progress record is missing")
+    checked = _validate_progress(progress_value, raw.get("checkpoint_names"), raw)
+    progress = {key: checked[key] for key in _PROGRESS_FIELDS}
+    jobs = progress["repair_jobs"]
+    if type(jobs) is not list:
+        raise ProductBuildError("progress record is tampered")
+    progress["repair_jobs"] = [*list(jobs), dict(job)]
+    _write_through_checkpoint(path, _string_payload(raw), progress)
+
+
+def _write_through_checkpoint(
+    path: Path, payload: Mapping[str, object], progress: Mapping[str, object]
+) -> None:
+    # notion_progress_record imports this module, so this import stays local.
+    from money_machine.agents.implementations.notion_progress_record import write_checkpoint
+
+    write_checkpoint(path, preserved_payload=payload, progress=progress)
+
+
+def _load_object(path: Path) -> dict[object, object]:
     text = path.read_text(encoding="utf-8")
     if text == "" or not text.endswith("\n"):
         raise ProductBuildError("checkpoint is incomplete")
@@ -197,19 +268,7 @@ def record_provider_failure(path: Path, operation: str, response: str, phase: st
         raise ProductBuildError("checkpoint is not JSON") from error
     if type(decoded) is not dict:
         raise ProductBuildError("checkpoint must be an object")
-    raw = cast(dict[object, object], decoded)
-    existing = raw.get(PROGRESS_KEY)
-    payload = _string_payload(raw)
-    if existing is None:
-        progress = _compatible_progress(payload.get("checkpoint_names"))
-    else:
-        checked = _validate_progress(existing, payload.get("checkpoint_names"))
-        progress = {key: checked[key] for key in _PROGRESS_FIELDS}
-    jobs = progress["repair_jobs"]
-    if type(jobs) is not list:
-        raise ProductBuildError("progress record is tampered")
-    progress["repair_jobs"] = [*jobs, job]
-    write_document(path, payload, progress)
+    return cast(dict[object, object], decoded)
 
 
 def empty_created_ids() -> dict[str, object]:
@@ -226,45 +285,26 @@ def empty_created_ids() -> dict[str, object]:
     }
 
 
-def _empty_progress() -> dict[str, object]:
-    return {
-        "completed_operations": [],
-        "deferred_operations": list(PHASES),
-        "created_notion_ids": empty_created_ids(),
-        "property_mappings": {},
-        "page_counts": {"blocks": 0, "databases": 0, "pages": 0},
-        "formula_state": [],
-        "repair_jobs": [],
-        "recovery": "recoverable",
-    }
-
-
-def _compatible_progress(names: object) -> dict[str, object]:
-    if type(names) is not list or not _is_prefix([item for item in names if type(item) is str]):
-        raise ProductBuildError("progress record is tampered")
-    completed = cast(list[str], names)
-    if len(completed) != len(names):
-        raise ProductBuildError("progress record is tampered")
-    progress = _empty_progress()
-    progress["completed_operations"] = completed
-    progress["deferred_operations"] = _deferred(completed)
-    return progress
-
-
-def _repair_job(operation: str, response: str, phase: str) -> dict[str, str]:
+def _repair_job(
+    operation: str, response: str, phase: str, *, kind: str = "provider_response"
+) -> dict[str, str]:
+    if kind not in _ACCEPTED_JOB_KINDS:
+        raise ProductBuildError("progress record is forged")
     if operation == "" or response == "" or phase == "":
         raise ProductBuildError("progress record is tampered")
     if not operation.isascii() or not response.isascii() or not phase.isascii():
         raise ProductBuildError("progress record is tampered")
     return {
-        "kind": "provider_response",
+        "kind": kind,
         "operation": operation,
         "phase": phase,
         "response": response,
     }
 
 
-def _validate_progress(value: object, checkpoint_names: object) -> dict[str, object]:
+def _validate_progress(
+    value: object, checkpoint_names: object, document: Mapping[object, object]
+) -> dict[str, object]:
     if type(value) is not dict:
         raise ProductBuildError("progress record is tampered")
     found = cast(dict[object, object], value)
@@ -274,7 +314,9 @@ def _validate_progress(value: object, checkpoint_names: object) -> dict[str, obj
     _require_shape(unsigned)
     _reject_non_provider_evidence(unsigned)
     digest = found["record_digest"]
-    if type(digest) is not str or digest != _digest(unsigned):
+    covered = _string_payload(document)
+    covered[PROGRESS_KEY] = unsigned
+    if type(digest) is not str or digest != _digest(covered):
         raise ProductBuildError("progress record is forged")
     _require_alignment(unsigned, checkpoint_names)
     return {key: found[key] for key in _PROGRESS_KEYS}
@@ -398,14 +440,14 @@ def _require_jobs(value: object) -> None:
 
 
 def _reject_non_provider_evidence(body: Mapping[str, object]) -> None:
-    """The fixture has no screenshots. Any other evidence kind is forged."""
+    """Screenshot evidence is forged. provider_response and rebuild_refused are kept."""
     jobs = body["repair_jobs"]
     if type(jobs) is not list:
         raise ProductBuildError("progress record is tampered")
     for item in jobs:
         if type(item) is not dict:
             raise ProductBuildError("progress record is tampered")
-        if item.get("kind") != "provider_response":
+        if item.get("kind") not in _ACCEPTED_JOB_KINDS:
             raise ProductBuildError("progress record is forged")
 
 

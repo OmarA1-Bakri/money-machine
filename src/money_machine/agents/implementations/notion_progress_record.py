@@ -1,8 +1,8 @@
 """Build the one progress record from a product-build checkpoint.
 
-The atomic writer lives in notion_progress.write_document. Every phase calls
-write_checkpoint here so completed operations, deferred operations, created
-Notion ids, property mappings, page counts, and formula state share one schema.
+write_checkpoint is the only caller of notion_progress.write_document. Every
+phase, repair job, and refused rebuild goes through that function. The
+integrity digest is stamped there over the whole payload.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from typing import Protocol
 from money_machine.agents.implementations.notion_progress import (
     PHASES,
     PHASES_COMPLETE,
+    ProductBuildError,
     empty_created_ids,
     write_document,
 )
@@ -120,25 +121,39 @@ class CheckpointView(Protocol):
 
 
 def write_checkpoint(
-    path: Path, checkpoint: CheckpointView, references: Mapping[str, object]
+    path: Path,
+    checkpoint: CheckpointView | None = None,
+    references: Mapping[str, object] | None = None,
+    *,
+    preserved_payload: Mapping[str, object] | None = None,
+    progress: Mapping[str, object] | None = None,
 ) -> None:
-    """Write one phase checkpoint through the single progress writer."""
-    recorded_at = checkpoint.recorded_at
-    isoformat = getattr(recorded_at, "isoformat", None)
-    if not callable(isoformat):
-        raise TypeError("checkpoint recorded_at must be a datetime")
-    payload: dict[str, object] = {
-        "build_kind": checkpoint.build_kind,
-        "build_version": checkpoint.build_version,
-        "checkpoint_names": list(checkpoint.checkpoint_names),
-        "palette_name": checkpoint.palette_name,
-        "palette_tokens": [list(token) for token in checkpoint.palette_tokens],
-        "product_id": checkpoint.product_id,
-        "provider_object_references": dict(references),
-        "recorded_at": isoformat(),
-        "spec_id": checkpoint.spec_id,
-    }
-    write_document(path, payload, progress_from_checkpoint(checkpoint))
+    """Write one checkpoint through the single progress writer."""
+    if preserved_payload is not None:
+        if progress is None:
+            raise ProductBuildError("progress record is missing")
+        payload = dict(preserved_payload)
+        body = dict(progress)
+    else:
+        if checkpoint is None or references is None:
+            raise ProductBuildError("checkpoint is incomplete")
+        recorded_at = checkpoint.recorded_at
+        isoformat = getattr(recorded_at, "isoformat", None)
+        if not callable(isoformat):
+            raise TypeError("checkpoint recorded_at must be a datetime")
+        payload = {
+            "build_kind": checkpoint.build_kind,
+            "build_version": checkpoint.build_version,
+            "checkpoint_names": list(checkpoint.checkpoint_names),
+            "palette_name": checkpoint.palette_name,
+            "palette_tokens": [list(token) for token in checkpoint.palette_tokens],
+            "product_id": checkpoint.product_id,
+            "provider_object_references": dict(references),
+            "recorded_at": isoformat(),
+            "spec_id": checkpoint.spec_id,
+        }
+        body = progress_from_checkpoint(checkpoint)
+    write_document(path, payload, body)
 
 
 def progress_from_checkpoint(checkpoint: CheckpointView) -> dict[str, object]:

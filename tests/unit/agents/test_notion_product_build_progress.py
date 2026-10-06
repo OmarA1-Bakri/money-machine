@@ -1,7 +1,9 @@
 """Progress record, repair jobs, and the wave-7 killing tests.
 
 Fixture only. A provider failure stores kind provider_response. Resume continues
-from the failed operation. An unrecoverable record is rebuilt only in phase 1.
+from the failed operation. An unrecoverable phase-1-only record is rebuilt in
+place. Later-phase objects refuse that rebuild: zero adapter writes, one
+write_checkpoint, one rebuild_refused job, and a recomputed integrity digest.
 """
 
 from __future__ import annotations
@@ -39,10 +41,13 @@ from money_machine.agents.implementations.notion_progress import (
     OP_NOTIFICATION_DATABASE,
     OP_PHASE1_PAGE,
     OP_PHASE1_SHELL,
+    OP_REBUILD,
     PHASES,
+    REBUILD_REFUSED,
     RECOVERY_RULE,
+    record_provider_failure,
     shared_create_operation,
-    sign_progress,
+    stamp_integrity_digest,
 )
 from money_machine.agents.implementations.notion_shared_databases import build_shared_databases
 from money_machine.domain.models.common import EvidenceReference
@@ -172,7 +177,6 @@ def _assert_job(path: Path, operation: str, response: str) -> None:
     assert job["kind"] == "provider_response"
     assert job["operation"] == operation
     assert job["response"] == response
-    assert job["kind"] != "screenshot"
 
 
 def _resign(path: Path, mutate: Callable[[dict[str, object]], None]) -> None:
@@ -181,9 +185,10 @@ def _resign(path: Path, mutate: Callable[[dict[str, object]], None]) -> None:
     assert type(progress) is dict
     body = {key: value for key, value in progress.items() if key != "record_digest"}
     mutate(body)
-    payload["progress"] = sign_progress(body)
+    payload["progress"] = body
+    stamped = stamp_integrity_digest(payload)
     path.write_text(
-        json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
+        json.dumps(stamped, sort_keys=True, separators=(",", ":")) + "\n",
         encoding="ascii",
     )
 
@@ -229,7 +234,7 @@ async def test_phase1_page_failure_resumes_without_rebuilding_prior_ids(tmp_path
     with pytest.raises(ProductBuildError, match="page refused"):
         await _phase_one(spec, probe, path)
 
-    _assert_job(path, OP_PHASE1_PAGE, "page refused")
+    assert not path.exists()
     assert _page_ids(probe) == set()
     assert _block_ids(probe) == set()
     assert _database_ids(probe) == set()
@@ -256,7 +261,7 @@ async def test_phase1_shell_failure_keeps_the_page_and_adds_one_block(tmp_path: 
     with pytest.raises(ProductBuildError, match="shell refused"):
         await _phase_one(spec, probe, path)
 
-    _assert_job(path, OP_PHASE1_SHELL, "shell refused")
+    assert not path.exists()
     page_ids = _page_ids(probe)
     assert len(page_ids) == 1
     assert _block_ids(probe) == set()
@@ -309,11 +314,12 @@ async def test_dashboard_failure_adds_only_the_dashboard_blocks(tmp_path: Path) 
         await build_dashboard_and_navigation(spec, probe, path, recorded_at=DASHBOARD_AT)
 
     _assert_job(path, OP_DASHBOARD_COVER, "cover refused")
-    assert _block_ids(probe) == before_blocks
+    greeting = _block_ids(probe) - before_blocks
+    assert len(greeting) == 1
     assert _database_ids(probe) == before_databases
     del probe.fail_operation  # type: ignore[attr-defined]
     await build_dashboard_and_navigation(spec, probe, path, recorded_at=DASHBOARD_AT)
-    assert before_blocks < _block_ids(probe)
+    assert greeting < _block_ids(probe)
     assert len(_block_ids(probe) - before_blocks) == 4
     assert _database_ids(probe) == before_databases
 
@@ -334,11 +340,13 @@ async def test_hub_failure_adds_only_the_hub_pages_and_blocks(tmp_path: Path) ->
         await build_identity_specific_hubs(spec, probe, path, recorded_at=HUBS_AT)
 
     _assert_job(path, OP_HUBS_CREATE, "hubs refused")
+    created_pages = _page_ids(probe) - before_pages
+    assert len(created_pages) == 1
     assert _block_ids(probe) == before_blocks
     assert _database_ids(probe) == before_databases
-    assert _page_ids(probe) == before_pages
     del probe.fail_operation  # type: ignore[attr-defined]
     await build_identity_specific_hubs(spec, probe, path, recorded_at=HUBS_AT)
+    assert created_pages < _page_ids(probe)
     assert before_blocks < _block_ids(probe)
     assert len(_block_ids(probe) - before_blocks) == 24
     assert len(_page_ids(probe) - before_pages) == 6
@@ -360,10 +368,13 @@ async def test_notification_failure_adds_one_database_and_no_blocks(tmp_path: Pa
         await build_notification_dashboard(spec, probe, path, recorded_at=NOTIFICATION_AT)
 
     _assert_job(path, OP_NOTIFICATION_DATABASE, "notice refused")
+    created = _database_ids(probe) - before_databases
+    assert len(created) == 1
+    notice_id = next(iter(created))
     assert _block_ids(probe) == before_blocks
-    assert _database_ids(probe) == before_databases
     del probe.fail_operation  # type: ignore[attr-defined]
     await build_notification_dashboard(spec, probe, path, recorded_at=NOTIFICATION_AT)
+    assert notice_id in _database_ids(probe)
     assert _block_ids(probe) == before_blocks
     assert len(_database_ids(probe) - before_databases) == 1
     assert before_databases < _database_ids(probe)
@@ -458,38 +469,329 @@ async def test_screenshot_kind_is_forged(tmp_path: Path) -> None:
     assert len(probe.pages) == pages
 
 
+def _mark_unrecoverable(path: Path) -> None:
+    _resign(path, lambda body: body.__setitem__("recovery", "unrecoverable"))
+
+
+def _workspace_pages(probe: FixtureNotionAdapter) -> list[NotionPage]:
+    return [
+        page
+        for page in probe.pages.values()
+        if type(page) is NotionPage and page.parent_type == "workspace"
+    ]
+
+
+async def _through_aesthetics(spec: ProductSpec, probe: FixtureNotionAdapter, path: Path) -> None:
+    await _through_notification(spec, probe, path)
+    await build_aesthetics_and_content_completion(spec, probe, path, recorded_at=LATER)
+
+
+def _assert_refused_diff(before: dict[str, object], after: dict[str, object]) -> None:
+    """The appended rebuild_refused job and the recomputed digest are the only differences.
+
+    The integrity digest covers the whole payload, so appending a job recomputes it.
+    That recomputed digest is the only permitted difference besides the new job.
+    """
+    assert set(before) == set(after)
+    for key, value in before.items():
+        if key != "progress":
+            assert after[key] == value
+    before_progress = before["progress"]
+    after_progress = after["progress"]
+    assert type(before_progress) is dict and type(after_progress) is dict
+    assert set(before_progress) == set(after_progress)
+    for key, value in before_progress.items():
+        if key in {"repair_jobs", "record_digest"}:
+            continue
+        assert after_progress[key] == value
+    assert after_progress["record_digest"] != before_progress["record_digest"]
+    before_jobs = before_progress["repair_jobs"]
+    after_jobs = after_progress["repair_jobs"]
+    assert type(before_jobs) is list and type(after_jobs) is list
+    assert after_jobs[:-1] == before_jobs
+    job = after_jobs[-1]
+    assert type(job) is dict
+    assert job["kind"] == REBUILD_REFUSED
+    assert job["operation"] == OP_REBUILD
+    response = job["response"]
+    assert type(response) is str and response.startswith("rebuild refused:")
+
+
 @pytest.mark.asyncio
-async def test_unrecoverable_phase1_rebuilds_and_later_phases_do_not(tmp_path: Path) -> None:
+async def test_unrecoverable_phase1_rebuilds_in_place_and_later_phases_do_not(
+    tmp_path: Path,
+) -> None:
     spec = _spec()
     probe = FixtureNotionAdapter()
     path = tmp_path / "build.json"
     await _phase_one(spec, probe, path)
     old_page = _home(probe)
-    _resign(path, lambda body: body.__setitem__("recovery", "unrecoverable"))
+    markers = dict(old_page.properties)
+    _mark_unrecoverable(path)
 
     await _phase_one(spec, probe, path)
 
-    assert len(probe.pages) == 2
-    assert "product_spec_id" not in old_page.properties
-    rebuilt = next(
-        page
-        for page in probe.pages.values()
-        if type(page) is NotionPage and "product_spec_id" in page.properties
-    )
-    assert rebuilt.id != old_page.id
+    assert _workspace_pages(probe) == [old_page]
+    assert len(probe.pages) == 1
+    assert old_page.properties["product_spec_id"] == markers["product_spec_id"]
+    assert old_page.properties["product_id"] == markers["product_id"]
     stored = json.loads(path.read_text(encoding="ascii"))
     assert stored["progress"]["recovery"] == "recoverable"
     assert stored["checkpoint_names"] == [PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL]
+    assert len(probe.blocks) == 1
 
     await build_shared_databases(spec, probe, path, recorded_at=PHASE_TWO_AT)
     databases = _database_ids(probe)
-    _resign(path, lambda body: body.__setitem__("recovery", "unrecoverable"))
+    _mark_unrecoverable(path)
     before = path.read_bytes()
 
     with pytest.raises(ProductBuildError, match="unrecoverable"):
         await build_shared_databases(spec, probe, path, recorded_at=LATER)
 
     assert path.read_bytes() == before
+    assert _database_ids(probe) == databases
+
+
+@pytest.mark.asyncio
+async def test_refused_rebuild_appends_one_job_and_writes_no_fixture_objects(
+    tmp_path: Path,
+) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _through_aesthetics(spec, probe, path)
+    page = _home(probe)
+    markers = dict(page.properties)
+    icon, cover = page.icon, page.cover
+    blocks = _block_ids(probe)
+    _mark_unrecoverable(path)
+    before = json.loads(path.read_text(encoding="ascii"))
+    counts = (len(probe.pages), len(probe.databases), len(probe.blocks))
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="rebuild refused"):
+        await _phase_one(spec, probe, path)
+
+    assert calls == []
+    assert (len(probe.pages), len(probe.databases), len(probe.blocks)) == counts
+    assert _block_ids(probe) == blocks
+    assert page.properties == markers
+    assert page.icon == icon
+    assert page.cover == cover
+    after = json.loads(path.read_text(encoding="ascii"))
+    _assert_refused_diff(before, after)
+    response = after["progress"]["repair_jobs"][-1]["response"]
+    for name in ("Tasks", "Notification dashboard", "Hub 1", "dashboard icon", "dashboard cover"):
+        assert name in response
+
+    stable = path.read_bytes()
+    for build in (
+        build_shared_databases,
+        build_dashboard_and_navigation,
+        build_identity_specific_hubs,
+        build_notification_dashboard,
+        build_aesthetics_and_content_completion,
+    ):
+        with pytest.raises(ProductBuildError, match="unrecoverable"):
+            await build(spec, probe, path, recorded_at=LATER)
+        assert path.read_bytes() == stable
+        assert (len(probe.pages), len(probe.databases), len(probe.blocks)) == counts
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("tier", "identity", "catalogue"),
+    [
+        ("mass", "Weekly Planner", ("Tasks", "Events", "Habits", "Finance", "Meals", "Notes")),
+        (
+            "business",
+            "Studio Ledger",
+            ("Clients", "Projects", "Content", "Invoices", "Tasks", "Notes"),
+        ),
+    ],
+)
+async def test_phase1_only_rebuild_continues_through_phase_6(
+    tmp_path: Path, tier: str, identity: str, catalogue: tuple[str, ...]
+) -> None:
+    spec = _spec(tier=tier, identity=identity)
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _phase_one(spec, probe, path)
+    home = _home(probe)
+    _mark_unrecoverable(path)
+
+    await _through_aesthetics(spec, probe, path)
+
+    assert _workspace_pages(probe) == [home]
+    titles = [database.title for database in probe.databases.values()]
+    assert sorted(titles) == sorted([*catalogue, "Notification dashboard"])
+    assert titles.count("Tasks") == 1
+    assert titles.count("Notification dashboard") == 1
+    stored = json.loads(path.read_text(encoding="ascii"))
+    progress = stored["progress"]
+    assert progress["page_counts"]["databases"] == len(catalogue) + 1
+    assert progress["page_counts"]["pages"] > 1
+    assert progress["page_counts"]["blocks"] > 1
+    assert progress["property_mappings"]["product_spec_id"] == "product_spec_id"
+    assert progress["property_mappings"]["buyer_name"] == "Buyer name"
+    assert progress["formula_state"]
+    assert {entry["kind"] for entry in progress["formula_state"]}
+
+
+def test_write_checkpoint_is_the_only_progress_writer() -> None:
+    root = Path("src/money_machine/agents/implementations")
+    calls = [
+        (path.name, line.strip())
+        for path in sorted(root.glob("*.py"))
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if "write_document(" in line
+    ]
+    assert calls == [
+        ("notion_progress.py", "def write_document("),
+        ("notion_progress_record.py", "write_document(path, payload, body)"),
+    ]
+
+
+def test_provider_failure_with_no_prior_record_leaves_the_file_absent(tmp_path: Path) -> None:
+    path = tmp_path / "missing.json"
+
+    with pytest.raises(ProductBuildError, match="no prior record"):
+        record_provider_failure(path, OP_PHASE1_PAGE, "page refused", PHASES[0])
+
+    assert not path.exists()
+
+
+@pytest.mark.asyncio
+async def test_payload_edit_with_a_stale_digest_is_forged(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _phase_one(spec, probe, path)
+    payload = json.loads(path.read_text(encoding="ascii"))
+    payload["palette_name"] = "Other Palette"
+    path.write_text(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="ascii"
+    )
+    before = path.read_bytes()
+    pages = _page_ids(probe)
+
+    with pytest.raises(ProductBuildError, match="forged"):
+        await _phase_one(spec, probe, path)
+
+    assert path.read_bytes() == before
+    assert _page_ids(probe) == pages
+
+
+@pytest.mark.asyncio
+async def test_deleted_progress_key_is_rejected(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _phase_one(spec, probe, path)
+    payload = json.loads(path.read_text(encoding="ascii"))
+    del payload["progress"]
+    path.write_text(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="ascii"
+    )
+    before = path.read_bytes()
+    pages = _page_ids(probe)
+
+    with pytest.raises(ProductBuildError, match="progress record is missing"):
+        await _phase_one(spec, probe, path)
+
+    assert path.read_bytes() == before
+    assert _page_ids(probe) == pages
+
+
+@pytest.mark.asyncio
+async def test_forged_unrecoverable_flag_with_a_stale_digest_does_not_rebuild(
+    tmp_path: Path,
+) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _phase_one(spec, probe, path)
+    payload = json.loads(path.read_text(encoding="ascii"))
+    payload["progress"]["recovery"] = "unrecoverable"
+    path.write_text(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="ascii"
+    )
+    before = path.read_bytes()
+    pages = len(probe.pages)
+
+    with pytest.raises(ProductBuildError, match="forged"):
+        await _phase_one(spec, probe, path)
+
+    assert path.read_bytes() == before
+    assert len(probe.pages) == pages
+
+
+@pytest.mark.asyncio
+async def test_progress_alignment_with_checkpoint_names_is_required(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _phase_one(spec, probe, path)
+
+    def _misalign(body: dict[str, object]) -> None:
+        body["completed_operations"] = list(PHASES[:2])
+        body["deferred_operations"] = list(PHASES[2:])
+
+    _resign(path, _misalign)
+    before = path.read_bytes()
+    pages = _page_ids(probe)
+
+    with pytest.raises(ProductBuildError, match="tampered"):
+        await _phase_one(spec, probe, path)
+
+    assert path.read_bytes() == before
+    assert _page_ids(probe) == pages
+
+
+@pytest.mark.asyncio
+async def test_saved_notification_rejects_loose_adopt_fields_and_client_name(
+    tmp_path: Path,
+) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _through_notification(spec, probe, path)
+    database = next(
+        item for item in probe.databases.values() if item.title == "Notification dashboard"
+    )
+    row = next(
+        page
+        for page in probe.pages.values()
+        if type(page) is NotionPage
+        and page.parent_id == database.id
+        and page.title == spec.identity
+    )
+    before = path.read_bytes()
+    databases = _database_ids(probe)
+
+    database.properties[0].type = "text"
+    with pytest.raises(ProductBuildError, match="notification database"):
+        await build_notification_dashboard(spec, probe, path, recorded_at=LATER)
+    assert path.read_bytes() == before
+    database.properties[0].type = "title"
+
+    database.properties[1].config = {"options": ["nope"]}
+    with pytest.raises(ProductBuildError, match="notification database"):
+        await build_notification_dashboard(spec, probe, path, recorded_at=LATER)
+    assert path.read_bytes() == before
+    database.properties[1].config = {}
+
+    database.icon = "other"
+    with pytest.raises(ProductBuildError, match="notification database"):
+        await build_notification_dashboard(spec, probe, path, recorded_at=LATER)
+    assert path.read_bytes() == before
+    database.icon = NOTIFICATION_ICON
+
+    row.properties["client_name"] = "hidden"
+    with pytest.raises(ProductBuildError, match="notification row"):
+        await build_notification_dashboard(spec, probe, path, recorded_at=LATER)
+    assert path.read_bytes() == before
+    assert row.properties["client_name"] == "hidden"
     assert _database_ids(probe) == databases
 
 
@@ -552,6 +854,7 @@ async def test_forged_business_events_relation_is_rejected(tmp_path: Path) -> No
     payload = json.loads(path.read_text(encoding="ascii"))
     relations = payload["provider_object_references"]["notification_dashboard"]["relations"]
     relations.append({"data_type": "Events", "property_id": "forged_events"})
+    payload = stamp_integrity_digest(payload)
     path.write_text(
         json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="ascii"
     )
@@ -581,6 +884,7 @@ async def test_duplicate_notification_relation_is_rejected(tmp_path: Path) -> No
     payload = json.loads(path.read_text(encoding="ascii"))
     relations = payload["provider_object_references"]["notification_dashboard"]["relations"]
     relations.append(dict(relations[0]))
+    payload = stamp_integrity_digest(payload)
     path.write_text(
         json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="ascii"
     )

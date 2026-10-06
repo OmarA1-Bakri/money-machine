@@ -26,6 +26,7 @@ from money_machine.agents.implementations.notion_product_builder import (
     ProductBuildError,
     build_top_level_page_and_design_shell,
 )
+from money_machine.agents.implementations.notion_progress import stamp_integrity_digest
 from money_machine.agents.implementations.notion_shared_databases import (
     BUSINESS_SHARED_DATABASES,
     PLANNER_SHARED_DATABASES,
@@ -259,11 +260,11 @@ async def test_replay_does_not_create_another_hub(tmp_path: Path) -> None:
 
     second = await _build(spec, probe, path, recorded_at=datetime(2026, 10, 6, tzinfo=UTC))
 
-    assert second == first
-    assert path.read_bytes() == before
     assert set(probe.pages) == pages
     assert set(probe.linked_views) == views
     assert set(probe.blocks) == blocks
+    assert second == first
+    assert path.read_bytes() == before
 
 
 @pytest.mark.asyncio
@@ -852,6 +853,7 @@ async def test_hubs_checkpoint_without_records_is_rejected(tmp_path: Path) -> No
     await _build(spec, probe, path)
     payload = json.loads(path.read_text(encoding="ascii"))
     del payload["provider_object_references"]["identity_hubs"]
+    payload = stamp_integrity_digest(payload)
     path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="ascii")
     pages = set(probe.pages)
 
@@ -872,6 +874,7 @@ async def test_five_hub_records_are_rejected(tmp_path: Path) -> None:
     payload["provider_object_references"]["identity_hubs"] = payload["provider_object_references"][
         "identity_hubs"
     ][:5]
+    payload = stamp_integrity_digest(payload)
     path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="ascii")
     pages = set(probe.pages)
 
@@ -891,6 +894,7 @@ async def test_swapped_section_roles_are_rejected(tmp_path: Path) -> None:
     payload = json.loads(path.read_text(encoding="ascii"))
     sections = payload["provider_object_references"]["identity_hubs"][0]["sections"]
     sections[0]["role"], sections[1]["role"] = sections[1]["role"], sections[0]["role"]
+    payload = stamp_integrity_digest(payload)
     path.write_text(json.dumps(payload) + "\n", encoding="ascii")
     pages = set(probe.pages)
 
@@ -1016,6 +1020,7 @@ async def test_hub_checkpoint_parser_rejects_bad_inputs(tmp_path: Path) -> None:
 
     payload = json.loads(original)
     payload["provider_object_references"]["identity_hubs"][0].pop("page_id")
+    payload = stamp_integrity_digest(payload)
     path.write_text(
         json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="ascii"
     )

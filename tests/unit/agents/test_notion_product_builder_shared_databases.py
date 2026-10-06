@@ -196,9 +196,9 @@ async def test_replay_does_not_create_another_database(tmp_path: Path) -> None:
 
     second = await _build(spec, probe, path, recorded_at=datetime(2026, 10, 6, tzinfo=UTC))
 
+    assert {database.id for database in probe.databases.values()} == ids
     assert second == first
     assert path.read_bytes() == before
-    assert {database.id for database in probe.databases.values()} == ids
     assert _titles(probe) == list(PLANNER_SHARED_DATABASES)
     assert len(probe.databases) == len(PLANNER_SHARED_DATABASES)
 

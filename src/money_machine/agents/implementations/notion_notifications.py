@@ -787,7 +787,6 @@ async def _ensure(
         existing, plan, database_ids, recorded
     ):
         raise ProductBuildError("notification database cannot be repaired")
-    guard_operation(probe, OP_NOTIFICATION_DATABASE)
     formula_ids = await _ensure_formulas(probe, database_ids, suffixes)
     if existing is None:
         database = await _create_database(probe, page, plan, database_ids, formula_ids)
@@ -801,6 +800,7 @@ async def _ensure(
     else:
         raise ProductBuildError("notification database cannot be repaired")
     _apply_notification_marks(database)
+    guard_operation(probe, OP_NOTIFICATION_DATABASE)
     samples = await _ensure_samples(probe, plan, database_ids)
     row = await _ensure_row(probe, spec, database, plan, samples)
     return _record_from(database, row, plan, formula_ids, samples)

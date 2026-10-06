@@ -14,6 +14,7 @@ from money_machine.agents.implementations.notion_dashboard import build_dashboar
 from money_machine.agents.implementations.notion_hubs import build_identity_specific_hubs
 from money_machine.agents.implementations.notion_notifications import (
     SAMPLE_DATE,
+    _ensure_sample_column,  # pyright: ignore[reportPrivateUsage]
     build_notification_dashboard,
     sample_field_values,
 )
@@ -26,6 +27,7 @@ from money_machine.agents.implementations.notion_product_builder import (
     ProductBuildError,
     build_top_level_page_and_design_shell,
 )
+from money_machine.agents.implementations.notion_progress import stamp_integrity_digest
 from money_machine.agents.implementations.notion_shared_databases import (
     BUSINESS_SHARED_DATABASES,
     PLANNER_SHARED_DATABASES,
@@ -723,6 +725,21 @@ async def test_buyer_name_placeholder_on_an_existing_row_is_not_overwritten(
 
 
 @pytest.mark.asyncio
+async def test_sample_marker_column_is_moved_to_the_end() -> None:
+    probe = FixtureNotionAdapter()
+    database = await probe.create_database(
+        title="Tasks", parent_id="ws_default", parent_type="workspace"
+    )
+    await probe.add_property(database.id, "sample_marker", "select", {"options": ["SAMPLE"]})
+    await probe.add_property(database.id, "Name", "title", {})
+    assert database.properties[-1].name == "Name"
+
+    await _ensure_sample_column(probe, database.id)
+
+    assert database.properties[-1].name == "sample_marker"
+
+
+@pytest.mark.asyncio
 async def test_notification_checkpoint_parser_rejects_bad_inputs(tmp_path: Path) -> None:
     spec = _spec()
     probe = FixtureNotionAdapter()
@@ -738,6 +755,7 @@ async def test_notification_checkpoint_parser_rejects_bad_inputs(tmp_path: Path)
 
     payload = json.loads(original)
     payload["provider_object_references"]["notification_dashboard"] = {"database_id": "x"}
+    payload = stamp_integrity_digest(payload)
     path.write_text(
         json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="ascii"
     )

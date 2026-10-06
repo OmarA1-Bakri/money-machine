@@ -443,12 +443,12 @@ async def _ensure_dashboard(
     )
     views = _classify_views(probe, page, database_ids, _linked_views(kinds))
     if _existing_mark(page.cover, palette_cover(spec), "cover") is None:
-        guard_operation(probe, OP_DASHBOARD_COVER)
         await probe.set_cover(page.id, palette_cover(spec))
     if _existing_mark(page.icon, palette_header(spec), "header") is None:
         await probe.set_icon(page.id, palette_header(spec))
     if greeting is None:
         greeting = await probe.add_text_block(page.id, greeting_content(spec))
+    guard_operation(probe, OP_DASHBOARD_COVER)
     if navigation is None:
         navigation = await probe.add_text_block(page.id, navigation_content(spec))
     if identity is None:

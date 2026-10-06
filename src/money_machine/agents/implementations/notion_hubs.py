@@ -661,13 +661,14 @@ async def _ensure_hubs(
     spec: ProductSpec,
     kinds: tuple[str, ...],
 ) -> tuple[IdentityHubRecord, ...]:
-    guard_operation(probe, OP_HUBS_CREATE)
     database_ids = dict(stored.database_ids)
     plan = _plan(spec, kinds)
     found = _classify(probe, home, stored, spec, plan, database_ids)
     records: list[IdentityHubRecord] = []
-    for planned, existing in zip(plan, found, strict=True):
+    for index, (planned, existing) in enumerate(zip(plan, found, strict=True)):
         page = existing.page or await probe.add_child_page(home.id, planned.name)
+        if index == 0:
+            guard_operation(probe, OP_HUBS_CREATE)
         section_ids: list[tuple[str, str]] = []
         for role, block in zip(_SECTION_ROLES, existing.sections, strict=True):
             saved = block or await probe.add_text_block(

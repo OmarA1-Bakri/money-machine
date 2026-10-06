@@ -26,6 +26,7 @@ from money_machine.agents.implementations.notion_product_builder import (
     ProductBuildError,
     build_top_level_page_and_design_shell,
 )
+from money_machine.agents.implementations.notion_progress import stamp_integrity_digest
 from money_machine.agents.implementations.notion_shared_databases import build_shared_databases
 from money_machine.control.state import SESSION_EVIDENCE_KEYS
 from money_machine.domain.models.common import EvidenceReference
@@ -372,6 +373,7 @@ async def test_aesthetics_checkpoint_parser_rejects_bad_inputs(tmp_path: Path) -
 
     payload = json.loads(original)
     payload["provider_object_references"]["aesthetics"]["accents"] = []
+    payload = stamp_integrity_digest(payload)
     path.write_text(
         json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="ascii"
     )

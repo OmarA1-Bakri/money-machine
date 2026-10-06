@@ -26,6 +26,7 @@ from money_machine.agents.implementations.notion_product_builder import (
     ProductBuildError,
     build_top_level_page_and_design_shell,
 )
+from money_machine.agents.implementations.notion_progress import stamp_integrity_digest
 from money_machine.agents.implementations.notion_shared_databases import (
     BUSINESS_SHARED_DATABASES,
     PLANNER_SHARED_DATABASES,
@@ -221,10 +222,10 @@ async def test_replay_does_not_create_another_dashboard(tmp_path: Path) -> None:
 
     second = await _build(spec, probe, path, recorded_at=datetime(2026, 10, 6, tzinfo=UTC))
 
-    assert second == first
-    assert path.read_bytes() == before
     assert set(probe.blocks) == block_ids
     assert set(probe.linked_views) == view_ids
+    assert second == first
+    assert path.read_bytes() == before
     assert len(probe.pages) == 1
     assert len(probe.databases) == len(PLANNER_SHARED_DATABASES)
 
@@ -611,6 +612,7 @@ async def test_dashboard_checkpoint_without_pieces_is_rejected(tmp_path: Path) -
     await _build(spec, probe, path)
     payload = json.loads(path.read_text(encoding="ascii"))
     del payload["provider_object_references"]["dashboard"]
+    payload = stamp_integrity_digest(payload)
     path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="ascii")
     before_views = set(probe.linked_views)
 
@@ -671,6 +673,7 @@ async def test_dashboard_piece_parser_rejects_bad_inputs(tmp_path: Path) -> None
 
     payload = json.loads(original)
     payload["provider_object_references"]["dashboard"][0]["kind"] = "nope"
+    payload = stamp_integrity_digest(payload)
     path.write_text(
         json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="ascii"
     )

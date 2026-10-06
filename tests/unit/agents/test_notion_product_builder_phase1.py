@@ -177,10 +177,10 @@ async def test_replay_does_not_create_another_page_or_rewrite_the_checkpoint(
 
     second = await _build(spec, probe, path, recorded_at=LATER)
 
-    assert second == first
-    assert second.recorded_at == WHEN
     assert set(probe.pages) == page_ids
     assert set(probe.blocks) == block_ids
+    assert second == first
+    assert second.recorded_at == WHEN
     assert path.read_bytes() == before
     assert len(probe.databases) == 0
 
