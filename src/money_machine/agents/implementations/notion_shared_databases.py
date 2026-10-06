@@ -7,8 +7,6 @@ does not run that phase, open a network connection, or commission an agent.
 
 from __future__ import annotations
 
-import json
-import os
 from collections.abc import Mapping
 from dataclasses import replace
 from datetime import datetime
@@ -35,6 +33,14 @@ from money_machine.agents.implementations.notion_product_builder import (
     require_token,
     resume_stored,
 )
+from money_machine.agents.implementations.notion_progress import (
+    ProviderFailure,
+    guard_operation,
+    load_payload,
+    raise_recorded,
+    shared_create_operation,
+)
+from money_machine.agents.implementations.notion_progress_record import write_checkpoint
 from money_machine.domain.models.product_spec import ProductSpec
 from money_machine.integrations.notion.domain import (
     NotionDatabase,
@@ -119,28 +125,23 @@ async def build_shared_databases(
     if stored.checkpoint_names == _PHASE_TWO_NAMES:
         _require_resumed_databases(fixture, page, stored, kinds)
         return stored
-    database_ids = await _ensure_databases(fixture, page, kinds)
+    try:
+        database_ids = await _ensure_databases(fixture, page, kinds)
+    except ProviderFailure as failure:
+        raise_recorded(path, PHASE_SHARED_DATABASES, failure)
     checkpoint = _checkpoint_with_databases(stored, database_ids, moment)
     _write_shared_checkpoint(path, checkpoint)
     return checkpoint
 
 
 def _read_product_checkpoint(path: Path) -> ProductBuildCheckpoint | None:
-    if not path.exists():
+    envelope = load_payload(path)
+    if envelope.payload is None:
         return None
-    text = path.read_text(encoding="utf-8")
-    if text == "" or not text.endswith("\n"):
-        raise ProductBuildError("checkpoint is incomplete")
-    try:
-        decoded = cast(object, json.loads(text))
-    except json.JSONDecodeError as error:
-        raise ProductBuildError("checkpoint is not JSON") from error
-    if type(decoded) is not dict:
-        raise ProductBuildError("checkpoint must be an object")
-    payload = cast(dict[object, object], decoded)
+    payload = envelope.payload
     names = payload.get("checkpoint_names")
     if names == list(_PHASE_ONE_NAMES):
-        return parse_checkpoint(decoded)
+        return parse_checkpoint(payload)
     return _parse_shared_checkpoint(payload)
 
 
@@ -210,29 +211,16 @@ def _checkpoint_with_databases(
 
 
 def _write_shared_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> None:
-    payload = {
-        "build_kind": checkpoint.build_kind,
-        "build_version": checkpoint.build_version,
-        "checkpoint_names": list(checkpoint.checkpoint_names),
-        "palette_name": checkpoint.palette_name,
-        "palette_tokens": [list(token) for token in checkpoint.palette_tokens],
-        "product_id": checkpoint.product_id,
-        "provider_object_references": {
-            "design_shell_block_id": checkpoint.shell_block_id,
-            "shared_databases": [
-                {"database_id": database_id, "kind": kind}
-                for kind, database_id in checkpoint.database_ids
-            ],
-            "top_level_page_id": checkpoint.page_id,
-            "workspace_id": checkpoint.workspace_id,
-        },
-        "recorded_at": checkpoint.recorded_at.isoformat(),
-        "spec_id": checkpoint.spec_id,
+    references: dict[str, object] = {
+        "design_shell_block_id": checkpoint.shell_block_id,
+        "shared_databases": [
+            {"database_id": database_id, "kind": kind}
+            for kind, database_id in checkpoint.database_ids
+        ],
+        "top_level_page_id": checkpoint.page_id,
+        "workspace_id": checkpoint.workspace_id,
     }
-    text = json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n"
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    temporary.write_text(text, encoding="ascii")
-    os.replace(temporary, path)
+    write_checkpoint(path, checkpoint, references)
 
 
 def _databases_named(probe: FixtureNotionAdapter, title: str, page_id: str) -> list[NotionDatabase]:
@@ -429,6 +417,7 @@ async def _ensure_databases(
     created: list[tuple[str, str]] = []
     for kind, existing in planned:
         if existing is None:
+            guard_operation(probe, shared_create_operation(kind))
             existing = await _create_shared_database(probe, page.id, kind)
         elif not _schema_matches(existing, kind):
             await _append_catalogue(probe, existing, kind)

@@ -9,8 +9,6 @@ an agent.
 from __future__ import annotations
 
 import hashlib
-import json
-import os
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -28,6 +26,9 @@ from money_machine.agents.implementations.notion_linked_views import (
 )
 from money_machine.agents.implementations.notion_linked_views import (
     filter_pairs as _filter_pairs,
+)
+from money_machine.agents.implementations.notion_linked_views import (
+    view_matches as _view_matches,
 )
 from money_machine.agents.implementations.notion_product_builder import (
     BUILD_PHASES,
@@ -47,6 +48,14 @@ from money_machine.agents.implementations.notion_product_builder import (
     require_spec,
     require_token,
 )
+from money_machine.agents.implementations.notion_progress import (
+    OP_HUBS_CREATE,
+    ProviderFailure,
+    guard_operation,
+    load_payload,
+    raise_recorded,
+)
+from money_machine.agents.implementations.notion_progress_record import write_checkpoint
 from money_machine.agents.implementations.notion_shared_databases import (
     require_checkpoint_databases,
     shared_database_kinds,
@@ -192,7 +201,10 @@ async def build_identity_specific_hubs(
     if stored.checkpoint_names == _PHASE_FOUR:
         _require_saved_hubs(fixture, page, stored, validated, kinds)
         return stored
-    records = await _ensure_hubs(fixture, page, stored, validated, kinds)
+    try:
+        records = await _ensure_hubs(fixture, page, stored, validated, kinds)
+    except ProviderFailure as failure:
+        raise_recorded(path, _PHASE_FOUR[-1], failure)
     checkpoint = _checkpoint_with_hubs(stored, records, moment)
     _write_hubs_checkpoint(path, checkpoint)
     return checkpoint
@@ -257,18 +269,10 @@ def _plan(spec: ProductSpec, kinds: tuple[str, ...]) -> tuple[_PlannedHub, ...]:
 
 
 def _load_checkpoint(path: Path) -> ProductBuildCheckpoint:
-    if not path.exists():
+    envelope = load_payload(path)
+    if envelope.payload is None:
         raise ProductBuildError("identity hubs require the dashboard checkpoint")
-    text = path.read_text(encoding="utf-8")
-    if text == "" or not text.endswith("\n"):
-        raise ProductBuildError("checkpoint is incomplete")
-    try:
-        decoded = cast(object, json.loads(text))
-    except json.JSONDecodeError as error:
-        raise ProductBuildError("checkpoint is not JSON") from error
-    if type(decoded) is not dict:
-        raise ProductBuildError("checkpoint must be an object")
-    payload = cast(dict[object, object], decoded)
+    payload = envelope.payload
     names = payload.get("checkpoint_names")
     if names == list(_PHASE_THREE):
         return parse_dashboard_checkpoint(payload)
@@ -621,22 +625,6 @@ def _classify_navigation(
     return matches[0] if matches else None
 
 
-def _view_matches(
-    probe: FixtureNotionAdapter, page_id: str, source_id: str, view: LinkedView
-) -> list[NotionLinkedView]:
-    filters = _filter_pairs(view)
-    return [
-        item
-        for item in probe.linked_views.values()
-        if type(item) is NotionLinkedView
-        and item.parent_page_id == page_id
-        and item.source_database_id == source_id
-        and item.view_type == view.view_type
-        and item.name == view.name
-        and item.filters == filters
-    ]
-
-
 def _classify_views(
     probe: FixtureNotionAdapter,
     page: NotionPage,
@@ -673,6 +661,7 @@ async def _ensure_hubs(
     spec: ProductSpec,
     kinds: tuple[str, ...],
 ) -> tuple[IdentityHubRecord, ...]:
+    guard_operation(probe, OP_HUBS_CREATE)
     database_ids = dict(stored.database_ids)
     plan = _plan(spec, kinds)
     found = _classify(probe, home, stored, spec, plan, database_ids)
@@ -802,7 +791,9 @@ def _hub_mark_ok(
 ) -> bool:
     if page_marks is not None and page_id in page_marks:
         icon, cover = page_marks[page_id]
-        return page.icon == icon and page.cover == cover
+        if page.icon != icon:
+            return False
+        return page.cover == cover or page.cover is None
     return page.icon is None and page.cover is None
 
 
@@ -858,19 +849,4 @@ def hub_provider_references(checkpoint: ProductBuildCheckpoint) -> dict[str, obj
 
 
 def _write_hubs_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> None:
-    references = hub_provider_references(checkpoint)
-    payload = {
-        "build_kind": checkpoint.build_kind,
-        "build_version": checkpoint.build_version,
-        "checkpoint_names": list(checkpoint.checkpoint_names),
-        "palette_name": checkpoint.palette_name,
-        "palette_tokens": [list(token) for token in checkpoint.palette_tokens],
-        "product_id": checkpoint.product_id,
-        "provider_object_references": references,
-        "recorded_at": checkpoint.recorded_at.isoformat(),
-        "spec_id": checkpoint.spec_id,
-    }
-    text = json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n"
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    temporary.write_text(text, encoding="ascii")
-    os.replace(temporary, path)
+    write_checkpoint(path, checkpoint, hub_provider_references(checkpoint))

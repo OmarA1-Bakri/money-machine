@@ -10,14 +10,23 @@ ProductSpec is not an input.
 
 from __future__ import annotations
 
-import json
-import os
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PosixPath, WindowsPath
 from typing import cast
 from uuid import UUID
 
+from money_machine.agents.implementations.notion_progress import (
+    OP_PHASE1_PAGE,
+    OP_PHASE1_SHELL,
+    ProductBuildError,
+    ProviderFailure,
+    UnrecoverableCheckpoint,
+    guard_operation,
+    load_payload,
+    raise_recorded,
+)
+from money_machine.agents.implementations.notion_progress_record import write_checkpoint
 from money_machine.domain.models.product_spec import ProductSpec
 from money_machine.integrations.notion.domain import (
     NotionCalloutBlock,
@@ -60,10 +69,6 @@ CHECKPOINT_KEYS = frozenset(
     }
 )
 PROVIDER_KEYS = frozenset({"design_shell_block_id", "top_level_page_id", "workspace_id"})
-
-
-class ProductBuildError(ValueError):
-    """Raised when a fixture product-build phase cannot proceed."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,23 +150,57 @@ async def build_top_level_page_and_design_shell(
     path = require_path(checkpoint_path)
     moment = require_datetime(recorded_at)
     _reject_shell_line_breaks(validated)
-    stored = _read_checkpoint(path)
+    try:
+        stored = _read_checkpoint(path)
+    except UnrecoverableCheckpoint as error:
+        return await _rebuild_unrecoverable(fixture, validated, path, moment, error)
     if stored is not None:
         require_same_spec(stored, validated)
     page = find_spec_page(fixture, str(validated.spec_id))
     if stored is not None:
         return resume_stored(fixture, stored, page, validated)
-    if page is None:
-        page = await _create_top_level_page(fixture, validated)
-    else:
-        _require_page_matches_spec(page, validated, fixture)
-    shell = _find_shell(fixture, page, validated)
-    if shell is None:
-        shell = await fixture.add_callout_block(
-            page.id, design_shell_content(validated), icon=DESIGN_SHELL_ICON
-        )
-        page.properties[SHELL_BLOCK_PROPERTY] = shell.id
+    try:
+        if page is None:
+            guard_operation(fixture, OP_PHASE1_PAGE)
+            page = await _create_top_level_page(fixture, validated)
+        else:
+            _require_page_matches_spec(page, validated, fixture)
+        shell = _find_shell(fixture, page, validated)
+        if shell is None:
+            guard_operation(fixture, OP_PHASE1_SHELL)
+            shell = await fixture.add_callout_block(
+                page.id, design_shell_content(validated), icon=DESIGN_SHELL_ICON
+            )
+            page.properties[SHELL_BLOCK_PROPERTY] = shell.id
+    except ProviderFailure as failure:
+        raise_recorded(path, PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL, failure)
     checkpoint = _checkpoint_for(validated, page, shell, moment)
+    _write_checkpoint(path, checkpoint)
+    return checkpoint
+
+
+async def _rebuild_unrecoverable(
+    probe: FixtureNotionAdapter,
+    spec: ProductSpec,
+    path: Path,
+    recorded_at: datetime,
+    error: UnrecoverableCheckpoint,
+) -> ProductBuildCheckpoint:
+    """Rebuild phase 1 only. Later phases refuse an unrecoverable record."""
+    spec_id = error.payload.get("spec_id")
+    if spec_id is not None and spec_id != str(spec.spec_id):
+        raise ProductBuildError("checkpoint belongs to a different ProductSpec") from error
+    stale = find_spec_page(probe, str(spec.spec_id))
+    if stale is not None:
+        stale.properties.pop(SPEC_ID_PROPERTY, None)
+        stale.properties.pop(PRODUCT_ID_PROPERTY, None)
+        stale.properties.pop(SHELL_BLOCK_PROPERTY, None)
+    page = await _create_top_level_page(probe, spec)
+    shell = await probe.add_callout_block(
+        page.id, design_shell_content(spec), icon=DESIGN_SHELL_ICON
+    )
+    page.properties[SHELL_BLOCK_PROPERTY] = shell.id
+    checkpoint = _checkpoint_for(spec, page, shell, recorded_at)
     _write_checkpoint(path, checkpoint)
     return checkpoint
 
@@ -215,7 +254,7 @@ def _palette(spec: ProductSpec) -> tuple[tuple[str, str], ...]:
     return tuple((token.name, token.hex) for token in spec.palette_tokens)
 
 
-def _workspace_id(probe: FixtureNotionAdapter) -> str:
+def require_workspace_id(probe: FixtureNotionAdapter) -> str:
     workspaces = list(probe.workspaces.values())
     if len(workspaces) != 1:
         raise ProductBuildError("fixture probe must have exactly one workspace")
@@ -250,7 +289,7 @@ def _property(page: NotionPage, key: str) -> str | None:
 def _require_page_matches_spec(
     page: NotionPage, spec: ProductSpec, probe: FixtureNotionAdapter
 ) -> None:
-    if page.parent_type != _TOP_LEVEL_PARENT or page.parent_id != _workspace_id(probe):
+    if page.parent_type != _TOP_LEVEL_PARENT or page.parent_id != require_workspace_id(probe):
         raise ProductBuildError("existing page is not top level")
     if page.title != spec.title:
         raise ProductBuildError("existing page title does not match the ProductSpec")
@@ -261,7 +300,7 @@ def _require_page_matches_spec(
 
 
 async def _create_top_level_page(probe: FixtureNotionAdapter, spec: ProductSpec) -> NotionPage:
-    workspace_id = _workspace_id(probe)
+    workspace_id = require_workspace_id(probe)
     page = await probe.create_page(
         title=spec.title,
         parent_id=workspace_id,
@@ -314,7 +353,7 @@ def resume_stored(
     page: NotionPage | None,
     spec: ProductSpec,
 ) -> ProductBuildCheckpoint:
-    if stored.workspace_id != _workspace_id(probe):
+    if stored.workspace_id != require_workspace_id(probe):
         raise ProductBuildError("checkpoint workspace does not match the fixture probe")
     if page is None or page.id != stored.page_id:
         raise ProductBuildError("checkpoint page is missing from the fixture probe")
@@ -369,16 +408,15 @@ def _checkpoint_for(
 
 
 def _read_checkpoint(path: Path) -> ProductBuildCheckpoint | None:
-    if not path.exists():
+    envelope = load_payload(path, allow_unrecoverable=True)
+    if envelope.payload is None:
         return None
-    text = path.read_text(encoding="utf-8")
-    if text == "" or not text.endswith("\n"):
-        raise ProductBuildError("checkpoint is incomplete")
-    try:
-        decoded = cast(object, json.loads(text))
-    except json.JSONDecodeError as error:
-        raise ProductBuildError("checkpoint is not JSON") from error
-    return parse_checkpoint(decoded)
+    if envelope.recovery == "unrecoverable":
+        raise UnrecoverableCheckpoint(envelope.payload)
+    names = envelope.payload.get("checkpoint_names")
+    if names == [] and envelope.repair_jobs:
+        return None
+    return parse_checkpoint(envelope.payload)
 
 
 def parse_checkpoint(decoded: object) -> ProductBuildCheckpoint:
@@ -477,22 +515,12 @@ def _require_stored_datetime(value: object) -> datetime:
 
 
 def _write_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> None:
-    payload = {
-        "build_kind": checkpoint.build_kind,
-        "build_version": checkpoint.build_version,
-        "checkpoint_names": list(checkpoint.checkpoint_names),
-        "palette_name": checkpoint.palette_name,
-        "palette_tokens": [list(token) for token in checkpoint.palette_tokens],
-        "product_id": checkpoint.product_id,
-        "provider_object_references": {
+    write_checkpoint(
+        path,
+        checkpoint,
+        {
             "design_shell_block_id": checkpoint.shell_block_id,
             "top_level_page_id": checkpoint.page_id,
             "workspace_id": checkpoint.workspace_id,
         },
-        "recorded_at": checkpoint.recorded_at.isoformat(),
-        "spec_id": checkpoint.spec_id,
-    }
-    text = json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n"
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    temporary.write_text(text, encoding="ascii")
-    os.replace(temporary, path)
+    )

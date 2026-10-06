@@ -52,7 +52,7 @@ PHASE_TWO_AT = datetime(2026, 10, 5, 20, 0, tzinfo=UTC)
 DASHBOARD_AT = datetime(2026, 10, 5, 22, 30, tzinfo=UTC)
 LATER = datetime(2026, 10, 5, 23, 45, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "0793e73147c0a3e50b6e27be2c74d3084ab1bfd5"
+HEAD_SHA = "3f0a30a8e52b183f10799128d4fd7b17c1b74495"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 _PHASES = (
     PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL,
@@ -235,8 +235,10 @@ async def test_mass_tier_builds_identity_hubs_once(tmp_path: Path) -> None:
     assert notes.filters == ()
     stored = json.loads(path.read_text(encoding="ascii"))
     assert stored["checkpoint_names"] == list(_PHASES)
-    assert "notification_dashboard" not in path.read_text(encoding="ascii")
-    assert "aesthetics_and_content_completion" not in path.read_text(encoding="ascii")
+    assert "notification_dashboard" not in stored["checkpoint_names"]
+    assert "aesthetics_and_content_completion" not in stored["checkpoint_names"]
+    assert "notification_dashboard" in stored["progress"]["deferred_operations"]
+    assert "aesthetics_and_content_completion" in stored["progress"]["deferred_operations"]
     hubs = stored["provider_object_references"]["identity_hubs"]
     assert [row["name"] for row in hubs] == [hub.name for hub in spec.hubs]
     assert [section["role"] for section in hubs[0]["sections"]] == list(_ROLES)
@@ -923,8 +925,10 @@ def test_hubs_module_does_not_name_a_live_client_or_later_phase() -> None:
         "https://",
         "http://",
         "etsy",
+        "Etsy",
+        "ETSY",
     ):
-        assert token not in source
+        assert token.casefold() not in source.casefold()
 
 
 @pytest.mark.asyncio
@@ -1057,5 +1061,5 @@ def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     assert evidence["identity_hubs_built"] is False
     assert evidence["notification_dashboard_built"] is False
     assert evidence["home_dashboard_built"] is False
-    assert state["state_revision"] == 54
+    assert state["state_revision"] == 55
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")

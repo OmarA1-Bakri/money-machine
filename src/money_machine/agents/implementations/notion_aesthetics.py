@@ -8,8 +8,6 @@ network connection, or commission an agent.
 
 from __future__ import annotations
 
-import json
-import os
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
@@ -37,6 +35,15 @@ from money_machine.agents.implementations.notion_product_builder import (
     require_spec,
     require_token,
 )
+from money_machine.agents.implementations.notion_progress import (
+    OP_AESTHETICS_SAMPLES,
+    ProviderFailure,
+    guard_operation,
+    load_payload,
+    raise_recorded,
+    reject_duplicate_labels,
+)
+from money_machine.agents.implementations.notion_progress_record import write_checkpoint
 from money_machine.domain.models.product_spec import ColourToken, ProductSpec
 from money_machine.integrations.notion.domain import (
     NotionCalloutBlock,
@@ -93,25 +100,20 @@ async def build_aesthetics_and_content_completion(
     if stored.checkpoint_names == BUILD_PHASES:
         _require_saved(fixture, stored, validated)
         return stored
-    record = await _ensure(fixture, stored, validated)
+    try:
+        record = await _ensure(fixture, stored, validated)
+    except ProviderFailure as failure:
+        raise_recorded(path, BUILD_PHASES[-1], failure)
     checkpoint = _checkpoint_with(stored, record, moment)
     _write_checkpoint(path, checkpoint)
     return checkpoint
 
 
 def _load_checkpoint(path: Path) -> ProductBuildCheckpoint:
-    if not path.exists():
+    envelope = load_payload(path)
+    if envelope.payload is None:
         raise ProductBuildError("aesthetics require the notification dashboard checkpoint")
-    text = path.read_text(encoding="utf-8")
-    if text == "" or not text.endswith("\n"):
-        raise ProductBuildError("checkpoint is incomplete")
-    try:
-        decoded = cast(object, json.loads(text))
-    except json.JSONDecodeError as error:
-        raise ProductBuildError("checkpoint is not JSON") from error
-    if type(decoded) is not dict:
-        raise ProductBuildError("checkpoint must be an object")
-    payload = cast(dict[object, object], decoded)
+    payload = envelope.payload
     names = payload.get("checkpoint_names")
     if names == list(_PHASE_FIVE):
         return parse_notification_checkpoint(payload)
@@ -189,8 +191,7 @@ def _require_pairs(
             )
         )
     names = [name for name, _block_id in rows]
-    if len(names) != len(set(names)):
-        raise ProductBuildError(f"checkpoint aesthetics {label} is duplicated")
+    reject_duplicate_labels(names, f"checkpoint aesthetics {label} is duplicated")
     return tuple(rows)
 
 
@@ -241,21 +242,7 @@ def _write_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> None:
         ],
         "samples": [{"block_id": block_id, "hub": hub} for hub, block_id in record.samples],
     }
-    payload = {
-        "build_kind": checkpoint.build_kind,
-        "build_version": checkpoint.build_version,
-        "checkpoint_names": list(checkpoint.checkpoint_names),
-        "palette_name": checkpoint.palette_name,
-        "palette_tokens": [list(token) for token in checkpoint.palette_tokens],
-        "product_id": checkpoint.product_id,
-        "provider_object_references": references,
-        "recorded_at": checkpoint.recorded_at.isoformat(),
-        "spec_id": checkpoint.spec_id,
-    }
-    text = json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n"
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    temporary.write_text(text, encoding="ascii")
-    os.replace(temporary, path)
+    write_checkpoint(path, checkpoint, references)
 
 
 def _require_saved(
@@ -313,9 +300,12 @@ def _require_contents(
             raise ProductBuildError("aesthetics sample is missing")
     if tuple(page_id for page_id, _icon, _cover in record.marks) != tuple(pages.values()):
         raise ProductBuildError("hub palette mark does not match")
-    for index, (_page_id, icon, cover) in enumerate(record.marks):
+    for index, (page_id, icon, cover) in enumerate(record.marks):
         token = spec.palette_tokens[index % len(spec.palette_tokens)]
         if icon != hub_icon(token) or cover != hub_cover(token):
+            raise ProductBuildError("hub palette mark does not match")
+        page = probe.pages.get(page_id)
+        if type(page) is not NotionPage or page.icon != icon or page.cover != cover:
             raise ProductBuildError("hub palette mark does not match")
 
 
@@ -334,6 +324,7 @@ async def _ensure(
         page_marks=found.marks or None,
     )
     accents = await _ensure_accents(probe, stored, spec, found.accents)
+    guard_operation(probe, OP_AESTHETICS_SAMPLES)
     samples = await _ensure_samples(probe, stored, spec, found.samples)
     marks = await _ensure_marks(probe, stored, spec)
     return AestheticsRecord(accents=accents, samples=samples, marks=marks)
@@ -447,6 +438,9 @@ def _adopt_marks(
         cover = hub_cover(token)
         if page.icon is None and page.cover is None:
             continue
+        if page.icon == icon and page.cover is None:
+            marks[page.id] = (icon, cover)
+            continue
         if page.icon != icon or page.cover != cover:
             raise ProductBuildError("hub palette mark does not match")
         marks[page.id] = (icon, cover)
@@ -504,5 +498,9 @@ async def _ensure_marks(
         if page.icon is None and page.cover is None:
             await probe.set_icon(page.id, icon)
             await probe.set_cover(page.id, cover)
+        elif page.icon == icon and page.cover is None:
+            await probe.set_cover(page.id, cover)
+        elif page.icon != icon or page.cover != cover:
+            raise ProductBuildError("hub palette mark does not match")
         rows.append((page.id, icon, cover))
     return tuple(rows)
