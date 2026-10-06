@@ -22,6 +22,8 @@ from money_machine.agents.implementations.notion_aesthetics import (
     hub_cover,
     hub_icon,
     parse_aesthetics_checkpoint,
+    require_aesthetics_created_ids,
+    require_completed_aesthetics,
 )
 from money_machine.agents.implementations.notion_product_builder import (
     BUILD_PHASES,
@@ -86,25 +88,28 @@ async def build_variants(
     fixture = require_probe(probe)
     path = require_path(checkpoint_path)
     moment = require_datetime(recorded_at)
-    stored = _load_checkpoint(path)
+    stored, created = _load_checkpoint(path)
     require_same_spec(stored, validated)
+    await _release_copied_spec_ids(fixture, stored, validated)
+    _bind_earlier_phases(fixture, stored, validated, created)
     if stored.variants:
-        _require_saved(fixture, stored, validated)
+        await _require_saved(fixture, stored, validated)
         return stored
     try:
         records = await _ensure(fixture, stored, validated)
     except ProviderFailure as failure:
         raise_recorded(path, BUILD_PHASES[-1], failure)
     checkpoint = _checkpoint_with(stored, records, moment)
-    _write_checkpoint(path, checkpoint)
+    _write_checkpoint(path, checkpoint, created)
     return checkpoint
 
 
-def _load_checkpoint(path: Path) -> ProductBuildCheckpoint:
+def _load_checkpoint(path: Path) -> tuple[ProductBuildCheckpoint, Mapping[str, object]]:
     envelope = load_payload(path)
     if envelope.payload is None or envelope.created_notion_ids is None:
         raise ProductBuildError("variants require the aesthetics checkpoint")
     payload = envelope.payload
+    created = envelope.created_notion_ids
     names = payload.get("checkpoint_names")
     if names != list(BUILD_PHASES):
         raise ProductBuildError("variants require the aesthetics checkpoint")
@@ -114,10 +119,28 @@ def _load_checkpoint(path: Path) -> ProductBuildCheckpoint:
     refs = cast(dict[object, object], references)
     base = parse_aesthetics_checkpoint(payload)
     if _VARIANTS_KEY not in refs:
-        return base
+        return base, created
     records = _require_records(refs[_VARIANTS_KEY])
-    _require_created_ids(envelope.created_notion_ids, records)
-    return replace(base, next_phase=PHASE_QA, variants=records)
+    _require_variant_created_ids(created, records)
+    return replace(base, next_phase=PHASE_QA, variants=records), created
+
+
+def _bind_earlier_phases(
+    probe: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+    created: Mapping[str, object],
+) -> None:
+    """Aesthetics saved state, then created ids, before any variant branch."""
+    page_ids, block_ids = _open_variant_ids(probe, stored, spec)
+    require_completed_aesthetics(
+        probe,
+        stored,
+        spec,
+        extra_top_level_ids=page_ids,
+        extra_block_ids=block_ids,
+    )
+    require_aesthetics_created_ids(probe, created, stored)
 
 
 def _require_records(value: object) -> tuple[VariantRecord, ...]:
@@ -151,7 +174,9 @@ def _require_records(value: object) -> tuple[VariantRecord, ...]:
     return tuple(records)
 
 
-def _require_created_ids(created: Mapping[str, object], records: tuple[VariantRecord, ...]) -> None:
+def _require_variant_created_ids(
+    created: Mapping[str, object], records: tuple[VariantRecord, ...]
+) -> None:
     found = created.get(_VARIANTS_KEY)
     if type(found) is not list or len(found) != len(records):
         raise ProductBuildError("progress created ids do not match the checkpoint")
@@ -174,10 +199,14 @@ def _checkpoint_with(
     return replace(stored, next_phase=PHASE_QA, variants=records, recorded_at=recorded_at)
 
 
-def _write_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> None:
+def _write_checkpoint(
+    path: Path,
+    checkpoint: ProductBuildCheckpoint,
+    created: Mapping[str, object],
+) -> None:
     references = aesthetics_provider_references(checkpoint)
     references[_VARIANTS_KEY] = [_reference_row(record) for record in checkpoint.variants]
-    write_checkpoint(path, checkpoint, references)
+    write_checkpoint(path, checkpoint, references, retained_created_ids=created)
 
 
 def _reference_row(record: VariantRecord) -> dict[str, str]:
@@ -214,15 +243,58 @@ async def _ensure(
     for colour, token in pairs:
         title = _variant_title(spec, colour)
         existing = _find_titled(probe, source, title)
-        if existing is not None:
-            records.append(_adopt(probe, spec, existing, colour, token))
-            continue
-        if records:
-            guard_operation(probe, OP_VARIANTS)
-        records.append(await _create_variant(probe, spec, source, colour, token))
+        if existing is None:
+            existing = _find_copy(probe, source)
+        if existing is None:
+            if records:
+                guard_operation(probe, OP_VARIANTS)
+            existing = await probe.duplicate_page(source.id)
+        records.append(await _finish_variant(probe, spec, existing, colour, token))
     _require_one_spec_page(probe, spec, stored)
     _require_original(source)
     return tuple(records)
+
+
+def _open_variant_ids(
+    probe: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    source = probe.pages.get(stored.page_id)
+    if type(source) is not NotionPage:
+        return (), ()
+    titles = {_variant_title(spec, colour) for colour in spec.colour_variants}
+    copy_title = f"{source.title} (Copy)"
+    recorded = {record.page_id for record in stored.variants}
+    page_ids = [
+        page.id
+        for page in probe.pages.values()
+        if type(page) is NotionPage
+        and page.id != source.id
+        and page.parent_type == "workspace"
+        and (page.id in recorded or page.title in titles or page.title == copy_title)
+    ]
+    block_ids = [block.id for block in probe.blocks.values() if block.parent_id in set(page_ids)]
+    return tuple(page_ids), tuple(block_ids)
+
+
+async def _release_copied_spec_ids(
+    probe: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+) -> None:
+    source = probe.pages.get(stored.page_id)
+    if type(source) is not NotionPage:
+        return
+    titles = {_variant_title(spec, colour) for colour in spec.colour_variants}
+    copy_title = f"{source.title} (Copy)"
+    for page in list(probe.pages.values()):
+        if type(page) is not NotionPage or page.id == source.id:
+            continue
+        if page.title not in titles and page.title != copy_title:
+            continue
+        if SPEC_ID_PROPERTY in page.properties:
+            await probe.drop_page_property(page.id, SPEC_ID_PROPERTY)
 
 
 def _source_page(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -> NotionPage:
@@ -249,46 +321,99 @@ def _find_titled(probe: FixtureNotionAdapter, source: NotionPage, title: str) ->
     return matches[0]
 
 
-async def _create_variant(
-    probe: FixtureNotionAdapter,
-    spec: ProductSpec,
-    source: NotionPage,
-    colour: str,
-    token: ColourToken,
-) -> VariantRecord:
-    page = await probe.duplicate_page(source.id)
-    page.properties.pop(SPEC_ID_PROPERTY, None)
-    await probe.rename_page(page.id, _variant_title(spec, colour))
-    await probe.set_icon(page.id, hub_icon(token))
-    await probe.set_cover(page.id, hub_cover(token))
-    accent = await probe.add_callout_block(
-        page.id,
-        accent_content(token.name, token.hex),
-        icon=AESTHETIC_ICON,
-    )
-    vocabulary = await probe.add_text_block(page.id, vocabulary_content(spec, colour, token))
-    await probe.publish_page(page.id)
-    await probe.set_duplicate_as_template(page.id, True)
-    await probe.set_search_indexing(page.id, False)
-    link = await probe.get_public_url(page.id)
-    if type(link) is not str or link == "":
-        raise ProductBuildError("variant secret link is missing")
-    return _record_from(page, colour, token, accent.id, vocabulary.id, link)
+def _find_copy(probe: FixtureNotionAdapter, source: NotionPage) -> NotionPage | None:
+    copy_title = f"{source.title} (Copy)"
+    matches = [
+        page
+        for page in probe.pages.values()
+        if type(page) is NotionPage and page.id != source.id and page.title == copy_title
+    ]
+    if len(matches) > 1:
+        raise ProductBuildError("variant page does not match")
+    if not matches:
+        return None
+    return matches[0]
 
 
-def _adopt(
+async def _finish_variant(
     probe: FixtureNotionAdapter,
     spec: ProductSpec,
     page: NotionPage,
     colour: str,
     token: ColourToken,
 ) -> VariantRecord:
-    _require_variant_page(probe, spec, page, colour, token)
-    accent_id, vocabulary_id = _block_ids(probe, spec, page, colour, token)
-    link = page.public_url
+    title = _variant_title(spec, colour)
+    if SPEC_ID_PROPERTY in page.properties:
+        page = await probe.drop_page_property(page.id, SPEC_ID_PROPERTY)
+    if page.title != title:
+        page = await probe.rename_page(page.id, title)
+    if page.icon != hub_icon(token):
+        page = await probe.set_icon(page.id, hub_icon(token))
+    if page.cover != hub_cover(token):
+        page = await probe.set_cover(page.id, hub_cover(token))
+    accent = _matching_accent(probe, page, token)
+    if accent is None:
+        accent = await probe.add_callout_block(
+            page.id,
+            accent_content(token.name, token.hex),
+            icon=AESTHETIC_ICON,
+        )
+    vocabulary = _matching_vocabulary(probe, spec, page, colour, token)
+    if vocabulary is None:
+        vocabulary = await probe.add_text_block(page.id, vocabulary_content(spec, colour, token))
+    if page.is_published is not True:
+        page = await probe.publish_page(page.id)
+    if page.duplicate_as_template is not True:
+        page = await probe.set_duplicate_as_template(page.id, True)
+    if page.search_indexing is not False:
+        page = await probe.set_search_indexing(page.id, False)
+    link = await probe.get_public_url(page.id)
     if type(link) is not str or link == "":
+        raise ProductBuildError("variant secret link is missing")
+    _require_variant_page(probe, spec, page, colour, token)
+    return _record_from(page, colour, token, accent.id, vocabulary.id, link)
+
+
+def _matching_accent(
+    probe: FixtureNotionAdapter, page: NotionPage, token: ColourToken
+) -> NotionCalloutBlock | None:
+    matches = [
+        block
+        for block in probe.blocks.values()
+        if type(block) is NotionCalloutBlock
+        and block.parent_id == page.id
+        and block.content == accent_content(token.name, token.hex)
+        and block.icon == AESTHETIC_ICON
+    ]
+    if len(matches) > 1:
         raise ProductBuildError("variant page does not match")
-    return _record_from(page, colour, token, accent_id, vocabulary_id, link)
+    if not matches:
+        return None
+    return matches[0]
+
+
+def _matching_vocabulary(
+    probe: FixtureNotionAdapter,
+    spec: ProductSpec,
+    page: NotionPage,
+    colour: str,
+    token: ColourToken,
+) -> NotionTextBlock | None:
+    expected = vocabulary_content(spec, colour, token)
+    matches = [
+        block
+        for block in probe.blocks.values()
+        if (
+            type(block) is NotionTextBlock
+            and block.parent_id == page.id
+            and block.content == expected
+        )
+    ]
+    if len(matches) > 1:
+        raise ProductBuildError("variant page does not match")
+    if not matches:
+        return None
+    return matches[0]
 
 
 def _record_from(
@@ -309,7 +434,7 @@ def _record_from(
     )
 
 
-def _require_saved(
+async def _require_saved(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
@@ -317,13 +442,16 @@ def _require_saved(
     if stored.next_phase != PHASE_QA or not stored.variants:
         raise ProductBuildError("variant record is missing")
     pairs = _aligned_pairs(spec)
-    if tuple((record.name, record.token_name) for record in stored.variants) != tuple(
-        (colour, token.name) for colour, token in pairs
+    if len(stored.variants) != len(pairs):
+        raise ProductBuildError("checkpoint variants do not match the ProductSpec")
+    aligned = tuple(zip(stored.variants, pairs, strict=True))
+    if tuple((record.name, record.token_name) for record, _pair in aligned) != tuple(
+        (colour, token.name) for _record, (colour, token) in aligned
     ):
         raise ProductBuildError("checkpoint variants do not match the ProductSpec")
     source = _source_page(probe, stored)
     _require_original(source)
-    for record, (colour, token) in zip(stored.variants, pairs, strict=True):
+    for record, (colour, token) in aligned:
         page = probe.pages.get(record.page_id)
         if type(page) is not NotionPage:
             raise ProductBuildError("variant page does not match")
@@ -331,7 +459,8 @@ def _require_saved(
         accent_id, vocabulary_id = _block_ids(probe, spec, page, colour, token)
         if accent_id != record.accent_block_id or vocabulary_id != record.vocabulary_block_id:
             raise ProductBuildError("variant page does not match")
-        if page.public_url != record.secret_link:
+        link = await probe.get_public_url(page.id)
+        if link != record.secret_link:
             raise ProductBuildError("variant page does not match")
     _require_one_spec_page(probe, spec, stored)
 

@@ -298,8 +298,6 @@ def _require_created_ids(
     samples = _created_pairs(body.get("samples"), "hub", "block_id")
     if accents != record.accents or samples != record.samples:
         raise ProductBuildError("progress created ids do not match the checkpoint")
-    if any(block_id not in probe.blocks for _label, block_id in (*accents, *samples)):
-        raise ProductBuildError("progress created ids do not match the checkpoint")
 
 
 def _created_database_pairs(
@@ -366,10 +364,43 @@ def _created_pairs(value: object, label_key: str, id_key: str) -> tuple[tuple[st
     return tuple(pairs)
 
 
+def require_completed_aesthetics(
+    probe: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+    *,
+    extra_top_level_ids: tuple[str, ...] = (),
+    extra_block_ids: tuple[str, ...] = (),
+) -> None:
+    """Check the saved aesthetics phase, including when variants already exist."""
+    view = stored
+    if stored.next_phase != BUILD_PHASES_COMPLETE:
+        view = replace(stored, next_phase=BUILD_PHASES_COMPLETE)
+    _require_saved(
+        probe,
+        view,
+        spec,
+        extra_top_level_ids=extra_top_level_ids,
+        extra_block_ids=extra_block_ids,
+    )
+
+
+def require_aesthetics_created_ids(
+    probe: FixtureNotionAdapter,
+    created: Mapping[str, object],
+    stored: ProductBuildCheckpoint,
+) -> None:
+    """Bind earlier-phase created ids to the fixture before any variant work."""
+    _require_created_ids(probe, created, stored)
+
+
 def _require_saved(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
+    *,
+    extra_top_level_ids: tuple[str, ...] = (),
+    extra_block_ids: tuple[str, ...] = (),
 ) -> None:
     record = stored.aesthetics
     if record is None or stored.next_phase != BUILD_PHASES_COMPLETE:
@@ -377,11 +408,13 @@ def _require_saved(
     home = require_home_page(probe, stored, spec)
     _require_contents(probe, home, stored, spec, record)
     marks = {page_id: (icon, cover) for page_id, icon, cover in record.marks}
+    accent_ids = tuple(block_id for _name, block_id in (*record.accents, *record.samples))
     require_notification_dashboard(
         probe,
         stored,
         spec,
-        extra_block_ids=tuple(block_id for _name, block_id in (*record.accents, *record.samples)),
+        extra_block_ids=(*accent_ids, *extra_block_ids),
+        extra_top_level_ids=extra_top_level_ids,
         page_marks=marks,
     )
 

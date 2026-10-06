@@ -150,6 +150,7 @@ def write_checkpoint(
     *,
     preserved_payload: Mapping[str, object] | None = None,
     progress: Mapping[str, object] | None = None,
+    retained_created_ids: Mapping[str, object] | None = None,
 ) -> None:
     """Write one checkpoint through the single progress writer."""
     if preserved_payload is not None:
@@ -176,6 +177,15 @@ def write_checkpoint(
             "spec_id": checkpoint.spec_id,
         }
         body = progress_from_checkpoint(checkpoint)
+        if retained_created_ids is not None:
+            fresh = body["created_notion_ids"]
+            if type(fresh) is not dict:
+                raise ProductBuildError("progress created ids do not match the checkpoint")
+            kept = dict(retained_created_ids)
+            variants = fresh.get("variants")
+            if variants is not None:
+                kept["variants"] = variants
+            body["created_notion_ids"] = kept
     write_document(path, payload, body)
 
 

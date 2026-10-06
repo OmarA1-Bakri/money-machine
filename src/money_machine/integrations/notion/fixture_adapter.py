@@ -121,6 +121,15 @@ class FixtureNotionAdapter(NotionAdapter):
         self.pages[new_id] = duplicate
         return duplicate
 
+    async def drop_page_property(self, page_id: str, name: str) -> NotionPage:
+        """Remove one page property. Missing names are a no-op."""
+        page = self.pages.get(page_id)
+        if not page:
+            raise ValueError(f"Page {page_id} not found")
+        page.properties.pop(name, None)
+        page.updated_at = datetime.now(UTC)
+        return page
+
     async def rename_page(self, page_id: str, new_title: str) -> NotionPage:
         """Rename a page."""
         page = self.pages.get(page_id)

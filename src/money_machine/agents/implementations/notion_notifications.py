@@ -343,6 +343,7 @@ def require_notification_dashboard(
     spec: ProductSpec,
     *,
     extra_block_ids: tuple[str, ...] = (),
+    extra_top_level_ids: tuple[str, ...] = (),
     page_marks: Mapping[str, tuple[str, str]] | None = None,
 ) -> NotionPage:
     """Check the saved notification dashboard. Later blocks and hub marks are allowed."""
@@ -355,6 +356,7 @@ def require_notification_dashboard(
         kinds,
         suffixes,
         extra_block_ids=extra_block_ids,
+        extra_top_level_ids=extra_top_level_ids,
         page_marks=page_marks,
     )
 
@@ -367,6 +369,7 @@ def _require_saved(
     suffixes: dict[str, tuple[tuple[str, str], ...]],
     *,
     extra_block_ids: tuple[str, ...] = (),
+    extra_top_level_ids: tuple[str, ...] = (),
     page_marks: Mapping[str, tuple[str, str]] | None = None,
 ) -> NotionPage:
     record = stored.notification_dashboard
@@ -379,7 +382,12 @@ def _require_saved(
         probe,
         stored,
         spec,
-        extra_page_ids=(record.row_page_id, *(page_id for _kind, page_id in record.samples)),
+        extra_page_ids=(
+            record.row_page_id,
+            *(page_id for _kind, page_id in record.samples),
+            *extra_top_level_ids,
+        ),
+        extra_top_level_ids=extra_top_level_ids,
         extra_database_ids=(record.database_id,),
         extra_block_ids=extra_block_ids,
         page_marks=page_marks,

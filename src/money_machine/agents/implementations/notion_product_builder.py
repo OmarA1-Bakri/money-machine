@@ -241,10 +241,16 @@ def _later_phase_object_names(probe: FixtureNotionAdapter, spec_id: str) -> tupl
     for database in probe.databases.values():
         if type(database) is NotionDatabase and database.title != "":
             names.append(database.title)
-    for candidate in probe.pages.values():
-        if type(candidate) is NotionPage and candidate.parent_type == "page_id":
-            names.append(candidate.title)
     page = find_spec_page(probe, spec_id)
+    home_id = page.id if page is not None else ""
+    for candidate in probe.pages.values():
+        if type(candidate) is not NotionPage:
+            continue
+        titled = candidate.parent_type == "page_id" or (
+            candidate.parent_type == "workspace" and candidate.id != home_id
+        )
+        if titled:
+            names.append(candidate.title)
     if page is not None:
         shell_id = page.properties.get(SHELL_BLOCK_PROPERTY)
         for block in probe.blocks.values():
