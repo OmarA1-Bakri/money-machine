@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -438,10 +437,12 @@ async def test_unexpected_hub_block_is_not_rewritten(tmp_path: Path) -> None:
 async def test_missing_checkpoint_creates_nothing(tmp_path: Path) -> None:
     spec = _spec()
     probe = FixtureNotionAdapter()
+    path = tmp_path / "missing.json"
 
     with pytest.raises(ProductBuildError, match="dashboard checkpoint"):
-        await _build(spec, probe, tmp_path / "missing.json")
+        await _build(spec, probe, path)
 
+    assert path.exists() is False
     assert probe.pages == {}
     assert probe.linked_views == {}
 
@@ -921,6 +922,7 @@ def test_hubs_module_does_not_name_a_live_client_or_later_phase() -> None:
         "aesthetics_and_content_completion",
         "https://",
         "http://",
+        "etsy",
     ):
         assert token not in source
 
@@ -950,10 +952,8 @@ def test_linked_view_name_token_is_the_sha256_prefix() -> None:
     identity = "Organized Working Parent Command Center"
     hub_name = "School And Activities Planner"
     spec = _spec(identity=identity, hub_name=hub_name, hub_count=6)
-    full = f"{identity} {spec.hubs[0].name} open tasks"
-    token = hashlib.sha256(full.encode("utf-8")).hexdigest()[:8]
     named = linked_view_name(spec, spec.hubs[0].name, "open tasks")
-    assert named.split()[-1] == token
+    assert named == "Organized Working Parent Command Center Scho open tasks 447d8579"
     assert linked_view_name(spec, spec.hubs[0].name, "open tasks") == named
 
 

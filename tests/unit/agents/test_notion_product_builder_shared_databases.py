@@ -259,8 +259,10 @@ async def test_mismatched_databases_create_nothing(
 @pytest.mark.asyncio
 async def test_missing_checkpoint_does_not_create_databases(tmp_path: Path) -> None:
     probe = FixtureNotionAdapter()
+    path = tmp_path / "missing.json"
     with pytest.raises(ProductBuildError, match="phase 1 checkpoint"):
-        await _build(_spec(), probe, tmp_path / "missing.json")
+        await _build(_spec(), probe, path)
+    assert path.exists() is False
     assert probe.databases == {}
     assert probe.pages == {}
 
@@ -514,6 +516,7 @@ def test_shared_databases_module_does_not_name_a_live_client() -> None:
         "AsyncClient",
         "publish_page",
         "create_linked_view",
+        "etsy",
     ):
         assert token not in source
 

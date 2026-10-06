@@ -160,8 +160,7 @@ async def test_mass_tier_adds_palette_accents_and_sample_hub_text(tmp_path: Path
         assert type(block) is NotionCalloutBlock
         assert block.parent_id == home.id
         assert block.icon == AESTHETIC_ICON
-        assert block.content == accent_content(token.name, token.hex)
-        assert "client_name" not in block.content
+        assert block.content == f"palette {token.name} {token.hex}"
     assert tuple(name for name, _block_id in record.samples) == tuple(hub.name for hub in spec.hubs)
     hubs = {hub.name: hub for hub in spec.hubs}
     for hub_name, block_id in record.samples:
@@ -218,10 +217,12 @@ async def test_replay_keeps_the_same_checkpoint_bytes_and_ids(tmp_path: Path) ->
 async def test_missing_checkpoint_creates_nothing(tmp_path: Path) -> None:
     spec = _spec()
     probe = FixtureNotionAdapter()
+    path = tmp_path / "missing.json"
 
     with pytest.raises(ProductBuildError, match="notification"):
-        await _build(spec, probe, tmp_path / "missing.json")
+        await _build(spec, probe, path)
 
+    assert path.exists() is False
     assert probe.pages == {}
     assert probe.blocks == {}
 
@@ -395,6 +396,7 @@ def test_aesthetics_module_does_not_name_a_live_client() -> None:
         "https://",
         "http://",
         "client_name",
+        "etsy",
     ):
         assert token not in source
 

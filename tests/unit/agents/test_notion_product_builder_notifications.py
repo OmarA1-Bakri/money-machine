@@ -299,10 +299,12 @@ async def test_replay_keeps_the_same_checkpoint_bytes_and_ids(tmp_path: Path) ->
 async def test_missing_checkpoint_creates_nothing(tmp_path: Path) -> None:
     spec = _spec()
     probe = FixtureNotionAdapter()
+    path = tmp_path / "missing.json"
 
     with pytest.raises(ProductBuildError, match="identity hubs"):
-        await _build(spec, probe, tmp_path / "missing.json")
+        await _build(spec, probe, path)
 
+    assert path.exists() is False
     assert probe.pages == {}
     assert probe.databases == {}
 
@@ -519,6 +521,7 @@ def test_notification_module_does_not_name_a_live_client() -> None:
         "https://",
         "http://",
         "aesthetics_and_content_completion",
+        "etsy",
     ):
         assert token not in source
 
@@ -653,13 +656,6 @@ async def test_missing_sample_values_are_filled_and_wrong_values_are_not(tmp_pat
     assert page.properties["sample_marker"] == "SAMPLE"
     assert _rows(probe, tasks.id) == [page]
 
-    events = _database(probe, "Events")
-    wrong = await probe.create_page("SAMPLE Events", parent_id=events.id, parent_type="database_id")
-    wrong.properties["Birthday"] = False
-    stored = path.read_bytes()
-    path.write_bytes(stored)
-    # The completed checkpoint must not overwrite a later wrong value on a new probe path.
-    # Rebuild from the hubs checkpoint with the wrong value already present.
     fresh = FixtureNotionAdapter()
     fresh_path = tmp_path / "fresh.json"
     await _prepare(spec, fresh, fresh_path)

@@ -341,10 +341,12 @@ async def test_wrong_cover_is_not_rewritten(tmp_path: Path) -> None:
 async def test_missing_checkpoint_creates_nothing(tmp_path: Path) -> None:
     spec = _spec()
     probe = FixtureNotionAdapter()
+    path = tmp_path / "missing.json"
 
     with pytest.raises(ProductBuildError, match="shared databases checkpoint"):
-        await _build(spec, probe, tmp_path / "missing.json")
+        await _build(spec, probe, path)
 
+    assert path.exists() is False
     assert probe.pages == {}
     assert probe.linked_views == {}
     assert probe.databases == {}
@@ -646,6 +648,7 @@ def test_dashboard_module_does_not_name_a_live_client() -> None:
         "http://",
         "notification_dashboard",
         "identity_specific_hubs",
+        "etsy",
     ):
         assert token not in source
 

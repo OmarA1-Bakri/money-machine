@@ -493,7 +493,15 @@ async def test_newline_in_identity_is_rejected(tmp_path: Path) -> None:
 
 def test_phase_one_module_does_not_name_a_live_client() -> None:
     source = MODULE_PATH.read_text(encoding="utf-8")
-    for token in ("notion_client", "httpx", "urllib", "socket", "requests", "APINotionAdapter"):
+    for token in (
+        "notion_client",
+        "httpx",
+        "urllib",
+        "socket",
+        "requests",
+        "APINotionAdapter",
+        "etsy",
+    ):
         assert token not in source
 
 
