@@ -10,7 +10,7 @@ network connection.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import cast
@@ -99,10 +99,11 @@ async def build_variants(
     if stored.variants:
         await _require_saved(fixture, stored, validated)
         return stored
+    plan = _plan_variants(fixture, stored, validated)
     try:
-        await _release_copied_spec_ids(fixture, stored, validated)
+        await _release_copied_spec_ids(fixture, plan.drop_ids)
         _bind_earlier_phases(fixture, stored, validated, created)
-        records = await _ensure(fixture, stored, validated)
+        records = await _ensure_planned(fixture, stored, validated, plan)
     except ProviderFailure as failure:
         raise_recorded(path, BUILD_PHASES[-1], failure)
     checkpoint = _checkpoint_with(stored, records, moment)
@@ -160,8 +161,7 @@ def _check_earlier_phases(
     ignore_spec_copies: bool,
 ) -> None:
     workspace_ids, block_ids, nested_ids = _open_variant_ids(probe, stored, spec)
-    # Ignore only this run's open pages, so a leftover spec id can be released
-    # before the bind. A workspace page outside an open variant title stays unexpected.
+    # Ignore open pages so a leftover spec id can be released before the bind.
     ignored = (*workspace_ids, *nested_ids) if ignore_spec_copies else ()
     require_completed_aesthetics(
         probe,
@@ -264,24 +264,164 @@ def _aligned_pairs(spec: ProductSpec) -> tuple[tuple[str, ColourToken], ...]:
     return tuple(zip(colours, tokens, strict=True))
 
 
-async def _ensure(
+@dataclass(frozen=True)
+class _VariantPlan:
+    drop_ids: tuple[str, ...]
+    adoptions: tuple[tuple[str, str], ...]
+
+
+def _page_in_play(
+    page: NotionPage,
+    source: NotionPage,
+    spec: ProductSpec,
+    recorded: set[str],
+    source_spec: object,
+) -> bool:
+    """Recorded pages, copy and colour leftovers, and any page holding the source spec id."""
+    if page.id in recorded:
+        return True
+    if page.title == f"{source.title} (Copy)":
+        return True
+    if _colour_from_title(spec, page) is not None:
+        return True
+    return source_spec is not None and page.properties.get(SPEC_ID_PROPERTY) == source_spec
+
+
+def _in_play_pages(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
-) -> tuple[VariantRecord, ...]:
+) -> list[NotionPage]:
     source = _source_page(probe, stored)
-    pairs = _aligned_pairs(spec)
+    recorded = {record.page_id for record in stored.variants}
+    source_spec = source.properties.get(SPEC_ID_PROPERTY)
+    return [
+        page
+        for page in probe.pages.values()
+        if type(page) is NotionPage
+        and page.id != source.id
+        and _page_in_play(page, source, spec, recorded, source_spec)
+    ]
+
+
+def _collect_drop_ids(
+    probe: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+) -> tuple[str, ...]:
+    """Title and spec-id filters only. This does not refuse and does not write."""
+    source = _source_page(probe, stored)
+    titles = {_variant_title(spec, colour) for colour, _token in _aligned_pairs(spec)}
+    copy_title = f"{source.title} (Copy)"
+    source_spec = source.properties.get(SPEC_ID_PROPERTY)
+    drop_ids: list[str] = []
+    for page in _in_play_pages(probe, stored, spec):
+        if page.title not in titles and page.title != copy_title:
+            continue
+        if page.properties.get(SPEC_ID_PROPERTY) != source_spec:
+            continue
+        drop_ids.append(page.id)
+    return tuple(drop_ids)
+
+
+def _refuse_titled_children(
+    probe: FixtureNotionAdapter,
+    spec: ProductSpec,
+    pages: list[NotionPage],
+) -> None:
+    """Finished colour pages are refused here, before any drop."""
+    for page in pages:
+        colour = _colour_from_title(spec, page)
+        if colour is None:
+            continue
+        token = next(item for name, item in _aligned_pairs(spec) if name == colour)
+        if _has_foreign_child(probe, spec, page, colour, token):
+            raise ProductBuildError("variant page does not match")
+
+
+def _require_unique_after_drops(
+    probe: FixtureNotionAdapter,
+    source: NotionPage,
+    drop_ids: tuple[str, ...],
+) -> None:
+    """ProductSpec uniqueness as if the planned drops had already happened."""
+    source_spec = source.properties.get(SPEC_ID_PROPERTY)
+    if source_spec is None:
+        return
+    dropped = set(drop_ids)
+    remaining = [
+        page
+        for page in probe.pages.values()
+        if type(page) is NotionPage
+        and page.id not in dropped
+        and page.properties.get(SPEC_ID_PROPERTY) == source_spec
+    ]
+    if len(remaining) != 1 or remaining[0].id != source.id:
+        raise ProductBuildError("fixture probe has more than one page for this ProductSpec")
+
+
+def _plan_adoptions(
+    probe: FixtureNotionAdapter,
+    source: NotionPage,
+    spec: ProductSpec,
+    in_play_ids: set[str],
+) -> tuple[tuple[str, str], ...]:
+    copy = _find_copy(probe, source)
+    if copy is not None and copy.id not in in_play_ids:
+        copy = None
+    used_copy = False
+    adoptions: list[tuple[str, str]] = []
+    for colour, _token in _aligned_pairs(spec):
+        existing = _find_titled(probe, source, _variant_title(spec, colour))
+        if existing is not None and existing.id not in in_play_ids:
+            existing = None
+        if existing is None and copy is not None and not used_copy:
+            existing = copy
+            used_copy = True
+        adoptions.append((colour, "" if existing is None else existing.id))
+    return tuple(adoptions)
+
+
+def _plan_variants(
+    probe: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+) -> _VariantPlan:
+    """Write-free plan. Refusal, or a fixed list of drops and adoptions."""
+    source = _source_page(probe, stored)
+    in_play = _in_play_pages(probe, stored, spec)
+    _refuse_titled_children(probe, spec, in_play)
+    drop_ids = _collect_drop_ids(probe, stored, spec)
+    for page_id in drop_ids:
+        page = probe.pages[page_id]
+        _refuse_unadoptable_release(probe, source, spec, page)
+    _require_unique_after_drops(probe, source, drop_ids)
+    adoptions = _plan_adoptions(probe, source, spec, {page.id for page in in_play})
+    return _VariantPlan(drop_ids, adoptions)
+
+
+async def _ensure_planned(
+    probe: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+    plan: _VariantPlan,
+) -> tuple[VariantRecord, ...]:
+    """Apply the plan. No new choice is made here."""
+    source = _source_page(probe, stored)
+    chosen = {colour: page_id for colour, page_id in plan.adoptions}
     records: list[VariantRecord] = []
-    for colour, token in pairs:
-        title = _variant_title(spec, colour)
-        existing = _find_titled(probe, source, title)
-        if existing is None:
-            existing = _find_copy(probe, source)
-        if existing is None:
+    for colour, token in _aligned_pairs(spec):
+        page_id = chosen[colour]
+        if page_id == "":
             if records:
                 guard_operation(probe, OP_VARIANTS)
-            existing = await probe.duplicate_page(source.id)
-        records.append(await _finish_variant(probe, spec, source, existing, colour, token))
+            page = await probe.duplicate_page(source.id)
+        else:
+            found = probe.pages.get(page_id)
+            if type(found) is not NotionPage:
+                raise ProductBuildError("variant page does not match")
+            page = found
+        records.append(await _finish_variant(probe, spec, source, page, colour, token))
     _require_one_spec_page(probe, spec, stored)
     _require_original(source)
     return tuple(records)
@@ -319,7 +459,8 @@ def _open_variant_ids(
             continue
         # Stored path: a variant or nested id is a recorded page id.
         # A hub child with a variant title is not that id.
-        # Extra workspace-level titles stay open. That limit is parked.
+        # An extra workspace / Blue passes even with a child under it.
+        # A forgery with the recorded title and a different id is rejected.
         if stored.variants:
             if page.parent_type == "workspace" and _title_open(page):
                 workspace_ids.append(page.id)
@@ -350,28 +491,11 @@ def _open_variant_ids(
 
 async def _release_copied_spec_ids(
     probe: FixtureNotionAdapter,
-    stored: ProductBuildCheckpoint,
-    spec: ProductSpec,
+    drop_ids: tuple[str, ...],
 ) -> None:
-    source = probe.pages.get(stored.page_id)
-    if type(source) is not NotionPage:
-        return
-    titles = {_variant_title(spec, colour) for colour in spec.colour_variants}
-    copy_title = f"{source.title} (Copy)"
-    source_spec = source.properties.get(SPEC_ID_PROPERTY)
-    pending: list[NotionPage] = []
-    for page in list(probe.pages.values()):
-        if type(page) is not NotionPage or page.id == source.id:
-            continue
-        if page.title not in titles and page.title != copy_title:
-            continue
-        if page.properties.get(SPEC_ID_PROPERTY) != source_spec:
-            continue
-        pending.append(page)
-    for page in pending:
-        _refuse_unadoptable_release(probe, source, spec, page)
-    for page in pending:
-        await probe.drop_page_property(page.id, SPEC_ID_PROPERTY)
+    """Drop only the ids the plan already accepted."""
+    for page_id in drop_ids:
+        await probe.drop_page_property(page_id, SPEC_ID_PROPERTY)
 
 
 def _source_page(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -> NotionPage:

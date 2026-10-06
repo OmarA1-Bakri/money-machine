@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import socket
 from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import asdict
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -13,11 +14,14 @@ from uuid import uuid4
 
 import pytest
 
+from money_machine.agents.implementations import notion_dashboard as notion_dashboard_module
 from money_machine.agents.implementations import notion_variants as notion_variants_module
 from money_machine.agents.implementations.notion_aesthetics import (
     AESTHETIC_ICON,
     accent_content,
     build_aesthetics_and_content_completion,
+    hub_cover,
+    hub_icon,
 )
 from money_machine.agents.implementations.notion_dashboard import build_dashboard_and_navigation
 from money_machine.agents.implementations.notion_hubs import build_identity_specific_hubs
@@ -155,23 +159,48 @@ def _four_spec() -> ProductSpec:
 _WRITE_METHODS = (
     "add_callout_block",
     "add_child_page",
+    "add_filter",
     "add_property",
+    "add_sort",
     "add_text_block",
+    "create_board_view",
+    "create_calendar_view",
     "create_database",
     "create_formula",
     "create_linked_view",
     "create_page",
     "create_relation",
     "create_rollup",
+    "create_table_view",
     "drop_page_property",
     "duplicate_page",
+    "move_page",
     "publish_page",
     "rename_page",
     "set_cover",
     "set_duplicate_as_template",
     "set_icon",
     "set_search_indexing",
+    "set_view_title_visibility",
+    "unpublish_page",
 )
+
+
+def _json_default(value: object) -> str:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    raise TypeError(type(value).__name__)
+
+
+def _fixture_bytes(probe: FixtureNotionAdapter) -> bytes:
+    payload = {
+        "blocks": {key: asdict(value) for key, value in probe.blocks.items()},
+        "databases": {key: asdict(value) for key, value in probe.databases.items()},
+        "linked_views": {key: asdict(value) for key, value in probe.linked_views.items()},
+        "pages": {key: asdict(value) for key, value in probe.pages.items()},
+        "views": {key: asdict(value) for key, value in probe.views.items()},
+    }
+    return json.dumps(payload, sort_keys=True, default=_json_default).encode("ascii")
 
 
 def _watch(probe: FixtureNotionAdapter) -> list[str]:
@@ -752,6 +781,24 @@ def _block_parent(
             created_at=WHEN,
         )
         return nested_id
+    if block_kind == "depth3":
+        mid_id = f"block-mid-{uuid4().hex}"
+        deep_id = f"block-deep-{uuid4().hex}"
+        probe.blocks[mid_id] = NotionTextBlock(
+            id=mid_id,
+            parent_id=accent_id,
+            type="paragraph",
+            content="mid note",
+            created_at=WHEN,
+        )
+        probe.blocks[deep_id] = NotionTextBlock(
+            id=deep_id,
+            parent_id=mid_id,
+            type="paragraph",
+            content="deep note",
+            created_at=WHEN,
+        )
+        return deep_id
     raise AssertionError(block_kind)
 
 
@@ -770,7 +817,10 @@ async def _plant_block_child(
         )
     if block_kind == "vocabulary" and _block_parent(probe, page, spec, "vocabulary") == "":
         await probe.add_text_block(page.id, vocabulary_content(spec, colour, token))
-    if block_kind in {"text", "callout"} and _block_parent(probe, page, spec, "accent") == "":
+    if (
+        block_kind in {"text", "callout", "depth3"}
+        and _block_parent(probe, page, spec, "accent") == ""
+    ):
         await probe.add_callout_block(
             page.id, accent_content(token.name, token.hex), icon=AESTHETIC_ICON
         )
@@ -786,9 +836,9 @@ async def _plant_block_child(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("block_kind", ["accent", "vocabulary", "text", "callout"])
+@pytest.mark.parametrize("block_kind", ["accent", "vocabulary", "text", "callout", "depth3"])
 @pytest.mark.parametrize("child_kind", ["database", "page"])
-@pytest.mark.parametrize("stage", ["empty", "stored"])
+@pytest.mark.parametrize("stage", ["empty", "stored", "copy"])
 async def test_child_under_a_page_block_writes_nothing(
     tmp_path: Path, block_kind: str, child_kind: str, stage: str
 ) -> None:
@@ -800,9 +850,14 @@ async def test_child_under_a_page_block_writes_nothing(
     if stage == "stored":
         checkpoint = await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
         page = probe.pages[checkpoint.variants[0].page_id]
-    else:
+    elif stage == "copy":
+        page = await probe.duplicate_page(home.id)
+        assert page.title == f"{home.title} (Copy)"
+    elif stage == "empty":
         page = await probe.duplicate_page(home.id)
         page = await probe.rename_page(page.id, f"{spec.title} / {spec.colour_variants[0]}")
+    else:
+        raise AssertionError(stage)
     await _plant_block_child(probe, page, spec, block_kind, child_kind)
     raw = path.read_bytes()
     calls = _watch(probe)
@@ -812,6 +867,370 @@ async def test_child_under_a_page_block_writes_nothing(
 
     assert calls == []
     assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("parent_kind", ["page", "accent", "text", "callout"])
+@pytest.mark.parametrize("child_kind", ["database", "page"])
+@pytest.mark.parametrize("leftover", ["copy", "green"])
+async def test_finished_variant_child_refuses_before_release_drop(
+    tmp_path: Path, parent_kind: str, child_kind: str, leftover: str
+) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    home = _home(probe, spec)
+    colour = spec.colour_variants[0]
+    token = spec.palette_tokens[0]
+    blue = await probe.duplicate_page(home.id)
+    await probe.drop_page_property(blue.id, SPEC_ID_PROPERTY)
+    blue = await probe.rename_page(blue.id, f"{spec.title} / {colour}")
+    await probe.set_icon(blue.id, hub_icon(token))
+    await probe.set_cover(blue.id, hub_cover(token))
+    await probe.add_callout_block(
+        blue.id, accent_content(token.name, token.hex), icon=AESTHETIC_ICON
+    )
+    await probe.add_text_block(blue.id, vocabulary_content(spec, colour, token))
+    await probe.publish_page(blue.id)
+    await probe.set_duplicate_as_template(blue.id, True)
+    await probe.set_search_indexing(blue.id, False)
+    finished = next(
+        page for page in probe.pages.values() if page.title == f"{spec.title} / {colour}"
+    )
+    assert SPEC_ID_PROPERTY not in finished.properties
+    green = await probe.duplicate_page(home.id)
+    spec_value = home.properties[SPEC_ID_PROPERTY]
+    if leftover == "copy":
+        assert green.title == f"{home.title} (Copy)"
+    elif leftover == "green":
+        green = await probe.rename_page(green.id, f"{spec.title} / Green")
+    else:
+        raise AssertionError(leftover)
+    assert green.properties.get(SPEC_ID_PROPERTY) == spec_value
+    if parent_kind == "page":
+        if child_kind == "database":
+            await probe.create_database("Private", parent_id=finished.id, parent_type="page_id")
+        else:
+            await probe.create_page("Nested", parent_id=finished.id, parent_type="page_id")
+    else:
+        await _plant_block_child(probe, finished, spec, parent_kind, child_kind)
+    raw = path.read_bytes()
+    before = json.loads(raw)
+    fixture = _fixture_bytes(probe)
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+    assert _fixture_bytes(probe) == fixture
+    stored = json.loads(path.read_text(encoding="ascii"))
+    assert stored["progress"]["repair_jobs"] == before["progress"]["repair_jobs"]
+    assert green.properties.get(SPEC_ID_PROPERTY) == spec_value
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("parent_kind", ["page", "accent"])
+@pytest.mark.parametrize("child_kind", ["database", "page"])
+async def test_finished_purple_child_refuses_before_blue_copy_is_published(
+    tmp_path: Path, parent_kind: str, child_kind: str
+) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    home = _home(probe, spec)
+    colour = spec.colour_variants[2]
+    token = spec.palette_tokens[2]
+    purple = await probe.duplicate_page(home.id)
+    await probe.drop_page_property(purple.id, SPEC_ID_PROPERTY)
+    purple = await probe.rename_page(purple.id, f"{spec.title} / {colour}")
+    await probe.set_icon(purple.id, hub_icon(token))
+    await probe.set_cover(purple.id, hub_cover(token))
+    await probe.add_callout_block(
+        purple.id, accent_content(token.name, token.hex), icon=AESTHETIC_ICON
+    )
+    await probe.add_text_block(purple.id, vocabulary_content(spec, colour, token))
+    await probe.publish_page(purple.id)
+    await probe.set_duplicate_as_template(purple.id, True)
+    await probe.set_search_indexing(purple.id, False)
+    finished = next(
+        page for page in probe.pages.values() if page.title == f"{spec.title} / {colour}"
+    )
+    blue = await probe.duplicate_page(home.id)
+    assert blue.title == f"{home.title} (Copy)"
+    if parent_kind == "page":
+        if child_kind == "database":
+            await probe.create_database("Private", parent_id=finished.id, parent_type="page_id")
+        else:
+            await probe.create_page("Nested", parent_id=finished.id, parent_type="page_id")
+    elif parent_kind == "accent":
+        accent_id = next(
+            block.id
+            for block in probe.blocks.values()
+            if type(block) is NotionCalloutBlock and block.parent_id == finished.id
+        )
+        if child_kind == "database":
+            await probe.create_database("Private", parent_id=accent_id, parent_type="block_id")
+        else:
+            await probe.create_page("Nested", parent_id=accent_id, parent_type="block_id")
+    else:
+        raise AssertionError(parent_kind)
+    raw = path.read_bytes()
+    before = json.loads(raw)
+    fixture = _fixture_bytes(probe)
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+    assert _fixture_bytes(probe) == fixture
+    stored = json.loads(path.read_text(encoding="ascii"))
+    assert stored["progress"]["repair_jobs"] == before["progress"]["repair_jobs"]
+    assert blue.is_published is False
+    assert SPEC_ID_PROPERTY in blue.properties
+
+
+def _hub_page_id(path: Path) -> str:
+    document = json.loads(path.read_text(encoding="ascii"))
+    references = document["provider_object_references"]
+    assert type(references) is dict
+    hubs = references["identity_hubs"]
+    assert type(hubs) is list and type(hubs[0]) is dict
+    page_id = hubs[0]["page_id"]
+    assert type(page_id) is str
+    return page_id
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("holder", ["renamed", "workspace", "hub"])
+async def test_copy_plus_another_spec_holder_refuses_before_any_drop(
+    tmp_path: Path, holder: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    home = _home(probe, spec)
+    spec_value = home.properties[SPEC_ID_PROPERTY]
+    assert type(spec_value) is str
+    copy = await probe.duplicate_page(home.id)
+    assert copy.title == f"{home.title} (Copy)"
+    if holder == "renamed":
+        extra = await probe.rename_page((await probe.duplicate_page(home.id)).id, "Notes")
+    elif holder == "workspace":
+        extra = await probe.create_page(
+            "Archive", parent_id=home.parent_id, parent_type="workspace"
+        )
+        extra.properties[SPEC_ID_PROPERTY] = spec_value
+    elif holder == "hub":
+        extra = await probe.create_page(
+            "Archive", parent_id=_hub_page_id(path), parent_type="page_id"
+        )
+        extra.properties[SPEC_ID_PROPERTY] = spec_value
+    else:
+        raise AssertionError(holder)
+    assert extra.properties.get(SPEC_ID_PROPERTY) == spec_value
+    raw = path.read_bytes()
+    before = json.loads(raw)
+    fixture = _fixture_bytes(probe)
+    calls = _watch(probe)
+    ignored_calls: list[tuple[str, ...]] = []
+    original = notion_dashboard_module.find_spec_page
+
+    def _wrapped(
+        fixture_probe: FixtureNotionAdapter,
+        spec_id: str,
+        *,
+        ignored_page_ids: tuple[str, ...] = (),
+    ) -> NotionPage | None:
+        ignored_calls.append(tuple(ignored_page_ids))
+        return original(fixture_probe, spec_id, ignored_page_ids=ignored_page_ids)
+
+    monkeypatch.setattr(notion_dashboard_module, "find_spec_page", _wrapped)
+
+    with pytest.raises(ProductBuildError, match="more than one page for this ProductSpec"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+    assert _fixture_bytes(probe) == fixture
+    stored = json.loads(path.read_text(encoding="ascii"))
+    assert stored["progress"]["repair_jobs"] == before["progress"]["repair_jobs"]
+    assert extra.id in ignored_calls[0]
+    assert SPEC_ID_PROPERTY in copy.properties
+    assert copy.is_published is False
+
+
+@pytest.mark.asyncio
+async def test_recorded_variant_id_stays_open_when_the_title_changes(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    checkpoint = await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    recorded = probe.pages[checkpoint.variants[0].page_id]
+    recorded.title = "Archived Blue"
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+    assert recorded.title == "Archived Blue"
+
+
+@pytest.mark.asyncio
+async def test_source_spec_id_keeps_a_retitled_page_open_until_bind(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    home = _home(probe, spec)
+    spec_value = home.properties[SPEC_ID_PROPERTY]
+    archive = await probe.create_page("Archive", parent_id=home.parent_id, parent_type="workspace")
+    archive.properties[SPEC_ID_PROPERTY] = spec_value
+    raw = path.read_bytes()
+    calls = _watch(probe)
+    ignored_calls: list[tuple[str, ...]] = []
+    original = notion_dashboard_module.find_spec_page
+
+    def _wrapped(
+        fixture: FixtureNotionAdapter,
+        spec_id: str,
+        *,
+        ignored_page_ids: tuple[str, ...] = (),
+    ) -> NotionPage | None:
+        ignored_calls.append(tuple(ignored_page_ids))
+        return original(fixture, spec_id, ignored_page_ids=ignored_page_ids)
+
+    monkeypatch.setattr(notion_dashboard_module, "find_spec_page", _wrapped)
+
+    with pytest.raises(ProductBuildError, match="more than one page for this ProductSpec"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+    assert archive.id in ignored_calls[0]
+    assert archive.properties.get(SPEC_ID_PROPERTY) == spec_value
+    assert archive.title == "Archive"
+    assert archive.is_published is False
+
+
+@pytest.mark.asyncio
+async def test_saved_variant_is_read_by_recorded_page_id(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    checkpoint = await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    record = checkpoint.variants[0]
+    recorded = probe.pages[record.page_id]
+    token = spec.palette_tokens[0]
+    decoy = await probe.create_page(
+        recorded.title,
+        parent_id=recorded.parent_id,
+        parent_type="workspace",
+        icon=hub_icon(token),
+        cover=hub_cover(token),
+    )
+    decoy.is_published = True
+    decoy.public_url = record.secret_link
+    decoy.duplicate_as_template = True
+    decoy.search_indexing = False
+    for block in probe.blocks.values():
+        if block.parent_id == recorded.id:
+            block.parent_id = decoy.id
+    recorded.title = "Archived Blue"
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+    assert recorded.title == "Archived Blue"
+    assert decoy.id != record.page_id
+
+
+def _rewrite_recorded_blue(document: dict[str, object], page_id: str) -> None:
+    references = document["provider_object_references"]
+    assert type(references) is dict
+    variants = references["variants"]
+    assert type(variants) is list and type(variants[0]) is dict
+    variants[0]["page_id"] = page_id
+    progress = document["progress"]
+    assert type(progress) is dict
+    created = progress["created_notion_ids"]
+    assert type(created) is dict
+    created_variants = created["variants"]
+    assert type(created_variants) is list and type(created_variants[0]) is dict
+    created_variants[0]["page_id"] = page_id
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("target", ["missing", "hub", "home", "decoy"])
+async def test_replay_rejects_a_recorded_page_id_that_is_not_the_variant(
+    tmp_path: Path, target: str
+) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    checkpoint = await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    record = checkpoint.variants[0]
+    recorded = probe.pages[record.page_id]
+    token = spec.palette_tokens[0]
+    decoy = await probe.create_page(
+        f"{spec.title} / Blue",
+        parent_id=recorded.parent_id,
+        parent_type="workspace",
+        icon=hub_icon(token),
+        cover=hub_cover(token),
+    )
+    decoy.is_published = True
+    decoy.public_url = record.secret_link
+    decoy.duplicate_as_template = True
+    decoy.search_indexing = False
+    if target == "decoy":
+        for block in probe.blocks.values():
+            if block.parent_id == recorded.id:
+                block.parent_id = decoy.id
+        recorded.title = "Archived Blue"
+    elif target == "missing":
+        _restamp(path, lambda document: _rewrite_recorded_blue(document, "page-missing"))
+    elif target == "hub":
+        _restamp(path, lambda document: _rewrite_recorded_blue(document, _hub_page_id(path)))
+    elif target == "home":
+        _restamp(path, lambda document: _rewrite_recorded_blue(document, checkpoint.page_id))
+    else:
+        raise AssertionError(target)
+    raw = path.read_bytes()
+    before = json.loads(raw)
+    fixture = _fixture_bytes(probe)
+    calls = _watch(probe)
+    expected: tuple[type[BaseException], ...] = (
+        (ProductBuildError, AttributeError) if target == "missing" else (ProductBuildError,)
+    )
+
+    with pytest.raises(expected):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+    assert _fixture_bytes(probe) == fixture
+    stored = json.loads(path.read_text(encoding="ascii"))
+    assert stored["progress"]["repair_jobs"] == before["progress"]["repair_jobs"]
+    assert decoy.id != record.page_id
 
 
 @pytest.mark.asyncio
@@ -997,7 +1416,12 @@ async def test_replay_refuses_a_hub_child_with_a_variant_title(
 async def test_replay_pins_extra_workspace_variant_titles_as_a_known_limit(
     tmp_path: Path, title_kind: str
 ) -> None:
-    """Known limit: extra workspace-level variant titles pass replay with zero writes."""
+    """Known limit: an extra workspace title passes replay with zero writes.
+
+    An extra workspace `/ Blue` also passes when a child database or page sits
+    under it. A forgery with the recorded title and a different id is rejected,
+    because replay reads `probe.pages.get(record.page_id)`.
+    """
     spec = _spec()
     probe = FixtureNotionAdapter()
     path = tmp_path / "build.json"
@@ -1020,6 +1444,37 @@ async def test_replay_pins_extra_workspace_variant_titles_as_a_known_limit(
 
     assert calls == []
     assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("child_kind", ["database", "page"])
+async def test_replay_pins_extra_workspace_blue_with_a_nested_child(
+    tmp_path: Path, child_kind: str
+) -> None:
+    """Known limit: extra workspace `/ Blue` passes even with a child database or page."""
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    home = _home(probe, spec)
+    extra = await probe.create_page(
+        f"{spec.title} / Blue", parent_id=home.parent_id, parent_type="workspace"
+    )
+    if child_kind == "database":
+        await probe.create_database("Private", parent_id=extra.id, parent_type="page_id")
+    elif child_kind == "page":
+        await probe.create_page("Nested", parent_id=extra.id, parent_type="page_id")
+    else:
+        raise AssertionError(child_kind)
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+    assert extra.is_published is False
 
 
 @pytest.mark.asyncio
