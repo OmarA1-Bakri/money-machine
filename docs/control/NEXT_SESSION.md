@@ -32,7 +32,11 @@
 
 Router browser and combined config modes still raise `NotImplementedError` (W4a). Fixture mode stays the default.
 
-## Session 07 — Wave 9 in progress
+## Session 07 — sandbox run tip-sync
+
+**Status**: Incomplete (2026-10-07, state revision 58). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` is the intentional tip-sync to the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD. The §11 sandbox CLI is still not run live. W10 is in flight from `a4e9b025` and will also bump STATE, so whichever PR merges second re-syncs.
+
+## Session 07 — Wave 9 handoff
 
 
 **Status**: Incomplete (2026-10-07, W9, state revision 57). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false, including `product_qa_implemented` and `variant_builder_implemented`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `6b087370eaaf1a5e09d9868643cca7b3654ddc4a` is the intentional tip-sync to the W8 squash. It is not `9bc56b2c`. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD.

@@ -649,7 +649,7 @@ def test_execute_on_the_fake_adapter_writes_evidence(
     assert payload["bot_user_id"] == "bot-user"
     assert payload["qa_verdict"] == "NOT_RUN"
     assert payload["redaction_self_check"] == "PASS"
-    assert payload["control_state_revision"] == 56
+    assert payload["control_state_revision"] == 58
     assert payload["current_session"] == 7
     assert _stage(payload, "build")["status"] == "PASS"
     assert _stage(payload, "variants")["status"] == "PASS"

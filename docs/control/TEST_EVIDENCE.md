@@ -1,5 +1,21 @@
 # Test Evidence
 
+## 2026-10-07 — Session 07 sandbox run tip-sync
+
+**Verification scope**: Tip-sync of the §11 sandbox runner onto the merged W9 squash. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `completed_sessions` `[0, 1, 2, 3, 4, 5, 6]`, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` is the intentional tip-sync to the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. `state_revision` is 58 | PASS |
+| Sandbox CLI | Still not run live. The four sandbox modules are unchanged from `df5413ac6f3df278d91a5bfc28601760931e62af`. That commit's CI verify run is `37698651795`, job `113056508051`, SUCCESS. If-flip: 104 rows, 104 killed, 0 equivalent, Failed sum 2109. T45 is row 54, `notion_sandbox_guard.py:288`, Failed 1 | PASS |
+| Full local pytest | 2630 collected, 2425 passed, 193 skipped, 12 failed. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because the `docker` binary is absent. Local-only. CI is the gate. `ruff format --check`, `ruff check`, and `pyright` 1.1.411 are clean | 12 known local docker failures; CI is the gate |
+| W10 | In flight from `a4e9b025`. It will also bump STATE. Whichever PR merges second re-syncs | NOTED |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
+**Status**: Session 07 sandbox-run tip-sync. The session stays incomplete. This is not SESSION_07 COMPLETE. Exit 78 stays HELD. No session exit code is recorded.
+
 ## 2026-10-07 — Session 07 W9: product QA
 
 **Verification scope**: Fixture-only A09 product QA over the A08 variants checkpoint, plus the must-fixes carried from Wave 8. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Postgres, Alembic, pnpm, and Compose were not required for this slice and were not run.

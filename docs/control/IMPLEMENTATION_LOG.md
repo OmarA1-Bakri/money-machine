@@ -1,5 +1,11 @@
 # Implementation Log
 
+## 2026-10-07 — Session 07 sandbox run: tip-sync onto the W9 squash
+
+Not a session close. This is not SESSION_07 COMPLETE. State revision 57 → 58. `head_sha` is the W9 squash `a4e9b025021b4effbb2b2879c1db756403cb1676`. It is the tip-sync pointer. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. Twelve session 7 evidence keys stay false. `commissioned_agents` stays empty. `session_status` stays incomplete. Exit 78 stays HELD. The §11 sandbox CLI is still not run live. W10 is in flight from `a4e9b025` and will also bump STATE, so whichever PR merges second re-syncs. `updated_at` is `2026-10-07T23:01:03Z`.
+
+The sandbox modules are unchanged from `df5413ac6f3df278d91a5bfc28601760931e62af`. That commit's CI verify run is `37698651795`, job `113056508051`, SUCCESS. The if-flip table below was measured on that commit: 104 rows, 104 killed, 0 equivalent, Failed sum 2109. T45 is row 54, `notion_sandbox_guard.py:288`, Failed 1. Full local pytest on this tip-sync tree: 2630 collected, 2425 passed, 193 skipped, 12 failed. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because the `docker` binary is absent. They are local-only. CI is the gate. `ruff format --check`, `ruff check`, and `pyright` 1.1.411 report clean. This tip-sync commit's CI run is not invented here.
+
 ## 2026-10-07 — Session 07 sandbox run CLI, round 2
 
 Not a session close. `state_revision` stays 56. `IMPLEMENTATION_STATE.json` is not edited in this round. Twelve session 7 evidence keys stay false. The runner is `python -m money_machine.cli.notion_sandbox`. This session does not execute it against Notion. Prompt-integrity review: `docs/control/reviews/2026-10-07-session-07-prompt-integrity.md`. Fixture tests in `tests/unit/cli/test_notion_sandbox.py`: 111 passed. With `tests/unit/integrations/notion/test_router.py`: 122 passed. Sockets stay blocked. Exit 78 stays HELD.
