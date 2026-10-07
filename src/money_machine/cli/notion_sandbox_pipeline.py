@@ -2,6 +2,7 @@
 
 QA, the fact ledger, the workflow link, and W11 stay out of this module.
 The registry in ``notion_sandbox`` records those slots as ``NOT_RUN``.
+``get_public_url`` is a fixture read. It is not a counted write.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from money_machine.agents.implementations.notion_variants import build_variants
 from money_machine.cli.notion_sandbox_guard import (
     PIPELINE_WRITE_METHODS,
     SANDBOX_PARENT_PAGE_ID,
+    SANDBOX_SPACE_ID,
     PageView,
     SandboxClient,
     SandboxError,
@@ -124,20 +126,52 @@ def _watch(probe: FixtureNotionAdapter, counts: dict[str, int]) -> None:
         setattr(probe, name, _bind(original, name))
 
 
+def _chain_reaches_sandbox(ctx: SandboxRun, page: PageView) -> None:
+    current = page
+    seen: set[str] = set()
+    for _step in range(4):
+        page_id = canonical_id(current.page_id)
+        if page_id == SANDBOX_PARENT_PAGE_ID:
+            if canonical_id(current.space_id) != SANDBOX_SPACE_ID or current.archived:
+                raise SandboxError("created page is not under the requested parent")
+            return
+        parent_id = canonical_id(current.parent_id)
+        if parent_id == "" or page_id == "" or page_id in seen:
+            raise SandboxError("created page is not under the requested parent")
+        seen.add(page_id)
+        current = ctx.client.read_page(parent_id)
+        if canonical_id(current.space_id) != SANDBOX_SPACE_ID or current.archived:
+            raise SandboxError("created page is not under the requested parent")
+    raise SandboxError("created page is not under the requested parent")
+
+
 def create_under(ctx: SandboxRun, parent_id: str, title: str) -> PageView:
     allowed = (SANDBOX_PARENT_PAGE_ID, *ctx.created_ids)
-    if not parent_is_allowed(parent_id, allowed):
+    requested = canonical_id(parent_id)
+    if not parent_is_allowed(requested, allowed):
         raise SandboxError("parent is not the sandbox parent")
     page = ctx.client.create_child_page(parent_id, title)
     ctx.write_counts["create_child_page"] = ctx.write_counts.get("create_child_page", 0) + 1
-    if canonical_id(page.parent_id) != canonical_id(parent_id):
-        raise SandboxError("created page is not under the requested parent")
     page_id = canonical_id(page.page_id)
-    if page_id == "":
-        raise SandboxError("created page id is invalid")
+    if page_id in {"", SANDBOX_PARENT_PAGE_ID, requested}:
+        raise SandboxError("created page is not new")
+    if canonical_id(page.parent_id) != requested:
+        raise SandboxError("created page is not under the requested parent")
+    if canonical_id(page.space_id) != SANDBOX_SPACE_ID:
+        raise SandboxError("created page is not under the requested parent")
+    confirmed = ctx.client.read_page(page_id)
+    if canonical_id(confirmed.page_id) != page_id:
+        raise SandboxError("created page is not under the requested parent")
+    if canonical_id(confirmed.parent_id) != requested:
+        raise SandboxError("created page is not under the requested parent")
+    if canonical_id(confirmed.space_id) != SANDBOX_SPACE_ID or confirmed.archived:
+        raise SandboxError("created page is not under the requested parent")
+    _chain_reaches_sandbox(ctx, confirmed)
     ctx.created_ids.append(page_id)
-    ctx.created.append({"id": page_id, "parent_id": canonical_id(page.parent_id), "url": page.url})
-    return page
+    ctx.created.append(
+        {"id": page_id, "parent_id": canonical_id(confirmed.parent_id), "url": confirmed.url}
+    )
+    return confirmed
 
 
 async def _run_build(ctx: SandboxRun) -> None:

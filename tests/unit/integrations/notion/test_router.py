@@ -6,9 +6,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from money_machine.integrations.notion import NotionAdapterRouter
 from money_machine.integrations.notion.api_adapter import APINotionAdapter
 from money_machine.integrations.notion.fixture_adapter import FixtureNotionAdapter
+from money_machine.integrations.notion.router import NotionAdapterRouter
 
 
 def test_router_defaults_to_fixture_when_config_missing():

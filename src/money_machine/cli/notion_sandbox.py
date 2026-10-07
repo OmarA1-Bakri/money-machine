@@ -1,16 +1,18 @@
 """Sandbox runner for the merged Session 07 build and variant pipeline.
 
 Dry-run is the default. ``--execute`` is the only path that writes. The token
-is read from ``NOTION_SANDBOX_TOKEN`` and is never printed.
+is read from ``NOTION_SANDBOX_TOKEN`` and is never printed. Git, the control
+ids, and the evidence file are resolved before any network read or write.
 
-Grok Bot runs this later, from a checkout of the merged SHA::
+Exit codes: 0 ok, 64 usage, a bad token, an evidence-path refusal, or a set
+``NOTION_CONFIG`` / ``NOTION_SANDBOX_CONFIG`` / ``NOTION_TOKEN_FILE``, 65
+target mismatch, 66 missing token, 69 git, control, read, stage, clock, or an
+interrupted run, 70 redaction self-check failure. Exit 78 is not used, and
+this module does not change that hold.
 
-    NOTION_SANDBOX_TOKEN=… python -m money_machine.cli.notion_sandbox \\
-        --execute --evidence-out <path>
-
-Exit codes: 0 ok, 64 usage or a bad token, 65 target mismatch, 66 missing
-token, 69 read or stage failure, 70 redaction self-check failure. Exit 78 is
-not used, and this module does not change that hold.
+``get_public_url`` reads are excluded from ``write_counts``. Only methods in
+``PIPELINE_WRITE_METHODS`` and the live ``create_child_page`` counter are
+recorded.
 """
 
 from __future__ import annotations
@@ -40,17 +42,19 @@ from money_machine.cli.notion_sandbox_guard import (
     PageView,
     SandboxClient,
     SandboxError,
+    commit_evidence,
     control_ids,
     empty_write_counts,
+    evidence_sections,
     git_sha,
     leaks,
+    open_evidence,
     qa_verdict,
     redact_text,
     repo_root,
     stage_status,
     stamp,
     target_ok,
-    write_evidence,
 )
 from money_machine.cli.notion_sandbox_guard import (
     argv_refused as argv_names_a_target,
@@ -111,11 +115,19 @@ def blocked_stages() -> list[dict[str, object]]:
     return rows
 
 
-async def _run_stages(ctx: SandboxRun) -> list[dict[str, object]]:
+def _remaining(start: int) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for name, runner_name in STAGE_REGISTRY[start:]:
+        available = runner_name is not None
+        rows.append(_stage_row(name, available, stage_status(runner_name, None), planned=False))
+    return rows
+
+
+async def _run_stages(ctx: SandboxRun, token: str | None) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     failed = False
     runners = stage_runners()
-    for name, runner_name in STAGE_REGISTRY:
+    for index, (name, runner_name) in enumerate(STAGE_REGISTRY):
         available = runner_name is not None
         if not available or failed:
             rows.append(_stage_row(name, available, stage_status(runner_name, None), planned=False))
@@ -126,10 +138,18 @@ async def _run_stages(ctx: SandboxRun) -> list[dict[str, object]]:
             continue
         try:
             await runner(ctx)
-        except Exception:
-            rows.append(_stage_row(name, True, stage_status(runner_name, "FAILED"), planned=False))
+        except Exception as exc:
+            row = _stage_row(name, True, stage_status(runner_name, "FAILED"), planned=False)
+            row["error"] = redact_text(str(exc), token)
+            rows.append(row)
             failed = True
             continue
+        except BaseException as exc:
+            row = _stage_row(name, True, "INTERRUPTED", planned=False)
+            row["error"] = redact_text(f"{type(exc).__name__}: {exc}", token)
+            rows.append(row)
+            rows.extend(_remaining(index + 1))
+            return rows
         rows.append(_stage_row(name, True, stage_status(runner_name, "PASS"), planned=False))
     return rows
 
@@ -141,7 +161,7 @@ class _Parser(argparse.ArgumentParser):
 
 
 def _parser() -> _Parser:
-    parser = _Parser(prog="python -m money_machine.cli.notion_sandbox")
+    parser = _Parser(prog="python -m money_machine.cli.notion_sandbox", allow_abbrev=False)
     parser.add_argument("--evidence-out", required=True)
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
@@ -164,11 +184,20 @@ def _fail(message: str, code: int) -> int:
     return code
 
 
-def _now(clock: Callable[[], datetime] | None) -> datetime:
-    moment = datetime.now(UTC) if clock is None else clock()
+def _now(clock: Callable[[], datetime] | None, token: str | None) -> datetime:
+    try:
+        moment = datetime.now(UTC) if clock is None else clock()
+    except Exception as exc:
+        raise SandboxError(redact_text(str(exc), token)) from None
     if type(moment) is not datetime or moment.tzinfo is None:
         raise SandboxError("clock must be timezone-aware")
     return moment.astimezone(UTC)
+
+
+def _shaped(token: str | None) -> str | None:
+    if token is not None and token_shape_ok(token):
+        return token
+    return None
 
 
 def _payload(
@@ -180,7 +209,8 @@ def _payload(
     created: list[dict[str, str]],
     counts: dict[str, int],
     bot_user_id: str | None,
-    root: Path,
+    git: str,
+    control: Mapping[str, object],
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "asserted_parent_page_id": SANDBOX_PARENT_PAGE_ID,
@@ -188,23 +218,27 @@ def _payload(
         "bot_user_id": bot_user_id,
         "created_pages": created,
         "ended_at": stamp(ended),
-        "git_sha": git_sha(root),
+        "git_sha": git,
         "mode": mode,
         "qa_verdict": qa_verdict(stages),
         "stages": stages,
         "started_at": stamp(started),
         "write_counts": counts,
     }
-    payload.update(control_ids(root))
+    payload.update(control)
+    payload.update(evidence_sections(counts, created))
     return payload
 
 
-def _emit(path: Path, payload: Mapping[str, object], token: str | None) -> str:
-    if leaks(str(path), token):
-        raise SandboxError("usage error")
-    result = write_evidence(path, payload, token)
+def _emit(fd: int, path: Path, payload: Mapping[str, object], token: str | None) -> str:
+    result = commit_evidence(fd, payload, token)
     print(path.resolve())
     return result
+
+
+def _preflight(path: Path, root: Path) -> tuple[str, dict[str, object], int]:
+    """Git, control ids, and the evidence fd. No network."""
+    return git_sha(root), control_ids(root), open_evidence(path)
 
 
 def _read_target(client: SandboxClient) -> tuple[BotView, PageView]:
@@ -221,60 +255,148 @@ def main(
     clock: Callable[[], datetime] | None = None,
 ) -> int:
     """Run the sandbox checks. Writes only when ``--execute`` is present."""
+    try:
+        return _main(argv, client=client, environ=environ, spec=spec, clock=clock)
+    except SandboxError as exc:
+        return _fail(str(exc), exc.code)
+    except OSError:
+        return _fail("evidence path is refused", EXIT_USAGE)
+
+
+def _main(
+    argv: Sequence[str] | None,
+    *,
+    client: SandboxClient | None,
+    environ: Mapping[str, str] | None,
+    spec: object | None,
+    clock: Callable[[], datetime] | None,
+) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     env = os.environ if environ is None else environ
     token = sandbox_token(env)
-    started = _now(clock)
+    secret = _shaped(token)
+    started = _now(clock, secret)
     early_path = _evidence_argument(arguments)
     root = repo_root()
     if argv_names_a_target(arguments) or environ_names_a_target(env):
-        return _refuse(early_path, token, started, root, "usage error", EXIT_USAGE, clock)
+        return _refuse(early_path, secret, started, root, "usage error", EXIT_USAGE, clock)
     try:
         parsed = _parser().parse_args(arguments)
     except SandboxError:
         return _fail("usage error", EXIT_USAGE)
     evidence = Path(parsed.evidence_out)
+    if str(evidence) == "" or leaks(str(evidence), secret):
+        return _fail("usage error", EXIT_USAGE)
+    git, control, fd = _preflight(evidence, root)
     if parsed.execute and parsed.dry_run:
-        return _refuse(evidence, token, started, root, "usage error", EXIT_USAGE, clock)
+        return _refuse_open(
+            fd, evidence, secret, started, clock, git, control, "usage error", EXIT_USAGE
+        )
     mode = "execute" if parsed.execute else "dry-run"
     if token is None:
-        return _refuse(
-            evidence, None, started, root, "notion sandbox token is missing", EXIT_NO_TOKEN, clock
+        return _refuse_open(
+            fd,
+            evidence,
+            None,
+            started,
+            clock,
+            git,
+            control,
+            "notion sandbox token is missing",
+            EXIT_NO_TOKEN,
         )
-    if not token_shape_ok(token):
-        return _refuse(
-            evidence, token, started, root, "notion token shape is invalid", EXIT_USAGE, clock
+    if secret is None:
+        return _refuse_open(
+            fd,
+            evidence,
+            None,
+            started,
+            clock,
+            git,
+            control,
+            "notion token shape is invalid",
+            EXIT_USAGE,
         )
-    if leaks(str(evidence), token):
-        return _fail("usage error", EXIT_USAGE)
     active = client if client is not None else LiveSandboxClient(token)
     counts = empty_write_counts()
     active.write_counts = counts
     try:
         bot, page = _read_target(active)
     except Exception as exc:
-        LOGGER.info("%s", redact_text(str(exc), token))
-        ended = _now(clock)
-        payload = _payload(
+        LOGGER.info("%s", redact_text(str(exc), secret))
+        return _finish(
+            fd,
+            evidence,
+            secret,
+            started,
+            clock,
             mode=mode,
-            started=started,
-            ended=ended,
             stages=planned_stages(),
             created=[],
             counts=counts,
             bot_user_id=None,
-            root=root,
+            git=git,
+            control=control,
+            error="notion api error",
+            code=EXIT_API,
+            log="notion api error",
         )
-        payload["error"] = "notion api error"
-        check = _emit(evidence, payload, token)
-        _fail("notion api error", EXIT_API)
-        return EXIT_REDACTION if check == "FAIL" else EXIT_API
     except BaseException as exc:
         _reraise(exc)
+    if type(bot.user_type) is not str:
+        return _finish(
+            fd,
+            evidence,
+            secret,
+            started,
+            clock,
+            mode=mode,
+            stages=planned_stages(),
+            created=[],
+            counts=counts,
+            bot_user_id=None,
+            git=git,
+            control=control,
+            error="notion api error",
+            code=EXIT_API,
+            log="notion api error",
+        )
     if not target_ok(bot, page):
-        return _finish_target(evidence, token, started, clock, mode, counts, bot, root)
+        return _finish(
+            fd,
+            evidence,
+            secret,
+            started,
+            clock,
+            mode=mode,
+            stages=blocked_stages(),
+            created=[],
+            counts=counts,
+            bot_user_id=_user_id(bot),
+            git=git,
+            control=control,
+            error="sandbox target mismatch",
+            code=EXIT_TARGET,
+            log="sandbox target mismatch",
+        )
     if mode == "dry-run":
-        return _finish_dry_run(evidence, token, started, clock, counts, bot, root)
+        return _finish(
+            fd,
+            evidence,
+            secret,
+            started,
+            clock,
+            mode="dry-run",
+            stages=planned_stages(),
+            created=[],
+            counts=counts,
+            bot_user_id=_user_id(bot),
+            git=git,
+            control=control,
+            error=None,
+            code=EXIT_OK,
+            log="sandbox dry-run ok",
+        )
     chosen: object = sandbox_product_spec(started) if spec is None else spec
     with tempfile.TemporaryDirectory() as folder:
         ctx = SandboxRun(
@@ -284,10 +406,66 @@ def main(
             moment=started,
             write_counts=counts,
         )
-        stages = asyncio.run(_run_stages(ctx))
+        stages = asyncio.run(_run_stages(ctx, secret))
         created = list(ctx.created)
+    interrupted = any(stage["status"] == "INTERRUPTED" for stage in stages)
     failed = any(stage["status"] == "FAILED" for stage in stages)
-    ended = _now(clock)
+    if interrupted:
+        error: str | None = None
+        code = EXIT_API
+        log = "sandbox interrupted"
+    elif failed:
+        error = "sandbox stage failed"
+        code = EXIT_API
+        log = "sandbox stage failed"
+    else:
+        error = None
+        code = EXIT_OK
+        log = "sandbox execute ok"
+    return _finish(
+        fd,
+        evidence,
+        secret,
+        started,
+        clock,
+        mode=mode,
+        stages=stages,
+        created=created,
+        counts=counts,
+        bot_user_id=_user_id(bot),
+        git=git,
+        control=control,
+        error=error,
+        code=code,
+        log=log,
+    )
+
+
+def _user_id(bot: BotView) -> str | None:
+    if type(bot.user_id) is str:
+        return bot.user_id
+    return None
+
+
+def _finish(
+    fd: int,
+    path: Path,
+    token: str | None,
+    started: datetime,
+    clock: Callable[[], datetime] | None,
+    *,
+    mode: str,
+    stages: list[dict[str, object]],
+    created: list[dict[str, str]],
+    counts: dict[str, int],
+    bot_user_id: str | None,
+    git: str,
+    control: Mapping[str, object],
+    error: str | None,
+    code: int,
+    log: str,
+) -> int:
+    ended = _now(clock, token)
     payload = _payload(
         mode=mode,
         started=started,
@@ -295,70 +473,51 @@ def main(
         stages=stages,
         created=created,
         counts=counts,
-        bot_user_id=bot.user_id,
-        root=root,
+        bot_user_id=bot_user_id,
+        git=git,
+        control=control,
     )
-    if failed:
-        payload["error"] = "sandbox stage failed"
-    check = _emit(evidence, payload, token)
+    if error is not None:
+        payload["error"] = error
+    if any(stage.get("status") == "INTERRUPTED" for stage in stages):
+        payload["run_status"] = "INTERRUPTED"
+    check = _emit(fd, path, payload, token)
     if check == "FAIL":
-        return EXIT_REDACTION
-    if failed:
-        return _fail("sandbox stage failed", EXIT_API)
-    LOGGER.info("sandbox execute ok")
-    return EXIT_OK
+        return _fail("redaction self-check failed", EXIT_REDACTION)
+    if code == EXIT_OK:
+        LOGGER.info("%s", log)
+        return EXIT_OK
+    return _fail(log, code)
 
 
-def _finish_target(
-    evidence: Path,
-    token: str,
+def _refuse_open(
+    fd: int,
+    path: Path,
+    token: str | None,
     started: datetime,
     clock: Callable[[], datetime] | None,
-    mode: str,
-    counts: dict[str, int],
-    bot: BotView,
-    root: Path,
+    git: str,
+    control: Mapping[str, object],
+    message: str,
+    code: int,
 ) -> int:
-    ended = _now(clock)
-    payload = _payload(
-        mode=mode,
-        started=started,
-        ended=ended,
-        stages=blocked_stages(),
-        created=[],
-        counts=counts,
-        bot_user_id=bot.user_id,
-        root=root,
-    )
-    payload["error"] = "sandbox target mismatch"
-    check = _emit(evidence, payload, token)
-    _fail("sandbox target mismatch", EXIT_TARGET)
-    return EXIT_REDACTION if check == "FAIL" else EXIT_TARGET
-
-
-def _finish_dry_run(
-    evidence: Path,
-    token: str,
-    started: datetime,
-    clock: Callable[[], datetime] | None,
-    counts: dict[str, int],
-    bot: BotView,
-    root: Path,
-) -> int:
-    ended = _now(clock)
-    payload = _payload(
+    return _finish(
+        fd,
+        path,
+        token,
+        started,
+        clock,
         mode="dry-run",
-        started=started,
-        ended=ended,
         stages=planned_stages(),
         created=[],
-        counts=counts,
-        bot_user_id=bot.user_id,
-        root=root,
+        counts=empty_write_counts(),
+        bot_user_id=None,
+        git=git,
+        control=control,
+        error=message,
+        code=code,
+        log=message,
     )
-    check = _emit(evidence, payload, token)
-    LOGGER.info("sandbox dry-run ok")
-    return EXIT_REDACTION if check == "FAIL" else EXIT_OK
 
 
 def _refuse(
@@ -370,23 +529,9 @@ def _refuse(
     code: int,
     clock: Callable[[], datetime] | None,
 ) -> int:
-    if path is not None and not leaks(str(path), token):
-        ended = _now(clock)
-        payload = _payload(
-            mode="dry-run",
-            started=started,
-            ended=ended,
-            stages=planned_stages(),
-            created=[],
-            counts=empty_write_counts(),
-            bot_user_id=None,
-            root=root,
-        )
-        payload["error"] = message
-        check = _emit(path, payload, token)
-        if check == "FAIL":
-            _fail(message, code)
-            return EXIT_REDACTION
+    if path is not None and str(path) != "" and not leaks(str(path), token):
+        git, control, fd = _preflight(path, root)
+        return _refuse_open(fd, path, token, started, clock, git, control, message, code)
     return _fail(message, code)
 
 

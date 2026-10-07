@@ -1,8 +1,125 @@
 # Implementation Log
 
-## 2026-10-07 — Session 07 sandbox run CLI
+## 2026-10-07 — Session 07 sandbox run CLI, round 2
 
-Not a session close. `state_revision` stays 56. Twelve session 7 evidence keys stay false. The runner is `python -m money_machine.cli.notion_sandbox`. This session does not execute it against Notion. Prompt-integrity review: `docs/control/reviews/2026-10-07-session-07-prompt-integrity.md`. Fixture tests in `tests/unit/cli/test_notion_sandbox.py`: 65 passed. Sockets stay blocked. Mutation checks: 60 mutations, each applied and reverted. 58 killed. 2 equivalent, both probe-backed. The Failed column sums to 125. Removing the url leak check in `LiveSandboxClient._send` matches the unmutated client: public calls use a constant path or a canonical page id, and a token-shaped page id is refused before the request. Removing the evidence-path leak check in `main` matches the unmutated run: `argv_refused` already rejects that path, the exit is 64, and no file is written.
+Not a session close. `state_revision` stays 56. `IMPLEMENTATION_STATE.json` is not edited in this round. Twelve session 7 evidence keys stay false. The runner is `python -m money_machine.cli.notion_sandbox`. This session does not execute it against Notion. Prompt-integrity review: `docs/control/reviews/2026-10-07-session-07-prompt-integrity.md`. Fixture tests in `tests/unit/cli/test_notion_sandbox.py`: 111 passed. With `tests/unit/integrations/notion/test_router.py`: 122 passed. Sockets stay blocked. Exit 78 stays HELD.
+
+`get_public_url` is a fixture read. It is not in `PIPELINE_WRITE_METHODS` and it is excluded from `write_counts`. The execute evidence splits fixture counts from the live `create_child_page` count.
+
+Exit codes: 0 ok, 64 usage, a bad token, an evidence-path refusal, or `NOTION_CONFIG` / `NOTION_SANDBOX_CONFIG` / `NOTION_TOKEN_FILE`, 65 target mismatch, 66 missing token, 69 git, control, read, stage, clock, or an interrupted run, 70 redaction self-check failure. A whitespace or junk token (`" "`, `"true"`) exits 64 and the evidence JSON is not rewritten with `[REDACTED]`. A failed redaction self-check exits 70 with stderr `redaction self-check failed` and does not log ok. Base64 and underscore-percent-encoded copies of a shaped token are redacted. `qa_verdict` still returns a supplied `PASS`; the CLI cannot produce that status while the qa runner is None, and `test_token_env_and_redaction_units` pins the mapping. The sandbox tests do not emit `StarletteDeprecationWarning`, and these modules do not import Starlette.
+
+If-flip sweep on this commit, after the killing tests. Every `if` test in `notion_sandbox.py`, `notion_sandbox_guard.py`, `notion_sandbox_live.py`, and `notion_sandbox_pipeline.py` was negated, `tests/unit/cli/test_notion_sandbox.py` was run, and the edit was reverted. 104 flips. 104 killed. 0 equivalent. The Failed column sums to 2109. A row is killed only when that run's pytest exit is non-zero. T45 is row 54, `notion_sandbox_guard.py:288`, the second `if leaks(text, token)` inside `render_evidence`. Failed 1. `test_failed_redaction_exits_70` keeps the redacted document (`bot_user_id` is `[REDACTED]`, `asserted_space_id` stays). The earlier claim of 60 mutations, 58 killed, 2 equivalent, Failed sum 125, and the url-leak EQUIVALENT, are withdrawn. The verifier's 146/46/10 figures were measured on `07f6cb00`, not on this tree. This commit's CI run is not invented here.
+
+Blocker to test. Lying create id: `test_lying_create_id_stops_before_colours` (exit 69, 1 create). Create-return space: `test_wrong_space_on_create_return_stops` (exit 69, 1 create). Response parent: `test_lying_response_parent_stops` (exit 69, 1 create; the re-read parent is the requested parent, so dropping the response check would finish). Database object and missing object: `test_database_parent_and_missing_object_write_nothing` (exit 69, GET GET). `in_trash` and `archived`: `test_trashed_parent_writes_nothing` (exit 65, GET GET). String `in_trash`: `test_string_in_trash_is_rejected` (exit 69). Raw parent body: `test_live_child_page_does_not_count_its_own_write` posts the dashed parent when called with the undashed id. Non-canonical fetch: `test_live_client_reads_without_writing_and_redacts` requests `/v1/pages/` plus the dashed id. Space fallback: `test_live_space_fallback_is_only_the_asserted_parent`. `database_id` parent and `target_ok`: `test_database_id_parent_is_not_a_page_parent` (exit 65, GET GET) and `test_target_and_parent_guards`. Hex token equal to the page id: `test_hex_token_equal_to_the_page_id_sends_nothing` (0 requests). Token in a created URL: `test_token_in_created_url_exits_70` (exit 70, 5 creates). Evidence `OSError`: `test_evidence_write_oserror_is_redacted` (exit 64, no traceback). Clock `RuntimeError`: `test_clock_runtime_error_is_redacted` (exit 69, 0 reads, no traceback). Whitespace token: `test_blank_or_junk_token_exits_64`. Preflight: `test_unwritable_directory_writes_nothing`, `test_evidence_refuses_existing_file_and_symlink`, `test_bad_git_dir_writes_nothing`, `test_git_missing_from_path_writes_nothing` (0 client writes; 64 or 69). Interrupt: `test_interrupt_writes_redacted_evidence` (exit 69, two created ids, `run_status` INTERRUPTED). Ignored config env: `test_override_env_refuses` for `NOTION_CONFIG`, `NOTION_SANDBOX_CONFIG`, and `NOTION_TOKEN_FILE`.
+
+
+| # | Site | Result | Failed | Condition |
+|---|---|---|---|---|
+| 1 | `notion_sandbox.py:111` | KILLED | 3 | `runner_name is None` |
+| 2 | `notion_sandbox.py:132` | KILLED | 10 | `not available or failed` |
+| 3 | `notion_sandbox.py:136` | KILLED | 10 | `runner is None` |
+| 4 | `notion_sandbox.py:173` | KILLED | 48 | `arg == "--evidence-out" and index + 1 < len(argv)` |
+| 5 | `notion_sandbox.py:175` | KILLED | 1 | `arg.startswith("--evidence-out=")` |
+| 6 | `notion_sandbox.py:192` | KILLED | 82 | `type(moment) is not datetime or moment.tzinfo is None` |
+| 7 | `notion_sandbox.py:198` | KILLED | 29 | `token is not None and token_shape_ok(token)` |
+| 8 | `notion_sandbox.py:281` | KILLED | 61 | `argv_names_a_target(arguments) or environ_names_a_target(env)` |
+| 9 | `notion_sandbox.py:288` | KILLED | 38 | `str(evidence) == "" or leaks(str(evidence), secret)` |
+| 10 | `notion_sandbox.py:291` | KILLED | 31 | `parsed.execute and parsed.dry_run` |
+| 11 | `notion_sandbox.py:296` | KILLED | 30 | `token is None` |
+| 12 | `notion_sandbox.py:308` | KILLED | 29 | `secret is None` |
+| 13 | `notion_sandbox.py:346` | KILLED | 21 | `type(bot.user_type) is not str` |
+| 14 | `notion_sandbox.py:364` | KILLED | 19 | `not target_ok(bot, page)` |
+| 15 | `notion_sandbox.py:382` | KILLED | 13 | `mode == "dry-run"` |
+| 16 | `notion_sandbox.py:413` | KILLED | 9 | `interrupted` |
+| 17 | `notion_sandbox.py:417` | KILLED | 8 | `failed` |
+| 18 | `notion_sandbox.py:445` | KILLED | 2 | `type(bot.user_id) is str` |
+| 19 | `notion_sandbox.py:480` | KILLED | 1 | `error is not None` |
+| 20 | `notion_sandbox.py:482` | KILLED | 1 | `any(stage.get("status") == "INTERRUPTED" for stage in stages)` |
+| 21 | `notion_sandbox.py:485` | KILLED | 72 | `check == "FAIL"` |
+| 22 | `notion_sandbox.py:487` | KILLED | 70 | `code == EXIT_OK` |
+| 23 | `notion_sandbox.py:532` | KILLED | 32 | `path is not None and str(path) != "" and not leaks(str(path), token)` |
+| 24 | `notion_sandbox.py:539` | KILLED | 1 | `isinstance(exc, SystemExit)` |
+| 25 | `notion_sandbox.py:542` | KILLED | 1 | `isinstance(exc, KeyboardInterrupt)` |
+| 26 | `notion_sandbox.py:555` | KILLED | 1 | `__name__ == "__main__"` |
+| 27 | `notion_sandbox_guard.py:139` | KILLED | 25 | `type(value) is not str` |
+| 28 | `notion_sandbox_guard.py:142` | KILLED | 25 | `len(compact) != 32` |
+| 29 | `notion_sandbox_guard.py:144` | KILLED | 25 | `any(character not in "0123456789abcdef" for character in compact)` |
+| 30 | `notion_sandbox_guard.py:151` | KILLED | 14 | `type(bot.user_type) is not str or bot.user_type != "bot"` |
+| 31 | `notion_sandbox_guard.py:153` | KILLED | 17 | `page.archived or page.parent_type == "database_id"` |
+| 32 | `notion_sandbox_guard.py:155` | KILLED | 13 | `canonical_id(bot.space_id) != SANDBOX_SPACE_ID` |
+| 33 | `notion_sandbox_guard.py:157` | KILLED | 13 | `canonical_id(page.page_id) != SANDBOX_PARENT_PAGE_ID` |
+| 34 | `notion_sandbox_guard.py:165` | KILLED | 11 | `candidate == ""` |
+| 35 | `notion_sandbox_guard.py:173` | KILLED | 30 | `type(value) is not str or value == ""` |
+| 36 | `notion_sandbox_guard.py:187` | KILLED | 41 | `head in _OVERRIDE_FLAGS` |
+| 37 | `notion_sandbox_guard.py:189` | KILLED | 30 | `contains_secret_shape(arg)` |
+| 38 | `notion_sandbox_guard.py:201` | KILLED | 81 | `token is None or not token_shape_ok(token)` |
+| 39 | `notion_sandbox_guard.py:206` | KILLED | 2 | `encoded != token` |
+| 40 | `notion_sandbox_guard.py:208` | KILLED | 2 | `digest not in forms and digest != token` |
+| 41 | `notion_sandbox_guard.py:216` | KILLED | 81 | `token is not None and token != "" and not _unsafe_exact(token) and token in cleaned` |
+| 42 | `notion_sandbox_guard.py:219` | KILLED | 2 | `form in cleaned` |
+| 43 | `notion_sandbox_guard.py:226` | KILLED | 11 | `runner_name is None` |
+| 44 | `notion_sandbox_guard.py:228` | KILLED | 11 | `outcome == "PASS"` |
+| 45 | `notion_sandbox_guard.py:230` | KILLED | 5 | `outcome == "FAILED"` |
+| 46 | `notion_sandbox_guard.py:232` | KILLED | 3 | `outcome == "BLOCKED"` |
+| 47 | `notion_sandbox_guard.py:247` | KILLED | 1 | `stage.get("name") == "qa" and type(found) is str` |
+| 48 | `notion_sandbox_guard.py:249` | KILLED | 6 | `status == "PASS"` |
+| 49 | `notion_sandbox_guard.py:251` | KILLED | 6 | `status == "FAILED"` |
+| 50 | `notion_sandbox_guard.py:253` | KILLED | 6 | `status == "BLOCKED"` |
+| 51 | `notion_sandbox_guard.py:267` | KILLED | 72 | `token is not None and token != "" and not _unsafe_exact(token) and token in text` |
+| 52 | `notion_sandbox_guard.py:269` | KILLED | 72 | `any(form in text for form in _encoded_forms(token))` |
+| 53 | `notion_sandbox_guard.py:284` | KILLED | 73 | `leaks(text, token)` |
+| 54 | `notion_sandbox_guard.py:288` | KILLED | 1 | `leaks(text, token)` |
+| 55 | `notion_sandbox_guard.py:307` | KILLED | 74 | `str(path) == "" or path == Path() or _under_proc(path)` |
+| 56 | `notion_sandbox_guard.py:315` | KILLED | 74 | `info is not None` |
+| 57 | `notion_sandbox_guard.py:322` | KILLED | 74 | `stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode)` |
+| 58 | `notion_sandbox_guard.py:324` | KILLED | 74 | `parent_info.st_mode & 0o200 == 0` |
+| 59 | `notion_sandbox_guard.py:382` | KILLED | 80 | `(candidate / "pyproject.toml").is_file() and (candidate / "docs" / "control").is_dir()` |
+| 60 | `notion_sandbox_guard.py:386` | KILLED | 1 | `(candidate / "pyproject.toml").is_file() and (candidate / "docs" / "control").is_dir()` |
+| 61 | `notion_sandbox_guard.py:404` | KILLED | 81 | `completed.returncode != 0 or len(sha) != 40` |
+| 62 | `notion_sandbox_guard.py:406` | KILLED | 80 | `any(character not in "0123456789abcdef" for character in sha)` |
+| 63 | `notion_sandbox_guard.py:421` | KILLED | 79 | `type(revision) is not int or type(session) is not int or type(head) is not str` |
+| 64 | `notion_sandbox_live.py:76` | KILLED | 8 | `bot is None` |
+| 65 | `notion_sandbox_live.py:83` | KILLED | 8 | `expected == ""` |
+| 66 | `notion_sandbox_live.py:88` | KILLED | 8 | `page is None` |
+| 67 | `notion_sandbox_live.py:95` | KILLED | 2 | `not parent_is_allowed(parent, allowed)` |
+| 68 | `notion_sandbox_live.py:107` | KILLED | 2 | `type(sent_parent) is not dict or sent_parent.get("page_id") != parent or sent_parent.get("type") ...` |
+| 69 | `notion_sandbox_live.py:114` | KILLED | 1 | `page is None` |
+| 70 | `notion_sandbox_live.py:121` | KILLED | 10 | `leaks(url, self._token) or leaks(url.replace("-", ""), self._token)` |
+| 71 | `notion_sandbox_live.py:127` | KILLED | 2 | `body is not None` |
+| 72 | `notion_sandbox_live.py:137` | KILLED | 9 | `type(raw) is not bytes` |
+| 73 | `notion_sandbox_live.py:147` | KILLED | 8 | `type(payload) is not dict` |
+| 74 | `notion_sandbox_live.py:151` | KILLED | 8 | `type(user_id) is not str or type(user_type) is not str` |
+| 75 | `notion_sandbox_live.py:155` | KILLED | 1 | `type(bot) is dict and type(bot.get("workspace_id")) is str` |
+| 76 | `notion_sandbox_live.py:162` | KILLED | 8 | `key not in payload` |
+| 77 | `notion_sandbox_live.py:165` | KILLED | 3 | `type(value) is not bool` |
+| 78 | `notion_sandbox_live.py:172` | KILLED | 9 | `type(payload) is not dict or payload.get("object") != "page"` |
+| 79 | `notion_sandbox_live.py:175` | KILLED | 8 | `page_id == ""` |
+| 80 | `notion_sandbox_live.py:181` | KILLED | 2 | `type(parent) is dict` |
+| 81 | `notion_sandbox_live.py:182` | KILLED | 1 | `space == ""` |
+| 82 | `notion_sandbox_live.py:185` | KILLED | 1 | `type(found_type) is str` |
+| 83 | `notion_sandbox_live.py:187` | KILLED | 1 | `found_type == "page_id"` |
+| 84 | `notion_sandbox_live.py:189` | KILLED | 2 | `space == "" and page_id == canonical_id(expected_id)` |
+| 85 | `notion_sandbox_live.py:192` | KILLED | 1 | `type(url) is not str or url == ""` |
+| 86 | `notion_sandbox_live.py:196` | KILLED | 9 | `archived_flag is None or trash_flag is None` |
+| 87 | `notion_sandbox_live.py:212` | KILLED | 1 | `type(handlers) is not list` |
+| 88 | `notion_sandbox_live.py:215` | KILLED | 1 | `isinstance(handler, urllib.request.ProxyHandler)` |
+| 89 | `notion_sandbox_live.py:217` | KILLED | 1 | `type(found) is not dict` |
+| 90 | `notion_sandbox_live.py:220` | KILLED | 1 | `type(key) is str and type(value) is str` |
+| 91 | `notion_sandbox_live.py:229` | KILLED | 1 | `type(value) is str and canonical_id(value) != ""` |
+| 92 | `notion_sandbox_pipeline.py:134` | KILLED | 1 | `page_id == SANDBOX_PARENT_PAGE_ID` |
+| 93 | `notion_sandbox_pipeline.py:135` | KILLED | 5 | `canonical_id(current.space_id) != SANDBOX_SPACE_ID or current.archived` |
+| 94 | `notion_sandbox_pipeline.py:139` | KILLED | 5 | `parent_id == "" or page_id == "" or page_id in seen` |
+| 95 | `notion_sandbox_pipeline.py:143` | KILLED | 5 | `canonical_id(current.space_id) != SANDBOX_SPACE_ID or current.archived` |
+| 96 | `notion_sandbox_pipeline.py:151` | KILLED | 10 | `not parent_is_allowed(requested, allowed)` |
+| 97 | `notion_sandbox_pipeline.py:156` | KILLED | 5 | `page_id in {"", SANDBOX_PARENT_PAGE_ID, requested}` |
+| 98 | `notion_sandbox_pipeline.py:158` | KILLED | 6 | `canonical_id(page.parent_id) != requested` |
+| 99 | `notion_sandbox_pipeline.py:160` | KILLED | 6 | `canonical_id(page.space_id) != SANDBOX_SPACE_ID` |
+| 100 | `notion_sandbox_pipeline.py:163` | KILLED | 6 | `canonical_id(confirmed.page_id) != page_id` |
+| 101 | `notion_sandbox_pipeline.py:165` | KILLED | 5 | `canonical_id(confirmed.parent_id) != requested` |
+| 102 | `notion_sandbox_pipeline.py:167` | KILLED | 5 | `canonical_id(confirmed.space_id) != SANDBOX_SPACE_ID or confirmed.archived` |
+| 103 | `notion_sandbox_pipeline.py:190` | KILLED | 9 | `type(spec) is not ProductSpec` |
+| 104 | `notion_sandbox_pipeline.py:198` | KILLED | 5 | `ctx.probe is None or ctx.product_page_id is None or type(spec) is not ProductSpec` |
+
 
 ## 2026-10-07 — Session 07 W8: variants
 
