@@ -506,3 +506,84 @@ This addendum governs Wave 8. The prompt remains the unamended source of record.
 | Twelve evidence keys | Session close, after the prompt's own criteria | Fixture variants are not that gate |
 | Extra workspace-level `/ Blue`, `/ Purple`, or `(Copy)` pages on replay | Later wave | They pass replay with zero writes. Pinned by `test_replay_pins_extra_workspace_variant_titles_as_a_known_limit`. A hub child with those titles is refused. Not a proven lineage |
 | W9 must-fix survivors from review 5427897657 | Next Session 07 wave | 13 items and 14 sites remain, named with file:line in `NEXT_SESSION.md`. The title compare and the two duplicate-block raises are closed |
+
+# Session 07 Prompt Integrity Review — Wave 9
+
+**Date:** 2026-10-07
+**Prompt:** `prompts/implementation/10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`
+**Verified SHA-256:** `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`
+**Workbook authority:** `hands-off-money-machine-full-implementation-workbook.md` appendix row for this prompt (5,255 bytes, 237 lines)
+**Scope:** Wave 9 only. Fixture-only A09 product QA (prompt section 8) over the A08 variants checkpoint, plus the must-fixes carried from Wave 8. Waves 1–8 above still govern their phases. This record is the corrective addendum for Wave 9.
+
+The prompt file is not amended.
+
+## 1. Prompt authenticity
+
+**Status:** VERIFIED
+
+- The extracted file's SHA-256 equals the workbook appendix value `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`.
+- The prompt stays the unamended source of record.
+
+## 2. Three-dimensional review
+
+### Fidelity
+
+**Verdict:** CONDITIONAL APPROVE. One high finding, resolved by the addendum.
+
+**F-01 [HIGH] — Section 8 lists product-fact persistence and automatic repair beside section 9 and section 11**
+
+- **Prompt lines:** 123–153, against section 9 (lines 155–170) and section 11 (lines 186–202).
+- **Authority:** `BUILD_PHASES` has six names. Variants leave `next_phase` as `qa`. `write_checkpoint` is the only progress writer. Repair job kinds are `provider_response` and `rebuild_refused`. The fixture can set publish, duplicate-as-template, and search indexing. It cannot update a formula expression or a linked-view source in place. A new formula or view would mint an id the checkpoint does not hold.
+- **Consequence of literal execution:** Building the section 9 ledger, the section 10 workflow link, or a second catalogue from "fresh duplicate" would leave the session looking finished, or a repair would orphan the stored ids.
+- **Amendment:** QA reads the variants checkpoint through `FixtureNotionAdapter` only. The verdict is `PASS`, `FAIL_REPAIRABLE`, or `BLOCKED`. It is stored in `provider_object_references["qa"]` by `write_checkpoint`. Checkpoint names stay the six build phases. `next_phase` becomes `fact_ledger` and section 9 is not run. Repairable defects are only an unpublished variant, duplicate-as-template off, or search indexing on. Those repairs use the existing adapter methods, then QA runs again. Any other failed check is `BLOCKED` and makes zero adapter writes. A passing run proves one fresh `duplicate_page` of the first variant and does not duplicate it again on resume. The facts stored on the QA reference are the colours, hubs, databases, variant count, page count, and secret links already on the variants build. They are not the section 9 ledger.
+
+**What the prompt already gets right**
+
+- QA returns `PASS`, `FAIL_REPAIRABLE`, or `BLOCKED` (lines 145–151).
+- `FAIL_REPAIRABLE` creates targeted repair jobs and reruns QA (line 153).
+- QA is a read of the build, and A09 stays `EXTERNAL_READ` on the roster. The one proof duplicate is the section 8 "fresh duplicate works" check, not a second product.
+
+### Safety and executability
+
+**Verdict:** CONDITIONAL APPROVE. The Wave 1 critical and high findings still apply and stay in force.
+
+**S-01 [CRITICAL] — Action 11 live sandbox.** Still deferred. This wave uses `FixtureNotionAdapter` only. No live HTTP, no real Notion workspace, no Etsy listing, no socket, no Exit 78 lift. Do not import `httpx`, `requests`, `notion_client`, or `APINotionAdapter`. The module must not contain an `https://` literal. Public links come from `get_public_url` and `verify_stranger_access`.
+
+**S-02 [HIGH] — Action 12 commissioning.** A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. `product_qa_implemented` stays false. Do not edit `config/agents.yaml`.
+
+**S-03 [HIGH] — Two ProductSpec types.** This phase accepts only `product_spec.ProductSpec`. The catalogue spec is rejected.
+
+**S-04 [HIGH] — Tip-sync must not look like completion.** `head_sha` becomes the W8 squash `6b087370eaaf1a5e09d9868643cca7b3654ddc4a`, the merged base of this wave. It does not become this wave's own commit. `evidence_closure_commit_sha` stays the Session 06 tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. All twelve session 7 evidence keys stay false. `session_status` stays `incomplete`. This wave does not print `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE`. Narrative `next_phase` becomes `fact_ledger` and is not started.
+
+### Gameability
+
+**Verdict:** CONDITIONAL APPROVE. One high finding, resolved by the addendum.
+
+**G-01 [HIGH] — A verdict string with no fixture checks, or a repair that still writes on a refusal, satisfies a careless reading**
+
+- **Prompt lines:** 125–153.
+- **Cheap fake:** Write `PASS` into the checkpoint without reading the fixture, treat every defect as repairable and rebuild the product, or call `duplicate_page` again on every resume.
+- **Ungameable for this wave:** The plan runs before any adapter write. A missing variants checkpoint, a non-fixture probe, or a catalogue spec raises and leaves the file bytes unchanged, with adapter writes empty. `BLOCKED` records the verdict and makes zero adapter writes. `FAIL_REPAIRABLE` applies only the three flag repairs, reruns the plan, and records `PASS` only when the rerun is clean. A lying repair that does not change the flag records `BLOCKED`. The proof duplicate happens once. Resume of a stored `PASS` makes zero adapter writes. A `ProviderFailure` from the plan read or the proof duplicate uses `raise_recorded`. A `ProductBuildError` from the plan does not append a repair job. Tests make no socket or other network access.
+
+## 3. Corrective addendum
+
+This addendum governs Wave 9. The prompt remains the unamended source of record.
+
+1. Prove the prompt hash, then implement only the slice below.
+2. Tip-sync only: `head_sha` becomes `6b087370eaaf1a5e09d9868643cca7b3654ddc4a`. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. Advance `state_revision` from 56 to 57. `session_status` stays `incomplete`. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays this prompt. Narrative `next_phase` becomes `fact_ledger` and this wave does not run it.
+3. Leave all twelve session 7 evidence keys false, including `product_qa_implemented` and `variant_builder_implemented`. Do not set `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE`. The log and the pull request say this is not SESSION_07 COMPLETE and Exit 78 stays HELD.
+4. Keep A07, A08, and A09 DESIGNED. `commissioned_agents` stays empty. Do not edit `config/agents.yaml`.
+5. QA goes through `write_checkpoint`. `write_document` stays the single progress writer. `checkpoint_names` stay the six build phases. The aesthetics parser also strips the `qa` reference key so a QA file can be read back by the variants loader. Re-entering variants after QA does not rewrite the file.
+6. Close the carried must-fixes with killing tests. The 13 items and 14 sites in `NEXT_SESSION.md` are in scope, including the saved-path `_require_original` call. A database whose parent is a hub block or a home block is refused before any adapter write. `type(database) is NotionDatabase` also rejects a subclass, with a test. The crash matrix asserts that a block-step crash leaves every page unpublished. `IMPLEMENTATION_LOG.md` line 124 of the W8 entry is reworded to say there is no current test and that probes differ only in refusal message, never in writes or acceptance. The doubled period after `local-only` is removed. The log notes that tests make no socket or network access.
+7. Tests use the fixture only. Do not start the section 9 fact ledger, the workflow link, or commissioning. Do not run the live sandbox.
+
+## 4. Deferrals
+
+| Finding | Owner | Reason |
+|---|---|---|
+| Section 9 fact ledger | Later Session 07 wave | Narrative next phase is `fact_ledger`, not started. QA persists the facts it checked; it does not open a second ledger |
+| Section 10 workflow link | Later Session 07 wave | Not this slice |
+| Section 11 live sandbox | Later wave with explicit authorization | S-01 |
+| In-place formula or linked-view repair | Later wave if the fixture grows an update method | A new id would not match the stored checkpoint. Those defects are `BLOCKED` with zero adapter writes |
+| Action 12 commissioning | Operator decision after full implementation | S-02 |
+| Twelve evidence keys | Session close, after the prompt's own criteria | Fixture QA is not that gate |

@@ -45,6 +45,7 @@ OP_HUBS_CREATE = "identity_specific_hubs.create"
 OP_NOTIFICATION_DATABASE = "notification_dashboard.database"
 OP_AESTHETICS_SAMPLES = "aesthetics_and_content_completion.samples"
 OP_VARIANTS = "variants.duplicate"
+OP_QA = "qa.duplicate"
 OP_REBUILD = "top_level_page_and_design_shell.rebuild"
 REBUILD_REFUSED = "rebuild_refused"
 _ACCEPTED_JOB_KINDS = frozenset({"provider_response", REBUILD_REFUSED})

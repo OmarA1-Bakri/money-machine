@@ -231,14 +231,32 @@ def _checkpoint_with(
     return replace(stored, next_phase=PHASE_QA, variants=records, recorded_at=recorded_at)
 
 
+def variant_provider_references(checkpoint: ProductBuildCheckpoint) -> dict[str, object]:
+    """Aesthetics references plus the variants list when those pages exist."""
+    references = aesthetics_provider_references(checkpoint)
+    if checkpoint.variants:
+        references[_VARIANTS_KEY] = [_reference_row(record) for record in checkpoint.variants]
+    return references
+
+
+def load_variant_checkpoint(
+    path: Path,
+) -> tuple[ProductBuildCheckpoint, Mapping[str, object]]:
+    """Read the variants checkpoint. An earlier phase returns an empty variants list."""
+    return _load_checkpoint(path)
+
+
 def _write_checkpoint(
     path: Path,
     checkpoint: ProductBuildCheckpoint,
     created: Mapping[str, object],
 ) -> None:
-    references = aesthetics_provider_references(checkpoint)
-    references[_VARIANTS_KEY] = [_reference_row(record) for record in checkpoint.variants]
-    write_checkpoint(path, checkpoint, references, retained_created_ids=created)
+    write_checkpoint(
+        path,
+        checkpoint,
+        variant_provider_references(checkpoint),
+        retained_created_ids=created,
+    )
 
 
 def _reference_row(record: VariantRecord) -> dict[str, str]:
@@ -367,6 +385,7 @@ async def _plan_variants(
     """
     source = _source_page(probe, stored)
     _require_original(source)
+    _refuse_structure_block_databases(probe)
     in_play = _in_play_pages(probe, stored, spec)
     _refuse_titled_children(probe, spec, in_play)
     drop_ids = _collect_drop_ids(probe, stored, spec)
@@ -458,7 +477,8 @@ def _open_variant_ids(
         # An extra workspace / Blue passes even with a child under it.
         # A forgery with the recorded title and a different id is rejected.
         if stored.variants:
-            if page.parent_type == "workspace" and _title_open(page):
+            proof_title = f"{_variant_title(spec, spec.colour_variants[0])} (Copy)"
+            if page.parent_type == "workspace" and (_title_open(page) or page.title == proof_title):
                 workspace_ids.append(page.id)
             continue
         # Empty path: an unrecorded copy is open so resume can adopt it.
@@ -559,11 +579,51 @@ def _page_block_ids(probe: FixtureNotionAdapter, page: NotionPage) -> set[str]:
     return owned
 
 
-def _has_nested_child(probe: FixtureNotionAdapter, page: NotionPage) -> bool:
-    """A database or page whose parent is this page or any of its blocks."""
-    parents = {page.id, *_page_block_ids(probe, page)}
+def _is_database(database: object) -> bool:
+    """A Notion database, including a subclass. A subclass is still nested."""
+    return isinstance(database, NotionDatabase)
+
+
+def _home_and_hub_block_ids(probe: FixtureNotionAdapter) -> set[str]:
+    """Blocks on the workspace home and on the hub pages under it.
+
+    The walk is ``_page_block_ids``. Shared databases are parented to the home
+    page, not to these blocks, so they are not nested children.
+    """
+    homes = [
+        page
+        for page in probe.pages.values()
+        if type(page) is NotionPage
+        and page.parent_type == "workspace"
+        and any(
+            type(child) is NotionPage and child.parent_id == page.id
+            for child in probe.pages.values()
+        )
+    ]
+    owned: set[str] = set()
+    for home in homes:
+        owned.update(_page_block_ids(probe, home))
+        for child in probe.pages.values():
+            if type(child) is NotionPage and child.parent_id == home.id:
+                owned.update(_page_block_ids(probe, child))
+    return owned
+
+
+def _refuse_structure_block_databases(probe: FixtureNotionAdapter) -> None:
+    """A database under a hub or home block is refused before any write."""
+    parents = _home_and_hub_block_ids(probe)
     if any(
-        type(database) is NotionDatabase and database.parent_id in parents
+        _is_database(database) and database.parent_id in parents
+        for database in probe.databases.values()
+    ):
+        raise ProductBuildError("variant page does not match")
+
+
+def _has_nested_child(probe: FixtureNotionAdapter, page: NotionPage) -> bool:
+    """A database or page whose parent is this page, its blocks, or a hub or home block."""
+    parents = {page.id, *_page_block_ids(probe, page), *_home_and_hub_block_ids(probe)}
+    if any(
+        _is_database(database) and database.parent_id in parents
         for database in probe.databases.values()
     ):
         return True
