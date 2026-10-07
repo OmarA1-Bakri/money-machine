@@ -121,6 +121,17 @@ class VariantRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class QaRecord:
+    """Fixture QA verdict recorded on the variants checkpoint."""
+
+    verdict: str
+    checks: tuple[tuple[str, bool], ...]
+    repairs: tuple[str, ...]
+    proof_page_id: str
+    facts: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
 class ProductBuildCheckpoint:
     """Persisted build progress. The next phase is not executed."""
 
@@ -142,6 +153,7 @@ class ProductBuildCheckpoint:
     notification_dashboard: NotificationDashboardRecord | None = None
     aesthetics: AestheticsRecord | None = None
     variants: tuple[VariantRecord, ...] = ()
+    qa: QaRecord | None = None
 
 
 def design_shell_content(spec: ProductSpec) -> str:

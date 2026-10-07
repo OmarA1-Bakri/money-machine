@@ -28,6 +28,7 @@ from money_machine.agents.implementations.notion_aesthetics import (
     build_aesthetics_and_content_completion,
     hub_cover,
     hub_icon,
+    require_aesthetics_created_ids,
 )
 from money_machine.agents.implementations.notion_dashboard import build_dashboard_and_navigation
 from money_machine.agents.implementations.notion_hubs import build_identity_specific_hubs
@@ -51,13 +52,19 @@ from money_machine.agents.implementations.notion_shared_databases import build_s
 from money_machine.agents.implementations.notion_variants import (
     PHASE_QA,
     build_variants,
+    load_variant_checkpoint,
     vocabulary_content,
 )
 from money_machine.control.state import SESSION_EVIDENCE_KEYS
 from money_machine.domain.models.common import EvidenceReference
 from money_machine.domain.models.product_spec import ColourToken, Hub, ProductSpec
 from money_machine.integrations.notion.api_adapter import APINotionAdapter
-from money_machine.integrations.notion.domain import NotionCalloutBlock, NotionPage, NotionTextBlock
+from money_machine.integrations.notion.domain import (
+    NotionCalloutBlock,
+    NotionDatabase,
+    NotionPage,
+    NotionTextBlock,
+)
 from money_machine.integrations.notion.fixture_adapter import FixtureNotionAdapter
 from tests.fixtures.products import create_fixture_product_spec
 
@@ -72,7 +79,7 @@ NOTIFICATION_AT = datetime(2026, 10, 6, 0, 30, tzinfo=UTC)
 LATER = datetime(2026, 10, 6, 1, 30, tzinfo=UTC)
 VARIANTS_AT = datetime(2026, 10, 6, 2, 30, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "9bc56b2c839f66fce13bebf55cb30e88474f526e"
+HEAD_SHA = "6b087370eaaf1a5e09d9868643cca7b3654ddc4a"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 
 
@@ -235,6 +242,37 @@ def _restamp(path: Path, mutate: Callable[[dict[str, object]], None]) -> None:
         json.dumps(stamped, sort_keys=True, separators=(",", ":")) + "\n",
         encoding="ascii",
     )
+
+
+def planner_spec(
+    *,
+    tier: str = "mass",
+    identity: str = "Weekly Planner",
+    title: str = "Home Dashboard Planner",
+    hub_name: str = "Hub",
+) -> ProductSpec:
+    """ProductSpec for a later-phase test. Same builder the variants file uses."""
+    return _spec(tier=tier, identity=identity, title=title, hub_name=hub_name)
+
+
+async def prepare_aesthetics(spec: ProductSpec, probe: FixtureNotionAdapter, path: Path) -> None:
+    """Build through aesthetics so a later phase can resume the checkpoint."""
+    await _prepare(spec, probe, path)
+
+
+def watch_adapter_writes(probe: FixtureNotionAdapter) -> list[str]:
+    """Record adapter write-method names. Reads such as get_public_url are not included."""
+    return _watch(probe)
+
+
+def restamp_checkpoint(path: Path, mutate: Callable[[dict[str, object]], None]) -> None:
+    """Mutate a checkpoint and recompute its integrity digest."""
+    _restamp(path, mutate)
+
+
+def adapter_snapshot(probe: FixtureNotionAdapter) -> bytes:
+    """Stable bytes for the fixture objects a refusal must leave unchanged."""
+    return _fixture_bytes(probe)
 
 
 def _assert_finished(spec: ProductSpec, probe: FixtureNotionAdapter, started: int) -> None:
@@ -2514,6 +2552,8 @@ async def test_each_variant_step_crash_resumes_without_a_second_page(
     message = "publish refused" if step == "publish_page" else "step crashed"
     with pytest.raises(expected, match=message):
         await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    if step in {"add_callout_block", "add_text_block"}:
+        assert all(page.is_published is False for page in probe.pages.values())
     if step == "publish_page":
         stored = json.loads(path.read_text(encoding="ascii"))
         job = stored["progress"]["repair_jobs"][-1]
@@ -2960,6 +3000,392 @@ async def test_variant_build_does_not_open_a_socket(
         assert token.casefold() not in source.casefold()
 
 
+def _plant_database(probe: FixtureNotionAdapter, parent_id: str) -> None:
+    probe.databases["db_nested"] = NotionDatabase(
+        id="db_nested",
+        title="Nested",
+        parent_id=parent_id,
+        parent_type="block_id",
+    )
+
+
+def _structure_block_id(probe: FixtureNotionAdapter, spec: ProductSpec, kind: str) -> str:
+    home = _home(probe, spec)
+    if kind == "home":
+        return next(block.id for block in probe.blocks.values() if block.parent_id == home.id)
+    hub = next(page for page in probe.pages.values() if page.parent_id == home.id)
+    return next(block.id for block in probe.blocks.values() if block.parent_id == hub.id)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["home", "hub"])
+async def test_database_under_a_structure_block_refuses_before_any_write(
+    tmp_path: Path, kind: str
+) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    _plant_database(probe, _structure_block_id(probe, spec, kind))
+    raw = path.read_bytes()
+    fixture = _fixture_bytes(probe)
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+    assert _fixture_bytes(probe) == fixture
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["home", "hub"])
+async def test_saved_database_under_a_structure_block_refuses(tmp_path: Path, kind: str) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    _plant_database(probe, _structure_block_id(probe, spec, kind))
+    raw = path.read_bytes()
+    fixture = _fixture_bytes(probe)
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+    assert _fixture_bytes(probe) == fixture
+
+
+@pytest.mark.asyncio
+async def test_database_subclass_under_a_hub_block_is_refused(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+
+    class _NestedDatabase(NotionDatabase):
+        pass
+
+    parent_id = _structure_block_id(probe, spec, "hub")
+    probe.databases["db_sub"] = _NestedDatabase(
+        id="db_sub",
+        title="Nested",
+        parent_id=parent_id,
+        parent_type="block_id",
+    )
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_database_subclass_under_a_copy_page_is_refused(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    home = _home(probe, spec)
+    copy = await probe.duplicate_page(home.id)
+
+    class _NestedDatabase(NotionDatabase):
+        pass
+
+    probe.databases["db_sub"] = _NestedDatabase(
+        id="db_sub",
+        title="Nested",
+        parent_id=copy.id,
+        parent_type="page_id",
+    )
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_replay_rejects_a_changed_secret_link(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    page = next(item for item in probe.pages.values() if item.title.endswith("/ Blue"))
+    page.public_url = "changed"
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_replay_rejects_a_moved_accent_block_id(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    checkpoint = await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    record = checkpoint.variants[0]
+    block = probe.blocks.pop(record.accent_block_id)
+    block.id = "block_moved"
+    probe.blocks[block.id] = block
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("flag", "value"),
+    [("duplicate_as_template", True), ("search_indexing", False)],
+)
+async def test_saved_home_original_flag_refuses(tmp_path: Path, flag: str, value: bool) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    setattr(_home(probe, spec), flag, value)
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_navigation_callout_fails_the_created_hub_pair(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    stored, created = load_variant_checkpoint(path)
+    hub = stored.identity_hubs[0]
+    original = probe.blocks[hub.navigation_block_id]
+    probe.blocks[hub.navigation_block_id] = NotionCalloutBlock(
+        id=original.id,
+        parent_id="not-the-hub",
+        type="callout",
+        content="moved",
+        created_at=original.created_at,
+    )
+
+    with pytest.raises(ProductBuildError, match="progress created ids do not match the checkpoint"):
+        require_aesthetics_created_ids(probe, created, stored)
+
+
+@pytest.mark.asyncio
+async def test_duplicate_palette_token_names_refuse_before_any_write(tmp_path: Path) -> None:
+    spec = _spec().model_copy(
+        update={
+            "palette_tokens": (
+                ColourToken(name="Primary", hex="#111111"),
+                ColourToken(name="Primary", hex="#111111"),
+                ColourToken(name="Accent", hex="#E74C3C"),
+            ),
+        }
+    )
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="checkpoint aesthetics accent is duplicated"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+def _copy_variant_field(document: dict[str, object], field: str) -> None:
+    references = document["provider_object_references"]
+    assert type(references) is dict
+    variants = references["variants"]
+    assert type(variants) is list
+    first = variants[0]
+    second = variants[1]
+    assert type(first) is dict and type(second) is dict
+    second[field] = first[field]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field", ["name", "page_id"])
+async def test_replay_rejects_a_duplicated_variant_label(tmp_path: Path, field: str) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    _restamp(path, lambda document: _copy_variant_field(document, field))
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="checkpoint variant is duplicated"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_replay_rejects_an_extra_variant_child(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    checkpoint = await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    page_id = checkpoint.variants[0].page_id
+    probe.blocks["block_extra"] = NotionTextBlock(
+        id="block_extra",
+        parent_id=page_id,
+        type="paragraph",
+        content="extra",
+    )
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_replay_rejects_a_home_without_the_spec_id(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    del _home(probe, spec).properties[SPEC_ID_PROPERTY]
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    with pytest.raises(
+        ProductBuildError, match="checkpoint page is missing from the fixture probe"
+    ):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_replay_rejects_a_home_that_is_not_workspace(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    _home(probe, spec).parent_type = "page_id"
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="checkpoint page is not the stored top-level page"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_two_colour_titles_refuse_before_any_write(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    title = f"{spec.title} / Blue"
+    await probe.create_page(title=title)
+    await probe.create_page(title=title)
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_two_copy_titles_refuse_before_any_write(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    title = f"{spec.title} (Copy)"
+    await probe.create_page(title=title)
+    await probe.create_page(title=title)
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_reversed_dashboard_created_ids_survive_variants(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    document = json.loads(path.read_text(encoding="ascii"))
+    progress = document["progress"]
+    assert type(progress) is dict
+    created = progress["created_notion_ids"]
+    assert type(created) is dict
+    dashboard = created["dashboard"]
+    assert type(dashboard) is list and len(dashboard) >= 2
+    reversed_rows = list(reversed(dashboard))
+
+    def _reverse(body: dict[str, object]) -> None:
+        fresh = body["progress"]
+        assert type(fresh) is dict
+        ids = fresh["created_notion_ids"]
+        assert type(ids) is dict
+        rows = ids["dashboard"]
+        assert type(rows) is list
+        ids["dashboard"] = list(reversed(rows))
+
+    _restamp(path, _reverse)
+    await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+    stored = json.loads(path.read_text(encoding="ascii"))
+    after = stored["progress"]
+    assert type(after) is dict
+    ids = after["created_notion_ids"]
+    assert type(ids) is dict
+    assert ids["dashboard"] == reversed_rows
+
+
 def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert state["current_session"] == 7
@@ -2976,5 +3402,6 @@ def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
     assert all(value is False for value in evidence.values())
     assert evidence["variant_builder_implemented"] is False
-    assert state["state_revision"] == 56
+    assert evidence["product_qa_implemented"] is False
+    assert state["state_revision"] == 57
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")
