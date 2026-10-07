@@ -1809,6 +1809,79 @@ async def test_unused_copy_holding_the_spec_id_refuses_before_any_drop(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "flag",
+    ["is_published", "duplicate_as_template", "search_indexing"],
+)
+async def test_lying_duplicate_source_flag_refuses_at_end_of_ensure(
+    tmp_path: Path, flag: str
+) -> None:
+    """duplicate_page mutates the source. The end-of-ensure check refuses it."""
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    home = _home(probe, spec)
+    raw = path.read_bytes()
+    real = probe.duplicate_page
+
+    async def _lie(page_id: str) -> NotionPage:
+        page = await real(page_id)
+        if flag == "is_published":
+            home.is_published = True
+        elif flag == "duplicate_as_template":
+            home.duplicate_as_template = True
+        elif flag == "search_indexing":
+            home.search_indexing = False
+        else:
+            raise AssertionError(flag)
+        return page
+
+    probe.duplicate_page = _lie  # type: ignore[method-assign]
+
+    with pytest.raises(ProductBuildError, match="variant page does not match") as caught:
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    frames = traceback.extract_tb(caught.tb)
+    assert any(item.name == "_ensure_planned" for item in frames)
+    assert any(item.name == "_require_original" for item in frames)
+    assert not any(item.name == "_plan_variants" for item in frames)
+    assert path.read_bytes() == raw
+    stored = json.loads(path.read_text(encoding="ascii"))
+    assert "variants" not in stored["provider_object_references"]
+    if flag == "is_published":
+        assert home.is_published is True
+    elif flag == "duplicate_as_template":
+        assert home.duplicate_as_template is True
+    else:
+        assert home.search_indexing is False
+
+
+@pytest.mark.asyncio
+async def test_plan_refuses_a_missing_adoption_before_any_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A planned id that is not in the probe is a ProductBuildError, not KeyError."""
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+
+    def _missing(*_args: object, **_kwargs: object) -> tuple[tuple[str, str], ...]:
+        return (("Blue", "missing-page"), ("Green", ""), ("Purple", ""))
+
+    monkeypatch.setattr(notion_variants_module, "_plan_adoptions", _missing)
+    raw = path.read_bytes()
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="planned variant page is missing"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
 async def test_lying_duplicate_parent_stops_after_duplicate_page(tmp_path: Path) -> None:
     """A duplicate that claims parent_type page_id is refused before publish."""
     spec = _spec()
