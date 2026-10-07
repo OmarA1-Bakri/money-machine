@@ -296,3 +296,28 @@ Wave 9 is a bounded slice within Session 04 that conditionally lifts Exit 78 wit
 - Session 02 addendum point 1 — "Job claiming is commissioned in Session 03" (later superseded by Session 03 addendum)
 - Session 03 addendum point 4 — "commissioning evidence, agent promotion to COMMISSIONED, and removal of exit 78 are Session 04's scope"
 - Session 04 addendum point 1 — "Exit 78 stays until decision record + commissioning evidence gate"
+
+## D-0029 — Session 07 section 10 names are labels on the workflow graph
+
+**Status:** accepted for Session 07 Wave 10, 2026-10-07.
+
+### Context
+
+Prompt section 10 names the chain DEDUPE_PASSED, BUILD_NOTION_TEMPLATE, RUN_PRODUCT_QA, REPAIR, CREATE_VARIANTS, RUN_VARIANT_QA, and GENERATE_LISTING_PACKAGE. Those names are not the job types in `config/workflows.yaml`. The Session 03 prompt-integrity review, finding M11, already voided the prompt's example job names as a parallel authority and bound implementation to `config/workflows.yaml`.
+
+### Decision
+
+The workflow link records the existing graph. It does not edit `config/workflows.yaml` and it does not create jobs.
+
+- BUILD_NOTION_TEMPLATE is ProductBuildJob. DEDUPE_PASSED maps to that job alone.
+- RUN_PRODUCT_QA is ProductQAJob.
+- REPAIR is BuildRepairJob. The edge is recorded. This wave does not execute it.
+- CREATE_VARIANTS is VariantBuildJob.
+- RUN_VARIANT_QA is VariantPublishJob, because that job admits VARIANT_LINKS_VERIFIED.
+- GENERATE_LISTING_PACKAGE ready is ListingCopyJob, whose output contract includes ListingPackage. The path reaches it through ScreenshotJob. There is no direct VariantPublishJob to ListingCopyJob edge.
+
+Supported devices are recorded as `unverified`. The free-update policy is recorded as `not_configured`. Nothing persisted verifies either one. Those tokens are not a device claim and not a free-update claim.
+
+### Consequences
+
+A missing edge or a missing ListingPackage output raises `workflow link does not match` before any write. Merchandising may claim only the facts in the ledger. Section 11 and commissioning stay out of this wave.

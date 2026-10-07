@@ -1,5 +1,69 @@
 # Implementation Log
 
+## 2026-10-07 — Session 07 W10: fact ledger and workflow link
+
+Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision is 58. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` is the intentional tip-sync to the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-07T23:29:39Z`.
+
+Twelve session 7 evidence keys stay false, including `product_fact_ledger_persisted` and `build_workflow_linked`. No session exit code is recorded. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. Exit 78 scheduler stays HELD. Narrative `next_phase` is `test_matrix` and it is not started. There is no top-level `next_phase` field. Section 11 is not this wave.
+
+Prompt integrity for this wave is the Wave 10 corrective addendum in `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md`. The prompt file is unchanged. SHA-256 `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`. D-0029 records that the section 10 names are labels on `config/workflows.yaml`, not a second engine.
+
+`run_fact_ledger` is `notion_fact_ledger.py:102`. It reads the QA record through `load_qa_record` (`notion_qa.py:142`) and the variants checkpoint. The plan at `_plan` (`:246`) runs before the single `write_checkpoint` (`:516`). Facts are the persisted checkpoint and the fixture adapter: page count from the known ids, hub and database titles from the adapter, variant names and secret links from the stored records, dashboard formula expressions from the adapter, `supported_devices` `unverified`, `free_update_policy` `not_configured`, and `build_version` from the checkpoint. Caller `colour_variants` and `version` are ignored. A stored ledger or link that does not match the live plan raises `fact ledger does not match` or `workflow link does not match` and leaves the file bytes unchanged, with 0 adapter writes. A `BLOCKED` record is re-planned when the live plan is no longer blocked. Resume of a matching record does not write. A crash inside `write_checkpoint` leaves no ledger key, and the resume writes once to a single `PASS`. The workflow link walks DEDUPE_PASSED to ListingCopyJob through the YAML graph, including ScreenshotJob, and does not create a job. `_write_qa` (`notion_qa.py:802`) keeps a stored ledger and link when QA rewrites. The aesthetics parser strips both keys at `notion_aesthetics.py:151`.
+
+Empty captured URL contract, pinned: a captured `public_url` of `""` is skipped, the same as a missing URL (`notion_qa.py:526`). `test_empty_captured_url_repairs_like_a_missing_url` records `PASS` with repairs `("published",)`. It does not refuse.
+
+Fresh-duplicate title and spec-id tests now keep going after a proof error, so each mutant fails at `assert false_checks == ("fresh_duplicate",)`. The applicable mutants replace `page.title == title` (`notion_qa.py:543`) and `SPEC_ID_PROPERTY not in page.properties` (`:545`) with `True`. Deleting either conjunct is not valid Python.
+
+Product-build tests: 582 passed (`test_notion_fact_ledger.py`, `test_notion_product_qa.py`, the variants file, the progress file, and the six phase files). `ruff format --check`, `ruff check`, and `pyright` 1.1.411 report 0 errors on the changed modules. Sockets stay blocked. No production Notion or Etsy. No commissioning.
+
+Mutation checks: 41 rows, 37 killed, 4 equivalent. The Failed column sums to 65. Each mutant was applied, the owning test file was run, and the file was restored. A syntax error is not a row. The 17 variant-file rows were remeasured on this tree. Their Failed counts match the W9 figures and sum to 20. The navigation check is now `notion_aesthetics.py:346` because the reference strip gained one line. Four rows are equivalent: palette token names `notion_variants.py:280`, the home id check `:904`, `_source_page` parent type `:519`, and the workflow length flag `notion_fact_ledger.py:281`. Each probe still refuses, with 0 adapter writes, and does not accept a bad build.
+
+| Mutation | Site (file:line) | Failing tests | Failed |
+|---|---|---|---|
+| delete secret-link compare | `notion_variants.py:847`. Delete `if link != record.secret_link` and its raise | `test_notion_product_builder_variants.py` | 1 |
+| delete accent and vocabulary id compare | `notion_variants.py:844`. Delete the accent and vocabulary id compare | owning variants file | 1 |
+| delete saved-path `_require_original` | `notion_variants.py:837`, the call in `_require_saved` | owning variants file | 2 |
+| replace navigation block type check with False | `notion_aesthetics.py:346`. Replace the type and parent condition with `False` | owning variants file | 1 |
+| delete palette token name uniqueness | `notion_variants.py:280`. Delete the token-name uniqueness check | Equivalent. `test_duplicate_palette_token_names_refuse_before_any_write` still raises `checkpoint aesthetics accent is duplicated`. 0 writes. Owning file: 213 passed | 0 |
+| delete variant name dedup | `notion_variants.py:198`. Delete the name `reject_duplicate_labels` call | owning variants file | 1 |
+| delete variant page-id dedup | `notion_variants.py:202`. Delete the page-id `reject_duplicate_labels` call | owning variants file | 1 |
+| delete `len(children) != 2` | `notion_variants.py:895`. Delete `len(children) != 2 or` | owning variants file | 1 |
+| delete home id check | `notion_variants.py:904`. Delete `if home is None or home.id != stored.page_id` and its raise | Equivalent. `test_replay_rejects_a_home_without_the_spec_id` still raises `checkpoint page is missing from the fixture probe`. 0 writes. Owning file: 213 passed | 0 |
+| delete `_source_page` parent_type | `notion_variants.py:519`. Delete `or page.parent_type != "workspace"` | Equivalent. `test_replay_rejects_a_home_that_is_not_workspace` still raises `checkpoint page is not the stored top-level page`. 0 writes. Owning file: 213 passed | 0 |
+| delete `_find_titled` `len(matches) > 1` | `notion_variants.py:534` | owning variants file | 1 |
+| delete `_find_copy` `len(matches) > 1` | `notion_variants.py:548` | owning variants file | 1 |
+| publish before blocks | `notion_variants.py:748` moved to just before the accent match at `:738` | owning variants file | 2 |
+| skip retained created ids | `notion_progress_record.py:180`. Replace `if retained_created_ids is not None` with `if False` | owning variants file | 1 |
+| delete plan nested-database refuse | `notion_variants.py:388`. Delete `_refuse_structure_block_databases(probe)` | owning variants file | 3 |
+| drop hub and home blocks from nested parents | `notion_variants.py:624`. Drop `*_home_and_hub_block_ids(probe)` | owning variants file | 2 |
+| exact type instead of isinstance | `notion_variants.py:584`. Replace `isinstance(database, NotionDatabase)` with `type(database) is NotionDatabase` | owning variants file | 2 |
+| fresh-duplicate title is True | `notion_qa.py:543`. Replace `page.title == title` with `True` | `test_renamed_variant_page_fails_fresh_duplicate` fails at `assert false_checks == ("fresh_duplicate",)`. Owning QA file | 1 |
+| fresh-duplicate spec id is True | `notion_qa.py:545`. Replace `SPEC_ID_PROPERTY not in page.properties` with `True` | `test_forged_spec_id_fails_fresh_duplicate` fails at the same false-check assert. Owning QA file | 1 |
+| empty captured url is checked | `notion_qa.py:526`. Delete `captured != ""` | `test_empty_captured_url_repairs_like_a_missing_url`. Owning QA file | 1 |
+| qa verdict check is True | `notion_fact_ledger.py:275`. Replace `qa.verdict == "PASS"` with `True` | owning ledger file | 2 |
+| ready is always ListingCopyJob | `notion_fact_ledger.py:288`. Replace the blocked-empty ready with `_READY_JOB` | owning ledger file | 3 |
+| repair_required is always false | `notion_fact_ledger.py:287` | owning ledger file | 1 |
+| supported_devices is desktop | `notion_fact_ledger.py:267`. Replace `unverified` with `desktop` | owning ledger file | 2 |
+| free_update_policy is free | `notion_fact_ledger.py:269`. Replace `not_configured` with `free` | owning ledger file | 2 |
+| build_version is a constant | `notion_fact_ledger.py:270`. Replace `str(stored.build_version)` with `"9"` | owning ledger file | 3 |
+| colour names ignore the adapter title | `notion_fact_ledger.py:283`. Delete `if not colours_ok` | owning ledger file | 1 |
+| hubs_present is True | `notion_fact_ledger.py:277` | owning ledger file | 1 |
+| databases_present is True | `notion_fact_ledger.py:278` | owning ledger file | 1 |
+| dashboard_outputs check is True | `notion_fact_ledger.py:279` | owning ledger file | 1 |
+| secret_links check is True | `notion_fact_ledger.py:280` | owning ledger file | 1 |
+| blocked is False | `notion_fact_ledger.py:286`. Replace `blocked = any(...)` with `blocked = False` | owning ledger file | 7 |
+| stored facts are not compared | `notion_fact_ledger.py:233`. Compare checks only on the pass path | `test_forged_fact_does_not_match_and_writes_nothing`. Owning ledger file | 1 |
+| stored steps are not compared | `notion_fact_ledger.py:238`. Drop `link.steps != plan.steps` on the pass path | `test_forged_step_does_not_match_and_writes_nothing`. Owning ledger file | 1 |
+| blocked ledger does not replan | `notion_fact_ledger.py:226`. Delete `if not plan.blocked: return False` | owning ledger file | 2 |
+| first workflow edge is skipped | `notion_fact_ledger.py:441`. Replace the event-map compare with `False` | `test_broken_workflow_graph_writes_nothing`. Owning ledger file | 1 |
+| successor edge is skipped | `notion_fact_ledger.py:447`. Replace the successor membership check with `False` | `test_missing_listing_successor_refuses`. Owning ledger file | 1 |
+| ListingPackage output is skipped | `notion_fact_ledger.py:453`. Replace the output check with `False` | `test_missing_listing_package_refuses`. Owning ledger file | 1 |
+| workflow check is True | `notion_fact_ledger.py:281`. Replace `len(steps) == len(_EDGES)` with `True` | Equivalent. `_walk_chain` already raises before the flag when an edge or `ListingPackage` is missing. Probes `test_broken_workflow_graph_writes_nothing`, `test_missing_listing_package_refuses`, and `test_missing_listing_successor_refuses` still raise `workflow link does not match` with 0 writes. Owning ledger file: 25 passed | 0 |
+| stop stripping fact_ledger and workflow_link | `notion_aesthetics.py:151`. Strip only `{_AESTHETICS_KEY, "variants", "qa"}` | owning ledger file | 9 |
+| qa rewrite drops the ledger keys | `notion_qa.py:802`. Iterate `()` instead of `("fact_ledger", "workflow_link")` | `test_blocked_ledger_replans_when_the_defect_is_gone`. Owning ledger file | 1 |
+
+Parked for the W11 test matrix, not fixed here: QA still records PASS when the home nav text, the 3 palette callouts, the identity callout, the 6 hub "returns to Home" texts, or the 3 home linked views are deleted. Uncovered code is `_linked_views` (`notion_qa.py:366`), `_palette` (`:576`), and `_teardown` (`:607`). Also parked: after a crash-resume, stored repairs drop repairs from the earlier run. The pull request lists the `docs/control` edits.
+
 ## 2026-10-07 — Session 07 W9: product QA
 
 Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision stays 57. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. STATE `head_sha` `6b087370eaaf1a5e09d9868643cca7b3654ddc4a` is the intentional tip-sync to the W8 squash. It is not `9bc56b2c`. It is not the revision that produced the test or mutation figures below. Those figures were measured on this commit, the child of `1a18b932987f709e66a5a158171c0a4505e39ef7`. Commit `1a18b93` CI verify run is `37682862874`, job `113003102755`, SUCCESS. Commit `8cf3e2b` CI verify run is `37641427600`, job `112861113785`, SUCCESS. Commit `548ed86d` CI verify run is `37626840209`, job `112810680638`, SUCCESS. Commit `ef7366e0` CI verify run is `37614528839`, job `112769557533`, SUCCESS. This commit's CI run is not invented here. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-07T21:59:24Z`.
@@ -128,8 +192,8 @@ Mutation checks. 110 mutations were each applied, the owning test file was run, 
 | delete payload none return | `notion_qa.py:143`. Delete `if envelope.payload is None: return None` | Equivalent. Dead on the public entry. `load_variant_checkpoint` already refuses a missing payload before `_stored_qa`. Probe `test_public_entry_payload_and_qa_record_are_present` passes on both versions, with one `duplicate_page` and a written qa object | 0 |
 | delete missing qa record check | `notion_qa.py:794`. Delete `if record is None` | Equivalent. Dead on the public entry. `_with_qa` sets `qa` before `_write_qa`. The same probe passes on both versions | 0 |
 | delete shared database parent check | `notion_qa.py:335`. Delete `or database.parent_id != stored.page_id` | `test_shared_database_off_the_home_page_is_blocked`. The good path records `BLOCKED` with false checks `("shared_databases",)` and 0 writes. The mutant records `PASS` and calls `duplicate_page` | 1 |
-| delete fresh-duplicate title compare | `notion_qa.py:542`. Delete `page.title == title` | `test_renamed_variant_page_fails_fresh_duplicate`. The good path records `BLOCKED` with false checks `("fresh_duplicate",)` and 0 writes. The mutant calls `duplicate_page` and then raises | 1 |
-| delete fresh-duplicate spec-id check | `notion_qa.py:544`. Delete `SPEC_ID_PROPERTY not in page.properties` | `test_forged_spec_id_fails_fresh_duplicate`. Same split as the title row: `BLOCKED` and 0 writes on the good path. The mutant writes `duplicate_page` and then raises | 1 |
+| replace fresh-duplicate title compare with True | `notion_qa.py:543`. Replace `page.title == title` with `True` | `test_renamed_variant_page_fails_fresh_duplicate`. The good path records `BLOCKED` with false checks `("fresh_duplicate",)` and 0 writes. W10 remeasured this applicable mutant: the test fails at `assert false_checks == ("fresh_duplicate",)` | 1 |
+| replace fresh-duplicate spec-id check with True | `notion_qa.py:545`. Replace `SPEC_ID_PROPERTY not in page.properties` with `True` | `test_forged_spec_id_fails_fresh_duplicate`. The good path records `BLOCKED` with false checks `("fresh_duplicate",)` and 0 writes. W10 remeasured this applicable mutant: the test fails at `assert false_checks == ("fresh_duplicate",)` | 1 |
 | delete vocabulary sample type check | `notion_qa.py:598`. Delete `type(block) is NotionTextBlock` on the SAMPLE block | `test_vocabulary_callout_fails_palette`. The good path records `BLOCKED` with false checks `("palette",)` and 0 writes. The mutant records `PASS` and calls `duplicate_page` | 1 |
 | delete fresh-duplicate icon check | `notion_qa.py:545`. Delete `page.icon == hub_icon(token)` | `test_fresh_duplicate_icon_and_cover_stay_in_the_false_set` for `icon`. The good path's false checks are `("fresh_duplicate", "palette")`. The mutant drops `fresh_duplicate` from that set | 1 |
 | delete fresh-duplicate cover check | `notion_qa.py:546`. Delete `page.cover == hub_cover(token)` | `test_fresh_duplicate_icon_and_cover_stay_in_the_false_set` for `cover`. The good path's false checks are `("fresh_duplicate", "palette")`. The mutant drops `fresh_duplicate` from that set | 1 |

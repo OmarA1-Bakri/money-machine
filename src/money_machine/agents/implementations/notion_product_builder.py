@@ -132,6 +132,25 @@ class QaRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class FactLedgerRecord:
+    """Verified product facts. Values come from the checkpoint and the adapter."""
+
+    verdict: str
+    checks: tuple[tuple[str, bool], ...]
+    facts: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowLinkRecord:
+    """Canonical successor chain from DEDUPE_PASSED to a listing package."""
+
+    verdict: str
+    steps: tuple[str, ...]
+    ready: str
+    repair_required: str
+
+
+@dataclass(frozen=True, slots=True)
 class ProductBuildCheckpoint:
     """Persisted build progress. The next phase is not executed."""
 
@@ -154,6 +173,8 @@ class ProductBuildCheckpoint:
     aesthetics: AestheticsRecord | None = None
     variants: tuple[VariantRecord, ...] = ()
     qa: QaRecord | None = None
+    fact_ledger: FactLedgerRecord | None = None
+    workflow_link: WorkflowLinkRecord | None = None
 
 
 def design_shell_content(spec: ProductSpec) -> str:

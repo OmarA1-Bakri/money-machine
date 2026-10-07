@@ -1,5 +1,24 @@
 # Test Evidence
 
+## 2026-10-07 — Session 07 W10: fact ledger and workflow link
+
+**Verification scope**: Fixture-only fact ledger and workflow link over the W9 QA checkpoint. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Postgres, Alembic, pnpm, and Compose were not required for this slice and were not run.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `completed_sessions` `[0, 1, 2, 3, 4, 5, 6]`, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`, including `product_fact_ledger_persisted` and `build_workflow_linked`. A07–A09 stay DESIGNED. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` is the intentional tip-sync to the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. `state_revision` is 58 | PASS |
+| Fact ledger and workflow link | Product-build tests: 582 passed. `run_fact_ledger` is `notion_fact_ledger.py:102`. The plan at `:246` runs before the single `write_checkpoint` at `:516`. Facts come from the persisted checkpoint and the fixture adapter. Caller colour names and version are ignored. A forged fact raises `fact ledger does not match` with 0 adapter writes and unchanged file bytes. A forged step raises `workflow link does not match` the same way. A `BLOCKED` record can be re-planned. A crash inside `write_checkpoint` resumes to one `PASS`. The link records ListingCopyJob as ready and does not create a job. Empty captured URL `""` is skipped and repairs like a missing URL (`notion_qa.py:526`, `test_empty_captured_url_repairs_like_a_missing_url`) | PASS for this slice |
+| No live HTTP | `test_ledger_does_not_open_a_socket` patches `socket.socket.connect`, `socket.socket.connect_ex`, and `socket.create_connection` to raise, then runs the ledger. It is a tripwire, not a sandbox. `notion_fact_ledger.py` does not contain `https://`, `httpx`, `requests`, `notion_client`, `APINotionAdapter`, `etsy`, `socket`, `urllib`, or `playwright` | PASS |
+| Mutations | 41 mutations applied, the owning test file run, then reverted. 37 killed. 4 equivalent. The Failed column sums to 65. The 17 variant-file rows were remeasured and still sum to 20 failed, with the same three equivalents. The fresh-duplicate title mutant (`notion_qa.py:543`, replace `page.title == title` with `True`) fails at `assert false_checks == ("fresh_duplicate",)`. The spec-id mutant (`:545`, replace the property check with `True`) fails at the same assert. The workflow length flag (`notion_fact_ledger.py:281`) is equivalent: the three graph probes still raise `workflow link does not match` with 0 writes. The per-row table is in `IMPLEMENTATION_LOG.md` | PASS |
+| Lint and types | `ruff format --check` and `ruff check` are clean on the changed modules. `pyright` 1.1.411 reports 0 errors on those modules with SQLAlchemy 2.0.52 | PASS |
+| Next phase | Narrative `next_phase` is `test_matrix` and is not started. It is not a top-level state field. Section 11 is not executed | PASS |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+| Parked items | QA coverage gap scheduled for the W11 test matrix: home nav text, 3 palette callouts, identity callout, 6 hub "returns to Home" texts, and 3 home linked views. Uncovered: `_linked_views` `notion_qa.py:366`, `_palette` `:576`, `_teardown` `:607`. Also parked: crash-resume drops earlier repairs; the pull request lists `docs/control` edits | PARKED |
+
+**Status**: Session 07 Wave 10. The session stays incomplete. This is not SESSION_07 COMPLETE. Exit 78 stays HELD. No session exit code is recorded.
+
 ## 2026-10-07 — Session 07 W9: product QA
 
 **Verification scope**: Fixture-only A09 product QA over the A08 variants checkpoint, plus the must-fixes carried from Wave 8. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Postgres, Alembic, pnpm, and Compose were not required for this slice and were not run.

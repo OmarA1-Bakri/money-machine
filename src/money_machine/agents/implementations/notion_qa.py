@@ -3,8 +3,9 @@
 Session 07 prompt section 8. QA reads the variants checkpoint through
 FixtureNotionAdapter and records PASS or BLOCKED with write_checkpoint.
 A repairable flag is fixed with the existing adapter and QA runs again.
-The section 9 fact ledger and the workflow link are not started. A07, A08,
-and A09 stay DESIGNED. This module does not open a network connection.
+The section 9 fact ledger and the workflow link are a later read of this
+record. A07, A08, and A09 stay DESIGNED. This module does not open a network
+connection.
 """
 
 from __future__ import annotations
@@ -115,7 +116,7 @@ async def run_product_qa(
     if not stored.variants or stored.next_phase != PHASE_QA:
         raise ProductBuildError("qa requires the variants checkpoint")
     try:
-        saved = _stored_qa(path)
+        saved = load_qa_record(path)
         if saved is not None and await _saved_holds(fixture, stored, validated, saved):
             return replace(stored, next_phase=PHASE_FACT_LEDGER, qa=saved)
         plan = await _plan(fixture, stored, validated)
@@ -138,7 +139,7 @@ async def run_product_qa(
     return checkpoint
 
 
-def _stored_qa(path: Path) -> QaRecord | None:
+def load_qa_record(path: Path) -> QaRecord | None:
     envelope = load_payload(path)
     if envelope.payload is None:
         return None
@@ -794,6 +795,13 @@ def _write_qa(
     if record is None:
         raise ProductBuildError("qa record is missing")
     references = variant_provider_references(checkpoint)
+    envelope = load_payload(path)
+    if envelope.payload is not None:
+        prior = envelope.payload.get("provider_object_references")
+        if type(prior) is dict:
+            for key in ("fact_ledger", "workflow_link"):
+                if key in prior:
+                    references[key] = prior[key]
     references[_QA_KEY] = {
         "checks": [
             {"check": name, "passed": "true" if passed else "false"}

@@ -795,6 +795,28 @@ async def test_unpublish_page_is_repaired_then_passes(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_empty_captured_url_repairs_like_a_missing_url(tmp_path: Path) -> None:
+    """Empty captured URL is skipped, the same as a missing URL, then repaired.
+
+    The public-link contract skips a captured value that is missing or "".
+    A real unpublish leaves public_url as None. "" takes that same repair.
+    """
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    await probe.unpublish_page(page.id)
+    page.public_url = ""
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "PASS"
+    assert checkpoint.qa.repairs == ("published",)
+    assert calls == ["publish_page", "duplicate_page"]
+    assert page.is_published is True
+
+
+@pytest.mark.asyncio
 async def test_unpublish_publish_crash_then_resume_passes(tmp_path: Path) -> None:
     spec, probe, path = await _built(tmp_path)
     page = _colour_pages(probe, spec)[0]
@@ -1873,20 +1895,39 @@ async def test_shared_database_off_the_home_page_is_blocked(tmp_path: Path) -> N
     assert calls == []
 
 
+def _fresh_duplicate_outcome(
+    checkpoint: ProductBuildCheckpoint | None, caught: ProductBuildError | None
+) -> tuple[tuple[str, ...], ProductBuildError | None]:
+    """Return the false checks. A proof error is acknowledged, then the asserts run."""
+    if caught is not None:
+        with pytest.raises(ProductBuildError, match="qa proof duplicate does not match"):
+            raise caught
+        return (), caught
+    assert checkpoint is not None and checkpoint.qa is not None
+    return _false_checks(checkpoint), None
+
+
 @pytest.mark.asyncio
 async def test_renamed_variant_page_fails_fresh_duplicate(tmp_path: Path) -> None:
     spec, probe, path = await _built(tmp_path)
     page = _colour_pages(probe, spec)[0]
     page.title = "TAMPERED"
     calls = watch_adapter_writes(probe)
+    checkpoint: ProductBuildCheckpoint | None = None
+    caught: ProductBuildError | None = None
+    try:
+        checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    except ProductBuildError as error:
+        caught = error
 
-    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    false_checks, error = _fresh_duplicate_outcome(checkpoint, caught)
 
-    assert checkpoint.qa is not None
+    assert false_checks == ("fresh_duplicate",)
+    assert calls == []
+    assert error is None
+    assert checkpoint is not None and checkpoint.qa is not None
     assert checkpoint.qa.verdict == "BLOCKED"
     assert checkpoint.qa.repairs == ()
-    assert _false_checks(checkpoint) == ("fresh_duplicate",)
-    assert calls == []
 
 
 @pytest.mark.asyncio
@@ -1895,14 +1936,21 @@ async def test_forged_spec_id_fails_fresh_duplicate(tmp_path: Path) -> None:
     page = _colour_pages(probe, spec)[0]
     page.properties[SPEC_ID_PROPERTY] = "forged-spec"
     calls = watch_adapter_writes(probe)
+    checkpoint: ProductBuildCheckpoint | None = None
+    caught: ProductBuildError | None = None
+    try:
+        checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    except ProductBuildError as error:
+        caught = error
 
-    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    false_checks, error = _fresh_duplicate_outcome(checkpoint, caught)
 
-    assert checkpoint.qa is not None
+    assert false_checks == ("fresh_duplicate",)
+    assert calls == []
+    assert error is None
+    assert checkpoint is not None and checkpoint.qa is not None
     assert checkpoint.qa.verdict == "BLOCKED"
     assert checkpoint.qa.repairs == ()
-    assert _false_checks(checkpoint) == ("fresh_duplicate",)
-    assert calls == []
 
 
 @pytest.mark.asyncio
