@@ -494,22 +494,35 @@ def _known_page_ids(stored: ProductBuildCheckpoint) -> set[str]:
     return known
 
 
+_FIXTURE_LINK_HOST = "fixture.notion.site"
+
+
+def _trusted_secret_link(page_id: str) -> str:
+    """Fixture publish shape: one host and the page id as the only path segment."""
+    return "https" + "://" + _FIXTURE_LINK_HOST + "/" + page_id
+
+
+def _is_trusted_link(link: object, page_id: str) -> bool:
+    return type(link) is str and link == _trusted_secret_link(page_id)
+
+
 async def _public_links(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -> bool:
-    """Stored links are checked before any repair, published or not."""
+    """Each stored link and captured URL is checked against the fixture shape."""
     for record in stored.variants:
         page = _variant_page(probe, record)
         link = record.secret_link
-        if not link.endswith("/" + page.id):
+        if not _is_trusted_link(link, page.id):
             return False
         accessible = await probe.verify_stranger_access(link)
         if accessible is not True:
             return False
         if page.is_published is True:
             live = await probe.get_public_url(page.id)
-            if type(live) is not str or live != link:
+            if not _is_trusted_link(live, page.id):
                 return False
             continue
-        if type(page.public_url) is str and page.public_url != "" and page.public_url != link:
+        captured = page.public_url
+        if type(captured) is str and captured != "" and not _is_trusted_link(captured, page.id):
             return False
     return True
 
@@ -636,7 +649,7 @@ def _accounted_facts(
         if type(page) is NotionPage and type(page.public_url) is str and page.public_url != "":
             links.append(_normalised_secret_link(page.public_url, page.id))
         else:
-            links.append("")
+            links.append(_normalised_secret_link(record.secret_link, record.page_id))
     notice = stored.notification_dashboard
     samples = len(notice.samples) if notice is not None else 0
     page_count = 1 + len(stored.identity_hubs) + samples + len(stored.variants)

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import socket
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -17,7 +19,11 @@ from money_machine.agents.implementations.notion_product_builder import (
     ProductBuildCheckpoint,
     ProductBuildError,
 )
-from money_machine.agents.implementations.notion_progress import OP_QA, ProviderFailure
+from money_machine.agents.implementations.notion_progress import (
+    OP_QA,
+    ProviderFailure,
+    load_payload,
+)
 from money_machine.agents.implementations.notion_qa import PHASE_FACT_LEDGER, run_product_qa
 from money_machine.agents.implementations.notion_variants import (
     PHASE_QA,
@@ -30,6 +36,7 @@ from money_machine.integrations.notion.domain import (
     NotionDatabase,
     NotionDatabaseProperty,
     NotionFormula,
+    NotionLinkedView,
     NotionPage,
     NotionRelation,
     NotionTextBlock,
@@ -561,6 +568,19 @@ async def _built(tmp_path: Path) -> tuple[ProductSpec, FixtureNotionAdapter, Pat
     return spec, probe, path
 
 
+def _load_replaced(
+    monkeypatch: pytest.MonkeyPatch,
+    mutate: Callable[[ProductBuildCheckpoint], ProductBuildCheckpoint],
+) -> None:
+    original = notion_qa_module.load_variant_checkpoint
+
+    def _load(path: Path) -> tuple[ProductBuildCheckpoint, Mapping[str, object]]:
+        stored, created = original(path)
+        return mutate(stored), created
+
+    monkeypatch.setattr(notion_qa_module, "load_variant_checkpoint", _load)
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("count", [1, 2, 3])
 @pytest.mark.parametrize("defect", ["forged", "stranger"])
@@ -665,13 +685,168 @@ async def test_published_live_url_must_match_the_stored_link(tmp_path: Path) -> 
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "forged",
+    [
+        "https://evil.notion.site/{page_id}",
+        "https://fixture.notion.site/x/{page_id}",
+    ],
+)
+async def test_matching_forged_unpublished_url_does_not_publish(
+    tmp_path: Path, forged: str
+) -> None:
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    forged_url = forged.format(page_id=page.id)
+    page.is_published = False
+    page.public_url = forged_url
+
+    def _forge(document: dict[str, object]) -> None:
+        def _one(row: dict[str, object]) -> None:
+            if row["page_id"] == page.id:
+                row["secret_link"] = forged_url
+
+        _edit_variant_rows(document, _one)
+
+    restamp_checkpoint(path, _forge)
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "BLOCKED"
+    assert checkpoint.qa.repairs == ()
+    assert checkpoint.qa.proof_page_id == ""
+    assert _flag(checkpoint, "public_links") is False
+    assert calls == []
+    assert page.is_published is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "forged",
+    [
+        "https://evil.notion.site/{page_id}",
+        "https://fixture.notion.site/x/{page_id}",
+    ],
+)
+async def test_unpublished_captured_url_must_match_the_fixture_shape(
+    tmp_path: Path, forged: str
+) -> None:
+    """The captured URL is checked on its own. The stored link stays the fixture shape."""
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    page.is_published = False
+    page.public_url = forged.format(page_id=page.id)
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "BLOCKED"
+    assert checkpoint.qa.repairs == ()
+    assert checkpoint.qa.proof_page_id == ""
+    assert _flag(checkpoint, "public_links") is False
+    assert calls == []
+    assert page.is_published is False
+
+
+@pytest.mark.asyncio
+async def test_unpublish_page_is_repaired_then_passes(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    await probe.unpublish_page(page.id)
+    assert page.public_url is None
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "PASS"
+    assert checkpoint.qa.repairs == ("published",)
+    assert checkpoint.qa.proof_page_id != ""
+    assert checkpoint.qa.proof_page_id in probe.pages
+    assert calls == ["publish_page", "duplicate_page"]
+    assert page.is_published is True
+    assert page.public_url == "https://fixture.notion.site/" + page.id
+
+
+@pytest.mark.asyncio
+async def test_unpublish_publish_crash_then_resume_passes(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    await probe.unpublish_page(page.id)
+    original = probe.publish_page
+    failed = {"done": False}
+
+    async def _boom(page_id: str) -> NotionPage:
+        if not failed["done"]:
+            failed["done"] = True
+            raise RuntimeError("publish crashed")
+        return await original(page_id)
+
+    probe.publish_page = _boom  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError, match="publish crashed"):
+        await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert page.is_published is False
+    assert "qa" not in json.loads(path.read_text(encoding="ascii"))["provider_object_references"]
+
+    probe.publish_page = original  # type: ignore[method-assign]
+    calls = watch_adapter_writes(probe)
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "PASS"
+    assert checkpoint.qa.proof_page_id != ""
+    assert checkpoint.qa.proof_page_id in probe.pages
+    assert calls == ["publish_page", "duplicate_page"]
+
+
+@pytest.mark.asyncio
+async def test_unpublish_checkpoint_crash_after_repair_resumes_to_pass(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    await probe.unpublish_page(page.id)
+    started = len(probe.pages)
+    original = notion_qa_module.write_checkpoint
+
+    def _boom(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+        raise RuntimeError("checkpoint crashed")
+
+    notion_qa_module.write_checkpoint = _boom  # type: ignore[assignment]
+    try:
+        with pytest.raises(RuntimeError, match="checkpoint crashed"):
+            await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    finally:
+        notion_qa_module.write_checkpoint = original  # type: ignore[assignment]
+    assert page.is_published is True
+    assert len(probe.pages) == started + 1
+    assert "qa" not in json.loads(path.read_text(encoding="ascii"))["provider_object_references"]
+
+    calls = watch_adapter_writes(probe)
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "PASS"
+    assert checkpoint.qa.proof_page_id != ""
+    assert checkpoint.qa.proof_page_id in probe.pages
+    assert calls == []
+    assert len(probe.pages) == started + 1
+
+
+@pytest.mark.asyncio
 async def test_secret_link_facts_match_across_fresh_runs(tmp_path: Path) -> None:
     first_spec, first_probe, first_path = await _built(tmp_path / "one")
     second_spec, second_probe, second_path = await _built(tmp_path / "two")
     first = await run_product_qa(first_spec, first_probe, first_path, recorded_at=QA_AT)
     second = await run_product_qa(second_spec, second_probe, second_path, recorded_at=QA_AT)
     assert first.qa is not None and second.qa is not None
-    assert dict(first.qa.facts)["secret_links"] == dict(second.qa.facts)["secret_links"]
+    assert first.qa.verdict == second.qa.verdict == "PASS"
+    assert first.qa.checks == second.qa.checks
+    assert first.qa.repairs == second.qa.repairs == ()
+    assert first.qa.facts == second.qa.facts
+    assert first.qa.proof_page_id != ""
+    assert second.qa.proof_page_id != ""
+    assert first.qa.proof_page_id != second.qa.proof_page_id
     assert first_probe.pages.keys() != second_probe.pages.keys()
 
 
@@ -930,6 +1105,21 @@ async def test_dropped_variant_row_fails_variant_count(tmp_path: Path) -> None:
 
     assert checkpoint.qa is not None and checkpoint.qa.verdict == "BLOCKED"
     assert _flag(checkpoint, "variant_count") is False
+    assert _flag(checkpoint, "spec_coverage") is False
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_colour_and_token_length_mismatch_is_blocked(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    short = spec.model_copy()
+    object.__setattr__(short, "colour_variants", spec.colour_variants[:2])
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(short, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "BLOCKED"
+    assert _flag(checkpoint, "spec_coverage") is False
     assert calls == []
 
 
@@ -1143,7 +1333,10 @@ async def test_loaded_variants_checkpoint_is_already_in_qa(tmp_path: Path) -> No
         ("passed-true-word", "qa record is incomplete"),
         ("repairs-dup", "qa record is incomplete"),
         ("repairs-word", "qa record is incomplete"),
-        ("repairs-type", "qa record is incomplete"),
+        (
+            "repairs-type",
+            r"qa record is incomplete|checkpoint qa repair must be a non-empty string",
+        ),
         ("repairs-shape", "qa record is incomplete"),
         ("repairs-int", "qa record is incomplete"),
         ("fact-blank", "checkpoint qa must be a non-empty string"),
@@ -1215,6 +1408,29 @@ async def test_incomplete_qa_record_is_refused(tmp_path: Path, kind: str, match:
     calls = watch_adapter_writes(probe)
 
     with pytest.raises(ProductBuildError, match=match):
+        await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_integer_repair_item_is_refused_before_any_write(tmp_path: Path) -> None:
+    """A non-string repair is refused. require_token refuses that same input too."""
+    spec, probe, path = await _built(tmp_path)
+    await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    def _mutate(document: dict[str, object]) -> None:
+        _qa_reference(document)["repairs"] = [1]
+
+    restamp_checkpoint(path, _mutate)
+    raw = path.read_bytes()
+    calls = watch_adapter_writes(probe)
+
+    with pytest.raises(
+        ProductBuildError,
+        match=r"qa record is incomplete|checkpoint qa repair must be a non-empty string",
+    ):
         await run_product_qa(spec, probe, path, recorded_at=QA_AT)
 
     assert calls == []
@@ -1296,8 +1512,44 @@ async def test_tampered_pass_proof_id_is_refused(tmp_path: Path, proof_id: str) 
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("check", ["no_access_blocks", "published"])
+async def test_forged_pass_matching_a_failed_check_is_refused(tmp_path: Path, check: str) -> None:
+    """A stored PASS whose checks were rewritten to the live failure is still refused."""
+    spec, probe, path = await _built(tmp_path)
+    passed = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert passed.qa is not None and passed.qa.verdict == "PASS"
+    if check == "no_access_blocks":
+        home = next(iter(probe.pages.values()))
+        probe.blocks["block_no_access"] = NotionTextBlock(
+            id="block_no_access",
+            parent_id=home.id,
+            content="No access",
+        )
+    else:
+        await probe.unpublish_page(_colour_pages(probe, spec)[0].id)
+
+    def _forge(document: dict[str, object]) -> None:
+        checks = _qa_reference(document)["checks"]
+        assert type(checks) is list
+        for item in checks:
+            assert type(item) is dict
+            if item["check"] == check:
+                item["passed"] = "false"
+
+    restamp_checkpoint(path, _forge)
+    raw = path.read_bytes()
+    calls = watch_adapter_writes(probe)
+
+    with pytest.raises(ProductBuildError, match="qa record does not match"):
+        await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
 async def test_stored_pass_with_a_new_unpublished_page_is_refused(tmp_path: Path) -> None:
-    """A drifted PASS is refused by the checks compare. The blocked disjunct is redundant."""
+    """A drifted PASS is refused by the checks compare before the blocked guard."""
     spec, probe, path = await _built(tmp_path)
     await run_product_qa(spec, probe, path, recorded_at=QA_AT)
     _colour_pages(probe, spec)[0].is_published = False
@@ -1328,6 +1580,257 @@ async def test_duplicate_with_the_wrong_title_is_refused(tmp_path: Path) -> None
 
     stored = json.loads(path.read_text(encoding="ascii"))
     assert "qa" not in stored["provider_object_references"]
+
+
+@pytest.mark.asyncio
+async def test_business_database_order_fails_shared_databases(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec = planner_spec(
+        tier="business", identity="Studio Ledger", title="Studio Home", hub_name="Desk"
+    )
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _variants(spec, probe, path)
+    _load_replaced(
+        monkeypatch,
+        lambda stored: replace(stored, database_ids=tuple(reversed(stored.database_ids))),
+    )
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "BLOCKED"
+    assert _flag(checkpoint, "shared_databases") is False
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_renamed_notification_database_fails_notification_values(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    assert stored.notification_dashboard is not None
+    probe.databases[stored.notification_dashboard.database_id].title = "Not the dashboard"
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "BLOCKED"
+    assert _flag(checkpoint, "notification_values") is False
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_foreign_linked_view_fails_cross_catalogue(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    probe.linked_views["view_foreign"] = NotionLinkedView(
+        id="view_foreign",
+        source_database_id="db_foreign",
+        parent_page_id=next(iter(probe.pages.values())).id,
+    )
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "BLOCKED"
+    assert _flag(checkpoint, "cross_catalogue") is False
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_removed_blue_accent_fails_palette(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    blue = next(record for record in stored.variants if record.name == "Blue")
+    del probe.blocks[blue.accent_block_id]
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "BLOCKED"
+    assert _flag(checkpoint, "palette") is False
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_empty_evidence_fails_teardown(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    empty = spec.model_copy()
+    object.__setattr__(empty, "evidence", ())
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(empty, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "BLOCKED"
+    assert _flag(checkpoint, "teardown_quality") is False
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_missing_known_page_fails_page_count(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    assert stored.notification_dashboard is not None
+    sample_id = stored.notification_dashboard.samples[0][1]
+    del probe.pages[sample_id]
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "BLOCKED"
+    assert _flag(checkpoint, "page_count") is False
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_missing_variant_page_is_a_product_build_error(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    del probe.pages[stored.variants[0].page_id]
+    calls = watch_adapter_writes(probe)
+
+    with pytest.raises(ProductBuildError, match="qa variant page is missing"):
+        await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_missing_formula_database_is_blocked(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    tasks_id = next(
+        database_id
+        for database_id, database in probe.databases.items()
+        if database.title == "Tasks"
+    )
+    del probe.databases[tasks_id]
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "BLOCKED"
+    assert _flag(checkpoint, "formulas_compile") is False
+    assert _flag(checkpoint, "notification_values") is False
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_missing_notification_dashboard_is_blocked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec, probe, path = await _built(tmp_path)
+    _load_replaced(monkeypatch, lambda stored: replace(stored, notification_dashboard=None))
+    calls = watch_adapter_writes(probe)
+
+    with pytest.raises(ProductBuildError, match="notification dashboard is missing"):
+        await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_reordered_hubs_fail_hubs_present(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec, probe, path = await _built(tmp_path)
+    _load_replaced(
+        monkeypatch,
+        lambda stored: replace(stored, identity_hubs=tuple(reversed(stored.identity_hubs))),
+    )
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "BLOCKED"
+    assert _flag(checkpoint, "hubs_present") is False
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_view_of_the_notification_database_stays_in_catalogue(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    assert stored.notification_dashboard is not None
+    probe.linked_views["view_notice"] = NotionLinkedView(
+        id="view_notice",
+        source_database_id=stored.notification_dashboard.database_id,
+        parent_page_id=stored.page_id,
+    )
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "PASS"
+    assert _flag(checkpoint, "cross_catalogue") is True
+    assert calls == ["duplicate_page"]
+
+
+@pytest.mark.asyncio
+async def test_non_database_value_is_skipped(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    cast(dict[str, object], probe.databases)["db_not"] = object()
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "PASS"
+    assert _flag(checkpoint, "cross_catalogue") is True
+    assert calls == ["duplicate_page"]
+
+
+@pytest.mark.asyncio
+async def test_renamed_variant_fails_palette(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+
+    def _rename(document: dict[str, object]) -> None:
+        def _one(row: dict[str, object]) -> None:
+            if row["name"] == "Blue":
+                row["name"] = "Blueish"
+
+        _edit_variant_rows(document, _one)
+
+    restamp_checkpoint(path, _rename)
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "BLOCKED"
+    assert _flag(checkpoint, "palette") is False
+    assert _flag(checkpoint, "spec_coverage") is False
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_missing_linked_view_is_blocked(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    _slug, view_id = stored.identity_hubs[0].views[0]
+    del probe.linked_views[view_id]
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "BLOCKED"
+    assert _flag(checkpoint, "linked_views") is False
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_public_entry_payload_and_qa_record_are_present(tmp_path: Path) -> None:
+    """The public entry always has a payload, and the writer always has a qa record."""
+    spec, probe, path = await _built(tmp_path)
+    envelope = load_payload(path)
+    assert envelope.payload is not None
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "PASS"
+    assert calls == ["duplicate_page"]
+    written = load_payload(path)
+    assert written.payload is not None
+    references = written.payload["provider_object_references"]
+    assert type(references) is dict and type(references["qa"]) is dict
 
 
 @pytest.mark.asyncio
