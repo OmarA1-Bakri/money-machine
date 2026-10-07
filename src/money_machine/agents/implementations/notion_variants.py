@@ -99,7 +99,7 @@ async def build_variants(
     if stored.variants:
         await _require_saved(fixture, stored, validated)
         return stored
-    plan = _plan_variants(fixture, stored, validated)
+    plan = await _plan_variants(fixture, stored, validated)
     try:
         await _release_copied_spec_ids(fixture, plan.drop_ids)
         _bind_earlier_phases(fixture, stored, validated, created)
@@ -270,21 +270,11 @@ class _VariantPlan:
     adoptions: tuple[tuple[str, str], ...]
 
 
-def _page_in_play(
-    page: NotionPage,
-    source: NotionPage,
-    spec: ProductSpec,
-    recorded: set[str],
-    source_spec: object,
-) -> bool:
-    """Recorded pages, copy and colour leftovers, and any page holding the source spec id."""
-    if page.id in recorded:
-        return True
+def _page_in_play(page: NotionPage, source: NotionPage, spec: ProductSpec) -> bool:
+    """Copy leftovers and / <Colour> leftovers. The plan runs only when nothing is recorded."""
     if page.title == f"{source.title} (Copy)":
         return True
-    if _colour_from_title(spec, page) is not None:
-        return True
-    return source_spec is not None and page.properties.get(SPEC_ID_PROPERTY) == source_spec
+    return _colour_from_title(spec, page) is not None
 
 
 def _in_play_pages(
@@ -293,14 +283,10 @@ def _in_play_pages(
     spec: ProductSpec,
 ) -> list[NotionPage]:
     source = _source_page(probe, stored)
-    recorded = {record.page_id for record in stored.variants}
-    source_spec = source.properties.get(SPEC_ID_PROPERTY)
     return [
         page
         for page in probe.pages.values()
-        if type(page) is NotionPage
-        and page.id != source.id
-        and _page_in_play(page, source, spec, recorded, source_spec)
+        if type(page) is NotionPage and page.id != source.id and _page_in_play(page, source, spec)
     ]
 
 
@@ -348,15 +334,8 @@ def _require_unique_after_drops(
     source_spec = source.properties.get(SPEC_ID_PROPERTY)
     if source_spec is None:
         return
-    dropped = set(drop_ids)
-    remaining = [
-        page
-        for page in probe.pages.values()
-        if type(page) is NotionPage
-        and page.id not in dropped
-        and page.properties.get(SPEC_ID_PROPERTY) == source_spec
-    ]
-    if len(remaining) != 1 or remaining[0].id != source.id:
+    found = find_spec_page(probe, str(source_spec), ignored_page_ids=drop_ids)
+    if found is None or found.id != source.id:
         raise ProductBuildError("fixture probe has more than one page for this ProductSpec")
 
 
@@ -364,17 +343,12 @@ def _plan_adoptions(
     probe: FixtureNotionAdapter,
     source: NotionPage,
     spec: ProductSpec,
-    in_play_ids: set[str],
 ) -> tuple[tuple[str, str], ...]:
     copy = _find_copy(probe, source)
-    if copy is not None and copy.id not in in_play_ids:
-        copy = None
     used_copy = False
     adoptions: list[tuple[str, str]] = []
     for colour, _token in _aligned_pairs(spec):
         existing = _find_titled(probe, source, _variant_title(spec, colour))
-        if existing is not None and existing.id not in in_play_ids:
-            existing = None
         if existing is None and copy is not None and not used_copy:
             existing = copy
             used_copy = True
@@ -382,13 +356,20 @@ def _plan_adoptions(
     return tuple(adoptions)
 
 
-def _plan_variants(
+async def _plan_variants(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
 ) -> _VariantPlan:
-    """Write-free plan. Refusal, or a fixed list of drops and adoptions."""
+    """Write-free plan. Refusal, or a fixed list of drops and adoptions.
+
+    Every adoption is checked here, before any adapter call: the original home,
+    the shell copy, the spec value, duplicate accent or vocabulary blocks, and
+    the secret link of a page that is already published. ``get_public_url`` is a
+    read. It is not one of the counted write methods.
+    """
     source = _source_page(probe, stored)
+    _require_original(source)
     in_play = _in_play_pages(probe, stored, spec)
     _refuse_titled_children(probe, spec, in_play)
     drop_ids = _collect_drop_ids(probe, stored, spec)
@@ -396,8 +377,26 @@ def _plan_variants(
         page = probe.pages[page_id]
         _refuse_unadoptable_release(probe, source, spec, page)
     _require_unique_after_drops(probe, source, drop_ids)
-    adoptions = _plan_adoptions(probe, source, spec, {page.id for page in in_play})
+    adoptions = _plan_adoptions(probe, source, spec)
+    for colour, page_id in adoptions:
+        if page_id == "":
+            continue
+        found = probe.pages.get(page_id)
+        if type(found) is not NotionPage:
+            raise ProductBuildError("variant page does not match")
+        token = next(item for name, item in _aligned_pairs(spec) if name == colour)
+        _require_adoptable(probe, source, found, spec, colour, token)
+        await _require_published_link(probe, found)
     return _VariantPlan(drop_ids, adoptions)
+
+
+async def _require_published_link(probe: FixtureNotionAdapter, page: NotionPage) -> None:
+    """Refuse a published adoption whose secret link is missing. No write."""
+    if page.is_published is not True:
+        return
+    link = await probe.get_public_url(page.id)
+    if type(link) is not str or link == "":
+        raise ProductBuildError("variant secret link is missing")
 
 
 async def _ensure_planned(

@@ -38,39 +38,38 @@ Router browser and combined config modes still raise `NotImplementedError` (W4a)
 
 W8 handoff. Counts and sites are in `IMPLEMENTATION_LOG.md` and `TEST_EVIDENCE.md`.
 
-- Fixture-only variants. `_plan_variants` at `notion_variants.py:385` runs at `:102`, after validate (`:98`) and before any adapter call. Execution applies the plan at `:104` and `:106`. `write_checkpoint` stays the single progress writer. The no-record rule is unchanged.
-- Product-build tests: 361 passed. Full local pytest: 2324 collected, 2119 passed, 193 skipped, 12 failed. All 12 are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because the `docker` binary is absent. The same figures are in `TEST_EVIDENCE.md`. The failures are the known local docker failures. CI is the gate. Prior tip `f5b8ef1a` CI verify run `37462968503`, job `112266857994`, SUCCESS. Figures in this note were measured on this commit, the child of `f5b8ef1a`.
-- Mutation checks: 55 rows, 52 killed, 3 equivalent. The Failed column sums to 791. Replacing the validate call with the uniqueness bind failed 75. Swapping release and bind inside the try (`:104` and `:105`) failed 3. Moving the plan after the first unchecked drop (`:102`) failed 54. Dropping uniqueness-after-planned-drops (`:398`) failed 3. Dropping finished variants from the in-play set (`:285-286`) failed 31. Q1 (`:587-588`) failed 30. Q7 (`:464-467`) failed 2. Nested-child body (`:566`) failed 54. Deleting the `_title_open` spec-id disjunct (`:449`) failed 4. Replacing `probe.pages.get(record.page_id)` with a title scan (`:783`) failed 5. Deleting the recorded-id branch (`:454-459`) is equivalent, Failed 0, and is not counted as killed. Dropping `child.id != page.id` (`:575`) is equivalent, Failed 0. Deleting the saved type guard (`:784-785`) is equivalent, Failed 0. The block-parent-only nested check (`parents = {page.id}` at `:568`) failed 44.
+- Fixture-only variants. `_plan_variants` at `notion_variants.py:359` is awaited at `:102`, after validate (`:98`) and before any adapter call. The plan checks every adoption, finished colours included, before any write. Execution applies the plan at `:104` and `:106`. `write_checkpoint` stays the single progress writer. The no-record rule is unchanged (`notion_progress.py:250`).
+- `get_public_url` in the plan (`:397`) is a read. It is not in `_WRITE_METHODS` (`tests/unit/agents/test_notion_product_builder_variants.py:165`). A refusal still has adapter `calls == []`. `FixtureNotionAdapter.get_public_url` (`fixture_adapter.py:504-510`) returns `page.public_url` when the page is published.
+- Unpublished, template, indexing, icon, and cover drift on an adopted page is repaired by `_finish_variant`, not refused. That repair is intended.
+- Product-build tests: 403 passed across the variants file, the progress file, and the six phase files. Full local pytest: 2366 collected, 2161 passed, 193 skipped, 12 failed. All 12 failures, when present, are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because the `docker` binary is absent. The same figures are in `TEST_EVIDENCE.md`. The failures are the known local docker failures. CI is the gate. Parent commit `3b025c9f` CI verify run `37561761627`, job `112600387175`, SUCCESS. Figures in this note were measured on this commit, the child of `3b025c9f`.
+- Mutation checks: 66 rows, 61 killed, 5 equivalent. The Failed column sums to 923. Replacing the validate call with the uniqueness bind failed 87. Swapping release and bind inside the try (`:104` and `:105`) failed 5. Moving the plan after the first unchecked drop (`:102`) failed 65. Dropping uniqueness-after-planned-drops (`:379`) failed 6. Dropping finished variants from the in-play set (`:277`) failed 29. Q1 (`:586-587`) failed 36. Q7 (`:463-466`) failed 2. Nested-child body (`:565`) failed 60. Deleting the `_title_open` spec-id disjunct (`:448`) failed 4. Replacing `probe.pages.get(record.page_id)` inside `_require_saved` with a title scan (`:782`) failed 5. Deleting the recorded-id branch (`:453-458`) is equivalent, Failed 0, and is not counted as killed. Title-only (`:671`), publish-before-validate, the release title filter (`:305-306`), and the release `_require_shell_copy` call (`:652`) are equivalent, Failed 0. Dropping `child.id != page.id` (`:574`) is killed, Failed 2. Deleting the saved type guard (`:783-784`) is killed, Failed 1. The block-parent-only nested check (`parents = {page.id}` at `:567`) failed 45.
 - State revision is 55 to 56. This wave is not SESSION_07 COMPLETE. Exit 78 stays HELD. Narrative `next_phase` is `qa` (A09) and is not started. It is not a top-level state field. QA, the fact ledger, and the workflow link are not started.
-- `test_crash_after_write_checkpoint_resumes_without_a_second_page` (`:1686`) pins the stored path. `test_crash_inside_write_checkpoint_before_the_file_lands` (`:1772`) asserts one `write_checkpoint` call on the crash and one more on resume, with no further adapter writes. The eleven-step crash-resume matrix (`:1562-1603`), the provider-failure resume, and unrecorded-copy adoption on the empty path are green.
-- B1 case 1 is `test_finished_variant_child_refuses_before_release_drop` (`:876`). B1 case 2 is `test_finished_purple_child_refuses_before_blue_copy_is_published` (`:937`). B2 is `test_copy_plus_another_spec_holder_refuses_before_any_drop` (`:1011`). The probe-by-id test is `test_replay_rejects_a_recorded_page_id_that_is_not_the_variant` (`:1182`). The `(Copy)` leftover and depth-3 cases are `test_child_under_a_page_block_writes_nothing` (`:842`).
-- Known limit, pinned: an extra workspace `/ Blue` passes replay even with a child database or page under it (`test_replay_pins_extra_workspace_blue_with_a_nested_child`). A forgery with the recorded title and a different id is rejected on saved replay, because the lookup is `probe.pages.get(record.page_id)` at `:783`.
+- `test_crash_after_write_checkpoint_resumes_without_a_second_page` (`:2397`) pins the stored path. `test_crash_inside_write_checkpoint_before_the_file_lands` (`:2483`) asserts one `write_checkpoint` call on the crash and one more on resume, with no further adapter writes. The eleven-step crash-resume matrix (`:2273-2314`, parametrize `:2257-2271`), the provider-failure resume, and unrecorded-copy adoption on the empty path are green.
+- B1 case 1 is `test_finished_variant_child_refuses_before_release_drop` (`:926`). B1 case 2 is `test_finished_purple_child_refuses_before_blue_copy_is_published` (`:987`). B2 is `test_copy_plus_another_spec_holder_refuses_before_any_drop` (`:1061`). The probe-by-id test is `test_replay_rejects_a_recorded_page_id_that_is_not_the_variant` (`:1232`). The depth-3 case is `test_child_under_a_page_block_writes_nothing` (`:892`). Finished Green different-spec, wrong-parent, or wrong-product-id is `test_finished_green_different_spec_wrong_parent_or_product_refuses` (`:1345`).
+- Known limit, pinned: an extra workspace `/ Blue` passes replay even with a child database or page under it (`test_replay_pins_extra_workspace_blue_with_a_nested_child`, `:2162`). A forgery with the recorded title and a different id is rejected on saved replay, because the lookup is `probe.pages.get(record.page_id)` at `:782`.
 - `write_checkpoint` stays the only progress writer. A provider failure still records a repair job when a prior record exists. A refusal does not.
 - Provenance is the title plus the copyable shell fields. An unrelated empty workspace page with the source `product_id` and shell block id would be adopted, and `parent_id` compares equal when both are `None`. PARKED for the live wave. Not a proven lineage.
 - Docstring coverage is 14.95%, measured by Eng Ops. This session did not re-measure it. No live Notion or Etsy mutation. The socket test is a tripwire, not a sandbox. It does not patch `sendto` or `getaddrinfo`.
 
-W9 must-fix. These are parked. This wave does not add killing tests for them. The header count is 18 executed survivors. Items 1–17 are the reviewer's survivors from review 5427897657, recast onto this commit's lines. Item 4 is two sites, which is how 17 items become 18 mutants. Items 18–20 are the three limits parked this round.
+W9 must-fix. These are parked. The header count is 15 executed mutants. Item 3 is two sites, which is how 14 items become 15 mutants. The title compare at `:804` and the duplicate-block raises at `:715-716` and `:739-740` are closed and are not in this list. Items 15–17 are the three limits parked this round.
 
-1. `notion_variants.py:791` — `if link != record.secret_link`.
-2. `notion_variants.py:788` — `accent_id != record.accent_block_id or vocabulary_id != record.vocabulary_block_id`.
-3. `notion_variants.py:805` — `page.title != _variant_title`.
-4. `notion_variants.py:852` `_require_original`, and the call in `_require_saved` at `:781`.
-5. `notion_aesthetics.py:345` — `type(block) is not NotionTextBlock or block.parent_id != page_id`.
-6. `notion_variants.py:263` — `len({token.name for token in tokens}) != len(tokens)`.
-7. `notion_variants.py:197-204` — `_require_records` through `reject_duplicate_labels`. The delete-the-call mutant in aesthetics is already killed. This survivor is the variants dedup.
-8. `notion_variants.py:699-700` — `type(link) is not str or link == ""`.
-9. `notion_variants.py:839` — `len(children) != 2`.
-10. `notion_variants.py:848` — `home is None or home.id != stored.page_id`.
-11. `notion_variants.py:503` — `parent_type != "workspace"` in `_source_page`.
-12. `notion_variants.py:518` — `len(matches) > 1` in `_find_titled`.
-13. `notion_variants.py:532` — `len(matches) > 1` in `_find_copy`.
-14. `notion_variants.py:716` — `len(matches) > 1` in `_matching_accent`.
-15. `notion_variants.py:740` — `len(matches) > 1` in `_matching_vocabulary`.
-16. Publish-before-blocks. A mutant that publishes before the accent and vocabulary blocks are added. No killing test this wave. Overlaps item 20.
-17. `notion_progress_record.py:180` — `if retained_created_ids is not None`.
-18. A database under a hub or home block is accepted on every path. `notion_variants.py:568` sets `parents = {page.id, *_page_block_ids(probe, page)}`, and the walk is `_page_block_ids` at `:549`. The reviewer measured 29 normal writes on the empty path, none touching that database, and 0 writes on replay. This session did not re-measure that write count.
-19. `notion_variants.py:570` — `type(database) is NotionDatabase`. The exact-type check misses a subclass.
-20. `tests/unit/agents/test_notion_product_builder_variants.py:1562-1603` — `test_each_variant_step_crash_resumes_without_a_second_page` does not assert that a page stays unpublished when a block step crashes. This is CodeRabbit's unpublished-after-crash assert. Overlaps item 16.
+1. `notion_variants.py:790` — `if link != record.secret_link`.
+2. `notion_variants.py:787` — `accent_id != record.accent_block_id or vocabulary_id != record.vocabulary_block_id`.
+3. Two sites: `_require_original` defined at `notion_variants.py:851`, and the call in `_require_saved` at `:780`. The plan call at `:372` is killed (Failed 2). The end-of-ensure call at `:425` is not a third survivor.
+4. `notion_aesthetics.py:345` — `type(block) is not NotionTextBlock or block.parent_id != page_id`.
+5. `notion_variants.py:262` — `len({token.name for token in tokens}) != len(tokens)`. The raise is the next line, `:263`.
+6. `notion_variants.py:198` and `:202` — the two `reject_duplicate_labels` calls (block `:198-205`). The delete-the-call mutant in aesthetics is already killed. This survivor is the variants dedup.
+7. `notion_variants.py:698-699` — `type(link) is not str or link == ""` in `_finish_variant`. Distinct from the killed plan pre-check at `:397-398`.
+8. `notion_variants.py:838` — `len(children) != 2`.
+9. `notion_variants.py:847` — `home is None or home.id != stored.page_id`.
+10. `notion_variants.py:502` — `parent_type != "workspace"` in `_source_page`.
+11. `notion_variants.py:517` — `len(matches) > 1` in `_find_titled`.
+12. `notion_variants.py:531` — `len(matches) > 1` in `_find_copy`.
+13. Publish-before-blocks. A mutant that publishes before the accent and vocabulary blocks are added. No killing test this wave. Overlaps item 17.
+14. `notion_progress_record.py:180` — `if retained_created_ids is not None`.
+15. A database under a hub or home block is accepted on every path. `notion_variants.py:567` sets `parents = {page.id, *_page_block_ids(probe, page)}`, and the walk is `_page_block_ids` at `:548`. The reviewer measured 29 normal writes on the empty path, none touching that database, and 0 writes on replay. This session did not re-measure that write count.
+16. `notion_variants.py:569` — `type(database) is NotionDatabase`. The exact-type check misses a subclass.
+17. `tests/unit/agents/test_notion_product_builder_variants.py:2273-2314` — `test_each_variant_step_crash_resumes_without_a_second_page` does not assert that a page stays unpublished when a block step crashes. This is CodeRabbit's unpublished-after-crash assert. Overlaps item 13.
 
 ## Later sessions
 
