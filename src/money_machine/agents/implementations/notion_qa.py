@@ -116,8 +116,7 @@ async def run_product_qa(
         raise ProductBuildError("qa requires the variants checkpoint")
     try:
         saved = _stored_qa(path)
-        if saved is not None:
-            await _require_saved(fixture, stored, validated, saved)
+        if saved is not None and await _saved_holds(fixture, stored, validated, saved):
             return replace(stored, next_phase=PHASE_FACT_LEDGER, qa=saved)
         plan = await _plan(fixture, stored, validated)
         repairs: tuple[str, ...] = ()
@@ -162,8 +161,8 @@ def _require_qa(value: object) -> QaRecord:
     if type(proof) is not str:
         raise ProductBuildError("qa proof page is unsupported")
     checks = _require_pairs(entry["checks"], "check", "passed")
-    parsed_checks = tuple((name, passed == "true") for name, passed in checks)
-    repairs = _require_tokens(entry["repairs"], "qa repair")
+    parsed_checks = tuple((name, _require_passed(passed)) for name, passed in checks)
+    repairs = _require_repairs(entry["repairs"])
     facts = _require_pairs(entry["facts"], "fact", "value")
     return QaRecord(
         verdict=verdict,
@@ -200,14 +199,38 @@ def _require_tokens(value: object, label: str) -> tuple[str, ...]:
     return tuple(rows)
 
 
-async def _require_saved(
+def _require_passed(value: str) -> bool:
+    if value == "true":
+        return True
+    if value == "false":
+        return False
+    raise ProductBuildError("qa record is incomplete")
+
+
+def _require_repairs(value: object) -> tuple[str, ...]:
+    repairs = _require_tokens(value, "qa repair")
+    if len(set(repairs)) != len(repairs) or any(name not in _REPAIRABLE for name in repairs):
+        raise ProductBuildError("qa record is incomplete")
+    return repairs
+
+
+async def _saved_holds(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
     saved: QaRecord,
-) -> None:
+) -> bool:
+    """True when the stored verdict still stands. A fixed BLOCKED record is re-run."""
     plan = await _plan(probe, stored, spec)
     facts = _facts(stored, spec, probe)
+    if saved.verdict == "BLOCKED":
+        if saved.proof_page_id != "":
+            raise ProductBuildError("qa record does not match")
+        if not plan.blocked:
+            return False
+        if saved.facts != facts or plan.checks != saved.checks:
+            raise ProductBuildError("qa record does not match")
+        return True
     if saved.facts != facts or plan.checks != saved.checks:
         raise ProductBuildError("qa record does not match")
     if saved.verdict == "PASS":
@@ -215,12 +238,7 @@ async def _require_saved(
             raise ProductBuildError("qa record does not match")
         if saved.proof_page_id == "" or plan.proof_page_id != saved.proof_page_id:
             raise ProductBuildError("qa record does not match")
-        return
-    if saved.verdict == "BLOCKED":
-        still_blocked = plan.blocked or bool(plan.repairs)
-        if not still_blocked or saved.proof_page_id != "":
-            raise ProductBuildError("qa record does not match")
-        return
+        return True
     raise ProductBuildError("qa record does not match")
 
 
@@ -281,6 +299,10 @@ async def _structural_checks(
     )
 
 
+def _is_database(value: object) -> bool:
+    return isinstance(value, NotionDatabase)
+
+
 def _variant_page(probe: FixtureNotionAdapter, record: VariantRecord) -> NotionPage:
     page = probe.pages.get(record.page_id)
     if type(page) is not NotionPage:
@@ -308,7 +330,7 @@ def _shared_databases(
     for kind, database_id in stored.database_ids:
         database = probe.databases.get(database_id)
         if (
-            type(database) is not NotionDatabase
+            not isinstance(database, NotionDatabase)
             or database.title != kind
             or database.parent_id != stored.page_id
         ):
@@ -319,9 +341,7 @@ def _shared_databases(
 def _duplicate_databases(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> bool:
-    titles = [
-        database.title for database in probe.databases.values() if type(database) is NotionDatabase
-    ]
+    titles = [database.title for database in probe.databases.values() if _is_database(database)]
     expected = len(shared_database_kinds(spec)) + 1
     return len(titles) == expected and len(set(titles)) == len(titles)
 
@@ -376,7 +396,7 @@ def _notification_values(
         return False
     row = probe.pages.get(notice.row_page_id)
     database = probe.databases.get(notice.database_id)
-    if type(row) is not NotionPage or type(database) is not NotionDatabase:
+    if type(row) is not NotionPage or not isinstance(database, NotionDatabase):
         return False
     if database.title != _NOTIFICATION_TITLE:
         return False
@@ -437,7 +457,7 @@ def _kind_database(
         if recorded != kind:
             continue
         database = probe.databases.get(database_id)
-        if type(database) is NotionDatabase:
+        if isinstance(database, NotionDatabase):
             return database
     return None
 
@@ -475,15 +495,21 @@ def _known_page_ids(stored: ProductBuildCheckpoint) -> set[str]:
 
 
 async def _public_links(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -> bool:
+    """Stored links are checked before any repair, published or not."""
     for record in stored.variants:
         page = _variant_page(probe, record)
-        if page.is_published is not True:
-            continue
-        link = await probe.get_public_url(page.id)
-        if type(link) is not str or link != record.secret_link or link == "":
+        link = record.secret_link
+        if not link.endswith("/" + page.id):
             return False
         accessible = await probe.verify_stranger_access(link)
         if accessible is not True:
+            return False
+        if page.is_published is True:
+            live = await probe.get_public_url(page.id)
+            if type(live) is not str or live != link:
+                return False
+            continue
+        if type(page.public_url) is str and page.public_url != "" and page.public_url != link:
             return False
     return True
 
@@ -522,7 +548,7 @@ def _cross_catalogue(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint
         if type(view) is not NotionLinkedView or view.source_database_id not in known:
             return False
     for database in probe.databases.values():
-        if type(database) is not NotionDatabase:
+        if not _is_database(database):
             continue
         for prop in database.properties:
             relation = prop.config.get("relation")
@@ -588,17 +614,49 @@ def _facts_persisted(
     spec: ProductSpec,
     probe: FixtureNotionAdapter,
 ) -> bool:
-    """The snapshot that will be written matches the live checkpoint accounting."""
-    snapshot = dict(_facts(stored, spec, probe))
-    expected = {
-        "colour_names": ",".join(spec.colour_variants),
-        "databases": ",".join(kind for kind, _database_id in stored.database_ids),
-        "hubs": ",".join(hub.name for hub in spec.hubs),
-        "page_count": str(_present_page_count(stored, probe)),
-        "secret_links": ",".join(record.secret_link for record in stored.variants),
-        "variant_count": str(len(stored.variants)),
+    """The written snapshot matches counts taken from the live probe and records."""
+    return dict(_facts(stored, spec, probe)) == _accounted_facts(stored, spec, probe)
+
+
+def _accounted_facts(
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+    probe: FixtureNotionAdapter,
+) -> dict[str, str]:
+    databases: list[str] = []
+    for _kind, database_id in stored.database_ids:
+        database = probe.databases.get(database_id)
+        if isinstance(database, NotionDatabase):
+            databases.append(database.title)
+        else:
+            databases.append("")
+    links: list[str] = []
+    for record in stored.variants:
+        page = probe.pages.get(record.page_id)
+        if type(page) is NotionPage and type(page.public_url) is str and page.public_url != "":
+            links.append(_normalised_secret_link(page.public_url, page.id))
+        else:
+            links.append("")
+    notice = stored.notification_dashboard
+    samples = len(notice.samples) if notice is not None else 0
+    page_count = 1 + len(stored.identity_hubs) + samples + len(stored.variants)
+    if notice is not None:
+        page_count += 1
+    return {
+        "colour_names": ",".join(record.name for record in stored.variants),
+        "databases": ",".join(databases),
+        "hubs": ",".join(hub.name for hub in stored.identity_hubs),
+        "page_count": str(page_count),
+        "secret_links": ",".join(links),
+        "variant_count": str(len(spec.colour_variants)),
     }
-    return snapshot == expected
+
+
+def _normalised_secret_link(link: str, page_id: str) -> str:
+    suffix = "/" + page_id
+    if link.endswith(suffix):
+        return link[: -len(suffix)]
+    return link
 
 
 def _present_page_count(stored: ProductBuildCheckpoint, probe: FixtureNotionAdapter) -> int:
@@ -616,7 +674,13 @@ def _facts(
         ("databases", ",".join(kind for kind, _database_id in stored.database_ids)),
         ("hubs", ",".join(hub.name for hub in spec.hubs)),
         ("page_count", str(_present_page_count(stored, probe))),
-        ("secret_links", ",".join(record.secret_link for record in stored.variants)),
+        (
+            "secret_links",
+            ",".join(
+                _normalised_secret_link(record.secret_link, record.page_id)
+                for record in stored.variants
+            ),
+        ),
         ("variant_count", str(len(stored.variants))),
     )
 
