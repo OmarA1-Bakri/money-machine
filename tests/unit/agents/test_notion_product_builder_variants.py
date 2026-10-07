@@ -3320,9 +3320,10 @@ async def test_two_colour_titles_refuse_before_any_write(tmp_path: Path) -> None
     probe = FixtureNotionAdapter()
     path = tmp_path / "build.json"
     await _prepare(spec, probe, path)
+    home = _home(probe, spec)
     title = f"{spec.title} / Blue"
-    await probe.create_page(title=title)
-    await probe.create_page(title=title)
+    await probe.rename_page((await probe.duplicate_page(home.id)).id, title)
+    await probe.rename_page((await probe.duplicate_page(home.id)).id, title)
     raw = path.read_bytes()
     calls = _watch(probe)
 
@@ -3339,9 +3340,9 @@ async def test_two_copy_titles_refuse_before_any_write(tmp_path: Path) -> None:
     probe = FixtureNotionAdapter()
     path = tmp_path / "build.json"
     await _prepare(spec, probe, path)
-    title = f"{spec.title} (Copy)"
-    await probe.create_page(title=title)
-    await probe.create_page(title=title)
+    home = _home(probe, spec)
+    await probe.duplicate_page(home.id)
+    await probe.duplicate_page(home.id)
     raw = path.read_bytes()
     calls = _watch(probe)
 
