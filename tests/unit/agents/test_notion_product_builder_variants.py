@@ -1128,7 +1128,7 @@ async def test_recorded_variant_id_stays_open_when_the_title_changes(tmp_path: P
     raw = path.read_bytes()
     calls = _watch(probe)
 
-    with pytest.raises(ProductBuildError):
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
         await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
 
     assert calls == []
@@ -1203,7 +1203,7 @@ async def test_saved_variant_is_read_by_recorded_page_id(tmp_path: Path) -> None
     raw = path.read_bytes()
     calls = _watch(probe)
 
-    with pytest.raises(ProductBuildError):
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
         await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
 
     assert calls == []
@@ -1269,7 +1269,7 @@ async def test_replay_rejects_a_recorded_page_id_that_is_not_the_variant(
     fixture = _fixture_bytes(probe)
     calls = _watch(probe)
 
-    with pytest.raises(ProductBuildError):
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
         await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
 
     assert calls == []
@@ -1757,13 +1757,156 @@ async def test_spec_less_copy_with_nested_child_refuses_before_any_write(
     fixture = _fixture_bytes(probe)
     calls = _watch(probe)
 
+    with pytest.raises(ProductBuildError, match="variant page does not match") as caught:
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    frames = traceback.extract_tb(caught.tb)
+    assert any(item.name == "_plan_variants" for item in frames)
+    assert any(item.name == "_require_adoptable" for item in frames)
+    assert not any(item.name == "_refuse_unadoptable_release" for item in frames)
+    _assert_untouched(path, probe, raw, before, fixture, calls)
+    assert SPEC_ID_PROPERTY not in copy.properties
+    assert not any(page.title == f"{spec.title} / Blue" for page in probe.pages.values())
+    assert copy.title == f"{home.title} (Copy)"
+    assert copy.is_published is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fault", ["shell_block", "parent_id", "child_db"])
+async def test_unused_copy_holding_the_spec_id_refuses_before_any_drop(
+    tmp_path: Path, fault: str
+) -> None:
+    """All three colours are finished. The unused (Copy) still holds the spec id."""
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    home = _home(probe, spec)
+    spec_value = home.properties[SPEC_ID_PROPERTY]
+    for colour, token in zip(spec.colour_variants, spec.palette_tokens, strict=True):
+        await _plant_finished(probe, home, spec, colour, token, publish=True)
+    copy = await probe.duplicate_page(home.id)
+    assert copy.properties.get(SPEC_ID_PROPERTY) == spec_value
+    if fault == "shell_block":
+        copy.properties[SHELL_BLOCK_PROPERTY] = "broken-shell"
+    elif fault == "parent_id":
+        copy.parent_id = "wrong-parent"
+    elif fault == "child_db":
+        await probe.create_database("Private", parent_id=copy.id, parent_type="page_id")
+    else:
+        raise AssertionError(fault)
+    raw = path.read_bytes()
+    before = json.loads(raw)
+    fixture = _fixture_bytes(probe)
+    calls = _watch(probe)
+
     with pytest.raises(ProductBuildError, match="variant page does not match"):
         await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
 
     _assert_untouched(path, probe, raw, before, fixture, calls)
-    assert not any(page.title == f"{spec.title} / Blue" for page in probe.pages.values())
-    assert copy.title == f"{home.title} (Copy)"
+    assert copy.properties.get(SPEC_ID_PROPERTY) == spec_value
     assert copy.is_published is False
+
+
+@pytest.mark.asyncio
+async def test_lying_duplicate_parent_stops_after_duplicate_page(tmp_path: Path) -> None:
+    """A duplicate that claims parent_type page_id is refused before publish."""
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    raw = path.read_bytes()
+    real = probe.duplicate_page
+
+    async def _lie(page_id: str) -> NotionPage:
+        page = await real(page_id)
+        page.parent_type = "page_id"
+        return page
+
+    probe.duplicate_page = _lie  # type: ignore[method-assign]
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == ["duplicate_page"]
+    assert path.read_bytes() == raw
+    copied = [page for page in probe.pages.values() if page.title.endswith(" (Copy)")]
+    assert len(copied) == 1
+    assert copied[0].parent_type == "page_id"
+    assert copied[0].is_published is False
+    stored = json.loads(path.read_text(encoding="ascii"))
+    assert "variants" not in stored["provider_object_references"]
+
+
+@pytest.mark.asyncio
+async def test_plan_secret_link_provider_failure_records_a_repair_job(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    home = _home(probe, spec)
+    green = await _plant_finished(probe, home, spec, "Green", spec.palette_tokens[1], publish=True)
+    before = json.loads(path.read_text(encoding="ascii"))
+
+    async def _boom(_page_id: str) -> str:
+        raise ProviderFailure(OP_VARIANTS, "link refused")
+
+    probe.get_public_url = _boom  # type: ignore[method-assign]
+    calls = _watch(probe)
+
+    with pytest.raises(ProductBuildError, match="link refused"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    assert calls == []
+    assert green.is_published is True
+    stored = json.loads(path.read_text(encoding="ascii"))
+    progress = stored["progress"]
+    before_progress = before["progress"]
+    assert type(progress) is dict and type(before_progress) is dict
+    jobs = progress["repair_jobs"]
+    before_jobs = before_progress["repair_jobs"]
+    assert type(jobs) is list and type(before_jobs) is list
+    assert len(jobs) == len(before_jobs) + 1
+    job = jobs[-1]
+    assert type(job) is dict
+    assert job["kind"] == "provider_response"
+    assert job["response"] == "link refused"
+    assert "variants" not in stored["provider_object_references"]
+
+
+@pytest.mark.asyncio
+async def test_empty_secret_link_after_publish_records_a_repair_job(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    before = json.loads(path.read_text(encoding="ascii"))
+
+    async def _empty(_page_id: str) -> str:
+        return ""
+
+    probe.get_public_url = _empty  # type: ignore[method-assign]
+
+    with pytest.raises(ProductBuildError, match="variant secret link is missing"):
+        await build_variants(spec, probe, path, recorded_at=VARIANTS_AT)
+
+    stored = json.loads(path.read_text(encoding="ascii"))
+    progress = stored["progress"]
+    before_progress = before["progress"]
+    assert type(progress) is dict and type(before_progress) is dict
+    jobs = progress["repair_jobs"]
+    before_jobs = before_progress["repair_jobs"]
+    assert type(jobs) is list and type(before_jobs) is list
+    assert len(jobs) == len(before_jobs) + 1
+    job = jobs[-1]
+    assert type(job) is dict
+    assert job["kind"] == "provider_response"
+    assert job["response"] == "variant secret link is missing"
+    assert "variants" not in stored["provider_object_references"]
+    blue = f"{spec.title} / Blue"
+    published = [page for page in probe.pages.values() if page.title == blue and page.is_published]
+    assert len(published) == 1
 
 
 @pytest.mark.asyncio

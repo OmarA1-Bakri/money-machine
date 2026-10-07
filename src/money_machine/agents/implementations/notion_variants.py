@@ -99,8 +99,8 @@ async def build_variants(
     if stored.variants:
         await _require_saved(fixture, stored, validated)
         return stored
-    plan = await _plan_variants(fixture, stored, validated)
     try:
+        plan = await _plan_variants(fixture, stored, validated)
         await _release_copied_spec_ids(fixture, plan.drop_ids)
         _bind_earlier_phases(fixture, stored, validated, created)
         records = await _ensure_planned(fixture, stored, validated, plan)
@@ -295,15 +295,11 @@ def _collect_drop_ids(
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
 ) -> tuple[str, ...]:
-    """Title and spec-id filters only. This does not refuse and does not write."""
+    """Spec-id filter only. In-play pages are already (Copy) or / <Colour> titles."""
     source = _source_page(probe, stored)
-    titles = {_variant_title(spec, colour) for colour, _token in _aligned_pairs(spec)}
-    copy_title = f"{source.title} (Copy)"
     source_spec = source.properties.get(SPEC_ID_PROPERTY)
     drop_ids: list[str] = []
     for page in _in_play_pages(probe, stored, spec):
-        if page.title not in titles and page.title != copy_title:
-            continue
         if page.properties.get(SPEC_ID_PROPERTY) != source_spec:
             continue
         drop_ids.append(page.id)
@@ -335,7 +331,7 @@ def _require_unique_after_drops(
     if source_spec is None:
         return
     found = find_spec_page(probe, str(source_spec), ignored_page_ids=drop_ids)
-    if found is None or found.id != source.id:
+    if found is not None and found.id != source.id:
         raise ProductBuildError("fixture probe has more than one page for this ProductSpec")
 
 
@@ -366,7 +362,9 @@ async def _plan_variants(
     Every adoption is checked here, before any adapter call: the original home,
     the shell copy, the spec value, duplicate accent or vocabulary blocks, and
     the secret link of a page that is already published. ``get_public_url`` is a
-    read. It is not one of the counted write methods.
+    read. It is not one of the counted write methods. A ``ProviderFailure`` from
+    that read is handled by ``build_variants`` with the same repair-job rule as
+    any other provider failure.
     """
     source = _source_page(probe, stored)
     _require_original(source)
@@ -381,9 +379,7 @@ async def _plan_variants(
     for colour, page_id in adoptions:
         if page_id == "":
             continue
-        found = probe.pages.get(page_id)
-        if type(found) is not NotionPage:
-            raise ProductBuildError("variant page does not match")
+        found = probe.pages[page_id]
         token = next(item for name, item in _aligned_pairs(spec) if name == colour)
         _require_adoptable(probe, source, found, spec, colour, token)
         await _require_published_link(probe, found)
@@ -696,7 +692,7 @@ async def _finish_variant(
         page = await probe.set_search_indexing(page.id, False)
     link = await probe.get_public_url(page.id)
     if type(link) is not str or link == "":
-        raise ProductBuildError("variant secret link is missing")
+        raise ProviderFailure(OP_VARIANTS, "variant secret link is missing")
     _require_variant_page(probe, spec, page, colour, token)
     return _record_from(page, colour, token, accent.id, vocabulary.id, link)
 
