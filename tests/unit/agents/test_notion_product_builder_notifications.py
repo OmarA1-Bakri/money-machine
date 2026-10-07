@@ -57,7 +57,7 @@ DASHBOARD_AT = datetime(2026, 10, 5, 22, 30, tzinfo=UTC)
 HUBS_AT = datetime(2026, 10, 5, 23, 45, tzinfo=UTC)
 LATER = datetime(2026, 10, 6, 0, 30, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "3f0a30a8e52b183f10799128d4fd7b17c1b74495"
+HEAD_SHA = "9bc56b2c839f66fce13bebf55cb30e88474f526e"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 _PHASES = (
     PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL,
@@ -788,6 +788,46 @@ async def test_notification_checkpoint_parser_rejects_bad_inputs(tmp_path: Path)
     assert set(probe.pages) == pages
 
 
+@pytest.mark.asyncio
+async def test_ensure_row_rejects_client_name_on_an_adopted_database(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    hubs = path.read_bytes()
+    await _build(spec, probe, path)
+    database = _database(probe, "Notification dashboard")
+    row = _rows(probe, database.id)
+    assert len(row) == 1
+    row[0].properties["client_name"] = spec.identity
+    path.write_bytes(hubs)
+
+    with pytest.raises(ProductBuildError, match="notification row does not match"):
+        await _build(spec, probe, path)
+
+    assert path.read_bytes() == hubs
+    assert row[0].properties["client_name"] == spec.identity
+
+
+@pytest.mark.asyncio
+async def test_adopted_database_rejects_a_text_title(tmp_path: Path) -> None:
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    hubs = path.read_bytes()
+    await _build(spec, probe, path)
+    database = _database(probe, "Notification dashboard")
+    database.properties[0].type = "text"
+    path.write_bytes(hubs)
+
+    with pytest.raises(ProductBuildError, match="cannot be repaired"):
+        await _build(spec, probe, path)
+
+    assert path.read_bytes() == hubs
+    assert database.properties[0].type == "text"
+
+
 def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert state["current_session"] == 7
@@ -804,5 +844,5 @@ def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
     assert all(value is False for value in evidence.values())
     assert evidence["notification_dashboard_built"] is False
-    assert state["state_revision"] == 55
+    assert state["state_revision"] == 56
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")

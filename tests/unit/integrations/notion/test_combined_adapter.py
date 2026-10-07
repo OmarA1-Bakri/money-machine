@@ -53,6 +53,7 @@ _EXPECTED_CALLS: dict[str, dict[str, object]] = {
         "cover": "https://example.com/cover-distinct.png",
     },
     "duplicate_page": {"page_id": "page-1"},
+    "drop_page_property": {"page_id": "page-1", "name": "product_spec_id"},
     "rename_page": {"page_id": "page-1", "new_title": "Renamed-title"},
     "move_page": {
         "page_id": "page-1",

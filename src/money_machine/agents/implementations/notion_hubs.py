@@ -393,11 +393,13 @@ def require_identity_hubs(
     spec: ProductSpec,
     *,
     extra_page_ids: tuple[str, ...] = (),
+    extra_top_level_ids: tuple[str, ...] = (),
     extra_database_ids: tuple[str, ...] = (),
     extra_block_ids: tuple[str, ...] = (),
     page_marks: Mapping[str, tuple[str, str]] | None = None,
     formula_suffixes: Mapping[str, tuple[tuple[str, str], ...]] | None = None,
     formulas_optional: bool = False,
+    ignored_page_ids: tuple[str, ...] = (),
 ) -> NotionPage:
     """Check the saved hubs. Extra pages and databases belong to a later phase."""
     kinds = shared_database_kinds(spec)
@@ -409,6 +411,7 @@ def require_identity_hubs(
         extra_database_ids=extra_database_ids,
         formula_suffixes=formula_suffixes,
         formulas_optional=formulas_optional,
+        ignored_page_ids=ignored_page_ids,
     )
     _require_saved_hubs(
         probe,
@@ -417,6 +420,7 @@ def require_identity_hubs(
         spec,
         kinds,
         extra_page_ids=extra_page_ids,
+        extra_top_level_ids=extra_top_level_ids,
         extra_block_ids=extra_block_ids,
         page_marks=page_marks,
     )
@@ -432,8 +436,9 @@ def _require_prior_dashboard(
     extra_database_ids: tuple[str, ...] = (),
     formula_suffixes: Mapping[str, tuple[tuple[str, str], ...]] | None = None,
     formulas_optional: bool = False,
+    ignored_page_ids: tuple[str, ...] = (),
 ) -> NotionPage:
-    page = require_home_page(probe, stored, spec)
+    page = require_home_page(probe, stored, spec, ignored_page_ids=ignored_page_ids)
     require_checkpoint_databases(
         probe,
         page,
@@ -485,13 +490,22 @@ def _child_pages(probe: FixtureNotionAdapter, home: NotionPage) -> list[NotionPa
     ]
 
 
-def _home_pages(probe: FixtureNotionAdapter, home: NotionPage) -> None:
+def _home_pages(
+    probe: FixtureNotionAdapter,
+    home: NotionPage,
+    extra_top_level_ids: tuple[str, ...] = (),
+) -> None:
     top_level = [
         page
         for page in probe.pages.values()
         if type(page) is NotionPage and page.parent_type == _TOP_LEVEL_PARENT
     ]
-    if top_level != [home]:
+    if not extra_top_level_ids:
+        if top_level != [home]:
+            raise ProductBuildError("hub page is unexpected")
+        return
+    allowed = {home.id, *extra_top_level_ids}
+    if {page.id for page in top_level} != allowed:
         raise ProductBuildError("hub page is unexpected")
 
 
@@ -704,6 +718,7 @@ def _require_saved_hubs(
     kinds: tuple[str, ...],
     *,
     extra_page_ids: tuple[str, ...] = (),
+    extra_top_level_ids: tuple[str, ...] = (),
     extra_block_ids: tuple[str, ...] = (),
     page_marks: Mapping[str, tuple[str, str]] | None = None,
 ) -> None:
@@ -715,7 +730,12 @@ def _require_saved_hubs(
     for planned, record in zip(plan, stored.identity_hubs, strict=True):
         _require_hub(probe, home, spec, planned, record, database_ids, page_marks=page_marks)
     _require_exact_hubs(
-        probe, home, stored, extra_page_ids=extra_page_ids, extra_block_ids=extra_block_ids
+        probe,
+        home,
+        stored,
+        extra_page_ids=extra_page_ids,
+        extra_top_level_ids=extra_top_level_ids,
+        extra_block_ids=extra_block_ids,
     )
 
 
@@ -804,9 +824,10 @@ def _require_exact_hubs(
     stored: ProductBuildCheckpoint,
     *,
     extra_page_ids: tuple[str, ...] = (),
+    extra_top_level_ids: tuple[str, ...] = (),
     extra_block_ids: tuple[str, ...] = (),
 ) -> None:
-    _home_pages(probe, home)
+    _home_pages(probe, home, extra_top_level_ids)
     _require_home_objects(probe, home, stored, extra_block_ids=extra_block_ids)
     pages = {home.id, *(record.page_id for record in stored.identity_hubs), *extra_page_ids}
     actual_pages = {page.id for page in probe.pages.values() if type(page) is NotionPage}

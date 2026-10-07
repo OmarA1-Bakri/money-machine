@@ -280,19 +280,23 @@ def require_home_page(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
+    *,
+    ignored_page_ids: tuple[str, ...] = (),
 ) -> NotionPage:
     """Return the saved top-level page, or raise when it does not match."""
-    return _require_home_page(probe, stored, spec)
+    return _require_home_page(probe, stored, spec, ignored_page_ids=ignored_page_ids)
 
 
 def _require_home_page(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
+    *,
+    ignored_page_ids: tuple[str, ...] = (),
 ) -> NotionPage:
     if stored.workspace_id != require_workspace_id(probe):
         raise ProductBuildError("checkpoint workspace does not match the fixture probe")
-    page = find_spec_page(probe, str(spec.spec_id))
+    page = find_spec_page(probe, str(spec.spec_id), ignored_page_ids=ignored_page_ids)
     if page is None or page.id != stored.page_id:
         raise ProductBuildError("checkpoint page is missing from the fixture probe")
     if (

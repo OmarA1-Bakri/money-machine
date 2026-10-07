@@ -109,6 +109,18 @@ class AestheticsRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class VariantRecord:
+    """One published fixture copy of the top-level product."""
+
+    name: str
+    token_name: str
+    page_id: str
+    accent_block_id: str
+    vocabulary_block_id: str
+    secret_link: str
+
+
+@dataclass(frozen=True, slots=True)
 class ProductBuildCheckpoint:
     """Persisted build progress. The next phase is not executed."""
 
@@ -129,6 +141,7 @@ class ProductBuildCheckpoint:
     identity_hubs: tuple[IdentityHubRecord, ...] = ()
     notification_dashboard: NotificationDashboardRecord | None = None
     aesthetics: AestheticsRecord | None = None
+    variants: tuple[VariantRecord, ...] = ()
 
 
 def design_shell_content(spec: ProductSpec) -> str:
@@ -228,10 +241,16 @@ def _later_phase_object_names(probe: FixtureNotionAdapter, spec_id: str) -> tupl
     for database in probe.databases.values():
         if type(database) is NotionDatabase and database.title != "":
             names.append(database.title)
-    for candidate in probe.pages.values():
-        if type(candidate) is NotionPage and candidate.parent_type == "page_id":
-            names.append(candidate.title)
     page = find_spec_page(probe, spec_id)
+    home_id = page.id if page is not None else ""
+    for candidate in probe.pages.values():
+        if type(candidate) is not NotionPage:
+            continue
+        titled = candidate.parent_type == "page_id" or (
+            candidate.parent_type == "workspace" and candidate.id != home_id
+        )
+        if titled:
+            names.append(candidate.title)
     if page is not None:
         shell_id = page.properties.get(SHELL_BLOCK_PROPERTY)
         for block in probe.blocks.values():
@@ -312,11 +331,19 @@ def require_workspace_id(probe: FixtureNotionAdapter) -> str:
     return workspace_id
 
 
-def find_spec_page(probe: FixtureNotionAdapter, spec_id: str) -> NotionPage | None:
+def find_spec_page(
+    probe: FixtureNotionAdapter,
+    spec_id: str,
+    *,
+    ignored_page_ids: tuple[str, ...] = (),
+) -> NotionPage | None:
+    ignored = set(ignored_page_ids)
     matches = [
         page
         for page in probe.pages.values()
-        if type(page) is NotionPage and _property(page, SPEC_ID_PROPERTY) == spec_id
+        if type(page) is NotionPage
+        and page.id not in ignored
+        and _property(page, SPEC_ID_PROPERTY) == spec_id
     ]
     if len(matches) > 1:
         raise ProductBuildError("fixture probe has more than one page for this ProductSpec")

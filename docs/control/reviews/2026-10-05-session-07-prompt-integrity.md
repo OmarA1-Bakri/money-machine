@@ -394,7 +394,7 @@ The prompt file is not amended.
 
 - **Prompt lines:** 90–104, read against lines 74–76.
 - **Cheap fake:** Append a repair-job label with no provider response, resume by rebuilding completed operations, compare sample text to `sample_content()` so a `client_name` suffix survives, or ban only the lowercase token `etsy`.
-- **Ungameable for this wave:** A failure injected at each of the six phases leaves a repair job whose kind is `provider_response` and whose response text is the provider response. A failure leaves a repair job only when a prior record exists. A first phase-1 failure with no record raises and writes no job and no file (notion_progress.py:248), which narrows prompt §6's 'create a repair job'. Resume keeps completed block and database ids and adds only the failed operation onward. A recomputed digest is accepted. Legacy progress files with no progress fail closed. Sample text is asserted as the literal identity, hub name, and hub description, and `client_name` is absent without calling `sample_content()`. `Etsy` and `ETSY` fail the source ban. A junk notification database and a placeholder Buyer name are rejected before any adapter write.
+- **Ungameable for this wave:** A failure injected at each of the six phases leaves a repair job whose kind is `provider_response` and whose response text is the provider response only when a prior record exists, and a first phase-1 failure with no record raises and writes no job and no file (notion_progress.py:248). Resume keeps completed block and database ids and adds only the failed operation onward. A recomputed digest is accepted. Legacy progress files with no progress fail closed. Sample text is asserted as the literal identity, hub name, and hub description, and `client_name` is absent without calling `sample_content()`. `Etsy` and `ETSY` fail the source ban. A junk notification database and a placeholder Buyer name are rejected before any adapter write.
 
 ## 3. Corrective addendum
 
@@ -405,7 +405,7 @@ This addendum governs Wave 7. The prompt remains the unamended source of record.
 3. Leave all twelve session 7 evidence keys false. Do not set `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE`.
 4. Keep A07, A08, and A09 DESIGNED. `commissioned_agents` stays empty. Exit 78 stays HELD.
 5. Persist one typed progress record for all six build phases: completed operations, deferred operations, created Notion ids, property mappings, page counts, and formula state. One schema, one reader, and one writer. A missing prior record is an error and writes nothing. A recomputed digest is accepted. Legacy progress files with no progress fail closed.
-6. On a provider failure, store the response with kind `provider_response`, create a repair job, and resume from the failed operation. A failure leaves a repair job only when a prior record exists. A first phase-1 failure with no record raises and writes no job and no file (notion_progress.py:248), which narrows prompt §6's 'create a repair job'. Never rebuild the whole product unless the progress record is unrecoverable. State that rule in code and docs. Test a recoverable resume and an unrecoverable rebuild. The fixture has no screenshots, so the record must not claim one.
+6. On a provider failure, store the response with kind `provider_response`, create a repair job, and resume from the failed operation only when a prior record exists, and a first phase-1 failure with no record raises and writes no job and no file (notion_progress.py:248). Never rebuild the whole product unless the progress record is unrecoverable. State that rule in code and docs. Test a recoverable resume and an unrecoverable rebuild. The fixture has no screenshots, so the record must not claim one.
 7. Close the operator must-fixes and the should-fixes that this fixture can close. Park, with a reason, the ones the fixture cannot close: navigation as a page link, one home page per probe, CodeRabbit docstring coverage, the fixed sample date, and assigning page properties through a separate provider write.
 8. Tests use the fixture only. Do not start A08, A09, the fact ledger, the workflow link, or commissioning.
 
@@ -421,3 +421,88 @@ This addendum governs Wave 7. The prompt remains the unamended source of record.
 | CodeRabbit docstring coverage 10.88% (W6, stale; not remeasured) | Unowned | Not re-measured this wave |
 | Fixed sample catalogue date | Unowned | Sample rows stay on the deterministic catalogue date; the buyer current-date formula stays `now()` |
 | Twelve evidence keys | Session close, after the prompt's own criteria | Fixture phase is not that gate |
+
+# Session 07 Prompt Integrity Review — Wave 8
+
+**Date:** 2026-10-06
+**Prompt:** `prompts/implementation/10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`
+**Verified SHA-256:** `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`
+**Workbook authority:** `hands-off-money-machine-full-implementation-workbook.md` appendix row for this prompt (5,255 bytes, 237 lines)
+**Scope:** Wave 8 only. Fixture-only product variants (prompt section 7, A08) plus the must-fixes carried from Wave 7. Waves 1–7 above still govern their phases. This record is the corrective addendum for Wave 8.
+
+The prompt file is not amended.
+
+## 1. Prompt authenticity
+
+**Status:** VERIFIED
+
+- The extracted file's SHA-256 equals the workbook appendix value `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`.
+- The prompt stays the unamended source of record.
+
+## 2. Three-dimensional review
+
+### Fidelity
+
+**Verdict:** CONDITIONAL APPROVE. One high finding, resolved by the addendum.
+
+**F-01 [HIGH] — Section 7 says duplicate the complete top-level product and section 11 says four variants**
+
+- **Prompt lines:** 106–121, against line 11 ("four variants") and the six `BUILD_PHASES` names. Section 2 forbids a second catalogue.
+- **Authority:** `duplicate_page` on the fixture copies title, parent, icon, cover, and properties. It does not copy child pages, databases, or blocks. `BUILD_PHASES` has six names. `build_phases_complete` is the sentinel after phase 6. `find_spec_page` raises when more than one page carries `product_spec_id`.
+- **Consequence of literal execution:** A deep clone would create a second catalogue, a seventh phase name would fail the progress prefix check, and a duplicate that keeps `product_spec_id` would make later resumes fail closed.
+- **Amendment:** One variant per `colour_variants` entry, zipped in index order with `palette_tokens`. The lengths must match and must be 3 or 4. "Total" means variant pages and does not count the original unpublished product. A 4-token spec is the four-variant case. A 3-token spec yields 3. A mismatch or a duplicate colour or token name raises and writes nothing. "Duplicate the complete top-level product" means `duplicate_page` only. Pop `product_spec_id` on the copy immediately. Keep the same workspace parent and the other copied properties. Then set that variant's cover, icon, one accent callout, and one vocabulary block. Do not mutate the original page, hubs, or databases. Publish only the variant pages. Enable duplicate-as-template. Disable search indexing. The secret link is `get_public_url`. Checkpoint names stay the six build phases. The returned checkpoint's `next_phase` is `qa`. `provider_object_references["variants"]` marks variants complete. `created_notion_ids["variants"]` stays `None` until then.
+
+**What the prompt already gets right**
+
+- Variants are a separate action after the six build phases (lines 106–121).
+- Each variant is published as its own top-level page, with duplicate-as-template on, search indexing off, and a recorded secret link (lines 118–121).
+- Commissioning is section 12 and is not this wave.
+
+### Safety and executability
+
+**Verdict:** CONDITIONAL APPROVE. The Wave 1 critical and high findings still apply and stay in force.
+
+**S-01 [CRITICAL] — Action 11 live sandbox.** Still deferred. This wave uses `FixtureNotionAdapter` only. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Do not import `httpx`, `requests`, `notion_client`, or `APINotionAdapter`. The new module may call `publish_page` because section 7 requires it. It must not contain the `https://` literal; the secret link comes from `get_public_url`.
+
+**S-02 [HIGH] — Action 12 commissioning.** A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. `variant_builder_implemented` stays false.
+
+**S-03 [HIGH] — Two ProductSpec types.** This phase accepts only `product_spec.ProductSpec`. The catalogue spec is rejected.
+
+**S-04 [HIGH] — Tip-sync must not look like completion.** `head_sha` moves to the post-merge Wave 7 tip `9bc56b2c839f66fce13bebf55cb30e88474f526e`. `evidence_closure_commit_sha` stays the Session 06 tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. All twelve session 7 evidence keys stay false. `session_status` stays `incomplete`. This wave does not print `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE`. The narrative next phase is `qa` (A09) and is not started.
+
+### Gameability
+
+**Verdict:** CONDITIONAL APPROVE. One high finding, resolved by the addendum.
+
+**G-01 [HIGH] — A renamed copy, a self-compared vocabulary string, or a seventh phase label satisfies a careless reading**
+
+- **Prompt lines:** 106–121, read against the six phase names and section 2.
+- **Cheap fake:** Create empty pages, leave `product_spec_id` on the copies, publish the original, or append `variants` to `checkpoint_names`.
+- **Ungameable for this wave:** Each colour becomes one workspace page whose title is the product title, a slash, and the colour. Saved aesthetics and created ids are checked before any adapter write. Release refuses every candidate, then drops a copied `product_spec_id` only for a page whose title is a variant title or `{title} (Copy)` and whose spec id equals the source value. A database or page whose parent is the candidate page or any block in its block tree, or a direct child block other than the matching accent and vocabulary, refuses that candidate with zero writes. ProductSpec uniqueness runs after the drop. An unrelated page with a variant title or a `(Copy)` title is not adopted, not published, and not recorded. Icon, cover, accent callout, and vocabulary text come from that index's palette token. Vocabulary text is the literal identity, colour, token name, and hex, and `client_name` is absent. The original page stays unpublished, with duplicate-as-template off and search indexing on. Unpublished, duplicate-as-template, search-indexing, icon, and cover drift on an adopted variant page is repaired by `_finish_variant`, not refused. That repair is intended. The original home page is still refused when it is published, marked as a template, or not indexed. Replay writes nothing and creates no second page. On a stored checkpoint, an extra workspace-level `/ Blue`, `/ Purple`, or `(Copy)` page passes that replay with zero writes. That limit is parked. The secret link is the value returned by `get_public_url` on the variant page, and replay compares that call. A provider failure during release or after the first variant leaves one `provider_response` job, and only when the aesthetics checkpoint already exists. Resume finishes a provable titled page or a provable `{title} (Copy)` page. It does not duplicate that page again. A missing file or a pre-aesthetics checkpoint raises and writes nothing. Adoption compares the title and the copyable shell fields. An unrelated empty workspace page that carries the source `product_id` and shell block id would be adopted, and `parent_id` compares equal when both are `None`. That limit is parked for the live wave. This wave does not claim a proven lineage. `Etsy` and `ETSY` fail the source ban on the new module.
+
+## 3. Corrective addendum
+
+This addendum governs Wave 8. The prompt remains the unamended source of record.
+
+1. Prove the prompt hash, then implement only the slice below.
+2. Tip-sync only: `head_sha` becomes `9bc56b2c839f66fce13bebf55cb30e88474f526e`. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. Advance `state_revision` from 55 to 56. `session_status` stays `incomplete`. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays this prompt. Narrative `next_phase` becomes `qa` (A09), not started.
+3. Leave all twelve session 7 evidence keys false. Do not set `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE`. The log and the pull request say this is not SESSION_07 COMPLETE and Exit 78 stays HELD.
+4. Keep A07, A08, and A09 DESIGNED. `commissioned_agents` stays empty. Do not edit `config/agents.yaml`.
+5. Variants go through `write_checkpoint`. `write_document` stays the single progress writer. `checkpoint_names` stay the six build phases. `created_notion_ids["variants"]` is `None` until variants exist. The aesthetics parser strips the `variants` reference key so a variants file can be read back. Re-entering aesthetics after variants raises `hub page is unexpected` because that checker still allows one top-level page, and it does not rewrite the file.
+6. On a provider failure of `variants.duplicate`, including a `ProviderFailure` from the release `drop_page_property`, store kind `provider_response` only when a prior record exists, and a first failure with no record raises and writes no job and no file (`notion_progress.py:250`). The job phase stays `aesthetics_and_content_completion` because variants are not a seventh checkpoint name. Every `build_variants` branch checks saved aesthetics and created ids before any adapter write (`notion_variants.py:98`). On an empty variants list, `await _plan_variants` (`:353`, call at `:103`) runs inside the try (`:102`) and before any adapter call. A `ProviderFailure` from the plan `get_public_url` uses `raise_recorded` (`notion_progress.py:133`). A `ProductBuildError` from the plan is not caught and does not append a repair job. The plan checks every adoption, finished colours included: `_require_original` (`:369`), `_require_adoptable` (`:385`, defined at `:626`), the duplicate-block raises (`:712-713` and `:736-737`), and the published secret link (`_require_published_link` at `:386`, `get_public_url` at `:394`). `get_public_url` is a read. It is not a counted write. An empty finish link raises `ProviderFailure` at `:695-696`. A planned page id that is not in the probe raises `planned variant page is missing` (`:381-383`) before any write. Execution then applies that plan: the spec-id release (`:104`), the ProductSpec uniqueness bind (`:105`), and `_ensure_planned` (`:106`). Only the empty-variants path releases. A `(Copy)` page planted before an unrelated spec-id page, a database or page whose parent is the candidate page or any of its blocks, and a drop crash followed by a database under that `(Copy)` each raise with zero adapter writes. A hub child titled `{title} (Copy)` or `/ Blue` raises `hub page is unexpected` on replay. Extra workspace-level `/ Blue`, `/ Purple`, or `(Copy)` pages pass replay with zero writes. That outcome is pinned and parked. A provider failure still records a repair job through `write_checkpoint` when a prior record exists. A valid build writes after that validation. A tampered checkpoint raises before any adapter write. Adoption requires the shell, the spec value, and no foreign or nested child (`_require_adoptable` at `:385`, defined at `:626`) before any finish write. The finish call is `:668`. The plan skips `page_id == ""` at `:379`. Unpublished, duplicate-as-template, search-indexing, icon, and cover drift on an adopted variant page is repaired by `_finish_variant`, not refused. That repair is intended. Resume adoption stays `_find_titled` (`:345`) and `_find_copy` (`:341`). Foreign means no direct child block other than the matching accent and vocabulary, and no database or page whose parent is the page or any block in its block tree. An unrelated empty workspace page with the source `product_id` and shell block id would be adopted, and `parent_id` compares equal when both are `None`. That limit is parked. This wave does not claim a proven lineage. Loaded created ids stay. Resume finishes a provable titled page or a provable `(Copy)` page without a second copy.
+7. Close the carried must-fixes with killing tests: phase-6 replay tamper of created ids (CI-1 the `_require_created_ids` call, CI-2 database pairs, CI-3 hub pairs, CI-4 accent and sample pairs), hub `navigation_block_id` on both sides of the replay comparison, duplicate accent labels, `_ensure_row` `client_name`, and `_adopted_database` title type. Name any survivor with its exact site.
+8. Tests use the fixture only. Do not start A09, the fact ledger, the workflow link, or commissioning.
+
+## 4. Deferrals
+
+| Finding | Owner | Reason |
+|---|---|---|
+| Actions 8–13 | Later Session 07 waves or the session close | Not this slice. Narrative next phase is qa (A09), not started |
+| Action 11 live sandbox | Later wave with explicit authorization | S-01 |
+| Action 12 commissioning | Operator decision after full implementation | S-02 |
+| Deep clone of databases and child pages | Rejected for this fixture | `duplicate_page` is shallow, and a second catalogue contradicts section 2 |
+| Navigation as a page-link block | Unowned until the fixture grows a link block | Fixture blocks are paragraph and callout only |
+| CodeRabbit docstring coverage 10.88% (W6, stale; not remeasured) | Unowned | Not re-measured this wave |
+| Twelve evidence keys | Session close, after the prompt's own criteria | Fixture variants are not that gate |
+| Extra workspace-level `/ Blue`, `/ Purple`, or `(Copy)` pages on replay | Later wave | They pass replay with zero writes. Pinned by `test_replay_pins_extra_workspace_variant_titles_as_a_known_limit`. A hub child with those titles is refused. Not a proven lineage |
+| W9 must-fix survivors from review 5427897657 | Next Session 07 wave | 13 items and 14 sites remain, named with file:line in `NEXT_SESSION.md`. The title compare and the two duplicate-block raises are closed |

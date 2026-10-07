@@ -126,6 +126,11 @@ def _load_checkpoint(path: Path) -> tuple[ProductBuildCheckpoint, Mapping[str, o
     raise ProductBuildError("aesthetics require the notification dashboard checkpoint")
 
 
+def parse_aesthetics_checkpoint(payload: dict[object, object]) -> ProductBuildCheckpoint:
+    """Parse a checkpoint that records aesthetics and content completion."""
+    return _parse_aesthetics_checkpoint(payload)
+
+
 def _parse_aesthetics_checkpoint(payload: dict[object, object]) -> ProductBuildCheckpoint:
     if not exact_keys(payload, CHECKPOINT_KEYS):
         raise ProductBuildError("checkpoint fields are missing or unsupported")
@@ -142,7 +147,7 @@ def _parse_aesthetics_checkpoint(payload: dict[object, object]) -> ProductBuildC
     phase_five = dict(payload)
     phase_five["checkpoint_names"] = list(_PHASE_FIVE)
     phase_five["provider_object_references"] = {
-        key: refs[key] for key in set(refs) - {_AESTHETICS_KEY}
+        key: refs[key] for key in set(refs) - {_AESTHETICS_KEY, "variants"}
     }
     base = parse_notification_checkpoint(phase_five)
     return replace(
@@ -233,7 +238,8 @@ def _checkpoint_with(
     )
 
 
-def _write_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> None:
+def aesthetics_provider_references(checkpoint: ProductBuildCheckpoint) -> dict[str, object]:
+    """Provider ids for the aesthetics checkpoint, without a variants reference."""
     record = checkpoint.aesthetics
     if record is None:
         raise ProductBuildError("aesthetics record is missing")
@@ -246,7 +252,11 @@ def _write_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> None:
         ],
         "samples": [{"block_id": block_id, "hub": hub} for hub, block_id in record.samples],
     }
-    write_checkpoint(path, checkpoint, references)
+    return references
+
+
+def _write_checkpoint(path: Path, checkpoint: ProductBuildCheckpoint) -> None:
+    write_checkpoint(path, checkpoint, aesthetics_provider_references(checkpoint))
 
 
 def _require_created_ids(
@@ -265,7 +275,9 @@ def _require_created_ids(
         raise ProductBuildError("progress created ids do not match the checkpoint")
     if _created_database_pairs(created, probe) != stored.database_ids:
         raise ProductBuildError("progress created ids do not match the checkpoint")
-    hub_ids = tuple((hub.name, hub.page_id) for hub in stored.identity_hubs)
+    hub_ids = tuple(
+        (hub.name, hub.page_id, hub.navigation_block_id) for hub in stored.identity_hubs
+    )
     if _created_hub_pairs(created, probe) != hub_ids:
         raise ProductBuildError("progress created ids do not match the checkpoint")
     notice = stored.notification_dashboard
@@ -285,8 +297,6 @@ def _require_created_ids(
     accents = _created_pairs(body.get("accents"), "token", "block_id")
     samples = _created_pairs(body.get("samples"), "hub", "block_id")
     if accents != record.accents or samples != record.samples:
-        raise ProductBuildError("progress created ids do not match the checkpoint")
-    if any(block_id not in probe.blocks for _label, block_id in (*accents, *samples)):
         raise ProductBuildError("progress created ids do not match the checkpoint")
 
 
@@ -314,23 +324,27 @@ def _created_database_pairs(
 
 def _created_hub_pairs(
     created: Mapping[str, object], probe: FixtureNotionAdapter
-) -> tuple[tuple[str, str], ...]:
+) -> tuple[tuple[str, str, str], ...]:
     rows = created.get("hubs")
     if type(rows) is not list:
         raise ProductBuildError("progress created ids do not match the checkpoint")
-    pairs: list[tuple[str, str]] = []
+    pairs: list[tuple[str, str, str]] = []
     for item in rows:
         if type(item) is not dict:
             raise ProductBuildError("progress created ids do not match the checkpoint")
         entry = cast(dict[object, object], item)
         name = entry.get("name")
         page_id = entry.get("page_id")
-        if type(name) is not str or type(page_id) is not str:
+        navigation_id = entry.get("navigation_block_id")
+        if type(name) is not str or type(page_id) is not str or type(navigation_id) is not str:
             raise ProductBuildError("progress created ids do not match the checkpoint")
         page = probe.pages.get(page_id)
+        block = probe.blocks.get(navigation_id)
         if type(page) is not NotionPage or page.title != name or page.parent_type != "page_id":
             raise ProductBuildError("progress created ids do not match the checkpoint")
-        pairs.append((name, page_id))
+        if type(block) is not NotionTextBlock or block.parent_id != page_id:
+            raise ProductBuildError("progress created ids do not match the checkpoint")
+        pairs.append((name, page_id, navigation_id))
     return tuple(pairs)
 
 
@@ -350,23 +364,66 @@ def _created_pairs(value: object, label_key: str, id_key: str) -> tuple[tuple[st
     return tuple(pairs)
 
 
+def require_completed_aesthetics(
+    probe: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+    *,
+    extra_top_level_ids: tuple[str, ...] = (),
+    extra_block_ids: tuple[str, ...] = (),
+    extra_page_ids: tuple[str, ...] = (),
+    ignored_page_ids: tuple[str, ...] = (),
+) -> None:
+    """Check the saved aesthetics phase, including when variants already exist."""
+    view = stored
+    if stored.next_phase != BUILD_PHASES_COMPLETE:
+        view = replace(stored, next_phase=BUILD_PHASES_COMPLETE)
+    _require_saved(
+        probe,
+        view,
+        spec,
+        extra_top_level_ids=extra_top_level_ids,
+        extra_block_ids=extra_block_ids,
+        extra_page_ids=extra_page_ids,
+        ignored_page_ids=ignored_page_ids,
+    )
+
+
+def require_aesthetics_created_ids(
+    probe: FixtureNotionAdapter,
+    created: Mapping[str, object],
+    stored: ProductBuildCheckpoint,
+) -> None:
+    """Bind earlier-phase created ids to the fixture before any variant work."""
+    _require_created_ids(probe, created, stored)
+
+
 def _require_saved(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
+    *,
+    extra_top_level_ids: tuple[str, ...] = (),
+    extra_block_ids: tuple[str, ...] = (),
+    extra_page_ids: tuple[str, ...] = (),
+    ignored_page_ids: tuple[str, ...] = (),
 ) -> None:
     record = stored.aesthetics
     if record is None or stored.next_phase != BUILD_PHASES_COMPLETE:
         raise ProductBuildError("aesthetics record is missing")
-    home = require_home_page(probe, stored, spec)
+    home = require_home_page(probe, stored, spec, ignored_page_ids=ignored_page_ids)
     _require_contents(probe, home, stored, spec, record)
     marks = {page_id: (icon, cover) for page_id, icon, cover in record.marks}
+    accent_ids = tuple(block_id for _name, block_id in (*record.accents, *record.samples))
     require_notification_dashboard(
         probe,
         stored,
         spec,
-        extra_block_ids=tuple(block_id for _name, block_id in (*record.accents, *record.samples)),
+        extra_block_ids=(*accent_ids, *extra_block_ids),
+        extra_top_level_ids=extra_top_level_ids,
+        extra_page_ids=extra_page_ids,
         page_marks=marks,
+        ignored_page_ids=ignored_page_ids,
     )
 
 

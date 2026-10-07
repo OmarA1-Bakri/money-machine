@@ -53,6 +53,7 @@ API_OPERATIONS: frozenset[str] = frozenset(
         "connection_status",
         "workspace_discovery",
         "create_page",
+        "drop_page_property",
         "rename_page",
         "move_page",
         "set_icon",
@@ -224,6 +225,9 @@ class CombinedNotionAdapter(NotionAdapter):
 
     async def duplicate_page(self, page_id: str) -> NotionPage:
         return await self._delegate("duplicate_page", page_id=page_id)
+
+    async def drop_page_property(self, page_id: str, name: str) -> NotionPage:
+        return await self._delegate("drop_page_property", page_id=page_id, name=name)
 
     async def rename_page(self, page_id: str, new_title: str) -> NotionPage:
         return await self._delegate("rename_page", page_id=page_id, new_title=new_title)

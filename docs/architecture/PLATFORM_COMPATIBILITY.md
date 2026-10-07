@@ -23,6 +23,7 @@
 | `workspace_discovery` | DIRECT_API | false | true | true | N/A | stub | List accessible workspaces via /v1/search |
 | `create_page` | DIRECT_API | true | true | false | true | stub | POST /v1/pages; idempotency via external_id |
 | `duplicate_page` | BROWSER | true | true | false | true | stub | UI-only; no API equivalent |
+| `drop_page_property` | DIRECT_API | true | true | true | true | stub | Remove one page property; missing names are a no-op |
 | `rename_page` | DIRECT_API | true | true | true | true | stub | PATCH /v1/pages/{id} title property |
 | `move_page` | DIRECT_API | true | true | true | true | stub | PATCH /v1/pages/{id} parent |
 | `set_icon` | DIRECT_API | true | true | true | true | stub | PATCH /v1/pages/{id} icon (emoji or external URL) |

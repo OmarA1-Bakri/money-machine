@@ -109,6 +109,24 @@ class NotionAdapter(ABC):
         """
 
     @abstractmethod
+    async def drop_page_property(self, page_id: str, name: str) -> NotionPage:
+        """Remove one page property. A missing name is a no-op.
+
+        Method: DIRECT_API
+        Mutates: true
+        Requires Auth: true
+        Idempotent: true
+        Reconcilable: true
+
+        Args:
+            page_id: Page that holds the property
+            name: Property name to remove
+
+        Returns:
+            The same page after the property is gone
+        """
+
+    @abstractmethod
     async def rename_page(self, page_id: str, new_title: str) -> NotionPage:
         """Rename a page.
 

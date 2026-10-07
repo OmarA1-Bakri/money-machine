@@ -276,6 +276,12 @@ class BrowserNotionAdapter(NotionAdapter):
             "Use APINotionAdapter or FixtureNotionAdapter."
         )
 
+    async def drop_page_property(self, page_id: str, name: str) -> NotionPage:
+        raise NotImplementedError(
+            "drop_page_property uses API method, not BROWSER. "
+            "Use APINotionAdapter or FixtureNotionAdapter."
+        )
+
     # BROWSER operations — implemented in Wave 3
     async def duplicate_page(self, page_id: str) -> NotionPage:
         """Duplicate page via UI interaction.
