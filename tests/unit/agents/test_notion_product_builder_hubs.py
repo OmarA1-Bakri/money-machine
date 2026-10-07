@@ -53,7 +53,7 @@ PHASE_TWO_AT = datetime(2026, 10, 5, 20, 0, tzinfo=UTC)
 DASHBOARD_AT = datetime(2026, 10, 5, 22, 30, tzinfo=UTC)
 LATER = datetime(2026, 10, 5, 23, 45, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "9bc56b2c839f66fce13bebf55cb30e88474f526e"
+HEAD_SHA = "6b087370eaaf1a5e09d9868643cca7b3654ddc4a"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 _PHASES = (
     PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL,
@@ -1066,5 +1066,5 @@ def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     assert evidence["identity_hubs_built"] is False
     assert evidence["notification_dashboard_built"] is False
     assert evidence["home_dashboard_built"] is False
-    assert state["state_revision"] == 56
+    assert state["state_revision"] == 57
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")
