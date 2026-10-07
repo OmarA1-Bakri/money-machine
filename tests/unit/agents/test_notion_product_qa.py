@@ -33,6 +33,7 @@ from money_machine.agents.implementations.notion_variants import (
 from money_machine.domain.models.product_spec import ProductSpec
 from money_machine.integrations.notion.api_adapter import APINotionAdapter
 from money_machine.integrations.notion.domain import (
+    NotionCalloutBlock,
     NotionDatabase,
     NotionDatabaseProperty,
     NotionFormula,
@@ -77,6 +78,11 @@ def _flag(checkpoint: ProductBuildCheckpoint, name: str) -> bool:
     flags = dict(checkpoint.qa.checks)
     assert name in flags
     return flags[name]
+
+
+def _false_checks(checkpoint: ProductBuildCheckpoint) -> tuple[str, ...]:
+    assert checkpoint.qa is not None
+    return tuple(name for name, passed in checkpoint.qa.checks if passed is False)
 
 
 def _colour_pages(probe: FixtureNotionAdapter, spec: ProductSpec) -> list[NotionPage]:
@@ -549,6 +555,10 @@ async def test_stored_fail_repairable_is_an_accepted_shape(tmp_path: Path) -> No
 
 class _ChildDatabase(NotionDatabase):
     """Subclass so isinstance accepts a database that type() would skip."""
+
+
+class _ChildPage(NotionPage):
+    """Subclass so type() rejects a page that a missing type check would accept."""
 
 
 def _qa_reference(document: dict[str, object]) -> dict[str, object]:
@@ -1844,6 +1854,132 @@ async def test_public_entry_payload_and_qa_record_are_present(tmp_path: Path) ->
     assert written.payload is not None
     references = written.payload["provider_object_references"]
     assert type(references) is dict and type(references["qa"]) is dict
+
+
+@pytest.mark.asyncio
+async def test_shared_database_off_the_home_page_is_blocked(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    _kind, database_id = stored.database_ids[0]
+    probe.databases[database_id].parent_id = "not-the-home-page"
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "BLOCKED"
+    assert checkpoint.qa.repairs == ()
+    assert _false_checks(checkpoint) == ("shared_databases",)
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_renamed_variant_page_fails_fresh_duplicate(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    page.title = "TAMPERED"
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "BLOCKED"
+    assert checkpoint.qa.repairs == ()
+    assert _false_checks(checkpoint) == ("fresh_duplicate",)
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_forged_spec_id_fails_fresh_duplicate(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    page.properties[SPEC_ID_PROPERTY] = "forged-spec"
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "BLOCKED"
+    assert checkpoint.qa.repairs == ()
+    assert _false_checks(checkpoint) == ("fresh_duplicate",)
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_vocabulary_callout_fails_palette(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    block = probe.blocks[stored.variants[0].vocabulary_block_id]
+    assert type(block) is NotionTextBlock
+    assert block.content.startswith("SAMPLE ")
+    probe.blocks[block.id] = NotionCalloutBlock(
+        id=block.id,
+        parent_id=block.parent_id,
+        content=block.content,
+    )
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "BLOCKED"
+    assert checkpoint.qa.repairs == ()
+    assert _false_checks(checkpoint) == ("palette",)
+    assert calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field", ["icon", "cover"])
+async def test_fresh_duplicate_icon_and_cover_stay_in_the_false_set(
+    tmp_path: Path, field: str
+) -> None:
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    if field == "icon":
+        page.icon = "not-the-icon"
+    else:
+        page.cover = "not-the-cover"
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "BLOCKED"
+    assert checkpoint.qa.repairs == ()
+    assert _false_checks(checkpoint) == ("fresh_duplicate", "palette")
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_notification_row_subclass_fails_notification_values(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    assert stored.notification_dashboard is not None
+    row = probe.pages[stored.notification_dashboard.row_page_id]
+    probe.pages[row.id] = _ChildPage(
+        id=row.id,
+        title=row.title,
+        parent_id=row.parent_id,
+        parent_type=row.parent_type,
+        icon=row.icon,
+        cover=row.cover,
+        public_url=row.public_url,
+        is_published=row.is_published,
+        duplicate_as_template=row.duplicate_as_template,
+        search_indexing=row.search_indexing,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        properties=dict(row.properties),
+    )
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "BLOCKED"
+    assert checkpoint.qa.repairs == ()
+    assert _false_checks(checkpoint) == ("notification_values", "page_count", "facts_persisted")
+    assert calls == []
 
 
 @pytest.mark.asyncio
