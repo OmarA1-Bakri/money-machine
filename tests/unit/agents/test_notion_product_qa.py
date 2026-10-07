@@ -690,6 +690,10 @@ async def test_published_live_url_must_match_the_stored_link(tmp_path: Path) -> 
     [
         "https://evil.notion.site/{page_id}",
         "https://fixture.notion.site/x/{page_id}",
+        "https://user:pw@fixture.notion.site/{page_id}",
+        "https://fixture.notion.site@evil.notion.site/{page_id}",
+        "https://fixture.notion.site/{page_id}?x=1",
+        "https://fixture.notion.site/{page_id}#frag",
     ],
 )
 async def test_matching_forged_unpublished_url_does_not_publish(
@@ -720,6 +724,8 @@ async def test_matching_forged_unpublished_url_does_not_publish(
     assert _flag(checkpoint, "public_links") is False
     assert calls == []
     assert page.is_published is False
+    stored = json.loads(path.read_text(encoding="ascii"))
+    assert stored["progress"]["repair_jobs"] == []
 
 
 @pytest.mark.asyncio
@@ -728,6 +734,11 @@ async def test_matching_forged_unpublished_url_does_not_publish(
     [
         "https://evil.notion.site/{page_id}",
         "https://fixture.notion.site/x/{page_id}",
+        "https://user:pw@fixture.notion.site/{page_id}",
+        "https://fixture.notion.site@evil.notion.site/{page_id}",
+        "https://fixture.notion.site/{page_id}?x=1",
+        "https://fixture.notion.site/{page_id}#frag",
+        "http://fixture.notion.site/{page_id}",
     ],
 )
 async def test_unpublished_captured_url_must_match_the_fixture_shape(
@@ -749,6 +760,8 @@ async def test_unpublished_captured_url_must_match_the_fixture_shape(
     assert _flag(checkpoint, "public_links") is False
     assert calls == []
     assert page.is_published is False
+    stored = json.loads(path.read_text(encoding="ascii"))
+    assert stored["progress"]["repair_jobs"] == []
 
 
 @pytest.mark.asyncio
