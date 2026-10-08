@@ -1,5 +1,25 @@
 # Test Evidence
 
+## 2026-10-09 — Session 07 sandbox run, round 5
+
+**Verification scope**: Round 5 of the §11 sandbox runner. The round-4 Reviewer FAIL, the round-4 Verifier FAIL, and CodeRabbit's CHANGES_REQUESTED at `69a2b421` are folded into this commit. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. `state_revision` stays 58. `origin/build/full-automation` is still that SHA | PASS |
+| Sandbox CLI | Still not run live. `tests/unit/cli/test_notion_sandbox.py`: 291 passed. Parent `69a2b421` CI verify run `37786526950`, job `113342585729`, SUCCESS. This commit's CI is not invented here | PASS |
+| Census | if 156, boolop 55, and 23, or 32, clause 117, ifexp 14, while 3. Mutations: if-flip 156, force-true 156, force-false 156, operator swap 55, clause negation 117, literal clause True/False 234, ifexp True/False 28, while-flip 3. Total 905 | PASS |
+| Mutation sweep (PARTIAL) | **The final-tree sweep is PARTIAL.** It was stopped at 07:43 (UTC+7) so this round would not block on it. `notion_sandbox.py` is COMPLETE: 213 of 213 mutations, 213 killed, 0 survived, 0 timeouts, Failed sum 6371 (if-flip 32 rows, 32 killed, Failed sum 1475; force-true 32 rows, 32 killed, Failed sum 1157; force-false 32 rows, 32 killed, Failed sum 458; operator swap 13 rows, 13 killed, Failed sum 223; clause negation 28 rows, 28 killed, Failed sum 1221; literal clause True/False 56 rows, 56 killed, Failed sum 1385; ifexp True/False 20 rows, 20 killed, Failed sum 452; while-flip 0 rows, 0 killed, Failed sum 0). `notion_sandbox_guard.py` is PARTIAL: 71 of 286 mutations finished (force_false 12, force_true 12, if 12, negate 10, operand 20, swap 5), 71 killed, 0 survived, Failed sum 2848. Those rows come from the worker log, which has no first-failing-test column. `notion_sandbox_live.py` (225 mutations) and `notion_sandbox_pipeline.py` (181) were NOT swept on this tree. Run so far: 284 of 905 mutations, 284 killed, 0 survived, 0 timeouts, Failed sum 9219. 621 mutations are not run and carry no claim. | PARTIAL: `notion_sandbox.py` complete, guard partial, live and pipeline not run |
+| SIGINT keeps passed stages | `test_real_sigint_during_the_evidence_write_leaves_a_complete_file`, `test_one_interrupt_during_the_evidence_write_keeps_passed_stages`, `test_interrupt_in_asyncio_teardown_keeps_passed_stages`, `test_interrupted_rows_keep_finished_stages`: build and variants stay `PASS`, exit 69, every id kept | PASS |
+| Repeated SIGINT | `test_repeated_sigint_during_the_evidence_write_keeps_one_file`: five real SIGINTs, exit 69, one complete file, handler restored | PASS |
+| Freshness bounds | `test_created_time_bounds_are_exact`: `11:58:00Z` and `12:02:37Z` accepted, `11:57:59Z`, `12:02:38Z`, and +1 day refused. `test_future_created_time_is_refused_end_to_end` exits 69 | PASS |
+| False equivalents killed | guard `:355` (now `:352`) force-false, swap, operand 3: `test_proc_alias_of_a_real_directory_is_refused`. pipeline `:200` (now `:205`) force-false: `test_interrupt_while_aligning_keeps_the_created_id`. guard `:462` (now `:460`) force-true: `test_temporary_evidence_fd_is_closed` | PASS |
+| Lint and types | `ruff format --check`, `ruff check`, and `pyright` 1.1.411 report 0 errors | PASS |
+| Full local pytest | 2811 collected, 2606 passed, 193 skipped, 12 failed. The failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because the `docker` binary is absent. Local-only. CI is the gate | 12 known local docker failures; CI is the gate |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
 ## 2026-10-08 — Session 07 sandbox run, round 4
 
 **Verification scope**: Round 4 of the §11 sandbox runner. Reviewer FAIL at `9cf574c0` and Verifier FAIL at the same SHA are folded into this commit. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited.

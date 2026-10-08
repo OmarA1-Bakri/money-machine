@@ -192,6 +192,11 @@ def _earliest(moment: datetime) -> datetime:
     return floored - _FRESH_SKEW
 
 
+def _latest(moment: datetime) -> datetime:
+    """A created time past this is a provider lie, not a clock a little behind."""
+    return moment.astimezone(UTC) + _FRESH_SKEW
+
+
 def _align(ctx: SandboxRun, page: PageView, before: int) -> str:
     """Keep the evidence id equal to the page the create returned."""
     page_id = canonical_id(page.page_id)
@@ -200,13 +205,13 @@ def _align(ctx: SandboxRun, page: PageView, before: int) -> str:
         if tail == page_id:
             break
         _drop_tail(ctx, tail, before)
-    if page_id == "" or space_conflicts(page.space_id):
+    # _remember, _flag, and _drop_recorded each ignore a blank id.
+    if space_conflicts(page.space_id):
         if page_id in ctx.created_ids[:before]:
             _drop_recorded(ctx, page_id)
             return page_id
-        if space_conflicts(page.space_id) and page_id != "":
-            _remember(ctx, page, page_id)
-            _flag(ctx, page_id, "space_conflict")
+        _remember(ctx, page, page_id)
+        _flag(ctx, page_id, "space_conflict")
         return page_id
     _remember(ctx, page, page_id)
     return page_id
@@ -221,6 +226,8 @@ def _fresh(ctx: SandboxRun, page: PageView) -> None:
     if moment.tzinfo is None:
         _reject_unfresh(ctx, page)
     if moment < _earliest(ctx.moment):
+        _reject_unfresh(ctx, page)
+    if moment > _latest(ctx.moment):
         _reject_unfresh(ctx, page)
 
 

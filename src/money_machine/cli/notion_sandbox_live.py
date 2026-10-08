@@ -7,6 +7,7 @@ client was injected.
 from __future__ import annotations
 
 import json
+import os
 import ssl
 import urllib.request
 from collections.abc import Callable, Mapping
@@ -71,12 +72,18 @@ def default_tls_context() -> ssl.SSLContext:
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     context.check_hostname = True
     context.verify_mode = ssl.CERT_REQUIRED
-    cafile = ssl.get_default_verify_paths().openssl_cafile
-    if type(cafile) is str and cafile != "":
-        try:
+    # Compiled-in paths only. Debian 13 ships the directory and no cert.pem,
+    # so the directory is the fallback. With neither, every handshake fails.
+    paths = ssl.get_default_verify_paths()
+    cafile = paths.openssl_cafile
+    capath = paths.openssl_capath
+    try:
+        if type(cafile) is str and os.path.isfile(cafile):
             context.load_verify_locations(cafile=cafile)
-        except OSError:
-            return context
+        elif type(capath) is str and os.path.isdir(capath):
+            context.load_verify_locations(capath=capath)
+    except OSError:
+        return context
     return context
 
 
@@ -101,14 +108,12 @@ class LiveSandboxClient:
         )
         self._bot_space = ""
         self._created_ids: list[str] = []
-        self._evidence_ids: list[str] | None = None
-        self._evidence_rows: list[dict[str, str]] | None = None
+        self._evidence: tuple[list[str], list[dict[str, str]]] | None = None
         self.write_counts: dict[str, int] = empty_write_counts()
 
     def bind_created(self, ids: list[str], rows: list[dict[str, str]]) -> None:
         """Record each accepted create into the run's evidence lists."""
-        self._evidence_ids = ids
-        self._evidence_rows = rows
+        self._evidence = (ids, rows)
 
     def proxy_targets(self) -> dict[str, str]:
         """Proxy map installed on the default opener. Empty means no proxy."""
@@ -148,13 +153,9 @@ class LiveSandboxClient:
                 "properties": {"title": {"title": [{"text": {"content": title}}]}},
             }
         ).encode("utf-8")
+        # The body is built above from a literal dict. Re-read the parent it carries.
         sent = json.loads(body)
-        sent_parent = sent.get("parent") if type(sent) is dict else None
-        if (
-            type(sent_parent) is not dict
-            or sent_parent.get("page_id") != parent
-            or sent_parent.get("type") != "page_id"
-        ):
+        if sent["parent"]["page_id"] != parent:
             raise SandboxError("parent is not the sandbox parent")
         payload = self._send("POST", "/v1/pages", body)
         page = parse_page(payload, fallback_space="", expected_id="")
@@ -170,10 +171,10 @@ class LiveSandboxClient:
             return
         if page_id not in self._created_ids:
             self._created_ids.append(page_id)
-        evidence_ids = self._evidence_ids
-        evidence_rows = self._evidence_rows
-        if evidence_ids is None or evidence_rows is None or page_id in evidence_ids:
+        evidence = self._evidence
+        if evidence is None or page_id in evidence[0]:
             return
+        evidence_ids, evidence_rows = evidence
         evidence_ids.append(page_id)
         evidence_rows.append(
             {"id": page_id, "parent_id": canonical_id(page.parent_id), "url": page.url}
@@ -280,7 +281,8 @@ def parse_page(payload: object, *, fallback_space: str, expected_id: str) -> Pag
 
 def parse_created_time(value: object) -> datetime | None:
     """Parse a Notion timestamp. Naive or blank values stay unset."""
-    if type(value) is not str or value == "":
+    # An empty string fails fromisoformat, so it is not checked separately.
+    if type(value) is not str:
         return None
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -320,7 +322,7 @@ def proxy_map(director: urllib.request.OpenerDirector) -> dict[str, str]:
 def explicit_space(payload: Mapping[str, object]) -> str:
     """A space id carried on the payload, or empty."""
     for key in ("space_id", "workspace_id"):
-        value = payload.get(key)
-        if type(value) is str and canonical_id(value) != "":
-            return canonical_id(value)
+        found = canonical_id(payload.get(key))
+        if found != "":
+            return found
     return ""

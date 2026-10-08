@@ -216,23 +216,19 @@ def _encoded_forms(token: str | None) -> tuple[str, ...]:
     """Url-encoding and base64 of a shaped token. Other tokens have none."""
     if token is None or not token_shape_ok(token):
         return ()
+    # A shaped token always holds "_", so the url form (with %5F) differs from it.
+    # Base64 has neither "_" nor "%", so the digest differs from both.
     encoded = quote(token, safe="").replace("_", "%5F")
     digest = base64.b64encode(token.encode("utf-8")).decode("ascii")
-    forms: list[str] = []
-    if encoded != token:
-        forms.append(encoded)
-    if digest not in forms and digest != token:
-        forms.append(digest)
-    return tuple(forms)
+    return (encoded, digest)
 
 
 def redact_text(text: str, token: str | None) -> str:
     """Replace shaped secrets, the exact token, and its base64 and url-encoded copies."""
     cleaned = redact_secret_shapes(text)
-    if token is not None and token != "" and not _unsafe_exact(token) and token in cleaned:
-        cleaned = cleaned.replace(token, "[REDACTED]")
-    if token is not None and token != "" and not _unsafe_exact(token):
-        cleaned = _scrub_hex(cleaned, _folded_hex(token))
+    # The empty token is whitespace-only, so _unsafe_exact covers it.
+    if token is not None and not _unsafe_exact(token):
+        cleaned = _scrub_hex(cleaned.replace(token, "[REDACTED]"), _folded_hex(token))
     for form in _encoded_forms(token):
         if form in cleaned:
             cleaned = cleaned.replace(form, "[REDACTED]")
@@ -308,7 +304,7 @@ def _folded_hex(token: str) -> str:
 
 def leaks(text: str, token: str | None) -> bool:
     """True when the text still contains a secret, including encoded copies."""
-    if token is not None and token != "" and not _unsafe_exact(token):
+    if token is not None and not _unsafe_exact(token):
         if token in text:
             return True
         folded = _folded_hex(token)
@@ -352,7 +348,8 @@ def under_proc(path: Path) -> bool:
 
 def open_evidence(path: Path) -> None:
     """Refuse a bad evidence path. The file is created only with finished bytes."""
-    if str(path) == "" or path == Path() or under_proc(path):
+    # An empty argument is Path("."), which exists, so the lstat below refuses it.
+    if under_proc(path):
         _refuse_path()
     try:
         info = path.lstat()
@@ -367,7 +364,8 @@ def open_evidence(path: Path) -> None:
         parent_info = parent.lstat()
     except OSError:
         _refuse_path()
-    if stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode):
+    # lstat never reports a symlink as a directory, so this refuses a symlinked parent too.
+    if not stat.S_ISDIR(parent_info.st_mode):
         _refuse_path()
     if parent_info.st_mode & 0o200 == 0:
         _refuse_path()

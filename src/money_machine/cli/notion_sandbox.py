@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -123,21 +124,15 @@ def blocked_stages() -> list[dict[str, object]]:
     return rows
 
 
-def _signal_stages() -> list[dict[str, object]]:
-    """SIGINT after the stages return. Created ids stay on the run."""
-    rows: list[dict[str, object]] = []
-    for name, runner_name in STAGE_REGISTRY:
-        available = runner_name is not None
-        status = "INTERRUPTED" if available else "NOT_RUN"
-        rows.append(_stage_row(name, available, status, planned=False))
-    return rows
+def _interrupted_rows(done: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Rows that finished stay as they are. Only the first unfinished stage is INTERRUPTED.
 
-
-def _read_interrupted() -> list[dict[str, object]]:
-    """A signal during the target reads. No page was created."""
-    rows: list[dict[str, object]] = []
-    marked = False
-    for name, runner_name in STAGE_REGISTRY:
+    An empty list is a signal during the target reads, before any stage ran. A
+    full list is a signal after every stage returned, so no row is relabelled.
+    """
+    rows = list(done)
+    marked = any(row.get("status") == "INTERRUPTED" for row in rows)
+    for name, runner_name in STAGE_REGISTRY[len(rows) :]:
         available = runner_name is not None
         if available and not marked:
             rows.append(_stage_row(name, True, "INTERRUPTED", planned=False))
@@ -155,8 +150,10 @@ def _remaining(start: int) -> list[dict[str, object]]:
     return rows
 
 
-async def _run_stages(ctx: SandboxRun, token: str | None) -> list[dict[str, object]]:
-    rows: list[dict[str, object]] = []
+async def _run_stages(
+    ctx: SandboxRun, token: str | None, rows: list[dict[str, object]]
+) -> list[dict[str, object]]:
+    """Append each finished row to ``rows`` so a later signal can keep them."""
     failed = False
     runners = stage_runners()
     for index, (name, runner_name) in enumerate(STAGE_REGISTRY):
@@ -354,7 +351,8 @@ def _evidence_is_complete(path: Path) -> bool:
         info = path.lstat()
     except OSError:
         return False
-    if stat.S_ISLNK(info.st_mode) or info.st_size <= 0:
+    # An empty file fails json.loads below, so there is no separate size check.
+    if stat.S_ISLNK(info.st_mode):
         return False
     try:
         parsed = json.loads(path.read_text(encoding="utf-8"))
@@ -386,6 +384,23 @@ def _remember_held(
 
 
 def _publish_held() -> int:
+    """Write INTERRUPTED evidence with further SIGINTs ignored, then restore the handler.
+
+    The operator already asked to stop. A second Ctrl-C must not cost the evidence.
+    Off the main thread the handler cannot change, so the write runs as it is.
+    """
+    previous = signal.getsignal(signal.SIGINT)
+    with contextlib.suppress(ValueError):
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+    try:
+        return _publish_interrupted()
+    finally:
+        # A handler installed outside Python reads back as None and cannot be restored.
+        with contextlib.suppress(ValueError, TypeError):
+            signal.signal(signal.SIGINT, previous)
+
+
+def _publish_interrupted() -> int:
     """Write INTERRUPTED evidence, or leave a complete file that is already there."""
     held = _HELD
     log = _with_ids("sandbox interrupted", held.created)
@@ -394,9 +409,7 @@ def _publish_held() -> int:
         return _fail(log, EXIT_API)
     if _evidence_is_complete(path):
         return _fail(log, EXIT_API)
-    stages = held.stages
-    if not any(stage.get("status") == "INTERRUPTED" for stage in stages):
-        stages = _signal_stages()
+    stages = _interrupted_rows(held.stages)
     try:
         return _finish(
             path,
@@ -416,6 +429,7 @@ def _publish_held() -> int:
             rejected=held.rejected,
             flagged=held.flagged,
             orphans=held.orphans,
+            interrupted=True,
         )
     except (KeyboardInterrupt, asyncio.CancelledError):
         if _evidence_is_complete(path):
@@ -465,7 +479,8 @@ def _main(
     except SandboxError:
         return _fail("usage error", EXIT_USAGE)
     evidence = Path(parsed.evidence_out)
-    if str(evidence) == "" or leaks(str(evidence), secret):
+    # Path("") is Path("."), so the path text is never empty. open_evidence refuses it.
+    if leaks(str(evidence), secret):
         return _fail("usage error", EXIT_USAGE)
     git, control = _preflight(evidence, root)
     _remember_held(evidence, secret, started, clock, "dry-run", git, control, empty_write_counts())
@@ -528,7 +543,7 @@ def _main(
             started,
             clock,
             mode=mode,
-            stages=_read_interrupted(),
+            stages=_interrupted_rows([]),
             created=[],
             counts=counts,
             bot_user_id=None,
@@ -601,10 +616,21 @@ def _main(
             bot_space_id=canonical_id(bot.space_id),
         )
         _bind_record(active, ctx)
+        done: list[dict[str, object]] = []
+        signalled = False
+        # Live lists, so a signal before the copies below still publishes them.
+        _HELD.stages = done
+        _HELD.created = ctx.created
+        _HELD.rejected = ctx.rejected_pages
+        _HELD.flagged = ctx.flagged_pages
+        _HELD.orphans = ctx.possible_orphans
+        _HELD.bot_user_id = _user_id(bot)
         try:
-            stages = asyncio.run(_run_stages(ctx, secret))
+            stages = asyncio.run(_run_stages(ctx, secret, done))
         except (KeyboardInterrupt, asyncio.CancelledError):
-            stages = _signal_stages()
+            # Between stages or in asyncio teardown. A finished row keeps its status.
+            stages = _interrupted_rows(done)
+            signalled = True
         created = list(ctx.created)
         rejected = list(ctx.rejected_pages)
         flagged = list(ctx.flagged_pages)
@@ -616,7 +642,7 @@ def _main(
         _HELD.stages = stages
         _HELD.bot_user_id = _user_id(bot)
         _HELD.counts = counts
-    interrupted = any(stage["status"] == "INTERRUPTED" for stage in stages)
+    interrupted = signalled or any(stage["status"] == "INTERRUPTED" for stage in stages)
     failed = any(stage["status"] == "FAILED" for stage in stages)
     if interrupted:
         error = None
@@ -649,6 +675,7 @@ def _main(
             rejected=rejected,
             flagged=flagged,
             orphans=orphans,
+            interrupted=signalled,
         )
     except (KeyboardInterrupt, asyncio.CancelledError):
         return _publish_held()
@@ -686,6 +713,7 @@ def _finish(
     rejected: list[dict[str, str]] | None = None,
     flagged: list[dict[str, str]] | None = None,
     orphans: list[dict[str, str]] | None = None,
+    interrupted: bool = False,
 ) -> int:
     ended = _now(clock, token)
     payload = _payload(
@@ -704,7 +732,7 @@ def _finish(
     )
     if error is not None:
         payload["error"] = error
-    if any(stage.get("status") == "INTERRUPTED" for stage in stages):
+    if interrupted or any(stage.get("status") == "INTERRUPTED" for stage in stages):
         payload["run_status"] = "INTERRUPTED"
     check = _emit(path, payload, token)
     if check == "FAIL":
@@ -752,7 +780,7 @@ def _refuse(
     code: int,
     clock: Callable[[], datetime] | None,
 ) -> int:
-    if path is not None and str(path) != "" and not leaks(str(path), token):
+    if path is not None and not leaks(str(path), token):
         git, control = _preflight(path, root)
         _remember_held(path, token, started, clock, "dry-run", git, control, empty_write_counts())
         return _refuse_open(path, token, started, clock, git, control, message, code)

@@ -20,7 +20,9 @@ import subprocess
 import sys
 import time
 import urllib.request
-from datetime import UTC, datetime
+from collections.abc import Coroutine
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import cast
 from urllib.parse import quote
@@ -48,6 +50,7 @@ from money_machine.cli.notion_sandbox_guard import (
     empty_write_counts,
     git_sha,
     leaks,
+    open_evidence,
     override_env,
     parent_is_allowed,
     qa_verdict,
@@ -2052,7 +2055,10 @@ def test_ssl_env_is_refused_and_ignored(
     assert dict(os.environ) == before
     assert context.verify_mode == ssl.CERT_REQUIRED
     assert context.check_hostname is True
-    assert context.get_ca_certs()
+    if os.path.isfile(ssl.get_default_verify_paths().openssl_cafile):
+        # Debian 13 has no compiled-in cert.pem. The directory fallback is
+        # test_tls_context_loads_the_compiled_in_paths.
+        assert context.get_ca_certs()
     assert sandbox_opener() is not None
 
 
@@ -3661,6 +3667,8 @@ def test_temporary_evidence_fd_is_closed(
     assert code == EXIT_OK
     assert opened
     assert opened[0] in closed
+    # The fd is reset to -1 after its close. The cleanup does not close it again.
+    assert -1 not in closed
 
 
 def test_interrupt_after_the_evidence_link_leaves_that_file(
@@ -3744,6 +3752,10 @@ def test_second_interrupt_retries_until_a_file_exists(
     assert [page["id"] for page in payload["created_pages"]] == [
         canonical_id(item) for item in _CHILD_IDS
     ]
+    # Both stages finished before the write. The interrupt does not relabel them.
+    assert _stage(payload, "build")["status"] == "PASS"
+    assert _stage(payload, "variants")["status"] == "PASS"
+    assert _stage(payload, "qa")["status"] == "NOT_RUN"
 
 
 def test_real_sigint_during_the_evidence_write_leaves_a_complete_file(tmp_path: Path) -> None:
@@ -3758,6 +3770,8 @@ def test_real_sigint_during_the_evidence_write_leaves_a_complete_file(tmp_path: 
     assert payload["run_status"] == "INTERRUPTED"
     assert payload["redaction_self_check"] == "PASS"
     assert payload["possible_orphans"] == []
+    assert _stage(payload, "build")["status"] == "PASS"
+    assert _stage(payload, "variants")["status"] == "PASS"
 
 
 def test_short_upper_hex_is_not_folded() -> None:
@@ -4467,3 +4481,831 @@ print("ok")
     )
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout.strip() == "ok"
+
+
+def _record_loads(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, object]]:
+    """Record which compiled-in CA location is loaded. Nothing is loaded."""
+    loads: list[dict[str, object]] = []
+
+    def _load(
+        _self: ssl.SSLContext,
+        cafile: object = None,
+        capath: object = None,
+        cadata: object = None,
+    ) -> None:
+        del cadata
+        loads.append({"cafile": cafile, "capath": capath})
+
+    monkeypatch.setattr(ssl.SSLContext, "load_verify_locations", _load)
+    return loads
+
+
+@pytest.mark.parametrize(
+    ("make_file", "make_dir", "expected"),
+    [
+        (True, True, "cafile"),
+        (False, True, "capath"),
+        (True, False, "cafile"),
+        (False, False, None),
+    ],
+)
+def test_tls_context_loads_the_compiled_in_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    make_file: bool,
+    make_dir: bool,
+    expected: str | None,
+) -> None:
+    """The CA file wins. A host with only the directory still gets CAs. Env is never read."""
+    cafile = tmp_path / "cert.pem"
+    capath = tmp_path / "certs"
+    if make_file:
+        cafile.write_text("not loaded by the recorder\n", encoding="utf-8")
+    if make_dir:
+        capath.mkdir()
+
+    class _Paths:
+        openssl_cafile = str(cafile)
+        openssl_capath = str(capath)
+
+    monkeypatch.setattr(
+        "money_machine.cli.notion_sandbox_live.ssl.get_default_verify_paths",
+        lambda: _Paths(),
+    )
+    loads = _record_loads(monkeypatch)
+    monkeypatch.setenv("SSL_CERT_FILE", str(cafile))
+    monkeypatch.setenv("SSL_CERT_DIR", str(capath))
+    context = sandbox_tls_context()
+    assert context.verify_mode == ssl.CERT_REQUIRED
+    if expected == "cafile":
+        assert loads == [{"cafile": str(cafile), "capath": None}]
+    elif expected == "capath":
+        assert loads == [{"cafile": None, "capath": str(capath)}]
+    else:
+        assert loads == []
+
+
+def test_tls_context_with_non_text_paths_loads_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """None paths are skipped before os.path is asked about them."""
+
+    class _Paths:
+        openssl_cafile = None
+        openssl_capath = None
+
+    monkeypatch.setattr(
+        "money_machine.cli.notion_sandbox_live.ssl.get_default_verify_paths",
+        lambda: _Paths(),
+    )
+    loads = _record_loads(monkeypatch)
+    context = sandbox_tls_context()
+    assert context.check_hostname is True
+    assert loads == []
+
+
+def test_one_interrupt_during_the_evidence_write_keeps_passed_stages(
+    evidence: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Clean execute, then one interrupt in the temp write. Build and variants stay PASS."""
+    real_write = os.write
+    seen = {"n": 0}
+
+    def _write(fd: int, data: bytes) -> int:
+        if bytes(data).startswith(b"{"):
+            seen["n"] += 1
+            if seen["n"] == 1:
+                raise KeyboardInterrupt
+        return real_write(fd, data)
+
+    monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.write", _write)
+    code = main(
+        ["--evidence-out", str(evidence), "--execute"],
+        client=FakeSandbox(),
+        environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+        clock=_clock,
+    )
+    assert code == EXIT_API
+    assert seen["n"] == 2
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    assert [row["status"] for row in cast(list[dict[str, object]], payload["stages"])] == [
+        "PASS",
+        "PASS",
+        "NOT_RUN",
+        "NOT_RUN",
+        "NOT_RUN",
+        "NOT_RUN",
+    ]
+    assert payload["run_status"] == "INTERRUPTED"
+    assert len(cast(list[object], payload["created_pages"])) == len(_CHILD_IDS)
+    assert "sandbox interrupted" in capsys.readouterr().err
+
+
+def test_interrupt_in_asyncio_teardown_keeps_passed_stages(
+    evidence: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A signal after every stage returned, outside a runner await. Nothing is relabelled."""
+    from money_machine.cli import notion_sandbox as sandbox_module
+
+    real_run = asyncio.run
+
+    def _run_then_interrupt(coroutine: object) -> object:
+        real_run(cast("Coroutine[object, object, object]", coroutine))
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(sandbox_module.asyncio, "run", _run_then_interrupt)
+    code = main(
+        ["--evidence-out", str(evidence), "--execute"],
+        client=FakeSandbox(),
+        environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+        clock=_clock,
+    )
+    assert code == EXIT_API
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    assert _stage(payload, "build")["status"] == "PASS"
+    assert _stage(payload, "variants")["status"] == "PASS"
+    assert payload["run_status"] == "INTERRUPTED"
+    assert [page["id"] for page in cast(list[dict[str, str]], payload["created_pages"])] == [
+        canonical_id(item) for item in _CHILD_IDS
+    ]
+
+
+def _row(name: str, available: bool, status: str) -> dict[str, object]:
+    return {"available": available, "name": name, "planned": False, "status": status}
+
+
+_TAIL = [
+    _row("qa", False, "NOT_RUN"),
+    _row("fact_ledger", False, "NOT_RUN"),
+    _row("workflow_link", False, "NOT_RUN"),
+    _row("w11", False, "NOT_RUN"),
+]
+
+
+@pytest.mark.parametrize(
+    ("done", "expected"),
+    [
+        ([], [_row("build", True, "INTERRUPTED"), _row("variants", True, "NOT_RUN"), *_TAIL]),
+        (
+            [_row("build", True, "PASS")],
+            [_row("build", True, "PASS"), _row("variants", True, "INTERRUPTED"), *_TAIL],
+        ),
+        (
+            [_row("build", True, "INTERRUPTED")],
+            [_row("build", True, "INTERRUPTED"), _row("variants", True, "NOT_RUN"), *_TAIL],
+        ),
+        (
+            [_row("build", True, "PASS"), _row("variants", True, "PASS"), *_TAIL],
+            [_row("build", True, "PASS"), _row("variants", True, "PASS"), *_TAIL],
+        ),
+    ],
+)
+def test_interrupted_rows_keep_finished_stages(
+    done: list[dict[str, object]], expected: list[dict[str, object]]
+) -> None:
+    """Only the first unfinished available stage is INTERRUPTED. The input is not changed."""
+    from money_machine.cli import notion_sandbox as sandbox_module
+
+    before = [dict(row) for row in done]
+    rows = sandbox_module._interrupted_rows(done)  # pyright: ignore[reportPrivateUsage]
+    assert rows == expected
+    assert done == before
+
+
+@pytest.mark.parametrize("form", ["self", "pid"])
+def test_proc_alias_of_a_real_directory_is_refused(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    form: str,
+) -> None:
+    """/proc/self/root/<dir> and /proc/<pid>/root/<dir> resolve to a writable directory.
+
+    lstat and the parent checks would accept them, so only the /proc rule refuses.
+    """
+    target = tmp_path / "sub"
+    target.mkdir()
+    owner = "self" if form == "self" else str(os.getpid())
+    alias = Path("/proc") / owner / "root" / target.relative_to("/") / "ev.json"
+    with pytest.raises(SandboxError, match="evidence path is refused"):
+        open_evidence(alias)
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(alias, capsys, caplog, ["--execute"], client=client)
+    assert code == EXIT_USAGE
+    assert err == "evidence path is refused\n"
+    assert payload == {}
+    assert client.reads == []
+    assert client.creates == []
+    assert list(target.iterdir()) == []
+
+
+@pytest.mark.parametrize("hook", ["_remember", "_drop_recorded", "_drop_tail"])
+def test_interrupt_while_aligning_keeps_the_created_id(
+    monkeypatch: pytest.MonkeyPatch, hook: str
+) -> None:
+    """The client already recorded the id. An interrupt inside _align must not lose it."""
+    from money_machine.cli import notion_sandbox_pipeline as pipeline_module
+
+    client = FakeSandbox()
+    ctx = _bound_run(client)
+    client.bind_created(ctx.created_ids, ctx.created)
+    page = client.create_child_page(SANDBOX_PARENT_PAGE_ID, "Sandbox Weekly Planner")
+    kept = canonical_id(_CHILD_IDS[0])
+    assert ctx.created_ids == [kept]
+    row = dict(ctx.created[0])
+
+    def _stop(*_args: object, **_kwargs: object) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(pipeline_module, hook, _stop)
+    returned: str | None = None
+    with contextlib.suppress(KeyboardInterrupt):
+        returned = pipeline_module._align(ctx, page, 0)  # pyright: ignore[reportPrivateUsage]
+    assert ctx.created_ids == [kept]
+    assert ctx.created == [row]
+    if hook == "_remember":
+        assert returned is None
+    else:
+        assert returned == kept
+
+
+_EDGE = datetime(2026, 10, 7, 12, 0, 37, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    ("created", "fresh"),
+    [
+        (datetime(2026, 10, 7, 11, 58, 0, tzinfo=UTC), True),
+        (datetime(2026, 10, 7, 11, 57, 59, tzinfo=UTC), False),
+        (datetime(2026, 10, 7, 12, 2, 37, tzinfo=UTC), True),
+        (datetime(2026, 10, 7, 12, 2, 38, tzinfo=UTC), False),
+        (datetime(2026, 10, 8, 12, 0, 0, tzinfo=UTC), False),
+    ],
+)
+def test_created_time_bounds_are_exact(created: datetime, fresh: bool) -> None:
+    """Clock 12:00:37Z. Earliest is the floored minute less two minutes, 11:58:00Z.
+
+    Latest is the clock plus two minutes, 12:02:37Z. A day ahead is a provider lie.
+    """
+    from money_machine.cli import notion_sandbox_pipeline as pipeline_module
+
+    client = FakeSandbox()
+    ctx = replace(_bound_run(client), moment=_EDGE)
+    page_id = canonical_id(_CHILD_IDS[0])
+    ctx.created_ids.append(page_id)
+    ctx.created.append({"id": page_id, "parent_id": "", "url": ""})
+    page = PageView(
+        page_id=page_id,
+        parent_id=SANDBOX_PARENT_PAGE_ID,
+        space_id=SANDBOX_SPACE_ID,
+        url="https://www.notion.so/child",
+        archived=False,
+        created_by="bot-user",
+        created_time=created,
+    )
+    if fresh:
+        pipeline_module._fresh(ctx, page)  # pyright: ignore[reportPrivateUsage]
+        assert ctx.created_ids == [page_id]
+        assert ctx.rejected_pages == []
+    else:
+        with pytest.raises(SandboxError, match="not new"):
+            pipeline_module._fresh(ctx, page)  # pyright: ignore[reportPrivateUsage]
+        assert ctx.created_ids == []
+        assert ctx.rejected_pages == [{"id": page_id, "reason": "not_new"}]
+
+
+class _FutureCreated(FakeSandbox):
+    def create_child_page(self, parent_id: str, title: str) -> PageView:
+        page = super().create_child_page(parent_id, title)
+        return _echo(page, created_time=_WHEN + timedelta(days=1))
+
+
+def test_future_created_time_is_refused_end_to_end(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A create response dated a day ahead is not new. One create, then exit 69."""
+    client = _FutureCreated()
+    code, payload, _out, _err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_API
+    assert len(client.creates) == 1
+    assert _stage(payload, "build")["status"] == "FAILED"
+    assert payload["created_pages"] == []
+    assert payload["rejected_pages"] == [{"id": canonical_id(_CHILD_IDS[0]), "reason": "not_new"}]
+
+
+# Round 5: literal-operand kills.
+
+
+class _Liar:
+    """Compares equal to everything. A type check is the only thing that refuses it."""
+
+    def __eq__(self, other: object) -> bool:
+        return True
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+    __hash__ = object.__hash__
+
+
+class _TextSubclass(str):
+    __slots__ = ()
+
+
+def test_type_checks_refuse_lookalike_values() -> None:
+    """A value that only compares like a string is not one."""
+    bot = BotView(user_id="bot-user", user_type=_Liar(), space_id=SANDBOX_SPACE_ID)
+    page = PageView(
+        page_id=SANDBOX_PARENT_PAGE_ID,
+        parent_id="",
+        space_id=SANDBOX_SPACE_ID,
+        url="",
+        archived=False,
+    )
+    assert target_ok(replace(bot, user_type="bot"), page) is True
+    assert target_ok(bot, page) is False
+    assert token_from_environ({"NOTION_SANDBOX_TOKEN": _TextSubclass(_SECRET)}) is None
+    assert qa_verdict([{"name": "qa", "status": _Liar()}]) == "NOT_RUN"
+
+
+def test_unshaped_tokens_have_no_encoded_forms() -> None:
+    """Only a shaped token gets url-encoded and base64 copies."""
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    plain = "plain token value"
+    digest = base64.b64encode(plain.encode("utf-8")).decode("ascii")
+    assert guard_module._encoded_forms(plain) == ()  # pyright: ignore[reportPrivateUsage]
+    assert guard_module._encoded_forms(None) == ()  # pyright: ignore[reportPrivateUsage]
+    assert redact_text(f"x {digest} y", plain) == f"x {digest} y"
+    assert leaks(f"x {digest} y", plain) is False
+
+
+@pytest.mark.parametrize("token", ["true", "false", "null", " ", "\t"])
+def test_json_literal_tokens_are_not_secrets(token: str) -> None:
+    """A token that would rewrite the JSON document is neither replaced nor reported."""
+    text = '{\n  "a": true,\n  "b": false,\n  "c": null\n}'
+    assert redact_text(text, token) == text
+    assert leaks(text, token) is False
+
+
+def test_hex_token_absent_from_the_text_is_not_a_leak() -> None:
+    token = "0123456789abcdef" * 2
+    assert leaks('{"clean": "text"}', token) is False
+    assert leaks(f"x {token.upper()} y", token) is True
+
+
+def test_created_page_ids_skip_empty_and_non_text_ids() -> None:
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    payload: dict[str, object] = {
+        "created_pages": [{"id": ""}, {"id": 5}, "page", {"id": "a"}, {"id": "b"}]
+    }
+    assert guard_module._created_page_ids(payload) == "a, b"  # pyright: ignore[reportPrivateUsage]
+    assert guard_module._created_page_ids({"created_pages": "a"}) == ""  # pyright: ignore[reportPrivateUsage]
+
+
+@pytest.mark.parametrize("extra", [1, 7])
+def test_overlong_write_count_is_refused(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, extra: int
+) -> None:
+    """``os.write`` never reports more bytes than it was given. A count that does is refused."""
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    target = tmp_path / "out.bin"
+    fd = os.open(target, os.O_CREAT | os.O_WRONLY, 0o600)
+
+    def _overlong(_fd: int, data: object) -> int:
+        return len(cast(memoryview, data)) + extra
+
+    monkeypatch.setattr(guard_module.os, "write", _overlong)
+    try:
+        with pytest.raises(SandboxError, match="evidence write failed"):
+            guard_module._write_all(fd, b"abc")  # pyright: ignore[reportPrivateUsage]
+    finally:
+        monkeypatch.undo()
+        os.close(fd)
+
+
+def test_link_replaced_by_a_same_size_symlink_is_refused(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A symlink at the destination is refused even when its size matches the document."""
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    path = tmp_path / "evidence.json"
+    payload: dict[str, object] = {"result": "PASS"}
+    text, _result = render_evidence(payload, _SECRET)
+    size = len(text.encode("utf-8"))
+    decoy = "x" * size
+    real_link = os.link
+
+    def _swap(source: object, destination: object) -> None:
+        del source
+        os.symlink(decoy, cast(str, destination))
+
+    monkeypatch.setattr(guard_module.os, "link", _swap)
+    try:
+        with pytest.raises(SandboxError, match="evidence file changed during the run"):
+            commit_evidence(path, payload, _SECRET)
+    finally:
+        monkeypatch.setattr(guard_module.os, "link", real_link)
+    assert os.path.lexists(path) is False
+    assert sorted(os.listdir(tmp_path)) == []
+
+
+def test_repo_root_needs_both_markers_in_one_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A directory with only one marker is skipped while walking up from the module."""
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    root = tmp_path / "root"
+    (root / "docs" / "control").mkdir(parents=True)
+    (root / "pyproject.toml").write_text("[project]\n", encoding="utf-8")
+    middle = root / "mid"
+    middle.mkdir()
+    (middle / "pyproject.toml").write_text("[project]\n", encoding="utf-8")
+    inner = middle / "inner"
+    (inner / "docs" / "control").mkdir(parents=True)
+    module_file = inner / "pkg" / "notion_sandbox_guard.py"
+    module_file.parent.mkdir()
+    module_file.write_text("", encoding="utf-8")
+    monkeypatch.setattr(guard_module, "__file__", str(module_file))
+    assert repo_root() == root.resolve()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("state_revision", "58"), ("current_session", "7"), ("head_sha", 7)],
+)
+def test_control_ids_refuse_each_mistyped_field(tmp_path: Path, field: str, value: object) -> None:
+    from money_machine.cli.notion_sandbox_guard import control_ids
+
+    state: dict[str, object] = {"state_revision": 58, "current_session": 7, "head_sha": "a" * 40}
+    control = tmp_path / "docs" / "control"
+    control.mkdir(parents=True)
+    target = control / "IMPLEMENTATION_STATE.json"
+    target.write_text(json.dumps(state), encoding="utf-8")
+    assert control_ids(tmp_path)["current_session"] == 7
+    state[field] = value
+    target.write_text(json.dumps(state), encoding="utf-8")
+    with pytest.raises(SandboxError, match="control state is unreadable"):
+        control_ids(tmp_path)
+
+
+def test_evidence_argument_reads_only_the_named_flag() -> None:
+    from money_machine.cli import notion_sandbox as sandbox_module
+
+    find = sandbox_module._evidence_argument  # pyright: ignore[reportPrivateUsage]
+    assert find(["--execute", "--evidence-out", "e.json"]) == Path("e.json")
+    assert find(["--dry-run", "x.json"]) is None
+    assert find(["--evidence-out=f.json", "--execute"]) == Path("f.json")
+    assert find(["--evidence-out"]) is None
+
+
+def test_with_ids_skips_empty_and_non_text_ids() -> None:
+    from money_machine.cli import notion_sandbox as sandbox_module
+
+    rows = cast(list[dict[str, str]], [{"id": None}, {"id": 5}, {"id": ""}, {"id": "a"}, {}])
+    assert sandbox_module._with_ids("p", rows) == "p: a"  # pyright: ignore[reportPrivateUsage]
+    assert sandbox_module._with_ids("p", []) == "p"  # pyright: ignore[reportPrivateUsage]
+
+
+@pytest.mark.parametrize("value", ["2026-10-07T12:00:00Z", 0])
+def test_clock_returning_a_non_datetime_is_refused(
+    evidence: Path, capsys: pytest.CaptureFixture[str], value: object
+) -> None:
+    client = FakeSandbox()
+
+    def _odd() -> datetime:
+        return cast(datetime, value)
+
+    code = main(
+        ["--evidence-out", str(evidence), "--execute"],
+        client=client,
+        environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+        clock=_odd,
+    )
+    captured = capsys.readouterr()
+    assert code == EXIT_API
+    assert captured.err == "clock must be timezone-aware\n"
+    assert client.reads == []
+    assert evidence.exists() is False
+
+
+@pytest.mark.parametrize(("started", "ready"), [(None, True), (_WHEN, False)])
+def test_publish_held_needs_a_start_and_a_ready_run(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    started: datetime | None,
+    ready: bool,
+) -> None:
+    """Without a start time or before the run is ready there is no evidence to write."""
+    from money_machine.cli import notion_sandbox as sandbox_module
+
+    held = sandbox_module._HELD  # pyright: ignore[reportPrivateUsage]
+    path = tmp_path / "evidence.json"
+    monkeypatch.setattr(held, "path", path)
+    monkeypatch.setattr(held, "started", started)
+    monkeypatch.setattr(held, "ready", ready)
+    monkeypatch.setattr(held, "created", [{"id": "a"}])
+    code = sandbox_module._publish_held()  # pyright: ignore[reportPrivateUsage]
+    captured = capsys.readouterr()
+    assert code == EXIT_API
+    assert captured.err == "sandbox interrupted: a\n"
+    assert os.listdir(tmp_path) == []
+
+
+def test_refusal_without_an_evidence_path_is_usage(
+    capsys: pytest.CaptureFixture[str], caplog: pytest.LogCaptureFixture
+) -> None:
+    """A refused environment with no ``--evidence-out`` writes nothing and exits 64."""
+    caplog.set_level(logging.DEBUG)
+    client = FakeSandbox()
+    code = main(
+        ["--execute"],
+        client=client,
+        environ={"NOTION_SANDBOX_TOKEN": _SECRET, "SSL_CERT_FILE": "/tmp/ca.pem"},
+        clock=_clock,
+    )
+    captured = capsys.readouterr()
+    assert code == EXIT_USAGE
+    assert captured.err == "usage error\n"
+    assert "Traceback" not in caplog.text
+    assert client.reads == []
+
+
+def _live_page(page_id: str, *, space: str = "") -> PageView:
+    return PageView(
+        page_id=page_id,
+        parent_id=SANDBOX_PARENT_PAGE_ID,
+        space_id=space,
+        url="https://www.notion.so/x",
+        archived=False,
+    )
+
+
+def test_live_publish_records_each_id_once() -> None:
+    """Unbound publishes only track the id. Bound publishes append a new id once."""
+    client = LiveSandboxClient(_SECRET, _Opener([]))
+    page = _live_page(canonical_id(_CHILD_IDS[0]))
+    client._publish(page)  # pyright: ignore[reportPrivateUsage]
+    ids: list[str] = []
+    rows: list[dict[str, str]] = []
+    client.bind_created(ids, rows)
+    client._publish(_live_page(""))  # pyright: ignore[reportPrivateUsage]
+    assert ids == []
+    client._publish(page)  # pyright: ignore[reportPrivateUsage]
+    client._publish(page)  # pyright: ignore[reportPrivateUsage]
+    assert ids == [canonical_id(_CHILD_IDS[0])]
+    assert [row["id"] for row in rows] == ids
+
+
+def test_dashed_plain_token_in_the_url_is_not_sent() -> None:
+    """A dashed token that is not hex is caught on the url as written."""
+    sent: list[str] = []
+
+    def _open(request: urllib.request.Request, timeout: object = None) -> _Response:
+        del timeout
+        sent.append(request.full_url)
+        return _Response(b"{}")
+
+    token = "pages/" + canonical_id(_PARENT_RAW)[:13]
+    assert "-" in token
+    client = LiveSandboxClient(token, _open)
+    with pytest.raises(SandboxError, match="notion api error"):
+        client.read_page(SANDBOX_PARENT_PAGE_ID)
+    assert sent == []
+
+
+class _OkBody:
+    status = 200
+
+    def read(self) -> bytes:
+        return json.dumps({"id": "bot-user", "type": "bot"}).encode("utf-8")
+
+    def close(self) -> None:
+        return None
+
+
+def test_status_200_is_read() -> None:
+    def _open(request: urllib.request.Request, timeout: object = None) -> _OkBody:
+        del request, timeout
+        return _OkBody()
+
+    bot = LiveSandboxClient(_SECRET, _open).read_bot()
+    assert bot.user_type == "bot"
+    assert bot.user_id == "bot-user"
+
+
+def test_parse_helpers_refuse_mistyped_fields() -> None:
+    base: dict[str, object] = {"object": "page", "id": _PARENT_RAW}
+    assert parse_bot({"id": "u", "type": 5}) is None
+    assert parse_page([], fallback_space="", expected_id="") is None
+    assert parse_page("page", fallback_space="", expected_id="") is None
+    for key in ("archived", "is_archived", "in_trash"):
+        assert parse_page({**base, key: "yes"}, fallback_space="", expected_id="") is None
+    page = parse_page({**base, "url": ""}, fallback_space="", expected_id="")
+    assert page is not None
+    assert page.url == "https://www.notion.so/" + canonical_id(_PARENT_RAW).replace("-", "")
+    assert explicit_space({"space_id": 5, "workspace_id": _SPACE_RAW}) == SANDBOX_SPACE_ID
+    assert parse_created_time("") is None
+    assert parse_created_time(7) is None
+
+
+def test_proxy_map_keeps_only_text_pairs() -> None:
+    handler = urllib.request.ProxyHandler({"https": "http://p:1"})
+    setattr(handler, "proxies", {5: "x", "https": "http://p:1", "http": 7})  # noqa: B010
+    director = urllib.request.OpenerDirector()
+    director.add_handler(handler)
+    assert proxy_map(director) == {"https": "http://p:1"}
+
+
+def test_pipeline_helpers_ignore_blank_and_missing_ids() -> None:
+    """Blank ids are never recorded or rejected. A missing id is not an error."""
+    from money_machine.cli import notion_sandbox_pipeline as pipeline_module
+
+    ctx = _bound_run(FakeSandbox())
+    page = _live_page("")
+    pipeline_module._remember(ctx, page, "")  # pyright: ignore[reportPrivateUsage]
+    assert ctx.created_ids == []
+    assert ctx.created == []
+    pipeline_module._drop_recorded(ctx, canonical_id(_CHILD_IDS[0]))  # pyright: ignore[reportPrivateUsage]
+    assert ctx.created_ids == []
+    with pytest.raises(SandboxError, match="created page is not new"):
+        pipeline_module._reject_unfresh(ctx, page)  # pyright: ignore[reportPrivateUsage]
+    assert ctx.rejected_pages == []
+
+
+def test_one_page_keeps_one_flag_per_reason() -> None:
+    from money_machine.cli import notion_sandbox_pipeline as pipeline_module
+
+    ctx = _bound_run(FakeSandbox())
+    page_id = canonical_id(_CHILD_IDS[0])
+    for reason in ("chain", "not_new", "chain"):
+        pipeline_module._flag(ctx, page_id, reason)  # pyright: ignore[reportPrivateUsage]
+    assert ctx.flagged_pages == [
+        {"id": page_id, "reason": "chain"},
+        {"id": page_id, "reason": "not_new"},
+    ]
+
+
+def _chain_page(page_id: str, parent_id: str, *, space: str = SANDBOX_SPACE_ID) -> PageView:
+    return PageView(
+        page_id=page_id,
+        parent_id=parent_id,
+        space_id=space,
+        url="https://www.notion.so/x",
+        archived=False,
+    )
+
+
+def test_chain_refuses_an_archived_sandbox_parent_handed_in() -> None:
+    client = FakeSandbox()
+    ctx = _bound_run(client)
+    parent = replace(_chain_page(SANDBOX_PARENT_PAGE_ID, ""), archived=True)
+    with pytest.raises(SandboxError, match="not under the requested parent"):
+        chain_reaches_sandbox(ctx, parent)
+    assert client.reads == []
+    chain_reaches_sandbox(ctx, replace(parent, archived=False))
+
+
+def test_chain_refuses_a_page_without_an_id() -> None:
+    client = FakeSandbox()
+    ctx = _bound_run(client)
+    with pytest.raises(SandboxError, match="not under the requested parent"):
+        chain_reaches_sandbox(ctx, _chain_page("", SANDBOX_PARENT_PAGE_ID))
+    assert client.reads == []
+
+
+def test_chain_stops_at_a_foreign_intermediate_page() -> None:
+    """A foreign page between the child and the sandbox parent is refused at that page."""
+    client = FakeSandbox()
+    ctx = _bound_run(client)
+    middle = canonical_id(_CHILD_IDS[1])
+    child = canonical_id(_CHILD_IDS[0])
+    client.pages[middle] = _chain_page(middle, SANDBOX_PARENT_PAGE_ID, space=_WRONG_SPACE)
+    with pytest.raises(SandboxError, match="not under the requested parent"):
+        chain_reaches_sandbox(ctx, _chain_page(child, middle))
+    assert client.reads == [middle]
+    assert ctx.flagged_pages == [{"id": child, "reason": "chain"}]
+
+
+def test_chain_cycle_stops_on_the_repeat() -> None:
+    """A parent cycle is refused when a page repeats, not after the step limit."""
+    client = FakeSandbox()
+    ctx = _bound_run(client)
+    first = canonical_id(_CHILD_IDS[0])
+    second = canonical_id(_CHILD_IDS[1])
+    client.pages[first] = _chain_page(first, second)
+    client.pages[second] = _chain_page(second, first)
+    with pytest.raises(SandboxError, match="not under the requested parent"):
+        chain_reaches_sandbox(ctx, client.pages[first])
+    assert client.reads == [second, first]
+
+
+class _ClearedTail(FakeSandbox):
+    """The confirm read empties the evidence rows. The create still returns the page."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.ctx: SandboxRun | None = None
+
+    def read_page(self, page_id: str) -> PageView:
+        page = super().read_page(page_id)
+        ctx = self.ctx
+        if ctx is not None and canonical_id(page_id) == canonical_id(_CHILD_IDS[0]):
+            ctx.created.clear()
+        return page
+
+
+def test_confirm_with_no_evidence_rows_does_not_add_one() -> None:
+    client = _ClearedTail()
+    ctx = _bound_run(client)
+    client.ctx = ctx
+    confirmed = create_under(ctx, SANDBOX_PARENT_PAGE_ID, "Sandbox Weekly Planner")
+    assert canonical_id(confirmed.page_id) == canonical_id(_CHILD_IDS[0])
+    assert ctx.created == []
+
+
+@pytest.mark.parametrize("missing", ["probe", "spec"])
+def test_variants_need_a_probe_and_a_product_spec(missing: str) -> None:
+    ctx = SandboxRun(
+        spec=sandbox_product_spec(_WHEN),
+        client=FakeSandbox(),
+        checkpoint=Path("checkpoint.json"),
+        moment=_WHEN,
+        write_counts={},
+        probe=FixtureNotionAdapter(),
+        product_page_id=canonical_id(_CHILD_IDS[0]),
+    )
+    if missing == "probe":
+        ctx.probe = None
+    else:
+        ctx.spec = object()
+
+    async def _call() -> None:
+        await stage_runners()["run_variants"](ctx)
+
+    with pytest.raises(SandboxError, match="variants require the build stage"):
+        asyncio.run(_call())
+
+
+class _SignalAtSecondCreate(FakeSandbox):
+    """A real SIGINT to this process during the second create."""
+
+    def create_child_page(self, parent_id: str, title: str) -> PageView:
+        page = super().create_child_page(parent_id, title)
+        if len(self.creates) == 2:
+            os.kill(os.getpid(), signal.SIGINT)
+        return page
+
+
+def test_repeated_sigint_during_the_evidence_write_keeps_one_file(
+    evidence: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reviewer S2: SIGINT at create 2, one in the first write, three in the publish."""
+    real_write = os.write
+    sent = {"n": 0, "writes": 0}
+
+    def _write(fd: int, data: bytes) -> int:
+        if bytes(data).startswith(b"{"):
+            sent["writes"] += 1
+            for _ in range(1 if sent["writes"] == 1 else 3):
+                sent["n"] += 1
+                os.kill(os.getpid(), signal.SIGINT)
+        return real_write(fd, data)
+
+    monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.write", _write)
+    before = signal.getsignal(signal.SIGINT)
+    try:
+        code = main(
+            ["--evidence-out", str(evidence), "--execute"],
+            client=_SignalAtSecondCreate(),
+            environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+            clock=_clock,
+        )
+    except KeyboardInterrupt:
+        pytest.fail("a repeated SIGINT escaped main")
+    finally:
+        after = signal.getsignal(signal.SIGINT)
+        signal.signal(signal.SIGINT, before)
+    assert code == EXIT_API
+    # The first write is interrupted. The publish ignores the next three signals.
+    assert sent == {"n": 4, "writes": 2}
+    assert after is not signal.SIG_IGN
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    assert payload["run_status"] == "INTERRUPTED"
+    assert [page["id"] for page in cast(list[dict[str, str]], payload["created_pages"])] == [
+        canonical_id(item) for item in _CHILD_IDS[:2]
+    ]
+    # The second create is the first variant. Build finished and stays PASS.
+    assert _stage(payload, "build")["status"] == "PASS"
+    assert _stage(payload, "variants")["status"] == "INTERRUPTED"
