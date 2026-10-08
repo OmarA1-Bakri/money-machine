@@ -4128,3 +4128,239 @@ async def test_next_phase_must_be_an_unpadded_ascii_token(tmp_path: Path, phase:
 def test_non_positive_pid_is_not_alive() -> None:
     """pid 0 is refused before os.kill. The temp test does not cover this branch."""
     assert progress_module._pid_alive(0) is False  # pyright: ignore[reportPrivateUsage]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("build_version", ""),
+        ("build_version", " 1"),
+        ("build_version", "1 "),
+        ("database_ids", ()),
+    ],
+)
+async def test_plan_refuses_an_undurable_fact(tmp_path: Path, field: str, value: object) -> None:
+    """Helper-level kills for the joined fact check in ``_plan``.
+
+    The public loader refuses each of these before ``_plan``. The helper must
+    refuse them too: empty kills ``value == ""``, padding kills the strip
+    conjunct, and both kill the two ``or`` to ``and`` flips.
+    """
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    qa = load_qa_record(path)
+    assert qa is not None
+    if field == "build_version":
+        stored = replace(stored, build_version=cast(int, value))
+    else:
+        stored = replace(stored, database_ids=cast(tuple[tuple[str, str], ...], value))
+    steps = ledger_module._walk_chain()  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ProductBuildError, match="fact ledger fact is not a durable string"):
+        await ledger_module._plan(probe, stored, spec, qa, steps)  # pyright: ignore[reportPrivateUsage]
+
+
+SECRET = "sk-live-secret"
+
+
+def _secret_reachable(error: BaseException) -> list[str]:
+    """Every place a secret could sit on a raised error: the chain, attributes, frames."""
+    import traceback
+
+    found: list[str] = []
+    pending: list[BaseException] = [error]
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        texts = [
+            str(current),
+            repr(current),
+            repr(current.args),
+            repr(getattr(current, "__notes__", None)),
+            repr(vars(current)),
+        ]
+        if any(SECRET in text for text in texts):
+            found.append(type(current).__name__)
+        for linked in (current.__cause__, current.__context__):
+            if linked is not None:
+                pending.append(linked)
+    formatted = "".join(traceback.format_exception(error))
+    if SECRET in formatted:
+        found.append("traceback")
+    trace = error.__traceback__
+    while trace is not None:
+        frame = trace.tb_frame
+        if frame.f_code.co_filename != __file__ and SECRET in repr(frame.f_locals):
+            found.append(f"locals:{frame.f_code.co_name}")
+        trace = trace.tb_next
+    return found
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "prefix", ["qa ", "checkpoint ", "fact ledger ", "progress ", "workflow link "]
+)
+async def test_provider_error_with_an_own_prefix_is_redacted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, prefix: str
+) -> None:
+    """A provider ProductBuildError is not an own refusal because of its text."""
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+
+    async def _boom(*_args: object, **_kwargs: object) -> bool:
+        try:
+            raise RuntimeError(SECRET)
+        except RuntimeError as inner:
+            raise ProductBuildError(prefix + SECRET) from inner
+
+    monkeypatch.setattr(ledger_module, "live_qa_passed", _boom)
+    with pytest.raises(ProductBuildError) as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    assert str(caught.value) == "fact ledger read failed"
+    assert caught.value.__cause__ is None
+    assert caught.value.__context__ is None
+    assert _secret_reachable(caught.value) == []
+    assert path.read_bytes() == raw
+    assert _jobs(path) == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("response", ["qa " + SECRET, "fact ledger " + SECRET, SECRET])
+async def test_recorded_provider_response_is_not_an_own_refusal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, response: str
+) -> None:
+    """raise_recorded is package code. Its provider response is still redacted."""
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+    elsewhere = tmp_path / "absent.json"
+
+    async def _boom(*_args: object, **_kwargs: object) -> bool:
+        progress_module.raise_recorded(
+            elsewhere, "qa", ProviderFailure("fact_ledger.read", response)
+        )
+
+    monkeypatch.setattr(ledger_module, "live_qa_passed", _boom)
+    with pytest.raises(ProductBuildError) as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    assert str(caught.value) == "fact ledger read failed"
+    assert caught.value.__cause__ is None
+    assert caught.value.__context__ is None
+    assert _secret_reachable(caught.value) == []
+    assert not elsewhere.exists()
+    assert path.read_bytes() == raw
+
+
+def _permission_error() -> BaseException:
+    return PermissionError(13, "denied", SECRET)
+
+
+def _noted_error() -> BaseException:
+    error = ConnectionError("reset")
+    error.add_note(SECRET)
+    return error
+
+
+def _provider_chain() -> BaseException:
+    try:
+        raise RuntimeError(SECRET)
+    except RuntimeError as inner:
+        error = ConnectionError("outer")
+        error.__cause__ = inner
+        return error
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "make",
+    [
+        lambda: ConnectionError(SECRET),
+        lambda: ProviderFailure("fact_ledger.read", SECRET),
+        _permission_error,
+        _noted_error,
+        _provider_chain,
+    ],
+)
+async def test_provider_failure_leaves_no_chain(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, make: Callable[[], BaseException]
+) -> None:
+    """The provider job error has the fixed cause only. The original is not its context."""
+    spec, probe, path = await _qa(tmp_path)
+
+    async def _boom(*_args: object, **_kwargs: object) -> bool:
+        raise make()
+
+    monkeypatch.setattr(ledger_module, "live_qa_passed", _boom)
+    with pytest.raises(ProductBuildError, match="provider read failed") as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    assert caught.value.__context__ is None
+    cause = caught.value.__cause__
+    assert type(cause) is ProviderFailure
+    assert cause.response == "provider read failed"
+    assert cause.__context__ is None
+    assert _secret_reachable(caught.value) == []
+    assert SECRET not in path.read_text(encoding="utf-8")
+    assert len(_provider_jobs(path)) == 1
+
+
+class _SecretError(Exception):
+    """A code error whose secret is in __str__, an attribute, and a note."""
+
+    def __init__(self) -> None:
+        super().__init__("plain")
+        self.token = SECRET
+        self.add_note(SECRET)
+
+    def __str__(self) -> str:
+        return SECRET
+
+
+@pytest.mark.asyncio
+async def test_code_error_attributes_do_not_survive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """__str__, a token attribute, a note, and a chained cause are all unreachable."""
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+
+    async def _boom(*_args: object, **_kwargs: object) -> bool:
+        try:
+            raise RuntimeError(SECRET)
+        except RuntimeError as inner:
+            raise _SecretError() from inner
+
+    monkeypatch.setattr(ledger_module, "live_qa_passed", _boom)
+    with pytest.raises(ProductBuildError) as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    assert str(caught.value) == "fact ledger read failed"
+    assert caught.value.__cause__ is None
+    assert caught.value.__context__ is None
+    assert _secret_reachable(caught.value) == []
+    assert path.read_bytes() == raw
+    assert _jobs(path) == []
+
+
+@pytest.mark.asyncio
+async def test_own_refusal_is_raised_without_a_chain(tmp_path: Path) -> None:
+    """A package refusal keeps its text. Nothing it was raised from comes with it."""
+    spec, probe, path = await _qa(tmp_path)
+    caller = _prose_caller(spec, "buyer")
+    raw = path.read_bytes()
+    with pytest.raises(ProductBuildError) as caught:
+        await run_fact_ledger(caller, probe, path, recorded_at=LEDGER_AT)
+    assert str(caught.value) == "fact ledger caller does not match"
+    assert caught.value.__cause__ is None
+    assert caught.value.__context__ is None
+    assert path.read_bytes() == raw
+
+
+def test_error_without_a_traceback_is_not_own() -> None:
+    """An error that was never raised has no frame, so it is not a package refusal."""
+    own = ledger_module._own_message  # pyright: ignore[reportPrivateUsage]
+    assert own(ProductBuildError("fact ledger caller does not match")) is False
+    try:
+        raise ProductBuildError("fact ledger caller does not match")
+    except ProductBuildError as error:
+        assert own(error) is False

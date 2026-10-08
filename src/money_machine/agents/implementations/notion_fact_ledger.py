@@ -176,68 +176,96 @@ async def run_fact_ledger(
         raise ProductBuildError("fact ledger requires the qa checkpoint")
     steps = _walk_chain()
     saved_ledger, saved_link = _stored_pair(path)
-    try:
-        if (
-            saved_ledger is not None
-            and saved_link is not None
-            and await _saved_holds(fixture, stored, validated, qa, saved_ledger, saved_link, steps)
-        ):
-            return replace(
-                stored,
-                next_phase=PHASE_TEST_MATRIX,
-                qa=qa,
-                fact_ledger=saved_ledger,
-                workflow_link=saved_link,
-            )
-        plan = await _plan(fixture, stored, validated, qa, steps)
-    except ProductBuildError as error:
-        if _own_message(error):
-            raise
-        _scrub_secret(error)
-        raise ProductBuildError("fact ledger read failed") from None
-    except (ProviderFailure, ConnectionError, OSError):
-        # These are provider failures. The stored response is a fixed sentence.
+    resumed, plan, failure = await _guarded_read(
+        fixture, stored, validated, qa, saved_ledger, saved_link, steps
+    )
+    # The handler in _guarded_read has returned, so nothing raised below has a
+    # __context__. A provider error object, and any secret on it, is not reachable.
+    if failure == _PROVIDER_FAILED:
         raise_recorded(
             path,
             BUILD_PHASES[-1],
             ProviderFailure("fact_ledger.read", "provider read failed"),
         )
-    except Exception as error:
-        # A code bug is not a provider job. Its text can carry a secret, including
-        # through __cause__ and __context__, so the chain is cleared before it leaves.
-        _scrub_secret(error)
-        raise ProductBuildError("fact ledger read failed") from None
+    if plan is None:
+        if resumed is None:
+            raise ProductBuildError(failure)
+        return resumed
     _require_stored_qa(qa, plan.live_pass)
     checkpoint = _with_records(stored, qa, plan, moment)
     _write(path, checkpoint, created)
     return checkpoint
 
 
+_PROVIDER_FAILED = "provider read failed"
+_READ_FAILED = "fact ledger read failed"
+_OWN_PREFIXES = ("fact ledger", "workflow link", "qa ", "progress ", "checkpoint ")
+_PACKAGE = "money_machine.agents.implementations."
+
+
+async def _guarded_read(
+    fixture: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+    qa: QaRecord,
+    saved_ledger: FactLedgerRecord | None,
+    saved_link: WorkflowLinkRecord | None,
+    steps: tuple[str, ...],
+) -> tuple[ProductBuildCheckpoint | None, _Plan | None, str]:
+    """The resumed checkpoint, or the plan, or a fixed failure text.
+
+    No exception leaves this function except BaseException. The caller raises
+    the failure text after this frame is gone, so the raised error has no
+    __cause__ or __context__ that points back at a provider or code error.
+    """
+    try:
+        if (
+            saved_ledger is not None
+            and saved_link is not None
+            and await _saved_holds(fixture, stored, spec, qa, saved_ledger, saved_link, steps)
+        ):
+            resumed = replace(
+                stored,
+                next_phase=PHASE_TEST_MATRIX,
+                qa=qa,
+                fact_ledger=saved_ledger,
+                workflow_link=saved_link,
+            )
+            return resumed, None, ""
+        return None, await _plan(fixture, stored, spec, qa, steps), ""
+    except ProductBuildError as error:
+        if _own_message(error):
+            return None, None, str(error)
+        return None, None, _READ_FAILED
+    except (ProviderFailure, ConnectionError, OSError):
+        return None, None, _PROVIDER_FAILED
+    except Exception:
+        # A code bug is not a provider job. Its text can carry a secret.
+        return None, None, _READ_FAILED
+
+
 def _own_message(error: ProductBuildError) -> bool:
-    """True for a refusal this module raises. A provider message is not one of these."""
-    text = str(error)
-    return text.startswith(("fact ledger", "workflow link", "qa ", "progress ", "checkpoint "))
+    """True for a fixed refusal raised by this package's own code.
+
+    A provider error is not one, even when its text starts with an own prefix.
+    That covers an error raised outside the package and a provider response
+    that raise_recorded re-raises from a ProviderFailure.
+    """
+    if not str(error).startswith(_OWN_PREFIXES):
+        return False
+    if isinstance(error.__cause__, ProviderFailure):
+        return False
+    return _raised_in_package(error)
 
 
-def _scrub_secret(error: BaseException) -> None:
-    """Drop a secret from an exception and from every cause and context it points at."""
-    pending = [error]
-    seen: set[int] = set()
-    while pending:
-        current = pending.pop()
-        if id(current) in seen:
-            continue
-        seen.add(id(current))
-        cause = current.__cause__
-        context = current.__context__
-        current.args = ("fact ledger read failed",)
-        current.__cause__ = None
-        current.__context__ = None
-        current.__suppress_context__ = True
-        if cause is not None:
-            pending.append(cause)
-        if context is not None:
-            pending.append(context)
+def _raised_in_package(error: BaseException) -> bool:
+    """True when the innermost frame that raised the error is package code."""
+    trace = error.__traceback__
+    if trace is None:
+        return False
+    while trace.tb_next is not None:
+        trace = trace.tb_next
+    return str(trace.tb_frame.f_globals.get("__name__", "")).startswith(_PACKAGE)
 
 
 def _stored_pair(path: Path) -> tuple[FactLedgerRecord | None, WorkflowLinkRecord | None]:
