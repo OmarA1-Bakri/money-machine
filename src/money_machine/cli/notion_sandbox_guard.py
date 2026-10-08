@@ -7,6 +7,8 @@ a file, or stdin. Redaction runs before any evidence file is written.
 from __future__ import annotations
 
 import base64
+import contextlib
+import errno
 import json
 import os
 import stat
@@ -29,6 +31,7 @@ EXIT_REDACTION = 70
 SANDBOX_SPACE_ID = "89282fb0-af94-8106-809e-0003c027fa07"
 SANDBOX_PARENT_PAGE_ID = "3ed82fb0-af94-80dc-8272-f40b16376b81"
 _TOKEN_ENV = "NOTION_SANDBOX_TOKEN"
+_CERT_ENV = ("SSL_CERT_DIR", "SSL_CERT_FILE")
 _OVERRIDE_ENV = (
     "NOTION_CONFIG",
     "NOTION_PARENT_PAGE_ID",
@@ -99,7 +102,7 @@ class SandboxError(Exception):
 class BotView:
     """Bot identity from a read-only users call."""
 
-    user_id: str
+    user_id: object
     user_type: object
     space_id: str
 
@@ -114,6 +117,8 @@ class PageView:
     url: str
     archived: bool
     parent_type: str = ""
+    created_by: str = ""
+    created_time: datetime | None = None
 
 
 class SandboxClient(Protocol):
@@ -150,7 +155,7 @@ def target_ok(bot: BotView, page: PageView) -> bool:
     """The bot and the parent page match the sandbox constants exactly."""
     if type(bot.user_type) is not str or bot.user_type != "bot":
         return False
-    if page.archived or page.parent_type == "database_id":
+    if page.archived or page.parent_type in {"database_id", "data_source_id"}:
         return False
     if canonical_id(bot.space_id) != SANDBOX_SPACE_ID:
         return False
@@ -178,6 +183,17 @@ def token_from_environ(environ: Mapping[str, str]) -> str | None:
 def override_env(environ: Mapping[str, str]) -> bool:
     """True when the environment tries to name a space or a parent."""
     return any(name in environ for name in _OVERRIDE_ENV)
+
+
+def cert_env_set(environ: Mapping[str, str]) -> bool:
+    """True when the process points TLS at a custom trust store."""
+    return any(name in environ for name in _CERT_ENV)
+
+
+def space_conflicts(space_id: str) -> bool:
+    """An explicit space that is not the sandbox. An absent space does not conflict."""
+    found = canonical_id(space_id)
+    return found != "" and found != SANDBOX_SPACE_ID
 
 
 def argv_refused(argv: Sequence[str]) -> bool:
@@ -297,14 +313,14 @@ def _refuse_path(message: str = "evidence path is refused") -> NoReturn:
     raise SandboxError(message, code=EXIT_USAGE)
 
 
-def _under_proc(path: Path) -> bool:
+def under_proc(path: Path) -> bool:
     absolute = Path(os.path.abspath(path))
     return absolute == Path("/proc") or Path("/proc") in absolute.parents
 
 
 def open_evidence(path: Path) -> int:
     """Create the evidence file. Existing files, links, and ``/proc`` are refused."""
-    if str(path) == "" or path == Path() or _under_proc(path):
+    if str(path) == "" or path == Path() or under_proc(path):
         _refuse_path()
     try:
         info = path.lstat()
@@ -324,29 +340,86 @@ def open_evidence(path: Path) -> int:
     if parent_info.st_mode & 0o200 == 0:
         _refuse_path()
     try:
-        return os.open(
+        fd = os.open(
             path,
             os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_WRONLY,
             0o600,
         )
     except OSError:
         _refuse_path()
+    try:
+        os.fchmod(fd, 0o600)
+    except OSError:
+        with contextlib.suppress(OSError):
+            os.close(fd)
+        _refuse_path()
+    return fd
 
 
-def commit_evidence(fd: int, payload: Mapping[str, object], token: str | None) -> str:
+def _created_page_ids(payload: Mapping[str, object]) -> str:
+    found = payload.get("created_pages")
+    if type(found) is not list:
+        return ""
+    ids: list[str] = []
+    for item in found:
+        if type(item) is not dict:
+            continue
+        page_id = item.get("id")
+        if type(page_id) is str and page_id != "":
+            ids.append(page_id)
+    return ", ".join(ids)
+
+
+def _write_all(fd: int, encoded: bytes) -> None:
+    pending = memoryview(encoded)
+    while len(pending) > 0:
+        written = os.write(fd, pending)
+        if written <= 0 or written > len(pending):
+            raise SandboxError("evidence write failed")
+        pending = pending[written:]
+
+
+def _same_inode(fd: int, path: Path) -> bool:
+    try:
+        opened = os.fstat(fd)
+        current = path.lstat()
+    except OSError:
+        return False
+    if stat.S_ISLNK(current.st_mode):
+        return False
+    return opened.st_ino == current.st_ino and opened.st_dev == current.st_dev
+
+
+def commit_evidence(
+    fd: int,
+    path: Path,
+    payload: Mapping[str, object],
+    token: str | None,
+) -> str:
     """Write JSON to an evidence fd opened with ``O_EXCL`` and ``O_NOFOLLOW``."""
     text, result = render_evidence(payload, token)
     try:
-        os.write(fd, text.encode("utf-8"))
-        os.close(fd)
-    except OSError:
+        _write_all(fd, text.encode("utf-8"))
+        os.fchmod(fd, 0o600)
+        if not _same_inode(fd, path):
+            raise SandboxError("evidence file changed during the run")
+    except SandboxError:
+        raise
+    except OSError as exc:
+        if exc.errno in {errno.ENOSPC, errno.EIO}:
+            ids = _created_page_ids(payload)
+            detail = "evidence write failed" if ids == "" else f"evidence write failed: {ids}"
+            raise SandboxError(redact_text(detail, token)) from None
         raise SandboxError("evidence path is refused", code=EXIT_USAGE) from None
+    finally:
+        with contextlib.suppress(OSError):
+            os.close(fd)
     return result
 
 
 def write_evidence(path: Path, payload: Mapping[str, object], token: str | None) -> str:
     """Create the evidence file and write JSON. ``PASS`` means it was clean."""
-    return commit_evidence(open_evidence(path), payload, token)
+    return commit_evidence(open_evidence(path), path, payload, token)
 
 
 def evidence_sections(
@@ -415,6 +488,8 @@ def control_ids(root: Path) -> dict[str, object]:
         payload = json.loads(raw)
     except (OSError, UnicodeError, json.JSONDecodeError):
         raise SandboxError("control state is unreadable") from None
+    if type(payload) is not dict:
+        raise SandboxError("control state is unreadable")
     revision = payload.get("state_revision")
     session = payload.get("current_session")
     head = payload.get("head_sha")

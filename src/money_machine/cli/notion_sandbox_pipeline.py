@@ -34,6 +34,7 @@ from money_machine.cli.notion_sandbox_guard import (
     SandboxError,
     canonical_id,
     parent_is_allowed,
+    space_conflicts,
 )
 from money_machine.domain.models.common import EvidenceReference
 from money_machine.domain.models.product_spec import ColourToken, Hub, ProductSpec
@@ -58,6 +59,8 @@ class SandboxRun:
     created: list[dict[str, str]] = field(default_factory=list)
     probe: FixtureNotionAdapter | None = None
     product_page_id: str | None = None
+    bot_user_id: str = ""
+    bot_space_id: str = ""
 
 
 def sandbox_product_spec(moment: datetime) -> ProductSpec:
@@ -126,13 +129,52 @@ def _watch(probe: FixtureNotionAdapter, counts: dict[str, int]) -> None:
         setattr(probe, name, _bind(original, name))
 
 
-def _chain_reaches_sandbox(ctx: SandboxRun, page: PageView) -> None:
+def _drop(ctx: SandboxRun, page_id: str) -> None:
+    if page_id in ctx.created_ids:
+        ctx.created_ids.remove(page_id)
+    ctx.created = [row for row in ctx.created if row.get("id") != page_id]
+
+
+def _align(ctx: SandboxRun, page: PageView, before: int) -> str:
+    """Keep the evidence id equal to the page the create returned."""
+    page_id = canonical_id(page.page_id)
+    while len(ctx.created_ids) > before:
+        tail = ctx.created_ids[-1]
+        if tail == page_id:
+            break
+        _drop(ctx, tail)
+    if page_id == "" or space_conflicts(page.space_id):
+        _drop(ctx, page_id)
+        return page_id
+    if page_id not in ctx.created_ids:
+        ctx.created_ids.append(page_id)
+        ctx.created.append(
+            {"id": page_id, "parent_id": canonical_id(page.parent_id), "url": page.url}
+        )
+    return page_id
+
+
+def _fresh(ctx: SandboxRun, page: PageView) -> None:
+    if page.created_by != ctx.bot_user_id:
+        raise SandboxError("created page is not new")
+    moment = page.created_time
+    if moment is None:
+        raise SandboxError("created page is not new")
+    if moment.tzinfo is None:
+        raise SandboxError("created page is not new")
+    if moment < ctx.moment:
+        raise SandboxError("created page is not new")
+
+
+def chain_reaches_sandbox(ctx: SandboxRun, page: PageView) -> None:
+    created_id = canonical_id(page.page_id)
     current = page
     seen: set[str] = set()
     for _step in range(4):
         page_id = canonical_id(current.page_id)
         if page_id == SANDBOX_PARENT_PAGE_ID:
-            if canonical_id(current.space_id) != SANDBOX_SPACE_ID or current.archived:
+            if space_conflicts(current.space_id) or current.archived:
+                _drop(ctx, created_id)
                 raise SandboxError("created page is not under the requested parent")
             return
         parent_id = canonical_id(current.parent_id)
@@ -140,7 +182,8 @@ def _chain_reaches_sandbox(ctx: SandboxRun, page: PageView) -> None:
             raise SandboxError("created page is not under the requested parent")
         seen.add(page_id)
         current = ctx.client.read_page(parent_id)
-        if canonical_id(current.space_id) != SANDBOX_SPACE_ID or current.archived:
+        if space_conflicts(current.space_id) or current.archived:
+            _drop(ctx, created_id)
             raise SandboxError("created page is not under the requested parent")
     raise SandboxError("created page is not under the requested parent")
 
@@ -150,27 +193,39 @@ def create_under(ctx: SandboxRun, parent_id: str, title: str) -> PageView:
     requested = canonical_id(parent_id)
     if not parent_is_allowed(requested, allowed):
         raise SandboxError("parent is not the sandbox parent")
+    if canonical_id(ctx.bot_space_id) != SANDBOX_SPACE_ID:
+        raise SandboxError("created page is not under the requested parent")
+    before = len(ctx.created_ids)
     page = ctx.client.create_child_page(parent_id, title)
     ctx.write_counts["create_child_page"] = ctx.write_counts.get("create_child_page", 0) + 1
-    page_id = canonical_id(page.page_id)
+    page_id = _align(ctx, page, before)
     if page_id in {"", SANDBOX_PARENT_PAGE_ID, requested}:
+        _drop(ctx, page_id)
         raise SandboxError("created page is not new")
+    if page_id in ctx.created_ids[:before]:
+        raise SandboxError("created page is not new")
+    if space_conflicts(page.space_id):
+        _drop(ctx, page_id)
+        raise SandboxError("created page is not under the requested parent")
     if canonical_id(page.parent_id) != requested:
         raise SandboxError("created page is not under the requested parent")
-    if canonical_id(page.space_id) != SANDBOX_SPACE_ID:
-        raise SandboxError("created page is not under the requested parent")
+    _fresh(ctx, page)
     confirmed = ctx.client.read_page(page_id)
     if canonical_id(confirmed.page_id) != page_id:
         raise SandboxError("created page is not under the requested parent")
     if canonical_id(confirmed.parent_id) != requested:
         raise SandboxError("created page is not under the requested parent")
-    if canonical_id(confirmed.space_id) != SANDBOX_SPACE_ID or confirmed.archived:
+    if space_conflicts(confirmed.space_id) or confirmed.archived:
+        _drop(ctx, page_id)
         raise SandboxError("created page is not under the requested parent")
-    _chain_reaches_sandbox(ctx, confirmed)
-    ctx.created_ids.append(page_id)
-    ctx.created.append(
-        {"id": page_id, "parent_id": canonical_id(confirmed.parent_id), "url": confirmed.url}
-    )
+    _fresh(ctx, confirmed)
+    chain_reaches_sandbox(ctx, confirmed)
+    if ctx.created and ctx.created[-1].get("id") == page_id:
+        ctx.created[-1] = {
+            "id": page_id,
+            "parent_id": canonical_id(confirmed.parent_id),
+            "url": confirmed.url,
+        }
     return confirmed
 
 

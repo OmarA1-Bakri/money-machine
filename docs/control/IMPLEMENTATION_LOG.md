@@ -1,5 +1,629 @@
 # Implementation Log
 
+## 2026-10-07 — Session 07 sandbox run, round 3
+
+Not a session close. This is not SESSION_07 COMPLETE. `state_revision` stays 58. `IMPLEMENTATION_STATE.json` is not edited. `head_sha` stays the W9 squash `a4e9b025021b4effbb2b2879c1db756403cb1676`. Twelve session 7 evidence keys stay false. `commissioned_agents` stays empty. Exit 78 stays HELD. The §11 sandbox CLI is still not run live. This commit's CI run is not invented here.
+
+The runner is `python -m money_machine.cli.notion_sandbox`. A page with an empty space is accepted when `/v1/users/me` `bot.workspace_id` is `89282fb0-af94-8106-809e-0003c027fa07` and the parent chain reaches `3ed82fb0-af94-80dc-8272-f40b16376b81`. An explicit different space is refused and that page is left out of `created_pages`. An archived confirm or an archived chain read is refused the same way. A later failure of any other kind keeps the id. The id is appended inside `create_child_page` as soon as the create response parses, before confirm and before the chain read. `SANDBOX_SPACE_ID` is not stamped onto created pages. `target_ok` refuses `database_id` and `data_source_id`. `write_counts` is `{"fixture": {...}, "live": {"create_child_page": n}}`. `get_public_url` is in neither section.
+
+Census method: one AST walk of `notion_sandbox.py`, `notion_sandbox_guard.py`, `notion_sandbox_live.py`, and `notion_sandbox_pipeline.py`, in source order. It counts `ast.If`, `ast.BoolOp` (`ast.And` / `ast.Or`, and each clause in `values`), `ast.IfExp`, and `ast.While`. Result: if 133, boolop 52, and 20, or 32, clause 116, ifexp 11, while 2. The if-flip table is one row per `if` (133). The operand table is one operator swap per boolop plus one negation per clause (52 + 116 = 168).
+
+If-flip, after the killing tests. 133 rows. 133 killed. 0 equivalent. The Failed column sums to 4364. A row is killed only when that run's pytest exit is non-zero. When the exit is non-zero and the output has neither a `failed` count nor an `error` count, the Failed count is 1. That is `__name__ == "__main__"`, if-flip row 27, `notion_sandbox.py:595`, Failed 1: the flip runs `main` at import and pytest exits 3 during collection. T45 is row 55, `notion_sandbox_guard.py:304`, the second `if leaks(text, token)` inside `render_evidence`, KILLED, Failed 1. Row 54 is the first leaks check, Failed 104. The earlier 104-row sum 2109 was measured on `df5413ac`, where this tree's extra `if`s did not exist.
+
+Force-true: 133 rows, 128 killed, 5 equivalent, Failed sum 3894. Force-false: 133 rows, 125 killed, 8 equivalent, Failed sum 629. Boolean operands: 168 rows, 162 killed, 6 equivalent, Failed sum 4460.
+
+Equivalent rows, each probe-backed. Both versions of a refusal produce the same exit and write nothing. None of them accepts a bad build.
+
+- `notion_sandbox.py:140` force-false, `runner is None`. The only registry names with a runner are `run_build` and `run_variants`, and those are the keys of `stage_runners()`. The branch does not run. `test_execute_on_the_fake_adapter_writes_evidence` reaches both runners and exits 0.
+- `notion_sandbox_guard.py:222` force-true, `encoded != token`. The url form replaces `_` with `%5F`, so it differs from a shaped token and the append already runs. `test_encoded_token_is_redacted_from_info_logs`.
+- `notion_sandbox_guard.py:224` force-true, and the `and`→`or` swap. The base64 digest of a shaped token is a different string from the token and from the url form, so the append already runs. `test_base64_token_in_evidence_exits_70` exits 70.
+- `notion_sandbox_guard.py:235` force-true, `form in cleaned`. `str.replace` of a missing substring leaves the text unchanged.
+- `notion_sandbox_guard.py:304` force-false, the second `leaks(text, token)`. The first redact has already removed the shaped token, so the body does not run. The if-flip of this same `if` is T45, Failed 1. `test_failed_redaction_exits_70` keeps `bot_user_id` as `[REDACTED]`.
+- `notion_sandbox_guard.py:323` force-false, and the `or`→`and` swap, `str(path) == "" or path == Path() or under_proc(path)`. `/proc` still fails the following `lstat` (`info is not None`) with exit 64 and no file. `test_proc_path_is_refused_before_open`. `test_proc_path_helper_rejects_proc_itself` pins `under_proc` itself.
+- `notion_sandbox_guard.py:331` force-false, `info is not None`. An existing file still fails `os.open` with `O_EXCL`. `test_evidence_refuses_existing_file_and_symlink` keeps the original bytes and exits 64.
+- `notion_sandbox_guard.py:338` `or`→`and`, `S_ISLNK(parent) or not S_ISDIR(parent)`. A symlink is not a directory under `lstat`, so both operands are true together and the refusal stays. `test_symlinked_parent_directory_is_refused` exits 64 with 0 reads.
+- `notion_sandbox_guard.py:340` force-false, the unwritable-mode check. `os.open` still returns `EACCES` and exit 64. `test_unwritable_directory_writes_nothing`.
+- `notion_sandbox_guard.py:388` force-false, `S_ISLNK` on the evidence path. `lstat` of a replaced path has a different inode from the open fd, so `_same_inode` already returns false. `test_swapped_evidence_file_does_not_exit_ok` and `test_commit_evidence_rejects_a_replaced_inode` exit 69.
+- `notion_sandbox_guard.py:459` force-true, and the `and`→`or` swap. This is the cwd walk. The file-parent walk returns the checkout first, so the cwd walk does not run. The file-parent copy at `:455` is killed: `test_repo_root_ignores_a_partial_marker` (swap) and `test_repo_root_needs_both_markers` (each operand). `test_repo_root_falls_back_to_cwd` kills both operands of `:459`.
+- `notion_sandbox_pipeline.py:146` force-false, and the `or`→`and` swap, `page_id == "" or space_conflicts(page.space_id)` inside `_align`. `create_under` repeats the empty-id refusal at `:202` and the explicit-space refusal at `:207`. `test_wrong_space_on_create_return_stops` exits 69, build `FAILED`, `created_pages` `[]`, one create.
+- `notion_sandbox_pipeline.py:223` force-true, and the `and`→`or` swap, `ctx.created and ctx.created[-1].get("id") == page_id`. A create that reaches this line has just been appended, so it is the tail. The two operators agree, and force-true updates that same tail. `test_execute_on_the_fake_adapter_writes_evidence` records five distinct ids. Both operand negations are killed (Failed 1).
+- `notion_sandbox_pipeline.py:245` force-false, `type(spec) is not ProductSpec`. The condition is false on the `ProductSpec` the CLI builds. A stand-in object fails inside `build_top_level_page_and_design_shell` with `phase 1 requires a validated ProductSpec` before this `if`, with 0 creates.
+
+`tests/unit/cli/test_notion_sandbox.py`: 185 passed. With `tests/unit/integrations/notion/test_router.py` the router export is included. Sockets stay blocked. `ruff format --check`, `ruff check`, and `pyright` 1.1.411 are clean on the four sandbox modules and the sandbox test. Full local pytest: 2705 collected, 2500 passed, 193 skipped, 12 failed. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because the `docker` binary is absent. They are local-only. One `StarletteDeprecationWarning` comes from FastAPI's test client. The sandbox modules do not import Starlette. CI is the gate.
+
+Blocker to test.
+
+- Reviewer B1, doc-shaped execute: `test_doc_shaped_pages_execute_without_a_space` (exit 0, five creates). One failed confirm still records the id: `test_doc_shaped_failure_still_records_the_created_id` (exit 69, one id). `python -m`: `test_module_entry_point_runs_main`.
+- Explicit space refused and omitted: `test_wrong_space_on_create_return_stops` (build `FAILED`, `created_pages` `[]`). Archived confirm omitted: `test_trashed_confirm_stops_further_writes`. Archived chain read omitted: `test_trashed_product_page_stops_further_writes`. Empty space on the parent page is filled only for that page: `test_live_space_fallback_is_only_the_asserted_parent` and `test_parse_page_fallback_does_not_fill_a_different_page`.
+- V-B1: the if-flip Failed sum above is 4364, and row 27 counts the collection error as Failed 1.
+- V-B2, atomic record: `test_interrupt_after_store_records_the_created_id` and `test_doc_shaped_interrupt_after_store_records_the_created_id` interrupt after the create is stored, at indexes 0, 2, and 4, on both fakes. Recorded ids equal created ids. Exit 69, `INTERRUPTED`, token absent. `test_interrupt_writes_redacted_evidence` still raises before the adapter stores the third create.
+- V-B3 operands. Evidence path with a base64 or url-encoded token: `test_encoded_token_evidence_path_writes_nothing` (exit 64, no file). Wrong-space ancestor: `test_wrong_space_ancestor_is_not_appended`. Archived or wrong-space re-read: `test_space_only_reread_is_not_appended` and `test_trashed_confirm_stops_further_writes`. Parent-only lie keeps the id: `test_parent_only_reread_stops_without_a_space_lie`. Sandbox parent in a foreign space: `test_sandbox_parent_in_a_foreign_space_fails_the_chain`. `qa_verdict` on a build-only `PASS`: `test_token_env_and_redaction_units`. String `state_revision`: `test_string_revision_is_unreadable` (exit 69, 0 reads). Both repo markers: `test_repo_root_needs_both_markers`. `SystemExit` normalisation: `test_system_exit_status_is_normalized`. Naive clock: `test_naive_clock_is_refused` (exit 69, 0 reads). `--evidence-out` without a value: `test_evidence_out_without_a_value_is_usage`. Non-string bot id: `test_non_string_bot_id_is_rejected` (exit 69, log stays `notion api error`). Missing `bot` object: `test_bot_payload_without_a_bot_object_exits_65` (exit 65, GET GET, 0 POST). Integer proxy value: `test_proxy_map_drops_non_strings`. `explicit_space` of `"nope"`: `test_explicit_space_skips_a_non_id`. Variants without a product page: `test_variants_without_a_product_page_are_a_sandbox_error`.
+- Verifier should-fixes. `under_proc(/proc)` and `under_proc(/proc/self)`: `test_proc_path_helper_rejects_proc_itself`. Empty parent chain reads nothing: `test_empty_parent_chain_does_not_read_again`. Confirm that lies about the parent id only: `test_parent_only_reread_stops_without_a_space_lie` (id kept, one create). Fallback widening: `test_parse_page_fallback_does_not_fill_a_different_page`. Read-path `BaseException`: `test_read_base_exceptions_stay_redacted` (exit 69, `notion api error`, evidence written, token absent).
+- Reviewer should-fixes. Redirect: `test_redirect_is_not_followed` and `test_redirect_code_is_refused_without_a_status`. `SSL_CERT_FILE` / `SSL_CERT_DIR`: `test_ssl_env_is_refused_and_ignored` (exit 64, 0 reads). ENOSPC prints the ids: `test_enospc_after_creates_prints_ids`. A 0-byte `os.write` exits 69: `test_zero_length_write_exits_69`. Short write stays complete: `test_short_evidence_write_is_complete`. Swapped inode: `test_swapped_evidence_file_does_not_exit_ok`. Freshness: `test_stale_foreign_page_is_not_a_parent`, `test_stale_confirm_stops_later_writes`, `test_missing_created_time_is_not_new`, `test_naive_created_time_is_not_new`. Missing workspace exits 65: `test_missing_workspace_id_writes_nothing`. Base64 in the evidence body exits 70: `test_base64_token_in_evidence_exits_70`. Chain trash stops at two creates: `test_trashed_product_page_stops_further_writes`. Symlinked parent directory: `test_symlinked_parent_directory_is_refused`. Mode 0600 is `os.fchmod` inside `open_evidence` and `commit_evidence`. A successful run is not `INTERRUPTED`: `test_execute_on_the_fake_adapter_writes_evidence`. Non-string bot user id is omitted on a dry-run: `test_non_string_bot_user_id_is_omitted`. `data_source_id`: `test_data_source_parent_writes_nothing`.
+- Nits. Control JSON that is a list or a string: `test_control_state_container_exits_69`. `/dev/full` and a non-ASCII path: `test_stdout_full_and_non_ascii_path_are_documented`. Router export: `test_package_exports_the_router`. The expected state revision is read from `docs/control/IMPLEMENTATION_STATE.json` inside the sandbox test. Product-builder tests that pin `a4e9b025` and revision 58 are unchanged.
+
+## If-flip
+
+| # | Site | Result | Failed | Test | Condition |
+|---|---|---|---|---|---|
+| 1 | `notion_sandbox.py:115` | KILLED | 3 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `runner_name is None` |
+| 2 | `notion_sandbox.py:136` | KILLED | 29 | `test_execute_on_the_fake_adapter_writes_evidence` | `not available or failed` |
+| 3 | `notion_sandbox.py:140` | KILLED | 29 | `test_execute_on_the_fake_adapter_writes_evidence` | `runner is None` |
+| 4 | `notion_sandbox.py:177` | KILLED | 58 | `test_missing_token_ignores_other_sources` | `arg == "--evidence-out" and index + 1 < len(argv)` |
+| 5 | `notion_sandbox.py:179` | KILLED | 3 | `test_abbreviations_are_refused` | `arg.startswith("--evidence-out=")` |
+| 6 | `notion_sandbox.py:196` | KILLED | 120 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `type(moment) is not datetime or moment.tzinfo is None` |
+| 7 | `notion_sandbox.py:202` | KILLED | 57 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `token is not None and token_shape_ok(token)` |
+| 8 | `notion_sandbox.py:295` | KILLED | 91 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `argv_names_a_target(arguments) or environ_names_a_target(env) or cert_env_set(env)` |
+| 9 | `notion_sandbox.py:302` | KILLED | 73 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `str(evidence) == "" or leaks(str(evidence), secret)` |
+| 10 | `notion_sandbox.py:305` | KILLED | 59 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `parsed.execute and parsed.dry_run` |
+| 11 | `notion_sandbox.py:310` | KILLED | 58 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `token is None` |
+| 12 | `notion_sandbox.py:322` | KILLED | 56 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `secret is None` |
+| 13 | `notion_sandbox.py:376` | KILLED | 47 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `type(bot.user_type) is not str` |
+| 14 | `notion_sandbox.py:394` | KILLED | 44 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `not target_ok(bot, page)` |
+| 15 | `notion_sandbox.py:412` | KILLED | 35 | `test_dry_run_is_the_default_and_writes_nothing` | `mode == "dry-run"` |
+| 16 | `notion_sandbox.py:446` | KILLED | 27 | `test_execute_on_the_fake_adapter_writes_evidence` | `interrupted` |
+| 17 | `notion_sandbox.py:450` | KILLED | 20 | `test_execute_on_the_fake_adapter_writes_evidence` | `failed` |
+| 18 | `notion_sandbox.py:479` | KILLED | 7 | `test_interrupt_after_store_records_the_created_id[0-exc0]` | `bind is None` |
+| 19 | `notion_sandbox.py:485` | KILLED | 21 | `test_execute_on_the_fake_adapter_writes_evidence` | `type(bot.user_id) is str` |
+| 20 | `notion_sandbox.py:520` | KILLED | 8 | `test_token_in_error_is_redacted` | `error is not None` |
+| 21 | `notion_sandbox.py:522` | KILLED | 9 | `test_execute_on_the_fake_adapter_writes_evidence` | `any(stage.get("status") == "INTERRUPTED" for stage in stages)` |
+| 22 | `notion_sandbox.py:525` | KILLED | 102 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `check == "FAIL"` |
+| 23 | `notion_sandbox.py:527` | KILLED | 98 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `code == EXIT_OK` |
+| 24 | `notion_sandbox.py:572` | KILLED | 34 | `test_override_env_refuses[-NOTION_CONFIG]` | `path is not None and str(path) != "" and not leaks(str(path), token)` |
+| 25 | `notion_sandbox.py:579` | KILLED | 2 | `test_system_exit_status_is_normalized` | `isinstance(exc, SystemExit)` |
+| 26 | `notion_sandbox.py:582` | KILLED | 1 | `test_reraise_preserves_interrupt_and_base_exceptions` | `isinstance(exc, KeyboardInterrupt)` |
+| 27 | `notion_sandbox.py:595` | KILLED | 1 | `(collection error)` | `__name__ == "__main__"` |
+| 28 | `notion_sandbox_guard.py:144` | KILLED | 65 | `test_canonical_id_normalizes_and_rejects` | `type(value) is not str` |
+| 29 | `notion_sandbox_guard.py:147` | KILLED | 65 | `test_canonical_id_normalizes_and_rejects` | `len(compact) != 32` |
+| 30 | `notion_sandbox_guard.py:149` | KILLED | 65 | `test_canonical_id_normalizes_and_rejects` | `any(character not in "0123456789abcdef" for character in compact)` |
+| 31 | `notion_sandbox_guard.py:156` | KILLED | 36 | `test_target_and_parent_guards` | `type(bot.user_type) is not str or bot.user_type != "bot"` |
+| 32 | `notion_sandbox_guard.py:158` | KILLED | 40 | `test_target_and_parent_guards` | `page.archived or page.parent_type in {"database_id", "data_source_id"}` |
+| 33 | `notion_sandbox_guard.py:160` | KILLED | 36 | `test_target_and_parent_guards` | `canonical_id(bot.space_id) != SANDBOX_SPACE_ID` |
+| 34 | `notion_sandbox_guard.py:162` | KILLED | 35 | `test_target_and_parent_guards` | `canonical_id(page.page_id) != SANDBOX_PARENT_PAGE_ID` |
+| 35 | `notion_sandbox_guard.py:170` | KILLED | 38 | `test_target_and_parent_guards` | `candidate == ""` |
+| 36 | `notion_sandbox_guard.py:178` | KILLED | 58 | `test_token_env_and_redaction_units` | `type(value) is not str or value == ""` |
+| 37 | `notion_sandbox_guard.py:203` | KILLED | 69 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `head in _OVERRIDE_FLAGS` |
+| 38 | `notion_sandbox_guard.py:205` | KILLED | 58 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `contains_secret_shape(arg)` |
+| 39 | `notion_sandbox_guard.py:217` | KILLED | 117 | `test_token_env_and_redaction_units` | `token is None or not token_shape_ok(token)` |
+| 40 | `notion_sandbox_guard.py:222` | KILLED | 3 | `test_token_env_and_redaction_units` | `encoded != token` |
+| 41 | `notion_sandbox_guard.py:224` | KILLED | 4 | `test_token_env_and_redaction_units` | `digest not in forms and digest != token` |
+| 42 | `notion_sandbox_guard.py:232` | KILLED | 116 | `test_token_env_and_redaction_units` | `token is not None and token != "" and not _unsafe_exact(token) and token in cleaned` |
+| 43 | `notion_sandbox_guard.py:235` | KILLED | 2 | `test_token_env_and_redaction_units` | `form in cleaned` |
+| 44 | `notion_sandbox_guard.py:242` | KILLED | 20 | `test_target_and_parent_guards` | `runner_name is None` |
+| 45 | `notion_sandbox_guard.py:244` | KILLED | 20 | `test_target_and_parent_guards` | `outcome == "PASS"` |
+| 46 | `notion_sandbox_guard.py:246` | KILLED | 8 | `test_target_and_parent_guards` | `outcome == "FAILED"` |
+| 47 | `notion_sandbox_guard.py:248` | KILLED | 3 | `test_target_and_parent_guards` | `outcome == "BLOCKED"` |
+| 48 | `notion_sandbox_guard.py:263` | KILLED | 1 | `test_token_env_and_redaction_units` | `stage.get("name") == "qa" and type(found) is str` |
+| 49 | `notion_sandbox_guard.py:265` | KILLED | 6 | `test_token_env_and_redaction_units` | `status == "PASS"` |
+| 50 | `notion_sandbox_guard.py:267` | KILLED | 6 | `test_token_env_and_redaction_units` | `status == "FAILED"` |
+| 51 | `notion_sandbox_guard.py:269` | KILLED | 6 | `test_token_env_and_redaction_units` | `status == "BLOCKED"` |
+| 52 | `notion_sandbox_guard.py:283` | KILLED | 111 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `token is not None and token != "" and not _unsafe_exact(token) and token in text` |
+| 53 | `notion_sandbox_guard.py:285` | KILLED | 112 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `any(form in text for form in _encoded_forms(token))` |
+| 54 | `notion_sandbox_guard.py:300` | KILLED | 104 | `test_write_evidence_redacts_a_planted_token` | `leaks(text, token)` |
+| 55 | `notion_sandbox_guard.py:304` | KILLED | 1 | `test_failed_redaction_exits_70` | `leaks(text, token)` |
+| 56 | `notion_sandbox_guard.py:323` | KILLED | 109 | `test_write_evidence_redacts_a_planted_token` | `str(path) == "" or path == Path() or under_proc(path)` |
+| 57 | `notion_sandbox_guard.py:331` | KILLED | 109 | `test_write_evidence_redacts_a_planted_token` | `info is not None` |
+| 58 | `notion_sandbox_guard.py:338` | KILLED | 110 | `test_write_evidence_redacts_a_planted_token` | `stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode)` |
+| 59 | `notion_sandbox_guard.py:340` | KILLED | 109 | `test_write_evidence_redacts_a_planted_token` | `parent_info.st_mode & 0o200 == 0` |
+| 60 | `notion_sandbox_guard.py:361` | KILLED | 2 | `test_enospc_after_creates_prints_ids` | `type(found) is not list` |
+| 61 | `notion_sandbox_guard.py:365` | KILLED | 2 | `test_enospc_after_creates_prints_ids` | `type(item) is not dict` |
+| 62 | `notion_sandbox_guard.py:368` | KILLED | 2 | `test_enospc_after_creates_prints_ids` | `type(page_id) is str and page_id != ""` |
+| 63 | `notion_sandbox_guard.py:377` | KILLED | 1 | `timeout` | `written <= 0 or written > len(pending)` |
+| 64 | `notion_sandbox_guard.py:388` | KILLED | 103 | `test_write_evidence_redacts_a_planted_token` | `stat.S_ISLNK(current.st_mode)` |
+| 65 | `notion_sandbox_guard.py:404` | KILLED | 105 | `test_write_evidence_redacts_a_planted_token` | `not _same_inode(fd, path)` |
+| 66 | `notion_sandbox_guard.py:409` | KILLED | 3 | `test_evidence_write_oserror_is_redacted` | `exc.errno in {errno.ENOSPC, errno.EIO}` |
+| 67 | `notion_sandbox_guard.py:455` | KILLED | 117 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `(candidate / "pyproject.toml").is_file() and (candidate / "docs" / "control").is_dir()` |
+| 68 | `notion_sandbox_guard.py:459` | KILLED | 1 | `test_repo_root_falls_back_to_cwd` | `(candidate / "pyproject.toml").is_file() and (candidate / "docs" / "control").is_dir()` |
+| 69 | `notion_sandbox_guard.py:477` | KILLED | 117 | `test_git_sha_rejects_a_bad_rev_parse` | `completed.returncode != 0 or len(sha) != 40` |
+| 70 | `notion_sandbox_guard.py:479` | KILLED | 116 | `test_git_sha_rejects_a_bad_rev_parse` | `any(character not in "0123456789abcdef" for character in sha)` |
+| 71 | `notion_sandbox_guard.py:491` | KILLED | 114 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `type(payload) is not dict` |
+| 72 | `notion_sandbox_guard.py:496` | KILLED | 114 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `type(revision) is not int or type(session) is not int or type(head) is not str` |
+| 73 | `notion_sandbox_live.py:118` | KILLED | 17 | `test_live_client_reads_without_writing_and_redacts` | `bot is None` |
+| 74 | `notion_sandbox_live.py:125` | KILLED | 17 | `test_live_client_reads_without_writing_and_redacts` | `expected == ""` |
+| 75 | `notion_sandbox_live.py:130` | KILLED | 16 | `test_live_client_reads_without_writing_and_redacts` | `page is None` |
+| 76 | `notion_sandbox_live.py:137` | KILLED | 10 | `test_live_client_reads_without_writing_and_redacts` | `not parent_is_allowed(parent, allowed)` |
+| 77 | `notion_sandbox_live.py:148` | KILLED | 10 | `test_live_child_page_does_not_count_its_own_write` | `type(sent_parent) is not dict or sent_parent.get("page_id") != parent or sent_parent.get("type") != "page_id"` |
+| 78 | `notion_sandbox_live.py:156` | KILLED | 9 | `test_live_child_page_does_not_count_its_own_write` | `page is None` |
+| 79 | `notion_sandbox_live.py:164` | KILLED | 6 | `test_doc_shaped_pages_execute_without_a_space` | `page_id == "" or space_conflicts(page.space_id)` |
+| 80 | `notion_sandbox_live.py:166` | KILLED | 4 | `test_doc_shaped_pages_execute_without_a_space` | `page_id not in self._created_ids` |
+| 81 | `notion_sandbox_live.py:170` | KILLED | 5 | `test_live_child_page_does_not_count_its_own_write` | `evidence_ids is None or evidence_rows is None or page_id in evidence_ids` |
+| 82 | `notion_sandbox_live.py:179` | KILLED | 22 | `test_live_client_reads_without_writing_and_redacts` | `leaks(url, self._token) or leaks(url.replace("-", ""), self._token)` |
+| 83 | `notion_sandbox_live.py:185` | KILLED | 2 | `test_live_client_reads_without_writing_and_redacts` | `body is not None` |
+| 84 | `notion_sandbox_live.py:190` | KILLED | 2 | `test_redirect_is_not_followed` | `type(status) is not int` |
+| 85 | `notion_sandbox_live.py:192` | KILLED | 21 | `test_live_client_reads_without_writing_and_redacts` | `type(status) is int and 300 <= status < 400` |
+| 86 | `notion_sandbox_live.py:201` | KILLED | 20 | `test_live_client_reads_without_writing_and_redacts` | `type(raw) is not bytes` |
+| 87 | `notion_sandbox_live.py:211` | KILLED | 17 | `test_live_client_reads_without_writing_and_redacts` | `type(payload) is not dict` |
+| 88 | `notion_sandbox_live.py:215` | KILLED | 17 | `test_live_client_reads_without_writing_and_redacts` | `type(user_id) is not str or type(user_type) is not str` |
+| 89 | `notion_sandbox_live.py:219` | KILLED | 8 | `test_live_client_reads_without_writing_and_redacts` | `type(bot) is dict and type(bot.get("workspace_id")) is str` |
+| 90 | `notion_sandbox_live.py:226` | KILLED | 19 | `test_live_client_reads_without_writing_and_redacts` | `key not in payload` |
+| 91 | `notion_sandbox_live.py:229` | KILLED | 8 | `test_trashed_parent_writes_nothing[archived]` | `type(value) is not bool` |
+| 92 | `notion_sandbox_live.py:236` | KILLED | 25 | `test_live_client_reads_without_writing_and_redacts` | `type(payload) is not dict or payload.get("object") != "page"` |
+| 93 | `notion_sandbox_live.py:239` | KILLED | 25 | `test_live_client_reads_without_writing_and_redacts` | `page_id == ""` |
+| 94 | `notion_sandbox_live.py:245` | KILLED | 10 | `test_live_child_page_does_not_count_its_own_write` | `type(parent) is dict` |
+| 95 | `notion_sandbox_live.py:246` | KILLED | 3 | `test_live_space_fallback_is_only_the_asserted_parent` | `space == ""` |
+| 96 | `notion_sandbox_live.py:249` | KILLED | 4 | `test_database_id_parent_is_not_a_page_parent` | `type(found_type) is str` |
+| 97 | `notion_sandbox_live.py:251` | KILLED | 6 | `test_live_child_page_does_not_count_its_own_write` | `found_type == "page_id"` |
+| 98 | `notion_sandbox_live.py:253` | KILLED | 10 | `test_live_client_reads_without_writing_and_redacts` | `space == "" and page_id == canonical_id(expected_id)` |
+| 99 | `notion_sandbox_live.py:256` | KILLED | 1 | `test_parse_page_keeps_a_url_and_fills_a_blank_one` | `type(url) is not str or url == ""` |
+| 100 | `notion_sandbox_live.py:260` | KILLED | 25 | `test_live_client_reads_without_writing_and_redacts` | `archived_flag is None or trash_flag is None` |
+| 101 | `notion_sandbox_live.py:277` | KILLED | 22 | `test_live_client_reads_without_writing_and_redacts` | `type(value) is not str or value == ""` |
+| 102 | `notion_sandbox_live.py:283` | KILLED | 4 | `test_doc_shaped_pages_execute_without_a_space` | `parsed.tzinfo is None` |
+| 103 | `notion_sandbox_live.py:290` | KILLED | 21 | `test_live_client_reads_without_writing_and_redacts` | `type(actor) is not dict` |
+| 104 | `notion_sandbox_live.py:293` | KILLED | 4 | `test_doc_shaped_pages_execute_without_a_space` | `type(found) is not str` |
+| 105 | `notion_sandbox_live.py:301` | KILLED | 3 | `test_proxy_map_reads_string_proxy_entries` | `type(handlers) is not list` |
+| 106 | `notion_sandbox_live.py:304` | KILLED | 3 | `test_proxy_map_reads_string_proxy_entries` | `isinstance(handler, urllib.request.ProxyHandler)` |
+| 107 | `notion_sandbox_live.py:306` | KILLED | 3 | `test_proxy_map_reads_string_proxy_entries` | `type(found) is not dict` |
+| 108 | `notion_sandbox_live.py:309` | KILLED | 2 | `test_proxy_map_reads_string_proxy_entries` | `type(key) is str and type(value) is str` |
+| 109 | `notion_sandbox_live.py:318` | KILLED | 4 | `test_live_space_fallback_is_only_the_asserted_parent` | `type(value) is str and canonical_id(value) != ""` |
+| 110 | `notion_sandbox_pipeline.py:133` | KILLED | 1 | `timeout` | `page_id in ctx.created_ids` |
+| 111 | `notion_sandbox_pipeline.py:143` | KILLED | 6 | `test_lying_create_id_stops_before_colours` | `tail == page_id` |
+| 112 | `notion_sandbox_pipeline.py:146` | KILLED | 21 | `test_execute_on_the_fake_adapter_writes_evidence` | `page_id == "" or space_conflicts(page.space_id)` |
+| 113 | `notion_sandbox_pipeline.py:149` | KILLED | 16 | `test_execute_on_the_fake_adapter_writes_evidence` | `page_id not in ctx.created_ids` |
+| 114 | `notion_sandbox_pipeline.py:158` | KILLED | 19 | `test_execute_on_the_fake_adapter_writes_evidence` | `page.created_by != ctx.bot_user_id` |
+| 115 | `notion_sandbox_pipeline.py:161` | KILLED | 20 | `test_execute_on_the_fake_adapter_writes_evidence` | `moment is None` |
+| 116 | `notion_sandbox_pipeline.py:163` | KILLED | 20 | `test_execute_on_the_fake_adapter_writes_evidence` | `moment.tzinfo is None` |
+| 117 | `notion_sandbox_pipeline.py:165` | KILLED | 19 | `test_execute_on_the_fake_adapter_writes_evidence` | `moment < ctx.moment` |
+| 118 | `notion_sandbox_pipeline.py:175` | KILLED | 4 | `test_broken_ancestor_stops_later_writes` | `page_id == SANDBOX_PARENT_PAGE_ID` |
+| 119 | `notion_sandbox_pipeline.py:176` | KILLED | 16 | `test_execute_on_the_fake_adapter_writes_evidence` | `space_conflicts(current.space_id) or current.archived` |
+| 120 | `notion_sandbox_pipeline.py:181` | KILLED | 17 | `test_execute_on_the_fake_adapter_writes_evidence` | `parent_id == "" or page_id == "" or page_id in seen` |
+| 121 | `notion_sandbox_pipeline.py:185` | KILLED | 15 | `test_execute_on_the_fake_adapter_writes_evidence` | `space_conflicts(current.space_id) or current.archived` |
+| 122 | `notion_sandbox_pipeline.py:194` | KILLED | 34 | `test_create_under_refuses_a_foreign_parent` | `not parent_is_allowed(requested, allowed)` |
+| 123 | `notion_sandbox_pipeline.py:196` | KILLED | 33 | `test_execute_on_the_fake_adapter_writes_evidence` | `canonical_id(ctx.bot_space_id) != SANDBOX_SPACE_ID` |
+| 124 | `notion_sandbox_pipeline.py:202` | KILLED | 22 | `test_execute_on_the_fake_adapter_writes_evidence` | `page_id in {"", SANDBOX_PARENT_PAGE_ID, requested}` |
+| 125 | `notion_sandbox_pipeline.py:205` | KILLED | 19 | `test_execute_on_the_fake_adapter_writes_evidence` | `page_id in ctx.created_ids[:before]` |
+| 126 | `notion_sandbox_pipeline.py:207` | KILLED | 24 | `test_execute_on_the_fake_adapter_writes_evidence` | `space_conflicts(page.space_id)` |
+| 127 | `notion_sandbox_pipeline.py:210` | KILLED | 21 | `test_execute_on_the_fake_adapter_writes_evidence` | `canonical_id(page.parent_id) != requested` |
+| 128 | `notion_sandbox_pipeline.py:214` | KILLED | 19 | `test_execute_on_the_fake_adapter_writes_evidence` | `canonical_id(confirmed.page_id) != page_id` |
+| 129 | `notion_sandbox_pipeline.py:216` | KILLED | 20 | `test_execute_on_the_fake_adapter_writes_evidence` | `canonical_id(confirmed.parent_id) != requested` |
+| 130 | `notion_sandbox_pipeline.py:218` | KILLED | 17 | `test_execute_on_the_fake_adapter_writes_evidence` | `space_conflicts(confirmed.space_id) or confirmed.archived` |
+| 131 | `notion_sandbox_pipeline.py:223` | KILLED | 1 | `test_token_in_created_url_exits_70` | `ctx.created and ctx.created[-1].get("id") == page_id` |
+| 132 | `notion_sandbox_pipeline.py:245` | KILLED | 28 | `test_execute_on_the_fake_adapter_writes_evidence` | `type(spec) is not ProductSpec` |
+| 133 | `notion_sandbox_pipeline.py:253` | KILLED | 16 | `test_execute_on_the_fake_adapter_writes_evidence` | `ctx.probe is None or ctx.product_page_id is None or type(spec) is not ProductSpec` |
+
+## Force-true and force-false
+
+| # | Site | Mode | Result | Failed | Test | Condition |
+|---|---|---|---|---|---|---|
+| 1 | `notion_sandbox.py:115` | true | KILLED | 3 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `runner_name is None` |
+| 2 | `notion_sandbox.py:115` | false | KILLED | 3 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `runner_name is None` |
+| 3 | `notion_sandbox.py:136` | true | KILLED | 29 | `test_execute_on_the_fake_adapter_writes_evidence` | `not available or failed` |
+| 4 | `notion_sandbox.py:136` | false | KILLED | 1 | `test_absent_stage_failure_stays_not_run` | `not available or failed` |
+| 5 | `notion_sandbox.py:140` | true | KILLED | 29 | `test_execute_on_the_fake_adapter_writes_evidence` | `runner is None` |
+| 6 | `notion_sandbox.py:140` | false | EQUIVALENT | 0 | `—` | `runner is None` |
+| 7 | `notion_sandbox.py:177` | true | KILLED | 3 | `test_evidence_out_equals_matches_the_space_form` | `arg == "--evidence-out" and index + 1 < len(argv)` |
+| 8 | `notion_sandbox.py:177` | false | KILLED | 32 | `test_override_env_refuses[-NOTION_CONFIG]` | `arg == "--evidence-out" and index + 1 < len(argv)` |
+| 9 | `notion_sandbox.py:179` | true | KILLED | 2 | `test_abbreviations_are_refused` | `arg.startswith("--evidence-out=")` |
+| 10 | `notion_sandbox.py:179` | false | KILLED | 1 | `test_equals_form_records_an_override_refusal` | `arg.startswith("--evidence-out=")` |
+| 11 | `notion_sandbox.py:196` | true | KILLED | 119 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `type(moment) is not datetime or moment.tzinfo is None` |
+| 12 | `notion_sandbox.py:196` | false | KILLED | 1 | `test_naive_clock_is_refused` | `type(moment) is not datetime or moment.tzinfo is None` |
+| 13 | `notion_sandbox.py:202` | true | KILLED | 3 | `test_short_token_is_refused` | `token is not None and token_shape_ok(token)` |
+| 14 | `notion_sandbox.py:202` | false | KILLED | 54 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `token is not None and token_shape_ok(token)` |
+| 15 | `notion_sandbox.py:295` | true | KILLED | 58 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `argv_names_a_target(arguments) or environ_names_a_target(env) or cert_env_set(env)` |
+| 16 | `notion_sandbox.py:295` | false | KILLED | 33 | `test_override_env_refuses[-NOTION_CONFIG]` | `argv_names_a_target(arguments) or environ_names_a_target(env) or cert_env_set(env)` |
+| 17 | `notion_sandbox.py:302` | true | KILLED | 72 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `str(evidence) == "" or leaks(str(evidence), secret)` |
+| 18 | `notion_sandbox.py:302` | false | KILLED | 1 | `test_encoded_token_evidence_path_writes_nothing` | `str(evidence) == "" or leaks(str(evidence), secret)` |
+| 19 | `notion_sandbox.py:305` | true | KILLED | 58 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `parsed.execute and parsed.dry_run` |
+| 20 | `notion_sandbox.py:305` | false | KILLED | 1 | `test_both_flags_and_secret_evidence_path_refuse` | `parsed.execute and parsed.dry_run` |
+| 21 | `notion_sandbox.py:310` | true | KILLED | 56 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `token is None` |
+| 22 | `notion_sandbox.py:310` | false | KILLED | 2 | `test_missing_token_ignores_other_sources` | `token is None` |
+| 23 | `notion_sandbox.py:322` | true | KILLED | 53 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `secret is None` |
+| 24 | `notion_sandbox.py:322` | false | KILLED | 3 | `test_short_token_is_refused` | `secret is None` |
+| 25 | `notion_sandbox.py:376` | true | KILLED | 46 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `type(bot.user_type) is not str` |
+| 26 | `notion_sandbox.py:376` | false | KILLED | 1 | `test_non_string_user_type_exits_69` | `type(bot.user_type) is not str` |
+| 27 | `notion_sandbox.py:394` | true | KILLED | 34 | `test_dry_run_is_the_default_and_writes_nothing` | `not target_ok(bot, page)` |
+| 28 | `notion_sandbox.py:394` | false | KILLED | 10 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `not target_ok(bot, page)` |
+| 29 | `notion_sandbox.py:412` | true | KILLED | 29 | `test_execute_on_the_fake_adapter_writes_evidence` | `mode == "dry-run"` |
+| 30 | `notion_sandbox.py:412` | false | KILLED | 6 | `test_dry_run_is_the_default_and_writes_nothing` | `mode == "dry-run"` |
+| 31 | `notion_sandbox.py:446` | true | KILLED | 20 | `test_execute_on_the_fake_adapter_writes_evidence` | `interrupted` |
+| 32 | `notion_sandbox.py:446` | false | KILLED | 7 | `test_interrupt_writes_redacted_evidence` | `interrupted` |
+| 33 | `notion_sandbox.py:450` | true | KILLED | 4 | `test_execute_on_the_fake_adapter_writes_evidence` | `failed` |
+| 34 | `notion_sandbox.py:450` | false | KILLED | 16 | `test_absent_stage_failure_stays_not_run` | `failed` |
+| 35 | `notion_sandbox.py:479` | true | KILLED | 6 | `test_interrupt_after_store_records_the_created_id[0-exc0]` | `bind is None` |
+| 36 | `notion_sandbox.py:479` | false | KILLED | 1 | `test_execute_without_bind_created_still_records` | `bind is None` |
+| 37 | `notion_sandbox.py:485` | true | KILLED | 1 | `test_non_string_bot_user_id_is_omitted` | `type(bot.user_id) is str` |
+| 38 | `notion_sandbox.py:485` | false | KILLED | 20 | `test_execute_on_the_fake_adapter_writes_evidence` | `type(bot.user_id) is str` |
+| 39 | `notion_sandbox.py:520` | true | KILLED | 5 | `test_execute_on_the_fake_adapter_writes_evidence` | `error is not None` |
+| 40 | `notion_sandbox.py:520` | false | KILLED | 3 | `test_token_in_error_is_redacted` | `error is not None` |
+| 41 | `notion_sandbox.py:522` | true | KILLED | 2 | `test_execute_on_the_fake_adapter_writes_evidence` | `any(stage.get("status") == "INTERRUPTED" for stage in stages)` |
+| 42 | `notion_sandbox.py:522` | false | KILLED | 7 | `test_interrupt_writes_redacted_evidence` | `any(stage.get("status") == "INTERRUPTED" for stage in stages)` |
+| 43 | `notion_sandbox.py:525` | true | KILLED | 99 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `check == "FAIL"` |
+| 44 | `notion_sandbox.py:525` | false | KILLED | 3 | `test_failed_redaction_exits_70` | `check == "FAIL"` |
+| 45 | `notion_sandbox.py:527` | true | KILLED | 90 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `code == EXIT_OK` |
+| 46 | `notion_sandbox.py:527` | false | KILLED | 8 | `test_dry_run_is_the_default_and_writes_nothing` | `code == EXIT_OK` |
+| 47 | `notion_sandbox.py:572` | true | KILLED | 1 | `test_both_flags_and_secret_evidence_path_refuse` | `path is not None and str(path) != "" and not leaks(str(path), token)` |
+| 48 | `notion_sandbox.py:572` | false | KILLED | 33 | `test_override_env_refuses[-NOTION_CONFIG]` | `path is not None and str(path) != "" and not leaks(str(path), token)` |
+| 49 | `notion_sandbox.py:579` | true | KILLED | 1 | `test_reraise_preserves_interrupt_and_base_exceptions` | `isinstance(exc, SystemExit)` |
+| 50 | `notion_sandbox.py:579` | false | KILLED | 1 | `test_system_exit_status_is_normalized` | `isinstance(exc, SystemExit)` |
+| 51 | `notion_sandbox.py:582` | true | KILLED | 1 | `test_reraise_preserves_interrupt_and_base_exceptions` | `isinstance(exc, KeyboardInterrupt)` |
+| 52 | `notion_sandbox.py:582` | false | KILLED | 1 | `test_reraise_preserves_interrupt_and_base_exceptions` | `isinstance(exc, KeyboardInterrupt)` |
+| 53 | `notion_sandbox.py:595` | true | KILLED | 1 | `—` | `__name__ == "__main__"` |
+| 54 | `notion_sandbox.py:595` | false | KILLED | 1 | `test_module_entry_point_runs_main` | `__name__ == "__main__"` |
+| 55 | `notion_sandbox_guard.py:144` | true | KILLED | 65 | `test_canonical_id_normalizes_and_rejects` | `type(value) is not str` |
+| 56 | `notion_sandbox_guard.py:144` | false | KILLED | 1 | `test_canonical_id_normalizes_and_rejects` | `type(value) is not str` |
+| 57 | `notion_sandbox_guard.py:147` | true | KILLED | 65 | `test_canonical_id_normalizes_and_rejects` | `len(compact) != 32` |
+| 58 | `notion_sandbox_guard.py:147` | false | KILLED | 9 | `test_canonical_id_normalizes_and_rejects` | `len(compact) != 32` |
+| 59 | `notion_sandbox_guard.py:149` | true | KILLED | 65 | `test_canonical_id_normalizes_and_rejects` | `any(character not in "0123456789abcdef" for character in compact)` |
+| 60 | `notion_sandbox_guard.py:149` | false | KILLED | 1 | `test_canonical_id_normalizes_and_rejects` | `any(character not in "0123456789abcdef" for character in compact)` |
+| 61 | `notion_sandbox_guard.py:156` | true | KILLED | 35 | `test_target_and_parent_guards` | `type(bot.user_type) is not str or bot.user_type != "bot"` |
+| 62 | `notion_sandbox_guard.py:156` | false | KILLED | 2 | `test_target_and_parent_guards` | `type(bot.user_type) is not str or bot.user_type != "bot"` |
+| 63 | `notion_sandbox_guard.py:158` | true | KILLED | 35 | `test_target_and_parent_guards` | `page.archived or page.parent_type in {"database_id", "data_source_id"}` |
+| 64 | `notion_sandbox_guard.py:158` | false | KILLED | 6 | `test_target_and_parent_guards` | `page.archived or page.parent_type in {"database_id", "data_source_id"}` |
+| 65 | `notion_sandbox_guard.py:160` | true | KILLED | 35 | `test_target_and_parent_guards` | `canonical_id(bot.space_id) != SANDBOX_SPACE_ID` |
+| 66 | `notion_sandbox_guard.py:160` | false | KILLED | 2 | `test_target_and_parent_guards` | `canonical_id(bot.space_id) != SANDBOX_SPACE_ID` |
+| 67 | `notion_sandbox_guard.py:162` | true | KILLED | 35 | `test_target_and_parent_guards` | `canonical_id(page.page_id) != SANDBOX_PARENT_PAGE_ID` |
+| 68 | `notion_sandbox_guard.py:162` | false | KILLED | 1 | `test_target_and_parent_guards` | `canonical_id(page.page_id) != SANDBOX_PARENT_PAGE_ID` |
+| 69 | `notion_sandbox_guard.py:170` | true | KILLED | 38 | `test_target_and_parent_guards` | `candidate == ""` |
+| 70 | `notion_sandbox_guard.py:170` | false | KILLED | 1 | `test_target_and_parent_guards` | `candidate == ""` |
+| 71 | `notion_sandbox_guard.py:178` | true | KILLED | 58 | `test_token_env_and_redaction_units` | `type(value) is not str or value == ""` |
+| 72 | `notion_sandbox_guard.py:178` | false | KILLED | 1 | `test_token_env_and_redaction_units` | `type(value) is not str or value == ""` |
+| 73 | `notion_sandbox_guard.py:203` | true | KILLED | 58 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `head in _OVERRIDE_FLAGS` |
+| 74 | `notion_sandbox_guard.py:203` | false | KILLED | 11 | `test_argv_refused_rejects_each_flag[--api-key]` | `head in _OVERRIDE_FLAGS` |
+| 75 | `notion_sandbox_guard.py:205` | true | KILLED | 58 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `contains_secret_shape(arg)` |
+| 76 | `notion_sandbox_guard.py:205` | false | KILLED | 1 | `test_token_on_argv_is_refused` | `contains_secret_shape(arg)` |
+| 77 | `notion_sandbox_guard.py:217` | true | KILLED | 4 | `test_token_env_and_redaction_units` | `token is None or not token_shape_ok(token)` |
+| 78 | `notion_sandbox_guard.py:217` | false | KILLED | 117 | `test_token_env_and_redaction_units` | `token is None or not token_shape_ok(token)` |
+| 79 | `notion_sandbox_guard.py:222` | true | EQUIVALENT | 0 | `—` | `encoded != token` |
+| 80 | `notion_sandbox_guard.py:222` | false | KILLED | 3 | `test_token_env_and_redaction_units` | `encoded != token` |
+| 81 | `notion_sandbox_guard.py:224` | true | EQUIVALENT | 0 | `—` | `digest not in forms and digest != token` |
+| 82 | `notion_sandbox_guard.py:224` | false | KILLED | 4 | `test_token_env_and_redaction_units` | `digest not in forms and digest != token` |
+| 83 | `notion_sandbox_guard.py:232` | true | KILLED | 116 | `test_token_env_and_redaction_units` | `token is not None and token != "" and not _unsafe_exact(token) and token in cleaned` |
+| 84 | `notion_sandbox_guard.py:232` | false | KILLED | 1 | `test_token_env_and_redaction_units` | `token is not None and token != "" and not _unsafe_exact(token) and token in cleaned` |
+| 85 | `notion_sandbox_guard.py:235` | true | EQUIVALENT | 0 | `—` | `form in cleaned` |
+| 86 | `notion_sandbox_guard.py:235` | false | KILLED | 2 | `test_token_env_and_redaction_units` | `form in cleaned` |
+| 87 | `notion_sandbox_guard.py:242` | true | KILLED | 19 | `test_target_and_parent_guards` | `runner_name is None` |
+| 88 | `notion_sandbox_guard.py:242` | false | KILLED | 1 | `test_token_env_and_redaction_units` | `runner_name is None` |
+| 89 | `notion_sandbox_guard.py:244` | true | KILLED | 18 | `test_target_and_parent_guards` | `outcome == "PASS"` |
+| 90 | `notion_sandbox_guard.py:244` | false | KILLED | 2 | `test_execute_on_the_fake_adapter_writes_evidence` | `outcome == "PASS"` |
+| 91 | `notion_sandbox_guard.py:246` | true | KILLED | 3 | `test_target_and_parent_guards` | `outcome == "FAILED"` |
+| 92 | `notion_sandbox_guard.py:246` | false | KILLED | 16 | `test_absent_stage_failure_stays_not_run` | `outcome == "FAILED"` |
+| 93 | `notion_sandbox_guard.py:248` | true | KILLED | 2 | `test_dry_run_is_the_default_and_writes_nothing` | `outcome == "BLOCKED"` |
+| 94 | `notion_sandbox_guard.py:248` | false | KILLED | 1 | `test_target_and_parent_guards` | `outcome == "BLOCKED"` |
+| 95 | `notion_sandbox_guard.py:263` | true | KILLED | 1 | `test_token_env_and_redaction_units` | `stage.get("name") == "qa" and type(found) is str` |
+| 96 | `notion_sandbox_guard.py:263` | false | KILLED | 1 | `test_token_env_and_redaction_units` | `stage.get("name") == "qa" and type(found) is str` |
+| 97 | `notion_sandbox_guard.py:265` | true | KILLED | 6 | `test_token_env_and_redaction_units` | `status == "PASS"` |
+| 98 | `notion_sandbox_guard.py:265` | false | KILLED | 1 | `test_token_env_and_redaction_units` | `status == "PASS"` |
+| 99 | `notion_sandbox_guard.py:267` | true | KILLED | 6 | `test_token_env_and_redaction_units` | `status == "FAILED"` |
+| 100 | `notion_sandbox_guard.py:267` | false | KILLED | 1 | `test_token_env_and_redaction_units` | `status == "FAILED"` |
+| 101 | `notion_sandbox_guard.py:269` | true | KILLED | 6 | `test_token_env_and_redaction_units` | `status == "BLOCKED"` |
+| 102 | `notion_sandbox_guard.py:269` | false | KILLED | 1 | `test_token_env_and_redaction_units` | `status == "BLOCKED"` |
+| 103 | `notion_sandbox_guard.py:283` | true | KILLED | 111 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `token is not None and token != "" and not _unsafe_exact(token) and token in text` |
+| 104 | `notion_sandbox_guard.py:283` | false | KILLED | 1 | `test_hex_token_equal_to_the_page_id_sends_nothing` | `token is not None and token != "" and not _unsafe_exact(token) and token in text` |
+| 105 | `notion_sandbox_guard.py:285` | true | KILLED | 111 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `any(form in text for form in _encoded_forms(token))` |
+| 106 | `notion_sandbox_guard.py:285` | false | KILLED | 2 | `test_base64_token_in_evidence_exits_70` | `any(form in text for form in _encoded_forms(token))` |
+| 107 | `notion_sandbox_guard.py:300` | true | KILLED | 100 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `leaks(text, token)` |
+| 108 | `notion_sandbox_guard.py:300` | false | KILLED | 4 | `test_write_evidence_redacts_a_planted_token` | `leaks(text, token)` |
+| 109 | `notion_sandbox_guard.py:304` | true | KILLED | 1 | `test_failed_redaction_exits_70` | `leaks(text, token)` |
+| 110 | `notion_sandbox_guard.py:304` | false | EQUIVALENT | 0 | `—` | `leaks(text, token)` |
+| 111 | `notion_sandbox_guard.py:323` | true | KILLED | 109 | `test_write_evidence_redacts_a_planted_token` | `str(path) == "" or path == Path() or under_proc(path)` |
+| 112 | `notion_sandbox_guard.py:323` | false | EQUIVALENT | 0 | `—` | `str(path) == "" or path == Path() or under_proc(path)` |
+| 113 | `notion_sandbox_guard.py:331` | true | KILLED | 109 | `test_write_evidence_redacts_a_planted_token` | `info is not None` |
+| 114 | `notion_sandbox_guard.py:331` | false | EQUIVALENT | 0 | `—` | `info is not None` |
+| 115 | `notion_sandbox_guard.py:338` | true | KILLED | 109 | `test_write_evidence_redacts_a_planted_token` | `stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode)` |
+| 116 | `notion_sandbox_guard.py:338` | false | KILLED | 1 | `test_symlinked_parent_directory_is_refused` | `stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode)` |
+| 117 | `notion_sandbox_guard.py:340` | true | KILLED | 109 | `test_write_evidence_redacts_a_planted_token` | `parent_info.st_mode & 0o200 == 0` |
+| 118 | `notion_sandbox_guard.py:340` | false | EQUIVALENT | 0 | `—` | `parent_info.st_mode & 0o200 == 0` |
+| 119 | `notion_sandbox_guard.py:361` | true | KILLED | 1 | `test_enospc_after_creates_prints_ids` | `type(found) is not list` |
+| 120 | `notion_sandbox_guard.py:361` | false | KILLED | 1 | `test_enospc_ignores_pages_that_are_not_ids` | `type(found) is not list` |
+| 121 | `notion_sandbox_guard.py:365` | true | KILLED | 1 | `test_enospc_after_creates_prints_ids` | `type(item) is not dict` |
+| 122 | `notion_sandbox_guard.py:365` | false | KILLED | 1 | `test_enospc_ignores_pages_that_are_not_ids` | `type(item) is not dict` |
+| 123 | `notion_sandbox_guard.py:368` | true | KILLED | 1 | `test_enospc_ignores_pages_that_are_not_ids` | `type(page_id) is str and page_id != ""` |
+| 124 | `notion_sandbox_guard.py:368` | false | KILLED | 1 | `test_enospc_after_creates_prints_ids` | `type(page_id) is str and page_id != ""` |
+| 125 | `notion_sandbox_guard.py:377` | true | KILLED | 105 | `test_write_evidence_redacts_a_planted_token` | `written <= 0 or written > len(pending)` |
+| 126 | `notion_sandbox_guard.py:377` | false | KILLED | 1 | `timeout` | `written <= 0 or written > len(pending)` |
+| 127 | `notion_sandbox_guard.py:388` | true | KILLED | 103 | `test_write_evidence_redacts_a_planted_token` | `stat.S_ISLNK(current.st_mode)` |
+| 128 | `notion_sandbox_guard.py:388` | false | EQUIVALENT | 0 | `—` | `stat.S_ISLNK(current.st_mode)` |
+| 129 | `notion_sandbox_guard.py:404` | true | KILLED | 103 | `test_write_evidence_redacts_a_planted_token` | `not _same_inode(fd, path)` |
+| 130 | `notion_sandbox_guard.py:404` | false | KILLED | 2 | `test_swapped_evidence_file_does_not_exit_ok` | `not _same_inode(fd, path)` |
+| 131 | `notion_sandbox_guard.py:409` | true | KILLED | 1 | `test_evidence_write_oserror_is_redacted` | `exc.errno in {errno.ENOSPC, errno.EIO}` |
+| 132 | `notion_sandbox_guard.py:409` | false | KILLED | 2 | `test_enospc_after_creates_prints_ids` | `exc.errno in {errno.ENOSPC, errno.EIO}` |
+| 133 | `notion_sandbox_guard.py:455` | true | KILLED | 117 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `(candidate / "pyproject.toml").is_file() and (candidate / "docs" / "control").is_dir()` |
+| 134 | `notion_sandbox_guard.py:455` | false | KILLED | 1 | `test_repo_root_needs_both_markers` | `(candidate / "pyproject.toml").is_file() and (candidate / "docs" / "control").is_dir()` |
+| 135 | `notion_sandbox_guard.py:459` | true | EQUIVALENT | 0 | `—` | `(candidate / "pyproject.toml").is_file() and (candidate / "docs" / "control").is_dir()` |
+| 136 | `notion_sandbox_guard.py:459` | false | KILLED | 1 | `test_repo_root_falls_back_to_cwd` | `(candidate / "pyproject.toml").is_file() and (candidate / "docs" / "control").is_dir()` |
+| 137 | `notion_sandbox_guard.py:477` | true | KILLED | 115 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `completed.returncode != 0 or len(sha) != 40` |
+| 138 | `notion_sandbox_guard.py:477` | false | KILLED | 2 | `test_git_sha_rejects_a_bad_rev_parse` | `completed.returncode != 0 or len(sha) != 40` |
+| 139 | `notion_sandbox_guard.py:479` | true | KILLED | 115 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `any(character not in "0123456789abcdef" for character in sha)` |
+| 140 | `notion_sandbox_guard.py:479` | false | KILLED | 1 | `test_git_sha_rejects_a_bad_rev_parse` | `any(character not in "0123456789abcdef" for character in sha)` |
+| 141 | `notion_sandbox_guard.py:491` | true | KILLED | 113 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `type(payload) is not dict` |
+| 142 | `notion_sandbox_guard.py:491` | false | KILLED | 1 | `test_control_state_container_exits_69` | `type(payload) is not dict` |
+| 143 | `notion_sandbox_guard.py:496` | true | KILLED | 113 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `type(revision) is not int or type(session) is not int or type(head) is not str` |
+| 144 | `notion_sandbox_guard.py:496` | false | KILLED | 1 | `test_string_revision_is_unreadable` | `type(revision) is not int or type(session) is not int or type(head) is not str` |
+| 145 | `notion_sandbox_live.py:118` | true | KILLED | 16 | `test_live_client_reads_without_writing_and_redacts` | `bot is None` |
+| 146 | `notion_sandbox_live.py:118` | false | KILLED | 1 | `test_non_string_bot_id_is_rejected` | `bot is None` |
+| 147 | `notion_sandbox_live.py:125` | true | KILLED | 16 | `test_live_client_reads_without_writing_and_redacts` | `expected == ""` |
+| 148 | `notion_sandbox_live.py:125` | false | KILLED | 1 | `test_empty_page_id_is_not_read` | `expected == ""` |
+| 149 | `notion_sandbox_live.py:130` | true | KILLED | 14 | `test_live_client_reads_without_writing_and_redacts` | `page is None` |
+| 150 | `notion_sandbox_live.py:130` | false | KILLED | 2 | `test_string_in_trash_is_rejected` | `page is None` |
+| 151 | `notion_sandbox_live.py:137` | true | KILLED | 9 | `test_live_child_page_does_not_count_its_own_write` | `not parent_is_allowed(parent, allowed)` |
+| 152 | `notion_sandbox_live.py:137` | false | KILLED | 1 | `test_live_client_reads_without_writing_and_redacts` | `not parent_is_allowed(parent, allowed)` |
+| 153 | `notion_sandbox_live.py:148` | true | KILLED | 9 | `test_live_child_page_does_not_count_its_own_write` | `type(sent_parent) is not dict or sent_parent.get("page_id") != parent or sent_parent.get("type") != "page_id"` |
+| 154 | `notion_sandbox_live.py:148` | false | KILLED | 1 | `test_request_body_parent_is_asserted` | `type(sent_parent) is not dict or sent_parent.get("page_id") != parent or sent_parent.get("type") != "page_id"` |
+| 155 | `notion_sandbox_live.py:156` | true | KILLED | 8 | `test_live_child_page_does_not_count_its_own_write` | `page is None` |
+| 156 | `notion_sandbox_live.py:156` | false | KILLED | 1 | `test_unparsed_create_is_not_recorded` | `page is None` |
+| 157 | `notion_sandbox_live.py:164` | true | KILLED | 5 | `test_doc_shaped_pages_execute_without_a_space` | `page_id == "" or space_conflicts(page.space_id)` |
+| 158 | `notion_sandbox_live.py:164` | false | KILLED | 1 | `test_wrong_space_create_is_not_published` | `page_id == "" or space_conflicts(page.space_id)` |
+| 159 | `notion_sandbox_live.py:166` | true | KILLED | 1 | `test_publish_does_not_repeat_an_id` | `page_id not in self._created_ids` |
+| 160 | `notion_sandbox_live.py:166` | false | KILLED | 4 | `test_doc_shaped_pages_execute_without_a_space` | `page_id not in self._created_ids` |
+| 161 | `notion_sandbox_live.py:170` | true | KILLED | 3 | `test_doc_shaped_interrupt_after_store_records_the_created_id[0-exc0]` | `evidence_ids is None or evidence_rows is None or page_id in evidence_ids` |
+| 162 | `notion_sandbox_live.py:170` | false | KILLED | 2 | `test_live_child_page_does_not_count_its_own_write` | `evidence_ids is None or evidence_rows is None or page_id in evidence_ids` |
+| 163 | `notion_sandbox_live.py:179` | true | KILLED | 21 | `test_live_client_reads_without_writing_and_redacts` | `leaks(url, self._token) or leaks(url.replace("-", ""), self._token)` |
+| 164 | `notion_sandbox_live.py:179` | false | KILLED | 1 | `test_hex_token_equal_to_the_page_id_sends_nothing` | `leaks(url, self._token) or leaks(url.replace("-", ""), self._token)` |
+| 165 | `notion_sandbox_live.py:185` | true | KILLED | 1 | `test_live_client_reads_without_writing_and_redacts` | `body is not None` |
+| 166 | `notion_sandbox_live.py:185` | false | KILLED | 1 | `test_live_child_page_does_not_count_its_own_write` | `body is not None` |
+| 167 | `notion_sandbox_live.py:190` | true | KILLED | 1 | `test_redirect_is_not_followed` | `type(status) is not int` |
+| 168 | `notion_sandbox_live.py:190` | false | KILLED | 1 | `test_redirect_code_is_refused_without_a_status` | `type(status) is not int` |
+| 169 | `notion_sandbox_live.py:192` | true | KILLED | 19 | `test_live_client_reads_without_writing_and_redacts` | `type(status) is int and 300 <= status < 400` |
+| 170 | `notion_sandbox_live.py:192` | false | KILLED | 2 | `test_redirect_is_not_followed` | `type(status) is int and 300 <= status < 400` |
+| 171 | `notion_sandbox_live.py:201` | true | KILLED | 19 | `test_live_client_reads_without_writing_and_redacts` | `type(raw) is not bytes` |
+| 172 | `notion_sandbox_live.py:201` | false | KILLED | 1 | `test_non_byte_body_is_an_api_error` | `type(raw) is not bytes` |
+| 173 | `notion_sandbox_live.py:211` | true | KILLED | 16 | `test_live_client_reads_without_writing_and_redacts` | `type(payload) is not dict` |
+| 174 | `notion_sandbox_live.py:211` | false | KILLED | 1 | `test_parse_bot_rejects_a_non_object` | `type(payload) is not dict` |
+| 175 | `notion_sandbox_live.py:215` | true | KILLED | 16 | `test_live_client_reads_without_writing_and_redacts` | `type(user_id) is not str or type(user_type) is not str` |
+| 176 | `notion_sandbox_live.py:215` | false | KILLED | 1 | `test_non_string_bot_id_is_rejected` | `type(user_id) is not str or type(user_type) is not str` |
+| 177 | `notion_sandbox_live.py:219` | true | KILLED | 2 | `test_missing_workspace_id_writes_nothing` | `type(bot) is dict and type(bot.get("workspace_id")) is str` |
+| 178 | `notion_sandbox_live.py:219` | false | KILLED | 6 | `test_live_client_reads_without_writing_and_redacts` | `type(bot) is dict and type(bot.get("workspace_id")) is str` |
+| 179 | `notion_sandbox_live.py:226` | true | KILLED | 3 | `test_trashed_parent_writes_nothing[archived]` | `key not in payload` |
+| 180 | `notion_sandbox_live.py:226` | false | KILLED | 19 | `test_live_client_reads_without_writing_and_redacts` | `key not in payload` |
+| 181 | `notion_sandbox_live.py:229` | true | KILLED | 7 | `test_trashed_parent_writes_nothing[archived]` | `type(value) is not bool` |
+| 182 | `notion_sandbox_live.py:229` | false | KILLED | 1 | `test_string_in_trash_is_rejected` | `type(value) is not bool` |
+| 183 | `notion_sandbox_live.py:236` | true | KILLED | 24 | `test_live_client_reads_without_writing_and_redacts` | `type(payload) is not dict or payload.get("object") != "page"` |
+| 184 | `notion_sandbox_live.py:236` | false | KILLED | 1 | `test_database_parent_and_missing_object_write_nothing` | `type(payload) is not dict or payload.get("object") != "page"` |
+| 185 | `notion_sandbox_live.py:239` | true | KILLED | 24 | `test_live_client_reads_without_writing_and_redacts` | `page_id == ""` |
+| 186 | `notion_sandbox_live.py:239` | false | KILLED | 1 | `test_parse_page_rejects_a_non_id` | `page_id == ""` |
+| 187 | `notion_sandbox_live.py:245` | true | KILLED | 2 | `test_missing_parent_object_stays_a_page` | `type(parent) is dict` |
+| 188 | `notion_sandbox_live.py:245` | false | KILLED | 8 | `test_live_child_page_does_not_count_its_own_write` | `type(parent) is dict` |
+| 189 | `notion_sandbox_live.py:246` | true | KILLED | 2 | `test_live_space_fallback_is_only_the_asserted_parent` | `space == ""` |
+| 190 | `notion_sandbox_live.py:246` | false | KILLED | 1 | `test_parent_object_can_carry_the_space` | `space == ""` |
+| 191 | `notion_sandbox_live.py:249` | true | KILLED | 1 | `test_non_string_parent_type_is_ignored` | `type(found_type) is str` |
+| 192 | `notion_sandbox_live.py:249` | false | KILLED | 3 | `test_database_id_parent_is_not_a_page_parent` | `type(found_type) is str` |
+| 193 | `notion_sandbox_live.py:251` | true | KILLED | 2 | `test_non_string_parent_type_is_ignored` | `found_type == "page_id"` |
+| 194 | `notion_sandbox_live.py:251` | false | KILLED | 4 | `test_live_child_page_does_not_count_its_own_write` | `found_type == "page_id"` |
+| 195 | `notion_sandbox_live.py:253` | true | KILLED | 4 | `test_live_space_fallback_is_only_the_asserted_parent` | `space == "" and page_id == canonical_id(expected_id)` |
+| 196 | `notion_sandbox_live.py:253` | false | KILLED | 6 | `test_live_client_reads_without_writing_and_redacts` | `space == "" and page_id == canonical_id(expected_id)` |
+| 197 | `notion_sandbox_live.py:256` | true | KILLED | 1 | `test_parse_page_keeps_a_url_and_fills_a_blank_one` | `type(url) is not str or url == ""` |
+| 198 | `notion_sandbox_live.py:256` | false | KILLED | 1 | `test_parse_page_keeps_a_url_and_fills_a_blank_one` | `type(url) is not str or url == ""` |
+| 199 | `notion_sandbox_live.py:260` | true | KILLED | 24 | `test_live_client_reads_without_writing_and_redacts` | `archived_flag is None or trash_flag is None` |
+| 200 | `notion_sandbox_live.py:260` | false | KILLED | 1 | `test_string_in_trash_is_rejected` | `archived_flag is None or trash_flag is None` |
+| 201 | `notion_sandbox_live.py:277` | true | KILLED | 3 | `test_doc_shaped_pages_execute_without_a_space` | `type(value) is not str or value == ""` |
+| 202 | `notion_sandbox_live.py:277` | false | KILLED | 19 | `test_live_client_reads_without_writing_and_redacts` | `type(value) is not str or value == ""` |
+| 203 | `notion_sandbox_live.py:283` | true | KILLED | 3 | `test_doc_shaped_pages_execute_without_a_space` | `parsed.tzinfo is None` |
+| 204 | `notion_sandbox_live.py:283` | false | KILLED | 1 | `test_naive_timestamp_stays_unset` | `parsed.tzinfo is None` |
+| 205 | `notion_sandbox_live.py:290` | true | KILLED | 3 | `test_doc_shaped_pages_execute_without_a_space` | `type(actor) is not dict` |
+| 206 | `notion_sandbox_live.py:290` | false | KILLED | 18 | `test_live_client_reads_without_writing_and_redacts` | `type(actor) is not dict` |
+| 207 | `notion_sandbox_live.py:293` | true | KILLED | 3 | `test_doc_shaped_pages_execute_without_a_space` | `type(found) is not str` |
+| 208 | `notion_sandbox_live.py:293` | false | KILLED | 1 | `test_non_string_created_by_stays_blank` | `type(found) is not str` |
+| 209 | `notion_sandbox_live.py:301` | true | KILLED | 2 | `test_proxy_map_reads_string_proxy_entries` | `type(handlers) is not list` |
+| 210 | `notion_sandbox_live.py:301` | false | KILLED | 1 | `test_proxy_map_ignores_a_missing_handler_list` | `type(handlers) is not list` |
+| 211 | `notion_sandbox_live.py:304` | true | KILLED | 1 | `test_proxy_map_ignores_handlers_that_are_not_proxies` | `isinstance(handler, urllib.request.ProxyHandler)` |
+| 212 | `notion_sandbox_live.py:304` | false | KILLED | 2 | `test_proxy_map_reads_string_proxy_entries` | `isinstance(handler, urllib.request.ProxyHandler)` |
+| 213 | `notion_sandbox_live.py:306` | true | KILLED | 2 | `test_proxy_map_reads_string_proxy_entries` | `type(found) is not dict` |
+| 214 | `notion_sandbox_live.py:306` | false | KILLED | 1 | `test_proxy_map_ignores_a_non_dict_proxy_table` | `type(found) is not dict` |
+| 215 | `notion_sandbox_live.py:309` | true | KILLED | 1 | `test_proxy_map_drops_non_strings` | `type(key) is str and type(value) is str` |
+| 216 | `notion_sandbox_live.py:309` | false | KILLED | 2 | `test_proxy_map_reads_string_proxy_entries` | `type(key) is str and type(value) is str` |
+| 217 | `notion_sandbox_live.py:318` | true | KILLED | 2 | `test_explicit_space_skips_a_non_id` | `type(value) is str and canonical_id(value) != ""` |
+| 218 | `notion_sandbox_live.py:318` | false | KILLED | 4 | `test_live_space_fallback_is_only_the_asserted_parent` | `type(value) is str and canonical_id(value) != ""` |
+| 219 | `notion_sandbox_pipeline.py:133` | true | KILLED | 1 | `test_sandbox_parent_in_a_foreign_space_fails_the_chain` | `page_id in ctx.created_ids` |
+| 220 | `notion_sandbox_pipeline.py:133` | false | KILLED | 1 | `timeout` | `page_id in ctx.created_ids` |
+| 221 | `notion_sandbox_pipeline.py:143` | true | KILLED | 2 | `test_lying_create_id_stops_before_colours` | `tail == page_id` |
+| 222 | `notion_sandbox_pipeline.py:143` | false | KILLED | 4 | `test_interrupt_after_store_records_the_created_id[2-exc1]` | `tail == page_id` |
+| 223 | `notion_sandbox_pipeline.py:146` | true | KILLED | 21 | `test_execute_on_the_fake_adapter_writes_evidence` | `page_id == "" or space_conflicts(page.space_id)` |
+| 224 | `notion_sandbox_pipeline.py:146` | false | EQUIVALENT | 0 | `—` | `page_id == "" or space_conflicts(page.space_id)` |
+| 225 | `notion_sandbox_pipeline.py:149` | true | KILLED | 12 | `test_execute_on_the_fake_adapter_writes_evidence` | `page_id not in ctx.created_ids` |
+| 226 | `notion_sandbox_pipeline.py:149` | false | KILLED | 4 | `test_lying_create_id_stops_before_colours` | `page_id not in ctx.created_ids` |
+| 227 | `notion_sandbox_pipeline.py:158` | true | KILLED | 19 | `test_execute_on_the_fake_adapter_writes_evidence` | `page.created_by != ctx.bot_user_id` |
+| 228 | `notion_sandbox_pipeline.py:158` | false | KILLED | 1 | `test_stale_foreign_page_is_not_a_parent` | `page.created_by != ctx.bot_user_id` |
+| 229 | `notion_sandbox_pipeline.py:161` | true | KILLED | 19 | `test_execute_on_the_fake_adapter_writes_evidence` | `moment is None` |
+| 230 | `notion_sandbox_pipeline.py:161` | false | KILLED | 1 | `test_missing_created_time_is_not_new` | `moment is None` |
+| 231 | `notion_sandbox_pipeline.py:163` | true | KILLED | 19 | `test_execute_on_the_fake_adapter_writes_evidence` | `moment.tzinfo is None` |
+| 232 | `notion_sandbox_pipeline.py:163` | false | KILLED | 1 | `test_naive_created_time_is_not_new` | `moment.tzinfo is None` |
+| 233 | `notion_sandbox_pipeline.py:165` | true | KILLED | 19 | `test_execute_on_the_fake_adapter_writes_evidence` | `moment < ctx.moment` |
+| 234 | `notion_sandbox_pipeline.py:165` | false | KILLED | 1 | `test_stale_confirm_stops_later_writes` | `moment < ctx.moment` |
+| 235 | `notion_sandbox_pipeline.py:175` | true | KILLED | 4 | `test_broken_ancestor_stops_later_writes` | `page_id == SANDBOX_PARENT_PAGE_ID` |
+| 236 | `notion_sandbox_pipeline.py:175` | false | KILLED | 15 | `test_execute_on_the_fake_adapter_writes_evidence` | `page_id == SANDBOX_PARENT_PAGE_ID` |
+| 237 | `notion_sandbox_pipeline.py:176` | true | KILLED | 15 | `test_execute_on_the_fake_adapter_writes_evidence` | `space_conflicts(current.space_id) or current.archived` |
+| 238 | `notion_sandbox_pipeline.py:176` | false | KILLED | 1 | `test_sandbox_parent_in_a_foreign_space_fails_the_chain` | `space_conflicts(current.space_id) or current.archived` |
+| 239 | `notion_sandbox_pipeline.py:181` | true | KILLED | 16 | `test_execute_on_the_fake_adapter_writes_evidence` | `parent_id == "" or page_id == "" or page_id in seen` |
+| 240 | `notion_sandbox_pipeline.py:181` | false | KILLED | 2 | `test_broken_ancestor_stops_later_writes` | `parent_id == "" or page_id == "" or page_id in seen` |
+| 241 | `notion_sandbox_pipeline.py:185` | true | KILLED | 15 | `test_execute_on_the_fake_adapter_writes_evidence` | `space_conflicts(current.space_id) or current.archived` |
+| 242 | `notion_sandbox_pipeline.py:185` | false | KILLED | 1 | `test_trashed_product_page_stops_further_writes` | `space_conflicts(current.space_id) or current.archived` |
+| 243 | `notion_sandbox_pipeline.py:194` | true | KILLED | 33 | `test_execute_on_the_fake_adapter_writes_evidence` | `not parent_is_allowed(requested, allowed)` |
+| 244 | `notion_sandbox_pipeline.py:194` | false | KILLED | 1 | `test_create_under_refuses_a_foreign_parent` | `not parent_is_allowed(requested, allowed)` |
+| 245 | `notion_sandbox_pipeline.py:196` | true | KILLED | 32 | `test_execute_on_the_fake_adapter_writes_evidence` | `canonical_id(ctx.bot_space_id) != SANDBOX_SPACE_ID` |
+| 246 | `notion_sandbox_pipeline.py:196` | false | KILLED | 1 | `test_foreign_bot_space_creates_nothing` | `canonical_id(ctx.bot_space_id) != SANDBOX_SPACE_ID` |
+| 247 | `notion_sandbox_pipeline.py:202` | true | KILLED | 21 | `test_execute_on_the_fake_adapter_writes_evidence` | `page_id in {"", SANDBOX_PARENT_PAGE_ID, requested}` |
+| 248 | `notion_sandbox_pipeline.py:202` | false | KILLED | 1 | `test_create_that_returns_the_parent_id_is_not_new` | `page_id in {"", SANDBOX_PARENT_PAGE_ID, requested}` |
+| 249 | `notion_sandbox_pipeline.py:205` | true | KILLED | 19 | `test_execute_on_the_fake_adapter_writes_evidence` | `page_id in ctx.created_ids[:before]` |
+| 250 | `notion_sandbox_pipeline.py:205` | false | KILLED | 1 | `test_repeated_created_id_is_refused` | `page_id in ctx.created_ids[:before]` |
+| 251 | `notion_sandbox_pipeline.py:207` | true | KILLED | 23 | `test_execute_on_the_fake_adapter_writes_evidence` | `space_conflicts(page.space_id)` |
+| 252 | `notion_sandbox_pipeline.py:207` | false | KILLED | 1 | `test_wrong_space_on_create_return_stops` | `space_conflicts(page.space_id)` |
+| 253 | `notion_sandbox_pipeline.py:210` | true | KILLED | 20 | `test_execute_on_the_fake_adapter_writes_evidence` | `canonical_id(page.parent_id) != requested` |
+| 254 | `notion_sandbox_pipeline.py:210` | false | KILLED | 1 | `test_lying_response_parent_stops` | `canonical_id(page.parent_id) != requested` |
+| 255 | `notion_sandbox_pipeline.py:214` | true | KILLED | 18 | `test_execute_on_the_fake_adapter_writes_evidence` | `canonical_id(confirmed.page_id) != page_id` |
+| 256 | `notion_sandbox_pipeline.py:214` | false | KILLED | 1 | `test_confirm_of_a_different_id_keeps_the_created_page` | `canonical_id(confirmed.page_id) != page_id` |
+| 257 | `notion_sandbox_pipeline.py:216` | true | KILLED | 18 | `test_execute_on_the_fake_adapter_writes_evidence` | `canonical_id(confirmed.parent_id) != requested` |
+| 258 | `notion_sandbox_pipeline.py:216` | false | KILLED | 3 | `test_lying_reread_stops_later_writes` | `canonical_id(confirmed.parent_id) != requested` |
+| 259 | `notion_sandbox_pipeline.py:218` | true | KILLED | 15 | `test_execute_on_the_fake_adapter_writes_evidence` | `space_conflicts(confirmed.space_id) or confirmed.archived` |
+| 260 | `notion_sandbox_pipeline.py:218` | false | KILLED | 2 | `test_trashed_confirm_stops_further_writes` | `space_conflicts(confirmed.space_id) or confirmed.archived` |
+| 261 | `notion_sandbox_pipeline.py:223` | true | EQUIVALENT | 0 | `—` | `ctx.created and ctx.created[-1].get("id") == page_id` |
+| 262 | `notion_sandbox_pipeline.py:223` | false | KILLED | 1 | `test_token_in_created_url_exits_70` | `ctx.created and ctx.created[-1].get("id") == page_id` |
+| 263 | `notion_sandbox_pipeline.py:245` | true | KILLED | 28 | `test_execute_on_the_fake_adapter_writes_evidence` | `type(spec) is not ProductSpec` |
+| 264 | `notion_sandbox_pipeline.py:245` | false | EQUIVALENT | 0 | `—` | `type(spec) is not ProductSpec` |
+| 265 | `notion_sandbox_pipeline.py:253` | true | KILLED | 15 | `test_execute_on_the_fake_adapter_writes_evidence` | `ctx.probe is None or ctx.product_page_id is None or type(spec) is not ProductSpec` |
+| 266 | `notion_sandbox_pipeline.py:253` | false | KILLED | 1 | `test_variants_without_a_product_page_are_a_sandbox_error` | `ctx.probe is None or ctx.product_page_id is None or type(spec) is not ProductSpec` |
+
+## Boolean operands
+
+| # | Site | Operator | Mutation | Result | Failed | Test | Condition |
+|---|---|---|---|---|---|---|---|
+| 1 | `notion_sandbox.py:136` | or | swap | KILLED | 1 | `test_absent_stage_failure_stays_not_run` | `not available or failed` |
+| 2 | `notion_sandbox.py:136` | or | neg0 | KILLED | 29 | `test_execute_on_the_fake_adapter_writes_evidence` | `not available or failed` |
+| 3 | `notion_sandbox.py:136` | or | neg1 | KILLED | 29 | `test_execute_on_the_fake_adapter_writes_evidence` | `not available or failed` |
+| 4 | `notion_sandbox.py:177` | and | swap | KILLED | 1 | `test_evidence_out_without_a_value_is_usage` | `arg == "--evidence-out" and index + 1 < len(argv)` |
+| 5 | `notion_sandbox.py:177` | and | neg0 | KILLED | 44 | `test_override_env_refuses[-NOTION_CONFIG]` | `arg == "--evidence-out" and index + 1 < len(argv)` |
+| 6 | `notion_sandbox.py:177` | and | neg1 | KILLED | 33 | `test_override_env_refuses[-NOTION_CONFIG]` | `arg == "--evidence-out" and index + 1 < len(argv)` |
+| 7 | `notion_sandbox.py:196` | or | swap | KILLED | 1 | `test_naive_clock_is_refused` | `type(moment) is not datetime or moment.tzinfo is None` |
+| 8 | `notion_sandbox.py:196` | or | neg0 | KILLED | 119 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `type(moment) is not datetime or moment.tzinfo is None` |
+| 9 | `notion_sandbox.py:196` | or | neg1 | KILLED | 120 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `type(moment) is not datetime or moment.tzinfo is None` |
+| 10 | `notion_sandbox.py:202` | and | swap | KILLED | 5 | `test_short_token_is_refused` | `token is not None and token_shape_ok(token)` |
+| 11 | `notion_sandbox.py:202` | and | neg0 | KILLED | 56 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `token is not None and token_shape_ok(token)` |
+| 12 | `notion_sandbox.py:202` | and | neg1 | KILLED | 57 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `token is not None and token_shape_ok(token)` |
+| 13 | `notion_sandbox.py:295` | or | swap | KILLED | 33 | `test_override_env_refuses[-NOTION_CONFIG]` | `argv_names_a_target(arguments) or environ_names_a_target(env) or cert_env_set(env)` |
+| 14 | `notion_sandbox.py:295` | or | neg0 | KILLED | 59 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `argv_names_a_target(arguments) or environ_names_a_target(env) or cert_env_set(env)` |
+| 15 | `notion_sandbox.py:295` | or | neg1 | KILLED | 89 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `argv_names_a_target(arguments) or environ_names_a_target(env) or cert_env_set(env)` |
+| 16 | `notion_sandbox.py:295` | or | neg2 | KILLED | 59 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `argv_names_a_target(arguments) or environ_names_a_target(env) or cert_env_set(env)` |
+| 17 | `notion_sandbox.py:302` | or | swap | KILLED | 1 | `test_encoded_token_evidence_path_writes_nothing` | `str(evidence) == "" or leaks(str(evidence), secret)` |
+| 18 | `notion_sandbox.py:302` | or | neg0 | KILLED | 72 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `str(evidence) == "" or leaks(str(evidence), secret)` |
+| 19 | `notion_sandbox.py:302` | or | neg1 | KILLED | 73 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `str(evidence) == "" or leaks(str(evidence), secret)` |
+| 20 | `notion_sandbox.py:305` | and | swap | KILLED | 49 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `parsed.execute and parsed.dry_run` |
+| 21 | `notion_sandbox.py:305` | and | neg0 | KILLED | 2 | `test_both_flags_and_secret_evidence_path_refuse` | `parsed.execute and parsed.dry_run` |
+| 22 | `notion_sandbox.py:305` | and | neg1 | KILLED | 49 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `parsed.execute and parsed.dry_run` |
+| 23 | `notion_sandbox.py:438` | or | swap | KILLED | 17 | `test_execute_on_the_fake_adapter_writes_evidence` | `_user_id(bot) or ""` |
+| 24 | `notion_sandbox.py:438` | or | neg0 | KILLED | 18 | `test_execute_on_the_fake_adapter_writes_evidence` | `_user_id(bot) or ""` |
+| 25 | `notion_sandbox.py:438` | or | neg1 | KILLED | 1 | `test_empty_bot_user_id_still_executes` | `_user_id(bot) or ""` |
+| 26 | `notion_sandbox.py:572` | and | swap | KILLED | 1 | `test_both_flags_and_secret_evidence_path_refuse` | `path is not None and str(path) != "" and not leaks(str(path), token)` |
+| 27 | `notion_sandbox.py:572` | and | neg0 | KILLED | 33 | `test_override_env_refuses[-NOTION_CONFIG]` | `path is not None and str(path) != "" and not leaks(str(path), token)` |
+| 28 | `notion_sandbox.py:572` | and | neg1 | KILLED | 33 | `test_override_env_refuses[-NOTION_CONFIG]` | `path is not None and str(path) != "" and not leaks(str(path), token)` |
+| 29 | `notion_sandbox.py:572` | and | neg2 | KILLED | 34 | `test_override_env_refuses[-NOTION_CONFIG]` | `path is not None and str(path) != "" and not leaks(str(path), token)` |
+| 30 | `notion_sandbox.py:580` | and | swap | KILLED | 1 | `test_system_exit_status_is_normalized` | `type(exc.code) is int and exc.code != 0` |
+| 31 | `notion_sandbox.py:580` | and | neg0 | KILLED | 1 | `test_system_exit_status_is_normalized` | `type(exc.code) is int and exc.code != 0` |
+| 32 | `notion_sandbox.py:580` | and | neg1 | KILLED | 1 | `test_system_exit_status_is_normalized` | `type(exc.code) is int and exc.code != 0` |
+| 33 | `notion_sandbox_guard.py:156` | or | swap | KILLED | 2 | `test_target_and_parent_guards` | `type(bot.user_type) is not str or bot.user_type != "bot"` |
+| 34 | `notion_sandbox_guard.py:156` | or | neg0 | KILLED | 35 | `test_target_and_parent_guards` | `type(bot.user_type) is not str or bot.user_type != "bot"` |
+| 35 | `notion_sandbox_guard.py:156` | or | neg1 | KILLED | 36 | `test_target_and_parent_guards` | `type(bot.user_type) is not str or bot.user_type != "bot"` |
+| 36 | `notion_sandbox_guard.py:158` | or | swap | KILLED | 6 | `test_target_and_parent_guards` | `page.archived or page.parent_type in {"database_id", "data_source_id"}` |
+| 37 | `notion_sandbox_guard.py:158` | or | neg0 | KILLED | 38 | `test_target_and_parent_guards` | `page.archived or page.parent_type in {"database_id", "data_source_id"}` |
+| 38 | `notion_sandbox_guard.py:158` | or | neg1 | KILLED | 37 | `test_target_and_parent_guards` | `page.archived or page.parent_type in {"database_id", "data_source_id"}` |
+| 39 | `notion_sandbox_guard.py:178` | or | swap | KILLED | 1 | `test_token_env_and_redaction_units` | `type(value) is not str or value == ""` |
+| 40 | `notion_sandbox_guard.py:178` | or | neg0 | KILLED | 58 | `test_token_env_and_redaction_units` | `type(value) is not str or value == ""` |
+| 41 | `notion_sandbox_guard.py:178` | or | neg1 | KILLED | 58 | `test_token_env_and_redaction_units` | `type(value) is not str or value == ""` |
+| 42 | `notion_sandbox_guard.py:196` | and | swap | KILLED | 26 | `test_execute_on_the_fake_adapter_writes_evidence` | `found != "" and found != SANDBOX_SPACE_ID` |
+| 43 | `notion_sandbox_guard.py:196` | and | neg0 | KILLED | 11 | `test_wrong_space_on_create_return_stops` | `found != "" and found != SANDBOX_SPACE_ID` |
+| 44 | `notion_sandbox_guard.py:196` | and | neg1 | KILLED | 26 | `test_execute_on_the_fake_adapter_writes_evidence` | `found != "" and found != SANDBOX_SPACE_ID` |
+| 45 | `notion_sandbox_guard.py:212` | or | swap | KILLED | 1 | `test_token_env_and_redaction_units` | `token.strip() == "" or token in {"true", "false", "null"}` |
+| 46 | `notion_sandbox_guard.py:212` | or | neg0 | KILLED | 2 | `test_token_env_and_redaction_units` | `token.strip() == "" or token in {"true", "false", "null"}` |
+| 47 | `notion_sandbox_guard.py:212` | or | neg1 | KILLED | 2 | `test_token_env_and_redaction_units` | `token.strip() == "" or token in {"true", "false", "null"}` |
+| 48 | `notion_sandbox_guard.py:217` | or | swap | KILLED | 117 | `test_token_env_and_redaction_units` | `token is None or not token_shape_ok(token)` |
+| 49 | `notion_sandbox_guard.py:217` | or | neg0 | KILLED | 117 | `test_token_env_and_redaction_units` | `token is None or not token_shape_ok(token)` |
+| 50 | `notion_sandbox_guard.py:217` | or | neg1 | KILLED | 4 | `test_token_env_and_redaction_units` | `token is None or not token_shape_ok(token)` |
+| 51 | `notion_sandbox_guard.py:224` | and | swap | EQUIVALENT | 0 | `—` | `digest not in forms and digest != token` |
+| 52 | `notion_sandbox_guard.py:224` | and | neg0 | KILLED | 4 | `test_token_env_and_redaction_units` | `digest not in forms and digest != token` |
+| 53 | `notion_sandbox_guard.py:224` | and | neg1 | KILLED | 4 | `test_token_env_and_redaction_units` | `digest not in forms and digest != token` |
+| 54 | `notion_sandbox_guard.py:232` | and | swap | KILLED | 116 | `test_token_env_and_redaction_units` | `token is not None and token != "" and not _unsafe_exact(token) and token in cleaned` |
+| 55 | `notion_sandbox_guard.py:232` | and | neg0 | KILLED | 116 | `test_token_env_and_redaction_units` | `token is not None and token != "" and not _unsafe_exact(token) and token in cleaned` |
+| 56 | `notion_sandbox_guard.py:232` | and | neg1 | KILLED | 1 | `test_token_env_and_redaction_units` | `token is not None and token != "" and not _unsafe_exact(token) and token in cleaned` |
+| 57 | `notion_sandbox_guard.py:232` | and | neg2 | KILLED | 1 | `test_token_env_and_redaction_units` | `token is not None and token != "" and not _unsafe_exact(token) and token in cleaned` |
+| 58 | `notion_sandbox_guard.py:232` | and | neg3 | KILLED | 1 | `test_token_env_and_redaction_units` | `token is not None and token != "" and not _unsafe_exact(token) and token in cleaned` |
+| 59 | `notion_sandbox_guard.py:263` | and | swap | KILLED | 1 | `test_token_env_and_redaction_units` | `stage.get("name") == "qa" and type(found) is str` |
+| 60 | `notion_sandbox_guard.py:263` | and | neg0 | KILLED | 1 | `test_token_env_and_redaction_units` | `stage.get("name") == "qa" and type(found) is str` |
+| 61 | `notion_sandbox_guard.py:263` | and | neg1 | KILLED | 1 | `test_token_env_and_redaction_units` | `stage.get("name") == "qa" and type(found) is str` |
+| 62 | `notion_sandbox_guard.py:283` | and | swap | KILLED | 111 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `token is not None and token != "" and not _unsafe_exact(token) and token in text` |
+| 63 | `notion_sandbox_guard.py:283` | and | neg0 | KILLED | 8 | `test_short_token_is_refused` | `token is not None and token != "" and not _unsafe_exact(token) and token in text` |
+| 64 | `notion_sandbox_guard.py:283` | and | neg1 | KILLED | 1 | `test_hex_token_equal_to_the_page_id_sends_nothing` | `token is not None and token != "" and not _unsafe_exact(token) and token in text` |
+| 65 | `notion_sandbox_guard.py:283` | and | neg2 | KILLED | 1 | `test_hex_token_equal_to_the_page_id_sends_nothing` | `token is not None and token != "" and not _unsafe_exact(token) and token in text` |
+| 66 | `notion_sandbox_guard.py:283` | and | neg3 | KILLED | 106 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `token is not None and token != "" and not _unsafe_exact(token) and token in text` |
+| 67 | `notion_sandbox_guard.py:318` | or | swap | KILLED | 1 | `test_proc_path_helper_rejects_proc_itself` | `absolute == Path("/proc") or Path("/proc") in absolute.parents` |
+| 68 | `notion_sandbox_guard.py:318` | or | neg0 | KILLED | 110 | `test_write_evidence_redacts_a_planted_token` | `absolute == Path("/proc") or Path("/proc") in absolute.parents` |
+| 69 | `notion_sandbox_guard.py:318` | or | neg1 | KILLED | 110 | `test_write_evidence_redacts_a_planted_token` | `absolute == Path("/proc") or Path("/proc") in absolute.parents` |
+| 70 | `notion_sandbox_guard.py:323` | or | swap | EQUIVALENT | 0 | `—` | `str(path) == "" or path == Path() or under_proc(path)` |
+| 71 | `notion_sandbox_guard.py:323` | or | neg0 | KILLED | 109 | `test_write_evidence_redacts_a_planted_token` | `str(path) == "" or path == Path() or under_proc(path)` |
+| 72 | `notion_sandbox_guard.py:323` | or | neg1 | KILLED | 109 | `test_write_evidence_redacts_a_planted_token` | `str(path) == "" or path == Path() or under_proc(path)` |
+| 73 | `notion_sandbox_guard.py:323` | or | neg2 | KILLED | 109 | `test_write_evidence_redacts_a_planted_token` | `str(path) == "" or path == Path() or under_proc(path)` |
+| 74 | `notion_sandbox_guard.py:338` | or | swap | EQUIVALENT | 0 | `—` | `stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode)` |
+| 75 | `notion_sandbox_guard.py:338` | or | neg0 | KILLED | 109 | `test_write_evidence_redacts_a_planted_token` | `stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode)` |
+| 76 | `notion_sandbox_guard.py:338` | or | neg1 | KILLED | 109 | `test_write_evidence_redacts_a_planted_token` | `stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode)` |
+| 77 | `notion_sandbox_guard.py:368` | and | swap | KILLED | 1 | `test_enospc_ignores_pages_that_are_not_ids` | `type(page_id) is str and page_id != ""` |
+| 78 | `notion_sandbox_guard.py:368` | and | neg0 | KILLED | 2 | `test_enospc_after_creates_prints_ids` | `type(page_id) is str and page_id != ""` |
+| 79 | `notion_sandbox_guard.py:368` | and | neg1 | KILLED | 1 | `test_enospc_after_creates_prints_ids` | `type(page_id) is str and page_id != ""` |
+| 80 | `notion_sandbox_guard.py:377` | or | swap | KILLED | 1 | `timeout` | `written <= 0 or written > len(pending)` |
+| 81 | `notion_sandbox_guard.py:377` | or | neg0 | KILLED | 1 | `timeout` | `written <= 0 or written > len(pending)` |
+| 82 | `notion_sandbox_guard.py:377` | or | neg1 | KILLED | 105 | `test_write_evidence_redacts_a_planted_token` | `written <= 0 or written > len(pending)` |
+| 83 | `notion_sandbox_guard.py:390` | and | swap | KILLED | 2 | `test_swapped_evidence_file_does_not_exit_ok` | `opened.st_ino == current.st_ino and opened.st_dev == current.st_dev` |
+| 84 | `notion_sandbox_guard.py:390` | and | neg0 | KILLED | 105 | `test_write_evidence_redacts_a_planted_token` | `opened.st_ino == current.st_ino and opened.st_dev == current.st_dev` |
+| 85 | `notion_sandbox_guard.py:390` | and | neg1 | KILLED | 103 | `test_write_evidence_redacts_a_planted_token` | `opened.st_ino == current.st_ino and opened.st_dev == current.st_dev` |
+| 86 | `notion_sandbox_guard.py:455` | and | swap | KILLED | 1 | `test_repo_root_ignores_a_partial_marker` | `(candidate / "pyproject.toml").is_file() and (candidate / "docs" / "control").is_dir()` |
+| 87 | `notion_sandbox_guard.py:455` | and | neg0 | KILLED | 1 | `test_repo_root_needs_both_markers` | `(candidate / "pyproject.toml").is_file() and (candidate / "docs" / "control").is_dir()` |
+| 88 | `notion_sandbox_guard.py:455` | and | neg1 | KILLED | 2 | `test_repo_root_needs_both_markers` | `(candidate / "pyproject.toml").is_file() and (candidate / "docs" / "control").is_dir()` |
+| 89 | `notion_sandbox_guard.py:459` | and | swap | EQUIVALENT | 0 | `—` | `(candidate / "pyproject.toml").is_file() and (candidate / "docs" / "control").is_dir()` |
+| 90 | `notion_sandbox_guard.py:459` | and | neg0 | KILLED | 1 | `test_repo_root_falls_back_to_cwd` | `(candidate / "pyproject.toml").is_file() and (candidate / "docs" / "control").is_dir()` |
+| 91 | `notion_sandbox_guard.py:459` | and | neg1 | KILLED | 1 | `test_repo_root_falls_back_to_cwd` | `(candidate / "pyproject.toml").is_file() and (candidate / "docs" / "control").is_dir()` |
+| 92 | `notion_sandbox_guard.py:477` | or | swap | KILLED | 1 | `test_git_sha_rejects_a_bad_rev_parse` | `completed.returncode != 0 or len(sha) != 40` |
+| 93 | `notion_sandbox_guard.py:477` | or | neg0 | KILLED | 116 | `test_git_sha_rejects_a_bad_rev_parse` | `completed.returncode != 0 or len(sha) != 40` |
+| 94 | `notion_sandbox_guard.py:477` | or | neg1 | KILLED | 116 | `test_git_sha_rejects_a_bad_rev_parse` | `completed.returncode != 0 or len(sha) != 40` |
+| 95 | `notion_sandbox_guard.py:496` | or | swap | KILLED | 1 | `test_string_revision_is_unreadable` | `type(revision) is not int or type(session) is not int or type(head) is not str` |
+| 96 | `notion_sandbox_guard.py:496` | or | neg0 | KILLED | 114 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `type(revision) is not int or type(session) is not int or type(head) is not str` |
+| 97 | `notion_sandbox_guard.py:496` | or | neg1 | KILLED | 113 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `type(revision) is not int or type(session) is not int or type(head) is not str` |
+| 98 | `notion_sandbox_guard.py:496` | or | neg2 | KILLED | 113 | `test_wrong_space_refuses_with_zero_writes[89282fb0-ffff-8106-809e-0003c027fa07]` | `type(revision) is not int or type(session) is not int or type(head) is not str` |
+| 99 | `notion_sandbox_live.py:149` | or | swap | KILLED | 1 | `test_request_body_parent_is_asserted` | `type(sent_parent) is not dict or sent_parent.get("page_id") != parent or sent_parent.get("type") != "page_id"` |
+| 100 | `notion_sandbox_live.py:149` | or | neg0 | KILLED | 9 | `test_live_child_page_does_not_count_its_own_write` | `type(sent_parent) is not dict or sent_parent.get("page_id") != parent or sent_parent.get("type") != "page_id"` |
+| 101 | `notion_sandbox_live.py:149` | or | neg1 | KILLED | 10 | `test_live_child_page_does_not_count_its_own_write` | `type(sent_parent) is not dict or sent_parent.get("page_id") != parent or sent_parent.get("type") != "page_id"` |
+| 102 | `notion_sandbox_live.py:149` | or | neg2 | KILLED | 9 | `test_live_child_page_does_not_count_its_own_write` | `type(sent_parent) is not dict or sent_parent.get("page_id") != parent or sent_parent.get("type") != "page_id"` |
+| 103 | `notion_sandbox_live.py:164` | or | swap | KILLED | 1 | `test_wrong_space_create_is_not_published` | `page_id == "" or space_conflicts(page.space_id)` |
+| 104 | `notion_sandbox_live.py:164` | or | neg0 | KILLED | 5 | `test_doc_shaped_pages_execute_without_a_space` | `page_id == "" or space_conflicts(page.space_id)` |
+| 105 | `notion_sandbox_live.py:164` | or | neg1 | KILLED | 6 | `test_doc_shaped_pages_execute_without_a_space` | `page_id == "" or space_conflicts(page.space_id)` |
+| 106 | `notion_sandbox_live.py:170` | or | swap | KILLED | 2 | `test_live_child_page_does_not_count_its_own_write` | `evidence_ids is None or evidence_rows is None or page_id in evidence_ids` |
+| 107 | `notion_sandbox_live.py:170` | or | neg0 | KILLED | 3 | `test_doc_shaped_interrupt_after_store_records_the_created_id[0-exc0]` | `evidence_ids is None or evidence_rows is None or page_id in evidence_ids` |
+| 108 | `notion_sandbox_live.py:170` | or | neg1 | KILLED | 3 | `test_doc_shaped_interrupt_after_store_records_the_created_id[0-exc0]` | `evidence_ids is None or evidence_rows is None or page_id in evidence_ids` |
+| 109 | `notion_sandbox_live.py:170` | or | neg2 | KILLED | 3 | `test_doc_shaped_interrupt_after_store_records_the_created_id[0-exc0]` | `evidence_ids is None or evidence_rows is None or page_id in evidence_ids` |
+| 110 | `notion_sandbox_live.py:179` | or | swap | KILLED | 1 | `test_hex_token_equal_to_the_page_id_sends_nothing` | `leaks(url, self._token) or leaks(url.replace("-", ""), self._token)` |
+| 111 | `notion_sandbox_live.py:179` | or | neg0 | KILLED | 21 | `test_live_client_reads_without_writing_and_redacts` | `leaks(url, self._token) or leaks(url.replace("-", ""), self._token)` |
+| 112 | `notion_sandbox_live.py:179` | or | neg1 | KILLED | 22 | `test_live_client_reads_without_writing_and_redacts` | `leaks(url, self._token) or leaks(url.replace("-", ""), self._token)` |
+| 113 | `notion_sandbox_live.py:192` | and | swap | KILLED | 21 | `test_live_client_reads_without_writing_and_redacts` | `type(status) is int and 300 <= status < 400` |
+| 114 | `notion_sandbox_live.py:192` | and | neg0 | KILLED | 23 | `test_live_client_reads_without_writing_and_redacts` | `type(status) is int and 300 <= status < 400` |
+| 115 | `notion_sandbox_live.py:192` | and | neg1 | KILLED | 2 | `test_redirect_is_not_followed` | `type(status) is int and 300 <= status < 400` |
+| 116 | `notion_sandbox_live.py:215` | or | swap | KILLED | 1 | `test_non_string_bot_id_is_rejected` | `type(user_id) is not str or type(user_type) is not str` |
+| 117 | `notion_sandbox_live.py:215` | or | neg0 | KILLED | 17 | `test_live_client_reads_without_writing_and_redacts` | `type(user_id) is not str or type(user_type) is not str` |
+| 118 | `notion_sandbox_live.py:215` | or | neg1 | KILLED | 16 | `test_live_client_reads_without_writing_and_redacts` | `type(user_id) is not str or type(user_type) is not str` |
+| 119 | `notion_sandbox_live.py:219` | and | swap | KILLED | 2 | `test_missing_workspace_id_writes_nothing` | `type(bot) is dict and type(bot.get("workspace_id")) is str` |
+| 120 | `notion_sandbox_live.py:219` | and | neg0 | KILLED | 7 | `test_live_client_reads_without_writing_and_redacts` | `type(bot) is dict and type(bot.get("workspace_id")) is str` |
+| 121 | `notion_sandbox_live.py:219` | and | neg1 | KILLED | 7 | `test_live_client_reads_without_writing_and_redacts` | `type(bot) is dict and type(bot.get("workspace_id")) is str` |
+| 122 | `notion_sandbox_live.py:236` | or | swap | KILLED | 1 | `test_database_parent_and_missing_object_write_nothing` | `type(payload) is not dict or payload.get("object") != "page"` |
+| 123 | `notion_sandbox_live.py:236` | or | neg0 | KILLED | 24 | `test_live_client_reads_without_writing_and_redacts` | `type(payload) is not dict or payload.get("object") != "page"` |
+| 124 | `notion_sandbox_live.py:236` | or | neg1 | KILLED | 25 | `test_live_client_reads_without_writing_and_redacts` | `type(payload) is not dict or payload.get("object") != "page"` |
+| 125 | `notion_sandbox_live.py:253` | and | swap | KILLED | 2 | `test_live_space_fallback_is_only_the_asserted_parent` | `space == "" and page_id == canonical_id(expected_id)` |
+| 126 | `notion_sandbox_live.py:253` | and | neg0 | KILLED | 7 | `test_live_client_reads_without_writing_and_redacts` | `space == "" and page_id == canonical_id(expected_id)` |
+| 127 | `notion_sandbox_live.py:253` | and | neg1 | KILLED | 7 | `test_live_client_reads_without_writing_and_redacts` | `space == "" and page_id == canonical_id(expected_id)` |
+| 128 | `notion_sandbox_live.py:256` | or | swap | KILLED | 1 | `test_parse_page_keeps_a_url_and_fills_a_blank_one` | `type(url) is not str or url == ""` |
+| 129 | `notion_sandbox_live.py:256` | or | neg0 | KILLED | 1 | `test_parse_page_keeps_a_url_and_fills_a_blank_one` | `type(url) is not str or url == ""` |
+| 130 | `notion_sandbox_live.py:256` | or | neg1 | KILLED | 1 | `test_parse_page_keeps_a_url_and_fills_a_blank_one` | `type(url) is not str or url == ""` |
+| 131 | `notion_sandbox_live.py:260` | or | swap | KILLED | 1 | `test_string_in_trash_is_rejected` | `archived_flag is None or trash_flag is None` |
+| 132 | `notion_sandbox_live.py:260` | or | neg0 | KILLED | 24 | `test_live_client_reads_without_writing_and_redacts` | `archived_flag is None or trash_flag is None` |
+| 133 | `notion_sandbox_live.py:260` | or | neg1 | KILLED | 25 | `test_live_client_reads_without_writing_and_redacts` | `archived_flag is None or trash_flag is None` |
+| 134 | `notion_sandbox_live.py:262` | or | swap | KILLED | 2 | `test_trashed_parent_writes_nothing[archived]` | `archived_flag or trash_flag` |
+| 135 | `notion_sandbox_live.py:262` | or | neg0 | KILLED | 6 | `test_trashed_parent_writes_nothing[archived]` | `archived_flag or trash_flag` |
+| 136 | `notion_sandbox_live.py:262` | or | neg1 | KILLED | 6 | `test_trashed_parent_writes_nothing[in_trash]` | `archived_flag or trash_flag` |
+| 137 | `notion_sandbox_live.py:277` | or | swap | KILLED | 19 | `test_live_client_reads_without_writing_and_redacts` | `type(value) is not str or value == ""` |
+| 138 | `notion_sandbox_live.py:277` | or | neg0 | KILLED | 22 | `test_live_client_reads_without_writing_and_redacts` | `type(value) is not str or value == ""` |
+| 139 | `notion_sandbox_live.py:277` | or | neg1 | KILLED | 3 | `test_doc_shaped_pages_execute_without_a_space` | `type(value) is not str or value == ""` |
+| 140 | `notion_sandbox_live.py:309` | and | swap | KILLED | 1 | `test_proxy_map_drops_non_strings` | `type(key) is str and type(value) is str` |
+| 141 | `notion_sandbox_live.py:309` | and | neg0 | KILLED | 2 | `test_proxy_map_reads_string_proxy_entries` | `type(key) is str and type(value) is str` |
+| 142 | `notion_sandbox_live.py:309` | and | neg1 | KILLED | 2 | `test_proxy_map_reads_string_proxy_entries` | `type(key) is str and type(value) is str` |
+| 143 | `notion_sandbox_live.py:318` | and | swap | KILLED | 1 | `test_explicit_space_skips_a_non_id` | `type(value) is str and canonical_id(value) != ""` |
+| 144 | `notion_sandbox_live.py:318` | and | neg0 | KILLED | 4 | `test_live_space_fallback_is_only_the_asserted_parent` | `type(value) is str and canonical_id(value) != ""` |
+| 145 | `notion_sandbox_live.py:318` | and | neg1 | KILLED | 4 | `test_live_space_fallback_is_only_the_asserted_parent` | `type(value) is str and canonical_id(value) != ""` |
+| 146 | `notion_sandbox_pipeline.py:146` | or | swap | EQUIVALENT | 0 | `—` | `page_id == "" or space_conflicts(page.space_id)` |
+| 147 | `notion_sandbox_pipeline.py:146` | or | neg0 | KILLED | 21 | `test_execute_on_the_fake_adapter_writes_evidence` | `page_id == "" or space_conflicts(page.space_id)` |
+| 148 | `notion_sandbox_pipeline.py:146` | or | neg1 | KILLED | 21 | `test_execute_on_the_fake_adapter_writes_evidence` | `page_id == "" or space_conflicts(page.space_id)` |
+| 149 | `notion_sandbox_pipeline.py:176` | or | swap | KILLED | 1 | `test_sandbox_parent_in_a_foreign_space_fails_the_chain` | `space_conflicts(current.space_id) or current.archived` |
+| 150 | `notion_sandbox_pipeline.py:176` | or | neg0 | KILLED | 16 | `test_execute_on_the_fake_adapter_writes_evidence` | `space_conflicts(current.space_id) or current.archived` |
+| 151 | `notion_sandbox_pipeline.py:176` | or | neg1 | KILLED | 15 | `test_execute_on_the_fake_adapter_writes_evidence` | `space_conflicts(current.space_id) or current.archived` |
+| 152 | `notion_sandbox_pipeline.py:181` | or | swap | KILLED | 2 | `test_broken_ancestor_stops_later_writes` | `parent_id == "" or page_id == "" or page_id in seen` |
+| 153 | `notion_sandbox_pipeline.py:181` | or | neg0 | KILLED | 17 | `test_execute_on_the_fake_adapter_writes_evidence` | `parent_id == "" or page_id == "" or page_id in seen` |
+| 154 | `notion_sandbox_pipeline.py:181` | or | neg1 | KILLED | 16 | `test_execute_on_the_fake_adapter_writes_evidence` | `parent_id == "" or page_id == "" or page_id in seen` |
+| 155 | `notion_sandbox_pipeline.py:181` | or | neg2 | KILLED | 16 | `test_execute_on_the_fake_adapter_writes_evidence` | `parent_id == "" or page_id == "" or page_id in seen` |
+| 156 | `notion_sandbox_pipeline.py:185` | or | swap | KILLED | 1 | `test_trashed_product_page_stops_further_writes` | `space_conflicts(current.space_id) or current.archived` |
+| 157 | `notion_sandbox_pipeline.py:185` | or | neg0 | KILLED | 15 | `test_execute_on_the_fake_adapter_writes_evidence` | `space_conflicts(current.space_id) or current.archived` |
+| 158 | `notion_sandbox_pipeline.py:185` | or | neg1 | KILLED | 15 | `test_execute_on_the_fake_adapter_writes_evidence` | `space_conflicts(current.space_id) or current.archived` |
+| 159 | `notion_sandbox_pipeline.py:218` | or | swap | KILLED | 2 | `test_trashed_confirm_stops_further_writes` | `space_conflicts(confirmed.space_id) or confirmed.archived` |
+| 160 | `notion_sandbox_pipeline.py:218` | or | neg0 | KILLED | 16 | `test_execute_on_the_fake_adapter_writes_evidence` | `space_conflicts(confirmed.space_id) or confirmed.archived` |
+| 161 | `notion_sandbox_pipeline.py:218` | or | neg1 | KILLED | 16 | `test_execute_on_the_fake_adapter_writes_evidence` | `space_conflicts(confirmed.space_id) or confirmed.archived` |
+| 162 | `notion_sandbox_pipeline.py:223` | and | swap | EQUIVALENT | 0 | `—` | `ctx.created and ctx.created[-1].get("id") == page_id` |
+| 163 | `notion_sandbox_pipeline.py:223` | and | neg0 | KILLED | 1 | `test_token_in_created_url_exits_70` | `ctx.created and ctx.created[-1].get("id") == page_id` |
+| 164 | `notion_sandbox_pipeline.py:223` | and | neg1 | KILLED | 1 | `test_token_in_created_url_exits_70` | `ctx.created and ctx.created[-1].get("id") == page_id` |
+| 165 | `notion_sandbox_pipeline.py:253` | or | swap | KILLED | 1 | `test_variants_without_a_product_page_are_a_sandbox_error` | `ctx.probe is None or ctx.product_page_id is None or type(spec) is not ProductSpec` |
+| 166 | `notion_sandbox_pipeline.py:253` | or | neg0 | KILLED | 15 | `test_execute_on_the_fake_adapter_writes_evidence` | `ctx.probe is None or ctx.product_page_id is None or type(spec) is not ProductSpec` |
+| 167 | `notion_sandbox_pipeline.py:253` | or | neg1 | KILLED | 16 | `test_execute_on_the_fake_adapter_writes_evidence` | `ctx.probe is None or ctx.product_page_id is None or type(spec) is not ProductSpec` |
+| 168 | `notion_sandbox_pipeline.py:253` | or | neg2 | KILLED | 15 | `test_execute_on_the_fake_adapter_writes_evidence` | `ctx.probe is None or ctx.product_page_id is None or type(spec) is not ProductSpec` |
+
 ## 2026-10-07 — Session 07 sandbox run: tip-sync onto the W9 squash
 
 Not a session close. This is not SESSION_07 COMPLETE. State revision 57 → 58. `head_sha` is the W9 squash `a4e9b025021b4effbb2b2879c1db756403cb1676`. It is the tip-sync pointer. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. Twelve session 7 evidence keys stay false. `commissioned_agents` stays empty. `session_status` stays incomplete. Exit 78 stays HELD. The §11 sandbox CLI is still not run live. W10 is in flight from `a4e9b025` and will also bump STATE, so whichever PR merges second re-syncs. `updated_at` is `2026-10-07T23:01:03Z`.

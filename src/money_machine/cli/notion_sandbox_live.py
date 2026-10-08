@@ -7,13 +7,15 @@ client was injected.
 from __future__ import annotations
 
 import json
+import os
+import ssl
 import urllib.request
 from collections.abc import Callable, Mapping
+from datetime import datetime
 from typing import Protocol, cast
 
 from money_machine.cli.notion_sandbox_guard import (
     SANDBOX_PARENT_PAGE_ID,
-    SANDBOX_SPACE_ID,
     BotView,
     PageView,
     SandboxError,
@@ -22,6 +24,7 @@ from money_machine.cli.notion_sandbox_guard import (
     leaks,
     parent_is_allowed,
     redact_text,
+    space_conflicts,
 )
 
 NOTION_API_ORIGIN = "https://api.notion.com"
@@ -44,9 +47,41 @@ def asserted_body_parent(parent_id: str) -> str:
     return canonical_id(parent_id)
 
 
+_CERT_ENV = ("SSL_CERT_DIR", "SSL_CERT_FILE")
+
+
+class RefuseRedirect(urllib.request.HTTPRedirectHandler):
+    """A 3xx must not send the bearer token to another host."""
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: _Readable,
+        code: int,
+        msg: str,
+        headers: object,
+        newurl: str,
+    ) -> urllib.request.Request | None:
+        del req, fp, code, msg, headers, newurl
+        raise SandboxError("notion api error")
+
+
+def default_tls_context() -> ssl.SSLContext:
+    """The default trust store, even if a cert env var names a missing file."""
+    saved = {name: os.environ.pop(name) for name in _CERT_ENV if name in os.environ}
+    try:
+        return ssl.create_default_context()
+    finally:
+        os.environ.update(saved)
+
+
 def sandbox_opener() -> urllib.request.OpenerDirector:
-    """HTTPS opener that ignores ``HTTPS_PROXY``."""
-    return urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    """HTTPS opener that ignores proxies and refuses redirects."""
+    return urllib.request.build_opener(
+        urllib.request.ProxyHandler({}),
+        RefuseRedirect(),
+        urllib.request.HTTPSHandler(context=default_tls_context()),
+    )
 
 
 class LiveSandboxClient:
@@ -61,7 +96,14 @@ class LiveSandboxClient:
         )
         self._bot_space = ""
         self._created_ids: list[str] = []
+        self._evidence_ids: list[str] | None = None
+        self._evidence_rows: list[dict[str, str]] | None = None
         self.write_counts: dict[str, int] = empty_write_counts()
+
+    def bind_created(self, ids: list[str], rows: list[dict[str, str]]) -> None:
+        """Record each accepted create into the run's evidence lists."""
+        self._evidence_ids = ids
+        self._evidence_rows = rows
 
     def proxy_targets(self) -> dict[str, str]:
         """Proxy map installed on the default opener. Empty means no proxy."""
@@ -110,11 +152,27 @@ class LiveSandboxClient:
         ):
             raise SandboxError("parent is not the sandbox parent")
         payload = self._send("POST", "/v1/pages", body)
-        page = parse_page(payload, fallback_space=SANDBOX_SPACE_ID, expected_id="")
+        page = parse_page(payload, fallback_space="", expected_id="")
         if page is None:
             raise SandboxError("notion api error")
-        self._created_ids.append(page.page_id)
+        self._publish(page)
         return page
+
+    def _publish(self, page: PageView) -> None:
+        """Append the id as soon as the create response parses. No further read."""
+        page_id = canonical_id(page.page_id)
+        if page_id == "" or space_conflicts(page.space_id):
+            return
+        if page_id not in self._created_ids:
+            self._created_ids.append(page_id)
+        evidence_ids = self._evidence_ids
+        evidence_rows = self._evidence_rows
+        if evidence_ids is None or evidence_rows is None or page_id in evidence_ids:
+            return
+        evidence_ids.append(page_id)
+        evidence_rows.append(
+            {"id": page_id, "parent_id": canonical_id(page.parent_id), "url": page.url}
+        )
 
     def _send(self, method: str, path: str, body: bytes | None) -> object:
         url = NOTION_API_ORIGIN + path
@@ -128,6 +186,12 @@ class LiveSandboxClient:
             request.add_header("Content-Type", "application/json")
         try:
             response = self._opener(request, timeout=_TIMEOUT_SECONDS)
+            status = getattr(response, "status", None)
+            if type(status) is not int:
+                status = getattr(response, "code", None)
+            if type(status) is int and 300 <= status < 400:
+                response.close()
+                raise SandboxError("notion api error")
             raw = response.read()
             response.close()
         except SandboxError:
@@ -203,7 +267,32 @@ def parse_page(payload: object, *, fallback_space: str, expected_id: str) -> Pag
         url=url,
         archived=archived,
         parent_type=parent_type,
+        created_by=_created_by(payload),
+        created_time=parse_created_time(payload.get("created_time")),
     )
+
+
+def parse_created_time(value: object) -> datetime | None:
+    """Parse a Notion timestamp. Naive or blank values stay unset."""
+    if type(value) is not str or value == "":
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed
+
+
+def _created_by(payload: Mapping[str, object]) -> str:
+    actor = payload.get("created_by")
+    if type(actor) is not dict:
+        return ""
+    found = actor.get("id")
+    if type(found) is not str:
+        return ""
+    return found
 
 
 def proxy_map(director: urllib.request.OpenerDirector) -> dict[str, str]:

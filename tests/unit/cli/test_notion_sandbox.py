@@ -3,22 +3,27 @@
 from __future__ import annotations
 
 import ast
+import asyncio
 import base64
+import contextlib
+import errno
 import io
 import json
 import logging
 import os
 import socket
+import stat
 import subprocess
 import sys
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 from urllib.parse import quote
 
 import pytest
 
-from money_machine.cli.notion_sandbox import main
+from money_machine.cli.notion_sandbox import main, reraise
 from money_machine.cli.notion_sandbox_guard import (
     EXIT_API,
     EXIT_NO_TOKEN,
@@ -34,27 +39,44 @@ from money_machine.cli.notion_sandbox_guard import (
     SandboxError,
     argv_refused,
     canonical_id,
+    cert_env_set,
+    commit_evidence,
     empty_write_counts,
     git_sha,
     leaks,
+    open_evidence,
     override_env,
     parent_is_allowed,
     qa_verdict,
     redact_text,
     repo_root,
+    space_conflicts,
     stage_status,
     target_ok,
     token_from_environ,
+    under_proc,
     write_evidence,
 )
 from money_machine.cli.notion_sandbox_live import (
     NOTION_VERSION,
     LiveSandboxClient,
+    RefuseRedirect,
     asserted_body_parent,
+    explicit_space,
+    parse_bot,
+    parse_created_time,
     parse_page,
     proxy_map,
+    sandbox_opener,
 )
-from money_machine.cli.notion_sandbox_pipeline import SandboxRun, create_under
+from money_machine.cli.notion_sandbox_pipeline import (
+    SandboxRun,
+    chain_reaches_sandbox,
+    create_under,
+    sandbox_product_spec,
+    stage_runners,
+)
+from money_machine.integrations.notion.fixture_adapter import FixtureNotionAdapter
 
 _SECRET = "secret_" + ("a" * 43)
 _NTN = "ntn_" + ("b" * 43)
@@ -118,7 +140,7 @@ class FakeSandbox:
         page_space: str | None = None,
         archived: bool = False,
         user_type: object = "bot",
-        user_id: str = "bot-user",
+        user_id: object = "bot-user",
         error: BaseException | None = None,
     ) -> None:
         self.space = space
@@ -132,6 +154,12 @@ class FakeSandbox:
         self.creates: list[tuple[str, str]] = []
         self.reads: list[str] = []
         self.pages: dict[str, PageView] = {}
+        self._evidence_ids: list[str] | None = None
+        self._evidence_rows: list[dict[str, str]] | None = None
+
+    def bind_created(self, ids: list[str], rows: list[dict[str, str]]) -> None:
+        self._evidence_ids = ids
+        self._evidence_rows = rows
 
     def read_bot(self) -> BotView:
         self.reads.append("bot")
@@ -152,6 +180,8 @@ class FakeSandbox:
                 space_id=self.page_space,
                 url=f"https://www.notion.so/{_PARENT_RAW.lower()}",
                 archived=self.archived,
+                created_by=self._actor(),
+                created_time=_WHEN,
             )
         return PageView(
             page_id=wanted,
@@ -159,6 +189,8 @@ class FakeSandbox:
             space_id=_WRONG_SPACE,
             url="https://www.notion.so/foreign",
             archived=False,
+            created_by=self._actor(),
+            created_time=_WHEN,
         )
 
     def create_child_page(self, parent_id: str, title: str) -> PageView:
@@ -173,14 +205,38 @@ class FakeSandbox:
             space_id=canonical_id(_SPACE_RAW),
             url=f"https://www.notion.so/{page_id.lower()}",
             archived=False,
+            created_by=self._actor(),
+            created_time=_WHEN,
         )
-        return PageView(
+        page = PageView(
             page_id=page_id,
             parent_id=parent_id.replace("-", "").upper(),
             space_id=_SPACE_RAW,
             url=f"https://www.notion.so/{page_id.lower()}",
             archived=False,
+            created_by=self._actor(),
+            created_time=_WHEN,
         )
+        self._publish(page)
+        return page
+
+    def _publish(self, page: PageView) -> None:
+        page_id = canonical_id(page.page_id)
+        if page_id == "" or space_conflicts(page.space_id):
+            return
+        evidence_ids = self._evidence_ids
+        evidence_rows = self._evidence_rows
+        if evidence_ids is None or evidence_rows is None or page_id in evidence_ids:
+            return
+        evidence_ids.append(page_id)
+        evidence_rows.append(
+            {"id": page_id, "parent_id": canonical_id(page.parent_id), "url": page.url}
+        )
+
+    def _actor(self) -> str:
+        if type(self.user_id) is str:
+            return self.user_id
+        return "bot-user"
 
 
 @pytest.fixture(autouse=True)
@@ -247,6 +303,46 @@ def _invoke(
     return code, payload, captured.out, captured.err, logs
 
 
+def _writes(payload: dict[str, object]) -> int:
+    counts = payload["write_counts"]
+    assert isinstance(counts, dict)
+    total = 0
+    for label in ("fixture", "live"):
+        section = counts[label]
+        assert isinstance(section, dict)
+        assert "get_public_url" not in section
+        for value in section.values():
+            assert type(value) is int
+            total += value
+    return total
+
+
+def _echo(page: PageView, **changes: object) -> PageView:
+    values: dict[str, object] = {
+        "archived": page.archived,
+        "created_by": page.created_by,
+        "created_time": page.created_time,
+        "page_id": page.page_id,
+        "parent_id": page.parent_id,
+        "parent_type": page.parent_type,
+        "space_id": page.space_id,
+        "url": page.url,
+    }
+    values.update(changes)
+    return PageView(
+        page_id=str(values["page_id"]),
+        parent_id=str(values["parent_id"]),
+        space_id=str(values["space_id"]),
+        url=str(values["url"]),
+        archived=bool(values["archived"]),
+        parent_type=str(values["parent_type"]),
+        created_by=str(values["created_by"]),
+        created_time=values["created_time"]
+        if isinstance(values["created_time"], datetime)
+        else None,
+    )
+
+
 def _stage(payload: dict[str, object], name: str) -> dict[str, object]:
     stages = payload["stages"]
     assert isinstance(stages, list)
@@ -307,6 +403,15 @@ def test_target_and_parent_guards() -> None:
         parent_type="database_id",
     )
     assert target_ok(bot, database_parent) is False
+    data_source_parent = PageView(
+        page.page_id,
+        "",
+        page.space_id,
+        page.url,
+        False,
+        parent_type="data_source_id",
+    )
+    assert target_ok(bot, data_source_parent) is False
     assert parent_is_allowed(_WRONG_PARENT, (SANDBOX_PARENT_PAGE_ID,)) is False
     assert parent_is_allowed(SANDBOX_PARENT_PAGE_ID, (SANDBOX_PARENT_PAGE_ID,)) is True
     assert parent_is_allowed(_CHILD_IDS[0], (SANDBOX_PARENT_PAGE_ID, _CHILD_IDS[0])) is True
@@ -337,6 +442,16 @@ def test_token_env_and_redaction_units() -> None:
     assert qa_verdict(({"name": "qa", "status": "NOT_RUN"},)) == "NOT_RUN"
     assert qa_verdict(({"name": "qa", "status": "FAILED"},)) == "FAIL"
     assert qa_verdict(({"name": "qa", "status": "BLOCKED"},)) == "BLOCKED"
+    assert qa_verdict(({"name": "build", "status": "PASS"},)) == "NOT_RUN"
+    assert (
+        qa_verdict(
+            (
+                {"name": "qa", "status": "FAILED"},
+                {"name": "build", "status": "PASS"},
+            )
+        )
+        == "FAIL"
+    )
     assert leaks(_SECRET, _SECRET) is True
 
 
@@ -393,10 +508,8 @@ def test_wrong_space_refuses_with_zero_writes(
     code, payload, out, err, logs = _invoke(evidence, capsys, caplog, ["--execute"], client=client)
     assert code == EXIT_TARGET
     assert err == "sandbox target mismatch\n"
-    counts = payload["write_counts"]
-    assert isinstance(counts, dict)
     assert client.creates == []
-    assert sum(counts.values()) == 0
+    assert _writes(payload) == 0
     assert _stage(payload, "build")["status"] == "BLOCKED"
     assert _stage(payload, "qa")["status"] == "NOT_RUN"
     assert payload["qa_verdict"] == "NOT_RUN"
@@ -466,11 +579,9 @@ def test_missing_token_ignores_other_sources(
     )
     assert code == EXIT_NO_TOKEN
     assert err == "notion sandbox token is missing\n"
-    counts = payload["write_counts"]
-    assert isinstance(counts, dict)
     assert client.reads == []
     assert client.creates == []
-    assert sum(counts.values()) == 0
+    assert _writes(payload) == 0
     assert payload["redaction_self_check"] == "PASS"
     _assert_clean(out, err, logs, evidence.read_text(encoding="utf-8"))
 
@@ -495,11 +606,9 @@ def test_override_env_refuses(
     )
     assert code == EXIT_USAGE
     assert err == "usage error\n"
-    counts = payload["write_counts"]
-    assert isinstance(counts, dict)
     assert client.creates == []
     assert payload["created_pages"] == []
-    assert sum(counts.values()) == 0
+    assert _writes(payload) == 0
     _assert_clean(out, err, logs, evidence.read_text(encoding="utf-8"))
 
 
@@ -575,11 +684,9 @@ def test_dry_run_is_the_default_and_writes_nothing(
     assert err == ""
     assert payload["mode"] == "dry-run"
     assert client.reads == ["bot", SANDBOX_PARENT_PAGE_ID]
-    counts = payload["write_counts"]
-    assert isinstance(counts, dict)
     assert client.creates == []
     assert payload["created_pages"] == []
-    assert sum(counts.values()) == 0
+    assert _writes(payload) == 0
     assert _stage(payload, "build") == {
         "available": True,
         "name": "build",
@@ -649,8 +756,12 @@ def test_execute_on_the_fake_adapter_writes_evidence(
     assert payload["bot_user_id"] == "bot-user"
     assert payload["qa_verdict"] == "NOT_RUN"
     assert payload["redaction_self_check"] == "PASS"
-    assert payload["control_state_revision"] == 58
+    assert "error" not in payload
+    assert payload.get("run_status") != "INTERRUPTED"
+    state = json.loads(_STATE.read_text(encoding="utf-8"))
+    assert payload["control_state_revision"] == state["state_revision"]
     assert payload["current_session"] == 7
+    assert stat.S_IMODE(evidence.stat().st_mode) == 0o600
     assert _stage(payload, "build")["status"] == "PASS"
     assert _stage(payload, "variants")["status"] == "PASS"
     for name in _ABSENT:
@@ -665,7 +776,14 @@ def test_execute_on_the_fake_adapter_writes_evidence(
         assert page["url"].startswith("https://www.notion.so/")
     counts = payload["write_counts"]
     assert isinstance(counts, dict)
-    assert counts["create_child_page"] == 5
+    live_top = counts["live"]
+    fixture_top = counts["fixture"]
+    assert isinstance(live_top, dict)
+    assert isinstance(fixture_top, dict)
+    assert live_top["create_child_page"] == 5
+    assert "create_child_page" not in fixture_top
+    assert "get_public_url" not in fixture_top
+    assert "get_public_url" not in live_top
     fixture = payload["fixture"]
     live = payload["live"]
     assert isinstance(fixture, dict)
@@ -677,7 +795,6 @@ def test_execute_on_the_fake_adapter_writes_evidence(
     assert isinstance(fixture_counts, dict)
     assert isinstance(live_counts, dict)
     assert "create_child_page" not in fixture_counts
-    assert "get_public_url" not in counts
     assert "get_public_url" not in fixture_counts
     assert live_counts == {"create_child_page": 5}
     assert live["created_pages"] == created
@@ -704,10 +821,8 @@ def test_absent_stage_failure_stays_not_run(
     assert _stage(payload, "build")["error"] != ""
     assert _stage(payload, "variants")["status"] == "NOT_RUN"
     assert _stage(payload, "qa")["status"] == "NOT_RUN"
-    counts = payload["write_counts"]
-    assert isinstance(counts, dict)
     assert payload["qa_verdict"] == "NOT_RUN"
-    assert sum(counts.values()) == 0
+    assert _writes(payload) == 0
 
 
 def test_run_path_imports_no_etsy_or_commission() -> None:
@@ -1091,7 +1206,7 @@ def test_non_string_user_type_exits_69(
 class _LieResponse(FakeSandbox):
     def create_child_page(self, parent_id: str, title: str) -> PageView:
         page = super().create_child_page(parent_id, title)
-        return PageView(page.page_id, _WRONG_PARENT, page.space_id, page.url, False)
+        return _echo(page, parent_id=_WRONG_PARENT)
 
 
 class _LieReread(FakeSandbox):
@@ -1099,7 +1214,7 @@ class _LieReread(FakeSandbox):
         page = super().create_child_page(parent_id, title)
         child = canonical_id(page.page_id)
         stored = self.pages[child]
-        self.pages[child] = PageView(stored.page_id, _WRONG_PARENT, _WRONG_SPACE, stored.url, False)
+        self.pages[child] = _echo(stored, parent_id=_WRONG_PARENT, space_id=_WRONG_SPACE)
         return page
 
 
@@ -1109,13 +1224,7 @@ class _WrongNest(FakeSandbox):
         if len(self.creates) == 2:
             child = canonical_id(page.page_id)
             stored = self.pages[child]
-            self.pages[child] = PageView(
-                stored.page_id,
-                SANDBOX_PARENT_PAGE_ID,
-                stored.space_id,
-                stored.url,
-                False,
-            )
+            self.pages[child] = _echo(stored, parent_id=SANDBOX_PARENT_PAGE_ID)
         return page
 
 
@@ -1130,7 +1239,7 @@ class _LieReturnedId(FakeSandbox):
     def create_child_page(self, parent_id: str, title: str) -> PageView:
         page = super().create_child_page(parent_id, title)
         if len(self.creates) == 1:
-            return PageView(_LIE_ID, page.parent_id, page.space_id, page.url, False)
+            return _echo(page, page_id=_LIE_ID)
         return page
 
     def read_page(self, page_id: str) -> PageView:
@@ -1143,7 +1252,7 @@ class _WrongSpaceReturn(FakeSandbox):
     def create_child_page(self, parent_id: str, title: str) -> PageView:
         page = super().create_child_page(parent_id, title)
         if len(self.creates) == 1:
-            return PageView(page.page_id, page.parent_id, _WRONG_SPACE, page.url, False)
+            return _echo(page, space_id=_WRONG_SPACE)
         return page
 
 
@@ -1153,14 +1262,21 @@ class _BrokenAncestor(FakeSandbox):
         if len(self.creates) == 2:
             product = canonical_id(_CHILD_IDS[0])
             stored = self.pages[product]
-            self.pages[product] = PageView(
-                stored.page_id,
-                _WRONG_PARENT,
-                stored.space_id,
-                stored.url,
-                False,
-            )
+            self.pages[product] = _echo(stored, parent_id=_WRONG_PARENT)
         return page
+
+    def read_page(self, page_id: str) -> PageView:
+        if canonical_id(page_id) == canonical_id(_WRONG_PARENT):
+            return PageView(
+                page_id=canonical_id(page_id),
+                parent_id="",
+                space_id="",
+                url="https://www.notion.so/foreign",
+                archived=False,
+                created_by=self._actor(),
+                created_time=_WHEN,
+            )
+        return super().read_page(page_id)
 
 
 class _SecretUrl(FakeSandbox):
@@ -1169,14 +1285,8 @@ class _SecretUrl(FakeSandbox):
         child = canonical_id(page.page_id)
         stored = self.pages[child]
         leaked = f"https://www.notion.so/{_SECRET}"
-        self.pages[child] = PageView(
-            stored.page_id,
-            stored.parent_id,
-            stored.space_id,
-            leaked,
-            False,
-        )
-        return PageView(page.page_id, page.parent_id, page.space_id, leaked, False)
+        self.pages[child] = _echo(stored, url=leaked)
+        return _echo(page, url=leaked)
 
 
 def test_lying_response_parent_stops(
@@ -1206,7 +1316,9 @@ def test_lying_reread_stops_later_writes(
     assert code == EXIT_API
     assert err == "sandbox stage failed\n"
     assert len(client.creates) == 1
-    assert payload["created_pages"] == []
+    created = payload["created_pages"]
+    assert isinstance(created, list)
+    assert [page["id"] for page in created] == [canonical_id(_CHILD_IDS[0])]
     live = payload["live"]
     assert isinstance(live, dict)
     assert live["write_counts"] == {"create_child_page": 1}
@@ -1394,7 +1506,9 @@ def test_lying_create_id_stops_before_colours(
     assert code == EXIT_API
     assert err == "sandbox stage failed\n"
     assert len(client.creates) == 1
-    assert payload["created_pages"] == []
+    created = payload["created_pages"]
+    assert isinstance(created, list)
+    assert [page["id"] for page in created] == [canonical_id(_LIE_ID)]
     assert all(canonical_id(parent) != canonical_id(_LIE_ID) for parent, _title in client.creates)
 
 
@@ -1409,8 +1523,11 @@ def test_wrong_space_on_create_return_stops(
     )
     assert code == EXIT_API
     assert err == "sandbox stage failed\n"
+    assert _stage(payload, "build")["status"] == "FAILED"
     assert len(client.creates) == 1
-    assert payload["created_pages"] == []
+    created = payload["created_pages"]
+    assert isinstance(created, list)
+    assert created == []
     live = payload["live"]
     assert isinstance(live, dict)
     assert live["write_counts"] == {"create_child_page": 1}
@@ -1541,32 +1658,33 @@ def test_read_base_exceptions_stay_redacted(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.DEBUG)
-    exited = FakeSandbox(error=SystemExit(7))
-    with pytest.raises(SystemExit) as caught:
-        main(
-            ["--evidence-out", str(evidence), "--execute"],
-            client=exited,
+    samples: tuple[tuple[str, BaseException], ...] = (
+        ("system", SystemExit(7)),
+        ("interrupt", KeyboardInterrupt(_SECRET)),
+        ("base", BaseException(_SECRET)),
+    )
+    for name, exc in samples:
+        path = evidence.with_name(f"read-{name}.json")
+        client = FakeSandbox(error=exc)
+        code = main(
+            ["--evidence-out", str(path), "--execute"],
+            client=client,
             environ={"NOTION_SANDBOX_TOKEN": _SECRET},
             clock=_clock,
         )
-    assert caught.value.code == 7
-    assert exited.creates == []
-    interrupted = FakeSandbox(error=KeyboardInterrupt(_SECRET))
-    other = evidence.with_name("interrupt.json")
-    with pytest.raises(KeyboardInterrupt) as blank:
-        main(
-            ["--evidence-out", str(other), "--execute"],
-            client=interrupted,
-            environ={"NOTION_SANDBOX_TOKEN": _SECRET},
-            clock=_clock,
-        )
-    assert blank.value.args == ()
-    assert _SECRET not in str(blank.value)
-    assert interrupted.creates == []
-    captured = capsys.readouterr()
-    assert "Traceback" not in captured.err
-    assert _SECRET not in captured.err
-    assert _SECRET not in caplog.text
+        captured = capsys.readouterr()
+        assert code == EXIT_API
+        assert captured.err == "notion api error\n"
+        assert "Traceback" not in captured.err
+        assert "Traceback" not in caplog.text
+        assert _SECRET not in captured.err
+        assert _SECRET not in caplog.text
+        body = path.read_text(encoding="utf-8")
+        assert body != ""
+        assert _SECRET not in body
+        loaded = json.loads(body)
+        assert loaded["error"] == "notion api error"
+        assert client.creates == []
 
 
 def test_parse_page_keeps_a_url_and_fills_a_blank_one() -> None:
@@ -1616,4 +1734,1442 @@ def test_broken_ancestor_stops_later_writes(
     assert len(client.creates) == 2
     created = payload["created_pages"]
     assert isinstance(created, list)
-    assert len(created) == 1
+    assert [page["id"] for page in created] == [canonical_id(item) for item in _CHILD_IDS[:2]]
+
+
+class _TrashOnChain(FakeSandbox):
+    def read_page(self, page_id: str) -> PageView:
+        page = super().read_page(page_id)
+        if canonical_id(page_id) == canonical_id(_CHILD_IDS[0]) and len(self.creates) >= 2:
+            return _echo(page, archived=True)
+        return page
+
+
+class _TrashOnConfirm(FakeSandbox):
+    def read_page(self, page_id: str) -> PageView:
+        page = super().read_page(page_id)
+        if canonical_id(page_id) == canonical_id(_CHILD_IDS[0]) and len(self.creates) == 1:
+            return _echo(page, archived=True)
+        return page
+
+
+class _StaleCreate(FakeSandbox):
+    def create_child_page(self, parent_id: str, title: str) -> PageView:
+        page = super().create_child_page(parent_id, title)
+        if len(self.creates) != 1:
+            return page
+        self.pages[canonical_id(_LIE_ID)] = _echo(page, page_id=_LIE_ID)
+        return _echo(page, page_id=_LIE_ID, created_by="other-user")
+
+    def read_page(self, page_id: str) -> PageView:
+        stored = self.pages.get(canonical_id(page_id))
+        if stored is not None and canonical_id(page_id) == canonical_id(_LIE_ID):
+            return stored
+        return super().read_page(page_id)
+
+
+class _StaleConfirm(FakeSandbox):
+    def read_page(self, page_id: str) -> PageView:
+        page = super().read_page(page_id)
+        if canonical_id(page_id) == canonical_id(_CHILD_IDS[0]) and len(self.creates) == 1:
+            return _echo(page, created_time=datetime(2020, 1, 1, tzinfo=UTC))
+        return page
+
+
+class _RepeatColour(FakeSandbox):
+    def create_child_page(self, parent_id: str, title: str) -> PageView:
+        page = super().create_child_page(parent_id, title)
+        if len(self.creates) < 3:
+            return page
+        echo = self.pages[canonical_id(_CHILD_IDS[1])]
+        return echo
+
+
+def test_trashed_product_page_stops_further_writes(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = _TrashOnChain()
+    code, _payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_API
+    assert err == "sandbox stage failed\n"
+    assert len(client.creates) == 2
+
+
+def test_trashed_confirm_stops_further_writes(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = _TrashOnConfirm()
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_API
+    assert err == "sandbox stage failed\n"
+    assert len(client.creates) == 1
+    created = payload["created_pages"]
+    assert isinstance(created, list)
+    assert created == []
+
+
+def test_stale_foreign_page_is_not_a_parent(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = _StaleCreate()
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_API
+    assert err == "sandbox stage failed\n"
+    assert len(client.creates) == 1
+    created = payload["created_pages"]
+    assert isinstance(created, list)
+    assert [page["id"] for page in created] == [canonical_id(_LIE_ID)]
+
+
+def test_stale_confirm_stops_later_writes(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = _StaleConfirm()
+    code, _payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_API
+    assert err == "sandbox stage failed\n"
+    assert len(client.creates) == 1
+
+
+def test_repeated_created_id_is_refused(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = _RepeatColour()
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_API
+    assert err == "sandbox stage failed\n"
+    created = payload["created_pages"]
+    assert isinstance(created, list)
+    ids = [page["id"] for page in created]
+    assert ids.count(canonical_id(_CHILD_IDS[1])) == 1
+    assert len(client.creates) == 3
+
+
+def test_non_string_bot_user_id_is_omitted(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = FakeSandbox(user_id=7)
+    code, payload, _out, err, _logs = _invoke(evidence, capsys, caplog, [], client=client)
+    assert code == EXIT_OK
+    assert err == ""
+    assert payload["bot_user_id"] is None
+    assert "error" not in payload
+    assert client.creates == []
+
+
+def test_base64_token_in_evidence_exits_70(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    digest = base64.b64encode(_SECRET.encode("utf-8")).decode("ascii")
+    client = FakeSandbox(user_id=digest)
+    code, payload, out, err, logs = _invoke(evidence, capsys, caplog, [], client=client)
+    assert code == EXIT_REDACTION
+    assert err == "redaction self-check failed\n"
+    assert "sandbox dry-run ok" not in logs
+    assert digest not in evidence.read_text(encoding="utf-8")
+    assert payload["redaction_self_check"] == "FAIL"
+    assert client.creates == []
+    _assert_clean(out, err, logs, evidence.read_text(encoding="utf-8"))
+
+
+def test_missing_workspace_id_writes_nothing(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    body = json.loads(_bot_body())
+    assert isinstance(body, dict)
+    bot = body["bot"]
+    assert isinstance(bot, dict)
+    del bot["workspace_id"]
+    opener = _Opener([json.dumps(body).encode("utf-8"), _page_body(_PARENT_RAW)])
+    code, err, methods = _live_execute(evidence, capsys, caplog, opener)
+    assert code == EXIT_TARGET
+    assert err == "sandbox target mismatch\n"
+    assert methods == ["GET", "GET"]
+    assert "POST" not in methods
+
+
+def test_symlinked_parent_directory_is_refused(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(real, target_is_directory=True)
+    path = link / "evidence.json"
+    client = FakeSandbox()
+    code, err = _refused(path, capsys, caplog, client)
+    assert code == EXIT_USAGE
+    assert err == "evidence path is refused\n"
+    assert path.exists() is False
+
+
+def test_data_source_parent_writes_nothing(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    body = json.loads(_page_body(_PARENT_RAW, space=_SPACE_RAW))
+    assert isinstance(body, dict)
+    body["parent"] = {"data_source_id": _WRONG_PARENT, "type": "data_source_id"}
+    parsed = parse_page(body, fallback_space=SANDBOX_SPACE_ID, expected_id=SANDBOX_PARENT_PAGE_ID)
+    assert parsed is not None
+    assert parsed.parent_type == "data_source_id"
+    assert parsed.parent_id == ""
+    bot = BotView(user_id="bot-user", user_type="bot", space_id=SANDBOX_SPACE_ID)
+    assert target_ok(bot, parsed) is False
+    opener = _Opener([_bot_body(), json.dumps(body).encode("utf-8")])
+    code, err, methods = _live_execute(evidence, capsys, caplog, opener)
+    assert code == EXIT_TARGET
+    assert err == "sandbox target mismatch\n"
+    assert methods == ["GET", "GET"]
+
+
+def test_redirect_is_not_followed() -> None:
+    class _Redirect:
+        def __init__(self) -> None:
+            self.urls: list[str] = []
+
+        def __call__(
+            self,
+            request: urllib.request.Request,
+            data: object = None,
+            *,
+            timeout: object = None,
+        ) -> _Response:
+            del data, timeout
+            self.urls.append(request.full_url)
+            response = _Response(b"")
+            response.status = 302  # type: ignore[attr-defined]
+            return response
+
+    opener = _Redirect()
+    client = LiveSandboxClient(_SECRET, opener)
+    with pytest.raises(SandboxError, match="notion api error"):
+        client.read_bot()
+    assert opener.urls == ["https://api.notion.com/v1/users/me"]
+    assert all("evil.example" not in url for url in opener.urls)
+    director = sandbox_opener()
+    installed = getattr(director, "handlers", None)
+    assert isinstance(installed, list)
+    assert any(type(handler) is RefuseRedirect for handler in installed)
+    request = urllib.request.Request("https://api.notion.com/v1/users/me")
+    with pytest.raises(SandboxError, match="notion api error"):
+        RefuseRedirect().redirect_request(
+            request,
+            _Response(b""),
+            302,
+            "Found",
+            {},
+            "https://evil.example/steal",
+        )
+
+
+def test_ssl_env_is_refused_and_ignored(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert cert_env_set({"SSL_CERT_FILE": "/tmp/ca.pem"}) is True
+    assert cert_env_set({"SSL_CERT_DIR": "/tmp/cas"}) is True
+    assert cert_env_set({"NOTION_SANDBOX_TOKEN": _SECRET}) is False
+    client = FakeSandbox()
+    for name in ("SSL_CERT_FILE", "SSL_CERT_DIR"):
+        path = evidence.with_name(f"{name}.json")
+        code, payload, out, err, logs = _invoke(
+            path,
+            capsys,
+            caplog,
+            ["--execute"],
+            client=client,
+            environ={"NOTION_SANDBOX_TOKEN": _SECRET, name: "/tmp/sandbox-ca.pem"},
+        )
+        assert code == EXIT_USAGE
+        assert err == "usage error\n"
+        assert client.reads == []
+        assert client.creates == []
+        assert _writes(payload) == 0
+        _assert_clean(out, err, logs)
+    monkeypatch.setenv("SSL_CERT_FILE", "/no/such/sandbox-ca.pem")
+    monkeypatch.setenv("SSL_CERT_DIR", "/no/such/sandbox-cas")
+    assert sandbox_opener() is not None
+
+
+def test_enospc_after_creates_prints_ids(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _boom(*_args: object, **_kwargs: object) -> int:
+        raise OSError(errno.ENOSPC, "nospace")
+
+    monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.write", _boom)
+    client = FakeSandbox()
+    caplog.set_level(logging.DEBUG)
+    code = main(
+        ["--evidence-out", str(evidence), "--execute"],
+        client=client,
+        environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+        clock=_clock,
+    )
+    captured = capsys.readouterr()
+    assert code == EXIT_API
+    assert "evidence path is refused" not in captured.err
+    assert "evidence write failed" in captured.err
+    assert canonical_id(_CHILD_IDS[0]) in captured.err
+    assert _SECRET not in captured.err
+    assert "Traceback" not in captured.err
+    assert len(client.creates) == 5
+
+
+def test_short_evidence_write_is_complete(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real = os.write
+    state = {"short": True}
+
+    def _short(fd: int, data: bytes | bytearray | memoryview) -> int:
+        if state["short"]:
+            state["short"] = False
+            return real(fd, bytes(data[:1]))
+        return real(fd, data)
+
+    monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.write", _short)
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(evidence, capsys, caplog, [], client=client)
+    assert code == EXIT_OK
+    assert err == ""
+    assert state["short"] is False
+    assert payload["mode"] == "dry-run"
+    assert evidence.read_bytes().endswith(b"\n")
+
+
+def test_swapped_evidence_file_does_not_exit_ok(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real = os.write
+
+    def _swap(fd: int, data: bytes | bytearray | memoryview) -> int:
+        os.unlink(evidence)
+        evidence.write_bytes(b"swapped")
+        return real(fd, data)
+
+    monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.write", _swap)
+    client = FakeSandbox()
+    code, _raw, _logs = _run(
+        evidence,
+        ["--evidence-out", str(evidence)],
+        client=client,
+        environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+        caplog=caplog,
+    )
+    captured = capsys.readouterr()
+    assert code == EXIT_API
+    assert code != EXIT_OK
+    assert "evidence file changed" in captured.err
+    assert client.creates == []
+
+
+def test_control_state_container_exits_69(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real = json.loads
+    payloads: list[object] = [[], "control"]
+
+    def _loads(text: str, *args: object, **kwargs: object) -> object:
+        if "state_revision" in text and payloads:
+            return payloads.pop(0)
+        return real(text)
+
+    monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.json.loads", _loads)
+    client = FakeSandbox()
+    for index in range(2):
+        path = tmp_path / f"control-{index}.json"
+        code = main(
+            ["--evidence-out", str(path), "--execute"],
+            client=client,
+            environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+            clock=_clock,
+        )
+        captured = capsys.readouterr()
+        assert code == EXIT_API
+        assert captured.err == "control state is unreadable\n"
+        assert "Traceback" not in captured.err
+        assert client.reads == []
+        assert client.creates == []
+
+
+def test_stdout_full_and_non_ascii_path_are_documented(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = FakeSandbox()
+    full = open("/dev/full", "w", encoding="utf-8", buffering=1)  # noqa: SIM115
+    try:
+        monkeypatch.setattr(sys, "stdout", full)
+        code = main(
+            ["--evidence-out", str(evidence), "--dry-run"],
+            client=client,
+            environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+            clock=_clock,
+        )
+        captured = capsys.readouterr()
+        assert code == EXIT_API
+        assert "stdout is unavailable" in captured.err
+        assert json.loads(evidence.read_text(encoding="utf-8"))["mode"] == "dry-run"
+        assert _SECRET not in captured.err
+    finally:
+        with contextlib.suppress(OSError):
+            full.close()
+
+    class _Ascii:
+        def write(self, text: str) -> int:
+            text.encode("ascii")
+            return len(text)
+
+        def flush(self) -> None:
+            return None
+
+    monkeypatch.setattr(sys, "stdout", _Ascii())
+    path = evidence.with_name("证据.json")
+    code = main(
+        ["--evidence-out", str(path), "--dry-run"],
+        client=client,
+        environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+        clock=_clock,
+    )
+    captured = capsys.readouterr()
+    assert code == EXIT_API
+    assert "stdout is unavailable" in captured.err
+    loaded = json.loads(path.read_text(encoding="utf-8"))
+    assert loaded["redaction_self_check"] == "PASS"
+    assert _SECRET not in path.read_text(encoding="utf-8")
+
+
+def _doc_page(page_id: str, parent: str | None) -> bytes:
+    parent_payload: dict[str, object]
+    if parent is None:
+        parent_payload = {"type": "workspace", "workspace": True}
+    else:
+        parent_payload = {"page_id": parent, "type": "page_id"}
+    return json.dumps(
+        {
+            "archived": False,
+            "created_by": {"id": "bot-user", "object": "user"},
+            "created_time": "2026-10-07T12:00:00.000Z",
+            "id": page_id,
+            "in_trash": False,
+            "object": "page",
+            "parent": parent_payload,
+            "url": f"https://www.notion.so/{page_id.replace('-', '')}",
+        }
+    ).encode("utf-8")
+
+
+class _DocOpener:
+    def __init__(self, *, confirm_fails: bool = False) -> None:
+        self.confirm_fails = confirm_fails
+        self.posts: list[str] = []
+        self.calls: list[tuple[str, str]] = []
+        self.pages: dict[str, bytes] = {}
+
+    def __call__(
+        self,
+        request: urllib.request.Request,
+        data: object = None,
+        *,
+        timeout: object = None,
+    ) -> _Response:
+        del data
+        method = request.get_method()
+        url = request.full_url
+        self.calls.append((method, url))
+        assert url.startswith("https://api.notion.com/")
+        assert timeout == 30
+        assert _SECRET not in url
+        if method == "GET" and url.endswith("/v1/users/me"):
+            return _Response(_bot_body())
+        if method == "GET" and "/v1/pages/" in url:
+            page_id = url.rsplit("/", 1)[1]
+            if page_id == SANDBOX_PARENT_PAGE_ID:
+                return _Response(_doc_page(SANDBOX_PARENT_PAGE_ID, None))
+            if self.confirm_fails and page_id == canonical_id(_CHILD_IDS[0]):
+                return _Response(b'{"object":"error","status":404}')
+            stored = self.pages.get(page_id)
+            assert stored is not None
+            return _Response(stored)
+        if method == "POST" and url.endswith("/v1/pages"):
+            raw = request.data
+            assert isinstance(raw, bytes)
+            body = json.loads(raw)
+            assert isinstance(body, dict)
+            parent = body["parent"]
+            assert isinstance(parent, dict)
+            parent_id = parent["page_id"]
+            assert type(parent_id) is str
+            page_id = canonical_id(_CHILD_IDS[len(self.posts)])
+            self.posts.append(parent_id)
+            encoded = _doc_page(page_id, parent_id)
+            self.pages[page_id] = encoded
+            return _Response(encoded)
+        raise AssertionError(f"{method} {url}")
+
+
+def test_doc_shaped_pages_execute_without_a_space(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    opener = _DocOpener()
+    client = LiveSandboxClient(_SECRET, opener)
+    code, payload, out, err, logs = _invoke(evidence, capsys, caplog, ["--execute"], client=client)
+    assert code == EXIT_OK
+    assert err == ""
+    assert opener.posts == [
+        SANDBOX_PARENT_PAGE_ID,
+        canonical_id(_CHILD_IDS[0]),
+        canonical_id(_CHILD_IDS[0]),
+        canonical_id(_CHILD_IDS[0]),
+        canonical_id(_CHILD_IDS[0]),
+    ]
+    created = payload["created_pages"]
+    assert isinstance(created, list)
+    assert [page["id"] for page in created] == [canonical_id(item) for item in _CHILD_IDS]
+    assert payload.get("run_status") != "INTERRUPTED"
+    assert "error" not in payload
+    live = payload["live"]
+    assert isinstance(live, dict)
+    assert live["write_counts"] == {"create_child_page": 5}
+    _assert_clean(out, err, logs, evidence.read_text(encoding="utf-8"))
+
+
+def test_doc_shaped_failure_still_records_the_created_id(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    opener = _DocOpener(confirm_fails=True)
+    client = LiveSandboxClient(_SECRET, opener)
+    code, payload, out, err, logs = _invoke(evidence, capsys, caplog, ["--execute"], client=client)
+    assert code == EXIT_API
+    assert err == "sandbox stage failed\n"
+    assert opener.posts == [SANDBOX_PARENT_PAGE_ID]
+    created = payload["created_pages"]
+    assert isinstance(created, list)
+    assert [page["id"] for page in created] == [canonical_id(_CHILD_IDS[0])]
+    assert _SECRET not in evidence.read_text(encoding="utf-8")
+    _assert_clean(out, err, logs)
+
+
+def test_module_entry_point_runs_main(tmp_path: Path) -> None:
+    env = os.environ.copy()
+    env.pop("NOTION_SANDBOX_TOKEN", None)
+    env.pop("SSL_CERT_FILE", None)
+    env.pop("SSL_CERT_DIR", None)
+    env["PYTHONIOENCODING"] = "utf-8"
+    bare = subprocess.run(
+        [sys.executable, "-m", "money_machine.cli.notion_sandbox"],
+        capture_output=True,
+        text=True,
+        cwd=repo_root(),
+        env=env,
+        check=False,
+    )
+    assert bare.returncode == EXIT_USAGE
+    assert "Traceback" not in bare.stderr
+    path = tmp_path / "module-entry.json"
+    missing = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "money_machine.cli.notion_sandbox",
+            "--evidence-out",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        cwd=repo_root(),
+        env=env,
+        check=False,
+    )
+    assert missing.returncode == EXIT_NO_TOKEN
+    assert path.is_file()
+    assert _SECRET not in path.read_text(encoding="utf-8")
+
+
+class _InterruptAfterStore(FakeSandbox):
+    def __init__(self, index: int, exc: BaseException) -> None:
+        super().__init__()
+        self.index = index
+        self.exc = exc
+
+    def create_child_page(self, parent_id: str, title: str) -> PageView:
+        page = super().create_child_page(parent_id, title)
+        if len(self.creates) == self.index + 1:
+            raise self.exc
+        return page
+
+
+class _DocInterrupt(LiveSandboxClient):
+    def __init__(self, opener: _DocOpener, index: int, exc: BaseException) -> None:
+        super().__init__(_SECRET, opener)
+        self.index = index
+        self.exc = exc
+        self.completed = 0
+
+    def create_child_page(self, parent_id: str, title: str) -> PageView:
+        page = super().create_child_page(parent_id, title)
+        self.completed += 1
+        if self.completed == self.index + 1:
+            raise self.exc
+        return page
+
+
+class _WrongSpaceAncestor(FakeSandbox):
+    def read_page(self, page_id: str) -> PageView:
+        page = super().read_page(page_id)
+        if canonical_id(page_id) == SANDBOX_PARENT_PAGE_ID and self.creates:
+            return _echo(page, space_id=_WRONG_SPACE)
+        return page
+
+
+class _LieParentOnly(FakeSandbox):
+    def create_child_page(self, parent_id: str, title: str) -> PageView:
+        page = super().create_child_page(parent_id, title)
+        child = canonical_id(page.page_id)
+        self.pages[child] = _echo(self.pages[child], parent_id=_WRONG_PARENT)
+        return page
+
+
+class _LieSpaceOnly(FakeSandbox):
+    def create_child_page(self, parent_id: str, title: str) -> PageView:
+        page = super().create_child_page(parent_id, title)
+        child = canonical_id(page.page_id)
+        self.pages[child] = _echo(self.pages[child], space_id=_WRONG_SPACE)
+        return page
+
+
+def _recorded(payload: dict[str, object]) -> list[str]:
+    created = payload["created_pages"]
+    assert isinstance(created, list)
+    return [page["id"] for page in created if isinstance(page, dict)]
+
+
+@pytest.mark.parametrize(
+    ("index", "exc"),
+    [
+        (0, KeyboardInterrupt(_SECRET)),
+        (2, BaseException(_SECRET)),
+        (4, KeyboardInterrupt("stop")),
+    ],
+)
+def test_interrupt_after_store_records_the_created_id(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    index: int,
+    exc: BaseException,
+) -> None:
+    path = tmp_path / f"stored-{index}.json"
+    client = _InterruptAfterStore(index, exc)
+    code, payload, out, err, logs = _invoke(path, capsys, caplog, ["--execute"], client=client)
+    assert code == EXIT_API
+    assert err == "sandbox interrupted\n"
+    assert payload["run_status"] == "INTERRUPTED"
+    assert len(client.creates) == index + 1
+    assert _recorded(payload) == [canonical_id(item) for item in _CHILD_IDS[: index + 1]]
+    assert "Traceback" not in err
+    _assert_clean(out, err, logs, path.read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize(
+    ("index", "exc"),
+    [
+        (0, BaseException(_SECRET)),
+        (2, KeyboardInterrupt(_SECRET)),
+        (4, BaseException("stop")),
+    ],
+)
+def test_doc_shaped_interrupt_after_store_records_the_created_id(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    index: int,
+    exc: BaseException,
+) -> None:
+    path = tmp_path / f"doc-stored-{index}.json"
+    opener = _DocOpener()
+    client = _DocInterrupt(opener, index, exc)
+    code, payload, out, err, logs = _invoke(path, capsys, caplog, ["--execute"], client=client)
+    assert code == EXIT_API
+    assert err == "sandbox interrupted\n"
+    assert payload["run_status"] == "INTERRUPTED"
+    assert len(opener.posts) == index + 1
+    assert _recorded(payload) == [canonical_id(item) for item in _CHILD_IDS[: index + 1]]
+    assert "Traceback" not in err
+    _assert_clean(out, err, logs, path.read_text(encoding="utf-8"))
+
+
+def test_encoded_token_evidence_path_writes_nothing(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = FakeSandbox()
+    digest = base64.b64encode(_SECRET.encode("utf-8")).decode("ascii")
+    encoded = quote(_SECRET, safe="").replace("_", "%5F")
+    for name in (digest, encoded):
+        path = tmp_path / f"{name}.json"
+        code, _payload, out, err, logs = _invoke(
+            path,
+            capsys,
+            caplog,
+            [],
+            client=client,
+            environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+        )
+        assert code == EXIT_USAGE
+        assert err == "usage error\n"
+        assert path.exists() is False
+        assert client.reads == []
+        assert client.creates == []
+        _assert_clean(out, err, logs)
+
+
+def test_wrong_space_ancestor_is_not_appended(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = _WrongSpaceAncestor()
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_API
+    assert err == "sandbox stage failed\n"
+    assert len(client.creates) == 1
+    assert _recorded(payload) == []
+
+
+def test_parent_only_reread_stops_without_a_space_lie(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = _LieParentOnly()
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_API
+    assert err == "sandbox stage failed\n"
+    assert len(client.creates) == 1
+    assert _recorded(payload) == [canonical_id(_CHILD_IDS[0])]
+
+
+def test_space_only_reread_is_not_appended(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = _LieSpaceOnly()
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_API
+    assert err == "sandbox stage failed\n"
+    assert len(client.creates) == 1
+    assert _recorded(payload) == []
+
+
+def test_sandbox_parent_in_a_foreign_space_fails_the_chain() -> None:
+    client = FakeSandbox()
+    ctx = SandboxRun(
+        spec=object(),
+        client=client,
+        checkpoint=Path("checkpoint.json"),
+        moment=_WHEN,
+        write_counts={},
+    )
+    page = PageView(
+        page_id=SANDBOX_PARENT_PAGE_ID,
+        parent_id="",
+        space_id=_WRONG_SPACE,
+        url="https://www.notion.so/x",
+        archived=False,
+    )
+    with pytest.raises(SandboxError, match="requested parent"):
+        chain_reaches_sandbox(ctx, page)
+    assert ctx.created == []
+    assert client.reads == []
+
+
+def test_empty_parent_chain_does_not_read_again() -> None:
+    client = FakeSandbox()
+    ctx = SandboxRun(
+        spec=object(),
+        client=client,
+        checkpoint=Path("checkpoint.json"),
+        moment=_WHEN,
+        write_counts={},
+    )
+    page = PageView(
+        page_id=canonical_id(_CHILD_IDS[0]),
+        parent_id="",
+        space_id=SANDBOX_SPACE_ID,
+        url="https://www.notion.so/x",
+        archived=False,
+    )
+    with pytest.raises(SandboxError, match="requested parent"):
+        chain_reaches_sandbox(ctx, page)
+    assert client.reads == []
+
+
+def test_proc_path_helper_rejects_proc_itself() -> None:
+    assert under_proc(Path("/proc")) is True
+    assert under_proc(Path("/proc/self")) is True
+    assert under_proc(Path("/tmp/evidence.json")) is False
+
+
+def test_string_revision_is_unreadable(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real = json.loads
+
+    def _loads(text: str, *args: object, **kwargs: object) -> object:
+        if "state_revision" in text:
+            return {"current_session": 7, "head_sha": "a" * 40, "state_revision": "58"}
+        return real(text)
+
+    monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.json.loads", _loads)
+    client = FakeSandbox()
+    code = main(
+        ["--evidence-out", str(evidence), "--execute"],
+        client=client,
+        environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+        clock=_clock,
+    )
+    captured = capsys.readouterr()
+    assert code == EXIT_API
+    assert captured.err == "control state is unreadable\n"
+    assert client.reads == []
+    assert client.creates == []
+
+
+def test_repo_root_needs_both_markers(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    expected = repo_root()
+    monkeypatch.chdir(tmp_path)
+    assert repo_root() == expected
+
+
+def test_system_exit_status_is_normalized() -> None:
+    for status in (0, None, "no"):
+        with pytest.raises(SystemExit) as caught:
+            reraise(SystemExit(status))
+        assert caught.value.code == 1
+
+
+def test_naive_clock_is_refused(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = FakeSandbox()
+
+    def _naive() -> datetime:
+        return datetime(2026, 10, 7)
+
+    caplog.set_level(logging.DEBUG)
+    code = main(
+        ["--evidence-out", str(evidence), "--execute"],
+        client=client,
+        environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+        clock=_naive,
+    )
+    captured = capsys.readouterr()
+    assert code == EXIT_API
+    assert captured.err == "clock must be timezone-aware\n"
+    assert client.reads == []
+    assert client.creates == []
+    assert evidence.exists() is False
+
+
+def test_evidence_out_without_a_value_is_usage(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    code = main(
+        ["--dry-run", "--evidence-out", str(evidence)],
+        client=FakeSandbox(),
+        environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+        clock=_clock,
+    )
+    captured = capsys.readouterr()
+    assert code == EXIT_OK
+    assert evidence.is_file()
+    stray = Path("--evidence-out")
+    if stray.exists():
+        stray.unlink()
+        raise AssertionError("the following flag was used as the evidence path")
+    missing = main(
+        ["--evidence-out"],
+        client=FakeSandbox(),
+        environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+        clock=_clock,
+    )
+    assert missing == EXIT_USAGE
+    assert "Traceback" not in captured.err
+
+
+def test_non_string_bot_id_is_rejected(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    assert parse_bot({"bot": {"workspace_id": _SPACE_RAW}, "id": 7, "type": "bot"}) is None
+    body = {"bot": {"workspace_id": _SPACE_RAW}, "id": 7, "object": "user", "type": "bot"}
+    opener = _Opener([json.dumps(body).encode("utf-8"), _page_body(_PARENT_RAW)])
+    code, err, methods = _live_execute(evidence, capsys, caplog, opener)
+    assert code == EXIT_API
+    assert err == "notion api error\n"
+    assert "Traceback" not in err
+    assert "NoneType" not in caplog.text
+    assert "notion api error" in caplog.text
+    assert methods == ["GET"]
+
+
+def test_bot_payload_without_a_bot_object_exits_65(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    body = {"id": "bot-user", "object": "user", "type": "bot"}
+    opener = _Opener([json.dumps(body).encode("utf-8"), _page_body(_PARENT_RAW, space=_SPACE_RAW)])
+    code, err, methods = _live_execute(evidence, capsys, caplog, opener)
+    assert code == EXIT_TARGET
+    assert err == "sandbox target mismatch\n"
+    assert "Traceback" not in err
+    assert methods == ["GET", "GET"]
+    assert "POST" not in methods
+
+
+def test_proxy_map_drops_non_strings() -> None:
+    class _Proxies(urllib.request.ProxyHandler):
+        proxies: dict[str, object]
+
+        def __init__(self) -> None:
+            super().__init__({"http": "http://127.0.0.1:9"})
+            self.proxies = {"https": 9, "http": "http://127.0.0.1:9"}
+
+    director = urllib.request.build_opener(_Proxies())
+    assert proxy_map(director) == {"http": "http://127.0.0.1:9"}
+
+
+def test_explicit_space_skips_a_non_id() -> None:
+    found = explicit_space({"space_id": "nope", "workspace_id": SANDBOX_SPACE_ID})
+    assert found == SANDBOX_SPACE_ID
+
+
+def test_variants_without_a_product_page_are_a_sandbox_error() -> None:
+    ctx = SandboxRun(
+        spec=sandbox_product_spec(_WHEN),
+        client=FakeSandbox(),
+        checkpoint=Path("checkpoint.json"),
+        moment=_WHEN,
+        write_counts={},
+        probe=FixtureNotionAdapter(),
+        product_page_id=None,
+    )
+
+    async def _call() -> None:
+        await stage_runners()["run_variants"](ctx)
+
+    with pytest.raises(SandboxError, match="variants require the build stage"):
+        asyncio.run(_call())
+
+
+def test_parse_page_fallback_does_not_fill_a_different_page() -> None:
+    body = json.loads(_page_body(canonical_id(_CHILD_IDS[0])))
+    assert isinstance(body, dict)
+    page = parse_page(
+        body,
+        fallback_space=SANDBOX_SPACE_ID,
+        expected_id=SANDBOX_PARENT_PAGE_ID,
+    )
+    assert page is not None
+    assert page.space_id == ""
+
+
+def test_commit_evidence_rejects_a_replaced_inode(tmp_path: Path) -> None:
+    path = tmp_path / "evidence.json"
+    fd = open_evidence(path)
+    path.unlink()
+    path.write_text("swapped", encoding="utf-8")
+    with pytest.raises(SandboxError, match="changed") as caught:
+        commit_evidence(fd, path, {"note": "ok"}, None)
+    assert caught.value.code == EXIT_API
+
+
+def _bound_run(client: FakeSandbox, *, bot_space_id: str = SANDBOX_SPACE_ID) -> SandboxRun:
+    return SandboxRun(
+        spec=sandbox_product_spec(_WHEN),
+        client=client,
+        checkpoint=Path("checkpoint.json"),
+        moment=_WHEN,
+        write_counts={},
+        bot_user_id="bot-user",
+        bot_space_id=bot_space_id,
+    )
+
+
+def test_equals_form_records_an_override_refusal(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    client = FakeSandbox()
+    code = main(
+        [f"--evidence-out={evidence}"],
+        client=client,
+        environ={"NOTION_SANDBOX_TOKEN": _SECRET, "NOTION_TOKEN_FILE": "ignored"},
+        clock=_clock,
+    )
+    captured = capsys.readouterr()
+    assert code == EXIT_USAGE
+    assert captured.err == "usage error\n"
+    assert evidence.is_file()
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    assert payload["error"] == "usage error"
+    assert client.reads == []
+    assert client.creates == []
+
+
+class _NoBind(FakeSandbox):
+    def __getattribute__(self, name: str) -> object:
+        if name == "bind_created":
+            raise AttributeError(name)
+        return super().__getattribute__(name)
+
+
+def test_execute_without_bind_created_still_records(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = _NoBind()
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_OK
+    assert err == ""
+    created = payload["created_pages"]
+    assert isinstance(created, list)
+    assert len(created) == 5
+    assert "error" not in payload
+
+
+def test_reraise_preserves_interrupt_and_base_exceptions() -> None:
+    with pytest.raises(KeyboardInterrupt) as interrupt:
+        reraise(KeyboardInterrupt(_SECRET))
+    assert str(interrupt.value) == ""
+    with pytest.raises(BaseException) as base:
+        reraise(BaseException(_SECRET))
+    assert type(base.value) is BaseException
+    assert str(base.value) == ""
+    assert _SECRET not in str(base.value)
+
+
+def test_empty_bot_user_id_still_executes(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = FakeSandbox(user_id="")
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_OK
+    assert err == ""
+    assert payload["bot_user_id"] == ""
+    assert len(client.creates) == 5
+    assert "error" not in payload
+
+
+def test_zero_length_write_exits_69(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _zero(fd: int, data: bytes | bytearray | memoryview) -> int:
+        del fd, data
+        return 0
+
+    monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.write", _zero)
+    code = main(
+        ["--evidence-out", str(evidence)],
+        client=FakeSandbox(),
+        environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+        clock=_clock,
+    )
+    captured = capsys.readouterr()
+    assert code == EXIT_API
+    assert captured.err == "evidence write failed\n"
+    assert "Traceback" not in captured.err
+
+
+def test_enospc_ignores_pages_that_are_not_ids(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _boom(fd: int, data: bytes | bytearray | memoryview) -> int:
+        del fd, data
+        raise OSError(errno.ENOSPC, "nospace")
+
+    monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.write", _boom)
+    pages: tuple[object, ...] = (7, ["nope"], [{"id": 7}], [{"id": ""}])
+    for index, created in enumerate(pages):
+        path = tmp_path / f"evidence-{index}.json"
+        fd = open_evidence(path)
+        with pytest.raises(SandboxError) as caught:
+            commit_evidence(fd, path, {"created_pages": created}, None)
+        assert str(caught.value) == "evidence write failed"
+        assert caught.value.code == EXIT_API
+
+
+def test_repo_root_ignores_a_partial_marker() -> None:
+    root = repo_root()
+    decoy = root / "src" / "money_machine" / "pyproject.toml"
+    decoy.write_text("[project]\nname = 'decoy'\n", encoding="utf-8")
+    try:
+        assert repo_root() == root
+    finally:
+        decoy.unlink()
+
+
+def test_missing_created_time_is_not_new() -> None:
+    class _NoTime(FakeSandbox):
+        def create_child_page(self, parent_id: str, title: str) -> PageView:
+            page = super().create_child_page(parent_id, title)
+            return _echo(page, created_time=None)
+
+    client = _NoTime()
+    with pytest.raises(SandboxError, match="created page is not new"):
+        create_under(_bound_run(client), SANDBOX_PARENT_PAGE_ID, "Sandbox Weekly Planner")
+    assert len(client.creates) == 1
+
+
+def test_naive_created_time_is_not_new() -> None:
+    class _Naive(FakeSandbox):
+        def create_child_page(self, parent_id: str, title: str) -> PageView:
+            page = super().create_child_page(parent_id, title)
+            return _echo(page, created_time=datetime(2026, 10, 7, 12, 0))
+
+    client = _Naive()
+    with pytest.raises(SandboxError, match="created page is not new"):
+        create_under(_bound_run(client), SANDBOX_PARENT_PAGE_ID, "Sandbox Weekly Planner")
+
+
+def test_foreign_bot_space_creates_nothing() -> None:
+    client = FakeSandbox()
+    with pytest.raises(SandboxError, match="not under the requested parent"):
+        create_under(
+            _bound_run(client, bot_space_id=_WRONG_SPACE),
+            SANDBOX_PARENT_PAGE_ID,
+            "Sandbox Weekly Planner",
+        )
+    assert client.creates == []
+
+
+def test_create_that_returns_the_parent_id_is_not_new() -> None:
+    class _ReturnsParent(FakeSandbox):
+        def create_child_page(self, parent_id: str, title: str) -> PageView:
+            page = super().create_child_page(parent_id, title)
+            return _echo(page, page_id=SANDBOX_PARENT_PAGE_ID)
+
+    client = _ReturnsParent()
+    ctx = _bound_run(client)
+    with pytest.raises(SandboxError, match="created page is not new"):
+        create_under(ctx, SANDBOX_PARENT_PAGE_ID, "Sandbox Weekly Planner")
+    assert ctx.created == []
+
+
+def test_confirm_of_a_different_id_keeps_the_created_page() -> None:
+    class _OtherConfirm(FakeSandbox):
+        def read_page(self, page_id: str) -> PageView:
+            page = super().read_page(page_id)
+            if canonical_id(page_id) == canonical_id(_CHILD_IDS[0]) and self.creates:
+                return _echo(page, page_id=_LIE_ID)
+            return page
+
+    client = _OtherConfirm()
+    ctx = _bound_run(client)
+    with pytest.raises(SandboxError, match="not under the requested parent"):
+        create_under(ctx, SANDBOX_PARENT_PAGE_ID, "Sandbox Weekly Planner")
+    assert [row["id"] for row in ctx.created] == [canonical_id(_CHILD_IDS[0])]
+
+
+def test_empty_page_id_is_not_read() -> None:
+    opener = _Opener([])
+    client = LiveSandboxClient(_SECRET, opener)
+    with pytest.raises(SandboxError, match="notion api error"):
+        client.read_page("not-a-page")
+    assert opener.calls == []
+
+
+def test_unparsed_create_is_not_recorded() -> None:
+    ids: list[str] = []
+    rows: list[dict[str, str]] = []
+    opener = _Opener([b'{"object":"error"}'])
+    client = LiveSandboxClient(_SECRET, opener)
+    client.bind_created(ids, rows)
+    with pytest.raises(SandboxError, match="notion api error"):
+        client.create_child_page(SANDBOX_PARENT_PAGE_ID, "Sandbox Weekly Planner")
+    assert ids == []
+    assert rows == []
+
+
+def test_wrong_space_create_is_not_published() -> None:
+    raw = _page_body(
+        canonical_id(_CHILD_IDS[0]),
+        parent=SANDBOX_PARENT_PAGE_ID,
+        space=_WRONG_SPACE,
+    )
+    ids: list[str] = []
+    rows: list[dict[str, str]] = []
+    client = LiveSandboxClient(_SECRET, _Opener([raw]))
+    client.bind_created(ids, rows)
+    page = client.create_child_page(SANDBOX_PARENT_PAGE_ID, "Sandbox Weekly Planner")
+    assert page.space_id == canonical_id(_WRONG_SPACE)
+    assert ids == []
+    assert rows == []
+
+
+def test_publish_does_not_repeat_an_id() -> None:
+    raw = _page_body(
+        canonical_id(_CHILD_IDS[0]),
+        parent=SANDBOX_PARENT_PAGE_ID,
+        space=_SPACE_RAW,
+    )
+    client = LiveSandboxClient(_SECRET, _Opener([raw, raw]))
+    client.create_child_page(SANDBOX_PARENT_PAGE_ID, "one")
+    client.create_child_page(SANDBOX_PARENT_PAGE_ID, "two")
+    recorded: list[str] = client._created_ids  # pyright: ignore[reportPrivateUsage]
+    assert recorded == [canonical_id(_CHILD_IDS[0])]
+
+
+class _CodeOnly:
+    def __init__(self) -> None:
+        self.code = 302
+        self.read_called = False
+
+    def read(self) -> bytes:
+        self.read_called = True
+        return b"{}"
+
+    def close(self) -> None:
+        return None
+
+
+def test_redirect_code_is_refused_without_a_status() -> None:
+    body = _CodeOnly()
+
+    def _open(request: urllib.request.Request, timeout: object = None) -> _CodeOnly:
+        del request, timeout
+        return body
+
+    client = LiveSandboxClient(_SECRET, _open)
+    with pytest.raises(SandboxError, match="notion api error"):
+        client.read_bot()
+    assert body.read_called is False
+
+
+class _TextBody:
+    status = 200
+
+    def read(self) -> bytes:
+        return cast(bytes, "not-bytes")
+
+    def close(self) -> None:
+        return None
+
+
+def test_non_byte_body_is_an_api_error() -> None:
+    def _open(request: urllib.request.Request, timeout: object = None) -> _TextBody:
+        del request, timeout
+        return _TextBody()
+
+    client = LiveSandboxClient(_SECRET, _open)
+    with pytest.raises(SandboxError, match="notion api error"):
+        client.read_bot()
+
+
+def test_parse_bot_rejects_a_non_object() -> None:
+    assert parse_bot(["bot"]) is None
+
+
+def test_parse_page_rejects_a_non_id() -> None:
+    page = parse_page(
+        {"object": "page", "id": "nope", "url": "https://www.notion.so/nope"},
+        fallback_space="",
+        expected_id="",
+    )
+    assert page is None
+
+
+def test_parent_object_can_carry_the_space() -> None:
+    page = parse_page(
+        {
+            "id": _PARENT_RAW,
+            "object": "page",
+            "parent": {
+                "page_id": _PARENT_RAW,
+                "type": "page_id",
+                "workspace_id": _SPACE_RAW,
+            },
+            "url": "https://www.notion.so/parent",
+        },
+        fallback_space="",
+        expected_id="",
+    )
+    assert page is not None
+    assert page.space_id == SANDBOX_SPACE_ID
+
+
+def test_missing_parent_object_stays_a_page() -> None:
+    page = parse_page(
+        {"id": _PARENT_RAW, "object": "page", "url": "https://www.notion.so/parent"},
+        fallback_space="",
+        expected_id="",
+    )
+    assert page is not None
+    assert page.parent_id == ""
+    assert page.parent_type == ""
+
+
+def test_non_string_parent_type_is_ignored() -> None:
+    page = parse_page(
+        {
+            "id": _CHILD_IDS[0],
+            "object": "page",
+            "parent": {"page_id": _PARENT_RAW, "type": 1},
+            "url": "https://www.notion.so/child",
+        },
+        fallback_space="",
+        expected_id="",
+    )
+    assert page is not None
+    assert page.parent_type == ""
+    assert page.parent_id == ""
+
+
+def test_database_parent_does_not_copy_a_page_id() -> None:
+    page = parse_page(
+        {
+            "id": _CHILD_IDS[0],
+            "object": "page",
+            "parent": {"page_id": _PARENT_RAW, "type": "database_id"},
+            "url": "https://www.notion.so/child",
+        },
+        fallback_space="",
+        expected_id="",
+    )
+    assert page is not None
+    assert page.parent_type == "database_id"
+    assert page.parent_id == ""
+
+
+def test_naive_timestamp_stays_unset() -> None:
+    assert parse_created_time("2026-10-07T12:00:00") is None
+
+
+def test_non_string_created_by_stays_blank() -> None:
+    page = parse_page(
+        {
+            "created_by": {"id": 7},
+            "id": _CHILD_IDS[0],
+            "object": "page",
+            "url": "https://www.notion.so/child",
+        },
+        fallback_space="",
+        expected_id="",
+    )
+    assert page is not None
+    assert page.created_by == ""
+
+
+def test_proxy_map_ignores_a_missing_handler_list() -> None:
+    class _Bare:
+        handlers: object = None
+
+    director = cast(urllib.request.OpenerDirector, _Bare())
+    assert proxy_map(director) == {}
+
+
+class _NotProxy(urllib.request.BaseHandler):
+    proxies: dict[str, str]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.proxies = {"http": "http://127.0.0.1:9"}
+
+    def http_open(self, request: urllib.request.Request) -> object:
+        return request
+
+
+def test_proxy_map_ignores_handlers_that_are_not_proxies() -> None:
+    director = urllib.request.build_opener(_NotProxy())
+    assert proxy_map(director) == {}
+
+
+class _NullProxies(urllib.request.ProxyHandler):
+    proxies: object
+
+    def __init__(self) -> None:
+        super().__init__({"http": "http://127.0.0.1:9"})
+        self.proxies = None
+
+
+def test_proxy_map_ignores_a_non_dict_proxy_table() -> None:
+    director = urllib.request.build_opener(_NullProxies())
+    assert proxy_map(director) == {}

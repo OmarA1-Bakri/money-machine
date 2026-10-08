@@ -18,10 +18,12 @@ from .domain import (
     NotionWorkspace,
 )
 from .fixture_adapter import FixtureNotionAdapter
+from .router import NotionAdapterRouter
 
 __all__ = [
     "FixtureNotionAdapter",
     "NotionAdapter",
+    "NotionAdapterRouter",
     "NotionBlock",
     "NotionCalloutBlock",
     "NotionDatabase",

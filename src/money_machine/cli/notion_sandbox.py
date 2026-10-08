@@ -4,15 +4,17 @@ Dry-run is the default. ``--execute`` is the only path that writes. The token
 is read from ``NOTION_SANDBOX_TOKEN`` and is never printed. Git, the control
 ids, and the evidence file are resolved before any network read or write.
 
-Exit codes: 0 ok, 64 usage, a bad token, an evidence-path refusal, or a set
-``NOTION_CONFIG`` / ``NOTION_SANDBOX_CONFIG`` / ``NOTION_TOKEN_FILE``, 65
-target mismatch, 66 missing token, 69 git, control, read, stage, clock, or an
-interrupted run, 70 redaction self-check failure. Exit 78 is not used, and
-this module does not change that hold.
+Exit codes: 0 ok, 64 usage, a bad token, an evidence-path refusal, a set
+``NOTION_CONFIG`` / ``NOTION_SANDBOX_CONFIG`` / ``NOTION_TOKEN_FILE``, or a set
+``SSL_CERT_FILE`` / ``SSL_CERT_DIR``, 65 target mismatch, 66 missing token, 69
+git, control, read, stage, clock, an interrupted run, a full disk, a swapped
+evidence file, or unprintable stdout, 70 redaction self-check failure. Exit
+78 is not used, and this module does not change that hold.
 
-``get_public_url`` reads are excluded from ``write_counts``. Only methods in
-``PIPELINE_WRITE_METHODS`` and the live ``create_child_page`` counter are
-recorded.
+``get_public_url`` reads are excluded from ``write_counts``. The top-level
+``write_counts`` object splits fixture pipeline methods from the live
+``create_child_page`` counter. The ``fixture`` and ``live`` sections repeat
+that split.
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import NoReturn
+from typing import NoReturn, cast
 
 from money_machine.cli.notion import token_shape_ok
 from money_machine.cli.notion_sandbox_guard import (
@@ -42,6 +44,8 @@ from money_machine.cli.notion_sandbox_guard import (
     PageView,
     SandboxClient,
     SandboxError,
+    canonical_id,
+    cert_env_set,
     commit_evidence,
     control_ids,
     empty_write_counts,
@@ -223,16 +227,26 @@ def _payload(
         "qa_verdict": qa_verdict(stages),
         "stages": stages,
         "started_at": stamp(started),
-        "write_counts": counts,
+        "write_counts": _split_counts(counts),
     }
     payload.update(control)
     payload.update(evidence_sections(counts, created))
     return payload
 
 
+def _split_counts(counts: Mapping[str, int]) -> dict[str, object]:
+    sections = evidence_sections(counts, [])
+    fixture = cast(dict[str, object], sections["fixture"])
+    live = cast(dict[str, object], sections["live"])
+    return {"fixture": fixture["write_counts"], "live": live["write_counts"]}
+
+
 def _emit(fd: int, path: Path, payload: Mapping[str, object], token: str | None) -> str:
-    result = commit_evidence(fd, payload, token)
-    print(path.resolve())
+    result = commit_evidence(fd, path, payload, token)
+    try:
+        print(path.resolve())
+    except (OSError, UnicodeError):
+        raise SandboxError("stdout is unavailable") from None
     return result
 
 
@@ -278,7 +292,7 @@ def _main(
     started = _now(clock, secret)
     early_path = _evidence_argument(arguments)
     root = repo_root()
-    if argv_names_a_target(arguments) or environ_names_a_target(env):
+    if argv_names_a_target(arguments) or environ_names_a_target(env) or cert_env_set(env):
         return _refuse(early_path, secret, started, root, "usage error", EXIT_USAGE, clock)
     try:
         parsed = _parser().parse_args(arguments)
@@ -341,8 +355,24 @@ def _main(
             code=EXIT_API,
             log="notion api error",
         )
-    except BaseException as exc:
-        _reraise(exc)
+    except BaseException:
+        return _finish(
+            fd,
+            evidence,
+            secret,
+            started,
+            clock,
+            mode=mode,
+            stages=planned_stages(),
+            created=[],
+            counts=counts,
+            bot_user_id=None,
+            git=git,
+            control=control,
+            error="notion api error",
+            code=EXIT_API,
+            log="notion api error",
+        )
     if type(bot.user_type) is not str:
         return _finish(
             fd,
@@ -405,7 +435,10 @@ def _main(
             checkpoint=Path(folder) / "checkpoint.json",
             moment=started,
             write_counts=counts,
+            bot_user_id=_user_id(bot) or "",
+            bot_space_id=canonical_id(bot.space_id),
         )
+        _bind_record(active, ctx)
         stages = asyncio.run(_run_stages(ctx, secret))
         created = list(ctx.created)
     interrupted = any(stage["status"] == "INTERRUPTED" for stage in stages)
@@ -439,6 +472,13 @@ def _main(
         code=code,
         log=log,
     )
+
+
+def _bind_record(client: SandboxClient, ctx: SandboxRun) -> None:
+    bind = getattr(client, "bind_created", None)
+    if bind is None:
+        return
+    bind(ctx.created_ids, ctx.created)
 
 
 def _user_id(bot: BotView) -> str | None:
@@ -535,7 +575,7 @@ def _refuse(
     return _fail(message, code)
 
 
-def _reraise(exc: BaseException) -> NoReturn:
+def reraise(exc: BaseException) -> NoReturn:
     if isinstance(exc, SystemExit):
         status = exc.code if type(exc.code) is int and exc.code != 0 else 1
         blank: BaseException = SystemExit(status)

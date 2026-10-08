@@ -32,9 +32,11 @@
 
 Router browser and combined config modes still raise `NotImplementedError` (W4a). Fixture mode stays the default.
 
-## Session 07 — sandbox run tip-sync
+## Session 07 — sandbox run, round 3
 
-**Status**: Incomplete (2026-10-07, state revision 58). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` is the intentional tip-sync to the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD. The §11 sandbox CLI is still not run live. W10 is in flight from `a4e9b025` and will also bump STATE, so whichever PR merges second re-syncs.
+**Status**: Incomplete (2026-10-07, state revision 58). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD. The §11 sandbox CLI is still not run live. W10 is in flight from `a4e9b025` and will also bump STATE, so whichever PR merges second re-syncs.
+
+Round 3 folds the Reviewer FAIL and the Verifier FAIL at `6dc72f1e` into one commit. Created page ids are appended inside `create_child_page` as soon as the response parses. An empty page space is accepted when the bot workspace matches and the parent chain reaches the sandbox parent. An explicit different space, and an archived confirm or chain read, are refused and left out of `created_pages`. Other later failures keep the id. Census is one AST walk: if 133, boolop 52, and 20, or 32, clause 116, ifexp 11, while 2. If-flip: 133 killed, 0 equivalent, Failed sum 4364. T45 is row 55, `notion_sandbox_guard.py:304`, Failed 1. `__name__ == "__main__"` is row 27, Failed 1. Force-true: 128 killed, 5 equivalent, Failed sum 3894. Force-false: 125 killed, 8 equivalent, Failed sum 629. Boolean operands: 162 killed, 6 equivalent, Failed sum 4460. The tables and the probes are in `IMPLEMENTATION_LOG.md`. Sandbox tests: 185 passed. Full local pytest: 2705 collected, 2500 passed, 193 skipped, 12 failed (docker absent). This commit's CI is not invented here.
 
 ## Session 07 — Wave 9 handoff
 
