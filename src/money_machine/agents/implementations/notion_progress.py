@@ -217,6 +217,9 @@ def write_document(
     stored["record_digest"] = _digest(body)
     body[PROGRESS_KEY] = stored
     text = json.dumps(body, sort_keys=True, separators=(",", ":")) + "\n"
+    for stale in path.parent.glob(f".{path.name}.*.tmp"):
+        with contextlib.suppress(OSError):
+            stale.unlink()
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     try:
         temporary.write_text(text, encoding="ascii")

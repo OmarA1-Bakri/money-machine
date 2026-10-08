@@ -3,9 +3,9 @@
 Session 07 prompt section 8. QA reads the variants checkpoint through
 FixtureNotionAdapter and records PASS or BLOCKED with write_checkpoint.
 A repairable flag is fixed with the existing adapter and QA runs again.
-The section 9 fact ledger and the workflow link are a later read of this
-record. A07, A08, and A09 stay DESIGNED. This module does not open a network
-connection.
+`live_qa_passed` re-runs these predicates for the fact ledger. The stored
+verdict is not that result. A07, A08, and A09 stay DESIGNED. This module
+does not open a network connection.
 """
 
 from __future__ import annotations
@@ -125,6 +125,8 @@ async def run_product_qa(
             await _apply_repairs(fixture, stored, plan.repairs)
             repairs = plan.repairs
             plan = await _plan(fixture, stored, validated)
+            if plan.blocked or plan.repairs:
+                repairs = plan.repairs
         if plan.blocked or plan.repairs:
             verdict = "BLOCKED"
             proof = ""
@@ -463,6 +465,31 @@ def _kind_database(
     return None
 
 
+def dashboard_formula_expressions(spec: ProductSpec) -> dict[str, tuple[str, str]]:
+    """Expected formula name to (database kind, expression) for this spec."""
+    generated = _generated(spec)
+    return {
+        name: (generated.databases[name], expression)
+        for name, expression in generated.expressions.items()
+    }
+
+
+async def live_qa_passed(
+    probe: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+) -> bool:
+    """True when the live fixture still satisfies the QA predicates.
+
+    The stored QA verdict is not consulted. A missing proof page is the
+    pre-duplicate shape: it is not one of the ledger's known ids, and this
+    function can still return True.
+    """
+    flags = _flag_failures(probe, stored)
+    structural = await _structural_checks(probe, stored, spec)
+    return all(passed for _name, passed in (*flags, *structural))
+
+
 def _generated(spec: ProductSpec) -> NotificationDashboardFormulas:
     definitions = schema_definitions()
     kinds = shared_database_kinds(spec)
@@ -640,7 +667,7 @@ def _accounted_facts(
     databases: list[str] = []
     for _kind, database_id in stored.database_ids:
         database = probe.databases.get(database_id)
-        if isinstance(database, NotionDatabase):
+        if isinstance(database, NotionDatabase) and type(database.title) is str:
             databases.append(database.title)
         else:
             databases.append("")
@@ -746,6 +773,8 @@ async def _apply_repairs(
         page = _variant_page(probe, record)
         if "published" in repairs and page.is_published is not True:
             page = await probe.publish_page(page.id)
+            if page.is_published is not True or not _is_trusted_link(page.public_url, page.id):
+                return
         if "duplicate_button" in repairs and page.duplicate_as_template is not True:
             page = await probe.set_duplicate_as_template(page.id, True)
         if "search_indexing" in repairs and page.search_indexing is not False:

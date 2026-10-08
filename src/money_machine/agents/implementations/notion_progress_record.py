@@ -16,6 +16,7 @@ from money_machine.agents.implementations.notion_progress import (
     PHASES_COMPLETE,
     ProductBuildError,
     empty_created_ids,
+    load_payload,
     write_document,
 )
 
@@ -177,6 +178,13 @@ def write_checkpoint(
             "spec_id": checkpoint.spec_id,
         }
         body = progress_from_checkpoint(checkpoint)
+        if path.is_file():
+            # An unrecoverable phase-1 rebuild is allowed to write. Reading the
+            # prior jobs must not raise the recovery rule from inside the writer.
+            prior = load_payload(path, allow_unrecoverable=True)
+            body["repair_jobs"] = [
+                dict(job) if type(job) is dict else job for job in prior.repair_jobs
+            ]
         if retained_created_ids is not None:
             fresh = body["created_notion_ids"]
             if type(fresh) is not dict:

@@ -38,19 +38,19 @@ Router browser and combined config modes still raise `NotImplementedError` (W4a)
 
 W10 handoff. Counts and sites are in `IMPLEMENTATION_LOG.md` and `TEST_EVIDENCE.md`.
 
-- Fixture fact ledger and workflow link over the QA checkpoint, through `FixtureNotionAdapter` only. `run_fact_ledger` is `notion_fact_ledger.py:102`. The plan at `:246` runs before the single `write_checkpoint` at `:516`. Facts come from the persisted checkpoint and the adapter. A stored mismatch raises `does not match` with 0 adapter writes. A `BLOCKED` record can be re-planned. Crash-resume reaches one `PASS`. The link is ready at ListingCopyJob and does not create a job. Narrative `next_phase` is `test_matrix` and is not started.
-- Empty captured URL `""` is skipped and repairs like a missing URL (`notion_qa.py:526`). That is the pinned contract.
-- Mutation checks: 41 rows, 37 killed, 4 equivalent. The Failed column sums to 65. The 17 variant-file rows were remeasured. Product-build tests: 582 passed.
-- `docs/control` edits this wave: `IMPLEMENTATION_STATE.json`, `IMPLEMENTATION_LOG.md`, `NEXT_SESSION.md`, `TEST_EVIDENCE.md`, `DECISIONS.md`, and `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md`.
+- Fixture fact ledger and workflow link over the QA checkpoint, through `FixtureNotionAdapter` only. `run_fact_ledger` is async at `notion_fact_ledger.py:117`. The plan at `:273` awaits `live_qa_passed` before the single `write_checkpoint` at `:572`. Facts come from the persisted checkpoint and the adapter. `qa_verdict` is the live QA result. A stored mismatch raises `does not match` with 0 adapter writes. A `BLOCKED` record whose checks changed can be re-planned. A forged verdict or a forged fact on an unchanged check row writes nothing. Crash-resume reaches one `PASS`. Every workflow edge is checked on `event_successor_map`. The link is ready at ListingCopyJob and does not create a job. Narrative `next_phase` is `test_matrix` and is not started.
+- Empty captured URL `""` is skipped in QA and repairs like a missing URL (`notion_qa.py:553`). On the ledger, `""` and `None` for a published page are `BLOCKED` and the fact component is `missing`.
+- Earlier `repair_jobs` are kept across `write_checkpoint` (`notion_progress_record.py:185`). A stale checkpoint tmp is removed on the next `write_document` (`notion_progress.py:220`).
+- Mutation checks are in `IMPLEMENTATION_LOG.md`. The if-flip table is 39 rows, 36 killed, 3 equivalent, Failed sum 174. The operand sweep of `notion_fact_ledger.py` is 176 mutants, 155 killed, 21 equivalent, Failed sum 1928. Product-build tests: 655 passed.
+- `docs/control` edits this wave: `IMPLEMENTATION_STATE.json` (not bumped this round), `IMPLEMENTATION_LOG.md`, `NEXT_SESSION.md`, `TEST_EVIDENCE.md`, `DECISIONS.md`, and `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md`.
 
 ### Parked for the W11 test matrix
 
-QA records PASS even when these are deleted: the home nav text, the 3 palette callouts, the identity callout, the 6 hub "returns to Home" texts, and the 3 home linked views (Tasks, Events, Notes). Uncovered code: `_linked_views` at `notion_qa.py:366`, `_palette` at `:576`, and `_teardown` at `:607`. Scheduled for the W11 test matrix. Not fixed in W10.
+QA records PASS even when these are deleted: the home nav text, the 3 palette callouts, the identity callout, the 6 hub "returns to Home" texts, and the 3 home linked views (Tasks, Events, Notes). Uncovered code: `_linked_views` at `notion_qa.py:368`, `_palette` at `:603`, and `_teardown` at `:634`. Scheduled for the W11 test matrix. Not fixed in W10.
 
-Also parked in this entry, not fixed in W10:
+Popping a page that is not a known id before the first ledger run is pinned as `PASS` with one checkpoint write (`test_unknown_page_before_the_ledger_is_not_a_fact`). The proof page is not a known id. That is intended.
 
-- After a crash-resume, stored repairs drop repairs from the earlier run.
-- The pull request body should list the `docs/control` edits. This handoff lists them above.
+The pull request body lists the `docs/control` edits. This handoff lists them above.
 
 
 W9 counts stay in `IMPLEMENTATION_LOG.md`. The 17 variant-file rows from that table were remeasured in W10. An extra workspace `/ Blue` still passes variants replay even with a child under it. Provenance beyond title and copyable shell fields stays parked. One home page per probe stays parked. Deep clone of databases stays rejected. Docstring coverage 14.95% was measured by Eng Ops and was not re-measured.

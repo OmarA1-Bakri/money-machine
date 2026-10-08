@@ -31,11 +31,16 @@ from money_machine.agents.implementations.notion_product_builder import (
 )
 from money_machine.agents.implementations.notion_progress import load_payload
 from money_machine.agents.implementations.notion_progress_record import write_checkpoint
-from money_machine.agents.implementations.notion_qa import load_qa_record
+from money_machine.agents.implementations.notion_qa import (
+    dashboard_formula_expressions,
+    live_qa_passed,
+    load_qa_record,
+)
 from money_machine.agents.implementations.notion_variants import (
     load_variant_checkpoint,
     variant_provider_references,
 )
+from money_machine.domain.models.product_spec import ProductSpec
 from money_machine.integrations.notion.domain import NotionDatabase, NotionFormula, NotionPage
 from money_machine.integrations.notion.fixture_adapter import FixtureNotionAdapter
 from money_machine.orchestration.successor_factory import load_workflows_config
@@ -47,6 +52,7 @@ _LEDGER_KEYS = frozenset({"checks", "facts", "verdict"})
 _LINK_KEYS = frozenset({"ready", "repair_required", "steps", "verdict"})
 _VERDICTS = frozenset({"PASS", "BLOCKED"})
 _READY_JOB = "ListingCopyJob"
+_LINK_HOST = "fixture.notion.site"
 _FACT_NAMES = (
     "page_count",
     "hubs",
@@ -66,7 +72,6 @@ _CHECK_NAMES = (
     "databases_present",
     "dashboard_outputs",
     "secret_links",
-    "workflow",
 )
 _QA_OVERLAP = (
     ("page_count", "page_count"),
@@ -74,9 +79,9 @@ _QA_OVERLAP = (
     ("databases", "databases"),
     ("variants", "variant_count"),
     ("colour_names", "colour_names"),
-    ("secret_links", "secret_links"),
 )
 # Prompt section 10 names are labels. The jobs are the workflows.yaml graph.
+# Every edge is checked on event_successor_map, the map the runtime routes with.
 _EDGES = (
     ("DEDUPE_PASSED", "ProductBuildJob", "BUILD_NOTION_TEMPLATE", ""),
     ("BUILD_COMPLETED", "ProductQAJob", "RUN_PRODUCT_QA", "ProductBuildJob"),
@@ -84,9 +89,19 @@ _EDGES = (
     ("REPAIR_APPLIED", "ProductQAJob", "RUN_PRODUCT_QA", "BuildRepairJob"),
     ("BUILD_QA_PASSED", "VariantBuildJob", "CREATE_VARIANTS", "ProductQAJob"),
     ("VARIANTS_COMPLETED", "VariantPublishJob", "RUN_VARIANT_QA", "VariantBuildJob"),
-    ("VARIANT_LINKS_VERIFIED", "ScreenshotJob", "ScreenshotJob", "VariantPublishJob"),
+    ("VARIANT_LINKS_VERIFIED", "ScreenshotJob", "CAPTURE_SCREENSHOTS", "VariantPublishJob"),
     ("SCREENSHOTS_CAPTURED", "ListingCopyJob", "GENERATE_LISTING_PACKAGE", "ScreenshotJob"),
 )
+_ROUTE: dict[str, tuple[str, ...]] = {
+    "DEDUPE_PASSED": ("ProductBuildJob",),
+    "BUILD_COMPLETED": ("ProductQAJob",),
+    "BUILD_QA_FAILED": ("BuildRepairJob",),
+    "REPAIR_APPLIED": ("ProductQAJob",),
+    "BUILD_QA_PASSED": ("VariantBuildJob",),
+    "VARIANTS_COMPLETED": ("VariantPublishJob",),
+    "VARIANT_LINKS_VERIFIED": ("ScreenshotJob",),
+    "SCREENSHOTS_CAPTURED": ("ListingCopyJob", "AssetFactoryJob", "DeliveryBuildJob"),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,7 +114,7 @@ class _Plan:
     repair_required: str
 
 
-def run_fact_ledger(
+async def run_fact_ledger(
     spec: object,
     probe: object,
     checkpoint_path: object,
@@ -121,7 +136,7 @@ def run_fact_ledger(
     if (
         saved_ledger is not None
         and saved_link is not None
-        and _saved_holds(fixture, stored, qa, saved_ledger, saved_link, steps)
+        and await _saved_holds(fixture, stored, validated, qa, saved_ledger, saved_link, steps)
     ):
         return replace(
             stored,
@@ -130,7 +145,7 @@ def run_fact_ledger(
             fact_ledger=saved_ledger,
             workflow_link=saved_link,
         )
-    plan = _plan(fixture, stored, qa, steps)
+    plan = await _plan(fixture, stored, validated, qa, steps)
     checkpoint = _with_records(stored, qa, plan, moment)
     _write(path, checkpoint, created)
     return checkpoint
@@ -178,7 +193,7 @@ def _require_link(value: object) -> WorkflowLinkRecord:
     if type(ready) is not str or ready not in {"", _READY_JOB}:
         raise ProductBuildError("workflow link record is incomplete")
     repair = value["repair_required"]
-    if repair not in {"true", "false"}:
+    if type(repair) is not str or repair not in {"true", "false"}:
         raise ProductBuildError("workflow link record is incomplete")
     steps = value["steps"]
     if type(steps) is not list or not steps:
@@ -210,25 +225,37 @@ def _require_flag(value: str) -> bool:
     raise ProductBuildError("fact ledger record is incomplete")
 
 
-def _saved_holds(
+def _verdict_agrees(saved: FactLedgerRecord) -> bool:
+    failed = any(passed is False for _name, passed in saved.checks)
+    if saved.verdict == "BLOCKED":
+        return failed
+    if saved.verdict == "PASS":
+        return not failed
+    return False
+
+
+async def _saved_holds(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
     qa: QaRecord,
     saved: FactLedgerRecord,
     link: WorkflowLinkRecord,
     steps: tuple[str, ...],
 ) -> bool:
-    """True when the stored ledger still stands. A fixed BLOCKED record is re-planned."""
-    plan = _plan(probe, stored, qa, steps)
+    """True when the stored ledger still stands. A fixed check is re-planned."""
+    plan = await _plan(probe, stored, spec, qa, steps)
+    if not _verdict_agrees(saved):
+        raise ProductBuildError("fact ledger does not match")
     if saved.verdict == "BLOCKED":
         if link.verdict != "BLOCKED" or link.ready != "":
             raise ProductBuildError("workflow link does not match")
-        if not plan.blocked:
-            return False
-        if saved.facts != plan.facts or saved.checks != plan.checks:
-            raise ProductBuildError("fact ledger does not match")
         if link.steps != plan.steps or link.repair_required != plan.repair_required:
             raise ProductBuildError("workflow link does not match")
+        if saved.facts != plan.facts or saved.checks != plan.checks:
+            if saved.checks == plan.checks:
+                raise ProductBuildError("fact ledger does not match")
+            return False
         return True
     if saved.facts != plan.facts or saved.checks != plan.checks:
         raise ProductBuildError("fact ledger does not match")
@@ -243,9 +270,10 @@ def _saved_holds(
     raise ProductBuildError("fact ledger does not match")
 
 
-def _plan(
+async def _plan(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
     qa: QaRecord,
     steps: tuple[str, ...],
 ) -> _Plan:
@@ -254,7 +282,7 @@ def _plan(
     database_titles, databases_ok = _database_titles(probe, stored)
     hub_names, hubs_ok = _hub_names(probe, stored)
     secret_ok, links = _secret_links(probe, stored)
-    dashboard_ok, dashboard = _dashboard_outputs(probe, stored)
+    dashboard_ok, dashboard = _dashboard_outputs(probe, stored, spec)
     home = probe.pages[stored.page_id]
     colours_ok = _colours_match(probe, stored, home.title)
     facts = {
@@ -269,27 +297,42 @@ def _plan(
         "free_update_policy": "not_configured",
         "build_version": str(stored.build_version),
     }
+    # Caller colour names and title are not facts. Live QA reads the adapter
+    # and the stored variant records.
+    home_title = home.title if type(home.title) is str and home.title != "" else spec.title
+    live_spec = spec.model_copy(
+        update={
+            "colour_variants": tuple(record.name for record in stored.variants),
+            "title": home_title,
+        }
+    )
+    qa_live = await live_qa_passed(probe, stored, live_spec)
     qa_facts = dict(qa.facts)
     overlap = all(facts[left] == qa_facts.get(right, "") for left, right in _QA_OVERLAP)
     flags = {
-        "qa_verdict": qa.verdict == "PASS",
+        "qa_verdict": qa_live,
         "qa_facts": overlap,
         "hubs_present": hubs_ok,
         "databases_present": databases_ok,
         "dashboard_outputs": dashboard_ok,
         "secret_links": secret_ok,
-        "workflow": len(steps) == len(_EDGES),
     }
     if not colours_ok:
         flags["qa_facts"] = False
+    ordered: list[tuple[str, str]] = []
+    for name in _FACT_NAMES:
+        value = facts[name]
+        if type(value) is not str or value == "" or value.strip() != value:
+            value = "missing"
+            flags["qa_facts"] = False
+        ordered.append((name, value))
     checks = tuple((name, flags[name]) for name in _CHECK_NAMES)
     blocked = any(passed is False for _name, passed in checks)
     repair_required = "true" if qa.repairs else "false"
     ready = "" if blocked else _READY_JOB
-    ordered = tuple((name, facts[name]) for name in _FACT_NAMES)
     return _Plan(
         checks=checks,
-        facts=ordered,
+        facts=tuple(ordered),
         blocked=blocked,
         steps=steps,
         ready=ready,
@@ -331,8 +374,15 @@ def _hub_names(
         title = _page_title(probe, hub.page_id)
         if title != hub.name:
             matched = False
-        names.append(title if title != "" else hub.name)
-    return tuple(names), matched
+        names.append(title if title != "" else "missing")
+    durable: list[str] = []
+    for name in names:
+        if type(name) is str and (name == "" or name.strip() != name):
+            durable.append("missing")
+            matched = False
+        else:
+            durable.append(name)
+    return tuple(durable), matched
 
 
 def _colours_match(
@@ -353,11 +403,19 @@ def _database_titles(
         database = probe.databases.get(database_id)
         if not isinstance(database, NotionDatabase) or database.parent_id != stored.page_id:
             raise ProductBuildError("fact ledger database is missing")
-        title = database.title if type(database.title) is str and database.title != "" else kind
+        title = (
+            database.title if type(database.title) is str and database.title != "" else "missing"
+        )
+        if type(title) is str and title.strip() != title:
+            title = "missing"
         if title != kind:
             matched = False
         titles.append(title)
     return tuple(titles), matched
+
+
+def _trusted_link(page_id: str) -> str:
+    return "https" + "://" + _LINK_HOST + "/" + page_id
 
 
 def _secret_links(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -> tuple[bool, str]:
@@ -365,34 +423,38 @@ def _secret_links(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -
     agreed = True
     for record in stored.variants:
         page = probe.pages[record.page_id]
-        stored_link = _normalised_secret_link(record.secret_link, page.id)
-        links.append(stored_link)
+        trusted = _trusted_link(page.id)
         captured = page.public_url
-        if type(captured) is str and captured != "":
-            if _normalised_secret_link(captured, page.id) != stored_link:
-                agreed = False
-        elif captured is not None and captured != "":
-            agreed = False
+        usable = type(captured) is str and captured != ""
+        if (
+            page.is_published is True
+            and usable
+            and captured == trusted
+            and record.secret_link == trusted
+        ):
+            links.append(trusted)
+            continue
+        agreed = False
+        if usable:
+            shown = captured if type(captured) is str else ""
+            links.append(shown)
+        else:
+            links.append("missing")
     return agreed, ",".join(links)
 
 
-def _normalised_secret_link(link: str, page_id: str) -> str:
-    suffix = "/" + page_id
-    if link.endswith(suffix):
-        return link[: -len(suffix)]
-    return link
-
-
 def _dashboard_outputs(
-    probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint
+    probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> tuple[bool, str]:
     notice = stored.notification_dashboard
     if notice is None:
         return False, "missing"
+    expected = dashboard_formula_expressions(spec)
     parts: list[str] = []
     for kind, name, property_id in notice.formulas:
         expression = _formula_expression(probe, stored, kind, property_id)
-        if expression is None:
+        wanted = expected.get(name)
+        if expression is None or wanted is None or wanted[0] != kind or expression != wanted[1]:
             return False, "missing"
         parts.append(f"{name}={expression}")
     for kind, page_id in notice.samples:
@@ -436,16 +498,10 @@ def _walk_chain() -> tuple[str, ...]:
         raise ProductBuildError("workflow link does not match")
     jobs = {job.job_type: job for job in workflow.jobs}
     steps: list[str] = []
-    for event, job_type, label, predecessor in _EDGES:
-        if predecessor == "":
-            if event_map.get(event) != [job_type]:
-                raise ProductBuildError("workflow link does not match")
-        else:
-            owner = jobs.get(predecessor)
-            if owner is None or event not in owner.admitted_events:
-                raise ProductBuildError("workflow link does not match")
-            if job_type not in owner.successor_job_types:
-                raise ProductBuildError("workflow link does not match")
+    for event, job_type, label, _predecessor in _EDGES:
+        mapped = event_map.get(event, [])
+        if job_type not in mapped or tuple(mapped) != _ROUTE[event]:
+            raise ProductBuildError("workflow link does not match")
         if job_type not in jobs:
             raise ProductBuildError("workflow link does not match")
         steps.append(f"{event}>{job_type}>{label}")

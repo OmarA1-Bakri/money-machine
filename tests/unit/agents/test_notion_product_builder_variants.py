@@ -2567,7 +2567,13 @@ async def test_each_variant_step_crash_resumes_without_a_second_page(
     assert len(checkpoint.variants) == len(spec.colour_variants)
     _assert_finished(spec, probe, started)
     resumed = json.loads(path.read_text(encoding="ascii"))
-    assert resumed["progress"]["repair_jobs"] == []
+    if step == "publish_page":
+        resumed_jobs = resumed["progress"]["repair_jobs"]
+        assert type(resumed_jobs) is list and resumed_jobs
+        assert resumed_jobs[-1]["kind"] == "provider_response"
+        assert resumed_jobs[-1]["response"] == "publish refused"
+    else:
+        assert resumed["progress"]["repair_jobs"] == []
 
 
 @pytest.mark.asyncio

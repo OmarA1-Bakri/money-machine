@@ -1898,10 +1898,8 @@ async def test_shared_database_off_the_home_page_is_blocked(tmp_path: Path) -> N
 def _fresh_duplicate_outcome(
     checkpoint: ProductBuildCheckpoint | None, caught: ProductBuildError | None
 ) -> tuple[tuple[str, ...], ProductBuildError | None]:
-    """Return the false checks. A proof error is acknowledged, then the asserts run."""
+    """Return the false checks. The caller asserts adapter writes before this result."""
     if caught is not None:
-        with pytest.raises(ProductBuildError, match="qa proof duplicate does not match"):
-            raise caught
         return (), caught
     assert checkpoint is not None and checkpoint.qa is not None
     return _false_checks(checkpoint), None
@@ -1922,8 +1920,8 @@ async def test_renamed_variant_page_fails_fresh_duplicate(tmp_path: Path) -> Non
 
     false_checks, error = _fresh_duplicate_outcome(checkpoint, caught)
 
-    assert false_checks == ("fresh_duplicate",)
     assert calls == []
+    assert false_checks == ("fresh_duplicate",)
     assert error is None
     assert checkpoint is not None and checkpoint.qa is not None
     assert checkpoint.qa.verdict == "BLOCKED"
@@ -1945,12 +1943,38 @@ async def test_forged_spec_id_fails_fresh_duplicate(tmp_path: Path) -> None:
 
     false_checks, error = _fresh_duplicate_outcome(checkpoint, caught)
 
-    assert false_checks == ("fresh_duplicate",)
     assert calls == []
+    assert false_checks == ("fresh_duplicate",)
     assert error is None
     assert checkpoint is not None and checkpoint.qa is not None
     assert checkpoint.qa.verdict == "BLOCKED"
     assert checkpoint.qa.repairs == ()
+
+
+@pytest.mark.asyncio
+async def test_lying_publish_stays_blocked_without_a_duplicate(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    await probe.unpublish_page(page.id)
+    original = probe.publish_page
+
+    async def _lie(page_id: str) -> NotionPage:
+        published = await original(page_id)
+        published.public_url = ""
+        return published
+
+    probe.publish_page = _lie  # type: ignore[method-assign]
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "BLOCKED"
+    assert checkpoint.qa.repairs == ()
+    assert checkpoint.qa.proof_page_id == ""
+    assert calls == ["publish_page"]
+    assert page.is_published is True
+    assert page.public_url == ""
 
 
 @pytest.mark.asyncio
