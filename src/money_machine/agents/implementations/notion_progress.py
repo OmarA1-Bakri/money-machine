@@ -205,6 +205,36 @@ def stamp_integrity_digest(document: Mapping[str, object]) -> dict[str, object]:
     return raw
 
 
+def _pid_alive(pid: int) -> bool:
+    """True when a process still owns this pid. A dead pid's temp is stale."""
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _remove_dead_temps(path: Path) -> None:
+    """Delete this checkpoint's leftover temps. The name is matched literally.
+
+    A glob would treat ``[`` in the file name as a character class and could
+    delete a different file. A temp whose pid is still running is left alone.
+    """
+    marker = f".{path.name}."
+    suffix = ".tmp"
+    for stale in path.parent.iterdir():
+        name = stale.name
+        if not name.startswith(marker) or not name.endswith(suffix):
+            continue
+        pid_text = name[len(marker) : -len(suffix)]
+        if pid_text.isdigit() and _pid_alive(int(pid_text)):
+            continue
+        with contextlib.suppress(OSError):
+            stale.unlink()
+
+
 def write_document(
     path: Path, payload: Mapping[str, object], progress: Mapping[str, object]
 ) -> None:
@@ -217,9 +247,7 @@ def write_document(
     stored["record_digest"] = _digest(body)
     body[PROGRESS_KEY] = stored
     text = json.dumps(body, sort_keys=True, separators=(",", ":")) + "\n"
-    for stale in path.parent.glob(f".{path.name}.*.tmp"):
-        with contextlib.suppress(OSError):
-            stale.unlink()
+    _remove_dead_temps(path)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     try:
         temporary.write_text(text, encoding="ascii")

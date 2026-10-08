@@ -8,25 +8,27 @@ Twelve session 7 evidence keys stay false, including `product_fact_ledger_persis
 
 Prompt integrity for this wave is the Wave 10 corrective addendum in `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md`. The prompt file is unchanged. SHA-256 `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`. D-0029 records that the section 10 names are labels on `config/workflows.yaml`, not a second engine.
 
-`run_fact_ledger` is async at `notion_fact_ledger.py:117`. The plan at `_plan` (`:273`) awaits `live_qa_passed` (`notion_qa.py:477`) before the single `write_checkpoint` (`notion_fact_ledger.py:572`). Facts are the persisted checkpoint and the fixture adapter. Caller colour names, version, and title are not facts. `qa_verdict` is the live QA result, not the stored `qa.verdict`. A stored record that does not agree with its own checks, or that does not match the live plan, raises `fact ledger does not match` or `workflow link does not match` and leaves the file bytes unchanged, with 0 adapter writes. A `BLOCKED` record whose checks changed is re-planned (`:258` returns false). A verdict-only or fact-only forgery on an unchanged check row raises and writes nothing. Resume of a matching record does not write. A crash inside `write_checkpoint` leaves no ledger key, and the resume writes once to a single `PASS`. The workflow link walks every edge on `event_successor_map` (`:503`) and requires the successor tuple to equal the canonical route. `ListingPackage` stays required (`:509`). The link does not create a job. `_write_qa` (`notion_qa.py:818`) keeps a stored ledger and link at `:831` when QA rewrites. The aesthetics parser strips both keys at `notion_aesthetics.py:151`.
+`run_fact_ledger` is async at `notion_fact_ledger.py:144`. The plan at `_plan` (`:331`) awaits `live_qa_passed` (`notion_qa.py:476`) before `_write` (`:739`), which calls `write_checkpoint` at `:778`. Facts are the persisted checkpoint and the fixture adapter. Caller colour names, version, title, `buyer_problem`, `flagship_feature`, `hubs`, `identity`, and `tier` are not facts. The observed spec is read from the stored pages before formulas and before live QA. `qa_verdict` is `stored_pass and qa_live` (`:365`). A stored verdict other than `PASS` cannot become a ledger `PASS` when the live state would pass (`_require_stored_qa` at `:276`). A stored record that does not agree with its own checks, or that does not match the live plan, raises `fact ledger does not match` or `workflow link does not match` and leaves the file bytes unchanged, with 0 adapter writes. A `BLOCKED` record whose checks changed is re-planned (`:316` returns false). A check-equal fact change stays a refusal, so a forged fact cannot be replanned away. Resume of a matching record does not write. A crash inside `write_checkpoint` leaves no ledger key, and the resume writes once to a single `PASS`. The workflow link checks each of the ten edges three ways (`:700` admitted events, `:702` successor job types, `:704` `event_successor_map` order). The eight persisted labels stay the section-10 names. `ListingPackage` stays required (`:709`). The link does not create a job. No `ListingCopyJob` reads the ledger in this wave. The ledger counts known ids only. The proof copy is not a known id, and `page_count` stays 15. `_write_qa` keeps a stored ledger and link at `notion_qa.py:845` when QA rewrites. The aesthetics parser strips both keys at `notion_aesthetics.py:151`.
 
-Round 2 is this commit. It answers the reviewer FAIL and the verifier FAIL at `b21d700b`. This commit's CI run is not invented here.
+Round 3 is this commit. It answers the reviewer FAIL and the verifier FAIL at `c2bfa5a8`. Round 2's 176-row and 39-row counts were that tip. They are not the counts below. This commit's CI run is not invented here.
 
-Empty captured URL is two contracts. QA still skips `""` the same as a missing URL (`notion_qa.py:553`). `test_empty_captured_url_repairs_like_a_missing_url` records `PASS` with repairs `("published",)`. The ledger does not skip `""` or `None` on a published page. `test_empty_or_missing_public_url_blocks_secret_links` records `BLOCKED`, the secret-link fact component `missing`, and 0 adapter writes.
+Empty captured URL is two contracts. QA still skips `""` the same as a missing URL (`notion_qa.py:557`). `test_empty_captured_url_repairs_like_a_missing_url` records `PASS` with repairs `("published",)`. The ledger does not skip `""` or `None` on a published page. `test_empty_or_missing_public_url_blocks_secret_links` records `BLOCKED`, the secret-link fact component `missing`, and 0 adapter writes.
 
-`write_checkpoint` keeps earlier `repair_jobs` when the file already exists (`notion_progress_record.py:185`). The publish crash-resume keeps that `publish_page` job. Steps that never added a job stay `[]`. `write_document` deletes a stale sibling tmp, named with a leading dot and the checkpoint file name, before the next write (`notion_progress.py:220`). A provider that publishes and then leaves `public_url` empty stays `BLOCKED` after one `publish_page` and does not call `duplicate_page` (`notion_qa.py:776`).
+`write_checkpoint` keeps earlier `repair_jobs` when the file already exists (`notion_progress_record.py:185`). A garbage, empty, or forged prior is refused and the file is left unchanged. `write_document` matches a sibling temp by the literal prefix `.{name}.` and the suffix `.tmp` (`notion_progress.py:219`). A character class in the file name is not a glob. A temp whose middle is a live pid is kept. A provider that publishes and then leaves the URL untrusted stays `BLOCKED` after one `publish_page`, records repairs `("published",)`, and does not call `duplicate_page` (`notion_qa.py:787`).
 
-The workflow length flag is gone. It is not an equivalent row. Popping a page that is not a known id before the first ledger run stays `PASS` with one checkpoint write. The proof page is the only extra page and it is not a known id. `test_unknown_page_before_the_ledger_is_not_a_fact` pins that.
+The ledger covers known ids only. Popping a page that is not a known id before the first ledger run stays `PASS` with one checkpoint write. The proof page is the only extra page and it is not a known id. `test_unknown_page_before_the_ledger_is_not_a_fact` pins that. An extra `NotionPage` subclass is a page and blocks. A known id replaced by a subclass raises `fact ledger page is missing`.
 
-Blocker map. Event-map routing, including a dropped `BUILD_QA_FAILED` successor: `test_each_workflow_edge_is_read_from_the_event_map` and `test_missing_listing_successor_refuses`. Live QA defects, including an unpublished page, a blank URL, a forged formula, a no-access block, and a foreign linked view: `test_live_state_qa_rejects_is_not_a_pass` and `test_stale_pass_refuses_when_the_live_page_is_unpublished`. A trailing space in a hub title is stored as `missing` and a later fix reaches `PASS`: `test_trailing_space_in_a_hub_title_can_be_repaired`. One of two defects fixed, the other still blocked, re-plans: `test_one_fixed_defect_replans_the_other`. A forged `BLOCKED` verdict, and a forged `BLOCKED` fact with the checks unchanged: `test_stored_blocked_verdict_replans_a_passing_plan` and `test_forged_blocked_fact_does_not_match_and_writes_nothing`. A `BLOCKED` link forged to `PASS`, and `repair_required` forged to `true`: `test_blocked_ledger_with_a_pass_link_refuses` and `test_blocked_ledger_with_forged_repair_required_refuses`. An extra key on the ledger, the link, or a check row: `test_extra_key_is_incomplete`. A database whose parent is not home raises `fact ledger database is missing` with 0 writes: `test_database_parent_other_than_home_writes_nothing`. Empty and missing public URLs, a hub title that is not text, a renamed hub, a blank database title, a decoy formula, and the persisted QA flags: `test_empty_or_missing_public_url_blocks_secret_links`, `test_hub_title_that_is_not_text_is_blocked`, `test_renamed_hub_is_blocked_with_no_adapter_writes`, `test_blank_database_title_is_missing_and_blocked`, `test_decoy_formula_is_not_the_dashboard_fact`, and `test_persisted_qa_flags_match_the_qa_record`. Exact messages: `test_link_verdict_maybe_is_unsupported` (`workflow link verdict is unsupported`), `test_ready_nope_is_incomplete`, `test_empty_steps_are_incomplete`, `test_check_flag_number_is_incomplete`, and `test_facts_json_number_is_incomplete`.
+SQLAlchemy in this workspace is 2.0.52, the same version as `uv.lock`. A verifier environment on a different SQLAlchemy build is not a product defect. `pyright` 1.1.411 reports 0 errors on the changed modules. The notice that 1.1.414 exists is not a failure.
 
-Product-build tests: 655 passed (`test_notion_fact_ledger.py`, `test_notion_product_qa.py`, the variants file, the progress file, and the six phase files). `ruff format --check`, `ruff check`, and `pyright` 1.1.411 report 0 errors on the changed modules. Sockets stay blocked. No production Notion or Etsy. No commissioning.
+Blocker map. Reviewer A and verifier 1, stored QA verdict: `test_blocked_qa_with_a_live_pass_writes_nothing`, `test_fresh_duplicate_block_is_not_a_ledger_pass`, and `test_forged_qa_verdict_writes_nothing`. Reviewer B and verifier 4, edge whitespace before persist: `test_edge_whitespace_is_refused_before_persist`. Verifier 2, each of ten edges three ways: `test_each_edge_is_read_three_ways`. Verifier 3, padded sample and padded row recover: `test_padded_sample_title_recovers_after_the_trim` and the whitespace test. Verifier 5, exact `str`: `test_captured_url_must_be_exact_str`. Verifier 6, secret-fact component, QA publish guard, and the prior rebuild job: `test_wrong_host_path_is_stored_as_the_captured_url`, `test_lying_publish_stays_blocked_without_a_duplicate`, `test_unpublished_and_duplicate_off_repairs_both`, `test_untrusted_publish_does_not_set_the_duplicate`, `test_publish_that_stays_unpublished_does_not_set_duplicate`, and `test_prior_rebuild_job_survives_the_ledger_write`. SF1 per-field dashboard: `test_blank_dashboard_row_title_refuses`, `test_blank_sample_title_is_missing`, `test_invisible_sample_mark_is_missing`, and `test_dashboard_delimiter_is_not_a_fact`. SF2 permuted names, `maybe`, forged repair, renamed workflow, and the false QA flag in the ledger file: `test_permuted_check_names_are_incomplete`, `test_permuted_fact_names_are_incomplete`, `test_check_flag_maybe_is_incomplete`, `test_forged_repair_required_on_a_pass_refuses`, `test_renamed_workflow_refuses`, and `test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes`. SF3 missing hub: `test_missing_hub_in_the_spec_is_a_product_error` (`notion_hubs.py:145`). SF4 caller narrative: `test_caller_spec_fields_are_not_the_facts`. SF5 shape change stays refused: `test_wrong_hub_shape_stays_refused_until_the_name_matches`. SF6 redacted read failure: `test_live_read_failure_is_a_redacted_job`. SF7 applied repairs: the four QA publish-guard tests above. SF8 PASS plus a false check: `test_pass_with_a_false_check_is_refused`. Page subclass: `test_page_subclass_is_not_accepted` and `test_extra_page_subclass_blocks_the_ledger`. Direct `_write`: `test_missing_record_raises_product_error`. Literal temp names: `test_temp_names_are_matched_literally`. Oversized hub description: `test_oversized_hub_description_is_not_adopted`.
 
-Census of `notion_fact_ledger.py` on this tip. An AST walk counts an `If` that is not an `elif`, an `elif` (`If` that is the sole `orelse` of another `If`), a `Compare`, a `BoolOp`, each `BoolOp` value as an operand, and an `IfExp`. The counts are if 57, elif 0, compare 93, boolop 32, operand 72, ifexp 9. That is 263 sites. The operand sweep replaces each operand span with `True` and with `False`, and flips the first ` or ` or ` and ` token of each `BoolOp`. That is 72 times 2 plus 32, which is 176 mutants. The owning file is `tests/unit/agents/test_notion_fact_ledger.py`, run with `pytest -q --tb=line`. The Failed column is the FAILED-line count. A syntax error is not a kill. None occurred. The verifier's 174 and the reviewer's 282 were counts of the previous file. They are not the counts of this tip. The QA preserve lines are not in the 176. They are the if-flip row at `notion_qa.py:831`.
+Product-build tests: 732 passed (`test_notion_fact_ledger.py`, `test_notion_product_qa.py`, the variants file, the progress file, and the six phase files). `ruff format --check`, `ruff check`, and `pyright` 1.1.411 report 0 errors on the changed modules. Sockets stay blocked. No production Notion or Etsy. No commissioning.
 
-Operand sweep: 176 rows, 155 killed, 21 equivalent. The Failed column sums to 1928. The equivalents are probe-backed in the table.
+Census of `notion_fact_ledger.py` on this tip. An AST walk counts an `If` that is not an `elif`, an `elif` (`If` that is the sole `orelse` of another `If`), a `Compare`, a `BoolOp`, each `BoolOp` value as an operand, and an `IfExp`. The counts are if 85, elif 1, compare 136, boolop 49, operand 109, ifexp 9. That is 389 sites. The operand sweep replaces each operand span with `True` and with `False`, and flips the first ` or ` or ` and ` token of each `BoolOp`. That is 109 times 2 plus 49, which is 267 mutants. The owning file is `tests/unit/agents/test_notion_fact_ledger.py`, run with `pytest -q --tb=line`. The Failed column is the FAILED-line count. A syntax error is not a kill. None occurred. Workers imported a copy of `src` so the workspace file was not the mutant. The round-2 176 and the verifier's earlier 174 are not the counts of this tip.
 
-If-flip table: 39 rows, 36 killed, 3 equivalent. The Failed column sums to 174. The workflow length flag is not a row. The first workflow edge and the successor membership check are one event-map compare at `notion_fact_ledger.py:503`. The 17 variant-file rows were remeasured. Their Failed counts sum to 20. Three of them are equivalent.
+Operand sweep: 267 rows, 212 killed, 55 equivalent. The Failed column sums to 3610. The equivalents are probe-backed in the table. The `:377` `strip` conjunct is killed (Failed 2). The same line's `or` to `and` flip is equivalent because every fact is a non-empty `str` and `and` binds tighter, so the strip conjunct still raises. Probe `test_edge_whitespace_is_refused_before_persist`. The old `:546` `None` `or` was split into three separate `if`s (`:748-753`) and is not a row. `test_missing_record_raises_product_error` raises `ProductBuildError`.
+
+If-flip table: 49 rows, 46 killed, 3 equivalent. The Failed column sums to 273. The 17 variant-file rows were remeasured. Their Failed counts sum to 20. Three of them are equivalent. Ten rows were added for the admitted-event check, the successor-type check, the prior-file check, the secret-fact compare, the secret-fact if-exp, and the five `notion_qa.py:787` publish-guard mutants.
 
 | Mutation | Site (file:line) | Failing tests | Failed |
 |---|---|---|---|
@@ -34,222 +36,323 @@ If-flip table: 39 rows, 36 killed, 3 equivalent. The Failed column sums to 174. 
 | delete accent and vocabulary id compare | `notion_variants.py:844` | test_replay_rejects_a_moved_accent_block_id | 1 |
 | delete saved-path _require_original | `notion_variants.py:837` | test_saved_home_original_flag_refuses[duplicate_as_template-True] | 2 |
 | replace navigation block type check with False | `notion_aesthetics.py:346` | test_navigation_callout_fails_the_created_hub_pair | 1 |
-| delete palette token name uniqueness | `notion_variants.py:280` | Equivalent. test_duplicate_palette_token_names_refuse_before_any_write still raises checkpoint aesthetics accent is duplicated. 0 writes. | 0 |
-| delete variant name dedup | `notion_variants.py:199` | test_replay_rejects_a_duplicated_variant_label[name] | 1 |
-| delete variant page-id dedup | `notion_variants.py:203` | test_replay_rejects_a_duplicated_variant_label[page_id] | 1 |
+| delete palette token name uniqueness | `notion_variants.py:280` | Equivalent. `test_duplicate_palette_token_names_refuse_before_any_write` still raises `checkpoint aesthetics accent is duplicated`. 0 writes. | 0 |
+| delete variant name dedup | `notion_variants.py:198` | test_replay_rejects_a_duplicated_variant_label[name] | 1 |
+| delete variant page-id dedup | `notion_variants.py:202` | test_replay_rejects_a_duplicated_variant_label[page_id] | 1 |
 | delete len(children) != 2 | `notion_variants.py:895` | test_replay_rejects_an_extra_variant_child | 1 |
-| delete home id check | `notion_variants.py:904` | Equivalent. test_replay_rejects_a_home_without_the_spec_id still raises checkpoint page is missing from the fixture probe. 0 writes. | 0 |
-| delete _source_page parent_type | `notion_variants.py:519` | Equivalent. test_replay_rejects_a_home_that_is_not_workspace still raises checkpoint page is not the stored top-level page. 0 writes. | 0 |
+| delete home id check | `notion_variants.py:904` | Equivalent. `test_replay_rejects_a_home_without_the_spec_id` still raises `checkpoint page is missing from the fixture probe`. 0 writes. | 0 |
+| delete _source_page parent_type | `notion_variants.py:519` | Equivalent. `test_replay_rejects_a_home_that_is_not_workspace` still raises `checkpoint page is not the stored top-level page`. 0 writes. | 0 |
 | delete _find_titled len(matches) > 1 | `notion_variants.py:534` | test_two_colour_titles_refuse_before_any_write | 1 |
 | delete _find_copy len(matches) > 1 | `notion_variants.py:548` | test_two_copy_titles_refuse_before_any_write | 1 |
-| publish before blocks | `notion_variants.py:748` | Moved to just before the accent match. test_each_variant_step_crash_resumes_without_a_second_page. | 2 |
-| skip retained created ids | `notion_progress_record.py:188` | test_reversed_dashboard_created_ids_survive_variants | 1 |
+| publish before blocks | `notion_variants.py:738` | test_each_variant_step_crash_resumes_without_a_second_page[add_callout_block] | 2 |
+| skip retained created ids | `notion_progress_record.py:192` | test_reversed_dashboard_created_ids_survive_variants | 1 |
 | delete plan nested-database refuse | `notion_variants.py:388` | test_database_under_a_structure_block_refuses_before_any_write[home] | 3 |
 | drop hub and home blocks from nested parents | `notion_variants.py:624` | test_saved_database_under_a_structure_block_refuses[home] | 2 |
 | exact type instead of isinstance | `notion_variants.py:584` | test_database_subclass_under_a_hub_block_is_refused | 2 |
-| fresh-duplicate title is True | `notion_qa.py:570` | Replace page.title == title with True. | 1 |
-| fresh-duplicate spec id is True | `notion_qa.py:572` | Replace the spec-id conjunct with True. | 1 |
-| empty captured url is checked | `notion_qa.py:553` | Delete captured != empty. QA only. | 1 |
-| qa verdict check is True | `notion_fact_ledger.py:313` | Replace qa_live with True. | 17 |
-| ready is always ListingCopyJob | `notion_fact_ledger.py:332` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 6 |
-| repair_required is always false | `notion_fact_ledger.py:331` | test_repaired_publish_keeps_the_listing_ready | 1 |
-| supported_devices is desktop | `notion_fact_ledger.py:295` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 2 |
-| free_update_policy is free | `notion_fact_ledger.py:297` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 2 |
-| build_version is a constant | `notion_fact_ledger.py:298` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 3 |
-| colour names ignore the adapter title | `notion_fact_ledger.py:320` | test_renamed_variant_page_blocks_qa_facts | 3 |
-| hubs_present is True | `notion_fact_ledger.py:315` | test_renamed_hub_is_blocked_with_no_adapter_writes | 5 |
-| databases_present is True | `notion_fact_ledger.py:316` | test_renamed_database_blocks_the_database_check | 4 |
-| dashboard_outputs check is True | `notion_fact_ledger.py:317` | test_blank_formula_blocks_dashboard_outputs | 5 |
-| secret_links check is True | `notion_fact_ledger.py:318` | test_forged_captured_url_blocks_secret_links | 5 |
-| blocked is False | `notion_fact_ledger.py:330` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 39 |
-| stored facts are not compared | `notion_fact_ledger.py:260` | test_forged_fact_does_not_match_and_writes_nothing | 1 |
-| stored steps are not compared | `notion_fact_ledger.py:265` | test_forged_step_does_not_match_and_writes_nothing | 1 |
-| blocked ledger does not replan | `notion_fact_ledger.py:258` | The check-diff return False becomes return True. | 3 |
-| event-map route check is False | `notion_fact_ledger.py:503` | Replace the event-map compare with False. The old first-edge row and the successor-membership row are this one compare. | 10 |
-| ListingPackage output is skipped | `notion_fact_ledger.py:509` | test_missing_listing_package_refuses | 1 |
-| stop stripping fact_ledger and workflow_link | `notion_aesthetics.py:151` | test_resume_of_pass_makes_no_second_write | 42 |
-| qa rewrite drops the ledger keys | `notion_qa.py:831` | test_blocked_ledger_replans_when_the_defect_is_gone | 1 |
+| fresh-duplicate title is True | `notion_qa.py:574` | Replace `page.title == title` with True. test_renamed_variant_page_fails_fresh_duplicate | 1 |
+| fresh-duplicate spec id is True | `notion_qa.py:572` | Replace the spec-id conjunct with True. test_forged_spec_id_fails_fresh_duplicate | 1 |
+| empty captured url is checked | `notion_qa.py:557` | Delete `captured != ""`. QA only. test_empty_captured_url_repairs_like_a_missing_url | 1 |
+| qa verdict check is True | `notion_fact_ledger.py:365` | Replace `stored_pass and qa_live` with True. test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 21 |
+| ready is always ListingCopyJob | `notion_fact_ledger.py:383` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 13 |
+| repair_required is always false | `notion_fact_ledger.py:382` | test_repaired_publish_keeps_the_listing_ready | 1 |
+| supported_devices is desktop | `notion_fact_ledger.py:355` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 2 |
+| free_update_policy is free | `notion_fact_ledger.py:357` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 2 |
+| build_version is a constant | `notion_fact_ledger.py:358` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 3 |
+| colour names ignore the adapter title | `notion_fact_ledger.py:372` | test_renamed_variant_page_blocks_qa_facts | 3 |
+| hubs_present is True | `notion_fact_ledger.py:367` | test_renamed_hub_is_blocked_with_no_adapter_writes | 5 |
+| databases_present is True | `notion_fact_ledger.py:368` | test_renamed_database_blocks_the_database_check | 4 |
+| dashboard_outputs check is True | `notion_fact_ledger.py:369` | test_blank_formula_blocks_dashboard_outputs | 11 |
+| secret_links check is True | `notion_fact_ledger.py:370` | test_forged_captured_url_blocks_secret_links | 8 |
+| blocked is False | `notion_fact_ledger.py:381` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 53 |
+| stored facts are not compared | `notion_fact_ledger.py:318` | test_forged_fact_does_not_match_and_writes_nothing | 1 |
+| stored steps are not compared | `notion_fact_ledger.py:323` | test_forged_step_does_not_match_and_writes_nothing | 1 |
+| blocked ledger does not replan | `notion_fact_ledger.py:316` | The check-diff `return False` becomes `return True`. test_blocked_ledger_replans_when_the_defect_is_gone | 10 |
+| event-map route check is False | `notion_fact_ledger.py:704` | Replace the event-map compare with False. test_broken_workflow_graph_writes_nothing | 20 |
+| ListingPackage output is skipped | `notion_fact_ledger.py:709` | test_missing_listing_package_refuses | 1 |
+| stop stripping fact_ledger and workflow_link | `notion_aesthetics.py:151` | test_resume_of_pass_makes_no_second_write | 53 |
+| qa rewrite drops the ledger keys | `notion_qa.py:845` | test_blocked_ledger_replans_when_the_defect_is_gone | 1 |
+| admitted event check is False | `notion_fact_ledger.py:700` | Dropping the admitted-event check. Killed on every edge. test_each_edge_is_read_three_ways[admitted-edge0] | 10 |
+| successor job types check is False | `notion_fact_ledger.py:702` | Dropping the successor-type check. Killed on every edge. test_each_edge_is_read_three_ways[successor-edge0] | 10 |
+| prior file check is flipped | `notion_progress_record.py:185` | `is_file` flipped. A prior `rebuild_refused` job must survive. test_prior_rebuild_job_survives_the_ledger_write | 1 |
+| secret shown compare is flipped | `notion_fact_ledger.py:603` | Compare flip stores a leading empty component. Killed. test_forged_captured_url_blocks_secret_links | 4 |
+| secret shown ifexp is flipped | `notion_fact_ledger.py:603` | If-exp flip stores a leading empty component. Killed. test_forged_captured_url_blocks_secret_links | 4 |
+| publish guard or becomes and | `notion_qa.py:787` | or to and. An untrusted URL must not set duplicate. test_lying_publish_stays_blocked_without_a_duplicate | 3 |
+| publish guard left is True | `notion_qa.py:787` | Left conjunct forced True. An honest publish must still repair duplicate. test_unpublished_and_duplicate_off_repairs_both | 1 |
+| publish guard left is False | `notion_qa.py:787` | Left conjunct forced False. An unpublished page must not set duplicate. test_publish_that_stays_unpublished_does_not_set_duplicate | 1 |
+| publish guard right is True | `notion_qa.py:787` | Right conjunct forced True. An honest publish must still repair duplicate. test_unpublished_and_duplicate_off_repairs_both | 1 |
+| publish guard right is False | `notion_qa.py:787` | Right conjunct forced False. An untrusted URL must not set duplicate. test_lying_publish_stays_blocked_without_a_duplicate | 2 |
 
 Per-operand sweep of `notion_fact_ledger.py`. Site, operator, mutation, killing test or probe, Failed.
 
 | Site | Op | Mutation | Failing tests | Failed |
 |---|---|---|---|---|
-| `notion_fact_ledger.py:132` | or | replace `qa is None` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 96 |
-| `notion_fact_ledger.py:132` | or | replace `qa is None` with False | test_missing_qa_and_half_a_pair_write_nothing | 1 |
-| `notion_fact_ledger.py:132` | or | replace `not stored.variants` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 96 |
-| `notion_fact_ledger.py:132` | or | replace `not stored.variants` with False | Equivalent. `load_variant_checkpoint` returns only after variants exist, or it raises. Probe `test_qa_pass_persists_one_ledger_and_one_link`. | 0 |
-| `notion_fact_ledger.py:132` | or | flip `or` to `and` | test_missing_qa_and_half_a_pair_write_nothing | 1 |
-| `notion_fact_ledger.py:137` | and | replace `saved_ledger is not None` with True | Equivalent. A half pair raises `fact ledger record is incomplete` before this `and`. Probe `test_missing_qa_and_half_a_pair_write_nothing`. | 0 |
-| `notion_fact_ledger.py:137` | and | replace `saved_ledger is not None` with False | test_resume_of_pass_makes_no_second_write | 14 |
-| `notion_fact_ledger.py:138` | and | replace `saved_link is not None` with True | Equivalent. A half pair raises `fact ledger record is incomplete` before this `and`. Probe `test_missing_qa_and_half_a_pair_write_nothing`. | 0 |
-| `notion_fact_ledger.py:138` | and | replace `saved_link is not None` with False | test_resume_of_pass_makes_no_second_write | 14 |
-| `notion_fact_ledger.py:139` | and | replace `await _saved_holds(fixture, stored, validated, qa, saved_ledger, saved_link, ...` with True | test_blocked_ledger_replans_when_the_defect_is_gone | 15 |
-| `notion_fact_ledger.py:139` | and | replace `await _saved_holds(fixture, stored, validated, qa, saved_ledger, saved_link, ...` with False | test_resume_of_pass_makes_no_second_write | 14 |
-| `notion_fact_ledger.py:137` | and | flip `and` to `or` | test_blocked_ledger_replans_when_the_defect_is_gone | 15 |
-| `notion_fact_ledger.py:171` | or | replace `type(value) is not dict` with True | test_resume_of_pass_makes_no_second_write | 30 |
-| `notion_fact_ledger.py:171` | or | replace `type(value) is not dict` with False | test_wrong_record_shapes_refuse[ledger-number-fact ledger record is incomplete] | 1 |
-| `notion_fact_ledger.py:171` | or | replace `not exact_keys(value, _LEDGER_KEYS)` with True | test_resume_of_pass_makes_no_second_write | 30 |
-| `notion_fact_ledger.py:171` | or | replace `not exact_keys(value, _LEDGER_KEYS)` with False | test_extra_key_is_incomplete[ledger-fact ledger record is incomplete] | 1 |
-| `notion_fact_ledger.py:171` | or | flip `or` to `and` | test_extra_key_is_incomplete[ledger-fact ledger record is incomplete] | 2 |
-| `notion_fact_ledger.py:174` | or | replace `type(verdict) is not str` with True | test_resume_of_pass_makes_no_second_write | 35 |
-| `notion_fact_ledger.py:174` | or | replace `type(verdict) is not str` with False | test_wrong_record_shapes_refuse[verdict-list-fact ledger verdict is unsupported] | 1 |
-| `notion_fact_ledger.py:174` | or | replace `verdict not in _VERDICTS` with True | test_resume_of_pass_makes_no_second_write | 35 |
-| `notion_fact_ledger.py:174` | or | replace `verdict not in _VERDICTS` with False | test_unsupported_verdict_writes_nothing | 1 |
-| `notion_fact_ledger.py:174` | or | flip `or` to `and` | test_unsupported_verdict_writes_nothing | 2 |
-| `notion_fact_ledger.py:187` | or | replace `type(value) is not dict` with True | test_resume_of_pass_makes_no_second_write | 19 |
-| `notion_fact_ledger.py:187` | or | replace `type(value) is not dict` with False | test_wrong_record_shapes_refuse[link-number-workflow link record is incomplete] | 1 |
-| `notion_fact_ledger.py:187` | or | replace `not exact_keys(value, _LINK_KEYS)` with True | test_resume_of_pass_makes_no_second_write | 19 |
-| `notion_fact_ledger.py:187` | or | replace `not exact_keys(value, _LINK_KEYS)` with False | test_extra_key_is_incomplete[link-workflow link record is incomplete] | 1 |
-| `notion_fact_ledger.py:187` | or | flip `or` to `and` | test_extra_key_is_incomplete[link-workflow link record is incomplete] | 2 |
-| `notion_fact_ledger.py:190` | or | replace `type(verdict) is not str` with True | test_resume_of_pass_makes_no_second_write | 23 |
-| `notion_fact_ledger.py:190` | or | replace `type(verdict) is not str` with False | test_wrong_record_shapes_refuse[link-verdict-list-workflow link verdict is unsupported] | 1 |
-| `notion_fact_ledger.py:190` | or | replace `verdict not in _VERDICTS` with True | test_resume_of_pass_makes_no_second_write | 23 |
-| `notion_fact_ledger.py:190` | or | replace `verdict not in _VERDICTS` with False | test_link_verdict_maybe_is_unsupported | 1 |
-| `notion_fact_ledger.py:190` | or | flip `or` to `and` | test_link_verdict_maybe_is_unsupported | 2 |
-| `notion_fact_ledger.py:193` | or | replace `type(ready) is not str` with True | test_resume_of_pass_makes_no_second_write | 17 |
-| `notion_fact_ledger.py:193` | or | replace `type(ready) is not str` with False | test_wrong_record_shapes_refuse[ready-list-workflow link record is incomplete] | 1 |
-| `notion_fact_ledger.py:193` | or | replace `ready not in {"", _READY_JOB}` with True | test_resume_of_pass_makes_no_second_write | 17 |
-| `notion_fact_ledger.py:193` | or | replace `ready not in {"", _READY_JOB}` with False | test_ready_nope_is_incomplete | 1 |
-| `notion_fact_ledger.py:193` | or | flip `or` to `and` | test_ready_nope_is_incomplete | 2 |
-| `notion_fact_ledger.py:196` | or | replace `type(repair) is not str` with True | test_resume_of_pass_makes_no_second_write | 17 |
-| `notion_fact_ledger.py:196` | or | replace `type(repair) is not str` with False | test_repair_required_list_is_incomplete | 1 |
-| `notion_fact_ledger.py:196` | or | replace `repair not in {"true", "false"}` with True | test_resume_of_pass_makes_no_second_write | 17 |
-| `notion_fact_ledger.py:196` | or | replace `repair not in {"true", "false"}` with False | test_wrong_record_shapes_refuse[repair-word-workflow link record is incomplete] | 1 |
-| `notion_fact_ledger.py:196` | or | flip `or` to `and` | test_repair_required_list_is_incomplete | 2 |
-| `notion_fact_ledger.py:199` | or | replace `type(steps) is not list` with True | test_resume_of_pass_makes_no_second_write | 17 |
-| `notion_fact_ledger.py:199` | or | replace `type(steps) is not list` with False | test_wrong_record_shapes_refuse[steps-string-workflow link record is incomplete] | 1 |
-| `notion_fact_ledger.py:199` | or | replace `not steps` with True | test_resume_of_pass_makes_no_second_write | 17 |
-| `notion_fact_ledger.py:199` | or | replace `not steps` with False | test_empty_steps_are_incomplete | 1 |
-| `notion_fact_ledger.py:199` | or | flip `or` to `and` | test_empty_steps_are_incomplete | 2 |
-| `notion_fact_ledger.py:206` | or | replace `type(value) is not list` with True | test_resume_of_pass_makes_no_second_write | 28 |
-| `notion_fact_ledger.py:206` | or | replace `type(value) is not list` with False | test_facts_json_number_is_incomplete | 1 |
-| `notion_fact_ledger.py:206` | or | replace `not value` with True | test_resume_of_pass_makes_no_second_write | 28 |
-| `notion_fact_ledger.py:206` | or | replace `not value` with False | Equivalent. An empty list still fails the later check-name compare as incomplete. Probe `test_wrong_record_shapes_refuse` checks-empty. | 0 |
-| `notion_fact_ledger.py:206` | or | flip `or` to `and` | test_facts_json_number_is_incomplete | 1 |
-| `notion_fact_ledger.py:260` | or | replace `saved.facts != plan.facts` with True | test_resume_of_pass_makes_no_second_write | 4 |
-| `notion_fact_ledger.py:260` | or | replace `saved.facts != plan.facts` with False | test_forged_fact_does_not_match_and_writes_nothing | 1 |
-| `notion_fact_ledger.py:260` | or | replace `saved.checks != plan.checks` with True | test_resume_of_pass_makes_no_second_write | 4 |
-| `notion_fact_ledger.py:260` | or | replace `saved.checks != plan.checks` with False | Equivalent. A PASS whose live checks fail is still refused by `if plan.blocked`. Probe `test_template_flag_after_a_pass_refuses`. | 0 |
-| `notion_fact_ledger.py:260` | or | flip `or` to `and` | test_forged_fact_does_not_match_and_writes_nothing | 1 |
-| `notion_fact_ledger.py:363` | or | replace `type(page.title) is not str` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 17 |
-| `notion_fact_ledger.py:363` | or | replace `type(page.title) is not str` with False | test_hub_title_that_is_not_text_is_blocked | 1 |
-| `notion_fact_ledger.py:363` | or | replace `page.title == ""` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 17 |
-| `notion_fact_ledger.py:363` | or | replace `page.title == ""` with False | Equivalent. An empty title is a str, so the function returns that empty string. Probe `test_blank_hub_title_is_missing`. | 0 |
-| `notion_fact_ledger.py:363` | or | flip `or` to `and` | test_hub_title_that_is_not_text_is_blocked | 1 |
-| `notion_fact_ledger.py:546` | or | replace `ledger is None` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 82 |
-| `notion_fact_ledger.py:546` | or | replace `ledger is None` with False | Equivalent. `_write` runs only after `_with_records`, which sets ledger, link, and qa. Probe `test_qa_pass_persists_one_ledger_and_one_link`. | 0 |
-| `notion_fact_ledger.py:546` | or | replace `link is None` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 82 |
-| `notion_fact_ledger.py:546` | or | replace `link is None` with False | Equivalent. `_write` runs only after `_with_records`, which sets ledger, link, and qa. Probe `test_qa_pass_persists_one_ledger_and_one_link`. | 0 |
-| `notion_fact_ledger.py:546` | or | replace `qa is None` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 82 |
-| `notion_fact_ledger.py:546` | or | replace `qa is None` with False | Equivalent. `_write` runs only after `_with_records`, which sets ledger, link, and qa. Probe `test_qa_pass_persists_one_ledger_and_one_link`. | 0 |
-| `notion_fact_ledger.py:546` | or | flip `or` to `and` | Equivalent. `_write` runs only after `_with_records`, which sets ledger, link, and qa. Probe `test_qa_pass_persists_one_ledger_and_one_link`. | 0 |
-| `notion_fact_ledger.py:210` | or | replace `type(item) is not dict` with True | test_resume_of_pass_makes_no_second_write | 28 |
-| `notion_fact_ledger.py:210` | or | replace `type(item) is not dict` with False | test_wrong_record_shapes_refuse[check-number-fact ledger record is incomplete] | 1 |
-| `notion_fact_ledger.py:210` | or | replace `not exact_keys(item, frozenset({left, right}))` with True | test_resume_of_pass_makes_no_second_write | 28 |
-| `notion_fact_ledger.py:210` | or | replace `not exact_keys(item, frozenset({left, right}))` with False | test_extra_key_is_incomplete[check-fact ledger record is incomplete] | 1 |
-| `notion_fact_ledger.py:210` | or | flip `or` to `and` | test_extra_key_is_incomplete[check-fact ledger record is incomplete] | 2 |
-| `notion_fact_ledger.py:214` | or | replace `type(label) is not str` with True | test_resume_of_pass_makes_no_second_write | 28 |
-| `notion_fact_ledger.py:214` | or | replace `type(label) is not str` with False | test_wrong_record_shapes_refuse[check-label-number-fact ledger record is incomplete] | 1 |
-| `notion_fact_ledger.py:214` | or | replace `type(stored) is not str` with True | test_resume_of_pass_makes_no_second_write | 28 |
-| `notion_fact_ledger.py:214` | or | replace `type(stored) is not str` with False | test_check_flag_number_is_incomplete | 1 |
-| `notion_fact_ledger.py:214` | or | flip `or` to `and` | test_check_flag_number_is_incomplete | 2 |
-| `notion_fact_ledger.py:251` | or | replace `link.verdict != "BLOCKED"` with True | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 5 |
-| `notion_fact_ledger.py:251` | or | replace `link.verdict != "BLOCKED"` with False | test_blocked_ledger_with_a_pass_link_refuses | 1 |
-| `notion_fact_ledger.py:251` | or | replace `link.ready != ""` with True | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 5 |
-| `notion_fact_ledger.py:251` | or | replace `link.ready != ""` with False | test_blocked_link_ready_job_refuses | 1 |
-| `notion_fact_ledger.py:251` | or | flip `or` to `and` | test_blocked_ledger_with_a_pass_link_refuses | 2 |
-| `notion_fact_ledger.py:253` | or | replace `link.steps != plan.steps` with True | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 5 |
-| `notion_fact_ledger.py:253` | or | replace `link.steps != plan.steps` with False | test_blocked_forged_step_refuses | 1 |
-| `notion_fact_ledger.py:253` | or | replace `link.repair_required != plan.repair_required` with True | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 5 |
-| `notion_fact_ledger.py:253` | or | replace `link.repair_required != plan.repair_required` with False | test_blocked_ledger_with_forged_repair_required_refuses | 1 |
-| `notion_fact_ledger.py:253` | or | flip `or` to `and` | test_blocked_ledger_with_forged_repair_required_refuses | 2 |
-| `notion_fact_ledger.py:255` | or | replace `saved.facts != plan.facts` with True | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 1 |
-| `notion_fact_ledger.py:255` | or | replace `saved.facts != plan.facts` with False | test_forged_blocked_fact_does_not_match_and_writes_nothing | 1 |
-| `notion_fact_ledger.py:255` | or | replace `saved.checks != plan.checks` with True | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 1 |
-| `notion_fact_ledger.py:255` | or | replace `saved.checks != plan.checks` with False | test_blocked_ledger_replans_when_the_defect_is_gone | 1 |
-| `notion_fact_ledger.py:255` | or | flip `or` to `and` | test_blocked_ledger_replans_when_the_defect_is_gone | 2 |
-| `notion_fact_ledger.py:265` | or | replace `link.verdict != "PASS"` with True | test_resume_of_pass_makes_no_second_write | 1 |
-| `notion_fact_ledger.py:265` | or | replace `link.verdict != "PASS"` with False | test_forged_link_verdict_on_a_pass_refuses | 1 |
-| `notion_fact_ledger.py:265` | or | replace `link.ready != plan.ready` with True | test_resume_of_pass_makes_no_second_write | 1 |
-| `notion_fact_ledger.py:265` | or | replace `link.ready != plan.ready` with False | test_forged_ready_on_a_pass_refuses | 1 |
-| `notion_fact_ledger.py:265` | or | replace `link.steps != plan.steps` with True | test_resume_of_pass_makes_no_second_write | 1 |
-| `notion_fact_ledger.py:265` | or | replace `link.steps != plan.steps` with False | test_forged_step_does_not_match_and_writes_nothing | 1 |
-| `notion_fact_ledger.py:265` | or | flip `or` to `and` | test_forged_ready_on_a_pass_refuses | 2 |
-| `notion_fact_ledger.py:302` | and | replace `type(home.title) is str` with True | test_home_title_integer_keeps_live_qa | 1 |
-| `notion_fact_ledger.py:302` | and | replace `type(home.title) is str` with False | test_renamed_home_title_fails_live_qa | 1 |
-| `notion_fact_ledger.py:302` | and | replace `home.title != ""` with True | test_blank_home_title_keeps_live_qa | 1 |
-| `notion_fact_ledger.py:302` | and | replace `home.title != ""` with False | test_renamed_home_title_fails_live_qa | 1 |
-| `notion_fact_ledger.py:302` | and | flip `and` to `or` | test_blank_home_title_keeps_live_qa | 2 |
-| `notion_fact_ledger.py:325` | or | replace `type(value) is not str` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 17 |
-| `notion_fact_ledger.py:325` | or | replace `type(value) is not str` with False | Equivalent. Joined facts are already durable strings. Edge spaces are substituted before the join. Probe `test_trailing_space_in_a_hub_title_can_be_repaired`. | 0 |
-| `notion_fact_ledger.py:325` | or | replace `value == ""` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 17 |
-| `notion_fact_ledger.py:325` | or | replace `value == ""` with False | Equivalent. Joined facts are already durable strings. Edge spaces are substituted before the join. Probe `test_database_title_with_edge_space_is_missing`. | 0 |
-| `notion_fact_ledger.py:325` | or | replace `value.strip() != value` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 17 |
-| `notion_fact_ledger.py:325` | or | replace `value.strip() != value` with False | Equivalent. Joined facts are already durable strings. Edge spaces are substituted before the join. Probe `test_qa_pass_persists_one_ledger_and_one_link`. | 0 |
-| `notion_fact_ledger.py:325` | or | flip `or` to `and` | Equivalent. Joined facts are already durable strings. Edge spaces are substituted before the join. Probe `test_trailing_space_in_a_hub_title_can_be_repaired`. | 0 |
-| `notion_fact_ledger.py:380` | and | replace `type(name) is str` with True | Equivalent. `_page_title` already returned a str. Probe `test_hub_title_that_is_not_text_is_blocked`. | 0 |
-| `notion_fact_ledger.py:380` | and | replace `type(name) is str` with False | test_trailing_space_in_a_hub_title_can_be_repaired | 1 |
-| `notion_fact_ledger.py:380` | and | replace `name == "" or name.strip() != name` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 17 |
-| `notion_fact_ledger.py:380` | and | replace `name == "" or name.strip() != name` with False | test_trailing_space_in_a_hub_title_can_be_repaired | 1 |
-| `notion_fact_ledger.py:380` | and | flip `and` to `or` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 17 |
-| `notion_fact_ledger.py:404` | or | replace `not isinstance(database, NotionDatabase)` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 82 |
-| `notion_fact_ledger.py:404` | or | replace `not isinstance(database, NotionDatabase)` with False | test_missing_database_writes_nothing | 1 |
-| `notion_fact_ledger.py:404` | or | replace `database.parent_id != stored.page_id` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 82 |
-| `notion_fact_ledger.py:404` | or | replace `database.parent_id != stored.page_id` with False | test_database_parent_other_than_home_writes_nothing | 1 |
-| `notion_fact_ledger.py:404` | or | flip `or` to `and` | test_database_parent_other_than_home_writes_nothing | 2 |
-| `notion_fact_ledger.py:409` | and | replace `type(title) is str` with True | Equivalent. The title ternary already returned a str. Probe `test_database_title_integer_is_missing`. | 0 |
-| `notion_fact_ledger.py:409` | and | replace `type(title) is str` with False | test_database_title_with_edge_space_is_missing | 1 |
-| `notion_fact_ledger.py:409` | and | replace `title.strip() != title` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 15 |
-| `notion_fact_ledger.py:409` | and | replace `title.strip() != title` with False | test_database_title_with_edge_space_is_missing | 1 |
-| `notion_fact_ledger.py:409` | and | flip `and` to `or` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 15 |
-| `notion_fact_ledger.py:428` | and | replace `type(captured) is str` with True | test_empty_or_missing_public_url_blocks_secret_links[None] | 1 |
-| `notion_fact_ledger.py:428` | and | replace `type(captured) is str` with False | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 15 |
-| `notion_fact_ledger.py:428` | and | replace `captured != ""` with True | test_empty_or_missing_public_url_blocks_secret_links[] | 1 |
-| `notion_fact_ledger.py:428` | and | replace `captured != ""` with False | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 15 |
-| `notion_fact_ledger.py:428` | and | flip `and` to `or` | test_empty_or_missing_public_url_blocks_secret_links[] | 2 |
-| `notion_fact_ledger.py:430` | and | replace `page.is_published is True` with True | test_unpublished_trusted_url_blocks_secret_links | 1 |
-| `notion_fact_ledger.py:430` | and | replace `page.is_published is True` with False | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 15 |
-| `notion_fact_ledger.py:431` | and | replace `usable` with True | Equivalent. `captured == trusted` already implies a non-empty str. Probe `test_empty_or_missing_public_url_blocks_secret_links`. | 0 |
-| `notion_fact_ledger.py:431` | and | replace `usable` with False | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 15 |
-| `notion_fact_ledger.py:432` | and | replace `captured == trusted` with True | test_forged_captured_url_blocks_secret_links | 1 |
-| `notion_fact_ledger.py:432` | and | replace `captured == trusted` with False | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 15 |
-| `notion_fact_ledger.py:433` | and | replace `record.secret_link == trusted` with True | test_forged_stored_secret_link_blocks | 1 |
-| `notion_fact_ledger.py:433` | and | replace `record.secret_link == trusted` with False | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 15 |
-| `notion_fact_ledger.py:430` | and | flip `and` to `or` | test_forged_captured_url_blocks_secret_links | 5 |
-| `notion_fact_ledger.py:457` | or | replace `expression is None` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 16 |
-| `notion_fact_ledger.py:457` | or | replace `expression is None` with False | Equivalent. `None != wanted[1]` still returns missing. Probe `test_non_formula_config_is_missing`. | 0 |
-| `notion_fact_ledger.py:457` | or | replace `wanted is None` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 16 |
-| `notion_fact_ledger.py:457` | or | replace `wanted is None` with False | test_unknown_formula_name_is_missing | 1 |
-| `notion_fact_ledger.py:457` | or | replace `wanted[0] != kind` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 16 |
-| `notion_fact_ledger.py:457` | or | replace `wanted[0] != kind` with False | test_formula_recorded_on_the_wrong_database_is_missing | 1 |
-| `notion_fact_ledger.py:457` | or | replace `expression != wanted[1]` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 16 |
-| `notion_fact_ledger.py:457` | or | replace `expression != wanted[1]` with False | test_one_fixed_defect_replans_the_other | 2 |
-| `notion_fact_ledger.py:457` | or | flip `or` to `and` | test_unknown_formula_name_is_missing | 1 |
-| `notion_fact_ledger.py:503` | or | replace `job_type not in mapped` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 85 |
-| `notion_fact_ledger.py:503` | or | replace `job_type not in mapped` with False | Equivalent. `tuple(mapped) != _ROUTE[event]` still raises, because the route contains `job_type`. Probe `test_each_workflow_edge_is_read_from_the_event_map`. | 0 |
-| `notion_fact_ledger.py:503` | or | replace `tuple(mapped) != _ROUTE[event]` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 85 |
-| `notion_fact_ledger.py:503` | or | replace `tuple(mapped) != _ROUTE[event]` with False | test_each_workflow_edge_is_read_from_the_event_map[variant-links-extra-job] | 1 |
-| `notion_fact_ledger.py:503` | or | flip `or` to `and` | test_each_workflow_edge_is_read_from_the_event_map[variant-links-extra-job] | 1 |
-| `notion_fact_ledger.py:380` | or | replace `name == ""` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 17 |
-| `notion_fact_ledger.py:380` | or | replace `name == ""` with False | Equivalent. An empty title is already stored as `missing` before this loop. Probe `test_blank_hub_title_is_missing`. | 0 |
-| `notion_fact_ledger.py:380` | or | replace `name.strip() != name` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 17 |
-| `notion_fact_ledger.py:380` | or | replace `name.strip() != name` with False | test_trailing_space_in_a_hub_title_can_be_repaired | 1 |
-| `notion_fact_ledger.py:380` | or | flip `or` to `and` | test_trailing_space_in_a_hub_title_can_be_repaired | 1 |
-| `notion_fact_ledger.py:407` | and | replace `type(database.title) is str` with True | test_database_title_integer_is_missing | 1 |
-| `notion_fact_ledger.py:407` | and | replace `type(database.title) is str` with False | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 15 |
-| `notion_fact_ledger.py:407` | and | replace `database.title != ""` with True | test_blank_database_title_is_missing_and_blocked | 1 |
-| `notion_fact_ledger.py:407` | and | replace `database.title != ""` with False | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 15 |
-| `notion_fact_ledger.py:407` | and | flip `and` to `or` | test_blank_database_title_is_missing_and_blocked | 2 |
-| `notion_fact_ledger.py:480` | or | replace `prop.id != property_id` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 16 |
-| `notion_fact_ledger.py:480` | or | replace `prop.id != property_id` with False | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 16 |
-| `notion_fact_ledger.py:480` | or | replace `prop.type != "formula"` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 16 |
-| `notion_fact_ledger.py:480` | or | replace `prop.type != "formula"` with False | test_text_property_is_not_a_dashboard_formula | 1 |
-| `notion_fact_ledger.py:480` | or | flip `or` to `and` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 17 |
-| `notion_fact_ledger.py:483` | or | replace `type(formula) is not NotionFormula` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 16 |
-| `notion_fact_ledger.py:483` | or | replace `type(formula) is not NotionFormula` with False | test_non_formula_config_is_missing | 1 |
-| `notion_fact_ledger.py:483` | or | replace `formula.expression == ""` with True | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 16 |
-| `notion_fact_ledger.py:483` | or | replace `formula.expression == ""` with False | Equivalent. The caller rejects `""` via inequality with the wanted expression. Probe `test_blank_formula_expression_is_missing`. | 0 |
-| `notion_fact_ledger.py:483` | or | flip `or` to `and` | test_non_formula_config_is_missing | 1 |
+| `notion_fact_ledger.py:163` | or | replace operand with True `qa is None` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 165 |
+| `notion_fact_ledger.py:163` | or | replace operand with False `qa is None` | test_missing_qa_and_half_a_pair_write_nothing | 1 |
+| `notion_fact_ledger.py:163` | or | replace operand with True `not stored.variants` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 165 |
+| `notion_fact_ledger.py:163` | or | replace operand with False `not stored.variants` | Equivalent. `load_variant_checkpoint` returns only after variants exist, or it raises. Probe `test_qa_pass_persists_one_ledger_and_one_link`. | 0 |
+| `notion_fact_ledger.py:163` | or | flip or to and `boolop or` | test_missing_qa_and_half_a_pair_write_nothing | 1 |
+| `notion_fact_ledger.py:168` | and | replace operand with True `saved_ledger is not None` | Equivalent. `_stored_pair` returns both records or neither. A half pair raises first. Probe `test_missing_qa_and_half_a_pair_write_nothing`. | 0 |
+| `notion_fact_ledger.py:168` | and | replace operand with False `saved_ledger is not None` | test_resume_of_pass_makes_no_second_write | 16 |
+| `notion_fact_ledger.py:169` | and | replace operand with True `saved_link is not None` | Equivalent. `_stored_pair` returns both records or neither. A half pair raises first. Probe `test_missing_qa_and_half_a_pair_write_nothing`. | 0 |
+| `notion_fact_ledger.py:169` | and | replace operand with False `saved_link is not None` | test_resume_of_pass_makes_no_second_write | 16 |
+| `notion_fact_ledger.py:170` | and | replace operand with True `await _saved_holds(fixture, stored, validated, qa, saved_ledger, saved_link, ...` | test_blocked_ledger_replans_when_the_defect_is_gone | 23 |
+| `notion_fact_ledger.py:170` | and | replace operand with False `await _saved_holds(fixture, stored, validated, qa, saved_ledger, saved_link, ...` | test_resume_of_pass_makes_no_second_write | 16 |
+| `notion_fact_ledger.py:168` | and | flip and to or `boolop and` | test_blocked_ledger_replans_when_the_defect_is_gone | 23 |
+| `notion_fact_ledger.py:216` | or | replace operand with True `type(value) is not dict` | test_resume_of_pass_makes_no_second_write | 38 |
+| `notion_fact_ledger.py:216` | or | replace operand with False `type(value) is not dict` | test_wrong_record_shapes_refuse[ledger-number-fact ledger record is incomplete] | 1 |
+| `notion_fact_ledger.py:216` | or | replace operand with True `not exact_keys(value, _LEDGER_KEYS)` | test_resume_of_pass_makes_no_second_write | 38 |
+| `notion_fact_ledger.py:216` | or | replace operand with False `not exact_keys(value, _LEDGER_KEYS)` | test_extra_key_is_incomplete[ledger-fact ledger record is incomplete] | 1 |
+| `notion_fact_ledger.py:216` | or | flip or to and `boolop or` | test_extra_key_is_incomplete[ledger-fact ledger record is incomplete] | 2 |
+| `notion_fact_ledger.py:219` | or | replace operand with True `type(verdict) is not str` | test_resume_of_pass_makes_no_second_write | 46 |
+| `notion_fact_ledger.py:219` | or | replace operand with False `type(verdict) is not str` | test_wrong_record_shapes_refuse[verdict-list-fact ledger verdict is unsupported] | 1 |
+| `notion_fact_ledger.py:219` | or | replace operand with True `verdict not in _VERDICTS` | test_resume_of_pass_makes_no_second_write | 46 |
+| `notion_fact_ledger.py:219` | or | replace operand with False `verdict not in _VERDICTS` | test_unsupported_verdict_writes_nothing | 1 |
+| `notion_fact_ledger.py:219` | or | flip or to and `boolop or` | test_unsupported_verdict_writes_nothing | 2 |
+| `notion_fact_ledger.py:233` | or | replace operand with True `type(value) is not dict` | test_resume_of_pass_makes_no_second_write | 27 |
+| `notion_fact_ledger.py:233` | or | replace operand with False `type(value) is not dict` | test_wrong_record_shapes_refuse[link-number-workflow link record is incomplete] | 1 |
+| `notion_fact_ledger.py:233` | or | replace operand with True `not exact_keys(value, _LINK_KEYS)` | test_resume_of_pass_makes_no_second_write | 27 |
+| `notion_fact_ledger.py:233` | or | replace operand with False `not exact_keys(value, _LINK_KEYS)` | test_extra_key_is_incomplete[link-workflow link record is incomplete] | 1 |
+| `notion_fact_ledger.py:233` | or | flip or to and `boolop or` | test_extra_key_is_incomplete[link-workflow link record is incomplete] | 2 |
+| `notion_fact_ledger.py:236` | or | replace operand with True `type(verdict) is not str` | test_resume_of_pass_makes_no_second_write | 31 |
+| `notion_fact_ledger.py:236` | or | replace operand with False `type(verdict) is not str` | test_wrong_record_shapes_refuse[link-verdict-list-workflow link verdict is unsupported] | 1 |
+| `notion_fact_ledger.py:236` | or | replace operand with True `verdict not in _VERDICTS` | test_resume_of_pass_makes_no_second_write | 31 |
+| `notion_fact_ledger.py:236` | or | replace operand with False `verdict not in _VERDICTS` | test_link_verdict_maybe_is_unsupported | 1 |
+| `notion_fact_ledger.py:236` | or | flip or to and `boolop or` | test_link_verdict_maybe_is_unsupported | 2 |
+| `notion_fact_ledger.py:239` | or | replace operand with True `type(ready) is not str` | test_resume_of_pass_makes_no_second_write | 25 |
+| `notion_fact_ledger.py:239` | or | replace operand with False `type(ready) is not str` | test_wrong_record_shapes_refuse[ready-list-workflow link record is incomplete] | 1 |
+| `notion_fact_ledger.py:239` | or | replace operand with True `ready not in {"", _READY_JOB}` | test_resume_of_pass_makes_no_second_write | 25 |
+| `notion_fact_ledger.py:239` | or | replace operand with False `ready not in {"", _READY_JOB}` | test_ready_nope_is_incomplete | 1 |
+| `notion_fact_ledger.py:239` | or | flip or to and `boolop or` | test_ready_nope_is_incomplete | 2 |
+| `notion_fact_ledger.py:242` | or | replace operand with True `type(repair) is not str` | test_resume_of_pass_makes_no_second_write | 25 |
+| `notion_fact_ledger.py:242` | or | replace operand with False `type(repair) is not str` | test_repair_required_list_is_incomplete | 1 |
+| `notion_fact_ledger.py:242` | or | replace operand with True `repair not in {"true", "false"}` | test_resume_of_pass_makes_no_second_write | 25 |
+| `notion_fact_ledger.py:242` | or | replace operand with False `repair not in {"true", "false"}` | test_wrong_record_shapes_refuse[repair-word-workflow link record is incomplete] | 1 |
+| `notion_fact_ledger.py:242` | or | flip or to and `boolop or` | test_repair_required_list_is_incomplete | 2 |
+| `notion_fact_ledger.py:245` | or | replace operand with True `type(steps) is not list` | test_resume_of_pass_makes_no_second_write | 25 |
+| `notion_fact_ledger.py:245` | or | replace operand with False `type(steps) is not list` | test_wrong_record_shapes_refuse[steps-string-workflow link record is incomplete] | 1 |
+| `notion_fact_ledger.py:245` | or | replace operand with True `not steps` | test_resume_of_pass_makes_no_second_write | 25 |
+| `notion_fact_ledger.py:245` | or | replace operand with False `not steps` | test_empty_steps_are_incomplete | 1 |
+| `notion_fact_ledger.py:245` | or | flip or to and `boolop or` | test_empty_steps_are_incomplete | 2 |
+| `notion_fact_ledger.py:253` | or | replace operand with True `type(value) is not list` | test_resume_of_pass_makes_no_second_write | 36 |
+| `notion_fact_ledger.py:253` | or | replace operand with False `type(value) is not list` | test_facts_json_number_is_incomplete | 1 |
+| `notion_fact_ledger.py:253` | or | replace operand with True `not value` | test_resume_of_pass_makes_no_second_write | 36 |
+| `notion_fact_ledger.py:253` | or | replace operand with False `not value` | Equivalent. An empty list still fails the name-tuple check with `fact ledger record is incomplete`. | 0 |
+| `notion_fact_ledger.py:253` | or | flip or to and `boolop or` | test_facts_json_number_is_incomplete | 1 |
+| `notion_fact_ledger.py:257` | or | replace operand with True `type(item) is not dict` | test_resume_of_pass_makes_no_second_write | 36 |
+| `notion_fact_ledger.py:257` | or | replace operand with False `type(item) is not dict` | test_wrong_record_shapes_refuse[check-number-fact ledger record is incomplete] | 1 |
+| `notion_fact_ledger.py:257` | or | replace operand with True `not exact_keys(item, frozenset({left, right}))` | test_resume_of_pass_makes_no_second_write | 36 |
+| `notion_fact_ledger.py:257` | or | replace operand with False `not exact_keys(item, frozenset({left, right}))` | test_extra_key_is_incomplete[check-fact ledger record is incomplete] | 1 |
+| `notion_fact_ledger.py:257` | or | flip or to and `boolop or` | test_extra_key_is_incomplete[check-fact ledger record is incomplete] | 2 |
+| `notion_fact_ledger.py:261` | or | replace operand with True `type(label) is not str` | test_resume_of_pass_makes_no_second_write | 36 |
+| `notion_fact_ledger.py:261` | or | replace operand with False `type(label) is not str` | test_wrong_record_shapes_refuse[check-label-number-fact ledger record is incomplete] | 1 |
+| `notion_fact_ledger.py:261` | or | replace operand with True `type(stored) is not str` | test_resume_of_pass_makes_no_second_write | 36 |
+| `notion_fact_ledger.py:261` | or | replace operand with False `type(stored) is not str` | test_check_flag_number_is_incomplete | 1 |
+| `notion_fact_ledger.py:261` | or | flip or to and `boolop or` | test_check_flag_number_is_incomplete | 2 |
+| `notion_fact_ledger.py:279` | and | replace operand with True `qa.verdict == "PASS"` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 9 |
+| `notion_fact_ledger.py:279` | and | replace operand with False `qa.verdict == "PASS"` | Equivalent. `load_qa_record` already raises `qa record does not match` for PASS plus a false check. Probe `test_pass_with_a_false_check_is_refused`. | 0 |
+| `notion_fact_ledger.py:279` | and | replace operand with True `failed` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 105 |
+| `notion_fact_ledger.py:279` | and | replace operand with False `failed` | Equivalent. `load_qa_record` already raises `qa record does not match` for PASS plus a false check. Probe `test_pass_with_a_false_check_is_refused`. | 0 |
+| `notion_fact_ledger.py:279` | and | flip and to or `boolop and` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 113 |
+| `notion_fact_ledger.py:281` | and | replace operand with True `qa.verdict != "PASS"` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 73 |
+| `notion_fact_ledger.py:281` | and | replace operand with False `qa.verdict != "PASS"` | test_blocked_qa_with_a_live_pass_writes_nothing | 4 |
+| `notion_fact_ledger.py:281` | and | replace operand with True `live_pass` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 9 |
+| `notion_fact_ledger.py:281` | and | replace operand with False `live_pass` | test_blocked_qa_with_a_live_pass_writes_nothing | 4 |
+| `notion_fact_ledger.py:281` | and | flip and to or `boolop and` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 81 |
+| `notion_fact_ledger.py:309` | or | replace operand with True `link.verdict != "BLOCKED"` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 12 |
+| `notion_fact_ledger.py:309` | or | replace operand with False `link.verdict != "BLOCKED"` | test_blocked_ledger_with_a_pass_link_refuses | 1 |
+| `notion_fact_ledger.py:309` | or | replace operand with True `link.ready != ""` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 12 |
+| `notion_fact_ledger.py:309` | or | replace operand with False `link.ready != ""` | test_blocked_link_ready_job_refuses | 1 |
+| `notion_fact_ledger.py:309` | or | flip or to and `boolop or` | test_blocked_ledger_with_a_pass_link_refuses | 2 |
+| `notion_fact_ledger.py:311` | or | replace operand with True `link.steps != plan.steps` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 12 |
+| `notion_fact_ledger.py:311` | or | replace operand with False `link.steps != plan.steps` | test_blocked_forged_step_refuses | 1 |
+| `notion_fact_ledger.py:311` | or | replace operand with True `link.repair_required != plan.repair_required` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 12 |
+| `notion_fact_ledger.py:311` | or | replace operand with False `link.repair_required != plan.repair_required` | test_blocked_ledger_with_forged_repair_required_refuses | 1 |
+| `notion_fact_ledger.py:311` | or | flip or to and `boolop or` | test_blocked_ledger_with_forged_repair_required_refuses | 2 |
+| `notion_fact_ledger.py:313` | or | replace operand with True `saved.facts != plan.facts` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 1 |
+| `notion_fact_ledger.py:313` | or | replace operand with False `saved.facts != plan.facts` | test_forged_blocked_fact_does_not_match_and_writes_nothing | 2 |
+| `notion_fact_ledger.py:313` | or | replace operand with True `saved.checks != plan.checks` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 1 |
+| `notion_fact_ledger.py:313` | or | replace operand with False `saved.checks != plan.checks` | test_blocked_ledger_replans_when_the_defect_is_gone | 1 |
+| `notion_fact_ledger.py:313` | or | flip or to and `boolop or` | test_blocked_ledger_replans_when_the_defect_is_gone | 3 |
+| `notion_fact_ledger.py:318` | or | replace operand with True `saved.facts != plan.facts` | test_resume_of_pass_makes_no_second_write | 5 |
+| `notion_fact_ledger.py:318` | or | replace operand with False `saved.facts != plan.facts` | test_forged_fact_does_not_match_and_writes_nothing | 1 |
+| `notion_fact_ledger.py:318` | or | replace operand with True `saved.checks != plan.checks` | test_resume_of_pass_makes_no_second_write | 5 |
+| `notion_fact_ledger.py:318` | or | replace operand with False `saved.checks != plan.checks` | Equivalent. A PASS whose checks disagree raises in `_verdict_agrees` before this compare. | 0 |
+| `notion_fact_ledger.py:318` | or | flip or to and `boolop or` | test_forged_fact_does_not_match_and_writes_nothing | 1 |
+| `notion_fact_ledger.py:323` | or | replace operand with True `link.verdict != "PASS"` | test_resume_of_pass_makes_no_second_write | 1 |
+| `notion_fact_ledger.py:323` | or | replace operand with False `link.verdict != "PASS"` | test_forged_link_verdict_on_a_pass_refuses | 1 |
+| `notion_fact_ledger.py:323` | or | replace operand with True `link.ready != plan.ready` | test_resume_of_pass_makes_no_second_write | 1 |
+| `notion_fact_ledger.py:323` | or | replace operand with False `link.ready != plan.ready` | test_forged_ready_on_a_pass_refuses | 1 |
+| `notion_fact_ledger.py:323` | or | replace operand with True `link.steps != plan.steps` | test_resume_of_pass_makes_no_second_write | 1 |
+| `notion_fact_ledger.py:323` | or | replace operand with False `link.steps != plan.steps` | test_forged_step_does_not_match_and_writes_nothing | 1 |
+| `notion_fact_ledger.py:323` | or | flip or to and `boolop or` | test_forged_ready_on_a_pass_refuses | 2 |
+| `notion_fact_ledger.py:363` | and | replace operand with True `qa.verdict == "PASS"` | Equivalent. A loaded PASS already has every check true. A non-PASS live success raises before a write. Probe `test_blocked_qa_with_a_live_pass_writes_nothing`. | 0 |
+| `notion_fact_ledger.py:363` | and | replace operand with False `qa.verdict == "PASS"` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:363` | and | replace operand with True `all(passed is True for _name, passed in qa.checks)` | Equivalent. A loaded PASS already has every check true. Probe `test_pass_with_a_false_check_is_refused`. | 0 |
+| `notion_fact_ledger.py:363` | and | replace operand with False `all(passed is True for _name, passed in qa.checks)` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:363` | and | flip and to or `boolop and` | Equivalent. The two conjuncts agree on every loaded QA record that reaches a write. | 0 |
+| `notion_fact_ledger.py:365` | and | replace operand with True `stored_pass` | Equivalent. A write happens only when `stored_pass` equals `qa_live`. A live pass on a non-PASS verdict raises first. Probe `test_blocked_qa_with_a_live_pass_writes_nothing`. | 0 |
+| `notion_fact_ledger.py:365` | and | replace operand with False `stored_pass` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:365` | and | replace operand with True `qa_live` | test_live_state_qa_rejects_is_not_a_pass[unpublished] | 12 |
+| `notion_fact_ledger.py:365` | and | replace operand with False `qa_live` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:365` | and | flip and to or `boolop and` | test_live_state_qa_rejects_is_not_a_pass[unpublished] | 12 |
+| `notion_fact_ledger.py:377` | or | replace operand with True `type(value) is not str` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 117 |
+| `notion_fact_ledger.py:377` | or | replace operand with False `type(value) is not str` | Equivalent. Every fact value is built with `str` or `join`. The strip conjunct is the live one. | 0 |
+| `notion_fact_ledger.py:377` | or | replace operand with True `value == ""` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 117 |
+| `notion_fact_ledger.py:377` | or | replace operand with False `value == ""` | Equivalent. Loaded joins are non-empty (`missing`, a count, or a token list). Edge whitespace still raises. | 0 |
+| `notion_fact_ledger.py:377` | or | replace operand with True `value.strip() != value` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 117 |
+| `notion_fact_ledger.py:377` | or | replace operand with False `value.strip() != value` | test_edge_whitespace_is_refused_before_persist[leading-url] | 2 |
+| `notion_fact_ledger.py:377` | or | flip or to and `boolop or` | Equivalent. `and` binds tighter, and the only reachable failure is `strip`. Probe `test_edge_whitespace_is_refused_before_persist` still raises. | 0 |
+| `notion_fact_ledger.py:402` | and | replace operand with True `type(home_title) is str` | test_home_title_integer_keeps_live_qa | 1 |
+| `notion_fact_ledger.py:402` | and | replace operand with False `type(home_title) is str` | test_renamed_home_title_fails_live_qa | 1 |
+| `notion_fact_ledger.py:402` | and | replace operand with True `home_title != ""` | test_blank_home_title_keeps_live_qa | 1 |
+| `notion_fact_ledger.py:402` | and | replace operand with False `home_title != ""` | test_renamed_home_title_fails_live_qa | 1 |
+| `notion_fact_ledger.py:402` | and | flip and to or `boolop and` | test_blank_home_title_keeps_live_qa | 2 |
+| `notion_fact_ledger.py:403` | or | replace operand with True `_row_identity(probe, stored)` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 37 |
+| `notion_fact_ledger.py:403` | or | replace operand with False `_row_identity(probe, stored)` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:403` | or | replace operand with True `spec.identity` | Equivalent. A loaded row title is the identity. A title that does not parse raises in the dashboard check before a write. | 0 |
+| `notion_fact_ledger.py:403` | or | replace operand with False `spec.identity` | Equivalent. A loaded row title is the identity. A title that does not parse raises in the dashboard check before a write. | 0 |
+| `notion_fact_ledger.py:403` | or | flip or to and `boolop or` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:404` | or | replace operand with True `_role_detail(probe, stored, identity, "buyer")` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 37 |
+| `notion_fact_ledger.py:404` | or | replace operand with False `_role_detail(probe, stored, identity, "buyer")` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:404` | or | replace operand with True `spec.buyer_problem` | Equivalent. The stored section detail is the buyer text on a checkpoint that returns. Caller text is not the fact. Probe `test_caller_spec_fields_are_not_the_facts`. | 0 |
+| `notion_fact_ledger.py:404` | or | replace operand with False `spec.buyer_problem` | Equivalent. The stored section detail is the buyer text on a checkpoint that returns. Caller text is not the fact. Probe `test_caller_spec_fields_are_not_the_facts`. | 0 |
+| `notion_fact_ledger.py:404` | or | flip or to and `boolop or` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:405` | or | replace operand with True `_role_detail(probe, stored, identity, "practice")` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 37 |
+| `notion_fact_ledger.py:405` | or | replace operand with False `_role_detail(probe, stored, identity, "practice")` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:405` | or | replace operand with True `spec.flagship_feature` | Equivalent. The stored section detail is the flagship text on a checkpoint that returns. Probe `test_caller_spec_fields_are_not_the_facts`. | 0 |
+| `notion_fact_ledger.py:405` | or | replace operand with False `spec.flagship_feature` | Equivalent. The stored section detail is the flagship text on a checkpoint that returns. Probe `test_caller_spec_fields_are_not_the_facts`. | 0 |
+| `notion_fact_ledger.py:405` | or | flip or to and `boolop or` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:407` | and | replace operand with True `set(kinds) == set(PLANNER_SHARED_DATABASES)` | test_qa_pass_persists_one_ledger_and_one_link[business-Studio Ledger-Studio Home-Desk] | 1 |
+| `notion_fact_ledger.py:407` | and | replace operand with False `set(kinds) == set(PLANNER_SHARED_DATABASES)` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:407` | and | replace operand with True `len(kinds) == len(PLANNER_SHARED_DATABASES)` | Equivalent. Stored kinds are unique, so set equality has the same length. | 0 |
+| `notion_fact_ledger.py:407` | and | replace operand with False `len(kinds) == len(PLANNER_SHARED_DATABASES)` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:407` | and | flip and to or `boolop and` | test_qa_pass_persists_one_ledger_and_one_link[business-Studio Ledger-Studio Home-Desk] | 1 |
+| `notion_fact_ledger.py:409` | and | replace operand with True `set(kinds) == set(BUSINESS_SHARED_DATABASES)` | Equivalent. A mass checkpoint takes the planner branch. A business checkpoint already matches this set, and `spec.tier` is `business`. Probe the business pass. | 0 |
+| `notion_fact_ledger.py:409` | and | replace operand with False `set(kinds) == set(BUSINESS_SHARED_DATABASES)` | Equivalent. Falling through uses `spec.tier`, which is `business` on that checkpoint. Probe the business pass. | 0 |
+| `notion_fact_ledger.py:409` | and | replace operand with True `len(kinds) == len( BUSINESS_SHARED_DATABASES )` | Equivalent. The business set match already implies this length. Probe the business pass. | 0 |
+| `notion_fact_ledger.py:409` | and | replace operand with False `len(kinds) == len( BUSINESS_SHARED_DATABASES )` | Equivalent. Falling through uses `spec.tier`, which is `business` on that checkpoint. Probe the business pass. | 0 |
+| `notion_fact_ledger.py:409` | and | flip and to or `boolop and` | Equivalent. Both sides are true together on a business checkpoint, and a mass checkpoint never reaches this branch. | 0 |
+| `notion_fact_ledger.py:437` | or | replace operand with True `type(page) is not NotionPage` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:437` | or | replace operand with False `type(page) is not NotionPage` | Equivalent. `_require_pages` already rejected a subclass. Probe `test_page_subclass_is_not_accepted`. | 0 |
+| `notion_fact_ledger.py:438` | or | replace operand with True `type(page.title) is not str` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:438` | or | replace operand with False `type(page.title) is not str` | test_blank_dashboard_row_title_refuses[None] | 1 |
+| `notion_fact_ledger.py:439` | or | replace operand with True `page.title.strip() != page.title` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:439` | or | replace operand with False `page.title.strip() != page.title` | Equivalent. A padded row raises in `_dashboard_outputs` before a write. Probe `test_edge_whitespace_is_refused_before_persist`. | 0 |
+| `notion_fact_ledger.py:437` | or | flip or to and `boolop or` | test_blank_dashboard_row_title_refuses[None] | 1 |
+| `notion_fact_ledger.py:468` | or | replace operand with True `type(sections) is not tuple` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:468` | or | replace operand with False `type(sections) is not tuple` | Equivalent. Loaded hub sections are tuples. A bad shape never arrives from the checkpoint loader. | 0 |
+| `notion_fact_ledger.py:468` | or | replace operand with True `type(name) is not str` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:468` | or | replace operand with False `type(name) is not str` | Equivalent. Loaded hub names are strings. | 0 |
+| `notion_fact_ledger.py:468` | or | flip or to and `boolop or` | Equivalent. Both type checks are true together on a loaded hub. | 0 |
+| `notion_fact_ledger.py:471` | or | replace operand with True `type(item) is not tuple` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:471` | or | replace operand with False `type(item) is not tuple` | Equivalent. Loaded section rows are pairs. Probe `test_caller_spec_fields_are_not_the_facts`. | 0 |
+| `notion_fact_ledger.py:471` | or | replace operand with True `len(item) != 2` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:471` | or | replace operand with False `len(item) != 2` | Equivalent. Loaded section rows are pairs. | 0 |
+| `notion_fact_ledger.py:471` | or | replace operand with True `item[0] != role` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:471` | or | replace operand with False `item[0] != role` | Equivalent. The role loop still skips other roles, and a missing role returns empty before a caller fallback is persisted as a fact. | 0 |
+| `notion_fact_ledger.py:471` | or | flip or to and `boolop or` | Equivalent. The three checks are false together on a loaded pair for the requested role. | 0 |
+| `notion_fact_ledger.py:474` | or | replace operand with True `type(block) is not NotionTextBlock` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:474` | or | replace operand with False `type(block) is not NotionTextBlock` | Equivalent. The purpose block on a loaded hub is a text block. | 0 |
+| `notion_fact_ledger.py:474` | or | replace operand with True `type(block.content) is not str` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:474` | or | replace operand with False `type(block.content) is not str` | Equivalent. Loaded text-block content is a string. | 0 |
+| `notion_fact_ledger.py:474` | or | flip or to and `boolop or` | Equivalent. Both type checks are true together on a loaded text block. | 0 |
+| `notion_fact_ledger.py:477` | and | replace operand with True `block.content.startswith(prefix)` | Equivalent. A matching block still returns the same slice. Section detail is not itself a ledger fact. | 0 |
+| `notion_fact_ledger.py:477` | and | replace operand with False `block.content.startswith(prefix)` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:477` | and | replace operand with True `len(block.content) > len(prefix)` | Equivalent. A matching stored section is longer than the prefix. Probe `test_caller_spec_fields_are_not_the_facts`. | 0 |
+| `notion_fact_ledger.py:477` | and | replace operand with False `len(block.content) > len(prefix)` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:477` | and | flip and to or `boolop and` | Equivalent. Both sides are true on a matching stored section. | 0 |
+| `notion_fact_ledger.py:491` | or | replace operand with True `description == ""` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:491` | or | replace operand with False `description == ""` | test_dashboard_delimiter_is_not_a_fact | 1 |
+| `notion_fact_ledger.py:491` | or | replace operand with True `len(hub.name) > 64` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:491` | or | replace operand with False `len(hub.name) > 64` | Equivalent. A loaded hub name fits `Hub.name` max length 64. The description bound is the killed conjunct. | 0 |
+| `notion_fact_ledger.py:491` | or | replace operand with True `len(description) > 500` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:491` | or | replace operand with False `len(description) > 500` | test_oversized_hub_description_is_not_adopted | 1 |
+| `notion_fact_ledger.py:491` | or | flip or to and `boolop or` | test_dashboard_delimiter_is_not_a_fact | 1 |
+| `notion_fact_ledger.py:494` | or | replace operand with True `len(rows) < 6` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:494` | or | replace operand with False `len(rows) < 6` | Equivalent. A loaded checkpoint has 6 to 8 hubs, so this bound is false. | 0 |
+| `notion_fact_ledger.py:494` | or | replace operand with True `len(rows) > 8` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:494` | or | replace operand with False `len(rows) > 8` | Equivalent. A loaded checkpoint has 6 to 8 hubs, so this bound is false. | 0 |
+| `notion_fact_ledger.py:494` | or | flip or to and `boolop or` | Equivalent. Both bounds are false on a loaded checkpoint, and `and` stays false. | 0 |
+| `notion_fact_ledger.py:522` | or | replace operand with True `type(page.title) is not str` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:522` | or | replace operand with False `type(page.title) is not str` | test_hub_title_that_is_not_text_is_blocked | 2 |
+| `notion_fact_ledger.py:522` | or | replace operand with True `page.title == ""` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:522` | or | replace operand with False `page.title == ""` | Equivalent. An empty title is a str and both versions return `""`. Probe `test_blank_dashboard_row_title_refuses`. | 0 |
+| `notion_fact_ledger.py:522` | or | flip or to and `boolop or` | test_hub_title_that_is_not_text_is_blocked | 2 |
+| `notion_fact_ledger.py:540` | and | replace operand with True `type(name) is str` | Equivalent. Titles are already strings or the word `missing`. | 0 |
+| `notion_fact_ledger.py:540` | and | replace operand with False `type(name) is str` | test_trailing_space_in_a_hub_title_can_be_repaired | 1 |
+| `notion_fact_ledger.py:540` | and | replace operand with True `name == "" or name.strip() != name` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:540` | and | replace operand with False `name == "" or name.strip() != name` | test_trailing_space_in_a_hub_title_can_be_repaired | 1 |
+| `notion_fact_ledger.py:540` | and | flip and to or `boolop and` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:540` | or | replace operand with True `name == ""` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:540` | or | replace operand with False `name == ""` | Equivalent. An empty title is replaced with `missing` before this `or`. Probe `test_blank_hub_title_is_missing`. | 0 |
+| `notion_fact_ledger.py:540` | or | replace operand with True `name.strip() != name` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:540` | or | replace operand with False `name.strip() != name` | test_trailing_space_in_a_hub_title_can_be_repaired | 1 |
+| `notion_fact_ledger.py:540` | or | flip or to and `boolop or` | test_trailing_space_in_a_hub_title_can_be_repaired | 1 |
+| `notion_fact_ledger.py:566` | or | replace operand with True `not isinstance(database, NotionDatabase)` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 119 |
+| `notion_fact_ledger.py:566` | or | replace operand with False `not isinstance(database, NotionDatabase)` | test_missing_database_writes_nothing | 1 |
+| `notion_fact_ledger.py:566` | or | replace operand with True `database.parent_id != stored.page_id` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 119 |
+| `notion_fact_ledger.py:566` | or | replace operand with False `database.parent_id != stored.page_id` | test_database_parent_other_than_home_writes_nothing | 1 |
+| `notion_fact_ledger.py:566` | or | flip or to and `boolop or` | test_database_parent_other_than_home_writes_nothing | 2 |
+| `notion_fact_ledger.py:569` | and | replace operand with True `type(database.title) is str` | test_database_title_integer_is_missing | 1 |
+| `notion_fact_ledger.py:569` | and | replace operand with False `type(database.title) is str` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 31 |
+| `notion_fact_ledger.py:569` | and | replace operand with True `database.title != ""` | test_blank_database_title_is_missing_and_blocked | 1 |
+| `notion_fact_ledger.py:569` | and | replace operand with False `database.title != ""` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 31 |
+| `notion_fact_ledger.py:569` | and | flip and to or `boolop and` | test_blank_database_title_is_missing_and_blocked | 2 |
+| `notion_fact_ledger.py:571` | and | replace operand with True `type(title) is str` | Equivalent. The title was already narrowed to str or replaced with `missing`. Probe `test_database_title_integer_is_missing`. | 0 |
+| `notion_fact_ledger.py:571` | and | replace operand with False `type(title) is str` | test_database_title_with_edge_space_is_missing | 1 |
+| `notion_fact_ledger.py:571` | and | replace operand with True `title.strip() != title` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 31 |
+| `notion_fact_ledger.py:571` | and | replace operand with False `title.strip() != title` | test_database_title_with_edge_space_is_missing | 1 |
+| `notion_fact_ledger.py:571` | and | flip and to or `boolop and` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 31 |
+| `notion_fact_ledger.py:592` | and | replace operand with True `type(captured) is str` | test_empty_or_missing_public_url_blocks_secret_links[None] | 3 |
+| `notion_fact_ledger.py:592` | and | replace operand with False `type(captured) is str` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:592` | and | replace operand with True `captured != ""` | test_empty_or_missing_public_url_blocks_secret_links[] | 1 |
+| `notion_fact_ledger.py:592` | and | replace operand with False `captured != ""` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:592` | and | flip and to or `boolop and` | test_empty_or_missing_public_url_blocks_secret_links[] | 4 |
+| `notion_fact_ledger.py:594` | and | replace operand with True `page.is_published is True` | test_unpublished_trusted_url_blocks_secret_links | 1 |
+| `notion_fact_ledger.py:594` | and | replace operand with False `page.is_published is True` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 31 |
+| `notion_fact_ledger.py:595` | and | replace operand with True `usable` | test_captured_url_must_be_exact_str[subclass] | 2 |
+| `notion_fact_ledger.py:595` | and | replace operand with False `usable` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 31 |
+| `notion_fact_ledger.py:596` | and | replace operand with True `captured == trusted` | test_forged_captured_url_blocks_secret_links | 4 |
+| `notion_fact_ledger.py:596` | and | replace operand with False `captured == trusted` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 31 |
+| `notion_fact_ledger.py:597` | and | replace operand with True `record.secret_link == trusted` | test_forged_stored_secret_link_blocks | 1 |
+| `notion_fact_ledger.py:597` | and | replace operand with False `record.secret_link == trusted` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 31 |
+| `notion_fact_ledger.py:594` | and | flip and to or `boolop and` | test_forged_captured_url_blocks_secret_links | 10 |
+| `notion_fact_ledger.py:612` | or | replace operand with True `type(value) is not str` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:612` | or | replace operand with False `type(value) is not str` | Equivalent. `_page_title` returns a str. Empty and padded titles are the killed conjuncts. Probe `test_blank_sample_title_is_missing`. | 0 |
+| `notion_fact_ledger.py:612` | or | replace operand with True `value == ""` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:612` | or | replace operand with False `value == ""` | test_blank_sample_title_is_missing | 1 |
+| `notion_fact_ledger.py:612` | or | replace operand with True `value.strip() != value` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:612` | or | replace operand with False `value.strip() != value` | test_padded_sample_title_recovers_after_the_trim[SAMPLE Tasks ] | 3 |
+| `notion_fact_ledger.py:612` | or | flip or to and `boolop or` | test_blank_sample_title_is_missing | 1 |
+| `notion_fact_ledger.py:616` | or | replace operand with True `"\u200b" in value` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:616` | or | replace operand with False `"\u200b" in value` | test_invisible_sample_mark_is_missing[\u200b] | 1 |
+| `notion_fact_ledger.py:616` | or | replace operand with True `"\ufeff" in value` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:616` | or | replace operand with False `"\ufeff" in value` | test_invisible_sample_mark_is_missing[\ufeff] | 1 |
+| `notion_fact_ledger.py:616` | or | flip or to and `boolop or` | test_invisible_sample_mark_is_missing[\u200b] | 2 |
+| `notion_fact_ledger.py:633` | or | replace operand with True `expression is None` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:633` | or | replace operand with False `expression is None` | Equivalent. `None != wanted[1]` still returns missing. Probe `test_blank_formula_expression_is_missing`. | 0 |
+| `notion_fact_ledger.py:633` | or | replace operand with True `wanted is None` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:633` | or | replace operand with False `wanted is None` | test_unknown_formula_name_is_missing | 1 |
+| `notion_fact_ledger.py:633` | or | replace operand with True `wanted[0] != kind` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:633` | or | replace operand with False `wanted[0] != kind` | test_formula_recorded_on_the_wrong_database_is_missing | 1 |
+| `notion_fact_ledger.py:633` | or | replace operand with True `expression != wanted[1]` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:633` | or | replace operand with False `expression != wanted[1]` | test_one_fixed_defect_replans_the_other | 2 |
+| `notion_fact_ledger.py:633` | or | flip or to and `boolop or` | test_unknown_formula_name_is_missing | 1 |
+| `notion_fact_ledger.py:635` | or | replace operand with True `";" in name` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:635` | or | replace operand with False `";" in name` | Equivalent. A formula name from the checkpoint has no semicolon, and a changed expression already fails equality. | 0 |
+| `notion_fact_ledger.py:635` | or | replace operand with True `";" in expression` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:635` | or | replace operand with False `";" in expression` | Equivalent. An expression that contains `;` already fails `expression != wanted[1]` first. Probe `test_semicolon_in_a_formula_expression_is_missing`. | 0 |
+| `notion_fact_ledger.py:635` | or | flip or to and `boolop or` | Equivalent. Generated names and matching expressions do not contain `;`, so both sides are false together. | 0 |
+| `notion_fact_ledger.py:668` | or | replace operand with True `prop.id != property_id` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:668` | or | replace operand with False `prop.id != property_id` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:668` | or | replace operand with True `prop.type != "formula"` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:668` | or | replace operand with False `prop.type != "formula"` | test_text_property_is_not_a_dashboard_formula | 1 |
+| `notion_fact_ledger.py:668` | or | flip or to and `boolop or` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:671` | or | replace operand with True `type(formula) is not NotionFormula` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:671` | or | replace operand with False `type(formula) is not NotionFormula` | test_non_formula_config_is_missing | 1 |
+| `notion_fact_ledger.py:671` | or | replace operand with True `formula.expression == ""` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:671` | or | replace operand with False `formula.expression == ""` | Equivalent. `"" != wanted[1]` still returns missing. Probe `test_blank_formula_expression_is_missing`. | 0 |
+| `notion_fact_ledger.py:671` | or | flip or to and `boolop or` | test_non_formula_config_is_missing | 1 |
 
 Parked for the W11 test matrix, not fixed here: QA still records PASS when the home nav text, the 3 palette callouts, the identity callout, the 6 hub "returns to Home" texts, or the 3 home linked views are deleted. Uncovered code is `_linked_views` (`notion_qa.py:368`), `_palette` (`:603`), and `_teardown` (`:634`). The pull request lists the `docs/control` edits.
 

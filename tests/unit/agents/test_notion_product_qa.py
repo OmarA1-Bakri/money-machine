@@ -24,7 +24,11 @@ from money_machine.agents.implementations.notion_progress import (
     ProviderFailure,
     load_payload,
 )
-from money_machine.agents.implementations.notion_qa import PHASE_FACT_LEDGER, run_product_qa
+from money_machine.agents.implementations.notion_qa import (
+    PHASE_FACT_LEDGER,
+    load_qa_record,
+    run_product_qa,
+)
 from money_machine.agents.implementations.notion_variants import (
     PHASE_QA,
     build_variants,
@@ -1956,6 +1960,7 @@ async def test_lying_publish_stays_blocked_without_a_duplicate(tmp_path: Path) -
     spec, probe, path = await _built(tmp_path)
     page = _colour_pages(probe, spec)[0]
     await probe.unpublish_page(page.id)
+    page.duplicate_as_template = False
     original = probe.publish_page
 
     async def _lie(page_id: str) -> NotionPage:
@@ -1970,11 +1975,102 @@ async def test_lying_publish_stays_blocked_without_a_duplicate(tmp_path: Path) -
 
     assert checkpoint.qa is not None
     assert checkpoint.qa.verdict == "BLOCKED"
-    assert checkpoint.qa.repairs == ()
+    assert checkpoint.qa.repairs == ("published",)
     assert checkpoint.qa.proof_page_id == ""
     assert calls == ["publish_page"]
     assert page.is_published is True
     assert page.public_url == ""
+
+
+@pytest.mark.asyncio
+async def test_unpublished_and_duplicate_off_repairs_both(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    await probe.unpublish_page(page.id)
+    page.duplicate_as_template = False
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "PASS"
+    assert checkpoint.qa.repairs == ("published", "duplicate_button")
+    assert calls == ["publish_page", "set_duplicate_as_template", "duplicate_page"]
+    assert page.is_published is True
+    assert page.duplicate_as_template is True
+
+
+@pytest.mark.asyncio
+async def test_untrusted_publish_does_not_set_the_duplicate(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    await probe.unpublish_page(page.id)
+    page.duplicate_as_template = False
+    original = probe.publish_page
+
+    async def _lie(page_id: str) -> NotionPage:
+        published = await original(page_id)
+        published.is_published = True
+        published.public_url = "https://evil.example/not-trusted"
+        return published
+
+    probe.publish_page = _lie  # type: ignore[method-assign]
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "BLOCKED"
+    assert checkpoint.qa.repairs == ("published",)
+    assert calls == ["publish_page"]
+    assert page.duplicate_as_template is False
+
+
+@pytest.mark.asyncio
+async def test_publish_that_stays_unpublished_does_not_set_duplicate(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    await probe.unpublish_page(page.id)
+    page.duplicate_as_template = False
+    original = probe.publish_page
+
+    async def _lie(page_id: str) -> NotionPage:
+        published = await original(page_id)
+        published.is_published = False
+        published.public_url = "https://fixture.notion.site/" + page_id
+        return published
+
+    probe.publish_page = _lie  # type: ignore[method-assign]
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "BLOCKED"
+    assert checkpoint.qa.repairs == ("published",)
+    assert calls == ["publish_page"]
+    assert page.duplicate_as_template is False
+
+
+@pytest.mark.asyncio
+async def test_pass_with_a_false_check_is_refused(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    def _false_check(document: dict[str, object]) -> None:
+        references = document["provider_object_references"]
+        assert type(references) is dict
+        qa = references["qa"]
+        assert type(qa) is dict
+        checks = qa["checks"]
+        assert type(checks) is list
+        row = checks[0]
+        assert type(row) is dict
+        row["passed"] = "false"
+
+    restamp_checkpoint(path, _false_check)
+    with pytest.raises(ProductBuildError, match="qa record does not match"):
+        load_qa_record(path)
 
 
 @pytest.mark.asyncio
@@ -2050,7 +2146,7 @@ async def test_notification_row_subclass_fails_notification_values(tmp_path: Pat
     assert checkpoint.qa is not None
     assert checkpoint.qa.verdict == "BLOCKED"
     assert checkpoint.qa.repairs == ()
-    assert _false_checks(checkpoint) == ("notification_values", "page_count", "facts_persisted")
+    assert _false_checks(checkpoint) == ("notification_values", "facts_persisted")
     assert calls == []
 
 

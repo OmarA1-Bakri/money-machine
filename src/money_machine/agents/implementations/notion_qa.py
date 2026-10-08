@@ -122,11 +122,8 @@ async def run_product_qa(
         plan = await _plan(fixture, stored, validated)
         repairs: tuple[str, ...] = ()
         if not plan.blocked and plan.repairs:
-            await _apply_repairs(fixture, stored, plan.repairs)
-            repairs = plan.repairs
+            repairs = await _apply_repairs(fixture, stored, plan.repairs)
             plan = await _plan(fixture, stored, validated)
-            if plan.blocked or plan.repairs:
-                repairs = plan.repairs
         if plan.blocked or plan.repairs:
             verdict = "BLOCKED"
             proof = ""
@@ -165,6 +162,8 @@ def _require_qa(value: object) -> QaRecord:
         raise ProductBuildError("qa proof page is unsupported")
     checks = _require_pairs(entry["checks"], "check", "passed")
     parsed_checks = tuple((name, _require_passed(passed)) for name, passed in checks)
+    if verdict == "PASS" and any(passed is False for _name, passed in parsed_checks):
+        raise ProductBuildError("qa record does not match")
     repairs = _require_repairs(entry["repairs"])
     facts = _require_pairs(entry["facts"], "fact", "value")
     return QaRecord(
@@ -499,9 +498,14 @@ def _generated(spec: ProductSpec) -> NotificationDashboardFormulas:
     return generate_notification_dashboard_formulas(verified)
 
 
+def _is_page(value: object) -> bool:
+    """True for a page, including a subclass. Exact type would ignore the subclass."""
+    return isinstance(value, NotionPage)
+
+
 def _page_count(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, proof: str) -> bool:
     known = _known_page_ids(stored)
-    present = [page for page in probe.pages.values() if type(page) is NotionPage]
+    present = [page for page in probe.pages.values() if _is_page(page)]
     known_present = [page for page in present if page.id in known]
     extras = [page for page in present if page.id not in known]
     if len(known_present) != len(known):
@@ -767,18 +771,28 @@ async def _apply_repairs(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
     repairs: tuple[str, ...],
-) -> None:
+) -> tuple[str, ...]:
+    """Apply repairable flags. A publish that is not trusted stops the rest.
+
+    The returned names are the repairs whose adapter call ran, including a
+    publish that wrote and then failed the trusted-link check.
+    """
     guard_operation(probe, OP_QA)
+    done: list[str] = []
     for record in stored.variants:
         page = _variant_page(probe, record)
         if "published" in repairs and page.is_published is not True:
             page = await probe.publish_page(page.id)
+            done.append("published")
             if page.is_published is not True or not _is_trusted_link(page.public_url, page.id):
-                return
+                return tuple(dict.fromkeys(done))
         if "duplicate_button" in repairs and page.duplicate_as_template is not True:
             page = await probe.set_duplicate_as_template(page.id, True)
+            done.append("duplicate_button")
         if "search_indexing" in repairs and page.search_indexing is not False:
             await probe.set_search_indexing(page.id, False)
+            done.append("search_indexing")
+    return tuple(dict.fromkeys(done))
 
 
 async def _prove_duplicate(

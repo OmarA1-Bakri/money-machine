@@ -153,7 +153,11 @@ def write_checkpoint(
     progress: Mapping[str, object] | None = None,
     retained_created_ids: Mapping[str, object] | None = None,
 ) -> None:
-    """Write one checkpoint through the single progress writer."""
+    """Write one checkpoint through the single progress writer.
+
+    A garbage, empty, or forged prior file is refused. The writer reads that
+    prior before replacing it, and a failed read leaves the file unchanged.
+    """
     if preserved_payload is not None:
         if progress is None:
             raise ProductBuildError("progress record is missing")

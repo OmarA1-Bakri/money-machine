@@ -313,13 +313,15 @@ The workflow link records the existing graph. It does not edit `config/workflows
 - RUN_PRODUCT_QA is ProductQAJob.
 - REPAIR is BuildRepairJob. The edge is recorded. This wave does not execute it.
 - CREATE_VARIANTS is VariantBuildJob.
-- RUN_VARIANT_QA is VariantPublishJob, because VARIANT_LINKS_VERIFIED maps to ScreenshotJob on `event_successor_map`. The job's `admitted_events` list is not the route.
+- RUN_VARIANT_QA is VariantPublishJob, because VARIANT_LINKS_VERIFIED maps to ScreenshotJob on `event_successor_map`.
 - GENERATE_LISTING_PACKAGE ready is ListingCopyJob, whose output contract includes ListingPackage. The path reaches it through ScreenshotJob. SCREENSHOTS_CAPTURED maps to ListingCopyJob, AssetFactoryJob, and DeliveryBuildJob. There is no direct VariantPublishJob to ListingCopyJob edge.
 
-Every edge is checked on `event_successor_map`: the job is a member, and the successor list is exactly the canonical route. `admitted_events` and `successor_job_types` are not the route. An extra successor refuses. The real three-job SCREENSHOTS_CAPTURED list still passes.
+Each of the ten edges is checked three ways. The predecessor must admit the event. The predecessor must name the successor. `event_successor_map` must list that event's successors in canonical order. The eight persisted step labels stay the section-10 names. An extra successor refuses. The real three-job SCREENSHOTS_CAPTURED list still passes.
+
+Caller `buyer_problem`, `flagship_feature`, `hubs`, `identity`, and `tier` are not facts. The ledger reads those from the stored pages. The ledger counts known ids only. The proof copy is not a known id, and `page_count` stays 15. No ListingCopyJob reads the ledger in this wave.
 
 Supported devices are recorded as `unverified`. The free-update policy is recorded as `not_configured`. Nothing persisted verifies either one. Those tokens are not a device claim and not a free-update claim.
 
 ### Consequences
 
-A missing edge, an extra successor, or a missing ListingPackage output raises `workflow link does not match` before any write. Merchandising may claim only the facts in the ledger. Section 11 and commissioning stay out of this wave.
+A missing admitted event, a missing successor type, a missing edge, an extra successor, or a missing ListingPackage output raises `workflow link does not match` before any write. Merchandising may claim only the facts in the ledger. Section 11 and commissioning stay out of this wave.
