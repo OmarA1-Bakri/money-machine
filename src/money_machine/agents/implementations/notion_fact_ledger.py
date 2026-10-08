@@ -128,6 +128,17 @@ _ROUTE: dict[str, tuple[str, ...]] = {
     "VARIANT_LINKS_VERIFIED": ("ScreenshotJob",),
     "SCREENSHOTS_CAPTURED": ("ListingCopyJob", "AssetFactoryJob", "DeliveryBuildJob"),
 }
+# Exact successor sets. An extra name, or a self-cycle, is not the route.
+# DedupeJob also names ReconceptProductJob in the real workflow file.
+_SUCCESSORS: dict[str, frozenset[str]] = {
+    "DedupeJob": frozenset({"ProductBuildJob", "ReconceptProductJob"}),
+    "ProductBuildJob": frozenset({"ProductQAJob"}),
+    "ProductQAJob": frozenset({"VariantBuildJob", "BuildRepairJob"}),
+    "BuildRepairJob": frozenset({"ProductQAJob"}),
+    "VariantBuildJob": frozenset({"VariantPublishJob"}),
+    "VariantPublishJob": frozenset({"ScreenshotJob"}),
+    "ScreenshotJob": frozenset({"ListingCopyJob", "AssetFactoryJob", "DeliveryBuildJob"}),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -164,25 +175,25 @@ async def run_fact_ledger(
         raise ProductBuildError("fact ledger requires the qa checkpoint")
     steps = _walk_chain()
     saved_ledger, saved_link = _stored_pair(path)
-    if (
-        saved_ledger is not None
-        and saved_link is not None
-        and await _saved_holds(fixture, stored, validated, qa, saved_ledger, saved_link, steps)
-    ):
-        return replace(
-            stored,
-            next_phase=PHASE_TEST_MATRIX,
-            qa=qa,
-            fact_ledger=saved_ledger,
-            workflow_link=saved_link,
-        )
     try:
+        if (
+            saved_ledger is not None
+            and saved_link is not None
+            and await _saved_holds(fixture, stored, validated, qa, saved_ledger, saved_link, steps)
+        ):
+            return replace(
+                stored,
+                next_phase=PHASE_TEST_MATRIX,
+                qa=qa,
+                fact_ledger=saved_ledger,
+                workflow_link=saved_link,
+            )
         plan = await _plan(fixture, stored, validated, qa, steps)
     except ProductBuildError:
         raise
-    except ProviderFailure as failure:
-        raise_recorded(path, BUILD_PHASES[-1], failure)
-    except (RuntimeError, TimeoutError):
+    except (ProviderFailure, ConnectionError, OSError, ValueError, KeyError):
+        # ProviderFailure text and OSError text can carry a secret. Store a fixed
+        # response. RuntimeError is a code bug and is not recorded as a provider failure.
         raise_recorded(
             path,
             BUILD_PHASES[-1],
@@ -341,8 +352,10 @@ async def _plan(
     hub_names, hubs_ok = _hub_names(probe, stored)
     secret_ok, links = _secret_links(probe, stored)
     home = probe.pages[stored.page_id]
-    # Caller narrative is not a fact. Formula expectations use the observed spec.
-    live_spec = _observed_spec(probe, stored, spec, home.title)
+    # Teardown uses the built spec when the caller still names this checkpoint.
+    # It does not rebuild expected prose from the live blocks. The notification
+    # row is not in the page sweep: a subclass there is a missing identity.
+    live_spec = _comparison_spec(probe, stored, spec, home.title)
     dashboard_ok, dashboard = _dashboard_outputs(probe, stored, live_spec)
     colours_ok = _colours_match(probe, stored, home.title)
     facts = {
@@ -392,108 +405,156 @@ async def _plan(
     )
 
 
-def _observed_spec(
+def _comparison_spec(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
     home_title: object,
 ) -> ProductSpec:
-    """Replace caller narrative with the text stored on the fixture pages."""
+    """Spec the live QA check compares against. Prose is not copied off the page.
+
+    When the caller still names this checkpoint, hub descriptions, buyer, and
+    flagship stay on that spec. A live edit then fails teardown. A caller that
+    does not name the checkpoint is not a fact source: the stored blocks are
+    parsed, and a block id that does not resolve is a refusal.
+    """
+    _require_hub_count(stored)
+    identity = _stable_identity(probe, stored)
     title = home_title if type(home_title) is str and home_title != "" else spec.title
-    identity = _row_identity(probe, stored) or spec.identity
-    buyer = _role_detail(probe, stored, identity, "buyer") or spec.buyer_problem
-    feature = _role_detail(probe, stored, identity, "practice") or spec.flagship_feature
-    kinds = tuple(kind for kind, _database_id in stored.database_ids)
+    tier = _tier_from_kinds(tuple(kind for kind, _database_id in stored.database_ids))
+    if tier == "":
+        tier = spec.tier
+    for hub in stored.identity_hubs:
+        _require_hub_name(hub)
+        for role in ("purpose", "practice", "buyer"):
+            block = _section_block(probe, hub, role)
+            if role == "purpose":
+                _refuse_undurable_purpose(block, identity, hub.name)
+    if _caller_matches(spec, stored, identity):
+        hubs: tuple[Hub, ...] = spec.hubs
+        buyer = spec.buyer_problem
+        feature = spec.flagship_feature
+    else:
+        hubs = tuple(
+            Hub(
+                name=hub.name,
+                description=_durable_detail(probe, hub, identity, "purpose"),
+                page_count=1,
+            )
+            for hub in stored.identity_hubs
+        )
+        buyer = _durable_detail(probe, stored.identity_hubs[0], identity, "buyer")
+        feature = _durable_detail(probe, stored.identity_hubs[0], identity, "practice")
+    return spec.model_copy(
+        update={
+            "colour_variants": tuple(record.name for record in stored.variants),
+            "title": title,
+            "identity": identity,
+            "buyer_problem": buyer,
+            "flagship_feature": feature,
+            "tier": tier,
+            "shared_databases": (),
+            "hubs": hubs,
+        }
+    )
+
+
+def _require_hub_count(stored: ProductBuildCheckpoint) -> None:
+    """Six to eight hubs. Five and nine are not a product fact."""
+    count = len(stored.identity_hubs)
+    if count < 6 or count > 8:
+        raise ProductBuildError("fact ledger fact is not a durable string")
+
+
+def _require_hub_name(hub: object) -> None:
+    """A hub name is a token of at most 64 characters."""
+    name = getattr(hub, "name", "")
+    if type(name) is not str or name == "" or name.strip() != name or len(name) > 64:
+        raise ProductBuildError("fact ledger fact is not a durable string")
+
+
+def _refuse_undurable_purpose(block: NotionTextBlock, identity: str, name: str) -> None:
+    """A whitespace-only or overlong purpose is a refusal, not a blocked write."""
+    prefix = f"{identity} / {name} purpose: "
+    if not block.content.startswith(prefix):
+        return
+    detail = block.content[len(prefix) :]
+    if (detail != "" and detail.strip() == "") or len(detail) > 500:
+        raise ProductBuildError("fact ledger fact is not a durable string")
+
+
+def _caller_matches(spec: ProductSpec, stored: ProductBuildCheckpoint, identity: str) -> bool:
+    """True when the caller names the same identity and the same hub names."""
+    stored_names = tuple(hub.name for hub in stored.identity_hubs)
+    caller_names = tuple(hub.name for hub in spec.hubs)
+    return stored_names == caller_names and spec.identity == identity
+
+
+def _tier_from_kinds(kinds: tuple[str, ...]) -> str:
+    """Tier implied by the stored database kinds. Empty when the set is neither."""
     if set(kinds) == set(PLANNER_SHARED_DATABASES) and len(kinds) == len(PLANNER_SHARED_DATABASES):
-        tier = "mass"
-    elif set(kinds) == set(BUSINESS_SHARED_DATABASES) and len(kinds) == len(
+        return "mass"
+    if set(kinds) == set(BUSINESS_SHARED_DATABASES) and len(kinds) == len(
         BUSINESS_SHARED_DATABASES
     ):
-        tier = "business"
-    else:
-        tier = spec.tier
-    update: dict[str, object] = {
-        "colour_variants": tuple(record.name for record in stored.variants),
-        "title": title,
-        "identity": identity,
-        "buyer_problem": buyer,
-        "flagship_feature": feature,
-        "tier": tier,
-        "shared_databases": (),
-    }
-    hubs = _observed_hubs(probe, stored, identity)
-    if hubs is not None:
-        update["hubs"] = hubs
-    return spec.model_copy(update=update)
+        return "business"
+    return ""
 
 
-def _row_identity(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -> str:
-    """Identity written on the notification row, or empty when that title is unusable."""
+def _stable_identity(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -> str:
+    """Identity on the notification row's Name property. The title is not the key."""
     notice = stored.notification_dashboard
     if notice is None:
-        return ""
+        raise ProductBuildError("fact ledger identity is missing")
     page = probe.pages.get(notice.row_page_id)
-    if (
-        type(page) is not NotionPage
-        or type(page.title) is not str
-        or page.title.strip() != page.title
-    ):
-        return ""
-    if page.title == "":
-        return ""
-    return page.title
+    if type(page) is not NotionPage:
+        raise ProductBuildError("fact ledger identity is missing")
+    name = page.properties.get("Name")
+    if type(name) is not str or name == "" or name.strip() != name:
+        raise ProductBuildError("fact ledger identity is missing")
+    return name
 
 
-def _role_detail(
+def _section_block(
     probe: FixtureNotionAdapter,
-    stored: ProductBuildCheckpoint,
-    identity: str,
+    hub: object,
     role: str,
-) -> str:
-    """Section detail read from the first stored hub, or empty when it does not parse."""
-    if not stored.identity_hubs:
-        return ""
-    return _hub_detail(probe, stored.identity_hubs[0], identity, role)
+) -> NotionTextBlock:
+    """The stored block for one role. A missing id is a refusal, not a caller fallback."""
+    sections = getattr(hub, "sections", ())
+    if type(sections) is not tuple:
+        raise ProductBuildError("fact ledger section is missing")
+    for item in sections:
+        if type(item) is not tuple or len(item) != 2 or item[0] != role:
+            continue
+        block = probe.blocks.get(item[1])
+        if type(block) is not NotionTextBlock:
+            raise ProductBuildError("fact ledger section is missing")
+        if type(block.content) is not str:
+            raise ProductBuildError("fact ledger section is missing")
+        return block
+    raise ProductBuildError("fact ledger section is missing")
 
 
-def _hub_detail(
+def _durable_detail(
     probe: FixtureNotionAdapter,
     hub: object,
     identity: str,
     role: str,
 ) -> str:
-    """Section text after the identity prefix, or empty when the block does not parse."""
-    sections = getattr(hub, "sections", ())
+    """Section detail after the identity prefix. A bad name or detail is refused."""
     name = getattr(hub, "name", "")
-    if type(sections) is not tuple or type(name) is not str:
-        return ""
-    for item in sections:
-        if type(item) is not tuple or len(item) != 2 or item[0] != role:
-            continue
-        block = probe.blocks.get(item[1])
-        if type(block) is not NotionTextBlock or type(block.content) is not str:
-            return ""
-        prefix = f"{identity} / {name} {role}: "
-        if block.content.startswith(prefix) and len(block.content) > len(prefix):
-            return block.content[len(prefix) :]
-    return ""
-
-
-def _observed_hubs(
-    probe: FixtureNotionAdapter,
-    stored: ProductBuildCheckpoint,
-    identity: str,
-) -> tuple[Hub, ...] | None:
-    """Hub records named and described by the stored pages."""
-    rows: list[Hub] = []
-    for hub in stored.identity_hubs:
-        description = _hub_detail(probe, hub, identity, "purpose")
-        if description == "" or len(hub.name) > 64 or len(description) > 500:
-            return None
-        rows.append(Hub(name=hub.name, description=description, page_count=1))
-    if len(rows) < 6 or len(rows) > 8:
-        return None
-    return tuple(rows)
+    if type(name) is not str or name == "" or name.strip() != name or len(name) > 64:
+        raise ProductBuildError("fact ledger fact is not a durable string")
+    block = _section_block(probe, hub, role)
+    prefix = f"{identity} / {name} {role}: "
+    if block.content.startswith(prefix) and len(block.content) > len(prefix):
+        detail = block.content[len(prefix) :]
+    else:
+        detail = ""
+    if detail == "" or detail.strip() != detail or len(detail) > 500:
+        raise ProductBuildError("fact ledger fact is not a durable string")
+    return detail
 
 
 def _known_ids(stored: ProductBuildCheckpoint) -> tuple[str, ...]:
@@ -509,8 +570,16 @@ def _known_ids(stored: ProductBuildCheckpoint) -> tuple[str, ...]:
 
 
 def _require_pages(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -> None:
-    """Every known page must be an exact NotionPage. A subclass is refused."""
+    """Every known page must be an exact NotionPage. A subclass is refused.
+
+    The notification row is judged by ``_stable_identity``. A subclass there
+    is a missing identity, not a missing page.
+    """
+    notice = stored.notification_dashboard
+    row_id = notice.row_page_id if notice is not None else None
     for page_id in _known_ids(stored):
+        if page_id == row_id:
+            continue
         page = probe.pages.get(page_id)
         if type(page) is not NotionPage:
             raise ProductBuildError("fact ledger page is missing")
@@ -601,10 +670,22 @@ def _secret_links(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -
         agreed = False
         if usable:
             shown = captured if type(captured) is str else ""
-            links.append(shown)
+            links.append(_redacted_url(shown))
         else:
             links.append("missing")
     return agreed, ",".join(links)
+
+
+def _redacted_url(captured: str) -> str:
+    """Persist a URL with its query and fragment removed. A token must not be stored."""
+    if type(captured) is not str or captured == "":
+        return "missing"
+    if captured.strip() != captured:
+        raise ProductBuildError("fact ledger fact is not a durable string")
+    bare = captured.split("?", 1)[0].split("#", 1)[0]
+    if bare == "" or bare.strip() != bare or any(mark in bare for mark in (",", ";", "=")):
+        return "missing"
+    return bare
 
 
 def _safe_label(value: object) -> str | None:
@@ -636,7 +717,9 @@ def _dashboard_outputs(
             return False, "missing"
         parts.append(f"{name}={expression}")
     for kind, page_id in notice.samples:
-        label = _safe_label(_page_title(probe, page_id))
+        sample = probe.pages.get(page_id)
+        title = sample.title if type(sample) is NotionPage else ""
+        label = _safe_label(title)
         if label is None:
             return False, "missing"
         parts.append(f"sample:{kind}={label}")
@@ -657,7 +740,11 @@ def _formula_expression(
     kind: str,
     property_id: str,
 ) -> str | None:
-    """The stored formula expression, or None when the property is not that formula."""
+    """The stored formula expression.
+
+    A missing or empty expression is None. The helper does not return an
+    empty string for that case, so the dashboard fact stays the word missing.
+    """
     for recorded, database_id in stored.database_ids:
         if recorded != kind:
             continue
@@ -700,6 +787,9 @@ def _walk_chain() -> tuple[str, ...]:
         if event not in job.admitted_events:
             raise ProductBuildError("workflow link does not match")
         if successor not in job.successor_job_types:
+            raise ProductBuildError("workflow link does not match")
+        allowed = _SUCCESSORS.get(predecessor)
+        if allowed is None or frozenset(job.successor_job_types) != allowed:
             raise ProductBuildError("workflow link does not match")
         if tuple(event_map.get(event, [])) != _ROUTE[event]:
             raise ProductBuildError("workflow link does not match")

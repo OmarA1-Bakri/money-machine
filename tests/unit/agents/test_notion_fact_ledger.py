@@ -10,10 +10,13 @@ from collections.abc import Callable, Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
 from money_machine.agents.implementations import notion_fact_ledger as ledger_module
+from money_machine.agents.implementations import notion_progress as progress_module
 from money_machine.agents.implementations.notion_fact_ledger import (
     PHASE_TEST_MATRIX,
     run_fact_ledger,
@@ -22,10 +25,22 @@ from money_machine.agents.implementations.notion_hubs import section_content
 from money_machine.agents.implementations.notion_product_builder import (
     ProductBuildCheckpoint,
     ProductBuildError,
+    QaRecord,
 )
-from money_machine.agents.implementations.notion_progress import append_refused_rebuild
+from money_machine.agents.implementations.notion_progress import (
+    ProviderFailure,
+    append_refused_rebuild,
+)
 from money_machine.agents.implementations.notion_progress_record import CheckpointView
-from money_machine.agents.implementations.notion_qa import load_qa_record, run_product_qa
+from money_machine.agents.implementations.notion_qa import (
+    live_qa_passed,
+    load_qa_record,
+    run_product_qa,
+)
+from money_machine.agents.implementations.notion_shared_databases import (
+    BUSINESS_SHARED_DATABASES,
+    PLANNER_SHARED_DATABASES,
+)
 from money_machine.agents.implementations.notion_variants import (
     build_variants,
     load_variant_checkpoint,
@@ -33,6 +48,7 @@ from money_machine.agents.implementations.notion_variants import (
 from money_machine.domain.models.product_spec import Hub, ProductSpec
 from money_machine.integrations.notion.api_adapter import APINotionAdapter
 from money_machine.integrations.notion.domain import (
+    NotionCalloutBlock,
     NotionDatabaseProperty,
     NotionFormula,
     NotionLinkedView,
@@ -1028,7 +1044,10 @@ async def test_blank_formula_expression_is_missing(tmp_path: Path) -> None:
     prop = next(item for item in probe.databases[database_id].properties if item.id == property_id)
     formula = prop.config["formula"]
     assert type(formula) is NotionFormula
+    read_expression = ledger_module._formula_expression  # pyright: ignore[reportPrivateUsage]
+    assert read_expression(probe, stored, kind, property_id) == formula.expression
     formula.expression = ""
+    assert read_expression(probe, stored, kind, property_id) is None
     calls = watch_adapter_writes(probe)
 
     checkpoint = await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
@@ -1710,6 +1729,24 @@ async def test_template_flag_after_a_pass_refuses(tmp_path: Path) -> None:
     assert path.read_bytes() == raw
 
 
+async def _assert_redacted_read(spec: ProductSpec, probe: FixtureNotionAdapter, path: Path) -> None:
+    calls = watch_adapter_writes(probe)
+    with pytest.raises(ProductBuildError, match="provider read failed") as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    text = path.read_text(encoding="utf-8")
+    assert "sk-live-secret" not in str(caught.value)
+    assert "sk-live-secret" not in text
+    assert calls == []
+    jobs = _jobs(path)
+    assert len(jobs) == 1
+    job = jobs[0]
+    assert type(job) is dict
+    assert job["kind"] == "provider_response"
+    assert job["operation"] == "fact_ledger.read"
+    assert job["response"] == "provider read failed"
+    assert "fact_ledger" not in _references(path)
+
+
 def _jobs(path: Path) -> list[object]:
     document = json.loads(path.read_text(encoding="utf-8"))
     progress = document["progress"]
@@ -1861,7 +1898,15 @@ async def test_fresh_duplicate_block_is_not_a_ledger_pass(tmp_path: Path) -> Non
         ("false-check", "qa record does not match"),
     ],
 )
-async def test_forged_qa_verdict_writes_nothing(tmp_path: Path, mode: str, message: str) -> None:
+async def test_inconsistent_stored_qa_writes_nothing(
+    tmp_path: Path, mode: str, message: str
+) -> None:
+    """An inconsistent stored QA record writes nothing.
+
+    A forged but internally consistent PASS is not this case. With a live
+    defect that record writes one BLOCKED ledger, because it cannot be told
+    apart from a real PASS.
+    """
     spec, probe, path = await _qa(tmp_path)
 
     def _mutate(document: dict[str, object]) -> None:
@@ -2083,13 +2128,15 @@ async def test_oversized_hub_description_is_not_adopted(tmp_path: Path) -> None:
     assert type(block) is NotionTextBlock
     block.content = f"{spec.identity} / {hub.name} purpose: " + ("x" * 501)
     calls = watch_adapter_writes(probe)
+    raw = path.read_bytes()
 
-    blocked = await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    message = "fact ledger fact is not a durable string"
+    with pytest.raises(ProductBuildError, match=message):
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
 
-    assert blocked.fact_ledger is not None
-    assert blocked.fact_ledger.verdict == "BLOCKED"
     assert "x" * 501 not in path.read_text(encoding="ascii")
     assert calls == []
+    assert path.read_bytes() == raw
 
 
 @pytest.mark.asyncio
@@ -2387,7 +2434,10 @@ async def test_missing_record_raises_product_error(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("exc_type", [RuntimeError, TimeoutError])
+@pytest.mark.parametrize(
+    "exc_type",
+    [ConnectionError, OSError, TimeoutError, ValueError, KeyError],
+)
 async def test_live_read_failure_is_a_redacted_job(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, exc_type: type[Exception]
 ) -> None:
@@ -2397,22 +2447,79 @@ async def test_live_read_failure_is_a_redacted_job(
         raise exc_type("sk-live-secret")
 
     monkeypatch.setattr(ledger_module, "live_qa_passed", _boom)
-    calls = watch_adapter_writes(probe)
+    await _assert_redacted_read(spec, probe, path)
 
-    with pytest.raises(ProductBuildError, match="provider read failed"):
+
+@pytest.mark.asyncio
+async def test_provider_failure_text_is_redacted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec, probe, path = await _qa(tmp_path)
+
+    async def _boom(*_args: object, **_kwargs: object) -> bool:
+        raise ProviderFailure("fact_ledger.read", "sk-live-secret")
+
+    monkeypatch.setattr(ledger_module, "live_qa_passed", _boom)
+    await _assert_redacted_read(spec, probe, path)
+
+
+@pytest.mark.asyncio
+async def test_resume_read_failure_is_redacted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    async def _boom(*_args: object, **_kwargs: object) -> bool:
+        raise ConnectionError("sk-live-secret")
+
+    monkeypatch.setattr(ledger_module, "live_qa_passed", _boom)
+    with pytest.raises(ProductBuildError, match="provider read failed") as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LATER)
+
+    assert "sk-live-secret" not in str(caught.value)
+    assert "sk-live-secret" not in path.read_text(encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_runtime_error_is_not_a_provider_job(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+
+    async def _boom(*_args: object, **_kwargs: object) -> bool:
+        raise RuntimeError("sk-live-secret")
+
+    monkeypatch.setattr(ledger_module, "live_qa_passed", _boom)
+
+    with pytest.raises(RuntimeError, match="sk-live-secret"):
         await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
 
-    text = path.read_text(encoding="utf-8")
-    assert "sk-live-secret" not in text
-    assert calls == []
-    jobs = _jobs(path)
+    assert path.read_bytes() == raw
+    assert _jobs(path) == []
+
+
+@pytest.mark.asyncio
+async def test_repeated_provider_failure_is_one_job(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec, probe, path = await _qa(tmp_path)
+
+    async def _boom(*_args: object, **_kwargs: object) -> bool:
+        raise ConnectionError("sk-live-secret")
+
+    monkeypatch.setattr(ledger_module, "live_qa_passed", _boom)
+    with pytest.raises(ProductBuildError, match="provider read failed"):
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    with pytest.raises(ProductBuildError, match="provider read failed"):
+        await run_fact_ledger(spec, probe, path, recorded_at=LATER)
+
+    jobs = [
+        job for job in _jobs(path) if type(job) is dict and job.get("kind") == "provider_response"
+    ]
     assert len(jobs) == 1
-    job = jobs[0]
-    assert type(job) is dict
-    assert job["kind"] == "provider_response"
-    assert job["operation"] == "fact_ledger.read"
-    assert job["response"] == "provider read failed"
-    assert "fact_ledger" not in _references(path)
+    assert "sk-live-secret" not in path.read_text(encoding="utf-8")
 
 
 @pytest.mark.asyncio
@@ -2450,3 +2557,761 @@ async def test_temp_names_are_matched_literally(tmp_path: Path) -> None:
     finally:
         process.kill()
         process.wait()
+
+
+def _role_block(
+    probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, index: int, role: str
+) -> NotionTextBlock:
+    hub = stored.identity_hubs[index]
+    block_id = dict(hub.sections)[role]
+    block = probe.blocks[block_id]
+    assert type(block) is NotionTextBlock
+    return block
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("role", "scope"),
+    [
+        ("purpose", "one"),
+        ("purpose", "all"),
+        ("buyer", "all"),
+        ("practice", "all"),
+    ],
+)
+async def test_edited_hub_prose_is_blocked_not_self_compared(
+    tmp_path: Path, role: str, scope: str
+) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    indexes = range(1) if scope == "one" else range(len(stored.identity_hubs))
+    for index in indexes:
+        block = _role_block(probe, stored, index, role)
+        suffix = {
+            "purpose": "Edited live purpose",
+            "buyer": "Edited buyer",
+            "practice": "Edited practice",
+        }[role]
+        block.content = block.content + suffix
+    derived_hubs = tuple(
+        Hub(
+            name=hub.name,
+            description=hub.description + "Edited live purpose"
+            if role == "purpose" and index in indexes
+            else hub.description,
+            page_count=hub.page_count,
+        )
+        for index, hub in enumerate(spec.hubs)
+    )
+    derived = spec.model_copy(
+        update={
+            "hubs": derived_hubs,
+            "buyer_problem": spec.buyer_problem + "Edited buyer"
+            if role == "buyer"
+            else spec.buyer_problem,
+            "flagship_feature": spec.flagship_feature + "Edited practice"
+            if role == "practice"
+            else spec.flagship_feature,
+        }
+    )
+    assert await live_qa_passed(probe, stored, derived) is True
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert checkpoint.fact_ledger is not None
+    assert checkpoint.workflow_link is not None
+    assert checkpoint.fact_ledger.verdict == "BLOCKED"
+    assert checkpoint.workflow_link.ready == ""
+    assert _check(checkpoint, "qa_verdict") is False
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_row_title_is_not_the_identity(tmp_path: Path) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    notice = stored.notification_dashboard
+    assert notice is not None
+    row = probe.pages[notice.row_page_id]
+    assert row.properties.get("Name") == spec.identity
+    row.title = "Weekly Planner Pro"
+
+    checkpoint = await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert checkpoint.fact_ledger is not None
+    assert checkpoint.fact_ledger.verdict == "PASS"
+    assert _check(checkpoint, "qa_verdict") is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("forged", [False, True])
+async def test_unresolved_section_block_refuses(tmp_path: Path, forged: bool) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    block = _role_block(probe, stored, 0, "buyer")
+    moved = replace(block, id="buyer-block-moved")
+    del probe.blocks[block.id]
+    probe.blocks[moved.id] = moved
+    used = spec.model_copy(update={"buyer_problem": "forged buyer"}) if forged else spec
+    raw = path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match="fact ledger section is missing"):
+        await run_fact_ledger(used, probe, path, recorded_at=LEDGER_AT)
+
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tier", ["mass", "solo", "x"])
+async def test_caller_tier_does_not_override_stored_kinds(tmp_path: Path, tier: str) -> None:
+    spec, probe, path = await _qa(
+        tmp_path,
+        tier="business",
+        identity="Studio Ledger",
+        title="Studio Home",
+        hub_name="Desk",
+    )
+    mutated = spec.model_copy(update={"tier": tier})
+
+    checkpoint = await run_fact_ledger(mutated, probe, path, recorded_at=LEDGER_AT)
+
+    assert checkpoint.fact_ledger is not None
+    assert checkpoint.fact_ledger.verdict == "PASS"
+
+
+@pytest.mark.asyncio
+async def test_tampered_hub_name_refuses_before_a_write(tmp_path: Path) -> None:
+    spec, probe, path = await _qa(tmp_path)
+
+    def _rename(document: dict[str, object]) -> None:
+        references = document["provider_object_references"]
+        assert type(references) is dict
+        hubs = references["identity_hubs"]
+        assert type(hubs) is list
+        row = hubs[0]
+        assert type(row) is dict
+        row["name"] = "X"
+
+    restamp_checkpoint(path, _rename)
+    raw = path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match="fact ledger fact is not a durable string"):
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_overlong_hub_name_is_a_product_error(tmp_path: Path) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    long_name = "H" * 65
+    hub = stored.identity_hubs[0]
+    for role, _block_id in hub.sections:
+        block = _role_block(probe, stored, 0, role)
+        prefix = f"{spec.identity} / {hub.name} {role}: "
+        assert block.content.startswith(prefix)
+        detail = block.content[len(prefix) :]
+        block.content = f"{spec.identity} / {long_name} {role}: {detail}"
+
+    def _rename(document: dict[str, object]) -> None:
+        references = document["provider_object_references"]
+        assert type(references) is dict
+        hubs = references["identity_hubs"]
+        assert type(hubs) is list
+        row = hubs[0]
+        assert type(row) is dict
+        row["name"] = long_name
+
+    restamp_checkpoint(path, _rename)
+
+    message = "fact ledger fact is not a durable string"
+    with pytest.raises(ProductBuildError, match=message) as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert "ValidationError" not in type(caught.value).__name__
+    assert long_name not in str(caught.value)
+
+
+@pytest.mark.asyncio
+async def test_whitespace_purpose_is_not_a_validation_error(tmp_path: Path) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    block = _role_block(probe, stored, 0, "purpose")
+    prefix = f"{spec.identity} / {stored.identity_hubs[0].name} purpose: "
+    assert block.content.startswith(prefix)
+    block.content = prefix + "   "
+    forged = spec.model_copy(update={"identity": "Forged Identity"})
+    raw = path.read_bytes()
+
+    message = "fact ledger fact is not a durable string"
+    with pytest.raises(ProductBuildError, match=message) as caught:
+        await run_fact_ledger(forged, probe, path, recorded_at=LEDGER_AT)
+
+    assert "sk-live-secret" not in str(caught.value)
+    assert "ValidationError" not in type(caught.value).__name__
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_blocked_resume_after_the_live_fix_stays_blocked(tmp_path: Path) -> None:
+    spec = planner_spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _variants(spec, probe, path)
+    home = next(iter(probe.pages.values()))
+    probe.blocks["block_no_access"] = NotionTextBlock(
+        id="block_no_access",
+        parent_id=home.id,
+        content="No access",
+    )
+    await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    blocked = await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    assert blocked.fact_ledger is not None
+    assert blocked.fact_ledger.verdict == "BLOCKED"
+    del probe.blocks["block_no_access"]
+    raw = path.read_bytes()
+    writes, original = _watch_checkpoint_writes()
+    try:
+        again = await run_fact_ledger(spec, probe, path, recorded_at=LATER)
+    finally:
+        ledger_module.write_checkpoint = original  # type: ignore[assignment]
+
+    assert again.fact_ledger is not None
+    assert again.fact_ledger.verdict == "BLOCKED"
+    assert writes["n"] == 0
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_query_token_is_not_stored(tmp_path: Path) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    page = probe.pages[stored.variants[0].page_id]
+    page.public_url = str(page.public_url) + "?token=sk-live-secret"
+
+    checkpoint = await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert checkpoint.fact_ledger is not None
+    assert _check(checkpoint, "secret_links") is False
+    shown = _fact(checkpoint, "secret_links").split(",")[0]
+    assert "sk-live-secret" not in shown
+    assert "?" not in shown
+    assert "sk-live-secret" not in path.read_text(encoding="utf-8")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["extra", "cycle"])
+async def test_extra_or_cyclic_successor_refuses(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str
+) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+
+    def _load() -> tuple[dict[str, list[str]], _Bundle]:
+        event_map, config = load_workflows_config()
+        new_map = {key: list(value) for key, value in event_map.items()}
+        flows: list[_Flow] = []
+        for workflow in config.workflows:
+            views: list[_View] = []
+            for job in workflow.jobs:
+                successors = tuple(job.successor_job_types)
+                if workflow.workflow_type == "ProductLifecycleWorkflow":
+                    if mode == "extra" and job.job_type == "ScreenshotJob":
+                        successors = (*successors, "ExtraJob")
+                    if mode == "cycle" and job.job_type == "ProductBuildJob":
+                        successors = (*successors, "ProductBuildJob")
+                views.append(
+                    _View(
+                        job.job_type,
+                        tuple(job.admitted_events),
+                        successors,
+                        job.output_contracts,
+                    )
+                )
+            flows.append(_Flow(workflow.workflow_type, tuple(views)))
+        return new_map, _Bundle(tuple(flows))
+
+    monkeypatch.setattr(ledger_module, "load_workflows_config", _load)
+
+    with pytest.raises(ProductBuildError, match="workflow link does not match"):
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_temp_cleanup_keeps_unrelated_names(tmp_path: Path) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    stray = tmp_path / ".build.json.abc.tmp"
+    backup = tmp_path / ".build.json.backup"
+    zero = tmp_path / ".build.json.0.tmp"
+    stray.write_text("stray\n", encoding="ascii")
+    backup.write_text("backup\n", encoding="ascii")
+    zero.write_text("zero\n", encoding="ascii")
+
+    await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert not stray.exists()
+    assert backup.exists()
+    assert not zero.exists()
+
+
+@pytest.mark.asyncio
+async def test_foreign_pid_temp_is_kept(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    foreign = tmp_path / ".build.json.424242.tmp"
+    foreign.write_text("foreign\n", encoding="ascii")
+
+    def _kill(pid: int, _signal: int) -> None:
+        raise PermissionError(pid)
+
+    monkeypatch.setattr(progress_module.os, "kill", _kill)
+
+    await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert foreign.exists()
+
+
+@pytest.mark.asyncio
+async def test_whitespace_purpose_on_the_built_spec_writes_nothing(tmp_path: Path) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    block = _role_block(probe, stored, 0, "purpose")
+    prefix = f"{spec.identity} / {stored.identity_hubs[0].name} purpose: "
+    assert block.content.startswith(prefix)
+    block.content = prefix + "   "
+    raw = path.read_bytes()
+    calls = watch_adapter_writes(probe)
+
+    message = "fact ledger fact is not a durable string"
+    with pytest.raises(ProductBuildError, match=message) as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert "ValidationError" not in type(caught.value).__name__
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_row_subclass_is_a_missing_identity(tmp_path: Path) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    notice = stored.notification_dashboard
+    assert notice is not None
+    row = probe.pages[notice.row_page_id]
+    probe.pages[row.id] = _ChildPage(
+        id=row.id,
+        title=row.title,
+        parent_id=row.parent_id,
+        parent_type=row.parent_type,
+        properties={"Name": "Forged Name"},
+    )
+    raw = path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match="fact ledger identity is missing"):
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_padded_row_name_is_a_missing_identity(tmp_path: Path) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    notice = stored.notification_dashboard
+    assert notice is not None
+    row = probe.pages[notice.row_page_id]
+    row.properties["Name"] = " " + spec.identity
+    raw = path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match="fact ledger identity is missing"):
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert path.read_bytes() == raw
+    assert " " + spec.identity not in path.read_text(encoding="ascii")
+
+
+@pytest.mark.asyncio
+async def test_non_text_purpose_block_is_refused(tmp_path: Path) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    block = _role_block(probe, stored, 0, "purpose")
+    probe.blocks[block.id] = NotionCalloutBlock(
+        id=block.id,
+        parent_id=block.parent_id,
+        content=block.content,
+    )
+    raw = path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match="fact ledger section is missing"):
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_numeric_purpose_content_is_a_product_error(tmp_path: Path) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    block = _role_block(probe, stored, 0, "purpose")
+    block.__dict__["content"] = 5
+    raw = path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match="fact ledger section is missing") as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert "AttributeError" not in type(caught.value).__name__
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_numeric_sample_title_is_missing(tmp_path: Path) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    assert stored.notification_dashboard is not None
+    sample_id = stored.notification_dashboard.samples[0][1]
+    probe.pages[sample_id].__dict__["title"] = 1
+
+    checkpoint = await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert checkpoint.fact_ledger is not None
+    assert checkpoint.fact_ledger.verdict == "BLOCKED"
+    assert _fact(checkpoint, "dashboard_outputs") == "missing"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tier", ["business", "solo", "x"])
+async def test_caller_tier_does_not_override_mass_kinds(tmp_path: Path, tier: str) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    mutated = spec.model_copy(update={"tier": tier})
+
+    checkpoint = await run_fact_ledger(mutated, probe, path, recorded_at=LEDGER_AT)
+
+    assert checkpoint.fact_ledger is not None
+    assert checkpoint.fact_ledger.verdict == "PASS"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("mode", "message"),
+    [
+        ("duplicate", "checkpoint databases do not match a tier"),
+        ("custom", "checkpoint databases do not match a tier"),
+        ("five-hubs", "checkpoint hubs must be six to eight"),
+        ("nine-hubs", "checkpoint hubs must be six to eight"),
+        ("empty-facts", "fact ledger record is incomplete"),
+        ("empty-checks", "fact ledger record is incomplete"),
+        ("foreign-check", "fact ledger record is incomplete"),
+    ],
+)
+async def test_verifier_shapes_are_refused(tmp_path: Path, mode: str, message: str) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    def _mutate(document: dict[str, object]) -> None:
+        references = document["provider_object_references"]
+        assert type(references) is dict
+        if mode in {"empty-facts", "empty-checks", "foreign-check"}:
+            ledger = references["fact_ledger"]
+            assert type(ledger) is dict
+            if mode == "empty-facts":
+                ledger["facts"] = []
+                return
+            if mode == "empty-checks":
+                ledger["checks"] = []
+                return
+            checks = ledger["checks"]
+            assert type(checks) is list
+            row = checks[0]
+            assert type(row) is dict
+            row["check"] = "foreign_check"
+            return
+        if mode in {"duplicate", "custom"}:
+            shared = references["shared_databases"]
+            assert type(shared) is list
+            first = shared[0]
+            second = shared[1]
+            assert type(first) is dict and type(second) is dict
+            second["kind"] = first["kind"] if mode == "duplicate" else "Custom"
+            return
+        hubs = references["identity_hubs"]
+        assert type(hubs) is list
+        if mode == "five-hubs":
+            del hubs[-1]
+            return
+        for extra_index in range(3):
+            extra = dict(hubs[-1])
+            assert type(extra) is dict
+            label = f"Hub {7 + extra_index}"
+            extra["name"] = label
+            extra["page_id"] = f"page-{label}"
+            extra["navigation_block_id"] = f"nav-{label}"
+            sections = extra["sections"]
+            assert type(sections) is list
+            extra["sections"] = [
+                {"role": item["role"], "block_id": f"block-{label}-{item['role']}"}
+                for item in sections
+                if type(item) is dict
+            ]
+            views = extra["views"]
+            assert type(views) is list
+            extra["views"] = [
+                {"slug": item["slug"], "view_id": f"view-{label}-{index}"}
+                for index, item in enumerate(views)
+                if type(item) is dict
+            ]
+            hubs.append(extra)
+
+    await _refuse(spec, probe, path, _mutate, message)
+
+
+@pytest.mark.asyncio
+async def test_legal_bounds_pass_and_one_past_refuses(tmp_path: Path) -> None:
+    long_name = "N" * 64
+    long_copy = "D" * 500
+    base = planner_spec()
+    hubs = tuple(
+        Hub(
+            name=long_name if index == 1 else f"Hub {index}",
+            description=long_copy if index == 1 else f"Weekly Planner copy {index}",
+            page_count=3,
+        )
+        for index in range(1, 9)
+    )
+    spec = base.model_copy(update={"hubs": hubs})
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _variants(spec, probe, path)
+    await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    checkpoint = await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert checkpoint.fact_ledger is not None
+    assert checkpoint.fact_ledger.verdict == "PASS"
+    assert len(spec.hubs) == 8
+    assert _fact(checkpoint, "hubs").split(",")[0] == long_name
+    stored, _created = load_variant_checkpoint(path)
+    block = _role_block(probe, stored, 0, "purpose")
+    block.content = block.content + "x"
+    raw = path.read_bytes()
+
+    message = "fact ledger fact is not a durable string"
+    with pytest.raises(ProductBuildError, match=message):
+        await run_fact_ledger(spec, probe, path, recorded_at=LATER)
+
+    assert path.read_bytes() == raw
+
+
+def test_empty_pair_list_is_incomplete() -> None:
+    """An empty fact or check list is incomplete. It is not an empty tuple."""
+    require_pairs = ledger_module._require_pairs  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ProductBuildError, match="fact ledger record is incomplete"):
+        require_pairs([], "fact", "value")
+
+
+def test_pass_with_a_false_check_is_not_stored() -> None:
+    """A PASS record that contains a false check is not a ledger source."""
+    require_stored = ledger_module._require_stored_qa  # pyright: ignore[reportPrivateUsage]
+    record = QaRecord(
+        verdict="PASS",
+        checks=(("qa_verdict", False),),
+        repairs=(),
+        proof_page_id="proof",
+        facts=(("page_count", "15"),),
+    )
+    with pytest.raises(ProductBuildError, match="qa record does not match"):
+        require_stored(record, False)
+
+
+def test_hub_count_accepts_six_through_eight() -> None:
+    """Five and nine hubs are refused. Six and eight are a product fact."""
+    require_count = ledger_module._require_hub_count  # pyright: ignore[reportPrivateUsage]
+    for count in (6, 8):
+        hubs = tuple(range(count))
+        require_count(cast(ProductBuildCheckpoint, SimpleNamespace(identity_hubs=hubs)))
+    for count in (5, 9):
+        with pytest.raises(ProductBuildError, match="fact ledger fact is not a durable string"):
+            require_count(
+                cast(ProductBuildCheckpoint, SimpleNamespace(identity_hubs=tuple(range(count))))
+            )
+
+
+def test_hub_name_bounds_are_a_product_error() -> None:
+    """A hub name is a token of at most 64 characters."""
+    require_name = ledger_module._require_hub_name  # pyright: ignore[reportPrivateUsage]
+    require_name(SimpleNamespace(name="N" * 64))
+    for name in (5, "", " padded", "N" * 65):
+        with pytest.raises(ProductBuildError, match="fact ledger fact is not a durable string"):
+            require_name(SimpleNamespace(name=name))
+
+
+def test_tier_follows_the_stored_kind_set() -> None:
+    """Duplicate kinds are neither mass nor business. A same-length foreign set is neither."""
+    tier_from = ledger_module._tier_from_kinds  # pyright: ignore[reportPrivateUsage]
+    assert tier_from(PLANNER_SHARED_DATABASES) == "mass"
+    assert tier_from(BUSINESS_SHARED_DATABASES) == "business"
+    assert tier_from((*PLANNER_SHARED_DATABASES, PLANNER_SHARED_DATABASES[0])) == ""
+    assert tier_from((*BUSINESS_SHARED_DATABASES, BUSINESS_SHARED_DATABASES[0])) == ""
+    foreign = tuple(f"Kind {index}" for index in range(len(BUSINESS_SHARED_DATABASES)))
+    assert tier_from(foreign) == ""
+
+
+def test_redacted_url_drops_a_bare_token() -> None:
+    """A non-string, a query-only URL, a padded bare URL, and a comma are missing."""
+    redact = ledger_module._redacted_url  # pyright: ignore[reportPrivateUsage]
+    assert redact(cast(str, 5)) == "missing"
+    assert redact("?") == "missing"
+    assert redact("http://fixture.notion.site/page ?dropped") == "missing"
+    assert redact("http://fixture.notion.site/a,b") == "missing"
+
+
+@pytest.mark.asyncio
+async def test_caller_identity_must_match_the_row(tmp_path: Path) -> None:
+    """Same hub names and a different identity are not the caller's spec."""
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    identity = ledger_module._stable_identity(probe, stored)  # pyright: ignore[reportPrivateUsage]
+    matches = ledger_module._caller_matches  # pyright: ignore[reportPrivateUsage]
+    assert matches(spec, stored, identity) is True
+    forged = spec.model_copy(update={"identity": "Other Identity"})
+    assert matches(forged, stored, identity) is False
+
+
+@pytest.mark.asyncio
+async def test_section_shape_is_a_pair(tmp_path: Path) -> None:
+    """A list section and a 3-tuple are missing. They are not the purpose copy."""
+    _spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    block = _role_block(probe, stored, 0, "purpose")
+    section = ledger_module._section_block  # pyright: ignore[reportPrivateUsage]
+    message = "fact ledger section is missing"
+    listed = SimpleNamespace(sections=(["purpose", block.id],))
+    triple = SimpleNamespace(sections=(("purpose", block.id, "extra"),))
+    with pytest.raises(ProductBuildError, match=message):
+        section(probe, listed, "purpose")
+    with pytest.raises(ProductBuildError, match=message):
+        section(probe, triple, "purpose")
+
+
+@pytest.mark.asyncio
+async def test_detail_bounds_are_a_product_error(tmp_path: Path) -> None:
+    """500 characters of purpose copy pass. 501, padding, and a 65-character name do not."""
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    hub = stored.identity_hubs[0]
+    block = _role_block(probe, stored, 0, "purpose")
+    prefix = f"{spec.identity} / {hub.name} purpose: "
+    detail_of = ledger_module._durable_detail  # pyright: ignore[reportPrivateUsage]
+    refuse = ledger_module._refuse_undurable_purpose  # pyright: ignore[reportPrivateUsage]
+    block.content = prefix
+    refuse(block, spec.identity, hub.name)
+    block.content = prefix + ("D" * 500)
+    assert detail_of(probe, hub, spec.identity, "purpose") == "D" * 500
+    message = "fact ledger fact is not a durable string"
+    block.content = prefix + ("D" * 501)
+    with pytest.raises(ProductBuildError, match=message):
+        detail_of(probe, hub, spec.identity, "purpose")
+    block.content = prefix + " padded"
+    with pytest.raises(ProductBuildError, match=message):
+        detail_of(probe, hub, spec.identity, "purpose")
+    for name in (5, "", " padded", "H" * 65):
+        shown = name if type(name) is str else "5"
+        block.content = f"{spec.identity} / {shown} purpose: copy"
+        bad = SimpleNamespace(name=name, sections=hub.sections)
+        with pytest.raises(ProductBuildError, match=message):
+            detail_of(probe, bad, spec.identity, "purpose")
+
+
+@pytest.mark.asyncio
+async def test_row_name_must_be_a_token(tmp_path: Path) -> None:
+    """An empty Name and a numeric Name are a missing identity."""
+    _spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    notice = stored.notification_dashboard
+    assert notice is not None
+    row = probe.pages[notice.row_page_id]
+    identity = ledger_module._stable_identity  # pyright: ignore[reportPrivateUsage]
+    row.properties["Name"] = ""
+    with pytest.raises(ProductBuildError, match="fact ledger identity is missing"):
+        identity(probe, stored)
+    row.properties["Name"] = 5
+    with pytest.raises(ProductBuildError, match="fact ledger identity is missing"):
+        identity(probe, stored)
+
+
+@pytest.mark.asyncio
+async def test_blocked_all_true_checks_are_not_a_pass(tmp_path: Path) -> None:
+    """BLOCKED with every check true does not plan qa_verdict true."""
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    qa = load_qa_record(path)
+    assert qa is not None
+    steps = ledger_module._walk_chain()  # pyright: ignore[reportPrivateUsage]
+    plan = ledger_module._plan  # pyright: ignore[reportPrivateUsage]
+    true_checks = tuple((name, True) for name, _flag in qa.checks)
+    blocked = replace(qa, verdict="BLOCKED", checks=true_checks)
+    blocked_plan = await plan(probe, stored, spec, blocked, steps)
+    assert dict(blocked_plan.checks)["qa_verdict"] is False
+    mixed = replace(
+        qa,
+        checks=tuple((name, name != "hubs_present") for name, _flag in qa.checks),
+    )
+    mixed_plan = await plan(probe, stored, spec, mixed, steps)
+    assert dict(mixed_plan.checks)["qa_verdict"] is False
+
+
+@pytest.mark.asyncio
+async def test_empty_variants_still_require_the_qa_checkpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A QA record with no variants is not a ledger checkpoint."""
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+
+    def _drop(checkpoint_path: Path) -> tuple[ProductBuildCheckpoint, Mapping[str, object]]:
+        stored, created = load_variant_checkpoint(checkpoint_path)
+        return replace(stored, variants=()), created
+
+    monkeypatch.setattr(ledger_module, "load_variant_checkpoint", _drop)
+    with pytest.raises(ProductBuildError, match="fact ledger requires the qa checkpoint"):
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_a_changed_blocked_check_is_replanned(tmp_path: Path) -> None:
+    """Facts can match while one stored check does not. That ledger is replanned."""
+    spec = planner_spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _variants(spec, probe, path)
+    home = next(iter(probe.pages.values()))
+    probe.blocks["block_no_access"] = NotionTextBlock(
+        id="block_no_access",
+        parent_id=home.id,
+        content="No access",
+    )
+    await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    def _flip(document: dict[str, object]) -> None:
+        references = document["provider_object_references"]
+        assert type(references) is dict
+        ledger = references["fact_ledger"]
+        assert type(ledger) is dict
+        checks = ledger["checks"]
+        assert type(checks) is list
+        for row in checks:
+            assert type(row) is dict
+            if row["passed"] == "true":
+                row["passed"] = "false"
+                return
+
+    restamp_checkpoint(path, _flip)
+    raw = path.read_bytes()
+    checkpoint = await run_fact_ledger(spec, probe, path, recorded_at=LATER)
+    assert path.read_bytes() != raw
+    assert checkpoint.fact_ledger is not None
+    assert checkpoint.fact_ledger.verdict == "BLOCKED"

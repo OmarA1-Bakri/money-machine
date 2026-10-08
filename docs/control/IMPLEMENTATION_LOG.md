@@ -8,9 +8,84 @@ Twelve session 7 evidence keys stay false, including `product_fact_ledger_persis
 
 Prompt integrity for this wave is the Wave 10 corrective addendum in `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md`. The prompt file is unchanged. SHA-256 `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`. D-0029 records that the section 10 names are labels on `config/workflows.yaml`, not a second engine.
 
-`run_fact_ledger` is async at `notion_fact_ledger.py:144`. The plan at `_plan` (`:331`) awaits `live_qa_passed` (`notion_qa.py:476`) before `_write` (`:739`), which calls `write_checkpoint` at `:778`. Facts are the persisted checkpoint and the fixture adapter. Caller colour names, version, title, `buyer_problem`, `flagship_feature`, `hubs`, `identity`, and `tier` are not facts. The observed spec is read from the stored pages before formulas and before live QA. `qa_verdict` is `stored_pass and qa_live` (`:365`). A stored verdict other than `PASS` cannot become a ledger `PASS` when the live state would pass (`_require_stored_qa` at `:276`). A stored record that does not agree with its own checks, or that does not match the live plan, raises `fact ledger does not match` or `workflow link does not match` and leaves the file bytes unchanged, with 0 adapter writes. A `BLOCKED` record whose checks changed is re-planned (`:316` returns false). A check-equal fact change stays a refusal, so a forged fact cannot be replanned away. Resume of a matching record does not write. A crash inside `write_checkpoint` leaves no ledger key, and the resume writes once to a single `PASS`. The workflow link checks each of the ten edges three ways (`:700` admitted events, `:702` successor job types, `:704` `event_successor_map` order). The eight persisted labels stay the section-10 names. `ListingPackage` stays required (`:709`). The link does not create a job. No `ListingCopyJob` reads the ledger in this wave. The ledger counts known ids only. The proof copy is not a known id, and `page_count` stays 15. `_write_qa` keeps a stored ledger and link at `notion_qa.py:845` when QA rewrites. The aesthetics parser strips both keys at `notion_aesthetics.py:151`.
+Round 4 is this commit. It answers the verifier FAIL on tip `9eff481e` (comment 6053693235, CI run 37729558421, job 113155351185) and the reviewer FAIL on the same tip. The tables below this paragraph are this commit. The round-3 tables later in this section are tip `9eff481e` and are not these counts. This commit's CI run is not invented here.
 
-Round 3 is this commit. It answers the reviewer FAIL and the verifier FAIL at `c2bfa5a8`. Round 2's 176-row and 39-row counts were that tip. They are not the counts below. This commit's CI run is not invented here.
+`run_fact_ledger` is async at `notion_fact_ledger.py:155`. `_plan` at `:342` awaits `live_qa_passed` (`notion_qa.py:496`) before `_write` at `:829`, which calls `write_checkpoint` at `:868`. `qa_verdict` is `stored_pass and qa_live` at `:378`. `stored_pass` is the stored verdict and the stored checks, at `:376`. A stored non-PASS whose live state would pass raises `qa record does not match` in `_require_stored_qa` at `:287`, with 0 writes. A `BLOCKED` ledger whose checks changed is re-planned (`_saved_holds` returns false at `:327`). A check-equal fact change stays a refusal. When the caller names the same hub names and `spec.identity` equals the notification row Name, `_comparison_spec` at `:408` keeps the caller hubs, buyer, and flagship. A live purpose edit on one hub, the same edit on every hub, or a buyer or practice edit is then `BLOCKED`, with ready `""` and `qa_verdict` false (`test_edited_hub_prose_is_blocked_not_self_compared`). A caller that does not name that identity is not a fact source. Stored blocks are parsed, and a missing block id is a refusal. Tier follows the stored database kinds (`_tier_from_kinds` at `:493`). A whitespace-only purpose suffix raises `ProductBuildError` (`fact ledger fact is not a durable string`) with 0 writes, not `ValidationError`. A `NotionPage` subclass on the notification row raises `fact ledger identity is missing` (`_stable_identity` at `:504`). `_formula_expression` at `:737` returns `str | None`. A missing or empty expression is `None`, never `""`. The workflow link still checks each of the ten edges three ways. Successor sets are exact (`_walk_chain` at `:765`). An extra successor or a cycle refuses. Known ids only. The proof copy is not a known id, and `page_count` stays 15. `_write_qa` keeps a stored ledger and link at `notion_qa.py:869`. Exit 78 stays HELD. This is not SESSION_07 COMPLETE.
+
+Product-build tests: 791 passed (`test_notion_fact_ledger.py`, `test_notion_product_qa.py`, the variants file, the progress file, and the six phase files), in 41.23s. `ruff format --check` and `ruff check` are clean on the five changed modules. `pyright` 1.1.411 reports 0 errors on those modules. The notice that 1.1.414 exists is not a failure. SQLAlchemy in this workspace is 2.0.52. Sockets stay blocked. No production Notion or Etsy. No commissioning. `IMPLEMENTATION_STATE.json` is not in this commit. Revision stays 58. `head_sha` stays `a4e9b025021b4effbb2b2879c1db756403cb1676`.
+
+Census of `notion_fact_ledger.py` on this tip, counted the same way as round 3 (an `If` that is not an `elif`, an `elif`, a `Compare`, a `BoolOp`, each `BoolOp` value, and an `IfExp`). The counts are if 97, elif 0, compare 160, boolop 52, operand 120, ifexp 11. That is 440 sites. The operand sweep replaces each operand with `True` and with `False`, and flips each `and` or `or`. Ledger non-if rows: 308 (120 times 2, plus 68 operator flips). If-flips: one `not` wrapped around each of the 97 `if` tests. Progress rows are the bool operands and if-flips at `notion_progress.py:235` and `:238`. Variant rows are the bool operands and if-flips at `notion_variants.py:280`, `:519`, and `:904`.
+
+Sweep method. Each worker imported a copy of `src` (`PYTHONPATH` set to that copy, pytest `-o pythonpath=`), with `config` copied beside it. The editable install was not the mutant. The owning suite for ledger and progress mutants was `tests/unit/agents/test_notion_fact_ledger.py`. Variant lines used `test_aligned_pairs_refuse_a_duplicated_palette_name`, `test_non_workspace_home_is_refused_by_the_source_check`, `test_spec_page_must_be_the_stored_home`, and `test_duplicate_palette_token_names_refuse_before_any_write`. The Failed column is the count of lines starting with `FAILED` or `ERROR`. A non-zero exit with zero such lines is still a kill. A syntax error is not a kill. None occurred. The 430-row merge is round 1, overlaid by the re-run of the then-equivalent keys, overlaid by the seven `:547` mutants. After that merge, `:758` `formula.expression == ""` replaced with `False` was still equivalent. `test_blank_formula_expression_is_missing` now requires the helper to return `None`. That one mutant was remeasured and is killed (Failed 1). The other 20 equivalents were not re-run after that assertion. The assertion does not call the sites those 20 mutate.
+
+| Sweep | Rows | Killed | Equivalent | Failed sum |
+|---|---:|---:|---:|---:|
+| Ledger operands (non-if) | 308 | 288 | 20 | 7464 |
+| Ledger if-flips | 97 | 97 | 0 | 6756 |
+| Progress `:235` and `:238` | 12 | 12 | 0 | 28 |
+| Variants `:280`, `:519`, `:904` | 13 | 13 | 0 | 13 |
+| Combined | 430 | 410 | 20 | 14261 |
+
+The 20 equivalents, all in `notion_fact_ledger.py`. Each one was run. Failed is 0. The probe is the input that used to distinguish the old line, or the reachable case on this tip.
+
+| Line | Mutation | Probe |
+|---|---|---|
+| `:180` | `saved_ledger is not None` to `True` | `_stored_pair` returns both or neither. One `None` still fails the `and`. |
+| `:181` | `saved_link is not None` to `True` | Same pair. |
+| `:329` | PASS-branch `saved.checks != plan.checks` to `False` | A foreign check name raises `fact ledger record is incomplete` at `:234` (`test_permuted_check_names_are_incomplete`). A PASS with a false saved check raises in `_verdict_agrees`. A PASS whose live plan has a false check raises `fact ledger does not match` at `plan.blocked` (`:332`), with 0 writes. The BLOCKED-branch twin at `:324` is killed by `test_a_changed_blocked_check_is_replanned`. |
+| `:390` | `type(value) is not str` to `False` | Facts built above the loop are non-empty stripped strings. `identity_hubs=()` raises in `_require_hub_count` at `:465` before this loop. |
+| `:390` | `value == ""` to `False` | Same. The empty fact never arrives. |
+| `:390` | `value.strip() != value` to `False` | Same. |
+| `:390` | first `or` to `and` | Same. The strip conjunct is not what keeps the fact out. |
+| `:390` | second `or` to `and` | Same. |
+| `:551` | `len(block.content) > len(prefix)` to `True` | Prefix-only content yields detail `""` either way, and `:555` raises. |
+| `:591` | `page.title == ""` to `False` | The empty title is returned by the `if` and by the fall-through. Both are `""`. |
+| `:609` | `type(name) is str` to `True` | The first loop and `_page_title` already produce a `str`. |
+| `:609` | `name == ""` to `False` | The first loop already stores `missing` for `""`. |
+| `:640` | `type(title) is str` to `True` | The preceding line already coerces a non-str title to `missing`. |
+| `:661` | `captured != ""` to `True` | `""` becomes usable, `_redacted_url("")` returns `missing`, and agreed stays false. The fact component is `missing` either way. |
+| `:681` | `captured == ""` to `False` | Stock returns `missing`. The mutant falls through and `bare == ""` returns `missing`. |
+| `:714` | `expression is None` to `False` | `None` still fails `expression != wanted[1]`. The dashboard fact is `missing`. |
+| `:716` | `";" in name` to `False` | A wanted expression has no semicolon. A live semicolon already failed equality at `:714`. |
+| `:716` | `";" in expression` to `False` | Same. |
+| `:716` | `or` to `and` | Same. |
+| `:792` | `allowed is None` to `False` | An unknown predecessor still has `frozenset(...) != None`, so the same raise happens. |
+
+Killing-test map for the verifier's distinguishing inputs on tip `9eff481e`. The old line is the verifier's line. The new line is this tip. Where the old mutant is gone, the test is the one that runs the distinguishing input.
+
+| Verifier input | Old line | This tip | Killing test |
+|---|---|---|---|
+| Purpose edit on one hub, on every hub, or a buyer edit, with stored QA PASS and no QA re-run | `:345`, `:424-426` | `_comparison_spec` `:408` | `test_edited_hub_prose_is_blocked_not_self_compared` |
+| `_require_pairs([])` | `:253` | `:264` | `test_empty_pair_list_is_incomplete` |
+| Stored PASS with a false check | `:279` ×2 | `:290` | `test_pass_with_a_false_check_is_not_stored` |
+| All-true checks under a foreign name | `:318` | `:234` | `test_permuted_check_names_are_incomplete`. The PASS-branch checks operand at `:329` is the equivalent row above. |
+| Stored BLOCKED with every check true | `:363` ×3, `:365` | `:376` | `test_blocked_all_true_checks_are_not_a_pass` |
+| `identity_hubs=()` | `:377` | `:465` before `:390` | `test_hub_count_accepts_six_through_eight`. The `:390` weakenings are the equivalent rows above. |
+| Blank notification row, cleared buyer or feature | `:403-:405` | `:408`, `:504` | `test_row_name_must_be_a_token`, `test_edited_hub_prose_is_blocked_not_self_compared`, `test_caller_identity_must_match_the_row` |
+| Duplicate or non-catalogue kinds, and the business tier | `:407`, `:409` ×5 | `:493` | `test_tier_follows_the_stored_kind_set`, `test_caller_tier_does_not_override_stored_kinds`, `test_caller_tier_does_not_override_mass_kinds`, `test_verifier_shapes_are_refused` |
+| Notification subclass | `:437` | `:510` | `test_row_subclass_is_a_missing_identity` |
+| Padded row Name | `:439` | `:513` | `test_padded_row_name_is_a_missing_identity`, `test_row_name_must_be_a_token` |
+| List section, 3-tuple, wrong role | `:468` ×2, `:471` ×4 | `:528` | `test_section_shape_is_a_pair` |
+| Non-text purpose block, `content=5` | `:474` ×3 | `:531`, `:533` | `test_non_text_purpose_block_is_refused`, `test_numeric_purpose_content_is_a_product_error` |
+| 65-character name, 501-character detail, and the legal bounds | `:491` | `:472`, `:547`, `:555` | `test_hub_name_bounds_are_a_product_error`, `test_detail_bounds_are_a_product_error`, `test_legal_bounds_pass_and_one_past_refuses` |
+| Five hubs and nine hubs, and a legal eight | `:494` | `:465` | `test_hub_count_accepts_six_through_eight`, `test_verifier_shapes_are_refused`, `test_legal_bounds_pass_and_one_past_refuses` |
+| Hub title `"Hub 1 "` | `:540` | `:609` strip | `test_trailing_space_in_a_hub_title_can_be_repaired`, `test_database_title_with_edge_space_is_missing` for the database twin. `name == ""` and `type(name) is str` on the second loop stay equivalent, as the table says. |
+| `_safe_label(1)` | `:612` | `_safe_label` `:691` | `test_numeric_sample_title_is_missing` |
+| Palette name duplicated | `:280` if-flip | `:280` | `test_aligned_pairs_refuse_a_duplicated_palette_name`. The public build still raises `checkpoint aesthetics accent is duplicated` first. |
+| Home id | `:904` if-flip | `:904` | `test_spec_page_must_be_the_stored_home` |
+| Parent type | `:519` if-flip | `:519` | `test_non_workspace_home_is_refused_by_the_source_check` |
+| Dead temp deleted, live pid kept, literal name | progress `:229`, `:232` | `:235`, `:238` | `test_stale_checkpoint_tmp_is_removed_on_the_next_write`, `test_foreign_pid_temp_is_kept`, `test_temp_cleanup_keeps_unrelated_names`, `test_temp_names_are_matched_literally`. 12 of 12 killed, Failed sum 28. |
+| Empty formula returns `None` | `:671` | `:758` | `test_blank_formula_expression_is_missing` |
+
+`test_inconsistent_stored_qa_writes_nothing` covers an inconsistent stored QA record. Its docstring says a forged but consistent PASS with a live defect writes one `BLOCKED` ledger. That name does not claim the consistent case writes nothing.
+
+Legal bounds that must pass: a 64-character hub name, a 500-character purpose detail, and 8 hubs. One past each bound must refuse: 65, 501, and 9. `test_legal_bounds_pass_and_one_past_refuses` runs the public path. The direct helpers cover 6 and 8 against 5 and 9, and 64 against 65.
+
+### Round 3 record at tip 9eff481e
+
+These counts are not this commit. Round 2's 176-row and 39-row counts were an earlier tip. They are not these counts either.
+
+`run_fact_ledger` on that tip was async at `notion_fact_ledger.py:144`. The plan at `_plan` (`:331`) awaited `live_qa_passed` (`notion_qa.py:476`) before `_write` (`:739`), which called `write_checkpoint` at `:778`. The observed spec was read from the stored pages. That is the behaviour the verifier rejected.
 
 Empty captured URL is two contracts. QA still skips `""` the same as a missing URL (`notion_qa.py:557`). `test_empty_captured_url_repairs_like_a_missing_url` records `PASS` with repairs `("published",)`. The ledger does not skip `""` or `None` on a published page. `test_empty_or_missing_public_url_blocks_secret_links` records `BLOCKED`, the secret-link fact component `missing`, and 0 adapter writes.
 
@@ -24,7 +99,7 @@ Blocker map. Reviewer A and verifier 1, stored QA verdict: `test_blocked_qa_with
 
 Product-build tests: 732 passed (`test_notion_fact_ledger.py`, `test_notion_product_qa.py`, the variants file, the progress file, and the six phase files). `ruff format --check`, `ruff check`, and `pyright` 1.1.411 report 0 errors on the changed modules. Sockets stay blocked. No production Notion or Etsy. No commissioning.
 
-Census of `notion_fact_ledger.py` on this tip. An AST walk counts an `If` that is not an `elif`, an `elif` (`If` that is the sole `orelse` of another `If`), a `Compare`, a `BoolOp`, each `BoolOp` value as an operand, and an `IfExp`. The counts are if 85, elif 1, compare 136, boolop 49, operand 109, ifexp 9. That is 389 sites. The operand sweep replaces each operand span with `True` and with `False`, and flips the first ` or ` or ` and ` token of each `BoolOp`. That is 109 times 2 plus 49, which is 267 mutants. The owning file is `tests/unit/agents/test_notion_fact_ledger.py`, run with `pytest -q --tb=line`. The Failed column is the FAILED-line count. A syntax error is not a kill. None occurred. Workers imported a copy of `src` so the workspace file was not the mutant. The round-2 176 and the verifier's earlier 174 are not the counts of this tip.
+Census of `notion_fact_ledger.py` on tip `9eff481e`. An AST walk counts an `If` that is not an `elif`, an `elif` (`If` that is the sole `orelse` of another `If`), a `Compare`, a `BoolOp`, each `BoolOp` value as an operand, and an `IfExp`. The counts are if 85, elif 1, compare 136, boolop 49, operand 109, ifexp 9. That is 389 sites. The operand sweep replaces each operand span with `True` and with `False`, and flips the first ` or ` or ` and ` token of each `BoolOp`. That is 109 times 2 plus 49, which is 267 mutants. The owning file is `tests/unit/agents/test_notion_fact_ledger.py`, run with `pytest -q --tb=line`. The Failed column is the FAILED-line count. A syntax error is not a kill. None occurred. Workers imported a copy of `src` so the workspace file was not the mutant. The round-2 176 and the verifier's earlier 174 are not the counts of tip `9eff481e`.
 
 Operand sweep: 267 rows, 212 killed, 55 equivalent. The Failed column sums to 3610. The equivalents are probe-backed in the table. The `:377` `strip` conjunct is killed (Failed 2). The same line's `or` to `and` flip is equivalent because every fact is a non-empty `str` and `and` binds tighter, so the strip conjunct still raises. Probe `test_edge_whitespace_is_refused_before_persist`. The old `:546` `None` `or` was split into three separate `if`s (`:748-753`) and is not a row. `test_missing_record_raises_product_error` raises `ProductBuildError`.
 

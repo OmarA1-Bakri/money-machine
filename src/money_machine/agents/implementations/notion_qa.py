@@ -139,6 +139,7 @@ async def run_product_qa(
 
 
 def load_qa_record(path: Path) -> QaRecord | None:
+    """Read the stored QA record, or None when the checkpoint has none."""
     envelope = load_payload(path)
     if envelope.payload is None:
         return None
@@ -149,6 +150,7 @@ def load_qa_record(path: Path) -> QaRecord | None:
 
 
 def _require_qa(value: object) -> QaRecord:
+    """Parse one QA record. A PASS with a false check is refused."""
     if type(value) is not dict:
         raise ProductBuildError("qa record must be an object")
     entry = value
@@ -176,6 +178,7 @@ def _require_qa(value: object) -> QaRecord:
 
 
 def _require_pairs(value: object, left: str, right: str) -> tuple[tuple[str, str], ...]:
+    """Rows of two exact string fields. An empty list is incomplete."""
     if type(value) is not list or not value:
         raise ProductBuildError("qa record is incomplete")
     rows: list[tuple[str, str]] = []
@@ -191,6 +194,7 @@ def _require_pairs(value: object, left: str, right: str) -> tuple[tuple[str, str
 
 
 def _require_tokens(value: object, label: str) -> tuple[str, ...]:
+    """A list of tokens. A non-list is incomplete."""
     if type(value) is not list:
         raise ProductBuildError("qa record is incomplete")
     rows: list[str] = []
@@ -202,6 +206,7 @@ def _require_tokens(value: object, label: str) -> tuple[str, ...]:
 
 
 def _require_passed(value: str) -> bool:
+    """A check flag is the word true or the word false."""
     if value == "true":
         return True
     if value == "false":
@@ -210,6 +215,7 @@ def _require_passed(value: str) -> bool:
 
 
 def _require_repairs(value: object) -> tuple[str, ...]:
+    """Repair names are unique and belong to the repairable set."""
     repairs = _require_tokens(value, "qa repair")
     if len(set(repairs)) != len(repairs) or any(name not in _REPAIRABLE for name in repairs):
         raise ProductBuildError("qa record is incomplete")
@@ -264,6 +270,7 @@ async def _plan(
 def _flag_failures(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint
 ) -> tuple[tuple[str, bool], ...]:
+    """Checks that failed, in the order the plan recorded them."""
     pages = [_variant_page(probe, record) for record in stored.variants]
     published = all(page.is_published is True for page in pages)
     duplicate = all(page.duplicate_as_template is True for page in pages)
@@ -280,6 +287,7 @@ async def _structural_checks(
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
 ) -> tuple[tuple[str, bool], ...]:
+    """Live structure checks. A false check blocks the verdict."""
     proof = _existing_proof_id(probe, stored, spec)
     return (
         ("spec_coverage", _spec_coverage(stored, spec)),
@@ -302,10 +310,12 @@ async def _structural_checks(
 
 
 def _is_database(value: object) -> bool:
+    """True when the value is a database, including a subclass."""
     return isinstance(value, NotionDatabase)
 
 
 def _variant_page(probe: FixtureNotionAdapter, record: VariantRecord) -> NotionPage:
+    """The stored variant page, or a refusal when it is missing."""
     page = probe.pages.get(record.page_id)
     if type(page) is not NotionPage:
         raise ProductBuildError("qa variant page is missing")
@@ -313,6 +323,7 @@ def _variant_page(probe: FixtureNotionAdapter, record: VariantRecord) -> NotionP
 
 
 def _spec_coverage(stored: ProductBuildCheckpoint, spec: ProductSpec) -> bool:
+    """True when the stored colours and tokens match the spec."""
     colours = spec.colour_variants
     tokens = spec.palette_tokens
     if len(stored.variants) != len(colours) or len(colours) != len(tokens):
@@ -325,6 +336,7 @@ def _spec_coverage(stored: ProductBuildCheckpoint, spec: ProductSpec) -> bool:
 def _shared_databases(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> bool:
+    """True when the stored databases match the tier catalogue."""
     kinds = shared_database_kinds(spec)
     recorded = tuple(kind for kind, _database_id in stored.database_ids)
     if recorded != kinds:
@@ -343,6 +355,7 @@ def _shared_databases(
 def _duplicate_databases(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> bool:
+    """True when database titles are present once."""
     titles = [database.title for database in probe.databases.values() if _is_database(database)]
     expected = len(shared_database_kinds(spec)) + 1
     return len(titles) == expected and len(set(titles)) == len(titles)
@@ -351,6 +364,7 @@ def _duplicate_databases(
 def _hubs_present(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> bool:
+    """True when each hub page is the stored child of home."""
     if tuple(hub.name for hub in stored.identity_hubs) != tuple(hub.name for hub in spec.hubs):
         return False
     for hub in stored.identity_hubs:
@@ -365,6 +379,7 @@ def _hubs_present(
 
 
 def _linked_views(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -> bool:
+    """True when each hub's linked views resolve."""
     by_kind = dict(stored.database_ids)
     for hub in stored.identity_hubs:
         for slug, view_id in hub.views:
@@ -380,6 +395,7 @@ def _linked_views(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -
 def _formulas_compile(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> bool:
+    """True when each dashboard formula matches the spec."""
     generated = _generated(spec)
     for name, expression in generated.expressions.items():
         kind = generated.databases[name]
@@ -393,6 +409,7 @@ def _formulas_compile(
 def _notification_values(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> bool:
+    """True when the notification row names this identity."""
     notice = stored.notification_dashboard
     if notice is None:
         return False
@@ -419,6 +436,7 @@ def _formula_compiles(
     expression: str,
     result_type: str,
 ) -> bool:
+    """True when one stored formula matches the expected expression."""
     database = _kind_database(probe, stored, kind)
     if database is None:
         return False
@@ -440,6 +458,7 @@ def _formula_property(
     kind: str,
     name: str,
 ) -> NotionFormula | None:
+    """The formula property, or None when it is not stored."""
     database = _kind_database(probe, stored, kind)
     if database is None:
         return None
@@ -455,6 +474,7 @@ def _formula_property(
 def _kind_database(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, kind: str
 ) -> NotionDatabase | None:
+    """The database for one kind, or None when the kind is absent."""
     for recorded, database_id in stored.database_ids:
         if recorded != kind:
             continue
@@ -490,6 +510,7 @@ async def live_qa_passed(
 
 
 def _generated(spec: ProductSpec) -> NotificationDashboardFormulas:
+    """Dashboard formulas derived from the spec."""
     definitions = schema_definitions()
     kinds = shared_database_kinds(spec)
     verified = {
@@ -504,6 +525,7 @@ def _is_page(value: object) -> bool:
 
 
 def _page_count(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, proof: str) -> bool:
+    """True when the known pages are the only pages in the probe."""
     known = _known_page_ids(stored)
     present = [page for page in probe.pages.values() if _is_page(page)]
     known_present = [page for page in present if page.id in known]
@@ -516,6 +538,7 @@ def _page_count(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, pro
 
 
 def _known_page_ids(stored: ProductBuildCheckpoint) -> set[str]:
+    """Page ids the QA check counts. The proof copy is included."""
     known = {stored.page_id}
     known.update(hub.page_id for hub in stored.identity_hubs)
     notice = stored.notification_dashboard
@@ -535,6 +558,7 @@ def _trusted_secret_link(page_id: str) -> str:
 
 
 def _is_trusted_link(link: object, page_id: str) -> bool:
+    """True when the link is the exact fixture URL for the page."""
     return type(link) is str and link == _trusted_secret_link(page_id)
 
 
@@ -581,10 +605,12 @@ def _fresh_duplicate(
 
 
 def _no_access(probe: FixtureNotionAdapter) -> bool:
+    """True when a no-access block is present."""
     return all("No access" not in block.content for block in probe.blocks.values())
 
 
 def _cross_catalogue(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -> bool:
+    """True when a database kind belongs to the other tier."""
     known = {database_id for _kind, database_id in stored.database_ids}
     notice = stored.notification_dashboard
     if notice is not None:
@@ -607,6 +633,7 @@ def _cross_catalogue(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint
 def _palette(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> bool:
+    """True when the three palette callouts are on the home page."""
     colours = spec.colour_variants
     tokens = spec.palette_tokens
     if len(stored.variants) != len(colours) or len(colours) != len(tokens):
@@ -638,6 +665,7 @@ def _palette(
 def _teardown(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> bool:
+    """True when hub prose and home navigation still match the spec."""
     if not spec.evidence:
         return False
     for hub in stored.identity_hubs:
@@ -668,6 +696,7 @@ def _accounted_facts(
     spec: ProductSpec,
     probe: FixtureNotionAdapter,
 ) -> dict[str, str]:
+    """True when the persisted facts match the live counts."""
     databases: list[str] = []
     for _kind, database_id in stored.database_ids:
         database = probe.databases.get(database_id)
@@ -698,6 +727,7 @@ def _accounted_facts(
 
 
 def _normalised_secret_link(link: str, page_id: str) -> str:
+    """The link with its query and fragment removed."""
     suffix = "/" + page_id
     if link.endswith(suffix):
         return link[: -len(suffix)]
@@ -705,6 +735,7 @@ def _normalised_secret_link(link: str, page_id: str) -> str:
 
 
 def _present_page_count(stored: ProductBuildCheckpoint, probe: FixtureNotionAdapter) -> int:
+    """How many known pages are present in the probe."""
     known = _known_page_ids(stored)
     return sum(1 for page in probe.pages.values() if type(page) is NotionPage and page.id in known)
 
@@ -714,6 +745,7 @@ def _facts(
     spec: ProductSpec,
     probe: FixtureNotionAdapter,
 ) -> tuple[tuple[str, str], ...]:
+    """The fact pairs a QA record stores."""
     return (
         ("colour_names", ",".join(spec.colour_variants)),
         ("databases", ",".join(kind for kind, _database_id in stored.database_ids)),
@@ -733,6 +765,7 @@ def _facts(
 def _existing_proof_id(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> str:
+    """The stored proof page id, or empty when there is none."""
     title = _proof_title(stored, spec)
     matches = [
         page for page in probe.pages.values() if type(page) is NotionPage and page.title == title
@@ -747,11 +780,13 @@ def _existing_proof_id(
 
 
 def _proof_title(stored: ProductBuildCheckpoint, spec: ProductSpec) -> str:
+    """The title of the fresh-duplicate proof page."""
     colour = spec.colour_variants[0]
     return f"{spec.title} / {colour} (Copy)"
 
 
 def _proof_matches(page: object, stored: ProductBuildCheckpoint, spec: ProductSpec) -> bool:
+    """True when the page is the stored proof copy."""
     record = stored.variants[0]
     if type(page) is not NotionPage or page.title != _proof_title(stored, spec):
         return False
@@ -801,6 +836,7 @@ async def _prove_duplicate(
     spec: ProductSpec,
     existing: str,
 ) -> str:
+    """Publish the fresh-duplicate proof page."""
     if existing != "":
         return existing
     guard_operation(probe, OP_QA)
@@ -819,6 +855,7 @@ def _with_qa(
     facts: tuple[tuple[str, str], ...],
     recorded_at: datetime,
 ) -> ProductBuildCheckpoint:
+    """Return the checkpoint with the QA record attached."""
     record = QaRecord(
         verdict=verdict,
         checks=checks,
@@ -834,6 +871,7 @@ def _write_qa(
     checkpoint: ProductBuildCheckpoint,
     created: Mapping[str, object],
 ) -> None:
+    """Persist the QA record through the single progress writer."""
     record = checkpoint.qa
     if record is None:
         raise ProductBuildError("qa record is missing")

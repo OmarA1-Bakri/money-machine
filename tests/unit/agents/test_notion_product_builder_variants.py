@@ -6,7 +6,7 @@ import json
 import socket
 import traceback
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -3391,6 +3391,71 @@ async def test_reversed_dashboard_created_ids_survive_variants(tmp_path: Path) -
     ids = after["created_notion_ids"]
     assert type(ids) is dict
     assert ids["dashboard"] == reversed_rows
+
+
+def test_aligned_pairs_refuse_a_duplicated_palette_name() -> None:
+    """Same token name and a different hex is refused. Unique names are kept.
+
+    Building from a duplicate spec never reaches this check: the aesthetics
+    loader refuses the duplicated accent label first. This calls the check
+    with that input directly.
+    """
+    spec = _spec()
+    tokens = spec.palette_tokens
+    mutated = spec.model_copy(
+        update={
+            "palette_tokens": (
+                tokens[0],
+                ColourToken(name=tokens[0].name, hex=tokens[1].hex),
+                *tokens[2:],
+            ),
+        }
+    )
+
+    with pytest.raises(ProductBuildError, match="palette token name is duplicated"):
+        notion_variants_module._aligned_pairs(mutated)  # pyright: ignore[reportPrivateUsage]
+
+    pairs = notion_variants_module._aligned_pairs(spec)  # pyright: ignore[reportPrivateUsage]
+    assert tuple(colour for colour, _token in pairs) == spec.colour_variants
+
+
+@pytest.mark.asyncio
+async def test_non_workspace_home_is_refused_by_the_source_check(tmp_path: Path) -> None:
+    """A home whose parent is not workspace fails the source-page check."""
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    stored, _created = load_variant_checkpoint(path)
+    page = notion_variants_module._source_page(probe, stored)  # pyright: ignore[reportPrivateUsage]
+    assert page.id == stored.page_id
+    probe.pages[stored.page_id].parent_type = "page_id"
+
+    with pytest.raises(ProductBuildError, match="variants require the aesthetics checkpoint"):
+        notion_variants_module._source_page(probe, stored)  # pyright: ignore[reportPrivateUsage]
+
+    del probe.pages[stored.page_id]
+    with pytest.raises(ProductBuildError, match="variants require the aesthetics checkpoint"):
+        notion_variants_module._source_page(probe, stored)  # pyright: ignore[reportPrivateUsage]
+
+
+@pytest.mark.asyncio
+async def test_spec_page_must_be_the_stored_home(tmp_path: Path) -> None:
+    """The page that carries the spec id has to be the stored home page."""
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    stored, _created = load_variant_checkpoint(path)
+    notion_variants_module._require_one_spec_page(probe, spec, stored)  # pyright: ignore[reportPrivateUsage]
+    forged = replace(stored, page_id="not-the-home")
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        notion_variants_module._require_one_spec_page(probe, spec, forged)  # pyright: ignore[reportPrivateUsage]
+
+    del _home(probe, spec).properties[SPEC_ID_PROPERTY]
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        notion_variants_module._require_one_spec_page(probe, spec, stored)  # pyright: ignore[reportPrivateUsage]
 
 
 def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:

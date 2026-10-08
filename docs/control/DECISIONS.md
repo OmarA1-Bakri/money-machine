@@ -318,7 +318,7 @@ The workflow link records the existing graph. It does not edit `config/workflows
 
 Each of the ten edges is checked three ways. The predecessor must admit the event. The predecessor must name the successor. `event_successor_map` must list that event's successors in canonical order. The eight persisted step labels stay the section-10 names. An extra successor refuses. The real three-job SCREENSHOTS_CAPTURED list still passes.
 
-Caller `buyer_problem`, `flagship_feature`, `hubs`, `identity`, and `tier` are not facts. The ledger reads those from the stored pages. The ledger counts known ids only. The proof copy is not a known id, and `page_count` stays 15. No ListingCopyJob reads the ledger in this wave.
+Caller `buyer_problem`, `flagship_feature`, `hubs`, `identity`, and `tier` are not a second fact source. When the caller names the same hub names and `spec.identity` equals the notification row Name, the comparison spec keeps those caller hubs, the buyer, and the flagship. A live purpose, buyer, or practice edit is then BLOCKED, with ready empty and `qa_verdict` false. When the caller does not name that identity, stored blocks are parsed, and a missing block id is a refusal. Tier follows the stored database kinds. The ledger counts known ids only. The proof copy is not a known id, and `page_count` stays 15. No ListingCopyJob reads the ledger in this wave. Amended 2026-10-08 after the verifier FAIL on tip `9eff481e`: reading buyer, flagship, and hub prose back off the live pages had turned a live edit into a ledger PASS.
 
 Supported devices are recorded as `unverified`. The free-update policy is recorded as `not_configured`. Nothing persisted verifies either one. Those tokens are not a device claim and not a free-update claim.
 

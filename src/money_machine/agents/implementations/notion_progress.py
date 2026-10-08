@@ -206,11 +206,17 @@ def stamp_integrity_digest(document: Mapping[str, object]) -> dict[str, object]:
 
 
 def _pid_alive(pid: int) -> bool:
-    """True when a process still owns this pid. A dead pid's temp is stale."""
+    """True when a process still owns this pid. A dead pid's temp is stale.
+
+    PermissionError means the pid is alive and owned by someone else. Treating
+    that as a dead process would delete another user's in-flight temp.
+    """
     if pid <= 0:
         return False
     try:
         os.kill(pid, 0)
+    except PermissionError:
+        return True
     except OSError:
         return False
     return True
@@ -289,8 +295,27 @@ def _append_job(path: Path, job: Mapping[str, str]) -> None:
     jobs = progress["repair_jobs"]
     if type(jobs) is not list:
         raise ProductBuildError("progress record is tampered")
-    progress["repair_jobs"] = [*list(jobs), dict(job)]
+    fresh = dict(job)
+    if _same_provider_job(jobs, fresh):
+        return
+    progress["repair_jobs"] = [*list(jobs), fresh]
     _write_through_checkpoint(path, _string_payload(raw), progress)
+
+
+def _same_provider_job(jobs: list[object], fresh: Mapping[str, str]) -> bool:
+    """True when this provider_response job is already on the checkpoint."""
+    if fresh.get("kind") != "provider_response":
+        return False
+    for item in jobs:
+        if type(item) is not dict:
+            continue
+        if (
+            item.get("kind") == fresh.get("kind")
+            and item.get("operation") == fresh.get("operation")
+            and item.get("phase") == fresh.get("phase")
+        ):
+            return True
+    return False
 
 
 def _write_through_checkpoint(
