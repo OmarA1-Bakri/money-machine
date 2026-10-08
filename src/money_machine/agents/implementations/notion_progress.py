@@ -59,6 +59,7 @@ _PROGRESS_FIELDS = (
     "formula_state",
     "repair_jobs",
     "recovery",
+    "next_phase",
 )
 _PROGRESS_KEYS = frozenset((*_PROGRESS_FIELDS, "record_digest"))
 _COUNT_KEYS = frozenset({"blocks", "databases", "pages"})
@@ -303,7 +304,12 @@ def _append_job(path: Path, job: Mapping[str, str]) -> None:
 
 
 def _same_provider_job(jobs: list[object], fresh: Mapping[str, str]) -> bool:
-    """True when this provider_response job is already on the checkpoint."""
+    """True when this exact provider_response job is already on the checkpoint.
+
+    Kind, operation, phase, and response all have to match. A second failure
+    with a different response, operation, or phase is a different job. A
+    rebuild refusal is not a provider response and is never collapsed here.
+    """
     if fresh.get("kind") != "provider_response":
         return False
     for item in jobs:
@@ -313,6 +319,7 @@ def _same_provider_job(jobs: list[object], fresh: Mapping[str, str]) -> bool:
             item.get("kind") == fresh.get("kind")
             and item.get("operation") == fresh.get("operation")
             and item.get("phase") == fresh.get("phase")
+            and item.get("response") == fresh.get("response")
         ):
             return True
     return False
@@ -421,6 +428,9 @@ def _require_shape(body: Mapping[str, object]) -> None:
         raise ProductBuildError("progress record is tampered")
     if recovery not in _RECOVERIES:
         raise ProductBuildError("progress record is forged")
+    phase = body["next_phase"]
+    if type(phase) is not str or phase == "" or phase.strip() != phase or not phase.isascii():
+        raise ProductBuildError("progress record is tampered")
 
 
 def _require_alignment(body: Mapping[str, object], checkpoint_names: object) -> None:

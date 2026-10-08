@@ -23,13 +23,18 @@ from money_machine.agents.implementations.notion_fact_ledger import (
 )
 from money_machine.agents.implementations.notion_hubs import section_content
 from money_machine.agents.implementations.notion_product_builder import (
+    FactLedgerRecord,
     ProductBuildCheckpoint,
     ProductBuildError,
     QaRecord,
+    WorkflowLinkRecord,
 )
 from money_machine.agents.implementations.notion_progress import (
+    OP_REBUILD,
+    PHASES,
     ProviderFailure,
     append_refused_rebuild,
+    record_provider_failure,
 )
 from money_machine.agents.implementations.notion_progress_record import CheckpointView
 from money_machine.agents.implementations.notion_qa import (
@@ -211,19 +216,11 @@ async def test_resume_of_pass_makes_no_second_write(tmp_path: Path) -> None:
 async def test_caller_spec_fields_are_not_the_facts(tmp_path: Path) -> None:
     spec, probe, path = await _qa(tmp_path)
     renamed = tuple(f"Not{index}" for index, _name in enumerate(spec.colour_variants))
-    lied_hubs = tuple(
-        Hub(name=f"Not{hub.name}", description=hub.description, page_count=hub.page_count)
-        for hub in spec.hubs
-    )
     mutated = spec.model_copy(
         update={
             "version": 9,
             "colour_variants": renamed,
-            "buyer_problem": "forged buyer",
-            "flagship_feature": "forged feature",
-            "identity": "Forged Identity",
             "tier": "nope",
-            "hubs": lied_hubs,
         }
     )
     calls = watch_adapter_writes(probe)
@@ -626,7 +623,9 @@ async def test_forged_captured_url_blocks_secret_links(tmp_path: Path) -> None:
     assert checkpoint.fact_ledger is not None
     assert checkpoint.fact_ledger.verdict == "BLOCKED"
     assert _check(checkpoint, "secret_links") is False
-    assert _fact(checkpoint, "secret_links").split(",")[0] == "https://evil.example/not-the-link"
+    shown = _fact(checkpoint, "secret_links").split(",")[0]
+    assert shown == "https://evil.example"
+    assert "/not-the-link" not in shown
     assert calls == []
 
 
@@ -2367,7 +2366,34 @@ async def test_wrong_host_path_is_stored_as_the_captured_url(tmp_path: Path) -> 
 
     assert checkpoint.fact_ledger is not None
     assert _check(checkpoint, "secret_links") is False
-    assert _fact(checkpoint, "secret_links").split(",")[0] == captured
+    shown = _fact(checkpoint, "secret_links").split(",")[0]
+    assert shown == "https://fixture.notion.site"
+    assert "not-this-page" not in shown
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "captured",
+    ["ftp://example.com", "https://@", "https://evil;example"],
+)
+async def test_untrusted_scheme_or_host_is_stored_as_missing(tmp_path: Path, captured: str) -> None:
+    """A bad captured URL is the word missing at the public entry.
+
+    Helper ``_redacted_url`` and this entry agree. ``ftp`` kills the scheme
+    check. ``https://@`` kills the empty-host check. A semicolon in the host
+    kills the delimiter check.
+    """
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    probe.pages[stored.variants[0].page_id].public_url = captured
+
+    checkpoint = await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert checkpoint.fact_ledger is not None
+    assert checkpoint.fact_ledger.verdict == "BLOCKED"
+    assert _check(checkpoint, "secret_links") is False
+    assert _fact(checkpoint, "secret_links").split(",")[0] == "missing"
+    assert captured not in path.read_text(encoding="utf-8")
 
 
 @pytest.mark.asyncio
@@ -2436,7 +2462,7 @@ async def test_missing_record_raises_product_error(
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "exc_type",
-    [ConnectionError, OSError, TimeoutError, ValueError, KeyError],
+    [ConnectionError, OSError, TimeoutError],
 )
 async def test_live_read_failure_is_a_redacted_job(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, exc_type: type[Exception]
@@ -2493,9 +2519,36 @@ async def test_runtime_error_is_not_a_provider_job(
 
     monkeypatch.setattr(ledger_module, "live_qa_passed", _boom)
 
-    with pytest.raises(RuntimeError, match="sk-live-secret"):
+    with pytest.raises(ProductBuildError, match="fact ledger read failed") as caught:
         await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
 
+    assert "sk-live-secret" not in str(caught.value)
+    assert caught.value.__cause__ is None
+    assert path.read_bytes() == raw
+    assert _jobs(path) == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("exc_type", [RuntimeError, Exception, LookupError, ValueError, KeyError])
+async def test_code_errors_are_redacted_and_not_provider_jobs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, exc_type: type[Exception]
+) -> None:
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+
+    async def _boom(*_args: object, **_kwargs: object) -> bool:
+        raise exc_type("sk-live-secret")
+
+    monkeypatch.setattr(ledger_module, "live_qa_passed", _boom)
+
+    with pytest.raises(ProductBuildError, match="fact ledger read failed") as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert "sk-live-secret" not in str(caught.value)
+    assert caught.value.__cause__ is None
+    context = caught.value.__context__
+    if context is not None:
+        assert "sk-live-secret" not in str(context)
     assert path.read_bytes() == raw
     assert _jobs(path) == []
 
@@ -2522,6 +2575,88 @@ async def test_repeated_provider_failure_is_one_job(
     assert "sk-live-secret" not in path.read_text(encoding="utf-8")
 
 
+def _provider_jobs(path: Path) -> list[dict[str, object]]:
+    found: list[dict[str, object]] = []
+    for job in _jobs(path):
+        if type(job) is dict and job.get("kind") == "provider_response":
+            found.append(job)
+    return found
+
+
+@pytest.mark.asyncio
+async def test_a_second_distinct_provider_failure_is_kept(tmp_path: Path) -> None:
+    """Same operation and phase, different response: both jobs stay."""
+    _spec, _probe, path = await _qa(tmp_path)
+    phase = "aesthetics_and_content_completion"
+    record_provider_failure(path, "fact_ledger.read", "provider read failed", phase)
+    record_provider_failure(path, "fact_ledger.read", "different failure", phase)
+    jobs = _provider_jobs(path)
+    assert len(jobs) == 2
+    assert {job["response"] for job in jobs} == {"provider read failed", "different failure"}
+
+
+@pytest.mark.asyncio
+async def test_provider_failures_on_different_operations_are_kept(tmp_path: Path) -> None:
+    _spec, _probe, path = await _qa(tmp_path)
+    phase = "aesthetics_and_content_completion"
+    record_provider_failure(path, "fact_ledger.read", "provider read failed", phase)
+    record_provider_failure(path, "fact_ledger.write", "provider read failed", phase)
+    assert len(_provider_jobs(path)) == 2
+
+
+@pytest.mark.asyncio
+async def test_provider_failures_on_different_phases_are_kept(tmp_path: Path) -> None:
+    _spec, _probe, path = await _qa(tmp_path)
+    record_provider_failure(path, "fact_ledger.read", "provider read failed", "shared_databases")
+    record_provider_failure(
+        path, "fact_ledger.read", "provider read failed", "aesthetics_and_content_completion"
+    )
+    assert len(_provider_jobs(path)) == 2
+
+
+@pytest.mark.asyncio
+async def test_provider_stream_job_counts_are_exact(tmp_path: Path) -> None:
+    """DIFF_PHASE, DIFF_OP, DIFF_KIND, and SAME are 2, 2, 2, and 1.
+
+    Forcing the kind, operation, or phase compare to True, or flipping either
+    ``and`` to ``or``, changes one of these counts.
+    """
+    phase = "aesthetics_and_content_completion"
+    response = "provider read failed"
+    counts: list[int] = []
+    for label in ("diff-phase", "diff-op", "diff-kind", "same"):
+        _spec, _probe, path = await _qa(tmp_path / label)
+        if label == "diff-phase":
+            record_provider_failure(path, "fact_ledger.read", response, "shared_databases")
+            record_provider_failure(path, "fact_ledger.read", response, phase)
+        elif label == "diff-op":
+            record_provider_failure(path, "fact_ledger.read", response, phase)
+            record_provider_failure(path, "fact_ledger.write", response, phase)
+        elif label == "diff-kind":
+            append_refused_rebuild(path, response)
+            record_provider_failure(path, OP_REBUILD, response, PHASES[0])
+        elif label == "same":
+            record_provider_failure(path, "fact_ledger.read", response, phase)
+            record_provider_failure(path, "fact_ledger.read", response, phase)
+        else:
+            raise AssertionError(label)
+        counts.append(len(_jobs(path)))
+    assert counts == [2, 2, 2, 1]
+
+
+@pytest.mark.asyncio
+async def test_two_rebuild_refusals_are_kept(tmp_path: Path) -> None:
+    """A rebuild refusal is not collapsed with another refusal."""
+    _spec, _probe, path = await _qa(tmp_path)
+    append_refused_rebuild(path, "first rebuild stays")
+    append_refused_rebuild(path, "second rebuild stays")
+    kept = [
+        job for job in _jobs(path) if type(job) is dict and job.get("kind") == "rebuild_refused"
+    ]
+    assert len(kept) == 2
+    assert {job["response"] for job in kept} == {"first rebuild stays", "second rebuild stays"}
+
+
 @pytest.mark.asyncio
 async def test_prior_rebuild_job_survives_the_ledger_write(tmp_path: Path) -> None:
     spec, probe, path = await _qa(tmp_path)
@@ -2537,20 +2672,36 @@ async def test_prior_rebuild_job_survives_the_ledger_write(tmp_path: Path) -> No
 
 
 @pytest.mark.asyncio
-async def test_temp_names_are_matched_literally(tmp_path: Path) -> None:
+async def test_temp_names_are_matched_literally(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     spec, probe, path = await _qa(tmp_path)
     weird = tmp_path / "b[x].json"
     weird.write_bytes(path.read_bytes())
     unrelated = tmp_path / ".bx.json.999.tmp"
     unrelated.write_text("keep\n", encoding="ascii")
+    notes = tmp_path / "notes.tmp"
+    cache = tmp_path / "unrelated-cache.tmp"
+    other = tmp_path / ".other.json.4242.tmp"
+    notes.write_text("notes\n", encoding="ascii")
+    cache.write_text("cache\n", encoding="ascii")
+    other.write_text("other\n", encoding="ascii")
     dead = tmp_path / ".b[x].json.999.tmp"
     dead.write_text("dead\n", encoding="ascii")
     process = subprocess.Popen(["sleep", "30"])
     live = tmp_path / f".b[x].json.{process.pid}.tmp"
     live.write_text("live\n", encoding="ascii")
+
+    def _alive(pid: int) -> bool:
+        return pid == process.pid
+
+    monkeypatch.setattr(progress_module, "_pid_alive", _alive)
     try:
         await run_fact_ledger(spec, probe, weird, recorded_at=LEDGER_AT)
         assert unrelated.exists()
+        assert notes.exists()
+        assert cache.exists()
+        assert other.exists()
         assert not dead.exists()
         assert live.exists()
         assert os.getpid() != process.pid
@@ -2623,8 +2774,130 @@ async def test_edited_hub_prose_is_blocked_not_self_compared(
     assert checkpoint.workflow_link is not None
     assert checkpoint.fact_ledger.verdict == "BLOCKED"
     assert checkpoint.workflow_link.ready == ""
+    assert checkpoint.next_phase == PHASE_TEST_MATRIX
+    stored_progress = json.loads(path.read_text(encoding="utf-8"))["progress"]
+    assert stored_progress["next_phase"] == checkpoint.next_phase
     assert _check(checkpoint, "qa_verdict") is False
     assert calls == []
+
+
+def _mismatched_caller(spec: ProductSpec, kind: str) -> ProductSpec:
+    """A caller that is not the hub set QA judged."""
+    if kind == "forged":
+        return spec.model_copy(update={"identity": "Not The Row"})
+    if kind == "renamed":
+        renamed = tuple(
+            Hub(
+                name="Other " + hub.name,
+                description=hub.description,
+                page_count=hub.page_count,
+            )
+            for hub in spec.hubs
+        )
+        return spec.model_copy(update={"hubs": renamed})
+    if kind == "rotated":
+        return spec.model_copy(update={"hubs": (*spec.hubs[1:], spec.hubs[0])})
+    raise AssertionError(kind)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("role", "scope"),
+    [
+        ("purpose", "one"),
+        ("purpose", "all"),
+        ("buyer", "all"),
+        ("practice", "all"),
+    ],
+)
+@pytest.mark.parametrize("caller_kind", ["forged", "renamed", "rotated"])
+async def test_unnamed_caller_cannot_adopt_a_live_hub_edit(
+    tmp_path: Path, role: str, scope: str, caller_kind: str
+) -> None:
+    """Twelve combinations. A post-QA edit plus a mismatched caller is a refusal.
+
+    One purpose edit is hub 2. All-purpose, all-buyer, and all-practice edits
+    cover the other three. Identity ``Not The Row``, hubs named ``Other `` plus
+    the judged name, and rotated hubs are the three callers. QA does not pass
+    the same pair. The first call writes nothing, so a resume cannot keep a PASS.
+    """
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    indexes = (2,) if scope == "one" else range(len(stored.identity_hubs))
+    suffix = {
+        "purpose": "Edited live purpose",
+        "buyer": "Edited buyer",
+        "practice": "Edited practice",
+    }[role]
+    for index in indexes:
+        block = _role_block(probe, stored, index, role)
+        block.content = block.content + suffix
+    caller = _mismatched_caller(spec, caller_kind)
+    try:
+        qa_passed = await live_qa_passed(probe, stored, caller)
+    except ProductBuildError:
+        qa_passed = False
+    assert qa_passed is False
+    raw = path.read_bytes()
+    calls = watch_adapter_writes(probe)
+
+    with pytest.raises(ProductBuildError, match="fact ledger caller does not match"):
+        await run_fact_ledger(caller, probe, path, recorded_at=LEDGER_AT)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("caller_kind", ["forged", "renamed"])
+async def test_stored_blocked_is_not_overwritten_on_a_forged_resume(
+    tmp_path: Path, caller_kind: str
+) -> None:
+    """An honest BLOCKED ledger stays BLOCKED when a mismatched caller resumes.
+
+    ``_saved_holds`` must not return false and let ``_plan`` write PASS.
+    """
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    block = _role_block(probe, stored, 2, "purpose")
+    block.content = block.content + "Edited live purpose"
+    blocked = await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    assert blocked.fact_ledger is not None
+    assert blocked.fact_ledger.verdict == "BLOCKED"
+    assert blocked.next_phase == PHASE_TEST_MATRIX
+    on_disk = json.loads(path.read_text(encoding="utf-8"))["progress"]["next_phase"]
+    assert on_disk == blocked.next_phase
+    raw = path.read_bytes()
+    caller = _mismatched_caller(spec, caller_kind)
+
+    with pytest.raises(ProductBuildError, match="fact ledger caller does not match"):
+        await run_fact_ledger(caller, probe, path, recorded_at=LATER)
+
+    assert path.read_bytes() == raw
+    ledger = _references(path)["fact_ledger"]
+    assert type(ledger) is dict
+    assert ledger["verdict"] == "BLOCKED"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("caller_kind", ["forged", "renamed"])
+async def test_forged_caller_does_not_return_a_stale_pass(tmp_path: Path, caller_kind: str) -> None:
+    """A stored PASS plus a live edit is not returned to a mismatched caller."""
+    spec, probe, path = await _qa(tmp_path)
+    await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    stored, _created = load_variant_checkpoint(path)
+    block = _role_block(probe, stored, 2, "purpose")
+    block.content = block.content + "Edited live purpose"
+    raw = path.read_bytes()
+    caller = _mismatched_caller(spec, caller_kind)
+
+    with pytest.raises(ProductBuildError, match="fact ledger caller does not match"):
+        await run_fact_ledger(caller, probe, path, recorded_at=LATER)
+
+    assert path.read_bytes() == raw
+    ledger = _references(path)["fact_ledger"]
+    assert type(ledger) is dict
+    assert ledger["verdict"] == "PASS"
 
 
 @pytest.mark.asyncio
@@ -2742,7 +3015,7 @@ async def test_whitespace_purpose_is_not_a_validation_error(tmp_path: Path) -> N
     prefix = f"{spec.identity} / {stored.identity_hubs[0].name} purpose: "
     assert block.content.startswith(prefix)
     block.content = prefix + "   "
-    forged = spec.model_copy(update={"identity": "Forged Identity"})
+    forged = spec.model_copy(update={"identity": "Not The Row"})
     raw = path.read_bytes()
 
     message = "fact ledger fact is not a durable string"
@@ -3102,6 +3375,85 @@ async def test_legal_bounds_pass_and_one_past_refuses(tmp_path: Path) -> None:
         await run_fact_ledger(spec, probe, path, recorded_at=LATER)
 
     assert path.read_bytes() == raw
+    require_name = ledger_module._require_hub_name  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ProductBuildError, match=message):
+        require_name(SimpleNamespace(name="N" * 65))
+    require_count = ledger_module._require_hub_count  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ProductBuildError, match=message):
+        require_count(cast(ProductBuildCheckpoint, SimpleNamespace(identity_hubs=tuple(range(9)))))
+    too_long = "N" * 65
+    hub = stored.identity_hubs[0]
+    for role, _block_id in hub.sections:
+        edited = _role_block(probe, stored, 0, role)
+        prefix = f"{spec.identity} / {hub.name} {role}: "
+        assert edited.content.startswith(prefix)
+        detail = edited.content[len(prefix) :]
+        edited.content = f"{spec.identity} / {too_long} {role}: {detail}"
+
+    def _rename(document: dict[str, object]) -> None:
+        references = document["provider_object_references"]
+        assert type(references) is dict
+        rows = references["identity_hubs"]
+        assert type(rows) is list
+        row = rows[0]
+        assert type(row) is dict
+        row["name"] = too_long
+
+    restamp_checkpoint(path, _rename)
+    with pytest.raises(ProductBuildError, match=message):
+        await run_fact_ledger(spec, probe, path, recorded_at=LATER)
+
+    def _nine(document: dict[str, object]) -> None:
+        references = document["provider_object_references"]
+        assert type(references) is dict
+        rows = references["identity_hubs"]
+        assert type(rows) is list
+        for extra_index in range(3):
+            extra = dict(rows[-1])
+            assert type(extra) is dict
+            label = f"Hub {7 + extra_index}"
+            extra["name"] = label
+            extra["page_id"] = f"page-{label}"
+            rows.append(extra)
+
+    restamp_checkpoint(path, _nine)
+    with pytest.raises(ProductBuildError, match="checkpoint hubs must be six to eight"):
+        await run_fact_ledger(spec, probe, path, recorded_at=LATER)
+
+
+@pytest.mark.asyncio
+async def test_unnamed_sixty_four_character_hub_name_passes(tmp_path: Path) -> None:
+    """A mismatched caller with a 64-character hub name passes. ``>=`` refuses it.
+
+    The named path uses ``_require_hub_name`` and does not execute the detail
+    length check. This caller changes only the identity, so the detail check runs.
+    """
+    long_name = "H" * 64
+    base = planner_spec()
+    hubs = tuple(
+        Hub(
+            name=long_name if index == 1 else f"Hub {index}",
+            description=f"Weekly Planner copy {index}",
+            page_count=3,
+        )
+        for index in range(1, 9)
+    )
+    spec = base.model_copy(update={"hubs": hubs})
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _variants(spec, probe, path)
+    await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    caller = spec.model_copy(update={"identity": "Not The Row"})
+    writes, original = _watch_checkpoint_writes()
+    try:
+        checkpoint = await run_fact_ledger(caller, probe, path, recorded_at=LEDGER_AT)
+    finally:
+        ledger_module.write_checkpoint = original  # type: ignore[assignment]
+
+    assert writes["n"] == 1
+    assert checkpoint.fact_ledger is not None
+    assert checkpoint.fact_ledger.verdict == "PASS"
+    assert _fact(checkpoint, "hubs").split(",")[0] == long_name
 
 
 def test_empty_pair_list_is_incomplete() -> None:
@@ -3159,12 +3511,27 @@ def test_tier_follows_the_stored_kind_set() -> None:
 
 
 def test_redacted_url_drops_a_bare_token() -> None:
-    """A non-string, a query-only URL, a padded bare URL, and a comma are missing."""
+    """Scheme and host only. Userinfo, a path, a query, and a bare token are not stored."""
     redact = ledger_module._redacted_url  # pyright: ignore[reportPrivateUsage]
     assert redact(cast(str, 5)) == "missing"
     assert redact("?") == "missing"
+    assert redact("sk-live-secret") == "missing"
     assert redact("http://fixture.notion.site/page ?dropped") == "missing"
-    assert redact("http://fixture.notion.site/a,b") == "missing"
+    secret = "sk-live-secret"
+    userinfo = redact("https://user:" + secret + "@evil.example/p")
+    path_token = redact("https://evil.example/" + secret)
+    assert userinfo == "https://evil.example"
+    assert path_token == "https://evil.example"
+    assert secret not in userinfo
+    assert secret not in path_token
+    assert "/" + secret not in path_token
+    # A non-http scheme, an empty host, and a delimiter in the host are missing.
+    # Forcing those operands to False, or flipping the surrounding ``or``, stores them.
+    assert redact("ftp://example.com") == "missing"
+    assert redact("https://@") == "missing"
+    assert redact("https://evil;example") == "missing"
+    assert redact("http://") == "missing"
+    assert redact("notaurl") == "missing"
 
 
 @pytest.mark.asyncio
@@ -3216,6 +3583,10 @@ async def test_detail_bounds_are_a_product_error(tmp_path: Path) -> None:
     block.content = prefix + " padded"
     with pytest.raises(ProductBuildError, match=message):
         detail_of(probe, hub, spec.identity, "purpose")
+    legal_name = "H" * 64
+    block.content = f"{spec.identity} / {legal_name} purpose: copy"
+    legal = SimpleNamespace(name=legal_name, sections=hub.sections)
+    assert detail_of(probe, legal, spec.identity, "purpose") == "copy"
     for name in (5, "", " padded", "H" * 65):
         shown = name if type(name) is str else "5"
         block.content = f"{spec.identity} / {shown} purpose: copy"
@@ -3315,3 +3686,96 @@ async def test_a_changed_blocked_check_is_replanned(tmp_path: Path) -> None:
     assert path.read_bytes() != raw
     assert checkpoint.fact_ledger is not None
     assert checkpoint.fact_ledger.verdict == "BLOCKED"
+
+
+class _Liar(str):
+    """A str subclass whose equality claims to match any non-empty string."""
+
+    def __eq__(self, other: object) -> bool:
+        return other != ""
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+
+@pytest.mark.asyncio
+async def test_lying_formula_expression_is_blocked(tmp_path: Path) -> None:
+    """Liar("x;y") on current_date is not an exact str, so the ledger stays BLOCKED."""
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    assert stored.notification_dashboard is not None
+    current = next(
+        (kind, property_id)
+        for kind, name, property_id in stored.notification_dashboard.formulas
+        if name == "current_date"
+    )
+    kind, property_id = current
+    database_id = next(item_id for item_kind, item_id in stored.database_ids if item_kind == kind)
+    prop = next(item for item in probe.databases[database_id].properties if item.id == property_id)
+    formula = prop.config["formula"]
+    assert type(formula) is NotionFormula
+    formula.expression = _Liar("x;y")
+    read_expression = ledger_module._formula_expression  # pyright: ignore[reportPrivateUsage]
+    assert read_expression(probe, stored, kind, property_id) is None
+    calls = watch_adapter_writes(probe)
+    writes, original = _watch_checkpoint_writes()
+    try:
+        checkpoint = await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    finally:
+        ledger_module.write_checkpoint = original  # type: ignore[assignment]
+
+    assert checkpoint.fact_ledger is not None
+    assert checkpoint.workflow_link is not None
+    assert checkpoint.fact_ledger.verdict == "BLOCKED"
+    assert checkpoint.workflow_link.ready == ""
+    assert _check(checkpoint, "dashboard_outputs") is False
+    assert _fact(checkpoint, "dashboard_outputs") == "missing"
+    assert "x;y" not in path.read_text(encoding="utf-8")
+    assert calls == []
+    assert writes["n"] == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("shape", ["renamed", "reordered", "short"])
+async def test_saved_pass_checks_must_match_the_plan(tmp_path: Path, shape: str) -> None:
+    """Helper-level: a PASS whose checks are true but not the plan does not hold."""
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    qa = load_qa_record(path)
+    assert qa is not None
+    steps = ledger_module._walk_chain()  # pyright: ignore[reportPrivateUsage]
+    plan = await ledger_module._plan(probe, stored, spec, qa, steps)  # pyright: ignore[reportPrivateUsage]
+    assert all(passed is True for _name, passed in plan.checks)
+    checks = plan.checks
+    if shape == "renamed":
+        saved_checks = (("renamed", True), *checks[1:])
+    elif shape == "reordered":
+        saved_checks = (checks[1], checks[0], *checks[2:])
+    elif shape == "short":
+        saved_checks = checks[:-1]
+    else:
+        raise AssertionError(shape)
+    saved = FactLedgerRecord(verdict="PASS", checks=saved_checks, facts=plan.facts)
+    link = WorkflowLinkRecord(
+        verdict="PASS",
+        steps=plan.steps,
+        ready=plan.ready,
+        repair_required=plan.repair_required,
+    )
+    holds = ledger_module._saved_holds  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ProductBuildError, match="fact ledger does not match"):
+        await holds(probe, stored, spec, qa, saved, link, steps)
+
+
+@pytest.mark.asyncio
+async def test_row_properties_must_be_a_dict(tmp_path: Path) -> None:
+    """A non-dict properties value is a missing identity, not an AttributeError."""
+    _spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    notice = stored.notification_dashboard
+    assert notice is not None
+    row = probe.pages[notice.row_page_id]
+    row.properties = None  # pyright: ignore[reportAttributeAccessIssue]
+    identity = ledger_module._stable_identity  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ProductBuildError, match="fact ledger identity is missing"):
+        identity(probe, stored)

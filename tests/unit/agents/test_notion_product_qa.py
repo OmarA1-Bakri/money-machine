@@ -222,6 +222,26 @@ async def test_no_access_block_is_blocked_with_no_adapter_writes(tmp_path: Path)
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("content", [None, 5])
+async def test_non_text_block_content_is_a_product_error(tmp_path: Path, content: object) -> None:
+    """None or an int in block content is a typed error, not a TypeError."""
+    spec = planner_spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _variants(spec, probe, path)
+    home = next(iter(probe.pages.values()))
+    block = NotionTextBlock(id="block_bad_content", parent_id=home.id, content="ok")
+    block.content = content  # pyright: ignore[reportAttributeAccessIssue]
+    probe.blocks[block.id] = block
+    raw = path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match="qa block content is not text"):
+        await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
 async def test_extra_database_is_blocked_with_no_adapter_writes(tmp_path: Path) -> None:
     spec = planner_spec()
     probe = FixtureNotionAdapter()

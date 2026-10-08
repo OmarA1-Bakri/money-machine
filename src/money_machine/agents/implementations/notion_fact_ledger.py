@@ -191,14 +191,18 @@ async def run_fact_ledger(
         plan = await _plan(fixture, stored, validated, qa, steps)
     except ProductBuildError:
         raise
-    except (ProviderFailure, ConnectionError, OSError, ValueError, KeyError):
-        # ProviderFailure text and OSError text can carry a secret. Store a fixed
-        # response. RuntimeError is a code bug and is not recorded as a provider failure.
+    except (ProviderFailure, ConnectionError, OSError):
+        # These are provider failures. The stored response is a fixed sentence.
         raise_recorded(
             path,
             BUILD_PHASES[-1],
             ProviderFailure("fact_ledger.read", "provider read failed"),
         )
+    except Exception as error:
+        # A code bug is not a provider job. Its text can carry a secret, including
+        # through the exception chain, so both are replaced before it leaves.
+        error.args = ("fact ledger read failed",)
+        raise ProductBuildError("fact ledger read failed") from None
     _require_stored_qa(qa, plan.live_pass)
     checkpoint = _with_records(stored, qa, plan, moment)
     _write(path, checkpoint, created)
@@ -413,10 +417,10 @@ def _comparison_spec(
 ) -> ProductSpec:
     """Spec the live QA check compares against. Prose is not copied off the page.
 
-    When the caller still names this checkpoint, hub descriptions, buyer, and
-    flagship stay on that spec. A live edit then fails teardown. A caller that
-    does not name the checkpoint is not a fact source: the stored blocks are
-    parsed, and a block id that does not resolve is a refusal.
+    The expected hubs are the caller's hubs when that caller is the spec QA
+    judged: the same hub names, in order, and the same identity. A mismatched
+    caller is refused when the live section prose is not that caller's prose.
+    A post-QA edit is that case. Live blocks are not the expected spec for it.
     """
     _require_hub_count(stored)
     identity = _stable_identity(probe, stored)
@@ -435,6 +439,8 @@ def _comparison_spec(
         buyer = spec.buyer_problem
         feature = spec.flagship_feature
     else:
+        # Name length is judged here. A 64-character name is legal. The named
+        # path uses ``_require_hub_name`` and does not reach this check.
         hubs = tuple(
             Hub(
                 name=hub.name,
@@ -445,6 +451,8 @@ def _comparison_spec(
         )
         buyer = _durable_detail(probe, stored.identity_hubs[0], identity, "buyer")
         feature = _durable_detail(probe, stored.identity_hubs[0], identity, "practice")
+        if not _caller_prose_matches(spec, hubs, buyer, feature):
+            raise ProductBuildError("fact ledger caller does not match")
     return spec.model_copy(
         update={
             "colour_variants": tuple(record.name for record in stored.variants),
@@ -484,10 +492,32 @@ def _refuse_undurable_purpose(block: NotionTextBlock, identity: str, name: str) 
 
 
 def _caller_matches(spec: ProductSpec, stored: ProductBuildCheckpoint, identity: str) -> bool:
-    """True when the caller names the same identity and the same hub names."""
+    """True when the caller is the hub set QA judged.
+
+    The stored checkpoint is that set: every hub name, in order, and the
+    identity on the notification row. A digest is not required. The ordered
+    names are the stored spec. Live pages are not consulted.
+    """
     stored_names = tuple(hub.name for hub in stored.identity_hubs)
     caller_names = tuple(hub.name for hub in spec.hubs)
     return stored_names == caller_names and spec.identity == identity
+
+
+def _caller_prose_matches(
+    spec: ProductSpec, hubs: tuple[Hub, ...], buyer: str, feature: str
+) -> bool:
+    """True when the caller's descriptions are the live section text.
+
+    A post-QA edit makes this false. The mismatched caller is then refused.
+    Matching prose is not a licence to adopt a renamed hub as the expected spec
+    when the text itself changed.
+    """
+    if len(spec.hubs) != len(hubs):
+        return False
+    for caller_hub, parsed in zip(spec.hubs, hubs, strict=True):
+        if caller_hub.description != parsed.description:
+            return False
+    return spec.buyer_problem == buyer and spec.flagship_feature == feature
 
 
 def _tier_from_kinds(kinds: tuple[str, ...]) -> str:
@@ -509,7 +539,10 @@ def _stable_identity(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint
     page = probe.pages.get(notice.row_page_id)
     if type(page) is not NotionPage:
         raise ProductBuildError("fact ledger identity is missing")
-    name = page.properties.get("Name")
+    properties = page.properties
+    if type(properties) is not dict:
+        raise ProductBuildError("fact ledger identity is missing")
+    name = properties.get("Name")
     if type(name) is not str or name == "" or name.strip() != name:
         raise ProductBuildError("fact ledger identity is missing")
     return name
@@ -677,15 +710,26 @@ def _secret_links(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -
 
 
 def _redacted_url(captured: str) -> str:
-    """Persist a URL with its query and fragment removed. A token must not be stored."""
+    """Persist scheme and host only.
+
+    Userinfo, the path, the query, the fragment, and a bare token are not
+    stored. Edge whitespace is a product error. Internal whitespace is missing.
+    """
     if type(captured) is not str or captured == "":
         return "missing"
     if captured.strip() != captured:
         raise ProductBuildError("fact ledger fact is not a durable string")
-    bare = captured.split("?", 1)[0].split("#", 1)[0]
-    if bare == "" or bare.strip() != bare or any(mark in bare for mark in (",", ";", "=")):
+    if any(character.isspace() for character in captured):
         return "missing"
-    return bare
+    scheme, separator, rest = captured.partition("://")
+    if separator == "" or scheme not in {"http", "https"} or rest == "":
+        return "missing"
+    rest = rest.split("?", 1)[0].split("#", 1)[0]
+    authority = rest.split("/", 1)[0]
+    host = authority.rsplit("@", 1)[-1].split(":", 1)[0]
+    if host == "" or host.strip() != host or any(mark in host for mark in (",", ";", "=", "@")):
+        return "missing"
+    return scheme + "://" + host
 
 
 def _safe_label(value: object) -> str | None:
@@ -755,9 +799,12 @@ def _formula_expression(
             if prop.id != property_id or prop.type != "formula":
                 continue
             formula = prop.config.get("formula")
-            if type(formula) is not NotionFormula or formula.expression == "":
+            if type(formula) is not NotionFormula:
                 return None
-            return formula.expression
+            expression = formula.expression
+            if type(expression) is not str or expression == "":
+                return None
+            return expression
         return None
     return None
 

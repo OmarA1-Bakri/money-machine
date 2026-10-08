@@ -217,6 +217,7 @@ def progress_from_checkpoint(checkpoint: CheckpointView) -> dict[str, object]:
         "formula_state": _formulas(checkpoint),
         "repair_jobs": [],
         "recovery": "recoverable",
+        "next_phase": checkpoint.next_phase,
     }
 
 

@@ -270,7 +270,7 @@ async def _plan(
 def _flag_failures(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint
 ) -> tuple[tuple[str, bool], ...]:
-    """Checks that failed, in the order the plan recorded them."""
+    """Publish, duplicate, and indexing, each true or false, in that order."""
     pages = [_variant_page(probe, record) for record in stored.variants]
     published = all(page.is_published is True for page in pages)
     duplicate = all(page.duplicate_as_template is True for page in pages)
@@ -605,12 +605,21 @@ def _fresh_duplicate(
 
 
 def _no_access(probe: FixtureNotionAdapter) -> bool:
-    """True when a no-access block is present."""
-    return all("No access" not in block.content for block in probe.blocks.values())
+    """True when no block contains the no-access marker.
+
+    Non-text content is a product error. It is not a raw TypeError.
+    """
+    for block in probe.blocks.values():
+        content = getattr(block, "content", None)
+        if type(content) is not str:
+            raise ProductBuildError("qa block content is not text")
+        if "No access" in content:
+            return False
+    return True
 
 
 def _cross_catalogue(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -> bool:
-    """True when a database kind belongs to the other tier."""
+    """True when every linked view and relation stays in this checkpoint."""
     known = {database_id for _kind, database_id in stored.database_ids}
     notice = stored.notification_dashboard
     if notice is not None:
@@ -633,7 +642,7 @@ def _cross_catalogue(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint
 def _palette(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> bool:
-    """True when the three palette callouts are on the home page."""
+    """True when each variant has its icon, cover, one accent, and one sample."""
     colours = spec.colour_variants
     tokens = spec.palette_tokens
     if len(stored.variants) != len(colours) or len(colours) != len(tokens):
@@ -696,7 +705,7 @@ def _accounted_facts(
     spec: ProductSpec,
     probe: FixtureNotionAdapter,
 ) -> dict[str, str]:
-    """True when the persisted facts match the live counts."""
+    """Live counts compared with the facts QA persists. This is not a boolean."""
     databases: list[str] = []
     for _kind, database_id in stored.database_ids:
         database = probe.databases.get(database_id)
@@ -727,7 +736,7 @@ def _accounted_facts(
 
 
 def _normalised_secret_link(link: str, page_id: str) -> str:
-    """The link with its query and fragment removed."""
+    """Drop a trailing slash and page id. The query and fragment stay."""
     suffix = "/" + page_id
     if link.endswith(suffix):
         return link[: -len(suffix)]
