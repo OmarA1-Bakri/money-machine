@@ -7,7 +7,6 @@ client was injected.
 from __future__ import annotations
 
 import json
-import os
 import ssl
 import urllib.request
 from collections.abc import Callable, Mapping
@@ -47,9 +46,6 @@ def asserted_body_parent(parent_id: str) -> str:
     return canonical_id(parent_id)
 
 
-_CERT_ENV = ("SSL_CERT_DIR", "SSL_CERT_FILE")
-
-
 class RefuseRedirect(urllib.request.HTTPRedirectHandler):
     """A 3xx must not send the bearer token to another host."""
 
@@ -67,12 +63,21 @@ class RefuseRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def default_tls_context() -> ssl.SSLContext:
-    """The default trust store, even if a cert env var names a missing file."""
-    saved = {name: os.environ.pop(name) for name in _CERT_ENV if name in os.environ}
-    try:
-        return ssl.create_default_context()
-    finally:
-        os.environ.update(saved)
+    """A client context from the compiled-in CA file.
+
+    ``SSL_CERT_FILE``, ``SSL_CERT_DIR``, and ``SSLKEYLOGFILE`` are not read
+    and the process environment is left unchanged.
+    """
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.check_hostname = True
+    context.verify_mode = ssl.CERT_REQUIRED
+    cafile = ssl.get_default_verify_paths().openssl_cafile
+    if type(cafile) is str and cafile != "":
+        try:
+            context.load_verify_locations(cafile=cafile)
+        except OSError:
+            return context
+    return context
 
 
 def sandbox_opener() -> urllib.request.OpenerDirector:
@@ -256,10 +261,11 @@ def parse_page(payload: object, *, fallback_space: str, expected_id: str) -> Pag
     if type(url) is not str or url == "":
         url = f"https://www.notion.so/{page_id.replace('-', '')}"
     archived_flag = _strict_bool(payload, "archived")
+    alias_flag = _strict_bool(payload, "is_archived")
     trash_flag = _strict_bool(payload, "in_trash")
-    if archived_flag is None or trash_flag is None:
+    if archived_flag is None or alias_flag is None or trash_flag is None:
         return None
-    archived = archived_flag or trash_flag
+    archived = archived_flag or alias_flag or trash_flag
     return PageView(
         page_id=page_id,
         parent_id=parent_id,

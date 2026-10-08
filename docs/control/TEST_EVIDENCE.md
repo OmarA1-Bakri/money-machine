@@ -1,5 +1,27 @@
 # Test Evidence
 
+## 2026-10-08 — Session 07 sandbox run, round 4
+
+**Verification scope**: Round 4 of the §11 sandbox runner. Reviewer FAIL at `9cf574c0` and Verifier FAIL at the same SHA are folded into this commit. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `completed_sessions` `[0, 1, 2, 3, 4, 5, 6]`, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. It is not this commit. `state_revision` stays 58. `origin/build/full-automation` was fetched and is still that SHA | PASS |
+| Sandbox CLI | Still not run live. `tests/unit/cli/test_notion_sandbox.py`: 231 passed. Parent `9cf574c0` CI verify run `37718039964`, job `113118993744`, SUCCESS. This commit's CI is not invented here | PASS |
+| Census | One AST walk of the four sandbox modules, in source order. if 159, boolop 63, and 26, or 37, clause 141, ifexp 16, while 3. If-flip is one row per `if` (159). Operand rows are one swap per boolop plus one negation per clause (204). Total mutations 681 | PASS |
+| If-flip | 159 rows, 159 killed, 0 equivalent. Failed column sums to 5924. `__name__ == "__main__"` is row 33, `notion_sandbox.py:762`, KILLED, Failed 1. The second `if leaks(text, token)` is row 68, `notion_sandbox_guard.py:336`, Failed 3. The full table is in `IMPLEMENTATION_LOG.md` | PASS |
+| Force-true | 159 rows, 154 killed, 5 equivalent, Failed sum 5320. The five equivalents are probe-backed in the log | PASS |
+| Force-false | 159 rows, 156 killed, 3 equivalent, Failed sum 813 | PASS |
+| Boolean operands | 204 rows, 200 killed, 4 equivalent, Failed sum 5824 | PASS |
+| Real SIGINT | `test_real_sigint_records_created_ids` keeps the ids created before stops `2` and `5`. `test_real_sigint_during_the_evidence_write_leaves_a_complete_file` leaves a complete file. `test_real_sigint_preserves_a_passing_stage` keeps build `PASS`. Exit 69. Return code is not `-2` | PASS |
+| Minute floor | `test_off_minute_clock_accepts_the_same_minute`: clock `12:00:37Z`, created time `12:00:00Z`, exit 0, five ids | PASS |
+| False equivalents killed | guard `:304` `test_percent_and_base64_tokens_are_not_folded_hex`. guard `:336` `test_marker_token_fails_the_redaction_self_check`. guard `:372` `test_unwritable_parent_mode_is_refused_before_open`. pipeline `:203` both mutations `test_later_create_returning_an_earlier_foreign_id_drops_it`. pipeline `:146` `test_drop_keeps_an_earlier_id_and_ignores_a_missing_one`. guard `:509` force-true `test_repo_root_outside_the_checkout_still_uses_the_repo`. guard `:509` swap `test_partial_marker_between_cwd_and_the_repo_is_not_root` | PASS |
+| Lint and types | `ruff format --check`, `ruff check`, and `pyright` 1.1.411 are clean on the four sandbox modules and the sandbox test | PASS |
+| Full local pytest | 2751 collected, 2546 passed, 193 skipped, 12 failed. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because the `docker` binary is absent. Local-only. One `StarletteDeprecationWarning` comes from FastAPI's test client. The sandbox modules do not import Starlette. CI is the gate | 12 known local docker failures; CI is the gate |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
 ## 2026-10-07 — Session 07 sandbox run, round 3
 
 **Verification scope**: Round 3 of the §11 sandbox runner. Reviewer FAIL at `6dc72f1e` and Verifier FAIL at the same SHA are folded into this commit. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited.

@@ -31,7 +31,7 @@ EXIT_REDACTION = 70
 SANDBOX_SPACE_ID = "89282fb0-af94-8106-809e-0003c027fa07"
 SANDBOX_PARENT_PAGE_ID = "3ed82fb0-af94-80dc-8272-f40b16376b81"
 _TOKEN_ENV = "NOTION_SANDBOX_TOKEN"
-_CERT_ENV = ("SSL_CERT_DIR", "SSL_CERT_FILE")
+_CERT_ENV = ("SSL_CERT_DIR", "SSL_CERT_FILE", "SSLKEYLOGFILE")
 _OVERRIDE_ENV = (
     "NOTION_CONFIG",
     "NOTION_PARENT_PAGE_ID",
@@ -231,10 +231,28 @@ def redact_text(text: str, token: str | None) -> str:
     cleaned = redact_secret_shapes(text)
     if token is not None and token != "" and not _unsafe_exact(token) and token in cleaned:
         cleaned = cleaned.replace(token, "[REDACTED]")
+    if token is not None and token != "" and not _unsafe_exact(token):
+        cleaned = _scrub_hex(cleaned, _folded_hex(token))
     for form in _encoded_forms(token):
         if form in cleaned:
             cleaned = cleaned.replace(form, "[REDACTED]")
     return cleaned
+
+
+def _scrub_hex(text: str, folded: str) -> str:
+    if folded == "":
+        return text
+    pieces: list[str] = []
+    index = 0
+    lowered = text.lower()
+    while True:
+        found = lowered.find(folded, index)
+        if found < 0:
+            pieces.append(text[index:])
+            return "".join(pieces)
+        pieces.append(text[index:found])
+        pieces.append("[REDACTED]")
+        index = found + len(folded)
 
 
 def stage_status(runner_name: str | None, outcome: str | None) -> str:
@@ -278,10 +296,24 @@ def empty_write_counts() -> dict[str, int]:
     return counts
 
 
+def _folded_hex(token: str) -> str:
+    """Lowercase hex of a long hex token, or empty when it is not one."""
+    compact = token.replace("-", "")
+    if len(compact) < 32:
+        return ""
+    if any(character not in "0123456789abcdefABCDEF" for character in compact):
+        return ""
+    return compact.lower()
+
+
 def leaks(text: str, token: str | None) -> bool:
     """True when the text still contains a secret, including encoded copies."""
-    if token is not None and token != "" and not _unsafe_exact(token) and token in text:
-        return True
+    if token is not None and token != "" and not _unsafe_exact(token):
+        if token in text:
+            return True
+        folded = _folded_hex(token)
+        if folded != "" and folded in text.lower().replace("-", ""):
+            return True
     if any(form in text for form in _encoded_forms(token)):
         return True
     return contains_secret_shape(text)
@@ -318,8 +350,8 @@ def under_proc(path: Path) -> bool:
     return absolute == Path("/proc") or Path("/proc") in absolute.parents
 
 
-def open_evidence(path: Path) -> int:
-    """Create the evidence file. Existing files, links, and ``/proc`` are refused."""
+def open_evidence(path: Path) -> None:
+    """Refuse a bad evidence path. The file is created only with finished bytes."""
     if str(path) == "" or path == Path() or under_proc(path):
         _refuse_path()
     try:
@@ -339,21 +371,15 @@ def open_evidence(path: Path) -> int:
         _refuse_path()
     if parent_info.st_mode & 0o200 == 0:
         _refuse_path()
-    try:
-        fd = os.open(
-            path,
-            os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_WRONLY,
-            0o600,
-        )
-    except OSError:
-        _refuse_path()
-    try:
-        os.fchmod(fd, 0o600)
-    except OSError:
-        with contextlib.suppress(OSError):
-            os.close(fd)
-        _refuse_path()
-    return fd
+
+
+_DISK_ERRNO = {errno.EDQUOT, errno.EFBIG, errno.EIO, errno.ENOSPC}
+
+
+def _failure_text(payload: Mapping[str, object], token: str | None, prefix: str) -> str:
+    ids = _created_page_ids(payload)
+    detail = prefix if ids == "" else f"{prefix}: {ids}"
+    return redact_text(detail, token)
 
 
 def _created_page_ids(payload: Mapping[str, object]) -> str:
@@ -379,47 +405,71 @@ def _write_all(fd: int, encoded: bytes) -> None:
         pending = pending[written:]
 
 
-def _same_inode(fd: int, path: Path) -> bool:
+def _destination_appeared(path: Path) -> bool:
     try:
-        opened = os.fstat(fd)
-        current = path.lstat()
+        path.lstat()
+    except FileNotFoundError:
+        return False
     except OSError:
-        return False
-    if stat.S_ISLNK(current.st_mode):
-        return False
-    return opened.st_ino == current.st_ino and opened.st_dev == current.st_dev
+        return True
+    return True
 
 
-def commit_evidence(
-    fd: int,
-    path: Path,
-    payload: Mapping[str, object],
-    token: str | None,
-) -> str:
-    """Write JSON to an evidence fd opened with ``O_EXCL`` and ``O_NOFOLLOW``."""
+def commit_evidence(path: Path, payload: Mapping[str, object], token: str | None) -> str:
+    """Write a complete JSON file via a temporary file and an atomic link.
+
+    The destination is absent until the temporary file holds every byte.
+    An interrupt unlinks the temporary file and leaves the previous destination.
+    """
+    open_evidence(path)
     text, result = render_evidence(payload, token)
+    encoded = text.encode("utf-8")
+    temporary = path.with_name(f".{path.name}.tmp")
+    tmp_fd = -1
     try:
-        _write_all(fd, text.encode("utf-8"))
-        os.fchmod(fd, 0o600)
-        if not _same_inode(fd, path):
-            raise SandboxError("evidence file changed during the run")
+        tmp_fd = os.open(
+            temporary,
+            os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_WRONLY,
+            0o600,
+        )
+        opened = os.fstat(tmp_fd)
+        if stat.S_IMODE(opened.st_mode) != 0o600:
+            raise OSError(errno.EPERM, "mode")
+        _write_all(tmp_fd, encoded)
+        os.fchmod(tmp_fd, 0o600)
+        os.fsync(tmp_fd)
+        os.close(tmp_fd)
+        tmp_fd = -1
+        if _destination_appeared(path):
+            raise SandboxError(
+                _failure_text(payload, token, "evidence file changed during the run")
+            )
+        os.link(temporary, path)
+        current = path.lstat()
+        if stat.S_ISLNK(current.st_mode) or current.st_size != len(encoded):
+            with contextlib.suppress(OSError):
+                os.unlink(path)
+            raise SandboxError(
+                _failure_text(payload, token, "evidence file changed during the run")
+            )
     except SandboxError:
         raise
     except OSError as exc:
-        if exc.errno in {errno.ENOSPC, errno.EIO}:
-            ids = _created_page_ids(payload)
-            detail = "evidence write failed" if ids == "" else f"evidence write failed: {ids}"
-            raise SandboxError(redact_text(detail, token)) from None
+        if exc.errno in _DISK_ERRNO:
+            raise SandboxError(_failure_text(payload, token, "evidence write failed")) from None
         raise SandboxError("evidence path is refused", code=EXIT_USAGE) from None
     finally:
+        if tmp_fd >= 0:
+            with contextlib.suppress(OSError):
+                os.close(tmp_fd)
         with contextlib.suppress(OSError):
-            os.close(fd)
+            os.unlink(temporary)
     return result
 
 
 def write_evidence(path: Path, payload: Mapping[str, object], token: str | None) -> str:
-    """Create the evidence file and write JSON. ``PASS`` means it was clean."""
-    return commit_evidence(open_evidence(path), path, payload, token)
+    """Write JSON once the path is acceptable. ``PASS`` means it was clean."""
+    return commit_evidence(path, payload, token)
 
 
 def evidence_sections(

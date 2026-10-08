@@ -7,11 +7,13 @@ The registry in ``notion_sandbox`` records those slots as ``NOT_RUN``.
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from typing import NoReturn
 from uuid import UUID
 
 from money_machine.agents.implementations.notion_aesthetics import (
@@ -61,6 +63,14 @@ class SandboxRun:
     product_page_id: str | None = None
     bot_user_id: str = ""
     bot_space_id: str = ""
+    rejected_pages: list[dict[str, str]] = field(default_factory=list)
+    flagged_pages: list[dict[str, str]] = field(default_factory=list)
+    possible_orphans: list[dict[str, str]] = field(default_factory=list)
+
+
+# Notion floors created_time to the minute. Two minutes covers a clock that
+# is a second ahead across that boundary. A page from a previous day is still stale.
+_FRESH_SKEW = timedelta(minutes=2)
 
 
 def sandbox_product_spec(moment: datetime) -> ProductSpec:
@@ -129,10 +139,57 @@ def _watch(probe: FixtureNotionAdapter, counts: dict[str, int]) -> None:
         setattr(probe, name, _bind(original, name))
 
 
-def _drop(ctx: SandboxRun, page_id: str) -> None:
+def _drop_tail(ctx: SandboxRun, page_id: str, before: int) -> None:
+    """Remove an id this create just published. An earlier id stays put."""
+    if page_id not in ctx.created_ids:
+        return
+    if ctx.created_ids.index(page_id) < before:
+        return
+    _drop_recorded(ctx, page_id)
+
+
+def _drop_recorded(ctx: SandboxRun, page_id: str) -> None:
+    """Remove one id in place. Callers that bound the list keep that object."""
+    if page_id == "" or page_id not in ctx.created_ids:
+        return
+    ctx.created_ids.remove(page_id)
+    ctx.created[:] = [row for row in ctx.created if row.get("id") != page_id]
+
+
+def _flag(ctx: SandboxRun, page_id: str, reason: str) -> None:
+    if page_id == "":
+        return
+    for row in ctx.flagged_pages:
+        if row.get("id") == page_id and row.get("reason") == reason:
+            return
+    ctx.flagged_pages.append({"id": page_id, "reason": reason})
+
+
+def _remember(ctx: SandboxRun, page: PageView, page_id: str) -> None:
+    if page_id == "" or page_id in ctx.created_ids:
+        return
+    ctx.created_ids.append(page_id)
+    ctx.created.append({"id": page_id, "parent_id": canonical_id(page.parent_id), "url": page.url})
+
+
+def _reject_unfresh(ctx: SandboxRun, page: PageView) -> NoReturn:
+    """A stale or other-user page is not ours. Cleanup must not delete it."""
+    page_id = canonical_id(page.page_id)
     if page_id in ctx.created_ids:
         ctx.created_ids.remove(page_id)
-    ctx.created = [row for row in ctx.created if row.get("id") != page_id]
+    ctx.created[:] = [row for row in ctx.created if row.get("id") != page_id]
+    if page_id != "" and all(row.get("id") != page_id for row in ctx.rejected_pages):
+        ctx.rejected_pages.append({"id": page_id, "reason": "not_new"})
+    raise SandboxError("created page is not new")
+
+
+def _request_fingerprint(parent_id: str, title: str) -> str:
+    return hashlib.sha256(f"{parent_id}\n{title}".encode()).hexdigest()
+
+
+def _earliest(moment: datetime) -> datetime:
+    floored = moment.astimezone(UTC).replace(second=0, microsecond=0)
+    return floored - _FRESH_SKEW
 
 
 def _align(ctx: SandboxRun, page: PageView, before: int) -> str:
@@ -142,28 +199,29 @@ def _align(ctx: SandboxRun, page: PageView, before: int) -> str:
         tail = ctx.created_ids[-1]
         if tail == page_id:
             break
-        _drop(ctx, tail)
+        _drop_tail(ctx, tail, before)
     if page_id == "" or space_conflicts(page.space_id):
-        _drop(ctx, page_id)
+        if page_id in ctx.created_ids[:before]:
+            _drop_recorded(ctx, page_id)
+            return page_id
+        if space_conflicts(page.space_id) and page_id != "":
+            _remember(ctx, page, page_id)
+            _flag(ctx, page_id, "space_conflict")
         return page_id
-    if page_id not in ctx.created_ids:
-        ctx.created_ids.append(page_id)
-        ctx.created.append(
-            {"id": page_id, "parent_id": canonical_id(page.parent_id), "url": page.url}
-        )
+    _remember(ctx, page, page_id)
     return page_id
 
 
 def _fresh(ctx: SandboxRun, page: PageView) -> None:
     if page.created_by != ctx.bot_user_id:
-        raise SandboxError("created page is not new")
+        _reject_unfresh(ctx, page)
     moment = page.created_time
     if moment is None:
-        raise SandboxError("created page is not new")
+        _reject_unfresh(ctx, page)
     if moment.tzinfo is None:
-        raise SandboxError("created page is not new")
-    if moment < ctx.moment:
-        raise SandboxError("created page is not new")
+        _reject_unfresh(ctx, page)
+    if moment < _earliest(ctx.moment):
+        _reject_unfresh(ctx, page)
 
 
 def chain_reaches_sandbox(ctx: SandboxRun, page: PageView) -> None:
@@ -174,7 +232,7 @@ def chain_reaches_sandbox(ctx: SandboxRun, page: PageView) -> None:
         page_id = canonical_id(current.page_id)
         if page_id == SANDBOX_PARENT_PAGE_ID:
             if space_conflicts(current.space_id) or current.archived:
-                _drop(ctx, created_id)
+                _flag(ctx, created_id, "chain")
                 raise SandboxError("created page is not under the requested parent")
             return
         parent_id = canonical_id(current.parent_id)
@@ -182,8 +240,11 @@ def chain_reaches_sandbox(ctx: SandboxRun, page: PageView) -> None:
             raise SandboxError("created page is not under the requested parent")
         seen.add(page_id)
         current = ctx.client.read_page(parent_id)
+        if canonical_id(current.page_id) != parent_id:
+            _flag(ctx, created_id, "chain_id")
+            raise SandboxError("created page is not under the requested parent")
         if space_conflicts(current.space_id) or current.archived:
-            _drop(ctx, created_id)
+            _flag(ctx, created_id, "chain")
             raise SandboxError("created page is not under the requested parent")
     raise SandboxError("created page is not under the requested parent")
 
@@ -196,16 +257,28 @@ def create_under(ctx: SandboxRun, parent_id: str, title: str) -> PageView:
     if canonical_id(ctx.bot_space_id) != SANDBOX_SPACE_ID:
         raise SandboxError("created page is not under the requested parent")
     before = len(ctx.created_ids)
-    page = ctx.client.create_child_page(parent_id, title)
+    marker = {
+        "fingerprint": _request_fingerprint(requested, title),
+        "parent_id": requested,
+    }
+    ctx.possible_orphans.append(marker)
+    try:
+        page = ctx.client.create_child_page(parent_id, title)
+    except BaseException:
+        raise
+    ctx.possible_orphans.remove(marker)
     ctx.write_counts["create_child_page"] = ctx.write_counts.get("create_child_page", 0) + 1
     page_id = _align(ctx, page, before)
     if page_id in {"", SANDBOX_PARENT_PAGE_ID, requested}:
-        _drop(ctx, page_id)
+        if page_id not in {"", SANDBOX_PARENT_PAGE_ID}:
+            _flag(ctx, page_id, "not_new")
+        else:
+            _drop_recorded(ctx, page_id)
         raise SandboxError("created page is not new")
     if page_id in ctx.created_ids[:before]:
         raise SandboxError("created page is not new")
     if space_conflicts(page.space_id):
-        _drop(ctx, page_id)
+        _flag(ctx, page_id, "space_conflict")
         raise SandboxError("created page is not under the requested parent")
     if canonical_id(page.parent_id) != requested:
         raise SandboxError("created page is not under the requested parent")
@@ -216,7 +289,8 @@ def create_under(ctx: SandboxRun, parent_id: str, title: str) -> PageView:
     if canonical_id(confirmed.parent_id) != requested:
         raise SandboxError("created page is not under the requested parent")
     if space_conflicts(confirmed.space_id) or confirmed.archived:
-        _drop(ctx, page_id)
+        reason = "archived" if confirmed.archived else "space_conflict"
+        _flag(ctx, page_id, reason)
         raise SandboxError("created page is not under the requested parent")
     _fresh(ctx, confirmed)
     chain_reaches_sandbox(ctx, confirmed)

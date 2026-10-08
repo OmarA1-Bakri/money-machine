@@ -6,10 +6,11 @@ ids, and the evidence file are resolved before any network read or write.
 
 Exit codes: 0 ok, 64 usage, a bad token, an evidence-path refusal, a set
 ``NOTION_CONFIG`` / ``NOTION_SANDBOX_CONFIG`` / ``NOTION_TOKEN_FILE``, or a set
-``SSL_CERT_FILE`` / ``SSL_CERT_DIR``, 65 target mismatch, 66 missing token, 69
-git, control, read, stage, clock, an interrupted run, a full disk, a swapped
-evidence file, or unprintable stdout, 70 redaction self-check failure. Exit
-78 is not used, and this module does not change that hold.
+``SSL_CERT_FILE`` / ``SSL_CERT_DIR`` / ``SSLKEYLOGFILE``, 65 target mismatch,
+66 missing token, 69 git, control, read, stage, clock, an interrupted run
+including SIGINT, a full disk (ENOSPC, EIO, EDQUOT, EFBIG), a swapped evidence
+file, or unprintable stdout, 70 redaction self-check failure. Exit 78 is not
+used, and this module does not change that hold.
 
 ``get_public_url`` reads are excluded from ``write_counts``. The top-level
 ``write_counts`` object splits fixture pipeline methods from the live
@@ -21,8 +22,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
 import os
+import signal
+import stat
 import sys
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
@@ -119,6 +123,30 @@ def blocked_stages() -> list[dict[str, object]]:
     return rows
 
 
+def _signal_stages() -> list[dict[str, object]]:
+    """SIGINT after the stages return. Created ids stay on the run."""
+    rows: list[dict[str, object]] = []
+    for name, runner_name in STAGE_REGISTRY:
+        available = runner_name is not None
+        status = "INTERRUPTED" if available else "NOT_RUN"
+        rows.append(_stage_row(name, available, status, planned=False))
+    return rows
+
+
+def _read_interrupted() -> list[dict[str, object]]:
+    """A signal during the target reads. No page was created."""
+    rows: list[dict[str, object]] = []
+    marked = False
+    for name, runner_name in STAGE_REGISTRY:
+        available = runner_name is not None
+        if available and not marked:
+            rows.append(_stage_row(name, True, "INTERRUPTED", planned=False))
+            marked = True
+            continue
+        rows.append(_stage_row(name, available, "NOT_RUN", planned=False))
+    return rows
+
+
 def _remaining(start: int) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for name, runner_name in STAGE_REGISTRY[start:]:
@@ -181,6 +209,18 @@ def _evidence_argument(argv: Sequence[str]) -> Path | None:
     return None
 
 
+def _with_ids(prefix: str, created: list[dict[str, str]]) -> str:
+    ids = [row["id"] for row in created if type(row.get("id")) is str and row["id"] != ""]
+    if not ids:
+        return prefix
+    return prefix + ": " + ", ".join(ids)
+
+
+def _sink_stdout() -> None:
+    """Drop a broken stdout so process exit stays the sandbox code."""
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
+
+
 def _fail(message: str, code: int) -> int:
     cleaned = redact_text(message, None)
     LOGGER.info("%s", cleaned)
@@ -215,6 +255,9 @@ def _payload(
     bot_user_id: str | None,
     git: str,
     control: Mapping[str, object],
+    rejected: list[dict[str, str]] | None = None,
+    flagged: list[dict[str, str]] | None = None,
+    orphans: list[dict[str, str]] | None = None,
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "asserted_parent_page_id": SANDBOX_PARENT_PAGE_ID,
@@ -222,9 +265,12 @@ def _payload(
         "bot_user_id": bot_user_id,
         "created_pages": created,
         "ended_at": stamp(ended),
+        "flagged_pages": [] if flagged is None else flagged,
         "git_sha": git,
         "mode": mode,
+        "possible_orphans": [] if orphans is None else orphans,
         "qa_verdict": qa_verdict(stages),
+        "rejected_pages": [] if rejected is None else rejected,
         "stages": stages,
         "started_at": stamp(started),
         "write_counts": _split_counts(counts),
@@ -241,23 +287,140 @@ def _split_counts(counts: Mapping[str, int]) -> dict[str, object]:
     return {"fixture": fixture["write_counts"], "live": live["write_counts"]}
 
 
-def _emit(fd: int, path: Path, payload: Mapping[str, object], token: str | None) -> str:
-    result = commit_evidence(fd, path, payload, token)
+def _emit(path: Path, payload: Mapping[str, object], token: str | None) -> str:
+    result = commit_evidence(path, payload, token)
     try:
         print(path.resolve())
     except (OSError, UnicodeError):
+        _sink_stdout()
         raise SandboxError("stdout is unavailable") from None
     return result
 
 
-def _preflight(path: Path, root: Path) -> tuple[str, dict[str, object], int]:
-    """Git, control ids, and the evidence fd. No network."""
-    return git_sha(root), control_ids(root), open_evidence(path)
+def _preflight(path: Path, root: Path) -> tuple[str, dict[str, object]]:
+    """Git, control ids, and a refused-or-acceptable evidence path. No network."""
+    git = git_sha(root)
+    control = control_ids(root)
+    open_evidence(path)
+    return git, control
 
 
 def _read_target(client: SandboxClient) -> tuple[BotView, PageView]:
     bot = client.read_bot()
     return bot, client.read_page(SANDBOX_PARENT_PAGE_ID)
+
+
+class _Held:
+    """Ids captured before an interrupt so main can still write evidence."""
+
+    def __init__(self) -> None:
+        self.path: Path | None = None
+        self.token: str | None = None
+        self.started: datetime | None = None
+        self.clock: Callable[[], datetime] | None = None
+        self.mode: str = "dry-run"
+        self.stages: list[dict[str, object]] = []
+        self.created: list[dict[str, str]] = []
+        self.counts: dict[str, int] = {}
+        self.bot_user_id: str | None = None
+        self.git: str = ""
+        self.control: dict[str, object] = {}
+        self.rejected: list[dict[str, str]] = []
+        self.flagged: list[dict[str, str]] = []
+        self.orphans: list[dict[str, str]] = []
+        self.ready: bool = False
+
+
+_HELD = _Held()
+
+
+def _raise_interrupt(_signum: int, _frame: object) -> None:
+    raise KeyboardInterrupt
+
+
+def _arm_interrupt() -> None:
+    """Keep SIGINT as a catchable interrupt for the whole process."""
+    try:
+        current = signal.getsignal(signal.SIGINT)
+    except ValueError:
+        return
+    if current not in (signal.SIG_DFL, signal.default_int_handler):
+        return
+    signal.signal(signal.SIGINT, _raise_interrupt)
+
+
+def _evidence_is_complete(path: Path) -> bool:
+    try:
+        info = path.lstat()
+    except OSError:
+        return False
+    if stat.S_ISLNK(info.st_mode) or info.st_size <= 0:
+        return False
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return False
+    return type(parsed) is dict
+
+
+def _remember_held(
+    path: Path,
+    token: str | None,
+    started: datetime,
+    clock: Callable[[], datetime] | None,
+    mode: str,
+    git: str,
+    control: Mapping[str, object],
+    counts: dict[str, int],
+) -> None:
+    held = _HELD
+    held.path = path
+    held.token = token
+    held.started = started
+    held.clock = clock
+    held.mode = mode
+    held.git = git
+    held.control = dict(control)
+    held.counts = counts
+    held.ready = True
+
+
+def _publish_held() -> int:
+    """Write INTERRUPTED evidence, or leave a complete file that is already there."""
+    held = _HELD
+    log = _with_ids("sandbox interrupted", held.created)
+    path = held.path
+    if path is None or held.started is None or not held.ready:
+        return _fail(log, EXIT_API)
+    if _evidence_is_complete(path):
+        return _fail(log, EXIT_API)
+    stages = held.stages
+    if not any(stage.get("status") == "INTERRUPTED" for stage in stages):
+        stages = _signal_stages()
+    try:
+        return _finish(
+            path,
+            held.token,
+            held.started,
+            held.clock,
+            mode=held.mode,
+            stages=stages,
+            created=held.created,
+            counts=held.counts if held.counts else empty_write_counts(),
+            bot_user_id=held.bot_user_id,
+            git=held.git,
+            control=held.control,
+            error=None,
+            code=EXIT_API,
+            log=log,
+            rejected=held.rejected,
+            flagged=held.flagged,
+            orphans=held.orphans,
+        )
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        if _evidence_is_complete(path):
+            return _fail(log, EXIT_API)
+        raise
 
 
 def main(
@@ -269,12 +432,15 @@ def main(
     clock: Callable[[], datetime] | None = None,
 ) -> int:
     """Run the sandbox checks. Writes only when ``--execute`` is present."""
+    _arm_interrupt()
     try:
         return _main(argv, client=client, environ=environ, spec=spec, clock=clock)
     except SandboxError as exc:
         return _fail(str(exc), exc.code)
     except OSError:
         return _fail("evidence path is refused", EXIT_USAGE)
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        return _publish_held()
 
 
 def _main(
@@ -301,15 +467,16 @@ def _main(
     evidence = Path(parsed.evidence_out)
     if str(evidence) == "" or leaks(str(evidence), secret):
         return _fail("usage error", EXIT_USAGE)
-    git, control, fd = _preflight(evidence, root)
+    git, control = _preflight(evidence, root)
+    _remember_held(evidence, secret, started, clock, "dry-run", git, control, empty_write_counts())
     if parsed.execute and parsed.dry_run:
         return _refuse_open(
-            fd, evidence, secret, started, clock, git, control, "usage error", EXIT_USAGE
+            evidence, secret, started, clock, git, control, "usage error", EXIT_USAGE
         )
     mode = "execute" if parsed.execute else "dry-run"
+    _HELD.mode = mode
     if token is None:
         return _refuse_open(
-            fd,
             evidence,
             None,
             started,
@@ -321,7 +488,6 @@ def _main(
         )
     if secret is None:
         return _refuse_open(
-            fd,
             evidence,
             None,
             started,
@@ -334,12 +500,12 @@ def _main(
     active = client if client is not None else LiveSandboxClient(token)
     counts = empty_write_counts()
     active.write_counts = counts
+    _HELD.counts = counts
     try:
         bot, page = _read_target(active)
     except Exception as exc:
         LOGGER.info("%s", redact_text(str(exc), secret))
         return _finish(
-            fd,
             evidence,
             secret,
             started,
@@ -357,25 +523,23 @@ def _main(
         )
     except BaseException:
         return _finish(
-            fd,
             evidence,
             secret,
             started,
             clock,
             mode=mode,
-            stages=planned_stages(),
+            stages=_read_interrupted(),
             created=[],
             counts=counts,
             bot_user_id=None,
             git=git,
             control=control,
-            error="notion api error",
+            error="interrupted",
             code=EXIT_API,
-            log="notion api error",
+            log="interrupted",
         )
     if type(bot.user_type) is not str:
         return _finish(
-            fd,
             evidence,
             secret,
             started,
@@ -393,7 +557,6 @@ def _main(
         )
     if not target_ok(bot, page):
         return _finish(
-            fd,
             evidence,
             secret,
             started,
@@ -411,7 +574,6 @@ def _main(
         )
     if mode == "dry-run":
         return _finish(
-            fd,
             evidence,
             secret,
             started,
@@ -439,14 +601,27 @@ def _main(
             bot_space_id=canonical_id(bot.space_id),
         )
         _bind_record(active, ctx)
-        stages = asyncio.run(_run_stages(ctx, secret))
+        try:
+            stages = asyncio.run(_run_stages(ctx, secret))
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            stages = _signal_stages()
         created = list(ctx.created)
+        rejected = list(ctx.rejected_pages)
+        flagged = list(ctx.flagged_pages)
+        orphans = list(ctx.possible_orphans)
+        _HELD.created = created
+        _HELD.rejected = rejected
+        _HELD.flagged = flagged
+        _HELD.orphans = orphans
+        _HELD.stages = stages
+        _HELD.bot_user_id = _user_id(bot)
+        _HELD.counts = counts
     interrupted = any(stage["status"] == "INTERRUPTED" for stage in stages)
     failed = any(stage["status"] == "FAILED" for stage in stages)
     if interrupted:
-        error: str | None = None
+        error = None
         code = EXIT_API
-        log = "sandbox interrupted"
+        log = _with_ids("sandbox interrupted", created)
     elif failed:
         error = "sandbox stage failed"
         code = EXIT_API
@@ -455,23 +630,28 @@ def _main(
         error = None
         code = EXIT_OK
         log = "sandbox execute ok"
-    return _finish(
-        fd,
-        evidence,
-        secret,
-        started,
-        clock,
-        mode=mode,
-        stages=stages,
-        created=created,
-        counts=counts,
-        bot_user_id=_user_id(bot),
-        git=git,
-        control=control,
-        error=error,
-        code=code,
-        log=log,
-    )
+    try:
+        return _finish(
+            evidence,
+            secret,
+            started,
+            clock,
+            mode=mode,
+            stages=stages,
+            created=created,
+            counts=counts,
+            bot_user_id=_user_id(bot),
+            git=git,
+            control=control,
+            error=error,
+            code=code,
+            log=log,
+            rejected=rejected,
+            flagged=flagged,
+            orphans=orphans,
+        )
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        return _publish_held()
 
 
 def _bind_record(client: SandboxClient, ctx: SandboxRun) -> None:
@@ -488,7 +668,6 @@ def _user_id(bot: BotView) -> str | None:
 
 
 def _finish(
-    fd: int,
     path: Path,
     token: str | None,
     started: datetime,
@@ -504,6 +683,9 @@ def _finish(
     error: str | None,
     code: int,
     log: str,
+    rejected: list[dict[str, str]] | None = None,
+    flagged: list[dict[str, str]] | None = None,
+    orphans: list[dict[str, str]] | None = None,
 ) -> int:
     ended = _now(clock, token)
     payload = _payload(
@@ -516,12 +698,15 @@ def _finish(
         bot_user_id=bot_user_id,
         git=git,
         control=control,
+        rejected=rejected,
+        flagged=flagged,
+        orphans=orphans,
     )
     if error is not None:
         payload["error"] = error
     if any(stage.get("status") == "INTERRUPTED" for stage in stages):
         payload["run_status"] = "INTERRUPTED"
-    check = _emit(fd, path, payload, token)
+    check = _emit(path, payload, token)
     if check == "FAIL":
         return _fail("redaction self-check failed", EXIT_REDACTION)
     if code == EXIT_OK:
@@ -531,7 +716,6 @@ def _finish(
 
 
 def _refuse_open(
-    fd: int,
     path: Path,
     token: str | None,
     started: datetime,
@@ -542,7 +726,6 @@ def _refuse_open(
     code: int,
 ) -> int:
     return _finish(
-        fd,
         path,
         token,
         started,
@@ -570,26 +753,10 @@ def _refuse(
     clock: Callable[[], datetime] | None,
 ) -> int:
     if path is not None and str(path) != "" and not leaks(str(path), token):
-        git, control, fd = _preflight(path, root)
-        return _refuse_open(fd, path, token, started, clock, git, control, message, code)
+        git, control = _preflight(path, root)
+        _remember_held(path, token, started, clock, "dry-run", git, control, empty_write_counts())
+        return _refuse_open(path, token, started, clock, git, control, message, code)
     return _fail(message, code)
-
-
-def reraise(exc: BaseException) -> NoReturn:
-    if isinstance(exc, SystemExit):
-        status = exc.code if type(exc.code) is int and exc.code != 0 else 1
-        blank: BaseException = SystemExit(status)
-    elif isinstance(exc, KeyboardInterrupt):
-        blank = KeyboardInterrupt()
-    else:
-        blank = BaseException()
-    try:
-        raise blank from None
-    except BaseException as surfaced:
-        surfaced.__context__ = None
-        surfaced.__cause__ = None
-        surfaced.__suppress_context__ = True
-        raise
 
 
 if __name__ == "__main__":

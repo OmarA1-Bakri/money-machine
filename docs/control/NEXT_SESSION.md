@@ -32,6 +32,12 @@
 
 Router browser and combined config modes still raise `NotImplementedError` (W4a). Fixture mode stays the default.
 
+## Session 07 — sandbox run, round 4
+
+**Status**: Incomplete (2026-10-08, state revision 58). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD. The §11 sandbox CLI is still not run live. `origin/build/full-automation` is still `a4e9b025`. Whichever PR merges second re-syncs STATE.
+
+Round 4 folds the Reviewer FAIL and the Verifier FAIL at `9cf574c0` into one commit. A real SIGINT writes `INTERRUPTED` evidence that keeps every created id and exits 69. A created time on the same floored minute exits 0. Census is one AST walk: if 159, boolop 63, and 26, or 37, clause 141, ifexp 16, while 3. If-flip: 159 killed, 0 equivalent, Failed sum 5924. Force-true: 154 killed, 5 equivalent, Failed sum 5320. Force-false: 156 killed, 3 equivalent, Failed sum 813. Boolean operands: 200 killed, 4 equivalent, Failed sum 5824. The tables and the probes are in `IMPLEMENTATION_LOG.md`. Sandbox tests: 231 passed. Full local pytest: 2751 collected, 2546 passed, 193 skipped, 12 failed (docker absent). This commit's CI is not invented here.
+
 ## Session 07 — sandbox run, round 3
 
 **Status**: Incomplete (2026-10-07, state revision 58). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD. The §11 sandbox CLI is still not run live. W10 is in flight from `a4e9b025` and will also bump STATE, so whichever PR merges second re-syncs.
