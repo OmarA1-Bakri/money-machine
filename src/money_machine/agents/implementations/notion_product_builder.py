@@ -129,6 +129,7 @@ class QaRecord:
     repairs: tuple[str, ...]
     proof_page_id: str
     facts: tuple[tuple[str, str], ...]
+    prose_digest: str
 
 
 @dataclass(frozen=True, slots=True)

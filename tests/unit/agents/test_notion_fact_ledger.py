@@ -6,6 +6,7 @@ import json
 import os
 import socket
 import subprocess
+import sys
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -17,6 +18,7 @@ import pytest
 
 from money_machine.agents.implementations import notion_fact_ledger as ledger_module
 from money_machine.agents.implementations import notion_progress as progress_module
+from money_machine.agents.implementations import notion_qa as qa_module
 from money_machine.agents.implementations.notion_fact_ledger import (
     PHASE_TEST_MATRIX,
     run_fact_ledger,
@@ -2549,6 +2551,56 @@ async def test_code_errors_are_redacted_and_not_provider_jobs(
     context = caught.value.__context__
     if context is not None:
         assert "sk-live-secret" not in str(context)
+        assert context.__cause__ is None or "sk-live-secret" not in str(context.__cause__)
+    assert path.read_bytes() == raw
+    assert _jobs(path) == []
+
+
+@pytest.mark.asyncio
+async def test_provider_product_error_does_not_carry_a_secret(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A provider ProductBuildError is redacted. It is not re-raised raw."""
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+
+    async def _boom(*_args: object, **_kwargs: object) -> bool:
+        raise ProductBuildError("sk-live-secret")
+
+    monkeypatch.setattr(ledger_module, "live_qa_passed", _boom)
+    with pytest.raises(ProductBuildError, match="fact ledger read failed") as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert "sk-live-secret" not in str(caught.value)
+    assert caught.value.__cause__ is None
+    assert path.read_bytes() == raw
+    assert _jobs(path) == []
+
+
+@pytest.mark.asyncio
+async def test_chained_secret_is_not_left_on_the_context(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A secret in __cause__ does not survive on the error that leaves."""
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+
+    async def _boom(*_args: object, **_kwargs: object) -> bool:
+        try:
+            raise RuntimeError("sk-live-secret")
+        except RuntimeError as inner:
+            raise RuntimeError("outer") from inner
+
+    monkeypatch.setattr(ledger_module, "live_qa_passed", _boom)
+    with pytest.raises(ProductBuildError, match="fact ledger read failed") as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+
+    assert "sk-live-secret" not in str(caught.value)
+    assert caught.value.__cause__ is None
+    context = caught.value.__context__
+    assert context is None or context.__cause__ is None
+    if context is not None and context.__cause__ is not None:
+        assert "sk-live-secret" not in str(context.__cause__)
     assert path.read_bytes() == raw
     assert _jobs(path) == []
 
@@ -2688,7 +2740,7 @@ async def test_temp_names_are_matched_literally(
     other.write_text("other\n", encoding="ascii")
     dead = tmp_path / ".b[x].json.999.tmp"
     dead.write_text("dead\n", encoding="ascii")
-    process = subprocess.Popen(["sleep", "30"])
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
     live = tmp_path / f".b[x].json.{process.pid}.tmp"
     live.write_text("live\n", encoding="ascii")
 
@@ -3342,6 +3394,7 @@ async def test_verifier_shapes_are_refused(tmp_path: Path, mode: str, message: s
 
 @pytest.mark.asyncio
 async def test_legal_bounds_pass_and_one_past_refuses(tmp_path: Path) -> None:
+    """64, 500, and 8 pass. The test itself then runs 65 and 9, which refuse."""
     long_name = "N" * 64
     long_copy = "D" * 500
     base = planner_spec()
@@ -3423,10 +3476,10 @@ async def test_legal_bounds_pass_and_one_past_refuses(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_unnamed_sixty_four_character_hub_name_passes(tmp_path: Path) -> None:
-    """A mismatched caller with a 64-character hub name passes. ``>=`` refuses it.
+    """A mismatched caller with a 64-character hub name passes.
 
-    The named path uses ``_require_hub_name`` and does not execute the detail
-    length check. This caller changes only the identity, so the detail check runs.
+    ``_require_hub_name`` allows 64 and refuses 65, on the named path and on
+    this one. The detail check repeats that name rule and is not what refuses 65.
     """
     long_name = "H" * 64
     base = planner_spec()
@@ -3456,6 +3509,25 @@ async def test_unnamed_sixty_four_character_hub_name_passes(tmp_path: Path) -> N
     assert _fact(checkpoint, "hubs").split(",")[0] == long_name
 
 
+@pytest.mark.asyncio
+async def test_long_buyer_passes_on_named_and_unnamed_paths(tmp_path: Path) -> None:
+    """501 to 1000 characters are legal for the buyer on both paths."""
+    buyer = "B" * 600
+    spec = planner_spec().model_copy(update={"buyer_problem": buyer})
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _variants(spec, probe, path)
+    await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    stored, _created = load_variant_checkpoint(path)
+    detail = ledger_module._durable_detail  # pyright: ignore[reportPrivateUsage]
+    assert detail(probe, stored.identity_hubs[0], spec.identity, "buyer") == buyer
+    named = await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    assert named.fact_ledger is not None and named.fact_ledger.verdict == "PASS"
+    caller = spec.model_copy(update={"identity": "Not The Row"})
+    unnamed = await run_fact_ledger(caller, probe, path, recorded_at=LATER)
+    assert unnamed.fact_ledger is not None and unnamed.fact_ledger.verdict == "PASS"
+
+
 def test_empty_pair_list_is_incomplete() -> None:
     """An empty fact or check list is incomplete. It is not an empty tuple."""
     require_pairs = ledger_module._require_pairs  # pyright: ignore[reportPrivateUsage]
@@ -3472,6 +3544,7 @@ def test_pass_with_a_false_check_is_not_stored() -> None:
         repairs=(),
         proof_page_id="proof",
         facts=(("page_count", "15"),),
+        prose_digest="0" * 64,
     )
     with pytest.raises(ProductBuildError, match="qa record does not match"):
         require_stored(record, False)
@@ -3779,3 +3852,279 @@ async def test_row_properties_must_be_a_dict(tmp_path: Path) -> None:
     identity = ledger_module._stable_identity  # pyright: ignore[reportPrivateUsage]
     with pytest.raises(ProductBuildError, match="fact ledger identity is missing"):
         identity(probe, stored)
+
+
+class _SemiName(str):
+    """A str subclass whose containment check reports a semicolon."""
+
+    def __contains__(self, item: object) -> bool:
+        return item == ";"
+
+
+class _PlainName(str):
+    """A str subclass that does not report a semicolon."""
+
+    def __contains__(self, item: object) -> bool:
+        return False
+
+
+def _rename_current_date(stored: ProductBuildCheckpoint, name: str) -> ProductBuildCheckpoint:
+    notice = stored.notification_dashboard
+    assert notice is not None
+    formulas = tuple(
+        (kind, _SemiName(name) if formula_name == "current_date" else formula_name, property_id)
+        for kind, formula_name, property_id in notice.formulas
+    )
+    return replace(stored, notification_dashboard=replace(notice, formulas=formulas))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("colour", ["", " red", "red "])
+async def test_plan_refuses_an_undurable_colour_name(tmp_path: Path, colour: str) -> None:
+    """Each name is checked. A joined 'red ,Green' or ',Green' is not durable."""
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    qa = load_qa_record(path)
+    assert qa is not None
+    variants = (replace(stored.variants[0], name=colour), *stored.variants[1:])
+    stored = replace(stored, variants=variants)
+    steps = ledger_module._walk_chain()  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ProductBuildError, match="fact ledger fact is not a durable string"):
+        await ledger_module._plan(probe, stored, spec, qa, steps)  # pyright: ignore[reportPrivateUsage]
+
+
+class _ColourName(str):
+    """A colour whose text is a real name. Only the type is wrong."""
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("colour", [_ColourName("Red"), 5, None])
+async def test_plan_refuses_a_non_string_colour_name(tmp_path: Path, colour: object) -> None:
+    """A subclass, an int, and None are product refusals, not AttributeError.
+
+    ``_colour_names`` checks the type before ``strip``. The joined fact is later.
+    """
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    qa = load_qa_record(path)
+    assert qa is not None
+    variants = (replace(stored.variants[0], name=cast(str, colour)), *stored.variants[1:])
+    stored = replace(stored, variants=variants)
+    steps = ledger_module._walk_chain()  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ProductBuildError, match="fact ledger fact is not a durable string"):
+        await ledger_module._plan(probe, stored, spec, qa, steps)  # pyright: ignore[reportPrivateUsage]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("colour", ["", " red", "red "])
+async def test_public_variant_name_is_refused_before_the_plan(tmp_path: Path, colour: str) -> None:
+    """The checkpoint loader refuses these names. It does not call _plan."""
+    spec, probe, path = await _qa(tmp_path)
+
+    def _rename(document: dict[str, object]) -> None:
+        references = document["provider_object_references"]
+        assert type(references) is dict
+        variants = references["variants"]
+        assert type(variants) is list
+        row = variants[0]
+        assert type(row) is dict
+        row["name"] = colour
+
+    restamp_checkpoint(path, _rename)
+    raw = path.read_bytes()
+    with pytest.raises(ProductBuildError, match="checkpoint variant must be a non-empty string"):
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("colour", [5, None])
+async def test_public_non_string_variant_name_is_refused(tmp_path: Path, colour: object) -> None:
+    """JSON can carry an int or null. A str subclass cannot survive the reload."""
+    spec, probe, path = await _qa(tmp_path)
+
+    def _rename(document: dict[str, object]) -> None:
+        references = document["provider_object_references"]
+        assert type(references) is dict
+        variants = references["variants"]
+        assert type(variants) is list
+        row = variants[0]
+        assert type(row) is dict
+        row["name"] = colour
+
+    restamp_checkpoint(path, _rename)
+    raw = path.read_bytes()
+    with pytest.raises(ProductBuildError, match="checkpoint variant must be a non-empty string"):
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_empty_variants_are_a_product_error(tmp_path: Path) -> None:
+    """variants=() is a product refusal. It is not an IndexError inside QA."""
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    qa = load_qa_record(path)
+    assert qa is not None
+    emptied = replace(stored, variants=())
+    steps = ledger_module._walk_chain()  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ProductBuildError, match="fact ledger fact is not a durable string"):
+        await ledger_module._plan(probe, emptied, spec, qa, steps)  # pyright: ignore[reportPrivateUsage]
+
+
+@pytest.mark.asyncio
+async def test_seminame_formula_is_missing(tmp_path: Path) -> None:
+    """SemiName('current_date') contains ';'. The expression is the real str now().
+
+    A reload from disk is a real str, so this kill stays on the helper. The public
+    expression path is test_lying_formula_expression_is_blocked.
+    """
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    mutated = _rename_current_date(stored, "current_date")
+    read_dashboard = ledger_module._dashboard_outputs  # pyright: ignore[reportPrivateUsage]
+    agreed, fact = read_dashboard(probe, mutated, spec)
+    assert agreed is False
+    assert fact == "missing"
+    assert "current_date=now()" not in fact
+
+
+@pytest.mark.asyncio
+async def test_plain_subclass_formula_name_is_refused(tmp_path: Path) -> None:
+    """A non-str name without ';' is refused. A JSON reload is a real str."""
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    notice = stored.notification_dashboard
+    assert notice is not None
+    formulas = tuple(
+        (
+            kind,
+            _PlainName(formula_name) if formula_name == "current_date" else formula_name,
+            property_id,
+        )
+        for kind, formula_name, property_id in notice.formulas
+    )
+    mutated = replace(stored, notification_dashboard=replace(notice, formulas=formulas))
+    read_dashboard = ledger_module._dashboard_outputs  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ProductBuildError, match="fact ledger fact is not a durable string"):
+        read_dashboard(probe, mutated, spec)
+
+
+def _align_live_sections(
+    probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
+) -> None:
+    for index, hub in enumerate(stored.identity_hubs):
+        for role in ("purpose", "practice", "buyer"):
+            block = _role_block(probe, stored, index, role)
+            block.content = section_content(spec, hub.name, role)
+
+
+def _prose_caller(spec: ProductSpec, kind: str) -> ProductSpec:
+    if kind == "description":
+        first = spec.hubs[0].model_copy(
+            update={"description": spec.hubs[0].description + " Edited"}
+        )
+        return spec.model_copy(update={"hubs": (first, *spec.hubs[1:])})
+    if kind == "buyer":
+        return spec.model_copy(update={"buyer_problem": spec.buyer_problem + " Edited"})
+    if kind == "flagship":
+        return spec.model_copy(update={"flagship_feature": spec.flagship_feature + " Edited"})
+    raise AssertionError(kind)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["description", "buyer", "flagship"])
+async def test_changed_prose_does_not_pass_without_a_new_qa(tmp_path: Path, kind: str) -> None:
+    """Names and identity stay. Descriptions, buyer, or flagship changed, and the blocks match."""
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    qa = load_qa_record(path)
+    assert qa is not None
+    caller = _prose_caller(spec, kind)
+    _align_live_sections(probe, stored, caller)
+    holds = await qa_module._saved_holds(probe, stored, caller, qa)  # pyright: ignore[reportPrivateUsage]
+    assert holds is False
+    steps = ledger_module._walk_chain()  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ProductBuildError, match="fact ledger caller does not match"):
+        await ledger_module._plan(probe, stored, caller, qa, steps)  # pyright: ignore[reportPrivateUsage]
+    raw = path.read_bytes()
+    writes, original = _watch_checkpoint_writes()
+    try:
+        with pytest.raises(ProductBuildError, match="fact ledger caller does not match"):
+            await run_fact_ledger(caller, probe, path, recorded_at=LEDGER_AT)
+    finally:
+        ledger_module.write_checkpoint = original  # type: ignore[assignment]
+    assert writes["n"] == 0
+    assert path.read_bytes() == raw
+    await run_product_qa(caller, probe, path, recorded_at=LATER)
+    checkpoint = await run_fact_ledger(caller, probe, path, recorded_at=LATER)
+    assert checkpoint.fact_ledger is not None
+    assert checkpoint.fact_ledger.verdict == "PASS"
+
+
+@pytest.mark.asyncio
+async def test_prefix_only_section_is_the_same_refusal(tmp_path: Path) -> None:
+    """Prefix-only content raises. A ``>=`` length compare still raises."""
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    hub = stored.identity_hubs[0]
+    block = _role_block(probe, stored, 0, "purpose")
+    block.content = f"{spec.identity} / {hub.name} purpose: "
+    detail = ledger_module._durable_detail  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ProductBuildError, match="fact ledger fact is not a durable string"):
+        detail(probe, hub, spec.identity, "purpose")
+    caller = spec.model_copy(update={"identity": "Not The Row"})
+    raw = path.read_bytes()
+    with pytest.raises(ProductBuildError, match="fact ledger fact is not a durable string"):
+        await run_fact_ledger(caller, probe, path, recorded_at=LEDGER_AT)
+    assert path.read_bytes() == raw
+
+
+def _install_phase(path: Path, phase: object) -> None:
+    """Write one phase with a digest that matches everything except the shape rule."""
+    document = json.loads(path.read_text(encoding="utf-8"))
+    progress = document["progress"]
+    assert type(progress) is dict
+    progress["next_phase"] = phase
+    fields = progress_module._PROGRESS_FIELDS  # pyright: ignore[reportPrivateUsage]
+    unsigned = {key: progress[key] for key in fields}
+    covered = {key: value for key, value in document.items() if key != "progress"}
+    covered["progress"] = unsigned
+    progress["record_digest"] = progress_module._digest(covered)  # pyright: ignore[reportPrivateUsage]
+    path.write_text(
+        json.dumps(document, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("phase", ["", " test_matrix", "tést", 5, None])
+async def test_next_phase_must_be_an_unpadded_ascii_token(tmp_path: Path, phase: object) -> None:
+    """Each bad phase is a product refusal. An int or None is not an AttributeError.
+
+    Empty kills ``== ""``. Padding kills the strip conjunct. ``tést`` kills
+    ``isascii``. ``5`` and ``None`` kill the str-type conjunct. The three
+    ``or`` to ``and`` flips accept one of the string phases and write.
+    """
+    spec, probe, path = await _qa(tmp_path)
+    document = json.loads(path.read_text(encoding="utf-8"))
+    progress = document["progress"]
+    assert type(progress) is dict
+    body = {key: value for key, value in progress.items() if key != "record_digest"}
+    body["next_phase"] = phase
+    unsigned = progress_module._unsigned_body(body)  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ProductBuildError, match="progress record is tampered"):
+        progress_module._require_shape(unsigned)  # pyright: ignore[reportPrivateUsage]
+    progress["next_phase"] = phase
+    with pytest.raises(ProductBuildError, match="progress record is tampered"):
+        progress_module.stamp_integrity_digest(document)
+    _install_phase(path, phase)
+    raw = path.read_bytes()
+    with pytest.raises(ProductBuildError, match="progress record is tampered"):
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    assert path.read_bytes() == raw
+
+
+def test_non_positive_pid_is_not_alive() -> None:
+    """pid 0 is refused before os.kill. The temp test does not cover this branch."""
+    assert progress_module._pid_alive(0) is False  # pyright: ignore[reportPrivateUsage]

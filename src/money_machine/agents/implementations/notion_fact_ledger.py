@@ -40,6 +40,7 @@ from money_machine.agents.implementations.notion_qa import (
     dashboard_formula_expressions,
     live_qa_passed,
     load_qa_record,
+    prose_digest,
 )
 from money_machine.agents.implementations.notion_shared_databases import (
     BUSINESS_SHARED_DATABASES,
@@ -189,8 +190,11 @@ async def run_fact_ledger(
                 workflow_link=saved_link,
             )
         plan = await _plan(fixture, stored, validated, qa, steps)
-    except ProductBuildError:
-        raise
+    except ProductBuildError as error:
+        if _own_message(error):
+            raise
+        _scrub_secret(error)
+        raise ProductBuildError("fact ledger read failed") from None
     except (ProviderFailure, ConnectionError, OSError):
         # These are provider failures. The stored response is a fixed sentence.
         raise_recorded(
@@ -200,13 +204,40 @@ async def run_fact_ledger(
         )
     except Exception as error:
         # A code bug is not a provider job. Its text can carry a secret, including
-        # through the exception chain, so both are replaced before it leaves.
-        error.args = ("fact ledger read failed",)
+        # through __cause__ and __context__, so the chain is cleared before it leaves.
+        _scrub_secret(error)
         raise ProductBuildError("fact ledger read failed") from None
     _require_stored_qa(qa, plan.live_pass)
     checkpoint = _with_records(stored, qa, plan, moment)
     _write(path, checkpoint, created)
     return checkpoint
+
+
+def _own_message(error: ProductBuildError) -> bool:
+    """True for a refusal this module raises. A provider message is not one of these."""
+    text = str(error)
+    return text.startswith(("fact ledger", "workflow link", "qa ", "progress ", "checkpoint "))
+
+
+def _scrub_secret(error: BaseException) -> None:
+    """Drop a secret from an exception and from every cause and context it points at."""
+    pending = [error]
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        cause = current.__cause__
+        context = current.__context__
+        current.args = ("fact ledger read failed",)
+        current.__cause__ = None
+        current.__context__ = None
+        current.__suppress_context__ = True
+        if cause is not None:
+            pending.append(cause)
+        if context is not None:
+            pending.append(context)
 
 
 def _stored_pair(path: Path) -> tuple[FactLedgerRecord | None, WorkflowLinkRecord | None]:
@@ -351,6 +382,9 @@ async def _plan(
     steps: tuple[str, ...],
 ) -> _Plan:
     """Write-free plan. Facts are the checkpoint and the adapter."""
+    if not stored.variants:
+        raise ProductBuildError("fact ledger fact is not a durable string")
+    colour_names = _colour_names(stored)
     _require_pages(probe, stored)
     database_titles, databases_ok = _database_titles(probe, stored)
     hub_names, hubs_ok = _hub_names(probe, stored)
@@ -360,6 +394,8 @@ async def _plan(
     # It does not rebuild expected prose from the live blocks. The notification
     # row is not in the page sweep: a subclass there is a missing identity.
     live_spec = _comparison_spec(probe, stored, spec, home.title)
+    if qa.prose_digest != prose_digest(spec):
+        raise ProductBuildError("fact ledger caller does not match")
     dashboard_ok, dashboard = _dashboard_outputs(probe, stored, live_spec)
     colours_ok = _colours_match(probe, stored, home.title)
     facts = {
@@ -367,7 +403,7 @@ async def _plan(
         "hubs": ",".join(hub_names),
         "databases": ",".join(database_titles),
         "variants": str(len(stored.variants)),
-        "colour_names": ",".join(record.name for record in stored.variants),
+        "colour_names": ",".join(colour_names),
         "dashboard_outputs": dashboard,
         "supported_devices": "unverified",
         "secret_links": links,
@@ -439,8 +475,8 @@ def _comparison_spec(
         buyer = spec.buyer_problem
         feature = spec.flagship_feature
     else:
-        # Name length is judged here. A 64-character name is legal. The named
-        # path uses ``_require_hub_name`` and does not reach this check.
+        # ``_require_hub_name`` already ran for every hub, on this path and on
+        # the named path. A 65-character name does not reach the detail check.
         hubs = tuple(
             Hub(
                 name=hub.name,
@@ -495,8 +531,9 @@ def _caller_matches(spec: ProductSpec, stored: ProductBuildCheckpoint, identity:
     """True when the caller is the hub set QA judged.
 
     The stored checkpoint is that set: every hub name, in order, and the
-    identity on the notification row. A digest is not required. The ordered
-    names are the stored spec. Live pages are not consulted.
+    identity on the notification row. Descriptions, buyer, and flagship are
+    the stored prose digest, compared before a PASS. Live pages are not the
+    source of those three.
     """
     stored_names = tuple(hub.name for hub in stored.identity_hubs)
     caller_names = tuple(hub.name for hub in spec.hubs)
@@ -585,9 +622,23 @@ def _durable_detail(
         detail = block.content[len(prefix) :]
     else:
         detail = ""
-    if detail == "" or detail.strip() != detail or len(detail) > 500:
+    # Purpose and practice follow the 500-character hub and flagship limits.
+    # The buyer problem limit is 1000, on this path and on the named path.
+    limit = 1000 if role == "buyer" else 500
+    if detail == "" or detail.strip() != detail or len(detail) > limit:
         raise ProductBuildError("fact ledger fact is not a durable string")
     return detail
+
+
+def _colour_names(stored: ProductBuildCheckpoint) -> tuple[str, ...]:
+    """Each variant name on its own. The joined fact is not the check."""
+    names: list[str] = []
+    for record in stored.variants:
+        name = record.name
+        if type(name) is not str or name == "" or name.strip() != name:
+            raise ProductBuildError("fact ledger fact is not a durable string")
+        names.append(name)
+    return tuple(names)
 
 
 def _known_ids(stored: ProductBuildCheckpoint) -> tuple[str, ...]:
@@ -759,6 +810,8 @@ def _dashboard_outputs(
             return False, "missing"
         if ";" in name or ";" in expression:
             return False, "missing"
+        if type(name) is not str:
+            raise ProductBuildError("fact ledger fact is not a durable string")
         parts.append(f"{name}={expression}")
     for kind, page_id in notice.samples:
         sample = probe.pages.get(page_id)
@@ -895,6 +948,7 @@ def _write(
         ],
         "facts": [{"fact": name, "value": value} for name, value in qa.facts],
         "proof_page_id": qa.proof_page_id,
+        "prose_digest": qa.prose_digest,
         "repairs": list(qa.repairs),
         "verdict": qa.verdict,
     }

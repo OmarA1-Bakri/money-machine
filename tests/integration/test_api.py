@@ -47,7 +47,10 @@ async def unreachable_client() -> AsyncGenerator[AsyncClient]:
     """A client whose database does not exist, to prove readiness fails."""
     application = create_app()
     settings = settings_for("postgresql+asyncpg://money_machine@127.0.0.1:1/absent")
-    state = ApplicationState.create(settings)
+    try:
+        state = ApplicationState.create(settings)
+    except ModuleNotFoundError:
+        pytest.skip("asyncpg is not installed")
     application.state.application = state
     transport = ASGITransport(app=application)
     async with AsyncClient(transport=transport, base_url="http://api") as active:

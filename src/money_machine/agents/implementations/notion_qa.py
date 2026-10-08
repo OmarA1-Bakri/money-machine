@@ -10,6 +10,7 @@ does not open a network connection.
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -74,7 +75,7 @@ _QA_KEY = "qa"
 _NOTIFICATION_TITLE = "Notification dashboard"
 _SECTION_ROLES = ("purpose", "practice", "buyer")
 _REPAIRABLE = ("published", "duplicate_button", "search_indexing")
-_QA_KEYS = frozenset({"checks", "facts", "proof_page_id", "repairs", "verdict"})
+_QA_KEYS = frozenset({"checks", "facts", "proof_page_id", "prose_digest", "repairs", "verdict"})
 _VERDICTS = frozenset({"PASS", "FAIL_REPAIRABLE", "BLOCKED"})
 _SLUG_DATABASE = {
     "active projects": "Projects",
@@ -131,7 +132,9 @@ async def run_product_qa(
             verdict = "PASS"
             proof = await _prove_duplicate(fixture, stored, validated, plan.proof_page_id)
         facts = _facts(stored, validated, fixture)
-        checkpoint = _with_qa(stored, plan.checks, repairs, verdict, proof, facts, moment)
+        checkpoint = _with_qa(
+            stored, plan.checks, repairs, verdict, proof, facts, moment, prose_digest(validated)
+        )
         _write_qa(path, checkpoint, created)
     except ProviderFailure as failure:
         raise_recorded(path, BUILD_PHASES[-1], failure)
@@ -168,13 +171,33 @@ def _require_qa(value: object) -> QaRecord:
         raise ProductBuildError("qa record does not match")
     repairs = _require_repairs(entry["repairs"])
     facts = _require_pairs(entry["facts"], "fact", "value")
+    digest = entry["prose_digest"]
+    if type(digest) is not str or len(digest) != 64 or not _hex_digest(digest):
+        raise ProductBuildError("qa record is incomplete")
     return QaRecord(
         verdict=verdict,
         checks=parsed_checks,
         repairs=repairs,
         proof_page_id=proof,
         facts=facts,
+        prose_digest=digest,
     )
+
+
+def prose_digest(spec: ProductSpec) -> str:
+    """Digest of the descriptions, buyer, and flagship QA judged.
+
+    Hub names and the row identity are not part of it. A later caller that
+    keeps those and changes this prose does not match the stored digest.
+    """
+    rows = [hub.description for hub in spec.hubs]
+    rows.append(spec.buyer_problem)
+    rows.append(spec.flagship_feature)
+    return hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()
+
+
+def _hex_digest(value: str) -> bool:
+    return all(character in "0123456789abcdef" for character in value)
 
 
 def _require_pairs(value: object, left: str, right: str) -> tuple[tuple[str, str], ...]:
@@ -229,6 +252,8 @@ async def _saved_holds(
     saved: QaRecord,
 ) -> bool:
     """True when the stored verdict still stands. A fixed BLOCKED record is re-run."""
+    if saved.prose_digest != prose_digest(spec):
+        return False
     plan = await _plan(probe, stored, spec)
     facts = _facts(stored, spec, probe)
     if saved.verdict == "BLOCKED":
@@ -423,7 +448,7 @@ def _notification_values(
     for name, expression in generated.expressions.items():
         kind = generated.databases[name]
         found = _formula_property(probe, stored, kind, name)
-        if found is None or found.expression != expression:
+        if found is None or type(found.expression) is not str or found.expression != expression:
             return False
     return True
 
@@ -674,7 +699,7 @@ def _palette(
 def _teardown(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> bool:
-    """True when hub prose and home navigation still match the spec."""
+    """True when hub prose still matches the spec."""
     if not spec.evidence:
         return False
     for hub in stored.identity_hubs:
@@ -863,6 +888,7 @@ def _with_qa(
     proof: str,
     facts: tuple[tuple[str, str], ...],
     recorded_at: datetime,
+    digest: str,
 ) -> ProductBuildCheckpoint:
     """Return the checkpoint with the QA record attached."""
     record = QaRecord(
@@ -871,6 +897,7 @@ def _with_qa(
         repairs=repairs,
         proof_page_id=proof,
         facts=facts,
+        prose_digest=digest,
     )
     return replace(stored, next_phase=PHASE_FACT_LEDGER, qa=record, recorded_at=recorded_at)
 
@@ -899,6 +926,7 @@ def _write_qa(
         ],
         "facts": [{"fact": name, "value": value} for name, value in record.facts],
         "proof_page_id": record.proof_page_id,
+        "prose_digest": record.prose_digest,
         "repairs": list(record.repairs),
         "verdict": record.verdict,
     }

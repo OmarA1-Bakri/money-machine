@@ -288,6 +288,44 @@ async def test_wrong_formula_expression_is_blocked(tmp_path: Path) -> None:
     assert calls == []
 
 
+class _LyingFormula(str):
+    """A str subclass that claims to equal any non-empty expression."""
+
+    def __eq__(self, other: object) -> bool:
+        return other != ""
+
+
+@pytest.mark.asyncio
+async def test_lying_formula_expression_is_not_a_string(tmp_path: Path) -> None:
+    """QA refuses a str subclass. Equality that always matches is not enough."""
+    spec, probe, path = await _built(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    changed = False
+    for database in probe.databases.values():
+        for prop in database.properties:
+            formula = prop.config.get("formula")
+            if (
+                type(formula) is NotionFormula
+                and type(formula.expression) is str
+                and formula.expression != ""
+            ):
+                # The text matches the spec, so ``!=`` does not refuse it.
+                # ``str.__ne__`` ignores a lying ``__eq__`` when the text differs.
+                formula.expression = _LyingFormula(formula.expression)
+                changed = True
+                break
+        if changed:
+            break
+    assert changed
+    values = notion_qa_module._notification_values  # pyright: ignore[reportPrivateUsage]
+    assert values(probe, stored, spec) is False
+    calls = watch_adapter_writes(probe)
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "BLOCKED"
+    assert _flag(checkpoint, "notification_values") is False
+    assert calls == []
+
+
 @pytest.mark.asyncio
 async def test_foreign_relation_is_blocked(tmp_path: Path) -> None:
     spec = planner_spec()
@@ -1479,6 +1517,30 @@ async def test_incomplete_qa_record_is_refused(tmp_path: Path, kind: str, match:
     with pytest.raises(ProductBuildError, match=match):
         await run_product_qa(spec, probe, path, recorded_at=QA_AT)
 
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("digest", [5, "a" * 63, "", "g" * 64, "A" * 64])
+async def test_prose_digest_must_be_lowercase_hex(tmp_path: Path, digest: object) -> None:
+    """Helper and public entry. A short, empty, non-hex, or non-string digest is incomplete."""
+    spec, probe, path = await _built(tmp_path)
+    await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    stored = dict(_qa_body(path))
+    stored["prose_digest"] = digest
+    require = notion_qa_module._require_qa  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ProductBuildError, match="qa record is incomplete"):
+        require(stored)
+
+    def _mutate(document: dict[str, object]) -> None:
+        _qa_reference(document)["prose_digest"] = digest
+
+    restamp_checkpoint(path, _mutate)
+    raw = path.read_bytes()
+    calls = watch_adapter_writes(probe)
+    with pytest.raises(ProductBuildError, match="qa record is incomplete"):
+        await run_product_qa(spec, probe, path, recorded_at=LATER)
     assert calls == []
     assert path.read_bytes() == raw
 
