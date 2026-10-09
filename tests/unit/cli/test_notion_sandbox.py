@@ -5447,11 +5447,12 @@ def test_tmp_eexist_after_creates_exits_69_with_ids(
 ) -> None:
     """O_EXCL EEXIST after creates is not a usage error. Ids stay on stderr."""
     real_open = os.open
+    wanted = evidence.with_name(f".{evidence.name}.tmp")
 
-    def _open(path: str | os.PathLike[str], flags: int, mode: int = 0o777) -> int:
-        if flags & os.O_EXCL and str(path).endswith(".tmp"):
+    def _open(path: str | os.PathLike[str], flags: int = 0, mode: int = 0o777, **kwargs: object) -> int:
+        if os.fspath(path) == str(wanted) and flags & os.O_EXCL:
             raise OSError(errno.EEXIST, "File exists")
-        return real_open(path, flags, mode)
+        return real_open(path, flags, mode, **kwargs)
 
     monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.open", _open)
     client = FakeSandbox()
@@ -5484,12 +5485,14 @@ def test_interrupt_during_tmp_unlink_keeps_ids(
             raise KeyboardInterrupt
         return real_write(fd, data)
 
-    def _unlink(path: str | os.PathLike[str]) -> None:
-        if str(path).endswith(".tmp"):
+    wanted = evidence.with_name(f".{evidence.name}.tmp")
+
+    def _unlink(path: str | os.PathLike[str], **kwargs: object) -> None:
+        if os.fspath(path) == str(wanted):
             state["unlinked"] += 1
             if state["unlinked"] == 1:
                 raise KeyboardInterrupt
-        real_unlink(path)
+        real_unlink(path, **kwargs)
 
     monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.write", _write)
     monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.unlink", _unlink)
