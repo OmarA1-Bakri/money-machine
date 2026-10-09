@@ -20,6 +20,7 @@ import pytest
 from money_machine.agents.implementations import notion_fact_ledger as ledger_module
 from money_machine.agents.implementations import notion_progress as progress_module
 from money_machine.agents.implementations import notion_qa as qa_module
+from money_machine.agents.implementations.notion_dashboard import identity_callout
 from money_machine.agents.implementations.notion_fact_ledger import (
     PHASE_TEST_MATRIX,
     run_fact_ledger,
@@ -2818,6 +2819,8 @@ async def test_edited_hub_prose_is_blocked_not_self_compared(
             else spec.flagship_feature,
         }
     )
+    if role == "buyer":
+        _set_identity_callout(probe, stored.page_id, identity_callout(derived))
     assert await live_qa_passed(probe, stored, derived) is True
     calls = watch_adapter_writes(probe)
 
@@ -4011,6 +4014,20 @@ async def test_plain_subclass_formula_name_is_refused(tmp_path: Path) -> None:
         read_dashboard(probe, mutated, spec)
 
 
+def _set_identity_callout(probe: FixtureNotionAdapter, page_id: str, content: str) -> None:
+    """Point the home identity callout at this spec. Buyer text lives in that callout."""
+    prefix = content.split(":", 1)[0] + ":"
+    matches = [
+        block
+        for block in probe.blocks.values()
+        if type(block) is NotionCalloutBlock
+        and block.parent_id == page_id
+        and block.content.startswith(prefix)
+    ]
+    assert len(matches) == 1
+    matches[0].content = content
+
+
 def _align_live_sections(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> None:
@@ -4018,6 +4035,7 @@ def _align_live_sections(
         for role in ("purpose", "practice", "buyer"):
             block = _role_block(probe, stored, index, role)
             block.content = section_content(spec, hub.name, role)
+    _set_identity_callout(probe, stored.page_id, identity_callout(spec))
 
 
 def _prose_caller(spec: ProductSpec, kind: str) -> ProductSpec:
@@ -4540,6 +4558,7 @@ async def test_interrupt_keeps_its_kind_and_drops_the_secret(
     assert error.args == args
     assert error.__cause__ is None
     assert error.__context__ is None
+    assert error.__suppress_context__ is True
     assert getattr(error, "__notes__", None) is None
     assert _secret_reachable(error) == []
     assert path.read_bytes() == raw

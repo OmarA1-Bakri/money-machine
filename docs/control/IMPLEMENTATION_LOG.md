@@ -1,5 +1,20 @@
 # Implementation Log
 
+## 2026-10-09 — Session 07 W11: QA coverage matrix and crash-resume repairs
+
+Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision stays 58. `IMPLEMENTATION_STATE.json` is not edited. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. STATE `head_sha` stays `a4e9b025021b4effbb2b2879c1db756403cb1676`. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. Twelve session 7 evidence keys stay false. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. Exit 78 stays HELD. Narrative `next_phase` stays `test_matrix` and is not started.
+
+Prompt integrity is the Wave 11 addendum in `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md`. The prompt file is unchanged. SHA-256 `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`.
+
+Fixtures only. No live Notion, no Etsy, no `--execute`.
+
+- Home contracts. `_linked_views` (`notion_qa.py:481`) also requires one home Today/Tasks view, one Quick notes/Notes view, and one Month/Events view when Events is a stored kind (`_home_linked_views` at `:495`). `_palette` (`:764`) requires one home callout per palette token. `_teardown` (`:806`) requires the home nav text, one identity callout, and one hub return text per hub. Deleting any one of those records `BLOCKED`, empty repairs, empty proof, and 0 adapter writes. `test_deleted_home_contract_is_blocked` is 14 cases.
+- Crash-resume. `record_applied_repairs` (`notion_progress.py:361`) appends kind `qa_repair`, operation `qa.repair`, phase `qa`, before the QA checkpoint write. `run_product_qa` stores the union of those names and the repairs this run applied. `test_crash_resume_keeps_the_earlier_repair_job` crashes `notion_qa.write_checkpoint` after the publish repair and requires the `published` job before resume. Resume stays `PASS` with repairs `("published",)` and the same one job.
+- Local bugs. `_local_bug` (`notion_qa.py:207`) is any in-package `Exception` except `ProviderFailure`. The fixed `_CODE_ERRORS` tuple is gone. `test_package_error_outside_the_old_fixed_set_is_local` raises `ValueError` and `RuntimeError` from a frame named as this package. A provider `TypeError` is still one provider job.
+- On `4b899fcf`, with these tests and the W10 sources, those 17 tests failed: 14 verdicts were `PASS`, the crash left `repair_jobs` `[]`, and both package errors were `provider operation failed`. On this tree the same 17 passed.
+
+`__suppress_context__ is True` was added to the existing interrupt tests that go through `raise escaped from None` at `notion_fact_ledger.py:254` and `notion_qa.py:189`. That assertion passes on `4b899fcf` because `from None` is already there. It is not one of the 17 fail-on-base tests. No mutation sweep was run.
+
 ## 2026-10-07 — Session 07 W10: fact ledger and workflow link
 
 Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision is 58. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` is the intentional tip-sync to the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-07T23:29:39Z`.

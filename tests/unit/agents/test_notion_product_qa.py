@@ -15,7 +15,19 @@ from typing import cast
 import pytest
 
 from money_machine.agents.implementations import notion_qa as notion_qa_module
-from money_machine.agents.implementations.notion_hubs import section_content
+from money_machine.agents.implementations.notion_aesthetics import accent_content
+from money_machine.agents.implementations.notion_dashboard import (
+    identity_callout,
+)
+from money_machine.agents.implementations.notion_dashboard import (
+    navigation_content as home_navigation_content,
+)
+from money_machine.agents.implementations.notion_hubs import (
+    navigation_content as hub_navigation_content,
+)
+from money_machine.agents.implementations.notion_hubs import (
+    section_content,
+)
 from money_machine.agents.implementations.notion_product_builder import (
     SPEC_ID_PROPERTY,
     ProductBuildCheckpoint,
@@ -2532,6 +2544,8 @@ async def test_provider_interrupt_in_qa_becomes_its_built_in_base(
         members.extend(cast(tuple[BaseException, ...], error.exceptions))
     assert [type(member) for member in members] == kinds
     assert repr(error.args) == repr(args)
+    assert error.__suppress_context__ is True
+    assert error.__cause__ is None
     for member in members:
         assert member.__cause__ is None
         assert member.__context__ is None
@@ -2593,3 +2607,175 @@ async def test_provider_type_error_is_still_a_provider_job(tmp_path: Path) -> No
     assert "sk-live-secret" not in _every_text(caught.value)
     assert "sk-live-secret" not in path.read_text(encoding="ascii")
     assert [job["response"] for job in _provider_jobs(path)] == ["provider operation failed"]
+
+
+def _pop_text(probe: FixtureNotionAdapter, parent_id: str, content: str) -> None:
+    matches = [
+        block_id
+        for block_id, block in probe.blocks.items()
+        if type(block) is NotionTextBlock
+        and block.parent_id == parent_id
+        and block.content == content
+    ]
+    assert len(matches) == 1
+    del probe.blocks[matches[0]]
+
+
+def _pop_callout(probe: FixtureNotionAdapter, parent_id: str, content: str) -> None:
+    matches = [
+        block_id
+        for block_id, block in probe.blocks.items()
+        if type(block) is NotionCalloutBlock
+        and block.parent_id == parent_id
+        and block.content == content
+    ]
+    assert len(matches) == 1
+    del probe.blocks[matches[0]]
+
+
+def _delete_home_contract(
+    probe: FixtureNotionAdapter,
+    spec: ProductSpec,
+    stored: ProductBuildCheckpoint,
+    target: str,
+) -> None:
+    """Remove one home or hub contract the section 8 checks must notice."""
+    if target == "home_nav":
+        _pop_text(probe, stored.page_id, home_navigation_content(spec))
+        return
+    if target == "identity":
+        _pop_callout(probe, stored.page_id, identity_callout(spec))
+        return
+    if target.startswith("palette:"):
+        token_name = target.split(":", 1)[1]
+        token = next(item for item in spec.palette_tokens if item.name == token_name)
+        _pop_callout(probe, stored.page_id, accent_content(token.name, token.hex))
+        return
+    if target.startswith("hub:"):
+        hub = stored.identity_hubs[int(target.split(":", 1)[1])]
+        _pop_text(probe, hub.page_id, hub_navigation_content(spec, hub.name))
+        return
+    if target.startswith("view:"):
+        name = target.split(":", 1)[1]
+        matches = [
+            view_id
+            for view_id, view in probe.linked_views.items()
+            if type(view) is NotionLinkedView
+            and view.parent_page_id == stored.page_id
+            and view.name == name
+        ]
+        assert len(matches) == 1
+        del probe.linked_views[matches[0]]
+        return
+    raise AssertionError(target)
+
+
+_HOME_CONTRACTS = (
+    ("home_nav", "teardown_quality"),
+    ("palette:Primary", "palette"),
+    ("palette:Secondary", "palette"),
+    ("palette:Accent", "palette"),
+    ("identity", "teardown_quality"),
+    *((f"hub:{index}", "teardown_quality") for index in range(6)),
+    ("view:Today", "linked_views"),
+    ("view:Month", "linked_views"),
+    ("view:Quick notes", "linked_views"),
+)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("target", "flag"), _HOME_CONTRACTS)
+async def test_deleted_home_contract_is_blocked(tmp_path: Path, target: str, flag: str) -> None:
+    """Deleting one section 8 contract records BLOCKED and writes nothing."""
+    spec, probe, path = await _built(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    _delete_home_contract(probe, spec, stored, target)
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "BLOCKED"
+    assert checkpoint.qa.repairs == ()
+    assert checkpoint.qa.proof_page_id == ""
+    assert _flag(checkpoint, flag) is False
+    assert calls == []
+    assert json.loads(path.read_text(encoding="ascii"))["progress"]["repair_jobs"] == []
+
+
+@pytest.mark.asyncio
+async def test_crash_resume_keeps_the_earlier_repair_job(tmp_path: Path) -> None:
+    """A repair applied before a checkpoint crash stays on the progress record."""
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    await probe.unpublish_page(page.id)
+    original = notion_qa_module.write_checkpoint
+
+    def _boom(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+        raise RuntimeError("checkpoint crashed")
+
+    notion_qa_module.write_checkpoint = _boom  # type: ignore[assignment]
+    try:
+        with pytest.raises(RuntimeError, match="checkpoint crashed"):
+            await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    finally:
+        notion_qa_module.write_checkpoint = original  # type: ignore[assignment]
+
+    crashed = json.loads(path.read_text(encoding="ascii"))
+    assert "qa" not in crashed["provider_object_references"]
+    jobs = [job for job in crashed["progress"]["repair_jobs"] if job["kind"] == "qa_repair"]
+    assert jobs == [
+        {
+            "kind": "qa_repair",
+            "operation": "qa.repair",
+            "phase": "qa",
+            "response": "published",
+        }
+    ]
+
+    calls = watch_adapter_writes(probe)
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "PASS"
+    assert checkpoint.qa.repairs == ("published",)
+    assert calls == []
+    resumed = json.loads(path.read_text(encoding="ascii"))
+    resumed_jobs = [job for job in resumed["progress"]["repair_jobs"] if job["kind"] == "qa_repair"]
+    assert resumed_jobs == jobs
+
+
+def _raiser_in_package(error_type: type[Exception]) -> Callable[..., None]:
+    """Raise from a frame whose module name is the QA package."""
+    namespace: dict[str, object] = {
+        "__name__": notion_qa_module.__name__,
+        "error_type": error_type,
+    }
+    exec(
+        "def boom(*_args: object, **_kwargs: object) -> None:\n"
+        "    raise error_type('sk-live-secret')\n",
+        namespace,
+    )
+    boom = namespace["boom"]
+    if not callable(boom):
+        raise AssertionError("raiser was not callable")
+    return cast(Callable[..., None], boom)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error_type", [ValueError, RuntimeError])
+async def test_package_error_outside_the_old_fixed_set_is_local(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error_type: type[Exception]
+) -> None:
+    """A package ValueError or RuntimeError is local code, with no provider job."""
+    spec, probe, path = await _built(tmp_path)
+    raw = path.read_bytes()
+    monkeypatch.setattr(notion_qa_module, "_plan", _raiser_in_package(error_type))
+    with pytest.raises(ProductBuildError) as caught:
+        await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert caught.value.args == ("qa failed in local code",)
+    assert caught.value.__cause__ is None
+    assert caught.value.__context__ is None
+    assert "sk-live-secret" not in _every_text(caught.value)
+    assert path.read_bytes() == raw

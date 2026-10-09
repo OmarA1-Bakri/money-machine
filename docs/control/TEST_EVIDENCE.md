@@ -1,5 +1,20 @@
 # Test Evidence
 
+## 2026-10-09 — Session 07 W11: QA coverage matrix and crash-resume repairs
+
+**Verification scope**: Fixture-only QA coverage and crash-resume repair retention. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` was not edited.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, revision stays 58, twelve evidence keys stay false. This is not SESSION_07 COMPLETE | PASS |
+| Home contract deletions | `test_deleted_home_contract_is_blocked`, 14 cases. On `4b899fcf` each verdict was `PASS`. On this tree each is `BLOCKED`, repairs `()`, proof `""`, adapter writes `[]`, `repair_jobs` `[]` | PASS for this slice |
+| Crash-resume repair job | `test_crash_resume_keeps_the_earlier_repair_job`. On `4b899fcf` the stored jobs were `[]`. On this tree the job is `qa_repair` / `qa.repair` / `qa` / `published` before resume, and the resume keeps that one job with repairs `("published",)` and 0 further adapter writes | PASS for this slice |
+| Package errors outside the old fixed set | `test_package_error_outside_the_old_fixed_set_is_local` for `ValueError` and `RuntimeError`. On `4b899fcf` both were `provider operation failed`. On this tree both are `qa failed in local code` and the checkpoint bytes are unchanged | PASS for this slice |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+| Full local pytest, ruff, and pyright | Recorded after the verification run on this tip. Not claimed in this paragraph | PENDING |
+
+**Status**: Session 07 Wave 11. The session stays incomplete. This is not SESSION_07 COMPLETE. Exit 78 stays HELD.
+
 ## 2026-10-07 — Session 07 W10: fact ledger and workflow link
 
 **Verification scope**: Fixture-only fact ledger and workflow link over the W9 QA checkpoint. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Postgres, Alembic, pnpm, and Compose were not required for this slice and were not run.

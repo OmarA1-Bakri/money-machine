@@ -7,7 +7,8 @@ rebuild makes no fixture writes and appends one rebuild_refused job through
 write_checkpoint. The integrity digest covers the whole payload. It detects
 accidental corruption. It is not a signature and it is not tamper-proof against
 someone who can recompute it. The fixture has no screenshots; captured evidence
-kind is provider_response.
+kind is provider_response. A repair QA already applied is stored as kind qa_repair
+and is kept on later writes.
 """
 
 from __future__ import annotations
@@ -49,7 +50,11 @@ OP_VARIANTS = "variants.duplicate"
 OP_QA = "qa.duplicate"
 OP_REBUILD = "top_level_page_and_design_shell.rebuild"
 REBUILD_REFUSED = "rebuild_refused"
-_ACCEPTED_JOB_KINDS = frozenset({"provider_response", REBUILD_REFUSED})
+_QA_REPAIR_KIND = "qa_repair"
+_QA_REPAIR_OPERATION = "qa.repair"
+_QA_REPAIR_PHASE = "qa"
+_QA_REPAIR_RESPONSES = frozenset({"published", "duplicate_button", "search_indexing"})
+_ACCEPTED_JOB_KINDS = frozenset({"provider_response", REBUILD_REFUSED, _QA_REPAIR_KIND})
 _RECOVERIES = frozenset({"recoverable", "unrecoverable"})
 _PROGRESS_FIELDS = (
     "completed_operations",
@@ -336,6 +341,41 @@ def write_document(
         raise
 
 
+def stored_qa_repair_names(path: Path) -> tuple[str, ...]:
+    """Repair names already stored as qa_repair jobs, in job order."""
+    if not path.exists():
+        return ()
+    names: list[str] = []
+    for job in load_payload(path).repair_jobs:
+        if type(job) is not dict:
+            continue
+        if job.get("kind") != _QA_REPAIR_KIND or job.get("operation") != _QA_REPAIR_OPERATION:
+            continue
+        response = job.get("response")
+        if type(response) is not str or response not in _QA_REPAIR_RESPONSES or response in names:
+            continue
+        names.append(response)
+    return tuple(names)
+
+
+def record_applied_repairs(path: Path, names: tuple[str, ...]) -> None:
+    """Append one qa_repair job per repair that ran, through write_checkpoint.
+
+    A name already stored is not appended again. A missing file writes nothing.
+    """
+    if not path.exists():
+        return
+    present = set(stored_qa_repair_names(path))
+    for name in names:
+        if name not in _QA_REPAIR_RESPONSES or name in present:
+            continue
+        _append_job(
+            path,
+            _repair_job(_QA_REPAIR_OPERATION, name, _QA_REPAIR_PHASE, kind=_QA_REPAIR_KIND),
+        )
+        present.add(name)
+
+
 def record_provider_failure(path: Path, operation: str, response: str, phase: str) -> None:
     """Append one provider_response job through write_checkpoint.
 
@@ -593,7 +633,7 @@ def _require_jobs(value: object) -> None:
 
 
 def _reject_non_provider_evidence(body: Mapping[str, object]) -> None:
-    """Screenshot evidence is forged. provider_response and rebuild_refused are kept."""
+    """Screenshot evidence is forged. provider_response, rebuild_refused, and qa_repair are kept."""
     jobs = body["repair_jobs"]
     if type(jobs) is not list:
         raise ProductBuildError("progress record is tampered")

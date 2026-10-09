@@ -675,3 +675,22 @@ This addendum governs Wave 10. The prompt remains the unamended source of record
 | Crash-resume drops earlier repairs | W11 test matrix | Parked with the coverage gap. Not fixed in W10 |
 | Action 12 commissioning | Operator decision after full implementation | S-02 |
 | Twelve evidence keys | Session close, after the prompt's own criteria | Fixture ledger and link are not that gate |
+
+## Wave 11 addendum (2026-10-09)
+
+The prompt file is unchanged. SHA-256 `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`. This addendum does not cut the prompt. It binds this wave to the frozen carry list.
+
+1. Prove the prompt hash, then implement only the slice below. Do not edit the prompt file.
+2. Do not edit `IMPLEMENTATION_STATE.json`. State revision stays 58. Another change takes revision 59. This wave does not take it. `head_sha` stays `a4e9b025021b4effbb2b2879c1db756403cb1676`. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. `session_status` stays `incomplete`. `current_session` stays 7. `next_session` stays 7. `next_prompt` stays this prompt. Narrative `next_phase` stays `test_matrix` and this wave does not start section 11.
+3. Leave all twelve session 7 evidence keys false. Do not set `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. Do not edit `config/agents.yaml` or `config/workflows.yaml`. Exit 78 stays HELD.
+4. Close the section 8 QA coverage gap. Deleting the home nav text, any of the 3 palette callouts, the identity callout, any of the 6 hub return texts, or any of the 3 home linked views (Tasks, Events, Notes) must record `BLOCKED` with 0 adapter writes, or refuse with 0 writes, and must not record `PASS`. Cover `_linked_views`, `_palette`, and `_teardown`.
+5. A crash after a repair must leave that repair in the stored progress record. The resume must still list it.
+6. The #61 parked items are fixed in this wave or listed under "Parked to next wave" with a reason. A new test that already passes on `4b899fcf` is not added.
+7. Remove the closed coverage entry from `NEXT_SESSION.md`.
+8. Tests use the fixture only, with sockets blocked. No live Notion, no Etsy, no `--execute`.
+
+| Finding | Owner | Reason |
+|---|---|---|
+| Section 11 test matrix and live sandbox | Later wave, and explicit authorization for the sandbox | S-01. Narrative next phase stays `test_matrix`, not started |
+| Action 12 commissioning | Operator decision after full implementation | S-02 |
+| Twelve evidence keys and STATE revision 59 | After the other revision-59 change merges | This wave does not edit `IMPLEMENTATION_STATE.json` |
