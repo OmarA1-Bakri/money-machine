@@ -128,10 +128,12 @@ def reject_duplicate_labels(labels: list[str], message: str) -> None:
     """Raise when a checkpoint list repeats a name.
 
     Only a known refusal text is raised. Any other text could carry a value
-    from the checkpoint, so it becomes the fixed fallback.
+    from the checkpoint, so it becomes the fixed fallback. A str subclass can
+    forge its hash and equality, so only an exact str is looked up.
     """
     if len(labels) != len(set(labels)):
-        raise ProductBuildError(message if message in _DUPLICATE_MESSAGES else _DUPLICATE_FALLBACK)
+        known = type(message) is str and message in _DUPLICATE_MESSAGES
+        raise ProductBuildError(message if known else _DUPLICATE_FALLBACK)
 
 
 def guard_operation(probe: object, operation: str) -> None:

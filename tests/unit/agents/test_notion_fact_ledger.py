@@ -4825,3 +4825,198 @@ async def test_public_comma_colour_name_is_refused_with_no_write(
     with pytest.raises(ProductBuildError, match="fact ledger fact is not a durable string"):
         await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
     assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_blank_hub_name_with_blank_title_is_matched(tmp_path: Path) -> None:
+    """``_hub_names`` with stored name ``""`` and title ``""`` reports matched True.
+
+    Kills IfExp ``title != ""`` to True at ``_hub_names`` (X748:21->T). Stock
+    stores ``missing`` for the blank title and the durable loop leaves it, so
+    the empty name and empty title still agree. The mutant keeps ``""``, which
+    the durable loop turns into a mismatch. At the public entry the loader and
+    ``_require_hub_name`` refuse a blank hub name first, so this is helper level.
+    """
+    _spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    hub = stored.identity_hubs[0]
+    blank = replace(hub, name="")
+    forged = replace(stored, identity_hubs=(blank, *stored.identity_hubs[1:]))
+    probe.pages[hub.page_id].title = ""
+    names = ledger_module._hub_names  # pyright: ignore[reportPrivateUsage]
+    durable, matched = names(probe, forged)
+    assert matched is True
+    assert durable[0] == "missing"
+
+
+class _PlainInterrupt(BaseException):
+    """A custom kind with no constructor of its own, so a fresh one is safe."""
+
+
+class _PlainKeyboard(KeyboardInterrupt):
+    """A custom KeyboardInterrupt with no constructor of its own."""
+
+
+class _PlainExit(SystemExit):
+    """A custom SystemExit with no constructor of its own."""
+
+
+class _PlainGroup(BaseExceptionGroup[BaseException]):
+    """A custom group with no constructor of its own."""
+
+
+class _BuiltKeyboard(KeyboardInterrupt):
+    """A custom KeyboardInterrupt whose constructor is caller code."""
+
+    def __init__(self, *args: object) -> None:
+        super().__init__(*args)
+        self.token = SECRET
+
+
+class _Meta(type):
+    pass
+
+
+class _MetaInterrupt(BaseException, metaclass=_Meta):
+    """A custom kind whose metaclass could run code on construction."""
+
+
+def _group_members(error: BaseException) -> list[BaseException]:
+    found: list[BaseException] = [error]
+    if isinstance(error, BaseExceptionGroup):
+        for member in cast(tuple[BaseException, ...], error.exceptions):
+            found.extend(_group_members(member))
+    return found
+
+
+def _secret_group() -> BaseException:
+    inner = KeyboardInterrupt(SECRET)
+    inner.add_note(SECRET)
+    return BaseExceptionGroup(SECRET, [inner, RuntimeError(SECRET)])
+
+
+def _nested_group() -> BaseException:
+    return BaseExceptionGroup(
+        SECRET, [BaseExceptionGroup(SECRET, [SystemExit(SECRET)]), _PlainInterrupt(SECRET)]
+    )
+
+
+def _plain_group() -> BaseException:
+    return _PlainGroup(SECRET, [_PlainKeyboard(SECRET)])
+
+
+def _group_with_an_exception_group() -> BaseException:
+    return BaseExceptionGroup(
+        SECRET, [ExceptionGroup(SECRET, [RuntimeError(SECRET)]), KeyboardInterrupt(SECRET)]
+    )
+
+
+@pytest.mark.parametrize(
+    ("make", "kind", "args"),
+    [
+        (lambda: _PlainInterrupt(SECRET), _PlainInterrupt, ("fact ledger read failed",)),
+        (lambda: _PlainKeyboard(SECRET), _PlainKeyboard, ()),
+        (lambda: _PlainExit(SECRET), _PlainExit, (1,)),
+        (lambda: _PlainExit(4), _PlainExit, (4,)),
+        (lambda: _BuiltKeyboard(SECRET), KeyboardInterrupt, ()),
+        (lambda: _MetaInterrupt(SECRET), BaseException, ("fact ledger read failed",)),
+        (_SecretInterrupt, BaseException, ("fact ledger read failed",)),
+    ],
+)
+def test_clean_interrupt_keeps_a_custom_kind_or_its_built_in_base(
+    make: Callable[[], BaseException], kind: type[BaseException], args: tuple[object, ...]
+) -> None:
+    """A custom kind is kept when a fresh one runs no caller code, else its built-in base."""
+    clean = ledger_module._clean_interrupt  # pyright: ignore[reportPrivateUsage]
+    error = clean(make())
+    assert type(error) is kind
+    assert error.args == args
+    assert error.__cause__ is None
+    assert error.__context__ is None
+    assert getattr(error, "__notes__", None) is None
+    assert vars(error) == {}
+    assert _secret_reachable(error) == []
+
+
+@pytest.mark.parametrize(
+    ("make", "kinds"),
+    [
+        (_secret_group, [BaseExceptionGroup, KeyboardInterrupt, Exception]),
+        (
+            _nested_group,
+            [BaseExceptionGroup, BaseExceptionGroup, SystemExit, _PlainInterrupt],
+        ),
+        (_plain_group, [_PlainGroup, _PlainKeyboard]),
+        (
+            _group_with_an_exception_group,
+            [BaseExceptionGroup, ExceptionGroup, Exception, KeyboardInterrupt],
+        ),
+    ],
+)
+def test_clean_interrupt_keeps_a_group_and_cleans_every_member(
+    make: Callable[[], BaseException], kinds: list[type[BaseException]]
+) -> None:
+    """A BaseExceptionGroup keeps its kind and members' kinds, with fixed text only."""
+    clean = ledger_module._clean_interrupt  # pyright: ignore[reportPrivateUsage]
+    error = clean(make())
+    members = _group_members(error)
+    assert [type(member) for member in members] == kinds
+    for member in members:
+        assert member.__cause__ is None
+        assert member.__context__ is None
+        assert getattr(member, "__notes__", None) is None
+        assert _secret_reachable(member) == []
+        if isinstance(member, BaseExceptionGroup):
+            assert str(member).startswith("fact ledger read failed")
+
+
+@pytest.mark.asyncio
+async def test_interrupt_group_from_the_read_keeps_its_kind(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Through run_fact_ledger, a group wrapping a KeyboardInterrupt stays a group."""
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+
+    async def _boom(*_args: object, **_kwargs: object) -> bool:
+        raise _secret_group()
+
+    monkeypatch.setattr(ledger_module, "live_qa_passed", _boom)
+    with pytest.raises(BaseExceptionGroup) as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    members = _group_members(caught.value)
+    assert [type(member) for member in members] == [
+        BaseExceptionGroup,
+        KeyboardInterrupt,
+        Exception,
+    ]
+    assert caught.value.__context__ is None
+    assert all(_secret_reachable(member) == [] for member in members)
+    assert path.read_bytes() == raw
+    assert _jobs(path) == []
+
+
+class _ForgedText(str):
+    """A str subclass that claims to equal, and hash like, a known refusal."""
+
+    __slots__ = ()
+
+    def __eq__(self, other: object) -> bool:
+        return True
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+    def __hash__(self) -> int:
+        return hash("checkpoint variant is duplicated")
+
+
+def test_forged_str_subclass_refusal_text_is_not_raised() -> None:
+    """A str subclass with a forged hash and equality is not a known refusal text."""
+    forged = _ForgedText("checkpoint " + SECRET)
+    assert forged in {"checkpoint variant is duplicated"}
+    with pytest.raises(ProductBuildError) as caught:
+        progress_module.reject_duplicate_labels(["a", "a"], forged)
+    assert type(caught.value.args[0]) is str
+    assert caught.value.args == ("checkpoint list is duplicated",)
+    assert SECRET not in str(caught.value)

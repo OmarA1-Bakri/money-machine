@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
+from typing import cast
 
 from money_machine.agents.implementations.notion_product_builder import (
     BUILD_PHASES,
@@ -202,6 +203,7 @@ _PROVIDER_FAILED = "provider read failed"
 _READ_FAILED = "fact ledger read failed"
 _OWN_PREFIXES = ("fact ledger", "workflow link", "qa ", "progress ", "checkpoint ")
 _PACKAGE = "money_machine.agents.implementations."
+_TRUSTED_MODULES = frozenset({"builtins"})
 
 
 async def _guarded_read(
@@ -254,23 +256,57 @@ async def _guarded_read(
 
 
 def _clean_interrupt(error: BaseException) -> BaseException:
-    """A fresh error of the same built-in kind, with no text and no chain.
+    """A fresh error of the same kind, with no text, notes, attributes, or chain.
 
     asyncio.timeout and Task.cancel match CancelledError by type, so a fresh
     CancelledError keeps cancellation working. A SystemExit keeps an integer
-    code only. Any other BaseException becomes a plain BaseException with the
-    fixed read failure text.
+    code only. A BaseExceptionGroup keeps its kind and its cleaned members
+    under the fixed read failure text. Any other BaseException keeps the fixed
+    read failure text.
+
+    A subclass keeps its own type only when building it runs no code outside
+    the standard library (see _safe_kind). Otherwise it becomes its nearest
+    built-in base, so a custom constructor never sees the secret or runs here.
     """
+    if isinstance(error, BaseExceptionGroup):
+        members = cast(tuple[BaseException, ...], error.exceptions)
+        cleaned = [_clean_member(member) for member in members]
+        group = cast(type[BaseExceptionGroup[BaseException]], _safe_kind(error, BaseExceptionGroup))
+        return group(_READ_FAILED, cleaned)
     if isinstance(error, asyncio.CancelledError):
-        return asyncio.CancelledError()
+        return _safe_kind(error, asyncio.CancelledError)()
     if isinstance(error, KeyboardInterrupt):
-        return KeyboardInterrupt()
+        return _safe_kind(error, KeyboardInterrupt)()
     if isinstance(error, GeneratorExit):
-        return GeneratorExit()
+        return _safe_kind(error, GeneratorExit)()
     if isinstance(error, SystemExit):
         code = error.code
-        return SystemExit(code if type(code) is int else 1)
-    return BaseException(_READ_FAILED)
+        return _safe_kind(error, SystemExit)(code if type(code) is int else 1)
+    return _safe_kind(error, BaseException)(_READ_FAILED)
+
+
+def _clean_member(member: BaseException) -> BaseException:
+    """One cleaned group member. An Exception member keeps no text either."""
+    if isinstance(member, Exception) and not isinstance(member, BaseExceptionGroup):
+        return Exception(_READ_FAILED)
+    return _clean_interrupt(member)
+
+
+def _safe_kind[K: BaseException](error: K, base: type[K]) -> type[K]:
+    """The error's own type when a fresh one is safe to build, else base.
+
+    Safe means the type is a plain class whose __new__ and __init__ both come
+    from the standard library, so building it runs no caller code and stores
+    only the arguments given here.
+    """
+    kind = type(error)
+    if type(kind) is not type:
+        return base
+    for slot in ("__new__", "__init__"):
+        owner = next(klass for klass in kind.__mro__ if slot in vars(klass))
+        if owner.__module__ not in _TRUSTED_MODULES:
+            return base
+    return kind
 
 
 def _own_message(error: ProductBuildError) -> bool:

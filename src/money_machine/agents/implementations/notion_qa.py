@@ -117,9 +117,9 @@ async def run_product_qa(
     require_same_spec(stored, validated)
     if not stored.variants or stored.next_phase != PHASE_QA:
         raise ProductBuildError("qa requires the variants checkpoint")
+    saved = load_qa_record(path)
     checkpoint: ProductBuildCheckpoint | None = None
     try:
-        saved = load_qa_record(path)
         if saved is not None and await _saved_holds(fixture, stored, validated, saved):
             return replace(stored, next_phase=PHASE_FACT_LEDGER, qa=saved)
         plan = await _plan(fixture, stored, validated)
@@ -137,13 +137,20 @@ async def run_product_qa(
         checkpoint = _with_qa(
             stored, plan.checks, repairs, verdict, proof, facts, moment, prose_digest(validated)
         )
-        _write_qa(path, checkpoint, created)
-    except ProviderFailure:
-        # The provider response can carry a secret. It is not stored, raised,
-        # or chained. The handler returns first, so the raise has no context.
+    except ProductBuildError:
+        # An own refusal keeps its fixed text.
+        raise
+    except Exception:
+        # A provider error of any kind (ProviderFailure, ConnectionError,
+        # OSError, RuntimeError, ...) can carry a secret in its text, args, or
+        # chain. None of it is stored, raised, or chained. The handler returns
+        # first, so the fixed raise below has no context.
         checkpoint = None
     if checkpoint is None:
         raise_recorded(path, BUILD_PHASES[-1], ProviderFailure(OP_QA, _QA_PROVIDER_FAILED))
+    # The local write is outside the provider handler. Its error carries no
+    # provider response, so it propagates as it is.
+    _write_qa(path, checkpoint, created)
     return checkpoint
 
 
