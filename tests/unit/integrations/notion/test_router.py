@@ -6,9 +6,15 @@ from pathlib import Path
 import pytest
 import yaml
 
-from money_machine.integrations.notion import NotionAdapterRouter
+from money_machine.integrations.notion import NotionAdapterRouter as exported_router
 from money_machine.integrations.notion.api_adapter import APINotionAdapter
 from money_machine.integrations.notion.fixture_adapter import FixtureNotionAdapter
+from money_machine.integrations.notion.router import NotionAdapterRouter
+
+
+def test_package_exports_the_router():
+    """The package re-exports the router used by the integration tests."""
+    assert exported_router is NotionAdapterRouter
 
 
 def test_router_defaults_to_fixture_when_config_missing():

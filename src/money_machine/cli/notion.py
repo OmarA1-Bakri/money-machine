@@ -81,6 +81,16 @@ def token_shape_ok(token: str) -> bool:
     return re.fullmatch(_TOKEN_RE, token) is not None
 
 
+def redact_secret_shapes(text: str) -> str:
+    """Replace shaped ``secret_`` and ``ntn_`` values with a fixed marker."""
+    return _TOKEN_RE.sub("[REDACTED]", text)
+
+
+def contains_secret_shape(text: str) -> bool:
+    """True when the text contains a shaped ``secret_`` or ``ntn_`` value."""
+    return _TOKEN_RE.search(text) is not None
+
+
 def _probe(arguments: object) -> NotionProbe:
     probe = getattr(arguments, "notion_probe", None)
     if probe is None:
