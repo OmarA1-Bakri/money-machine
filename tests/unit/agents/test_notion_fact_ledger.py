@@ -4915,19 +4915,22 @@ def _group_with_an_exception_group() -> BaseException:
 @pytest.mark.parametrize(
     ("make", "kind", "args"),
     [
-        (lambda: _PlainInterrupt(SECRET), _PlainInterrupt, ("fact ledger read failed",)),
-        (lambda: _PlainKeyboard(SECRET), _PlainKeyboard, ()),
-        (lambda: _PlainExit(SECRET), _PlainExit, (1,)),
-        (lambda: _PlainExit(4), _PlainExit, (4,)),
+        (lambda: _PlainInterrupt(SECRET), BaseException, ("fact ledger read failed",)),
+        (lambda: _PlainKeyboard(SECRET), KeyboardInterrupt, ()),
+        (lambda: _PlainExit(SECRET), SystemExit, (1,)),
+        (lambda: _PlainExit(4), SystemExit, (4,)),
         (lambda: _BuiltKeyboard(SECRET), KeyboardInterrupt, ()),
         (lambda: _MetaInterrupt(SECRET), BaseException, ("fact ledger read failed",)),
         (_SecretInterrupt, BaseException, ("fact ledger read failed",)),
     ],
 )
-def test_clean_interrupt_keeps_a_custom_kind_or_its_built_in_base(
+def test_clean_interrupt_always_gives_the_built_in_base(
     make: Callable[[], BaseException], kind: type[BaseException], args: tuple[object, ...]
 ) -> None:
-    """A custom kind is kept when a fresh one runs no caller code, else its built-in base."""
+    """Round 11: every subclass, even a plain one, becomes its built-in base.
+
+    A SystemExit keeps an integer code only.
+    """
     clean = ledger_module._clean_interrupt  # pyright: ignore[reportPrivateUsage]
     error = clean(make())
     assert type(error) is kind
@@ -4945,19 +4948,19 @@ def test_clean_interrupt_keeps_a_custom_kind_or_its_built_in_base(
         (_secret_group, [BaseExceptionGroup, KeyboardInterrupt, Exception]),
         (
             _nested_group,
-            [BaseExceptionGroup, BaseExceptionGroup, SystemExit, _PlainInterrupt],
+            [BaseExceptionGroup, BaseExceptionGroup, SystemExit, BaseException],
         ),
-        (_plain_group, [_PlainGroup, _PlainKeyboard]),
+        (_plain_group, [BaseExceptionGroup, KeyboardInterrupt]),
         (
             _group_with_an_exception_group,
             [BaseExceptionGroup, ExceptionGroup, Exception, KeyboardInterrupt],
         ),
     ],
 )
-def test_clean_interrupt_keeps_a_group_and_cleans_every_member(
+def test_clean_interrupt_rebuilds_a_group_from_built_in_bases(
     make: Callable[[], BaseException], kinds: list[type[BaseException]]
 ) -> None:
-    """A BaseExceptionGroup keeps its kind and members' kinds, with fixed text only."""
+    """A group is rebuilt as a built-in group of built-in bases, with fixed text only."""
     clean = ledger_module._clean_interrupt  # pyright: ignore[reportPrivateUsage]
     error = clean(make())
     members = _group_members(error)
@@ -5151,9 +5154,89 @@ def _all_reachable(error: BaseException) -> list[str]:
     return found
 
 
+# Round 11, Verifier 6079224062: the secret in the class identity itself.
+# A class built at runtime by the provider can name itself with the secret, or
+# set its __qualname__ or __module__ to it, on any interrupt base.
+_IDENTITY_SHAPES: dict[str, Callable[[str], tuple[str, dict[str, object]]]] = {
+    "name": lambda base: (SECRET, {"__module__": __name__}),
+    "qualname": lambda base: (
+        f"_qualname_{base}",
+        {"__module__": __name__, "__qualname__": "probe." + SECRET},
+    ),
+    "module": lambda base: (f"_module_{base}", {"__module__": SECRET}),
+    "doc": lambda base: (f"_doc_{base}", {"__module__": __name__, "__doc__": SECRET}),
+}
+
+
+def _identity_kind(shape: str, base: str) -> type[BaseException]:
+    """A plain subclass of the named base whose name, qualname, or module is the secret."""
+    name, body = _IDENTITY_SHAPES[shape](base)
+    return cast(type[BaseException], type(name, (_LEAK_BASES[base][0],), body))
+
+
+_IDENTITY_ROWS = [
+    pytest.param(_identity_kind(shape, base), _LEAK_BASES[base][1], id=f"{base}-identity_{shape}")
+    for base in _LEAK_BASES
+    for shape in _IDENTITY_SHAPES
+]
+
+
+def _wrapped_identity(shape: str, base: str) -> Callable[[], BaseException]:
+    """The identity shape inside a plain BaseExceptionGroup."""
+    kind = _identity_kind(shape, base)
+    return lambda: BaseExceptionGroup("wrapped", [kind()])
+
+
+_IDENTITY_GROUP_ROWS = [
+    pytest.param(
+        _wrapped_identity(shape, base),
+        _LEAK_BASES[base][1],
+        id=f"{base}-identity_{shape}-in_group",
+    )
+    for base in _LEAK_BASES
+    for shape in _IDENTITY_SHAPES
+]
+
+
+def _stderr_of(error: BaseException, capsys: pytest.CaptureFixture[str]) -> str:
+    """What the default hook prints to stderr when the error ends the program uncaught."""
+    import sys
+
+    capsys.readouterr()
+    sys.__excepthook__(type(error), error, error.__traceback__)
+    return capsys.readouterr().err
+
+
+def _identity_group() -> BaseException:
+    kind = cast(
+        type[BaseExceptionGroup[BaseException]],
+        type(SECRET, (BaseExceptionGroup,), {"__module__": SECRET, "__qualname__": SECRET}),
+    )
+    return kind("wrapped", [_identity_kind("name", "KeyboardInterrupt")()])
+
+
+def _identity_shown(error: BaseException) -> list[str]:
+    """Where the secret shows in the class identity of the error or any group member."""
+    found: list[str] = []
+    for member in _group_members(error):
+        kind = type(member)
+        for where, text in (
+            ("name", kind.__name__),
+            ("qualname", kind.__qualname__),
+            ("module", kind.__module__),
+            ("doc", kind.__doc__ or ""),
+            ("type_repr", repr(kind)),
+            ("repr", repr(member)),
+        ):
+            if SECRET in text:
+                found.append(where)
+    return found
+
+
 _LEAKS = [
     *_LEAK_MATRIX,
     *_INIT_ROWS,
+    *_IDENTITY_ROWS,
     pytest.param(_PropertyKeyboard, KeyboardInterrupt, id="property"),
     pytest.param(_ForgedModuleKeyboard, KeyboardInterrupt, id="forged_module"),
     pytest.param(_PlainUnderStr, BaseException, id="custom_base_str"),
@@ -5188,6 +5271,7 @@ async def test_leaking_interrupt_from_the_provider_becomes_its_built_in_base(
     assert error.__context__ is None
     assert vars(error) == {}
     assert _all_reachable(error) == []
+    assert _identity_shown(error) == []
     assert path.read_bytes() == raw
     assert _jobs(path) == []
     assert calls == []
@@ -5195,7 +5279,7 @@ async def test_leaking_interrupt_from_the_provider_becomes_its_built_in_base(
 
 @pytest.mark.asyncio
 async def test_leaking_members_of_a_provider_group_become_their_bases(tmp_path: Path) -> None:
-    """A BaseExceptionGroup from the provider keeps its kind; leaking members are flattened."""
+    """A BaseExceptionGroup from the provider is rebuilt from built-in bases."""
     spec, probe, path = await _qa(tmp_path)
     raw = path.read_bytes()
 
@@ -5220,6 +5304,83 @@ async def test_leaking_members_of_a_provider_group_become_their_bases(tmp_path: 
     assert calls == []
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("make", "base"), [*_IDENTITY_ROWS, *_IDENTITY_GROUP_ROWS])
+async def test_class_identity_secret_from_the_provider_never_shows(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    make: Callable[[], BaseException],
+    base: type[BaseException],
+) -> None:
+    """Round 11 (Reviewer 5468975790, Verifier 6079224062): name, qualname, module, doc.
+
+    Each shape alone and inside a group, raised at the provider seam and seen at
+    public run_fact_ledger, shows no secret in repr, traceback, or stderr.
+    """
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+
+    async def _boom(_url: str) -> bool:
+        raise make()
+
+    probe.verify_stranger_access = _boom  # type: ignore[method-assign]
+    calls = watch_adapter_writes(probe)
+    with pytest.raises(BaseException) as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    error = caught.value
+    members = _group_members(error)
+    expected = base if not isinstance(error, BaseExceptionGroup) else BaseExceptionGroup
+    assert type(error) is expected
+    assert type(members[-1]) is base
+    assert error.__cause__ is None
+    assert error.__context__ is None
+    assert _all_reachable(error) == []
+    assert _identity_shown(error) == []
+    assert SECRET not in _stderr_of(error, capsys)
+    assert path.read_bytes() == raw
+    assert _jobs(path) == []
+    assert calls == []
+
+
+@pytest.mark.parametrize(("make", "base"), _IDENTITY_GROUP_ROWS)
+def test_clean_interrupt_drops_a_secret_class_identity_inside_a_group(
+    capsys: pytest.CaptureFixture[str],
+    make: Callable[[], BaseException],
+    base: type[BaseException],
+) -> None:
+    """Helper level: an identity shape wrapped in a group becomes a built-in group of bases."""
+    clean = ledger_module._clean_interrupt  # pyright: ignore[reportPrivateUsage]
+    error = clean(make())
+    assert [type(member) for member in _group_members(error)] == [BaseExceptionGroup, base]
+    assert _all_reachable(error) == []
+    assert _identity_shown(error) == []
+    assert SECRET not in _stderr_of(error, capsys)
+
+
+@pytest.mark.asyncio
+async def test_provider_group_with_a_secret_class_identity_is_rebuilt(tmp_path: Path) -> None:
+    """Round 11: a group class and member named with the secret show none of it."""
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+
+    async def _boom(_url: str) -> bool:
+        raise _identity_group()
+
+    probe.verify_stranger_access = _boom  # type: ignore[method-assign]
+    calls = watch_adapter_writes(probe)
+    with pytest.raises(BaseExceptionGroup) as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    members = _group_members(caught.value)
+    assert [type(member) for member in members] == [BaseExceptionGroup, KeyboardInterrupt]
+    assert caught.value.__cause__ is None
+    assert caught.value.__context__ is None
+    assert _all_reachable(caught.value) == []
+    assert _identity_shown(caught.value) == []
+    assert path.read_bytes() == raw
+    assert _jobs(path) == []
+    assert calls == []
+
+
 @pytest.mark.parametrize(("make", "base"), _LEAKS)
 def test_clean_interrupt_flattens_every_leak_shape(
     make: Callable[[], BaseException], base: type[BaseException]
@@ -5230,6 +5391,7 @@ def test_clean_interrupt_flattens_every_leak_shape(
     assert type(error) is base
     assert vars(error) == {}
     assert _all_reachable(error) == []
+    assert _identity_shown(error) == []
 
 
 def _alias_secret_group() -> BaseException:
@@ -5251,19 +5413,21 @@ def _alias_secret_group() -> BaseException:
         (_ModuleObjectKeyboard, KeyboardInterrupt),
         (_WeakrefKeyboard, KeyboardInterrupt),
         (_DictKeyboard, KeyboardInterrupt),
-        (lambda: _PlainKeyboard(SECRET), _PlainKeyboard),
-        (lambda: _PlainGroup(SECRET, [_PlainKeyboard()]), _PlainGroup),
+        (lambda: _PlainKeyboard(SECRET), KeyboardInterrupt),
+        (lambda: _PlainGroup(SECRET, [_PlainKeyboard()]), BaseExceptionGroup),
+        (_identity_group, BaseExceptionGroup),
     ],
 )
-def test_clean_interrupt_keeps_only_a_plain_class_body(
+def test_clean_interrupt_drops_every_provider_class_body(
     make: Callable[[], BaseException], kind: type[BaseException]
 ) -> None:
-    """Any member beyond the plain class-statement ones makes the kind its built-in base."""
+    """Round 11: no provider class survives, plain or not; each becomes its built-in base."""
     clean = ledger_module._clean_interrupt  # pyright: ignore[reportPrivateUsage]
     error = clean(make())
     assert type(error) is kind
     assert vars(error) == {}
     assert _all_reachable(error) == []
+    assert _identity_shown(error) == []
 
 
 class _ForgedText(str):

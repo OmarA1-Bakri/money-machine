@@ -246,15 +246,16 @@ async def _guarded_read(
         # A code bug is not a provider job. Its text can carry a secret.
         return None, None, _READ_FAILED
     except BaseException as error:
-        # Cancellation and interrupts keep their type. Their text, args,
-        # notes, and chain can carry a secret, so none of it is kept.
+        # Cancellation and interrupts become a fresh built-in base. Their
+        # class, text, args, notes, and chain can carry a secret, so none of
+        # it is kept.
         escaped = _clean_interrupt(error)
     # Raised after the handler has returned, so the fresh error has no context.
-    raise escaped
+    raise escaped from None
 
 
 def _clean_interrupt(error: BaseException) -> BaseException:
-    """A fresh error of the same kind under the fixed read failure text (see clean_interrupt)."""
+    """A fresh built-in base error under the fixed read failure text (see clean_interrupt)."""
     return clean_interrupt(error, _READ_FAILED)
 
 

@@ -2470,6 +2470,19 @@ def _interrupt_group() -> BaseException:
     return BaseExceptionGroup("sk-live-secret", [_StrInterrupt(), RuntimeError("sk-live-secret")])
 
 
+def _identity_interrupt(shape: str) -> type[BaseException]:
+    """Round 11: a KeyboardInterrupt subclass whose name, qualname, module, or doc is the secret."""
+    secret = "sk-live-secret"
+    bodies: dict[str, tuple[str, dict[str, object]]] = {
+        "name": (secret, {"__module__": __name__}),
+        "qualname": ("_Qualname", {"__module__": __name__, "__qualname__": "probe." + secret}),
+        "module": ("_Module", {"__module__": secret}),
+        "doc": ("_Doc", {"__module__": __name__, "__doc__": secret}),
+    }
+    name, body = bodies[shape]
+    return cast(type[BaseException], type(name, (KeyboardInterrupt,), body))
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("make", "kinds", "args"),
@@ -2478,6 +2491,15 @@ def _interrupt_group() -> BaseException:
         (lambda: asyncio.CancelledError("sk-live-secret"), [asyncio.CancelledError], ()),
         (lambda: SystemExit("sk-live-secret"), [SystemExit], (1,)),
         (_StrInterrupt, [KeyboardInterrupt], ()),
+        (_identity_interrupt("name"), [KeyboardInterrupt], ()),
+        (_identity_interrupt("qualname"), [KeyboardInterrupt], ()),
+        (_identity_interrupt("module"), [KeyboardInterrupt], ()),
+        (_identity_interrupt("doc"), [KeyboardInterrupt], ()),
+        (
+            lambda: BaseExceptionGroup("w", [_identity_interrupt("name")()]),
+            [BaseExceptionGroup, KeyboardInterrupt],
+            ("provider operation failed", [KeyboardInterrupt()]),
+        ),
         (
             _interrupt_group,
             [BaseExceptionGroup, KeyboardInterrupt, Exception],
@@ -2488,7 +2510,7 @@ def _interrupt_group() -> BaseException:
         ),
     ],
 )
-async def test_provider_interrupt_in_qa_keeps_its_kind_and_drops_the_secret(
+async def test_provider_interrupt_in_qa_becomes_its_built_in_base(
     tmp_path: Path,
     make: Callable[[], BaseException],
     kinds: list[type[BaseException]],
@@ -2516,6 +2538,10 @@ async def test_provider_interrupt_in_qa_keeps_its_kind_and_drops_the_secret(
         assert getattr(member, "__notes__", None) is None
         assert vars(member) == {}
     assert "sk-live-secret" not in _every_text(error)
+    assert "sk-live-secret" not in "".join(traceback.format_exception(error))
+    for member in members:
+        assert "sk-live-secret" not in repr(type(member))
+        assert "sk-live-secret" not in (type(member).__doc__ or "")
     assert path.read_bytes() == raw
 
 

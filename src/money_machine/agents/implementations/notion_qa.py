@@ -159,10 +159,11 @@ async def run_product_qa(
         # first, so the fixed raise below has no context.
         failure = _QA_LOCAL_FAILED if _local_bug(error) else _QA_PROVIDER_FAILED
     except BaseException as error:
-        # Cancellation and interrupts keep their type, with no text or chain.
+        # Cancellation and interrupts become a fresh built-in base, with no
+        # provider class, text, or chain.
         escaped = clean_interrupt(error, _QA_PROVIDER_FAILED)
     if escaped is not None:
-        raise escaped
+        raise escaped from None
     if failure == _QA_LOCAL_FAILED:
         raise ProductBuildError(_QA_LOCAL_FAILED)
     if checkpoint is None:

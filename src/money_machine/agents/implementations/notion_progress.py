@@ -17,8 +17,7 @@ import contextlib
 import hashlib
 import json
 import os
-import types
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NoReturn, cast
@@ -139,9 +138,6 @@ def reject_duplicate_labels(labels: list[str], message: str) -> None:
 
 
 _PACKAGE = "money_machine.agents.implementations."
-# Py_TPFLAGS_HEAPTYPE. A type without it is built in C, so its methods run no
-# caller code. A class statement always makes a heap type.
-_HEAP_TYPE = 1 << 9
 
 
 def raised_in_package(error: BaseException) -> bool:
@@ -155,32 +151,34 @@ def raised_in_package(error: BaseException) -> bool:
 
 
 def clean_interrupt(error: BaseException, text: str) -> BaseException:
-    """A fresh error of the same kind, with no text, notes, attributes, or chain.
+    """A fresh built-in base error, with no text, notes, attributes, or chain.
 
-    asyncio.timeout and Task.cancel match CancelledError by type, so a fresh
-    CancelledError keeps cancellation working. A SystemExit keeps an integer
-    code only. A BaseExceptionGroup keeps its kind and its cleaned members
-    under the fixed text. Any other BaseException keeps the fixed text.
-
-    A subclass keeps its own type only when its class bodies add nothing a
-    fresh instance could show (see _safe_kind). Otherwise it becomes its
-    nearest built-in base, so no caller method runs here or on the result.
+    The result is always one of the fixed classes below, never the caller's
+    own type. A provider-defined subclass is dropped, because its __name__,
+    __qualname__, __module__, class dict, and methods are the caller's, and a
+    class built at runtime can put a secret in any of them. Only the control
+    flow kind survives: a KeyboardInterrupt is a fresh KeyboardInterrupt, a
+    CancelledError a fresh asyncio.CancelledError (asyncio.timeout and
+    Task.cancel match it by type), a GeneratorExit a fresh GeneratorExit, and a
+    SystemExit a fresh SystemExit with an integer code only (any other code
+    becomes 1). A BaseExceptionGroup becomes a fresh BaseExceptionGroup of its
+    cleaned members under the fixed text. Any other BaseException becomes a
+    plain BaseException with the fixed text.
     """
     if isinstance(error, BaseExceptionGroup):
         members = cast(tuple[BaseException, ...], error.exceptions)
         cleaned = [_clean_member(member, text) for member in members]
-        group = cast(type[BaseExceptionGroup[BaseException]], _safe_kind(error, BaseExceptionGroup))
-        return group(text, cleaned)
+        return BaseExceptionGroup(text, cleaned)
     if isinstance(error, asyncio.CancelledError):
-        return _safe_kind(error, asyncio.CancelledError)()
+        return asyncio.CancelledError()
     if isinstance(error, KeyboardInterrupt):
-        return _safe_kind(error, KeyboardInterrupt)()
+        return KeyboardInterrupt()
     if isinstance(error, GeneratorExit):
-        return _safe_kind(error, GeneratorExit)()
+        return GeneratorExit()
     if isinstance(error, SystemExit):
         code = error.code
-        return _safe_kind(error, SystemExit)(code if type(code) is int else 1)
-    return _safe_kind(error, BaseException)(text)
+        return SystemExit(code if type(code) is int else 1)
+    return BaseException(text)
 
 
 def _clean_member(member: BaseException, text: str) -> BaseException:
@@ -188,59 +186,6 @@ def _clean_member(member: BaseException, text: str) -> BaseException:
     if isinstance(member, Exception) and not isinstance(member, BaseExceptionGroup):
         return Exception(text)
     return clean_interrupt(member, text)
-
-
-def _safe_kind[K: BaseException](error: K, base: type[K]) -> type[K]:
-    """The error's own type when a fresh one shows nothing of the caller's, else base.
-
-    The metaclass must be type. Every class in the MRO is either built in (not
-    a heap type) or a plain class whose body defines nothing but its module,
-    docstring, and the standard dict/weakref slots (see _plain_member). So an
-    overridden __new__, __init__, __str__, __repr__, __getattribute__,
-    __getattr__, __reduce__, property, or class attribute makes it base. The
-    check is by type flag, not by __module__, which a class body can forge.
-    """
-    kind = type(error)
-    if type(kind) is not type:
-        return base
-    for klass in kind.__mro__:
-        if not klass.__flags__ & _HEAP_TYPE:
-            continue
-        if not all(_plain_member(name, value) for name, value in vars(klass).items()):
-            return base
-    return kind
-
-
-def _plain_member(name: str, value: object) -> bool:
-    """True for a member every plain class statement adds, with its usual type."""
-    if name in ("__dict__", "__weakref__"):
-        return type(value) is types.GetSetDescriptorType
-    if name == "__doc__":
-        return value is None or type(value) is str
-    if name in ("__module__", "__qualname__"):
-        return type(value) is str
-    if name == "__firstlineno__":
-        return type(value) is int
-    if name == "__static_attributes__":
-        return _tuple_of(value, lambda item: type(item) is str)
-    if name == "__orig_bases__":
-        # class C(BaseExceptionGroup[BaseException]) stores its written bases.
-        return _tuple_of(value, _plain_base)
-    return False
-
-
-def _tuple_of(value: object, check: Callable[[object], bool]) -> bool:
-    """True for an exact tuple whose items all pass check."""
-    return type(value) is tuple and all(check(item) for item in cast(tuple[object, ...], value))
-
-
-def _plain_base(item: object) -> bool:
-    """A written base: a class, or a class subscripted with classes only."""
-    if type(item) is type:
-        return True
-    if type(item) is not types.GenericAlias:
-        return False
-    return type(item.__origin__) is type and all(type(arg) is type for arg in item.__args__)
 
 
 def guard_operation(probe: object, operation: str) -> None:
