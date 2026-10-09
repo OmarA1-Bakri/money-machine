@@ -129,16 +129,16 @@ def _interrupted_rows(done: list[dict[str, object]]) -> list[dict[str, object]]:
 
     An empty list is a signal during the target reads, before any stage ran. A
     full list is a signal after every stage returned, so no row is relabelled.
+    A prefix of only the finished available stages leaves qa and later NOT_RUN.
     """
     rows = list(done)
     marked = any(row.get("status") == "INTERRUPTED" for row in rows)
     for name, runner_name in STAGE_REGISTRY[len(rows) :]:
-        available = runner_name is not None
-        if available and not marked:
+        if runner_name is not None and not marked:
             rows.append(_stage_row(name, True, "INTERRUPTED", planned=False))
             marked = True
             continue
-        rows.append(_stage_row(name, available, "NOT_RUN", planned=False))
+        rows.append(_stage_row(name, runner_name is not None, "NOT_RUN", planned=False))
     return rows
 
 
@@ -262,12 +262,12 @@ def _payload(
         "bot_user_id": bot_user_id,
         "created_pages": created,
         "ended_at": stamp(ended),
-        "flagged_pages": [] if flagged is None else flagged,
+        "flagged_pages": _page_list(flagged),
         "git_sha": git,
         "mode": mode,
-        "possible_orphans": [] if orphans is None else orphans,
+        "possible_orphans": _page_list(orphans),
         "qa_verdict": qa_verdict(stages),
-        "rejected_pages": [] if rejected is None else rejected,
+        "rejected_pages": _page_list(rejected),
         "stages": stages,
         "started_at": stamp(started),
         "write_counts": _split_counts(counts),
@@ -275,6 +275,12 @@ def _payload(
     payload.update(control)
     payload.update(evidence_sections(counts, created))
     return payload
+
+
+def _page_list(rows: list[dict[str, str]] | None) -> list[dict[str, str]]:
+    if rows is None:
+        return []
+    return rows
 
 
 def _split_counts(counts: Mapping[str, int]) -> dict[str, object]:
@@ -410,6 +416,9 @@ def _publish_interrupted() -> int:
     if _evidence_is_complete(path):
         return _fail(log, EXIT_API)
     stages = _interrupted_rows(held.stages)
+    counts = held.counts
+    if not counts:
+        counts = empty_write_counts()
     try:
         return _finish(
             path,
@@ -419,7 +428,7 @@ def _publish_interrupted() -> int:
             mode=held.mode,
             stages=stages,
             created=held.created,
-            counts=held.counts if held.counts else empty_write_counts(),
+            counts=counts,
             bot_user_id=held.bot_user_id,
             git=held.git,
             control=held.control,
@@ -512,7 +521,10 @@ def _main(
             "notion token shape is invalid",
             EXIT_USAGE,
         )
-    active = client if client is not None else LiveSandboxClient(token)
+    if client is None:
+        active: SandboxClient = LiveSandboxClient(token)
+    else:
+        active = client
     counts = empty_write_counts()
     active.write_counts = counts
     _HELD.counts = counts

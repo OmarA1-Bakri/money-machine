@@ -1,7 +1,7 @@
 """Live Notion reads and child-page writes for the sandbox parent only.
 
-Tests do not construct this client. The runner does, and only when no fake
-client was injected.
+The runner constructs this client when no fake client was injected. The
+default opener is ``sandbox_opener``; tests may omit the opener argument.
 """
 
 from __future__ import annotations
@@ -103,9 +103,10 @@ class LiveSandboxClient:
         self._token = token
         director = sandbox_opener()
         self._proxy_targets = dict(proxy_map(director))
-        self._opener = (
-            opener if opener is not None else cast(Callable[..., _Readable], director.open)
-        )
+        if opener is None:
+            self._opener = cast(Callable[..., _Readable], director.open)
+        else:
+            self._opener = opener
         self._bot_space = ""
         self._created_ids: list[str] = []
         self._evidence: tuple[list[str], list[dict[str, str]]] | None = None

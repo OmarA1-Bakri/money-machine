@@ -699,6 +699,9 @@ def test_dry_run_is_the_default_and_writes_nothing(
     assert client.reads == ["bot", SANDBOX_PARENT_PAGE_ID]
     assert client.creates == []
     assert payload["created_pages"] == []
+    assert payload["flagged_pages"] == []
+    assert payload["possible_orphans"] == []
+    assert payload["rejected_pages"] == []
     assert _writes(payload) == 0
     assert _stage(payload, "build") == {
         "available": True,
@@ -1425,6 +1428,7 @@ def test_https_proxy_is_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:9")
     client = LiveSandboxClient(_SECRET)
     assert client.proxy_targets() == {}
+    assert client._opener is not None
 
 
 def _flagged_page(**flags: object) -> bytes:
@@ -2624,6 +2628,8 @@ def test_empty_parent_chain_does_not_read_again() -> None:
 def test_proc_path_helper_rejects_proc_itself() -> None:
     assert under_proc(Path("/proc")) is True
     assert under_proc(Path("/proc/self")) is True
+    assert under_proc(Path("//proc/self/ev.json")) is True
+    assert under_proc(Path("///proc/self/ev.json")) is True
     assert under_proc(Path("/tmp/evidence.json")) is False
 
 
@@ -3756,6 +3762,11 @@ def test_second_interrupt_retries_until_a_file_exists(
     assert _stage(payload, "build")["status"] == "PASS"
     assert _stage(payload, "variants")["status"] == "PASS"
     assert _stage(payload, "qa")["status"] == "NOT_RUN"
+    live_counts = payload["write_counts"]
+    assert isinstance(live_counts, dict)
+    live = live_counts["live"]
+    assert isinstance(live, dict)
+    assert live["create_child_page"] == 5
 
 
 def test_real_sigint_during_the_evidence_write_leaves_a_complete_file(tmp_path: Path) -> None:
@@ -4659,6 +4670,10 @@ _TAIL = [
             [_row("build", True, "PASS"), _row("variants", True, "PASS"), *_TAIL],
             [_row("build", True, "PASS"), _row("variants", True, "PASS"), *_TAIL],
         ),
+        (
+            [_row("build", True, "PASS"), _row("variants", True, "PASS")],
+            [_row("build", True, "PASS"), _row("variants", True, "PASS"), *_TAIL],
+        ),
     ],
 )
 def test_interrupted_rows_keep_finished_stages(
@@ -5309,3 +5324,186 @@ def test_repeated_sigint_during_the_evidence_write_keeps_one_file(
     # The second create is the first variant. Build finished and stays PASS.
     assert _stage(payload, "build")["status"] == "PASS"
     assert _stage(payload, "variants")["status"] == "INTERRUPTED"
+
+
+def test_leading_double_slash_proc_path_is_refused(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """``//proc/...`` keeps a ``//`` root under abspath. Stock must still refuse it."""
+    target = tmp_path / "sub"
+    target.mkdir()
+    alias = Path("//proc/self/root") / target.relative_to("/") / "ev.json"
+    with pytest.raises(SandboxError, match="evidence path is refused"):
+        open_evidence(alias)
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(alias, capsys, caplog, ["--execute"], client=client)
+    assert code == EXIT_USAGE
+    assert err == "evidence path is refused\n"
+    assert payload == {}
+    assert client.reads == []
+    assert client.creates == []
+    assert list(target.iterdir()) == []
+    assert alias.exists() is False
+
+
+def test_symlink_to_proc_is_refused(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A directory symlink to ``/proc`` must not skip the ``/proc`` refusal."""
+    link = tmp_path / "proc"
+    link.symlink_to("/proc")
+    alias = link / "self" / "root" / tmp_path.relative_to("/") / "ev.json"
+    with pytest.raises(SandboxError, match="evidence path is refused"):
+        open_evidence(alias)
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(alias, capsys, caplog, ["--execute"], client=client)
+    assert code == EXIT_USAGE
+    assert err == "evidence path is refused\n"
+    assert payload == {}
+    assert client.reads == []
+    assert client.creates == []
+    assert alias.exists() is False
+
+
+def test_live_client_default_opener_is_callable() -> None:
+    client = LiveSandboxClient(_SECRET)
+    assert callable(client._opener)
+
+
+def test_absent_injected_client_writes_evidence(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """No injected client uses LiveSandboxClient. Sockets stay blocked."""
+    code, payload, _out, err, _logs = _invoke(evidence, capsys, caplog, [])
+    assert code == EXIT_API
+    assert err == "notion api error\n"
+    assert evidence.is_file()
+    assert payload["error"] == "notion api error"
+    assert payload["flagged_pages"] == []
+    assert payload["possible_orphans"] == []
+    assert payload["rejected_pages"] == []
+    assert payload["created_pages"] == []
+
+
+def test_production_client_dry_run_uses_sandbox_opener(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A dry-run without an injected client must use ``sandbox_opener().open``."""
+    opener = _Opener(
+        [_bot_body(), _page_body(_PARENT_RAW, parent=_PARENT_RAW, space=_SPACE_RAW)]
+    )
+
+    class _Director:
+        def open(self, *args: object, **kwargs: object) -> _Response:
+            return opener(*args, **kwargs)
+
+    monkeypatch.setattr(
+        "money_machine.cli.notion_sandbox_live.sandbox_opener",
+        lambda: _Director(),
+    )
+    code, payload, _out, err, _logs = _invoke(evidence, capsys, caplog, [])
+    assert code == EXIT_OK
+    assert err == ""
+    assert payload["mode"] == "dry-run"
+    assert [call[0] for call in opener.calls] == ["GET", "GET"]
+    assert payload["flagged_pages"] == []
+    assert payload["possible_orphans"] == []
+    assert payload["rejected_pages"] == []
+
+
+def test_leftover_tmp_is_replaced(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    leftover = evidence.with_name(f".{evidence.name}.tmp")
+    leftover.write_text("stale", encoding="utf-8")
+    leftover.chmod(0o600)
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=FakeSandbox()
+    )
+    assert code == EXIT_OK
+    assert err == ""
+    assert leftover.exists() is False
+    assert [page["id"] for page in payload["created_pages"]] == [
+        canonical_id(item) for item in _CHILD_IDS
+    ]
+
+
+def test_tmp_eexist_after_creates_exits_69_with_ids(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """O_EXCL EEXIST after creates is not a usage error. Ids stay on stderr."""
+    real_open = os.open
+
+    def _open(path: str | os.PathLike[str], flags: int, mode: int = 0o777) -> int:
+        if flags & os.O_EXCL and str(path).endswith(".tmp"):
+            raise OSError(errno.EEXIST, "File exists")
+        return real_open(path, flags, mode)
+
+    monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.open", _open)
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_API
+    assert code != EXIT_USAGE
+    assert evidence.exists() is False
+    kept = canonical_id(_CHILD_IDS[0])
+    assert kept in err
+    for page_id in _CHILD_IDS:
+        assert canonical_id(page_id) in err
+    assert client.creates
+    assert payload == {}
+
+
+def test_interrupt_during_tmp_unlink_keeps_ids(
+    evidence: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A second interrupt during the first tmp unlink must not become exit 64."""
+    real_write = os.write
+    real_unlink = os.unlink
+    state = {"wrote": False, "unlinked": 0}
+
+    def _write(fd: int, data: bytes) -> int:
+        if bytes(data).startswith(b"{") and not state["wrote"]:
+            state["wrote"] = True
+            raise KeyboardInterrupt
+        return real_write(fd, data)
+
+    def _unlink(path: str | os.PathLike[str]) -> None:
+        if str(path).endswith(".tmp"):
+            state["unlinked"] += 1
+            if state["unlinked"] == 1:
+                raise KeyboardInterrupt
+        real_unlink(path)
+
+    monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.write", _write)
+    monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.unlink", _unlink)
+    code = main(
+        ["--evidence-out", str(evidence), "--execute"],
+        client=FakeSandbox(),
+        environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+        clock=_clock,
+    )
+    assert code == EXIT_API
+    assert code != EXIT_USAGE
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    assert [page["id"] for page in payload["created_pages"]] == [
+        canonical_id(item) for item in _CHILD_IDS
+    ]
+    assert _stage(payload, "build")["status"] == "PASS"
+    assert _stage(payload, "variants")["status"] == "PASS"

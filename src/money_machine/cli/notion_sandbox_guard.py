@@ -11,6 +11,7 @@ import contextlib
 import errno
 import json
 import os
+import signal
 import stat
 import subprocess
 from collections.abc import Mapping, Sequence
@@ -341,9 +342,37 @@ def _refuse_path(message: str = "evidence path is refused") -> NoReturn:
     raise SandboxError(message, code=EXIT_USAGE)
 
 
+def _collapsed_abs(path: Path) -> str:
+    """``abspath`` keeps a leading ``//``. Collapse it so ``//proc`` is ``/proc``."""
+    raw = os.path.abspath(path)
+    if raw.startswith("//"):
+        return "/" + raw.lstrip("/")
+    return raw
+
+
+def _is_proc(path: Path) -> bool:
+    return path == Path("/proc") or Path("/proc") in path.parents
+
+
 def under_proc(path: Path) -> bool:
-    absolute = Path(os.path.abspath(path))
-    return absolute == Path("/proc") or Path("/proc") in absolute.parents
+    """True when the path is ``/proc``, under it, or reached through a ``/proc`` symlink.
+
+    ``abspath('//proc/...')`` keeps the ``//`` root, so a leading-slash check
+    would miss it. ``realpath`` of ``/proc/self/root/<dir>`` is ``<dir>``, so the
+    unresolved form still has to be checked. A symlink to ``/proc`` is found by
+    resolving each prefix.
+    """
+    collapsed = Path(_collapsed_abs(path))
+    if _is_proc(collapsed) or _is_proc(Path(os.path.realpath(path))):
+        return True
+    for prefix in (collapsed, *collapsed.parents):
+        try:
+            resolved = Path(os.path.realpath(prefix))
+        except OSError:
+            continue
+        if _is_proc(resolved):
+            return True
+    return False
 
 
 def open_evidence(path: Path) -> None:
@@ -413,6 +442,44 @@ def _destination_appeared(path: Path) -> bool:
     return True
 
 
+def _mask_sigint() -> object:
+    try:
+        previous = signal.getsignal(signal.SIGINT)
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        return previous
+    except ValueError:
+        return None
+
+
+def _restore_sigint(previous: object) -> None:
+    if previous is None:
+        return
+    with contextlib.suppress(ValueError, TypeError):
+        signal.signal(signal.SIGINT, previous)
+
+
+def _discard_leftover_tmp(temporary: Path) -> None:
+    """Remove a leftover sibling tmp from an interrupted first write.
+
+    A symlink is left for ``O_EXCL|O_NOFOLLOW`` to refuse. SIGINT is ignored so a
+    second Ctrl-C cannot leave the file behind and turn the retry into EEXIST.
+    """
+    previous = _mask_sigint()
+    try:
+        try:
+            info = temporary.lstat()
+        except FileNotFoundError:
+            return
+        except OSError:
+            return
+        if stat.S_ISLNK(info.st_mode):
+            return
+        with contextlib.suppress(OSError):
+            os.unlink(temporary)
+    finally:
+        _restore_sigint(previous)
+
+
 def commit_evidence(path: Path, payload: Mapping[str, object], token: str | None) -> str:
     """Write a complete JSON file via a temporary file and an atomic link.
 
@@ -423,6 +490,7 @@ def commit_evidence(path: Path, payload: Mapping[str, object], token: str | None
     text, result = render_evidence(payload, token)
     encoded = text.encode("utf-8")
     temporary = path.with_name(f".{path.name}.tmp")
+    _discard_leftover_tmp(temporary)
     tmp_fd = -1
     try:
         tmp_fd = os.open(
@@ -453,15 +521,19 @@ def commit_evidence(path: Path, payload: Mapping[str, object], token: str | None
     except SandboxError:
         raise
     except OSError as exc:
-        if exc.errno in _DISK_ERRNO:
+        if exc.errno in _DISK_ERRNO or exc.errno == errno.EEXIST:
             raise SandboxError(_failure_text(payload, token, "evidence write failed")) from None
         raise SandboxError("evidence path is refused", code=EXIT_USAGE) from None
     finally:
-        if tmp_fd >= 0:
+        previous = _mask_sigint()
+        try:
+            if tmp_fd >= 0:
+                with contextlib.suppress(OSError):
+                    os.close(tmp_fd)
             with contextlib.suppress(OSError):
-                os.close(tmp_fd)
-        with contextlib.suppress(OSError):
-            os.unlink(temporary)
+                os.unlink(temporary)
+        finally:
+            _restore_sigint(previous)
     return result
 
 
