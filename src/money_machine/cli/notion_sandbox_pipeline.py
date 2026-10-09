@@ -201,15 +201,19 @@ def _align(ctx: SandboxRun, page: PageView, before: int) -> str:
     """Keep the evidence id equal to the page the create returned."""
     page_id = canonical_id(page.page_id)
     remaining = len(ctx.created_ids) - before
-    guard = remaining + 1
-    while len(ctx.created_ids) > before:
-        if guard <= 0:
-            raise SandboxError("created id list did not shrink")
-        guard -= 1
+    for _step in range(max(remaining, 0) + 1):
+        if len(ctx.created_ids) <= before:
+            break
         tail = ctx.created_ids[-1]
         if tail == page_id:
             break
+        before_len = len(ctx.created_ids)
         _drop_tail(ctx, tail, before)
+        if len(ctx.created_ids) >= before_len:
+            raise SandboxError("created id list did not shrink")
+    else:
+        if len(ctx.created_ids) > before:
+            raise SandboxError("created id list did not shrink")
     # _remember, _flag, and _drop_recorded each ignore a blank id.
     if space_conflicts(page.space_id):
         if page_id in ctx.created_ids[:before]:

@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import base64
 import contextlib
+import ctypes
+import ctypes.util
 import errno
 import json
+import logging
 import os
 import signal
 import stat
@@ -22,6 +25,10 @@ from typing import NoReturn, Protocol
 from urllib.parse import quote
 
 from money_machine.cli.notion import contains_secret_shape, redact_secret_shapes, token_shape_ok
+
+LOGGER = logging.getLogger(__name__)
+PROC_SUPER_MAGIC = 0x9FA0
+_WALK_LIMIT = 256
 
 EXIT_OK = 0
 EXIT_USAGE = 64
@@ -363,26 +370,113 @@ def _is_proc(path: Path) -> bool:
     return path == Path("/proc") or Path("/proc") in path.parents
 
 
-def _proc_device() -> int | None:
+class _Statfs(ctypes.Structure):
+    """Linux ``struct statfs``. ``f_type`` is the first field on this ABI."""
+
+    _fields_ = [
+        ("f_type", ctypes.c_long),
+        ("f_bsize", ctypes.c_long),
+        ("f_blocks", ctypes.c_ulong),
+        ("f_bfree", ctypes.c_ulong),
+        ("f_bavail", ctypes.c_ulong),
+        ("f_files", ctypes.c_ulong),
+        ("f_ffree", ctypes.c_ulong),
+        ("f_fsid", ctypes.c_int * 2),
+        ("f_namelen", ctypes.c_long),
+        ("f_frsize", ctypes.c_long),
+        ("f_flags", ctypes.c_long),
+        ("f_spare", ctypes.c_long * 4),
+    ]
+
+
+def _libc() -> ctypes.CDLL | None:
+    name = ctypes.util.find_library("c")
+    if name is None:
+        return None
     try:
-        return os.lstat("/proc").st_dev
+        return ctypes.CDLL(name, use_errno=True)
     except OSError:
         return None
 
 
-def _on_procfs(path: Path) -> bool:
-    """True when ``path`` itself is an inode on the procfs device.
+def _statfs_f_type(path: Path) -> int | None:
+    """``statfs(2)`` ``f_type``, or ``None`` when the call cannot run.
 
-    ``realpath('/proc/self/root')`` is ``/``, and ``stat`` follows that link, so
-    only ``lstat`` sees the procfs inode. ``PermissionError`` is not procfs.
+    ``os.statvfs`` has no ``f_type``. A bind-mounted ``/proc`` and a second
+    procfs instance share the magic ``0x9fa0``, not ``/proc``'s ``st_dev``.
     """
-    proc_dev = _proc_device()
-    if proc_dev is None:
-        return False
+    lib = _libc()
+    if lib is None:
+        return None
+    buf = _Statfs()
     try:
-        return os.lstat(path).st_dev == proc_dev
+        result = lib.statfs(os.fsencode(path), ctypes.byref(buf))
     except OSError:
+        return None
+    if result != 0:
+        return None
+    return int(buf.f_type)
+
+
+def _fstatfs_f_type(fd: int) -> int | None:
+    """``fstatfs(2)`` ``f_type`` for an open directory fd."""
+    lib = _libc()
+    if lib is None:
+        return None
+    buf = _Statfs()
+    try:
+        result = lib.fstatfs(fd, ctypes.byref(buf))
+    except OSError:
+        return None
+    if result != 0:
+        return None
+    return int(buf.f_type)
+
+
+def _mountinfo_text() -> str:
+    try:
+        return Path("/proc/self/mountinfo").read_text(encoding="utf-8")
+    except OSError:
+        return ""
+
+
+def _mountinfo_is_proc(path: Path) -> bool:
+    """True when the containing mount's fstype is ``proc``."""
+    collapsed = _collapsed_abs(path)
+    best = ""
+    matched = False
+    for line in _mountinfo_text().splitlines():
+        if " - " not in line:
+            continue
+        left, right = line.split(" - ", 1)
+        fields = left.split()
+        kinds = right.split()
+        if len(fields) < 5 or not kinds:
+            continue
+        mount_point = fields[4]
+        fstype = kinds[0]
+        if (
+            collapsed == mount_point or collapsed.startswith(mount_point.rstrip("/") + "/")
+        ) and len(mount_point) >= len(best):
+            best = mount_point
+            matched = fstype == "proc"
+    return matched
+
+
+def _on_procfs(path: Path) -> bool:
+    """True when ``path`` sits on a procfs mount.
+
+    Filesystem type is the check, not ``st_dev`` versus ``/proc``. ``statfs``
+    follows a symlink, so ``/proc/self/root`` reports the root fs; callers
+    still walk lexical names and symlink targets. ``PermissionError`` is not
+    procfs.
+    """
+    ftype = _statfs_f_type(path)
+    if ftype == PROC_SUPER_MAGIC:
+        return True
+    if ftype is not None:
         return False
+    return _mountinfo_is_proc(path)
 
 
 def _safe_realpath(path: Path) -> Path | None:
@@ -423,8 +517,10 @@ def under_proc(path: Path) -> bool:
     ``/proc/self/root/<dir>`` is ``<dir>``, and a symlink to
     ``/proc/self/root`` also resolves to ``/``. Every existing ancestor is
     checked on the lexical path and on each resolved/symlink target, by
-    name and by procfs ``st_dev``. ``realpath`` of ``/proc/1/root/...``
-    may raise ``PermissionError``; that is treated as proc, not as a crash.
+    name and by filesystem type (``statfs`` ``f_type`` or mountinfo
+    ``proc``). A relative symlink is joined to its parent before the walk.
+    A symlink cycle is bounded. ``realpath`` of ``/proc/1/root/...`` may
+    raise ``PermissionError``; that is treated as proc, not as a crash.
     """
     collapsed = Path(_collapsed_abs(path))
     pending: list[Path] = [collapsed]
@@ -435,7 +531,11 @@ def under_proc(path: Path) -> bool:
     else:
         pending.append(resolved)
     seen: set[str] = set()
+    steps = 0
     while pending:
+        steps += 1
+        if steps > _WALK_LIMIT:
+            return True
         current = pending.pop()
         key = str(current)
         if key in seen:
@@ -605,6 +705,7 @@ def _discard_leftover_tmp(
             return
         if kind != "file":
             raise SandboxError(_failure_text(payload, token, "evidence write failed"))
+        LOGGER.info("removing leftover regular evidence tmp")
         with contextlib.suppress(OSError):
             os.unlink(temporary)
 
@@ -612,10 +713,42 @@ def _discard_leftover_tmp(
 def _fsync(fd: int) -> None:
     try:
         os.fsync(fd)
+        return
     except OSError as exc:
         if exc.errno != errno.EINTR and "race condition" not in str(exc):
-            raise
+            raise SandboxError("evidence write failed") from None
+    try:
         os.fsync(fd)
+    except OSError:
+        raise SandboxError("evidence write failed") from None
+
+
+def _open_parent_dirfd(path: Path) -> int:
+    """Open the evidence parent as a directory fd. A symlink parent is followed once."""
+    parent = path.parent
+    try:
+        info = os.lstat(parent)
+    except OSError as exc:
+        raise OSError(exc.errno or errno.ENOENT, "parent") from None
+    if stat.S_ISLNK(info.st_mode):
+        target = _symlink_target(parent)
+        if target is None:
+            raise OSError(errno.ENOENT, "parent")
+        if under_proc(parent) or under_proc(target):
+            raise OSError(errno.EPERM, "parent")
+        return os.open(target, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    if not stat.S_ISDIR(info.st_mode):
+        raise OSError(errno.ENOTDIR, "parent")
+    return os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+
+
+def _fd_on_procfs(fd: int) -> bool:
+    ftype = _fstatfs_f_type(fd)
+    if ftype == PROC_SUPER_MAGIC:
+        return True
+    if ftype is not None:
+        return False
+    return _mountinfo_is_proc(Path(f"/proc/self/fd/{fd}"))
 
 
 def commit_evidence(path: Path, payload: Mapping[str, object], token: str | None) -> str:
@@ -623,36 +756,48 @@ def commit_evidence(path: Path, payload: Mapping[str, object], token: str | None
 
     The destination is absent until the temporary file holds every byte.
     An interrupt unlinks the temporary file and leaves the previous destination.
-    A destination that appears after creates, or a procfs swap, is exit 69.
+    A destination that appears after creates, a LINK-stage swap, or a procfs
+    swap is exit 69. ``openat``/``linkat`` use the parent directory fd.
     """
     text, result = render_evidence(payload, token)
     encoded = text.encode("utf-8")
     temporary = _tmp_path(path)
+    tmp_name = temporary.name
+    dest_name = path.name
     _discard_leftover_tmp(temporary, payload, token)
     _refuse_proc_write(path, payload, token)
     tmp_fd = -1
+    parent_fd = -1
     try:
         _refuse_proc_write(path, payload, token)
+        parent_fd = _open_parent_dirfd(path)
+        if _fd_on_procfs(parent_fd):
+            raise SandboxError(_failure_text(payload, token, "evidence write failed"))
         tmp_fd = os.open(
-            temporary,
+            tmp_name,
             os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_WRONLY,
             0o600,
+            dir_fd=parent_fd,
         )
         opened = os.fstat(tmp_fd)
         if stat.S_IMODE(opened.st_mode) != 0o600:
             raise OSError(errno.EPERM, "mode")
         _refuse_proc_write(path, payload, token)
+        if _fd_on_procfs(parent_fd) or _fd_on_procfs(tmp_fd):
+            raise SandboxError(_failure_text(payload, token, "evidence write failed"))
         _write_all(tmp_fd, encoded)
         os.fchmod(tmp_fd, 0o600)
         _fsync(tmp_fd)
         os.close(tmp_fd)
         tmp_fd = -1
         _refuse_proc_write(path, payload, token)
+        if _fd_on_procfs(parent_fd):
+            raise SandboxError(_failure_text(payload, token, "evidence write failed"))
         if _destination_appeared(path):
             raise SandboxError(
                 _failure_text(payload, token, "evidence file changed during the run")
             )
-        os.link(temporary, path)
+        os.link(tmp_name, dest_name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
         current = path.lstat()
         if stat.S_ISLNK(current.st_mode) or current.st_size != len(encoded) or under_proc(path):
             with contextlib.suppress(OSError):
@@ -663,7 +808,8 @@ def commit_evidence(path: Path, payload: Mapping[str, object], token: str | None
     except SandboxError:
         raise
     except OSError as exc:
-        if exc.errno in _WRITE_ERRNO or "race condition" in str(exc):
+        ids = _created_page_ids(payload)
+        if ids != "" or exc.errno in _WRITE_ERRNO or "race condition" in str(exc):
             raise SandboxError(_failure_text(payload, token, "evidence write failed")) from None
         raise SandboxError(
             _failure_text(payload, token, "evidence path is refused"),
@@ -674,6 +820,9 @@ def commit_evidence(path: Path, payload: Mapping[str, object], token: str | None
             if tmp_fd >= 0:
                 with contextlib.suppress(OSError):
                     os.close(tmp_fd)
+            if parent_fd >= 0:
+                with contextlib.suppress(OSError):
+                    os.close(parent_fd)
             with contextlib.suppress(OSError):
                 os.unlink(temporary)
     return result

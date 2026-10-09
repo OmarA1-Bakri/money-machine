@@ -344,6 +344,13 @@ _leave_sigint_ignored = False
 
 
 def _raise_interrupt(_signum: int, _frame: object) -> None:
+    """Turn SIGINT into KeyboardInterrupt. Ignore further SIGINTs first.
+
+    A gap-0 second SIGINT must not restore the default handler and drop the
+    stderr ids. ``SIG_IGN`` is installed before anything else in this handler.
+    """
+    with contextlib.suppress(ValueError, OSError):
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
     raise KeyboardInterrupt
 
 
@@ -443,10 +450,14 @@ def _publish_interrupted() -> int:
             orphans=held.orphans,
             interrupted=True,
         )
+    except SandboxError as exc:
+        return _fail(_with_ids(str(exc), held.created), EXIT_API)
     except (KeyboardInterrupt, asyncio.CancelledError):
         if _evidence_is_complete(path):
             return _fail(log, EXIT_API)
         raise
+    except Exception:
+        return _fail(log, EXIT_API)
 
 
 def _reset_held() -> None:

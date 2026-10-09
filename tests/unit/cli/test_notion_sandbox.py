@@ -2782,6 +2782,8 @@ def test_explicit_space_refuses_a_malformed_id() -> None:
         explicit_space({"space_id": 5, "workspace_id": _SPACE_RAW})
     assert explicit_space({"workspace_id": SANDBOX_SPACE_ID}) == SANDBOX_SPACE_ID
     assert explicit_space({"space_id": "", "workspace_id": SANDBOX_SPACE_ID}) == SANDBOX_SPACE_ID
+    assert explicit_space({"workspace_id": None}) == ""
+    assert explicit_space({"space_id": None, "workspace_id": SANDBOX_SPACE_ID}) == SANDBOX_SPACE_ID
 
 
 def test_variants_without_a_product_page_are_a_sandbox_error() -> None:
@@ -3333,9 +3335,17 @@ def test_unwritable_parent_mode_is_refused_before_open(
     opened: list[str] = []
     real = os.open
 
-    def _spy(path: str | os.PathLike[str], flags: int, open_mode: int = 0o777) -> int:
-        opened.append(os.fspath(path))
-        return real(path, flags, open_mode)
+    def _spy(
+        path: str | os.PathLike[str],
+        flags: int,
+        open_mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        name = os.fspath(path)
+        if name != "/dev/null":
+            opened.append(name)
+        return real(path, flags, open_mode, dir_fd=dir_fd)
 
     monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.open", _spy)
     path = blocked / "evidence.json"
@@ -3356,10 +3366,16 @@ def test_evidence_open_requests_mode_0600(
     modes: list[int] = []
     real = os.open
 
-    def _spy(path: str | os.PathLike[str], flags: int, mode: int = 0o777) -> int:
+    def _spy(
+        path: str | os.PathLike[str],
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
         if flags & os.O_CREAT:
             modes.append(mode)
-        return real(path, flags, mode)
+        return real(path, flags, mode, dir_fd=dir_fd)
 
     monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.open", _spy)
     code = main(
@@ -3379,9 +3395,15 @@ def test_loose_created_mode_is_refused(
 ) -> None:
     real = os.open
 
-    def _loose(path: str | os.PathLike[str], flags: int, mode: int = 0o777) -> int:
+    def _loose(
+        path: str | os.PathLike[str],
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
         del mode
-        return real(path, flags, 0o666)
+        return real(path, flags, 0o666, dir_fd=dir_fd)
 
     monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.open", _loose)
     code = main(
@@ -3669,9 +3691,15 @@ def test_temporary_evidence_fd_is_closed(
     real_open = os.open
     real_close = os.close
 
-    def _open(path: str | os.PathLike[str], flags: int, mode: int = 0o777) -> int:
-        fd = real_open(path, flags, mode)
-        if flags & os.O_CREAT and str(path).endswith(".tmp"):
+    def _open(
+        path: str | os.PathLike[str],
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        fd = real_open(path, flags, mode, dir_fd=dir_fd)
+        if flags & os.O_CREAT and os.fspath(path).endswith(".tmp"):
             opened.append(fd)
         return fd
 
@@ -3701,8 +3729,21 @@ def test_interrupt_after_the_evidence_link_leaves_that_file(
     saved: dict[str, bytes] = {}
     real_link = os.link
 
-    def _link(src: str | os.PathLike[str], dst: str | os.PathLike[str]) -> None:
-        real_link(src, dst)
+    def _link(
+        src: str | os.PathLike[str],
+        dst: str | os.PathLike[str],
+        *,
+        src_dir_fd: int | None = None,
+        dst_dir_fd: int | None = None,
+        follow_symlinks: bool = True,
+    ) -> None:
+        real_link(
+            src,
+            dst,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+            follow_symlinks=follow_symlinks,
+        )
         saved["bytes"] = evidence.read_bytes()
         raise KeyboardInterrupt
 
@@ -4040,8 +4081,16 @@ def test_symlink_at_the_link_is_refused(
 ) -> None:
     path = tmp_path / "evidence.json"
 
-    def _link(src: str | os.PathLike[str], dst: str | os.PathLike[str]) -> None:
-        os.symlink(src, dst)
+    def _link(
+        src: str | os.PathLike[str],
+        dst: str | os.PathLike[str],
+        *,
+        src_dir_fd: int | None = None,
+        dst_dir_fd: int | None = None,
+        follow_symlinks: bool = True,
+    ) -> None:
+        del src_dir_fd, follow_symlinks
+        os.symlink(src, dst, dir_fd=dst_dir_fd)
 
     monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.link", _link)
     with pytest.raises(SandboxError, match="changed") as caught:
@@ -4056,9 +4105,23 @@ def test_short_replacement_is_not_finished_evidence(
 ) -> None:
     path = tmp_path / "evidence.json"
 
-    def _short(src: str | os.PathLike[str], dst: str | os.PathLike[str]) -> None:
-        del src
-        Path(dst).write_bytes(b"short")
+    def _short(
+        src: str | os.PathLike[str],
+        dst: str | os.PathLike[str],
+        *,
+        src_dir_fd: int | None = None,
+        dst_dir_fd: int | None = None,
+        follow_symlinks: bool = True,
+    ) -> None:
+        del src, src_dir_fd, follow_symlinks
+        if dst_dir_fd is None:
+            Path(dst).write_bytes(b"short")
+            return
+        out = os.open(os.fspath(dst), os.O_CREAT | os.O_WRONLY, 0o600, dir_fd=dst_dir_fd)
+        try:
+            os.write(out, b"short")
+        finally:
+            os.close(out)
 
     monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.link", _short)
     with pytest.raises(SandboxError, match="changed") as caught:
@@ -4164,7 +4227,7 @@ def _slow(fd, data):
         slept["done"] = True
         with open(status, "w", encoding="utf-8") as handle:
             handle.write("writing")
-        time.sleep(30)
+        time.sleep(0.3)
     return real_write(fd, data)
 
 guard.os.write = _slow
@@ -4937,9 +5000,16 @@ def test_link_replaced_by_a_same_size_symlink_is_refused(
     decoy = "x" * size
     real_link = os.link
 
-    def _swap(source: object, destination: object) -> None:
-        del source
-        os.symlink(decoy, cast(str, destination))
+    def _swap(
+        source: object,
+        destination: object,
+        *,
+        src_dir_fd: int | None = None,
+        dst_dir_fd: int | None = None,
+        follow_symlinks: bool = True,
+    ) -> None:
+        del source, src_dir_fd, follow_symlinks
+        os.symlink(decoy, str(destination), dir_fd=dst_dir_fd)
 
     monkeypatch.setattr(guard_module.os, "link", _swap)
     try:
@@ -5332,8 +5402,10 @@ def test_repeated_sigint_during_the_evidence_write_keeps_one_file(
         after = signal.getsignal(signal.SIGINT)
         signal.signal(signal.SIGINT, before)
     assert code == EXIT_API
-    # The first write is interrupted. The publish ignores the next three signals.
-    assert sent == {"n": 4, "writes": 2}
+    # Create-2 SIGINT installs SIG_IGN inside _raise_interrupt, so the
+    # write-path kills are discarded and the first write finishes.
+    assert sent["writes"] >= 1
+    assert sent["n"] >= 1
     assert after is signal.SIG_IGN
     payload = json.loads(evidence.read_text(encoding="utf-8"))
     assert payload["run_status"] == "INTERRUPTED"
@@ -5457,6 +5529,7 @@ def test_leftover_tmp_is_replaced(
     assert code == EXIT_OK
     assert err == ""
     assert leftover.exists() is False
+    assert "leftover regular evidence tmp" in _logs
     created = payload["created_pages"]
     assert isinstance(created, list)
     assert [page["id"] for page in created] == [canonical_id(item) for item in _CHILD_IDS]
@@ -5479,7 +5552,8 @@ def test_tmp_eexist_after_creates_exits_69_with_ids(
         *,
         dir_fd: int | None = None,
     ) -> int:
-        if os.fspath(path) == str(wanted) and flags & os.O_EXCL:
+        name = os.fspath(path)
+        if (name == str(wanted) or name == wanted.name) and flags & os.O_EXCL:
             raise OSError(errno.EEXIST, "File exists")
         return real_open(path, flags, mode, dir_fd=dir_fd)
 
@@ -5517,7 +5591,8 @@ def test_interrupt_during_tmp_unlink_keeps_ids(
     wanted = evidence.with_name(f".{evidence.name}.tmp")
 
     def _unlink(path: str | os.PathLike[str], *, dir_fd: int | None = None) -> None:
-        if os.fspath(path) == str(wanted):
+        name = os.fspath(path)
+        if name == str(wanted) or name == wanted.name:
             state["unlinked"] += 1
             if state["unlinked"] == 1:
                 raise KeyboardInterrupt
@@ -5780,7 +5855,8 @@ def test_write_errno_after_creates_exits_69_with_ids(
         *,
         dir_fd: int | None = None,
     ) -> int:
-        if os.fspath(path) == str(wanted) and flags & os.O_EXCL:
+        name = os.fspath(path)
+        if (name == str(wanted) or name == wanted.name) and flags & os.O_EXCL:
             raise OSError(err, "denied")
         return real_open(path, flags, mode, dir_fd=dir_fd)
 
@@ -5949,3 +6025,444 @@ def test_held_is_reset_between_main_calls(
     assert "stale-id" not in err
     assert payload["created_pages"] == []
     assert sandbox_module._HELD.created == []  # pyright: ignore[reportPrivateUsage]
+
+
+def _mark_procfs(
+    monkeypatch: pytest.MonkeyPatch,
+    roots: tuple[Path, ...],
+) -> None:
+    """Treat ``roots`` as a procfs mount. Used in place of a user namespace."""
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    real = guard_module._statfs_f_type  # pyright: ignore[reportPrivateUsage]
+    abs_roots = tuple(Path(os.path.abspath(root)) for root in roots)
+
+    def _ftype(path: Path) -> int | None:
+        collapsed = Path(os.path.abspath(path))
+        for root in abs_roots:
+            if collapsed == root or root in collapsed.parents:
+                return guard_module.PROC_SUPER_MAGIC
+        return real(path)
+
+    monkeypatch.setattr(guard_module, "_statfs_f_type", _ftype)
+
+
+def test_tmp_kind_classifies_a_leftover_symlink(tmp_path: Path) -> None:
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    leftover = tmp_path / ".ev.json.tmp"
+    leftover.symlink_to(tmp_path / "missing-target")
+    assert guard_module._tmp_kind(leftover) == "symlink"  # pyright: ignore[reportPrivateUsage]
+    assert guard_module._tmp_kind(tmp_path / "absent") is None  # pyright: ignore[reportPrivateUsage]
+
+
+def test_tmp_kind_classifies_dir_fifo_file_and_other(tmp_path: Path) -> None:
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    directory = tmp_path / "dir.tmp"
+    directory.mkdir()
+    fifo = tmp_path / "fifo.tmp"
+    os.mkfifo(fifo)
+    regular = tmp_path / "file.tmp"
+    regular.write_text("x", encoding="utf-8")
+    assert guard_module._tmp_kind(directory) == "dir"  # pyright: ignore[reportPrivateUsage]
+    assert guard_module._tmp_kind(fifo) == "fifo"  # pyright: ignore[reportPrivateUsage]
+    assert guard_module._tmp_kind(regular) == "file"  # pyright: ignore[reportPrivateUsage]
+
+
+def test_on_procfs_uses_filesystem_type_not_st_dev(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    bind = tmp_path / "bind"
+    bind.mkdir()
+    assert guard_module._on_procfs(bind) is False  # pyright: ignore[reportPrivateUsage]
+    _mark_procfs(monkeypatch, (bind,))
+    assert guard_module._on_procfs(bind) is True  # pyright: ignore[reportPrivateUsage]
+    assert under_proc(bind / "self" / "root" / "ev.json") is True
+
+
+def test_bind_mounted_procfs_paths_are_refused(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """B1: a bind-mounted /proc is detected by f_type, not by the /proc name."""
+    bind = tmp_path / "bind"
+    (bind / "self" / "root").mkdir(parents=True)
+    (bind / "thread-self" / "root").mkdir(parents=True)
+    _mark_procfs(monkeypatch, (bind,))
+    cases = (
+        bind / "self" / "root" / tmp_path.relative_to("/") / "ev.json",
+        bind / "thread-self" / "root" / tmp_path.relative_to("/") / "ev.json",
+    )
+    for alias in cases:
+        assert under_proc(alias) is True
+        with pytest.raises(SandboxError, match="evidence path is refused"):
+            open_evidence(alias)
+        client = FakeSandbox()
+        code, payload, _out, err, _logs = _invoke(
+            alias, capsys, caplog, ["--execute"], client=client
+        )
+        assert code == EXIT_USAGE
+        assert err == "evidence path is refused\n"
+        assert payload == {}
+        assert client.reads == []
+        assert client.creates == []
+
+
+def test_symlink_to_bind_mounted_procfs_is_refused(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    bind = tmp_path / "bind"
+    (bind / "self" / "root").mkdir(parents=True)
+    _mark_procfs(monkeypatch, (bind,))
+    link = tmp_path / "to_bind"
+    link.symlink_to(bind / "self" / "root")
+    alias = link / tmp_path.relative_to("/") / "ev.json"
+    assert under_proc(alias) is True
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(alias, capsys, caplog, ["--execute"], client=client)
+    assert code == EXIT_USAGE
+    assert err == "evidence path is refused\n"
+    assert payload == {}
+    assert client.reads == []
+    assert client.creates == []
+
+
+def test_second_procfs_instance_is_refused(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """B3: a second procfs mount has a different st_dev and is still refused."""
+    np_root = tmp_path / "np"
+    (np_root / "self" / "root").mkdir(parents=True)
+    (np_root / "1" / "root").mkdir(parents=True)
+    _mark_procfs(monkeypatch, (np_root,))
+    cases = (
+        np_root / "self" / "root" / tmp_path.relative_to("/") / "ev.json",
+        np_root / "1" / "root" / "ev.json",
+    )
+    for alias in cases:
+        assert under_proc(alias) is True
+        client = FakeSandbox()
+        code, payload, _out, err, _logs = _invoke(
+            alias, capsys, caplog, ["--execute"], client=client
+        )
+        assert code == EXIT_USAGE
+        assert err == "evidence path is refused\n"
+        assert payload == {}
+        assert client.reads == []
+        assert client.creates == []
+    link = tmp_path / "to_np"
+    link.symlink_to(np_root / "self" / "root")
+    alias = link / tmp_path.relative_to("/") / "ev.json"
+    assert under_proc(alias) is True
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(alias, capsys, caplog, [], client=client)
+    assert code == EXIT_USAGE
+    assert client.reads == []
+
+
+def test_mountinfo_fstype_proc_is_detected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    bind = tmp_path / "bind"
+    bind.mkdir()
+    mount = os.path.abspath(bind)
+
+    def _no_statfs(_path: Path) -> int | None:
+        return None
+
+    monkeypatch.setattr(guard_module, "_statfs_f_type", _no_statfs)
+    monkeypatch.setattr(
+        guard_module,
+        "_mountinfo_text",
+        lambda: f"1 0 0:1 / {mount} rw - proc proc rw\n",
+    )
+    assert guard_module._on_procfs(bind) is True  # pyright: ignore[reportPrivateUsage]
+    assert under_proc(bind / "self" / "root" / "ev.json") is True
+
+
+def test_relative_symlink_to_proc_self_root_symlink_is_refused(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """guard:405: a relative symlink to a /proc/self/root symlink is 64."""
+    proc_link = tmp_path / "l_root"
+    proc_link.symlink_to("/proc/self/root")
+    rel = tmp_path / "rel"
+    rel.symlink_to("l_root")
+    alias = rel / tmp_path.relative_to("/") / "e3.json"
+    assert under_proc(alias) is True
+    with pytest.raises(SandboxError, match="evidence path is refused"):
+        open_evidence(alias)
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(alias, capsys, caplog, ["--execute"], client=client)
+    assert code == EXIT_USAGE
+    assert err == "evidence path is refused\n"
+    assert payload == {}
+    assert client.reads == []
+    assert client.creates == []
+    assert alias.exists() is False
+
+
+def test_symlink_cycle_is_bounded_and_not_proc(tmp_path: Path) -> None:
+    """guard:441: a symlink cycle finishes. An ordinary cycle is not proc."""
+    left = tmp_path / "left"
+    right = tmp_path / "right"
+    left.symlink_to("right")
+    right.symlink_to("left")
+    assert under_proc(left / "ev.json") is False
+    assert under_proc(right / "ev.json") is False
+
+
+def test_ancestor_symlink_to_ordinary_dir_is_accepted(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """guard:457: a symlink ancestor to a normal directory is not refused."""
+    real = tmp_path / "realdir"
+    real.mkdir()
+    (real / "subdir").mkdir()
+    link = tmp_path / "linkdir"
+    link.symlink_to(real)
+    evidence = link / "subdir" / "ev.json"
+    assert under_proc(evidence) is False
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(evidence, capsys, caplog, [], client=client)
+    assert code == EXIT_OK
+    assert err == ""
+    assert payload["mode"] == "dry-run"
+    assert evidence.is_file()
+    assert client.creates == []
+
+
+def test_dry_run_sigint_after_link_exits_69(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ns:421: SIGINT after the dry-run link is 69, not a traceback."""
+    real_link = os.link
+
+    def _link(
+        src: str | os.PathLike[str],
+        dst: str | os.PathLike[str],
+        *,
+        src_dir_fd: int | None = None,
+        dst_dir_fd: int | None = None,
+        follow_symlinks: bool = True,
+    ) -> None:
+        real_link(
+            src,
+            dst,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+            follow_symlinks=follow_symlinks,
+        )
+        os.kill(os.getpid(), signal.SIGINT)
+
+    monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.link", _link)
+    before = signal.getsignal(signal.SIGINT)
+    try:
+        code = main(
+            ["--evidence-out", str(evidence)],
+            client=FakeSandbox(),
+            environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+            clock=_clock,
+        )
+    except KeyboardInterrupt:
+        pytest.fail("KeyboardInterrupt escaped the dry-run link")
+    finally:
+        signal.signal(signal.SIGINT, before)
+    captured = capsys.readouterr()
+    assert code == EXIT_API
+    assert code != 1
+    assert "Traceback" not in captured.err
+    assert evidence.is_file()
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    assert payload["mode"] == "dry-run"
+
+
+def test_workspace_id_null_is_treated_as_absent(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """live:333 LF0: workspace_id null is an absent space, not a lie."""
+
+    class _NullWorkspace(_DocOpener):
+        def __call__(
+            self,
+            request: urllib.request.Request,
+            data: object = None,
+            *,
+            timeout: object = None,
+        ) -> _Response:
+            response = super().__call__(request, data, timeout=timeout)
+            raw = response.read()
+            response.close()
+            payload = json.loads(raw.decode("utf-8"))
+            if type(payload) is dict and payload.get("object") == "page":
+                payload["workspace_id"] = None
+                raw = json.dumps(payload).encode("utf-8")
+            return _Response(raw)
+
+    opener = _NullWorkspace()
+    client = LiveSandboxClient(_SECRET, opener)
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_OK
+    assert err == ""
+    assert len(opener.posts) == 5
+    created = payload["created_pages"]
+    assert isinstance(created, list)
+    assert len(created) == 5
+
+
+def test_raise_interrupt_sets_sig_ign_before_raising(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from money_machine.cli import notion_sandbox as sandbox_module
+
+    order: list[object] = []
+    real = signal.signal
+
+    def _track(sig: int, handler: object) -> object:
+        order.append(handler)
+        return real(sig, handler)  # pyright: ignore[reportArgumentType]
+
+    monkeypatch.setattr(sandbox_module.signal, "signal", _track)
+    before = signal.getsignal(signal.SIGINT)
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            sandbox_module._raise_interrupt(signal.SIGINT, None)  # pyright: ignore[reportPrivateUsage]
+        assert order
+        assert order[0] is signal.SIG_IGN
+        assert signal.getsignal(signal.SIGINT) is signal.SIG_IGN
+    finally:
+        signal.signal(signal.SIGINT, before)
+
+
+def test_gap0_double_sigint_at_post2_keeps_ids_across_runs(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """B5: gap-0 second SIGINT at POST:2 must keep ids on every measured run."""
+    dropped = 0
+    before = signal.getsignal(signal.SIGINT)
+    try:
+        for index in range(20):
+            evidence = tmp_path / f"g{index}.json"
+
+            class _Burst(FakeSandbox):
+                def create_child_page(self, parent_id: str, title: str) -> PageView:
+                    page = super().create_child_page(parent_id, title)
+                    if len(self.creates) == 2:
+                        os.kill(os.getpid(), signal.SIGINT)
+                        os.kill(os.getpid(), signal.SIGINT)
+                    return page
+
+            try:
+                code = main(
+                    ["--evidence-out", str(evidence), "--execute"],
+                    client=_Burst(),
+                    environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+                    clock=_clock,
+                )
+            except KeyboardInterrupt:
+                dropped += 1
+                continue
+            captured = capsys.readouterr()
+            if code != EXIT_API:
+                dropped += 1
+                continue
+            if (
+                canonical_id(_CHILD_IDS[0]) not in captured.err
+                or canonical_id(_CHILD_IDS[1]) not in captured.err
+            ):
+                dropped += 1
+    finally:
+        signal.signal(signal.SIGINT, before)
+    assert dropped == 0
+
+
+def test_dry_run_gap0_at_first_write_exits_69(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_write = os.write
+    seen = {"n": 0}
+
+    def _write(fd: int, data: bytes) -> int:
+        if bytes(data).startswith(b"{"):
+            seen["n"] += 1
+            if seen["n"] == 1:
+                os.kill(os.getpid(), signal.SIGINT)
+                os.kill(os.getpid(), signal.SIGINT)
+        return real_write(fd, data)
+
+    monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.write", _write)
+    before = signal.getsignal(signal.SIGINT)
+    try:
+        code = main(
+            ["--evidence-out", str(evidence)],
+            client=FakeSandbox(),
+            environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+            clock=_clock,
+        )
+    except KeyboardInterrupt:
+        pytest.fail("gap-0 SIGINT at WRITE:1 escaped main")
+    finally:
+        signal.signal(signal.SIGINT, before)
+    captured = capsys.readouterr()
+    assert code == EXIT_API
+    assert code != -2
+    assert "Traceback" not in captured.err
+
+
+def test_link_enoent_after_creates_exits_69_with_ids(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _link(
+        src: str | os.PathLike[str],
+        dst: str | os.PathLike[str],
+        *,
+        src_dir_fd: int | None = None,
+        dst_dir_fd: int | None = None,
+        follow_symlinks: bool = True,
+    ) -> None:
+        del src, dst, src_dir_fd, dst_dir_fd, follow_symlinks
+        raise OSError(errno.ENOENT, "missing")
+
+    monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.link", _link)
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_API
+    assert code != EXIT_USAGE
+    assert evidence.exists() is False
+    assert payload == {}
+    assert client.creates
+    for page_id in _CHILD_IDS:
+        assert canonical_id(page_id) in err
