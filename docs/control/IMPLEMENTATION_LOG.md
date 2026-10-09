@@ -1,3 +1,47 @@
+## 2026-10-09 — Session 07 sandbox run, round 6
+
+Not a session close. This is not SESSION_07 COMPLETE. `state_revision` stays 58. `IMPLEMENTATION_STATE.json` is not edited. `head_sha` stays the W9 squash `a4e9b025021b4effbb2b2879c1db756403cb1676`. Twelve session 7 evidence keys stay false. `commissioned_agents` stays empty. Exit 78 stays HELD. The §11 sandbox CLI is still not run live. This commit's CI run is not invented here.
+
+Round 6 answers Reviewer 5465433904 and Verifier 6073572255 on tip `bcf9a36c`. Prompt-integrity addendum: `docs/control/reviews/2026-10-09-session-07-round-6-prompt-integrity.md`.
+
+Blocker to test.
+
+- Reviewer B1 / V-B4 residual: `under_proc` now collapses a leading `//` and walks `realpath` of each prefix (`notion_sandbox_guard.py:357`). `//proc/self/root/<dir>/ev.json` and a directory symlink to `/proc` exit 64 with 0 reads and 0 writes. Tests: `test_leading_double_slash_proc_path_is_refused`, `test_symlink_to_proc_is_refused`, `test_proc_path_helper_rejects_proc_itself`. Serial: prefix-walk `if False` fails `test_symlink_to_proc_is_refused` (1). Both checks `if False` fail 5. `under_proc` `return False` fails 5.
+- Reviewer B4 / gap-0 SIGINT: `commit_evidence` discards a leftover non-symlink `.tmp` with SIGINT ignored, ignores SIGINT around the final unlink, and maps `EEXIST` to exit 69 with held ids (`_failure_text`). Tests: `test_leftover_tmp_is_replaced`, `test_tmp_eexist_after_creates_exits_69_with_ids`, `test_interrupt_during_tmp_unlink_keeps_ids`. Serial: `EEXIST` clause forced `False` fails 1; leftover treated as a symlink fails 1.
+- Verifier B2 survivors, rewritten off IfExp and pinned: `_page_list` (`notion_sandbox.py:280`) so `flagged_pages` / `possible_orphans` / `rejected_pages` stay `[]`; `if client is None` (`:524`); `if opener is None` (`notion_sandbox_live.py:106`); `if not counts` (`notion_sandbox.py:420`); `_interrupted_rows` inlines `runner_name is not None` (`:137`) and the `[build PASS, variants PASS]` prefix is a case of `test_interrupted_rows_keep_finished_stages`. Serial, each replacement `if False`/`if True` fails its named test (1 or 2).
+
+Round-4 Verifier V-B1–B5 on `bcf9a36c` still hold. This round only extends V-B4 (`//proc` and symlink-to-`/proc`) and V-B5 (`:137` qa INTERRUPTED).
+
+Census on this tree, one AST walk of the four modules: if 164, boolop 57, and 23, or 34, clause 121, ifexp 8, while 3. Mutations: if-flip 164, force-true 164, force-false 164, operator swap 57, clause negation 121, literal clause True/False 242, ifexp True/False 16, while-flip 3. Total 931. **The 931-row table was not re-run. No file-level killed/survived/sum is claimed.**
+
+Serial probes that were actually run (full sandbox suite or the named tests; stock first: 300 passed):
+
+| Site | Mutant | Result | Failed | Test |
+|---|---|---|---|---|
+| `notion_sandbox.py:281` | `if rows is None` → `False` | KILLED | 1 | `test_dry_run_is_the_default_and_writes_nothing` |
+| `notion_sandbox.py:524` | `if client is None` → `False` | KILLED | 1 | `test_absent_injected_client_writes_evidence` |
+| `notion_sandbox_live.py:106` | `if opener is None` → `False` | KILLED | 2 | `test_live_client_default_opener_is_callable`, `test_production_client_dry_run_uses_sandbox_opener` |
+| `notion_sandbox.py:137` | `runner_name is not None` → `True` | KILLED | 1 | `test_interrupted_rows_keep_finished_stages` |
+| `notion_sandbox.py:420` | `if not counts` → `True` | KILLED | 1 | `test_second_interrupt_retries_until_a_file_exists` |
+| `notion_sandbox_guard.py:520` | `errno.EEXIST` clause → `False` | KILLED | 1 | `test_tmp_eexist_after_creates_exits_69_with_ids` |
+| `notion_sandbox_guard.py:373` | prefix-walk `if _is_proc` → `False` | KILLED | 1 | `test_symlink_to_proc_is_refused` |
+| `notion_sandbox_guard.py:366`+`:373` | both checks → `False` | KILLED | 5 | `//proc`, symlink, proc-alias, helper |
+| leftover tmp | `S_ISLNK` → `True` | KILLED | 1 | `test_leftover_tmp_is_replaced` |
+| `notion_sandbox.py:230` IfExp T/F | always `datetime.now` / always `clock()` | KILLED | 42 / 1 | full sandbox suite |
+| `notion_sandbox.py:477` IfExp T/F | always `sys.argv[1:]` / always `argv` | KILLED | 136 / 1 | full sandbox suite |
+| `notion_sandbox.py:478` IfExp T/F | always `os.environ` / always `environ` | KILLED | 101 / 1 | full sandbox suite |
+| `notion_sandbox.py:500` IfExp T/F | always `"execute"` / always `"dry-run"` | KILLED | 12 / 38 | full sandbox suite |
+| `notion_sandbox.py:619` IfExp T/F | always default spec / always injected | KILLED | 1 / 47 | full sandbox suite |
+
+Probe-backed equivalents. Both versions produce the same output on the named tests.
+
+- `notion_sandbox_guard.py:366` force-false of the first `under_proc` check only. The prefix walk still refuses `//proc` and a symlink to `/proc`.
+- `notion_sandbox_guard.py:348` force-false of `raw.startswith("//")`. The prefix walk still refuses `//proc/self/...`.
+
+The previous mapping claim that `notion_sandbox.py` was 213/213 killed with Failed sum 6371 is withdrawn. On `bcf9a36c` Verifier measured 205 killed / 8 survived, sum 5761; Reviewer measured the same 205/8 split, sum 5704. Those 8 sites are the IfExps and `:137` rewritten above. They are not re-claimed as a 213-row table.
+
+`tests/unit/cli/test_notion_sandbox.py`: 300 passed. Sockets stay blocked. `ruff format --check`, `ruff check`, and `pyright` 1.1.411 (0 errors) are clean on the four sandbox modules and the sandbox test.
+
 ## 2026-10-09 — Session 07 sandbox run, round 5
 
 Not a session close. This is not SESSION_07 COMPLETE. `state_revision` stays 58. `IMPLEMENTATION_STATE.json` is not edited. `head_sha` stays the W9 squash `a4e9b025021b4effbb2b2879c1db756403cb1676`. Twelve session 7 evidence keys stay false. `commissioned_agents` stays empty. Exit 78 stays HELD. The §11 sandbox CLI is still not run live. This commit's CI run is not invented here. Whichever PR merges second re-syncs STATE. `origin/build/full-automation` was fetched and is still `a4e9b025021b4effbb2b2879c1db756403cb1676`. The round-4 tip `69a2b421c6d865ed46aa3cf9d1b1c55036a6ac5a` CI verify run 37786526950, job 113342585729, SUCCESS.

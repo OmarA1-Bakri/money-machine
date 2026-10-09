@@ -1,5 +1,22 @@
 # Test Evidence
 
+## 2026-10-09 — Session 07 sandbox run, round 6
+
+**Verification scope**: Round 6 of the §11 sandbox runner. Reviewer FAIL 5465433904 and Verifier FAIL 6073572255 at `bcf9a36c` are folded into this commit series. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. `state_revision` stays 58 | PASS |
+| Sandbox CLI | Still not run live. `tests/unit/cli/test_notion_sandbox.py`: 300 passed. Parent `bcf9a36c` CI verify run `37871343909`, job `113629916678`, SUCCESS. This commit's CI is not invented here | PASS |
+| Census | if 164, boolop 57, and 23, or 34, clause 121, ifexp 8, while 3. Total mutations 931. **931-row table not re-run; no file-level sum claimed** | PASS (count only) |
+| Named serial mutants | Replacement ifs for the 8 `bcf9a36c` survivors, `under_proc` prefix walk, leftover tmp, EEXIST, and all 10 remaining `notion_sandbox.py` IfExp T/F mutants: each KILLED. Two probe-backed EQs: first `under_proc` check only, and `//` collapse only | PASS |
+| `//proc` and symlink | `test_leading_double_slash_proc_path_is_refused`, `test_symlink_to_proc_is_refused`: exit 64, 0 network | PASS |
+| Gap-0 SIGINT / EEXIST | `test_tmp_eexist_after_creates_exits_69_with_ids`, `test_interrupt_during_tmp_unlink_keeps_ids`, `test_leftover_tmp_is_replaced`: exit 69 with ids, not 64 | PASS |
+| Lint and types | `ruff format --check`, `ruff check`, and `pyright` 1.1.411 report 0 errors on the touched modules | PASS |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
 ## 2026-10-09 — Session 07 sandbox run, round 5
 
 **Verification scope**: Round 5 of the §11 sandbox runner. The round-4 Reviewer FAIL, the round-4 Verifier FAIL, and CodeRabbit's CHANGES_REQUESTED at `69a2b421` are folded into this commit. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited.

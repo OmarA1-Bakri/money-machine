@@ -32,6 +32,12 @@
 
 Router browser and combined config modes still raise `NotImplementedError` (W4a). Fixture mode stays the default.
 
+## Session 07 — sandbox run, round 6
+
+**Status**: Incomplete (2026-10-09, state revision 58). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD. The §11 sandbox CLI is still not run live. `origin/build/full-automation` is still `a4e9b025`. Whichever PR merges second re-syncs STATE.
+
+Round 6 answers Reviewer 5465433904 and Verifier 6073572255 at `bcf9a36c`. `under_proc` refuses `//proc/...` and a symlink to `/proc`. A leftover `.tmp` or `O_EXCL` EEXIST after creates exits 69 with ids. The eight behaviour-changing survivors from `bcf9a36c` were rewritten off IfExp and each replacement has a serial killing test. Census: if 164, boolop 57, and 23, or 34, clause 121, ifexp 8, while 3. Total 931. **The 931-row table was not re-run; no 213/213 or Failed-sum claim is made.** The withdrawn `bcf9a36c` claim was 213/213 sum 6371; Verifier measured 205/8 sum 5761 and Reviewer 205/8 sum 5704. Sandbox tests: 300 passed. This commit's CI is not invented here.
+
 ## Session 07 — sandbox run, round 5
 
 **Status**: Incomplete (2026-10-09, state revision 58). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD. The §11 sandbox CLI is still not run live. `origin/build/full-automation` is still `a4e9b025`. Whichever PR merges second re-syncs STATE.
