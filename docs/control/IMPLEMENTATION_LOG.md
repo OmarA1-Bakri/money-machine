@@ -1,3 +1,54 @@
+## 2026-10-09 — Session 07 sandbox run, round 8
+
+Not a session close. This is not SESSION_07 COMPLETE. `state_revision` stays 58. `IMPLEMENTATION_STATE.json` is not edited. `head_sha` stays the W9 squash `a4e9b025021b4effbb2b2879c1db756403cb1676`. Twelve session 7 evidence keys stay false. `commissioned_agents` stays empty. Exit 78 stays HELD. The §11 sandbox CLI is still not run live. This commit's CI run is not invented here. No Verifier verdict had landed on `e571b8e7` when this round was written.
+
+Round 8 answers Reviewer 5467032904 on tip `e571b8e7`. Prompt-integrity addendum: `docs/control/reviews/2026-10-09-session-07-round-8-prompt-integrity.md`.
+
+Blocker to fix to test.
+
+- B1/B3 procfs by filesystem type: `_on_procfs` (`notion_sandbox_guard.py`) uses `ctypes` `statfs`/`fstatfs` `f_type == PROC_SUPER_MAGIC` `0x9fa0`, else `/proc/self/mountinfo` fstype `proc` for the longest matching mount. It does not compare `st_dev` with `/proc`. `under_proc` walks every lexical and resolved ancestor, follows relative symlink targets joined to the parent, and re-checks at each `_refuse_proc_write` / dirfd point. Tests (fstype injected; no user namespace): `test_on_procfs_uses_filesystem_type_not_st_dev`, `test_bind_mounted_procfs_paths_are_refused`, `test_symlink_to_bind_mounted_procfs_is_refused`, `test_second_procfs_instance_is_refused`, `test_mountinfo_fstype_proc_is_detected`.
+- B2 false EQs withdrawn: `_tmp_kind` on a leftover symlink is `"symlink"` (`test_tmp_kind_classifies_a_leftover_symlink`). `_on_procfs`→False is not equivalent; the bind-mount / second-procfs tests fail when it returns False.
+- B4 public survivors: relative symlink to a `/proc/self/root` symlink is 64 (`test_relative_symlink_to_proc_self_root_symlink_is_refused`); a symlink cycle finishes and is not proc (`test_symlink_cycle_is_bounded_and_not_proc`); a grandparent symlink to an ordinary directory with a real subdir is accepted dry-run 0 (`test_ancestor_symlink_to_ordinary_dir_is_accepted`); dry-run SIGINT after `os.link` is 69 with `sandbox interrupted` and no traceback (`test_dry_run_sigint_after_link_exits_69`); `workspace_id: null` is absent and execute finishes 0 after 5 (`test_workspace_id_null_is_treated_as_absent`). Namespace-dependent bind-mount / second-procfs paths are the fstype tests above.
+- B5: `_raise_interrupt` installs `SIG_IGN` before anything else. Tests: `test_raise_interrupt_sets_sig_ign_before_raising`, `test_gap0_double_sigint_at_post2_keeps_ids_across_runs` (20/20, `dropped == 0`).
+
+Should-fixes and nits that were done.
+
+- LINK-stage ENOENT after creates is 69 with ids (`test_link_enoent_after_creates_exits_69_with_ids`). Other post-create `OSError` with ids, or `_WRITE_ERRNO` / `"race condition"`, is 69. Empty-ids unknown `OSError` stays 64.
+- `commit_evidence` opens the parent dirfd and uses `os.open(..., dir_fd=)` / `os.link(..., src_dir_fd=, dst_dir_fd=)`.
+- Dry-run gap-0 at WRITE:1 is 69, not -2 (`test_dry_run_gap0_at_first_write_exits_69`).
+- Run plan dirty-tree checks use `test -z … || exit 1`.
+- `_fsync` raises `SandboxError` `from None`. A leftover regular tmp logs `removing leftover regular evidence tmp`. `_align` is a bounded `for` plus a shrink check, so pipeline:206 is not timeout-only.
+
+Census on this tree, one AST walk of the four modules: if 212, boolop 71, and 26, or 45, clause 151, ifexp 8, while 3. Mutations: if-flip 212, force-true 212, force-false 212, operator swap 71, clause negation 151, literal clause True/False 302, ifexp True/False 16, while-flip 3. Total 1179. **The 1179-row table was not run. No file-level killed/survived/sum is claimed.**
+
+Serial probes that were actually run (named tests; stock first: 336 passed). Command: `uv run --frozen pytest -q -p no:cacheprovider tests/unit/cli/test_notion_sandbox.py --basetemp /tmp/p60r8mut/<name>/bt -k '<expr>'`.
+
+| Site | Mutant | Result | Failed | Test |
+|---|---|---|---|---|
+| guard `_tmp_kind` `S_ISLNK` | `if False` | KILLED | 1 | `test_tmp_kind_classifies_a_leftover_symlink` |
+| guard `_on_procfs` MAGIC | `if False` | KILLED | 3 | fstype / bind / second procfs |
+| guard `_on_procfs` | `return False` | KILLED | 4 | those plus mountinfo |
+| guard mountinfo fallback | `return False` | KILLED | 1 | `test_mountinfo_fstype_proc_is_detected` |
+| guard `_symlink_target` relative join | `if False` | KILLED | 1 | `test_relative_symlink_to_proc_self_root_symlink_is_refused` |
+| guard `key in seen` | `if False` | KILLED | 1 | `test_symlink_cycle_is_bounded_and_not_proc` |
+| guard symlink ancestor | always `return True` | KILLED | 1 | `test_ancestor_symlink_to_ordinary_dir_is_accepted` |
+| guard `ids != ""` after `OSError` | skipped | KILLED | 1 | `test_link_enoent_after_creates_exits_69_with_ids` |
+| live `raw is None` | skipped | KILLED | 1 | `test_workspace_id_null_is_treated_as_absent` |
+| ns `_raise_interrupt` `SIG_IGN` | removed | KILLED | 1 | `test_raise_interrupt_sets_sig_ign_before_raising` |
+| ns `_publish_interrupted` top `_evidence_is_complete` | `if False` | KILLED | 1 | `test_dry_run_sigint_after_link_exits_69` |
+
+Probe-backed equivalents on the named tests only. Both versions produced the same output there.
+
+- `_is_proc` `return False` alone. `_on_procfs` still refuses `/proc` by `f_type`. 3 passed.
+- `_WALK_LIMIT` `if False` alone. The seen-set finishes an ordinary cycle. 1 passed.
+- `_publish_interrupted` except `_evidence_is_complete` `if False` alone. The top check still prints `sandbox interrupted` and exits 69. 1 passed.
+
+The round-7 EQ claims `_on_procfs`→False and `_tmp_kind` `S_ISLNK`→False are withdrawn. `_scrub_hex` `nxt<=index` and `_write_all` `written<=0` were not re-probed on this tip.
+
+Helper-only survivors from Reviewer 5467032904 at `e571b8e7` (16 rows: guard:357, 363, 411, 414T, 416, 479/481/483F; ns:356F, 367F, and the rest of that split) were not re-swept. They are not claimed as EQ. Line numbers have moved. This tip did not run the 1179-row table.
+
+`tests/unit/cli/test_notion_sandbox.py`: 336 passed. Sockets stay blocked. `ruff format --check`, `ruff check`, and `pyright` 1.1.411 (0 errors) are clean on the four sandbox modules and the sandbox test. Full local pytest: `uv run --frozen pytest -q -p no:cacheprovider --basetemp /tmp/p60r8all`: 2651 passed, 193 skipped, 12 failed. The 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. Local-only. CI is the gate.
+
 ## 2026-10-09 — Session 07 sandbox run, round 7
 
 Not a session close. This is not SESSION_07 COMPLETE. `state_revision` stays 58. `IMPLEMENTATION_STATE.json` is not edited. `head_sha` stays the W9 squash `a4e9b025021b4effbb2b2879c1db756403cb1676`. Twelve session 7 evidence keys stay false. `commissioned_agents` stays empty. Exit 78 stays HELD. The §11 sandbox CLI is still not run live. This commit's CI run is not invented here. Verifier verdict on `8f77434c` had not landed when this round was written.

@@ -1,5 +1,25 @@
 # Test Evidence
 
+## 2026-10-09 — Session 07 sandbox run, round 8
+
+**Verification scope**: Round 8 of the §11 sandbox runner. Reviewer FAIL 5467032904 at `e571b8e7` is folded into this commit. No Verifier verdict had landed on that tip. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. `state_revision` stays 58 | PASS |
+| Sandbox CLI | Still not run live. `uv run --frozen pytest -q -p no:cacheprovider tests/unit/cli/test_notion_sandbox.py --basetemp /tmp/p60r8sb2/bt`: 336 passed | PASS |
+| Procfs by fstype | `test_on_procfs_uses_filesystem_type_not_st_dev`, bind-mount, second procfs, mountinfo fallback: refused when `f_type` is `0x9fa0` or mountinfo fstype is `proc`. No user namespace | PASS |
+| Public survivors | relative `/proc/self/root` symlink 64; cycle bounded and not proc; ordinary-dir ancestor accepted 0; dry-run after-link SIGINT 69 `sandbox interrupted`; `workspace_id` null execute 0 after 5 | PASS |
+| SIG_IGN | hook installs `SIG_IGN` first. 20-run gap-0 at POST:2: `dropped == 0` | PASS |
+| SF / nits | LINK ENOENT after creates 69 with ids; leftover regular tmp log; `_fsync` `from None`; dry-run WRITE:1 gap-0 69 | PASS |
+| Census | if 212, boolop 71, and 26, or 45, clause 151, ifexp 8, while 3. Total 1179. **1179-row table not run; no file-level sum claimed** | PASS (count only) |
+| Named serial mutants | 11 named probes KILLED. 3 probe-backed EQs on the named tests only (`_is_proc`→False, walk-limit if False, except complete-check if False). Listed in IMPLEMENTATION_LOG | PARTIAL |
+| Lint and types | `ruff format --check`, `ruff check`, and `pyright` 1.1.411 report 0 errors on the touched modules | PASS |
+| Full local pytest | `uv run --frozen pytest -q -p no:cacheprovider --basetemp /tmp/p60r8all`: 2651 passed, 193 skipped, 12 failed. The failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because the `docker` binary is absent. Local-only. CI is the gate | 12 known local docker failures; CI is the gate |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
 ## 2026-10-09 — Session 07 sandbox run, round 7
 
 **Verification scope**: Round 7 of the §11 sandbox runner. Reviewer FAIL 5465945944 at `8f77434c` is folded into this commit. The Verifier verdict on that tip had not landed. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited.

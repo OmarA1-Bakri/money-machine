@@ -32,6 +32,12 @@
 
 Router browser and combined config modes still raise `NotImplementedError` (W4a). Fixture mode stays the default.
 
+## Session 07 — sandbox run, round 8
+
+**Status**: Incomplete (2026-10-09, state revision 58). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD. The §11 sandbox CLI is still not run live. `origin/build/full-automation` is still `a4e9b025`. Whichever PR merges second re-syncs STATE.
+
+Round 8 answers Reviewer 5467032904 at `e571b8e7`. `under_proc` detects procfs by `statfs` `f_type == 0x9fa0` or mountinfo fstype `proc`, not by `st_dev` versus `/proc`. Bind-mounted `/proc` and a second procfs instance are refused via monkeypatched fstype. `_raise_interrupt` installs `SIG_IGN` first. LINK ENOENT after creates is 69 with ids. Evidence writes use parent-dirfd `openat`/`linkat`. The false EQs `_on_procfs`→False and `_tmp_kind` S_ISLNK→False are withdrawn. Census: if 212, boolop 71, and 26, or 45, clause 151, ifexp 8, while 3. Total 1179. **The 1179-row table was not run; no file-level sum is claimed.** Named serial probes are in `IMPLEMENTATION_LOG.md`. Sandbox tests: 336 passed. Full local pytest: 2651 passed, 193 skipped, 12 failed (`docker` absent). This commit's CI is not invented here. Verifier verdict on `e571b8e7` had not landed.
+
 ## Session 07 — sandbox run, round 7
 
 **Status**: Incomplete (2026-10-09, state revision 58). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD. The §11 sandbox CLI is still not run live. `origin/build/full-automation` is still `a4e9b025`. Whichever PR merges second re-syncs STATE.

@@ -6293,6 +6293,8 @@ def test_dry_run_sigint_after_link_exits_69(
     assert code == EXIT_API
     assert code != 1
     assert "Traceback" not in captured.err
+    assert "sandbox interrupted" in captured.err
+    assert "evidence file changed" not in captured.err
     assert evidence.is_file()
     payload = json.loads(evidence.read_text(encoding="utf-8"))
     assert payload["mode"] == "dry-run"
