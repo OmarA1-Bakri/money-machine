@@ -40,9 +40,11 @@ from money_machine.agents.implementations.notion_product_builder import (
 from money_machine.agents.implementations.notion_progress import (
     OP_QA,
     ProviderFailure,
+    clean_interrupt,
     guard_operation,
     load_payload,
     raise_recorded,
+    raised_in_package,
 )
 from money_machine.agents.implementations.notion_progress_record import write_checkpoint
 from money_machine.agents.implementations.notion_shared_databases import shared_database_kinds
@@ -72,6 +74,10 @@ from money_machine.integrations.notion.schema_builder import schema_definitions
 
 PHASE_FACT_LEDGER = "fact_ledger"
 _QA_PROVIDER_FAILED = "provider operation failed"
+_QA_LOCAL_FAILED = "qa failed in local code"
+# Errors that only a bug raises. A provider's own TypeError still counts as
+# a provider error, because the innermost frame decides (raised_in_package).
+_CODE_ERRORS = (TypeError, AttributeError, NameError, AssertionError, LookupError)
 _QA_KEY = "qa"
 _NOTIFICATION_TITLE = "Notification dashboard"
 _SECTION_ROLES = ("purpose", "practice", "buyer")
@@ -119,6 +125,8 @@ async def run_product_qa(
         raise ProductBuildError("qa requires the variants checkpoint")
     saved = load_qa_record(path)
     checkpoint: ProductBuildCheckpoint | None = None
+    failure = ""
+    escaped: BaseException | None = None
     try:
         if saved is not None and await _saved_holds(fixture, stored, validated, saved):
             return replace(stored, next_phase=PHASE_FACT_LEDGER, qa=saved)
@@ -137,21 +145,44 @@ async def run_product_qa(
         checkpoint = _with_qa(
             stored, plan.checks, repairs, verdict, proof, facts, moment, prose_digest(validated)
         )
-    except ProductBuildError:
-        # An own refusal keeps its fixed text.
-        raise
-    except Exception:
+    except ProductBuildError as error:
+        if _own_refusal(error):
+            # An own refusal keeps its fixed text.
+            raise
+        # A provider-raised ProductBuildError is a provider error like any other.
+        failure = _QA_PROVIDER_FAILED
+    except Exception as error:
         # A provider error of any kind (ProviderFailure, ConnectionError,
         # OSError, RuntimeError, ...) can carry a secret in its text, args, or
-        # chain. None of it is stored, raised, or chained. The handler returns
+        # chain. None of it is stored, raised, or chained. A programming error
+        # raised by package code is not a provider job. The handler returns
         # first, so the fixed raise below has no context.
-        checkpoint = None
+        failure = _QA_LOCAL_FAILED if _local_bug(error) else _QA_PROVIDER_FAILED
+    except BaseException as error:
+        # Cancellation and interrupts keep their type, with no text or chain.
+        escaped = clean_interrupt(error, _QA_PROVIDER_FAILED)
+    if escaped is not None:
+        raise escaped
+    if failure == _QA_LOCAL_FAILED:
+        raise ProductBuildError(_QA_LOCAL_FAILED)
     if checkpoint is None:
         raise_recorded(path, BUILD_PHASES[-1], ProviderFailure(OP_QA, _QA_PROVIDER_FAILED))
     # The local write is outside the provider handler. Its error carries no
     # provider response, so it propagates as it is.
     _write_qa(path, checkpoint, created)
     return checkpoint
+
+
+def _own_refusal(error: ProductBuildError) -> bool:
+    """True for a refusal raised by package code, not re-raised from a provider."""
+    if isinstance(error.__cause__, ProviderFailure):
+        return False
+    return raised_in_package(error)
+
+
+def _local_bug(error: Exception) -> bool:
+    """True for a programming error raised by package code, not by a provider."""
+    return isinstance(error, _CODE_ERRORS) and raised_in_package(error)
 
 
 def load_qa_record(path: Path) -> QaRecord | None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import socket
@@ -12,7 +13,7 @@ from dataclasses import fields, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
-from typing import cast
+from typing import Any, cast
 
 import pytest
 
@@ -4994,6 +4995,275 @@ async def test_interrupt_group_from_the_read_keeps_its_kind(
     assert all(_secret_reachable(member) == [] for member in members)
     assert path.read_bytes() == raw
     assert _jobs(path) == []
+
+
+def _secret_str(_self: BaseException) -> str:
+    return "token=" + SECRET
+
+
+def _secret_args(self: BaseException, name: str) -> object:
+    if name == "args":
+        return (SECRET,)
+    return object.__getattribute__(self, name)
+
+
+def _secret_getattr(_self: BaseException, _name: str) -> str:
+    return SECRET
+
+
+def _secret_init(self: BaseException, *args: object) -> None:
+    BaseException.__init__(self, *args)
+    self.secret = SECRET  # type: ignore[attr-defined]
+
+
+# The verifier's matrix: four interrupt bases x five leak shapes = 20.
+_LEAK_BASES: dict[str, tuple[type[BaseException], type[BaseException]]] = {
+    "KeyboardInterrupt": (KeyboardInterrupt, KeyboardInterrupt),
+    "CancelledError": (asyncio.CancelledError, asyncio.CancelledError),
+    "SystemExit": (SystemExit, SystemExit),
+    "custom": (_PlainInterrupt, BaseException),
+}
+_LEAK_SHAPES: dict[str, dict[str, object]] = {
+    "str": {"__str__": _secret_str},
+    "repr": {"__repr__": _secret_str},
+    "getattribute": {"__getattribute__": _secret_args},
+    "class_attribute": {"secret": SECRET},
+    "getattr": {"__getattr__": _secret_getattr},
+}
+
+
+def _leak_kind(shape: str, base: str) -> type[BaseException]:
+    """A subclass of the named base whose body adds one leak shape."""
+    body = {"__module__": __name__, **_LEAK_SHAPES[shape]}
+    return cast(type[BaseException], type(f"_{shape}_{base}", (_LEAK_BASES[base][0],), body))
+
+
+_LEAK_MATRIX = [
+    pytest.param(_leak_kind(shape, base), _LEAK_BASES[base][1], id=f"{base}-{shape}")
+    for base in _LEAK_BASES
+    for shape in _LEAK_SHAPES
+]
+# Instance attributes set in __init__: stripped on 120f530f as well.
+_INIT_ROWS = [
+    pytest.param(
+        cast(
+            type[BaseException],
+            type(f"_init_{name}", (kinds[0],), {"__module__": __name__, "__init__": _secret_init}),
+        ),
+        kinds[1],
+        id=f"{name}-init_attribute",
+    )
+    for name, kinds in _LEAK_BASES.items()
+]
+
+
+class _PropertyKeyboard(KeyboardInterrupt):
+    """A KeyboardInterrupt with a property that returns the secret."""
+
+    @property
+    def token(self) -> str:
+        return SECRET
+
+
+class _ForgedModuleKeyboard(KeyboardInterrupt):
+    """A class body that forges a built-in module name over its own constructor."""
+
+    __module__ = "builtins"
+
+    def __init__(self, *args: object) -> None:
+        super().__init__(*args)
+        self.token = SECRET
+
+
+class _ReduceKeyboard(KeyboardInterrupt):
+    """A KeyboardInterrupt whose pickled form carries the secret."""
+
+    def __reduce__(self) -> tuple[object, ...]:
+        return (KeyboardInterrupt, (SECRET,))
+
+
+class _StrBase(BaseException):
+    """A custom base whose text is the secret, under a plain subclass."""
+
+    def __str__(self) -> str:
+        return "token=" + SECRET
+
+
+class _PlainUnderStr(_StrBase):
+    """Plain itself; its base overrides __str__."""
+
+
+class _DocKeyboard(KeyboardInterrupt):
+    """Replaced below by a property that returns the secret."""
+
+    __doc__ = property(lambda _self: SECRET)  # type: ignore[assignment]
+
+
+class _ModuleObjectKeyboard(KeyboardInterrupt):
+    """A class body whose module name is not a str."""
+
+    __module__ = 7  # type: ignore[assignment]
+
+
+class _WeakrefKeyboard(KeyboardInterrupt):
+    """A class body that replaces the weakref slot with the secret."""
+
+    __weakref__ = SECRET  # type: ignore[assignment]
+
+
+class _DictKeyboard(KeyboardInterrupt):
+    """A class body that replaces the dict slot with the secret."""
+
+    __dict__ = {"token": SECRET}  # type: ignore[assignment]
+
+
+def _leak_group() -> BaseException:
+    members = [
+        _leak_kind("str", "KeyboardInterrupt")(),
+        _leak_kind("repr", "CancelledError")(),
+        _leak_kind("class_attribute", "KeyboardInterrupt")(),
+    ]
+    return BaseExceptionGroup("wrapped", members)
+
+
+def _all_reachable(error: BaseException) -> list[str]:
+    """Where the secret shows: str, repr, args, vars, dir attributes, and the traceback."""
+    import traceback
+
+    found: list[str] = []
+    for member in _group_members(error):
+        name = type(member).__name__
+        shown = {
+            "str": str(member),
+            "repr": repr(member),
+            "args": repr(member.args),
+            "vars": repr(vars(member)),
+            "notes": repr(getattr(member, "__notes__", None)),
+        }
+        for attribute in dir(member):
+            if not attribute.startswith("__"):
+                shown["attr:" + attribute] = repr(getattr(member, attribute))
+        for attribute in ("response", "token", "secret"):
+            shown["probe:" + attribute] = repr(getattr(member, attribute, None))
+        found.extend(f"{name}.{where}" for where, text in shown.items() if SECRET in text)
+    if SECRET in "".join(traceback.format_exception(error)):
+        found.append("traceback")
+    return found
+
+
+_LEAKS = [
+    *_LEAK_MATRIX,
+    *_INIT_ROWS,
+    pytest.param(_PropertyKeyboard, KeyboardInterrupt, id="property"),
+    pytest.param(_ForgedModuleKeyboard, KeyboardInterrupt, id="forged_module"),
+    pytest.param(_PlainUnderStr, BaseException, id="custom_base_str"),
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("make", "base"), _LEAKS)
+async def test_leaking_interrupt_from_the_provider_becomes_its_built_in_base(
+    tmp_path: Path,
+    make: Callable[[], BaseException],
+    base: type[BaseException],
+) -> None:
+    """An interrupt subclass that shows the secret is raised as its plain built-in base.
+
+    It is raised by the provider seam the ledger read calls, verify_stranger_access,
+    and seen at public run_fact_ledger.
+    """
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+
+    async def _boom(_url: str) -> bool:
+        raise make()
+
+    probe.verify_stranger_access = _boom  # type: ignore[method-assign]
+    calls = watch_adapter_writes(probe)
+    with pytest.raises(BaseException) as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    error = caught.value
+    assert type(error) is base
+    assert error.__cause__ is None
+    assert error.__context__ is None
+    assert vars(error) == {}
+    assert _all_reachable(error) == []
+    assert path.read_bytes() == raw
+    assert _jobs(path) == []
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_leaking_members_of_a_provider_group_become_their_bases(tmp_path: Path) -> None:
+    """A BaseExceptionGroup from the provider keeps its kind; leaking members are flattened."""
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+
+    async def _boom(_url: str) -> bool:
+        raise _leak_group()
+
+    probe.verify_stranger_access = _boom  # type: ignore[method-assign]
+    calls = watch_adapter_writes(probe)
+    with pytest.raises(BaseExceptionGroup) as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    members = _group_members(caught.value)
+    assert [type(member) for member in members] == [
+        BaseExceptionGroup,
+        KeyboardInterrupt,
+        asyncio.CancelledError,
+        KeyboardInterrupt,
+    ]
+    assert caught.value.__context__ is None
+    assert _all_reachable(caught.value) == []
+    assert path.read_bytes() == raw
+    assert _jobs(path) == []
+    assert calls == []
+
+
+@pytest.mark.parametrize(("make", "base"), _LEAKS)
+def test_clean_interrupt_flattens_every_leak_shape(
+    make: Callable[[], BaseException], base: type[BaseException]
+) -> None:
+    """Helper level: each leak shape on each interrupt base becomes the plain built-in base."""
+    clean = ledger_module._clean_interrupt  # pyright: ignore[reportPrivateUsage]
+    error = clean(make())
+    assert type(error) is base
+    assert vars(error) == {}
+    assert _all_reachable(error) == []
+
+
+def _alias_secret_group() -> BaseException:
+    import types
+
+    alias = cast(Any, BaseExceptionGroup)[SECRET]
+    kind = cast(type[BaseExceptionGroup[BaseException]], types.new_class("_AliasGroup", (alias,)))
+    return kind("wrapped", [KeyboardInterrupt()])
+
+
+@pytest.mark.parametrize(
+    ("make", "kind"),
+    [
+        (_ReduceKeyboard, KeyboardInterrupt),
+        (_ForgedModuleKeyboard, KeyboardInterrupt),
+        (_PlainUnderStr, BaseException),
+        (_alias_secret_group, BaseExceptionGroup),
+        (_DocKeyboard, KeyboardInterrupt),
+        (_ModuleObjectKeyboard, KeyboardInterrupt),
+        (_WeakrefKeyboard, KeyboardInterrupt),
+        (_DictKeyboard, KeyboardInterrupt),
+        (lambda: _PlainKeyboard(SECRET), _PlainKeyboard),
+        (lambda: _PlainGroup(SECRET, [_PlainKeyboard()]), _PlainGroup),
+    ],
+)
+def test_clean_interrupt_keeps_only_a_plain_class_body(
+    make: Callable[[], BaseException], kind: type[BaseException]
+) -> None:
+    """Any member beyond the plain class-statement ones makes the kind its built-in base."""
+    clean = ledger_module._clean_interrupt  # pyright: ignore[reportPrivateUsage]
+    error = clean(make())
+    assert type(error) is kind
+    assert vars(error) == {}
+    assert _all_reachable(error) == []
 
 
 class _ForgedText(str):
