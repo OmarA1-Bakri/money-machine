@@ -11,7 +11,8 @@
 | Crash-resume repair job | `test_crash_resume_keeps_the_earlier_repair_job`. On `4b899fcf` the stored jobs were `[]`. On this tree the job is `qa_repair` / `qa.repair` / `qa` / `published` before resume, and the resume keeps that one job with repairs `("published",)` and 0 further adapter writes | PASS for this slice |
 | Package errors outside the old fixed set | `test_package_error_outside_the_old_fixed_set_is_local` for `ValueError` and `RuntimeError`. On `4b899fcf` both were `provider operation failed`. On this tree both are `qa failed in local code` and the checkpoint bytes are unchanged | PASS for this slice |
 | Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
-| Full local pytest, ruff, and pyright | Recorded after the verification run on this tip. Not claimed in this paragraph | PENDING |
+| Full local pytest | `uv run pytest -q --tb=line` on this tip: 12 failed, 2876 passed, 193 skipped, 1 warning, 346.98s. Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` for the `docker` binary. Pre-existing | 12 known local docker failures |
+| Lint and types | `uv run ruff format --check .` exit 0, 331 files already formatted. `uv run ruff check .` exit 0, all checks passed. `uv run pyright` 1.1.411, strict, exit 0, 0 errors, 0 warnings, 0 informations | PASS |
 
 **Status**: Session 07 Wave 11. The session stays incomplete. This is not SESSION_07 COMPLETE. Exit 78 stays HELD.
 

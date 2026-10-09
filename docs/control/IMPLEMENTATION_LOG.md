@@ -15,6 +15,8 @@ Fixtures only. No live Notion, no Etsy, no `--execute`.
 
 `__suppress_context__ is True` was added to the existing interrupt tests that go through `raise escaped from None` at `notion_fact_ledger.py:254` and `notion_qa.py:189`. That assertion passes on `4b899fcf` because `from None` is already there. It is not one of the 17 fail-on-base tests. No mutation sweep was run.
 
+Verification on this tip: `uv run pytest -q --tb=line` was 12 failed, 2876 passed, 193 skipped, 1 warning, 346.98s. The 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. `uv run ruff format --check .` exit 0, 331 files already formatted. `uv run ruff check .` exit 0. `uv run pyright` 1.1.411 strict, 0 errors, 0 warnings, 0 informations.
+
 ## 2026-10-07 — Session 07 W10: fact ledger and workflow link
 
 Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision is 58. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` is the intentional tip-sync to the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-07T23:29:39Z`.
