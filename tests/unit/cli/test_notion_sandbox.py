@@ -6219,14 +6219,14 @@ def test_relative_symlink_to_proc_self_root_symlink_is_refused(
     assert alias.exists() is False
 
 
-def test_symlink_cycle_is_bounded_and_not_proc(tmp_path: Path) -> None:
-    """guard:441: a symlink cycle finishes. An ordinary cycle is not proc."""
+def test_symlink_cycle_is_refused(tmp_path: Path) -> None:
+    """A symlink cycle finishes and is refused, not walked forever."""
     left = tmp_path / "left"
     right = tmp_path / "right"
     left.symlink_to("right")
     right.symlink_to("left")
-    assert under_proc(left / "ev.json") is False
-    assert under_proc(right / "ev.json") is False
+    assert under_proc(left / "ev.json") is True
+    assert under_proc(right / "ev.json") is True
 
 
 def test_ancestor_symlink_to_ordinary_dir_is_accepted(
@@ -6468,3 +6468,247 @@ def test_link_enoent_after_creates_exits_69_with_ids(
     assert client.creates
     for page_id in _CHILD_IDS:
         assert canonical_id(page_id) in err
+
+
+def test_missing_libc_refuses_before_any_post(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    monkeypatch.setattr(guard_module, "_libc", lambda: None)
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_USAGE
+    assert err == "evidence path is refused\n"
+    assert payload == {}
+    assert client.reads == []
+    assert client.creates == []
+    assert evidence.exists() is False
+
+
+def test_empty_mountinfo_refuses_before_any_post(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    monkeypatch.setattr(guard_module, "_mountinfo_text", lambda: "")
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_USAGE
+    assert err == "evidence path is refused\n"
+    assert payload == {}
+    assert client.reads == []
+    assert client.creates == []
+    assert evidence.exists() is False
+
+
+def test_literal_proc_is_refused_when_fstype_is_tmpfs(
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """tmpfs over /proc still refuses the literal /proc path."""
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    tmpfs_magic = 0x01021994
+    real = guard_module._statfs_f_type  # pyright: ignore[reportPrivateUsage]
+
+    def _ftype(path: Path) -> int | None:
+        collapsed = Path(os.path.abspath(path))
+        if collapsed == Path("/proc") or Path("/proc") in collapsed.parents:
+            return tmpfs_magic
+        return real(path)
+
+    monkeypatch.setattr(guard_module, "_statfs_f_type", _ftype)
+    alias = Path("/proc/ev_p60.json")
+    assert under_proc(alias) is True
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(alias, capsys, caplog, ["--execute"], client=client)
+    assert code == EXIT_USAGE
+    assert err == "evidence path is refused\n"
+    assert payload == {}
+    assert client.reads == []
+    assert client.creates == []
+    assert alias.exists() is False
+
+
+def test_mountinfo_decodes_octal_escaped_space(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    bind = tmp_path / "b sp"
+    (bind / "self" / "root").mkdir(parents=True)
+    mount = os.path.abspath(bind)
+    escaped = mount.replace("\\", "\\134").replace(" ", "\\040")
+
+    def _no_statfs(_path: Path) -> int | None:
+        return None
+
+    monkeypatch.setattr(guard_module, "_statfs_f_type", _no_statfs)
+    monkeypatch.setattr(
+        guard_module,
+        "_mountinfo_text",
+        lambda: f"1 0 0:1 / {escaped} rw - proc proc rw\n",
+    )
+    alias = bind / "self" / "root" / tmp_path.relative_to("/") / "e.json"
+    assert guard_module._unescape_mount_field(escaped) == mount  # pyright: ignore[reportPrivateUsage]
+    assert under_proc(alias) is True
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(alias, capsys, caplog, ["--execute"], client=client)
+    assert code == EXIT_USAGE
+    assert err == "evidence path is refused\n"
+    assert payload == {}
+    assert client.reads == []
+    assert client.creates == []
+
+
+def test_later_short_proc_mount_does_not_win(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A later short proc line must not override a longer non-proc mount."""
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    mount = os.path.abspath(tmp_path)
+    real = guard_module._statfs_f_type  # pyright: ignore[reportPrivateUsage]
+
+    def _skip_leaf(path: Path) -> int | None:
+        collapsed = Path(os.path.abspath(path))
+        if collapsed == Path(mount) or mount in str(collapsed):
+            return None
+        return real(path)
+
+    monkeypatch.setattr(guard_module, "_statfs_f_type", _skip_leaf)
+    monkeypatch.setattr(
+        guard_module,
+        "_mountinfo_text",
+        lambda: f"1 0 0:1 / {mount} rw - ext4 /dev/sda rw\n2 0 0:2 / / rw - proc proc rw\n",
+    )
+    evidence = tmp_path / "ev.json"
+    assert under_proc(evidence) is False
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(evidence, capsys, caplog, [], client=client)
+    assert code == EXIT_OK
+    assert err == ""
+    assert payload["mode"] == "dry-run"
+    assert evidence.is_file()
+    assert client.creates == []
+
+
+def test_relative_symlink_chain_of_16_is_accepted(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    real = tmp_path / "real"
+    (real / "sub").mkdir(parents=True)
+    prev = "real"
+    for index in range(16, 0, -1):
+        link = tmp_path / f"s{index}"
+        link.symlink_to(prev)
+        prev = f"s{index}"
+    evidence = tmp_path / "s1" / "sub" / "ev.json"
+    assert under_proc(evidence) is False
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(evidence, capsys, caplog, [], client=client)
+    assert code == EXIT_OK
+    assert err == ""
+    assert payload["mode"] == "dry-run"
+    assert evidence.is_file()
+    assert client.creates == []
+
+
+def test_unique_walk_limit_refuses_an_overlong_chain(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    monkeypatch.setattr(guard_module, "_WALK_LIMIT", 8)
+    real = tmp_path / "real"
+    (real / "sub").mkdir(parents=True)
+    prev = "real"
+    for index in range(16, 0, -1):
+        link = tmp_path / f"s{index}"
+        link.symlink_to(prev)
+        prev = f"s{index}"
+    evidence = tmp_path / "s1" / "sub" / "ev.json"
+    assert under_proc(evidence) is True
+
+
+def test_fd_on_procfs_uses_fstatfs_not_proc_self_fd(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    seen: list[Path] = []
+
+    def _no_fstatfs(_fd: int) -> int | None:
+        return None
+
+    def _track(path: Path) -> bool:
+        seen.append(path)
+        return False
+
+    monkeypatch.setattr(guard_module, "_fstatfs_f_type", _no_fstatfs)
+    monkeypatch.setattr(guard_module, "_mountinfo_is_proc", _track)
+    fd = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    try:
+        assert guard_module._fd_on_procfs(fd) is True  # pyright: ignore[reportPrivateUsage]
+    finally:
+        os.close(fd)
+    assert seen == []
+
+
+def test_publish_interrupted_ki_after_complete_file_returns_69(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ns:456: KeyboardInterrupt after the file is complete is 69, not a raise."""
+    from money_machine.cli import notion_sandbox as sandbox_module
+
+    path = tmp_path / "held.json"
+    sandbox_module._reset_held()  # pyright: ignore[reportPrivateUsage]
+    sandbox_module._remember_held(  # pyright: ignore[reportPrivateUsage]
+        path,
+        None,
+        _WHEN,
+        None,
+        "dry-run",
+        "a" * 40,
+        {},
+        empty_write_counts(),
+    )
+
+    def _write_then_interrupt(*_args: object, **_kwargs: object) -> int:
+        path.write_text('{"ok": true}', encoding="utf-8")
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(sandbox_module, "_finish", _write_then_interrupt)
+    before = signal.getsignal(signal.SIGINT)
+    try:
+        code = sandbox_module._publish_interrupted()  # pyright: ignore[reportPrivateUsage]
+    except KeyboardInterrupt:
+        pytest.fail("KeyboardInterrupt escaped the complete-file except")
+    finally:
+        signal.signal(signal.SIGINT, before)
+        sandbox_module._reset_held()  # pyright: ignore[reportPrivateUsage]
+    assert code == EXIT_API
+    assert path.is_file()

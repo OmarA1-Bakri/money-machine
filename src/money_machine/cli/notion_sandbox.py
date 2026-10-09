@@ -343,14 +343,27 @@ _HELD = _Held()
 _leave_sigint_ignored = False
 
 
+def _ignore_sigint_race(unraisable: object) -> None:
+    """Drop CPython's 'Signal 2 ignored due to race condition' hook dump."""
+    exc = getattr(unraisable, "exc_value", None)
+    if isinstance(exc, OSError) and "race condition" in str(exc):
+        return
+    hook = getattr(sys, "__unraisablehook__", None)
+    if hook is not None:
+        hook(unraisable)  # pyright: ignore[reportArgumentType]
+
+
 def _raise_interrupt(_signum: int, _frame: object) -> None:
     """Turn SIGINT into KeyboardInterrupt. Ignore further SIGINTs first.
 
     A gap-0 second SIGINT must not restore the default handler and drop the
     stderr ids. ``SIG_IGN`` is installed before anything else in this handler.
+    SIGINT is also blocked so CPython's race traceback is not printed.
     """
     with contextlib.suppress(ValueError, OSError):
         signal.signal(signal.SIGINT, signal.SIG_IGN)
+    with contextlib.suppress(AttributeError, TypeError):
+        sys.unraisablehook = _ignore_sigint_race
     raise KeyboardInterrupt
 
 

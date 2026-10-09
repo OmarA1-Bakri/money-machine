@@ -9,7 +9,6 @@ from __future__ import annotations
 import base64
 import contextlib
 import ctypes
-import ctypes.util
 import errno
 import json
 import logging
@@ -29,6 +28,8 @@ from money_machine.cli.notion import contains_secret_shape, redact_secret_shapes
 LOGGER = logging.getLogger(__name__)
 PROC_SUPER_MAGIC = 0x9FA0
 _WALK_LIMIT = 256
+_libc_cache: list[ctypes.CDLL | None] | None = None
+_MOUNT_ESCAPES = (("\\134", "\\"), ("\\040", " "), ("\\011", "\t"), ("\\012", "\n"))
 
 EXIT_OK = 0
 EXIT_USAGE = 64
@@ -390,13 +391,33 @@ class _Statfs(ctypes.Structure):
 
 
 def _libc() -> ctypes.CDLL | None:
-    name = ctypes.util.find_library("c")
-    if name is None:
-        return None
+    """Process libc. ``CDLL(None)`` is cached so ``ldconfig`` is not spawned."""
+    global _libc_cache
+    if _libc_cache is not None:
+        return _libc_cache[0]
     try:
-        return ctypes.CDLL(name, use_errno=True)
+        loaded: ctypes.CDLL | None = ctypes.CDLL(None, use_errno=True)
     except OSError:
-        return None
+        loaded = None
+    _libc_cache = [loaded]
+    return loaded
+
+
+def _unescape_mount_field(field: str) -> str:
+    """Decode mountinfo octal escapes (space, tab, newline, backslash)."""
+    decoded = field
+    for escaped, raw in _MOUNT_ESCAPES:
+        decoded = decoded.replace(escaped, raw)
+    return decoded
+
+
+def _mountinfo_usable() -> bool:
+    return bool(_mountinfo_text().strip())
+
+
+def _detection_ready() -> bool:
+    """False when libc/statfs or mountinfo cannot be used. Callers refuse."""
+    return _libc() is not None and _mountinfo_usable()
 
 
 def _statfs_f_type(path: Path) -> int | None:
@@ -441,11 +462,19 @@ def _mountinfo_text() -> str:
 
 
 def _mountinfo_is_proc(path: Path) -> bool:
-    """True when the containing mount's fstype is ``proc``."""
+    """True when the containing mount's fstype is ``proc``.
+
+    Mount points are compared after decoding ``\\040`` / ``\\011`` / ``\\012``
+    / ``\\134``. The longest matching mount wins, so a later short ``proc``
+    line does not override a longer non-proc mount.
+    """
+    text = _mountinfo_text()
+    if not text.strip():
+        return True
     collapsed = _collapsed_abs(path)
     best = ""
     matched = False
-    for line in _mountinfo_text().splitlines():
+    for line in text.splitlines():
         if " - " not in line:
             continue
         left, right = line.split(" - ", 1)
@@ -453,13 +482,14 @@ def _mountinfo_is_proc(path: Path) -> bool:
         kinds = right.split()
         if len(fields) < 5 or not kinds:
             continue
-        mount_point = fields[4]
+        mount_point = _unescape_mount_field(fields[4])
         fstype = kinds[0]
-        if (
-            collapsed == mount_point or collapsed.startswith(mount_point.rstrip("/") + "/")
-        ) and len(mount_point) >= len(best):
-            best = mount_point
-            matched = fstype == "proc"
+        if not (collapsed == mount_point or collapsed.startswith(mount_point.rstrip("/") + "/")):
+            continue
+        if len(mount_point) < len(best):
+            continue
+        best = mount_point
+        matched = fstype == "proc"
     return matched
 
 
@@ -468,7 +498,8 @@ def _on_procfs(path: Path) -> bool:
 
     Filesystem type is the check, not ``st_dev`` versus ``/proc``. ``statfs``
     follows a symlink, so ``/proc/self/root`` reports the root fs; callers
-    still walk lexical names and symlink targets. ``PermissionError`` is not
+    still walk lexical names and symlink targets. A missing ``f_type`` plus
+    empty mountinfo is proc (fail-closed). ``PermissionError`` is not
     procfs.
     """
     ftype = _statfs_f_type(path)
@@ -519,9 +550,14 @@ def under_proc(path: Path) -> bool:
     checked on the lexical path and on each resolved/symlink target, by
     name and by filesystem type (``statfs`` ``f_type`` or mountinfo
     ``proc``). A relative symlink is joined to its parent before the walk.
-    A symlink cycle is bounded. ``realpath`` of ``/proc/1/root/...`` may
-    raise ``PermissionError``; that is treated as proc, not as a crash.
+    The walk counts unique nodes, not pushes, so a deep relative chain is
+    accepted while a symlink cycle is refused. Missing libc or empty
+    mountinfo is refused. The literal ``/proc`` prefix is proc even when
+    ``f_type`` is tmpfs. ``realpath`` of ``/proc/1/root/...`` may raise
+    ``PermissionError``; that is treated as proc, not as a crash.
     """
+    if not _detection_ready():
+        return True
     collapsed = Path(_collapsed_abs(path))
     pending: list[Path] = [collapsed]
     resolved = _safe_realpath(path)
@@ -531,15 +567,14 @@ def under_proc(path: Path) -> bool:
     else:
         pending.append(resolved)
     seen: set[str] = set()
-    steps = 0
+    seen_symlinks: set[str] = set()
     while pending:
-        steps += 1
-        if steps > _WALK_LIMIT:
-            return True
         current = pending.pop()
         key = str(current)
         if key in seen:
             continue
+        if len(seen) >= _WALK_LIMIT:
+            return True
         seen.add(key)
         if _is_proc(current) or _component_touches_proc(current):
             return True
@@ -551,10 +586,17 @@ def under_proc(path: Path) -> bool:
             except OSError:
                 continue
             if stat.S_ISLNK(info.st_mode):
+                prefix_key = str(prefix)
+                if prefix_key in seen_symlinks:
+                    return True
+                seen_symlinks.add(prefix_key)
                 target = _symlink_target(prefix)
                 if target is None:
                     continue
                 if _is_proc(target) or _component_touches_proc(target):
+                    return True
+                target_key = str(target)
+                if target_key in seen_symlinks:
                     return True
                 pending.append(target)
                 target_resolved = _safe_realpath(target)
@@ -743,12 +785,15 @@ def _open_parent_dirfd(path: Path) -> int:
 
 
 def _fd_on_procfs(fd: int) -> bool:
+    """True when the open fd is on procfs. Uses ``fstatfs`` only.
+
+    ``/proc/self/fd/N`` is itself a procfs path, so it is never used as a
+    fallback. A missing ``f_type`` is fail-closed.
+    """
     ftype = _fstatfs_f_type(fd)
     if ftype == PROC_SUPER_MAGIC:
         return True
-    if ftype is not None:
-        return False
-    return _mountinfo_is_proc(Path(f"/proc/self/fd/{fd}"))
+    return ftype is None
 
 
 def commit_evidence(path: Path, payload: Mapping[str, object], token: str | None) -> str:
