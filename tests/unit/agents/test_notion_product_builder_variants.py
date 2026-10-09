@@ -6,7 +6,7 @@ import json
 import socket
 import traceback
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -79,7 +79,7 @@ NOTIFICATION_AT = datetime(2026, 10, 6, 0, 30, tzinfo=UTC)
 LATER = datetime(2026, 10, 6, 1, 30, tzinfo=UTC)
 VARIANTS_AT = datetime(2026, 10, 6, 2, 30, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "a4e9b025021b4effbb2b2879c1db756403cb1676"
+HEAD_SHA = "4b899fcf6bf09730b952bf5517d6bd691b72ba9a"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 
 
@@ -2567,7 +2567,13 @@ async def test_each_variant_step_crash_resumes_without_a_second_page(
     assert len(checkpoint.variants) == len(spec.colour_variants)
     _assert_finished(spec, probe, started)
     resumed = json.loads(path.read_text(encoding="ascii"))
-    assert resumed["progress"]["repair_jobs"] == []
+    if step == "publish_page":
+        resumed_jobs = resumed["progress"]["repair_jobs"]
+        assert type(resumed_jobs) is list and resumed_jobs
+        assert resumed_jobs[-1]["kind"] == "provider_response"
+        assert resumed_jobs[-1]["response"] == "publish refused"
+    else:
+        assert resumed["progress"]["repair_jobs"] == []
 
 
 @pytest.mark.asyncio
@@ -3387,6 +3393,71 @@ async def test_reversed_dashboard_created_ids_survive_variants(tmp_path: Path) -
     assert ids["dashboard"] == reversed_rows
 
 
+def test_aligned_pairs_refuse_a_duplicated_palette_name() -> None:
+    """Same token name and a different hex is refused. Unique names are kept.
+
+    Building from a duplicate spec never reaches this check: the aesthetics
+    loader refuses the duplicated accent label first. This calls the check
+    with that input directly.
+    """
+    spec = _spec()
+    tokens = spec.palette_tokens
+    mutated = spec.model_copy(
+        update={
+            "palette_tokens": (
+                tokens[0],
+                ColourToken(name=tokens[0].name, hex=tokens[1].hex),
+                *tokens[2:],
+            ),
+        }
+    )
+
+    with pytest.raises(ProductBuildError, match="palette token name is duplicated"):
+        notion_variants_module._aligned_pairs(mutated)  # pyright: ignore[reportPrivateUsage]
+
+    pairs = notion_variants_module._aligned_pairs(spec)  # pyright: ignore[reportPrivateUsage]
+    assert tuple(colour for colour, _token in pairs) == spec.colour_variants
+
+
+@pytest.mark.asyncio
+async def test_non_workspace_home_is_refused_by_the_source_check(tmp_path: Path) -> None:
+    """A home whose parent is not workspace fails the source-page check."""
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    stored, _created = load_variant_checkpoint(path)
+    page = notion_variants_module._source_page(probe, stored)  # pyright: ignore[reportPrivateUsage]
+    assert page.id == stored.page_id
+    probe.pages[stored.page_id].parent_type = "page_id"
+
+    with pytest.raises(ProductBuildError, match="variants require the aesthetics checkpoint"):
+        notion_variants_module._source_page(probe, stored)  # pyright: ignore[reportPrivateUsage]
+
+    del probe.pages[stored.page_id]
+    with pytest.raises(ProductBuildError, match="variants require the aesthetics checkpoint"):
+        notion_variants_module._source_page(probe, stored)  # pyright: ignore[reportPrivateUsage]
+
+
+@pytest.mark.asyncio
+async def test_spec_page_must_be_the_stored_home(tmp_path: Path) -> None:
+    """The page that carries the spec id has to be the stored home page."""
+    spec = _spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _prepare(spec, probe, path)
+    stored, _created = load_variant_checkpoint(path)
+    notion_variants_module._require_one_spec_page(probe, spec, stored)  # pyright: ignore[reportPrivateUsage]
+    forged = replace(stored, page_id="not-the-home")
+
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        notion_variants_module._require_one_spec_page(probe, spec, forged)  # pyright: ignore[reportPrivateUsage]
+
+    del _home(probe, spec).properties[SPEC_ID_PROPERTY]
+    with pytest.raises(ProductBuildError, match="variant page does not match"):
+        notion_variants_module._require_one_spec_page(probe, spec, stored)  # pyright: ignore[reportPrivateUsage]
+
+
 def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert state["current_session"] == 7
@@ -3404,5 +3475,5 @@ def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     assert all(value is False for value in evidence.values())
     assert evidence["variant_builder_implemented"] is False
     assert evidence["product_qa_implemented"] is False
-    assert state["state_revision"] == 58
+    assert state["state_revision"] == 59
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")

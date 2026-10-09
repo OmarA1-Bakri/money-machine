@@ -39,7 +39,11 @@ async def _postgres_available() -> bool:
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
 
-    engine = create_async_engine(admin_url(), isolation_level="AUTOCOMMIT")
+    try:
+        engine = create_async_engine(admin_url(), isolation_level="AUTOCOMMIT")
+    except Exception:
+        # A missing asyncpg driver raises while the dialect loads, before connect.
+        return False
     try:
         async with engine.connect() as connection:
             await connection.execute(text("SELECT 1"))

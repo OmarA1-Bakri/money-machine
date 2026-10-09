@@ -6875,7 +6875,12 @@ def test_libc_losing_fstatfs_after_creates_exits_69_with_ids(
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """guard:449 via :790: fstatfs gone after creates is a refusal with the ids printed."""
+    """fstatfs gone after creates is a refusal with the ids printed.
+
+    With the attribute removed, ``_detection_ready`` is False, so ``under_proc``
+    is True and ``_refuse_proc_write`` refuses first ("evidence path is
+    refused"). ``_fd_on_procfs`` is the ``OSError`` path, not this one.
+    """
     from money_machine.cli import notion_sandbox_guard as guard_module
 
     real = guard_module._libc()  # pyright: ignore[reportPrivateUsage]
@@ -6897,6 +6902,7 @@ def test_libc_losing_fstatfs_after_creates_exits_69_with_ids(
     assert "Traceback" not in err
     assert evidence.exists() is False
     assert payload == {}
+    assert "evidence path is refused" in err
     assert len(client.creates) == len(_CHILD_IDS)
     for page_id in _CHILD_IDS:
         assert canonical_id(page_id) in err

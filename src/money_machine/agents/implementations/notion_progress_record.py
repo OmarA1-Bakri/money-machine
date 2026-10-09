@@ -16,6 +16,7 @@ from money_machine.agents.implementations.notion_progress import (
     PHASES_COMPLETE,
     ProductBuildError,
     empty_created_ids,
+    load_payload,
     write_document,
 )
 
@@ -152,7 +153,11 @@ def write_checkpoint(
     progress: Mapping[str, object] | None = None,
     retained_created_ids: Mapping[str, object] | None = None,
 ) -> None:
-    """Write one checkpoint through the single progress writer."""
+    """Write one checkpoint through the single progress writer.
+
+    A garbage, empty, or forged prior file is refused. The writer reads that
+    prior before replacing it, and a failed read leaves the file unchanged.
+    """
     if preserved_payload is not None:
         if progress is None:
             raise ProductBuildError("progress record is missing")
@@ -177,6 +182,13 @@ def write_checkpoint(
             "spec_id": checkpoint.spec_id,
         }
         body = progress_from_checkpoint(checkpoint)
+        if path.is_file():
+            # An unrecoverable phase-1 rebuild is allowed to write. Reading the
+            # prior jobs must not raise the recovery rule from inside the writer.
+            prior = load_payload(path, allow_unrecoverable=True)
+            body["repair_jobs"] = [
+                dict(job) if type(job) is dict else job for job in prior.repair_jobs
+            ]
         if retained_created_ids is not None:
             fresh = body["created_notion_ids"]
             if type(fresh) is not dict:
@@ -205,6 +217,7 @@ def progress_from_checkpoint(checkpoint: CheckpointView) -> dict[str, object]:
         "formula_state": _formulas(checkpoint),
         "repair_jobs": [],
         "recovery": "recoverable",
+        "next_phase": checkpoint.next_phase,
     }
 
 

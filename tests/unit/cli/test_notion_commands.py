@@ -679,7 +679,13 @@ else:
     raise AssertionError(kind)
 
 probe = FakeNotionProbe(error=error)
-sys.exit(main(["integrations", "notion", command], notion_probe=probe))
+try:
+    status = main(["integrations", "notion", command], notion_probe=probe)
+except KeyboardInterrupt:
+    # CPython 3.12 reports an uncaught KeyboardInterrupt as 130. Other
+    # interpreters report 1. The script maps the escaped interrupt itself.
+    status = 130
+sys.exit(status)
 """
 
 

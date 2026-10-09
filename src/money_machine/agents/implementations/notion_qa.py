@@ -3,12 +3,14 @@
 Session 07 prompt section 8. QA reads the variants checkpoint through
 FixtureNotionAdapter and records PASS or BLOCKED with write_checkpoint.
 A repairable flag is fixed with the existing adapter and QA runs again.
-The section 9 fact ledger and the workflow link are not started. A07, A08,
-and A09 stay DESIGNED. This module does not open a network connection.
+`live_qa_passed` re-runs these predicates for the fact ledger. The stored
+verdict is not that result. A07, A08, and A09 stay DESIGNED. This module
+does not open a network connection.
 """
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -38,9 +40,11 @@ from money_machine.agents.implementations.notion_product_builder import (
 from money_machine.agents.implementations.notion_progress import (
     OP_QA,
     ProviderFailure,
+    clean_interrupt,
     guard_operation,
     load_payload,
     raise_recorded,
+    raised_in_package,
 )
 from money_machine.agents.implementations.notion_progress_record import write_checkpoint
 from money_machine.agents.implementations.notion_shared_databases import shared_database_kinds
@@ -69,11 +73,16 @@ from money_machine.integrations.notion.formulas import (
 from money_machine.integrations.notion.schema_builder import schema_definitions
 
 PHASE_FACT_LEDGER = "fact_ledger"
+_QA_PROVIDER_FAILED = "provider operation failed"
+_QA_LOCAL_FAILED = "qa failed in local code"
+# Errors that only a bug raises. A provider's own TypeError still counts as
+# a provider error, because the innermost frame decides (raised_in_package).
+_CODE_ERRORS = (TypeError, AttributeError, NameError, AssertionError, LookupError)
 _QA_KEY = "qa"
 _NOTIFICATION_TITLE = "Notification dashboard"
 _SECTION_ROLES = ("purpose", "practice", "buyer")
 _REPAIRABLE = ("published", "duplicate_button", "search_indexing")
-_QA_KEYS = frozenset({"checks", "facts", "proof_page_id", "repairs", "verdict"})
+_QA_KEYS = frozenset({"checks", "facts", "proof_page_id", "prose_digest", "repairs", "verdict"})
 _VERDICTS = frozenset({"PASS", "FAIL_REPAIRABLE", "BLOCKED"})
 _SLUG_DATABASE = {
     "active projects": "Projects",
@@ -114,15 +123,17 @@ async def run_product_qa(
     require_same_spec(stored, validated)
     if not stored.variants or stored.next_phase != PHASE_QA:
         raise ProductBuildError("qa requires the variants checkpoint")
+    saved = load_qa_record(path)
+    checkpoint: ProductBuildCheckpoint | None = None
+    failure = ""
+    escaped: BaseException | None = None
     try:
-        saved = _stored_qa(path)
         if saved is not None and await _saved_holds(fixture, stored, validated, saved):
             return replace(stored, next_phase=PHASE_FACT_LEDGER, qa=saved)
         plan = await _plan(fixture, stored, validated)
         repairs: tuple[str, ...] = ()
         if not plan.blocked and plan.repairs:
-            await _apply_repairs(fixture, stored, plan.repairs)
-            repairs = plan.repairs
+            repairs = await _apply_repairs(fixture, stored, plan.repairs)
             plan = await _plan(fixture, stored, validated)
         if plan.blocked or plan.repairs:
             verdict = "BLOCKED"
@@ -131,14 +142,52 @@ async def run_product_qa(
             verdict = "PASS"
             proof = await _prove_duplicate(fixture, stored, validated, plan.proof_page_id)
         facts = _facts(stored, validated, fixture)
-        checkpoint = _with_qa(stored, plan.checks, repairs, verdict, proof, facts, moment)
-        _write_qa(path, checkpoint, created)
-    except ProviderFailure as failure:
-        raise_recorded(path, BUILD_PHASES[-1], failure)
+        checkpoint = _with_qa(
+            stored, plan.checks, repairs, verdict, proof, facts, moment, prose_digest(validated)
+        )
+    except ProductBuildError as error:
+        if _own_refusal(error):
+            # An own refusal keeps its fixed text.
+            raise
+        # A provider-raised ProductBuildError is a provider error like any other.
+        failure = _QA_PROVIDER_FAILED
+    except Exception as error:
+        # A provider error of any kind (ProviderFailure, ConnectionError,
+        # OSError, RuntimeError, ...) can carry a secret in its text, args, or
+        # chain. None of it is stored, raised, or chained. A programming error
+        # raised by package code is not a provider job. The handler returns
+        # first, so the fixed raise below has no context.
+        failure = _QA_LOCAL_FAILED if _local_bug(error) else _QA_PROVIDER_FAILED
+    except BaseException as error:
+        # Cancellation and interrupts become a fresh built-in base, with no
+        # provider class, text, or chain.
+        escaped = clean_interrupt(error, _QA_PROVIDER_FAILED)
+    if escaped is not None:
+        raise escaped from None
+    if failure == _QA_LOCAL_FAILED:
+        raise ProductBuildError(_QA_LOCAL_FAILED)
+    if checkpoint is None:
+        raise_recorded(path, BUILD_PHASES[-1], ProviderFailure(OP_QA, _QA_PROVIDER_FAILED))
+    # The local write is outside the provider handler. Its error carries no
+    # provider response, so it propagates as it is.
+    _write_qa(path, checkpoint, created)
     return checkpoint
 
 
-def _stored_qa(path: Path) -> QaRecord | None:
+def _own_refusal(error: ProductBuildError) -> bool:
+    """True for a refusal raised by package code, not re-raised from a provider."""
+    if isinstance(error.__cause__, ProviderFailure):
+        return False
+    return raised_in_package(error)
+
+
+def _local_bug(error: Exception) -> bool:
+    """True for a programming error raised by package code, not by a provider."""
+    return isinstance(error, _CODE_ERRORS) and raised_in_package(error)
+
+
+def load_qa_record(path: Path) -> QaRecord | None:
+    """Read the stored QA record, or None when the checkpoint has none."""
     envelope = load_payload(path)
     if envelope.payload is None:
         return None
@@ -149,6 +198,7 @@ def _stored_qa(path: Path) -> QaRecord | None:
 
 
 def _require_qa(value: object) -> QaRecord:
+    """Parse one QA record. A PASS with a false check is refused."""
     if type(value) is not dict:
         raise ProductBuildError("qa record must be an object")
     entry = value
@@ -162,18 +212,41 @@ def _require_qa(value: object) -> QaRecord:
         raise ProductBuildError("qa proof page is unsupported")
     checks = _require_pairs(entry["checks"], "check", "passed")
     parsed_checks = tuple((name, _require_passed(passed)) for name, passed in checks)
+    if verdict == "PASS" and any(passed is False for _name, passed in parsed_checks):
+        raise ProductBuildError("qa record does not match")
     repairs = _require_repairs(entry["repairs"])
     facts = _require_pairs(entry["facts"], "fact", "value")
+    digest = entry["prose_digest"]
+    if type(digest) is not str or len(digest) != 64 or not _hex_digest(digest):
+        raise ProductBuildError("qa record is incomplete")
     return QaRecord(
         verdict=verdict,
         checks=parsed_checks,
         repairs=repairs,
         proof_page_id=proof,
         facts=facts,
+        prose_digest=digest,
     )
 
 
+def prose_digest(spec: ProductSpec) -> str:
+    """Digest of the descriptions, buyer, and flagship QA judged.
+
+    Hub names and the row identity are not part of it. A later caller that
+    keeps those and changes this prose does not match the stored digest.
+    """
+    rows = [hub.description for hub in spec.hubs]
+    rows.append(spec.buyer_problem)
+    rows.append(spec.flagship_feature)
+    return hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()
+
+
+def _hex_digest(value: str) -> bool:
+    return all(character in "0123456789abcdef" for character in value)
+
+
 def _require_pairs(value: object, left: str, right: str) -> tuple[tuple[str, str], ...]:
+    """Rows of two exact string fields. An empty list is incomplete."""
     if type(value) is not list or not value:
         raise ProductBuildError("qa record is incomplete")
     rows: list[tuple[str, str]] = []
@@ -189,6 +262,7 @@ def _require_pairs(value: object, left: str, right: str) -> tuple[tuple[str, str
 
 
 def _require_tokens(value: object, label: str) -> tuple[str, ...]:
+    """A list of tokens. A non-list is incomplete."""
     if type(value) is not list:
         raise ProductBuildError("qa record is incomplete")
     rows: list[str] = []
@@ -200,6 +274,7 @@ def _require_tokens(value: object, label: str) -> tuple[str, ...]:
 
 
 def _require_passed(value: str) -> bool:
+    """A check flag is the word true or the word false."""
     if value == "true":
         return True
     if value == "false":
@@ -208,6 +283,7 @@ def _require_passed(value: str) -> bool:
 
 
 def _require_repairs(value: object) -> tuple[str, ...]:
+    """Repair names are unique and belong to the repairable set."""
     repairs = _require_tokens(value, "qa repair")
     if len(set(repairs)) != len(repairs) or any(name not in _REPAIRABLE for name in repairs):
         raise ProductBuildError("qa record is incomplete")
@@ -221,6 +297,8 @@ async def _saved_holds(
     saved: QaRecord,
 ) -> bool:
     """True when the stored verdict still stands. A fixed BLOCKED record is re-run."""
+    if saved.prose_digest != prose_digest(spec):
+        return False
     plan = await _plan(probe, stored, spec)
     facts = _facts(stored, spec, probe)
     if saved.verdict == "BLOCKED":
@@ -262,6 +340,7 @@ async def _plan(
 def _flag_failures(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint
 ) -> tuple[tuple[str, bool], ...]:
+    """Publish, duplicate, and indexing, each true or false, in that order."""
     pages = [_variant_page(probe, record) for record in stored.variants]
     published = all(page.is_published is True for page in pages)
     duplicate = all(page.duplicate_as_template is True for page in pages)
@@ -278,6 +357,7 @@ async def _structural_checks(
     stored: ProductBuildCheckpoint,
     spec: ProductSpec,
 ) -> tuple[tuple[str, bool], ...]:
+    """Live structure checks. A false check blocks the verdict."""
     proof = _existing_proof_id(probe, stored, spec)
     return (
         ("spec_coverage", _spec_coverage(stored, spec)),
@@ -300,10 +380,12 @@ async def _structural_checks(
 
 
 def _is_database(value: object) -> bool:
+    """True when the value is a database, including a subclass."""
     return isinstance(value, NotionDatabase)
 
 
 def _variant_page(probe: FixtureNotionAdapter, record: VariantRecord) -> NotionPage:
+    """The stored variant page, or a refusal when it is missing."""
     page = probe.pages.get(record.page_id)
     if type(page) is not NotionPage:
         raise ProductBuildError("qa variant page is missing")
@@ -311,6 +393,7 @@ def _variant_page(probe: FixtureNotionAdapter, record: VariantRecord) -> NotionP
 
 
 def _spec_coverage(stored: ProductBuildCheckpoint, spec: ProductSpec) -> bool:
+    """True when the stored colours and tokens match the spec."""
     colours = spec.colour_variants
     tokens = spec.palette_tokens
     if len(stored.variants) != len(colours) or len(colours) != len(tokens):
@@ -323,6 +406,7 @@ def _spec_coverage(stored: ProductBuildCheckpoint, spec: ProductSpec) -> bool:
 def _shared_databases(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> bool:
+    """True when the stored databases match the tier catalogue."""
     kinds = shared_database_kinds(spec)
     recorded = tuple(kind for kind, _database_id in stored.database_ids)
     if recorded != kinds:
@@ -341,6 +425,7 @@ def _shared_databases(
 def _duplicate_databases(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> bool:
+    """True when database titles are present once."""
     titles = [database.title for database in probe.databases.values() if _is_database(database)]
     expected = len(shared_database_kinds(spec)) + 1
     return len(titles) == expected and len(set(titles)) == len(titles)
@@ -349,6 +434,7 @@ def _duplicate_databases(
 def _hubs_present(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> bool:
+    """True when each hub page is the stored child of home."""
     if tuple(hub.name for hub in stored.identity_hubs) != tuple(hub.name for hub in spec.hubs):
         return False
     for hub in stored.identity_hubs:
@@ -363,6 +449,7 @@ def _hubs_present(
 
 
 def _linked_views(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -> bool:
+    """True when each hub's linked views resolve."""
     by_kind = dict(stored.database_ids)
     for hub in stored.identity_hubs:
         for slug, view_id in hub.views:
@@ -378,6 +465,7 @@ def _linked_views(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -
 def _formulas_compile(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> bool:
+    """True when each dashboard formula matches the spec."""
     generated = _generated(spec)
     for name, expression in generated.expressions.items():
         kind = generated.databases[name]
@@ -391,6 +479,7 @@ def _formulas_compile(
 def _notification_values(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> bool:
+    """True when the notification row names this identity."""
     notice = stored.notification_dashboard
     if notice is None:
         return False
@@ -404,7 +493,7 @@ def _notification_values(
     for name, expression in generated.expressions.items():
         kind = generated.databases[name]
         found = _formula_property(probe, stored, kind, name)
-        if found is None or found.expression != expression:
+        if found is None or type(found.expression) is not str or found.expression != expression:
             return False
     return True
 
@@ -417,6 +506,7 @@ def _formula_compiles(
     expression: str,
     result_type: str,
 ) -> bool:
+    """True when one stored formula matches the expected expression."""
     database = _kind_database(probe, stored, kind)
     if database is None:
         return False
@@ -438,6 +528,7 @@ def _formula_property(
     kind: str,
     name: str,
 ) -> NotionFormula | None:
+    """The formula property, or None when it is not stored."""
     database = _kind_database(probe, stored, kind)
     if database is None:
         return None
@@ -453,6 +544,7 @@ def _formula_property(
 def _kind_database(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, kind: str
 ) -> NotionDatabase | None:
+    """The database for one kind, or None when the kind is absent."""
     for recorded, database_id in stored.database_ids:
         if recorded != kind:
             continue
@@ -462,7 +554,33 @@ def _kind_database(
     return None
 
 
+def dashboard_formula_expressions(spec: ProductSpec) -> dict[str, tuple[str, str]]:
+    """Expected formula name to (database kind, expression) for this spec."""
+    generated = _generated(spec)
+    return {
+        name: (generated.databases[name], expression)
+        for name, expression in generated.expressions.items()
+    }
+
+
+async def live_qa_passed(
+    probe: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+) -> bool:
+    """True when the live fixture still satisfies the QA predicates.
+
+    The stored QA verdict is not consulted. A missing proof page is the
+    pre-duplicate shape: it is not one of the ledger's known ids, and this
+    function can still return True.
+    """
+    flags = _flag_failures(probe, stored)
+    structural = await _structural_checks(probe, stored, spec)
+    return all(passed for _name, passed in (*flags, *structural))
+
+
 def _generated(spec: ProductSpec) -> NotificationDashboardFormulas:
+    """Dashboard formulas derived from the spec."""
     definitions = schema_definitions()
     kinds = shared_database_kinds(spec)
     verified = {
@@ -471,9 +589,15 @@ def _generated(spec: ProductSpec) -> NotificationDashboardFormulas:
     return generate_notification_dashboard_formulas(verified)
 
 
+def _is_page(value: object) -> bool:
+    """True for a page, including a subclass. Exact type would ignore the subclass."""
+    return isinstance(value, NotionPage)
+
+
 def _page_count(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, proof: str) -> bool:
+    """True when the known pages are the only pages in the probe."""
     known = _known_page_ids(stored)
-    present = [page for page in probe.pages.values() if type(page) is NotionPage]
+    present = [page for page in probe.pages.values() if _is_page(page)]
     known_present = [page for page in present if page.id in known]
     extras = [page for page in present if page.id not in known]
     if len(known_present) != len(known):
@@ -484,6 +608,7 @@ def _page_count(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, pro
 
 
 def _known_page_ids(stored: ProductBuildCheckpoint) -> set[str]:
+    """Page ids the QA check counts. The proof copy is included."""
     known = {stored.page_id}
     known.update(hub.page_id for hub in stored.identity_hubs)
     notice = stored.notification_dashboard
@@ -503,6 +628,7 @@ def _trusted_secret_link(page_id: str) -> str:
 
 
 def _is_trusted_link(link: object, page_id: str) -> bool:
+    """True when the link is the exact fixture URL for the page."""
     return type(link) is str and link == _trusted_secret_link(page_id)
 
 
@@ -549,10 +675,21 @@ def _fresh_duplicate(
 
 
 def _no_access(probe: FixtureNotionAdapter) -> bool:
-    return all("No access" not in block.content for block in probe.blocks.values())
+    """True when no block contains the no-access marker.
+
+    Non-text content is a product error. It is not a raw TypeError.
+    """
+    for block in probe.blocks.values():
+        content = getattr(block, "content", None)
+        if type(content) is not str:
+            raise ProductBuildError("qa block content is not text")
+        if "No access" in content:
+            return False
+    return True
 
 
 def _cross_catalogue(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -> bool:
+    """True when every linked view and relation stays in this checkpoint."""
     known = {database_id for _kind, database_id in stored.database_ids}
     notice = stored.notification_dashboard
     if notice is not None:
@@ -575,6 +712,7 @@ def _cross_catalogue(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint
 def _palette(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> bool:
+    """True when each variant has its icon, cover, one accent, and one sample."""
     colours = spec.colour_variants
     tokens = spec.palette_tokens
     if len(stored.variants) != len(colours) or len(colours) != len(tokens):
@@ -606,6 +744,7 @@ def _palette(
 def _teardown(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> bool:
+    """True when hub prose still matches the spec."""
     if not spec.evidence:
         return False
     for hub in stored.identity_hubs:
@@ -636,10 +775,11 @@ def _accounted_facts(
     spec: ProductSpec,
     probe: FixtureNotionAdapter,
 ) -> dict[str, str]:
+    """Live counts compared with the facts QA persists. This is not a boolean."""
     databases: list[str] = []
     for _kind, database_id in stored.database_ids:
         database = probe.databases.get(database_id)
-        if isinstance(database, NotionDatabase):
+        if isinstance(database, NotionDatabase) and type(database.title) is str:
             databases.append(database.title)
         else:
             databases.append("")
@@ -666,6 +806,7 @@ def _accounted_facts(
 
 
 def _normalised_secret_link(link: str, page_id: str) -> str:
+    """Drop a trailing slash and page id. The query and fragment stay."""
     suffix = "/" + page_id
     if link.endswith(suffix):
         return link[: -len(suffix)]
@@ -673,6 +814,7 @@ def _normalised_secret_link(link: str, page_id: str) -> str:
 
 
 def _present_page_count(stored: ProductBuildCheckpoint, probe: FixtureNotionAdapter) -> int:
+    """How many known pages are present in the probe."""
     known = _known_page_ids(stored)
     return sum(1 for page in probe.pages.values() if type(page) is NotionPage and page.id in known)
 
@@ -682,6 +824,7 @@ def _facts(
     spec: ProductSpec,
     probe: FixtureNotionAdapter,
 ) -> tuple[tuple[str, str], ...]:
+    """The fact pairs a QA record stores."""
     return (
         ("colour_names", ",".join(spec.colour_variants)),
         ("databases", ",".join(kind for kind, _database_id in stored.database_ids)),
@@ -701,6 +844,7 @@ def _facts(
 def _existing_proof_id(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> str:
+    """The stored proof page id, or empty when there is none."""
     title = _proof_title(stored, spec)
     matches = [
         page for page in probe.pages.values() if type(page) is NotionPage and page.title == title
@@ -715,11 +859,13 @@ def _existing_proof_id(
 
 
 def _proof_title(stored: ProductBuildCheckpoint, spec: ProductSpec) -> str:
+    """The title of the fresh-duplicate proof page."""
     colour = spec.colour_variants[0]
     return f"{spec.title} / {colour} (Copy)"
 
 
 def _proof_matches(page: object, stored: ProductBuildCheckpoint, spec: ProductSpec) -> bool:
+    """True when the page is the stored proof copy."""
     record = stored.variants[0]
     if type(page) is not NotionPage or page.title != _proof_title(stored, spec):
         return False
@@ -739,16 +885,28 @@ async def _apply_repairs(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
     repairs: tuple[str, ...],
-) -> None:
+) -> tuple[str, ...]:
+    """Apply repairable flags. A publish that is not trusted stops the rest.
+
+    The returned names are the repairs whose adapter call ran, including a
+    publish that wrote and then failed the trusted-link check.
+    """
     guard_operation(probe, OP_QA)
+    done: list[str] = []
     for record in stored.variants:
         page = _variant_page(probe, record)
         if "published" in repairs and page.is_published is not True:
             page = await probe.publish_page(page.id)
+            done.append("published")
+            if page.is_published is not True or not _is_trusted_link(page.public_url, page.id):
+                return tuple(dict.fromkeys(done))
         if "duplicate_button" in repairs and page.duplicate_as_template is not True:
             page = await probe.set_duplicate_as_template(page.id, True)
+            done.append("duplicate_button")
         if "search_indexing" in repairs and page.search_indexing is not False:
             await probe.set_search_indexing(page.id, False)
+            done.append("search_indexing")
+    return tuple(dict.fromkeys(done))
 
 
 async def _prove_duplicate(
@@ -757,6 +915,7 @@ async def _prove_duplicate(
     spec: ProductSpec,
     existing: str,
 ) -> str:
+    """Publish the fresh-duplicate proof page."""
     if existing != "":
         return existing
     guard_operation(probe, OP_QA)
@@ -774,13 +933,16 @@ def _with_qa(
     proof: str,
     facts: tuple[tuple[str, str], ...],
     recorded_at: datetime,
+    digest: str,
 ) -> ProductBuildCheckpoint:
+    """Return the checkpoint with the QA record attached."""
     record = QaRecord(
         verdict=verdict,
         checks=checks,
         repairs=repairs,
         proof_page_id=proof,
         facts=facts,
+        prose_digest=digest,
     )
     return replace(stored, next_phase=PHASE_FACT_LEDGER, qa=record, recorded_at=recorded_at)
 
@@ -790,10 +952,18 @@ def _write_qa(
     checkpoint: ProductBuildCheckpoint,
     created: Mapping[str, object],
 ) -> None:
+    """Persist the QA record through the single progress writer."""
     record = checkpoint.qa
     if record is None:
         raise ProductBuildError("qa record is missing")
     references = variant_provider_references(checkpoint)
+    envelope = load_payload(path)
+    if envelope.payload is not None:
+        prior = envelope.payload.get("provider_object_references")
+        if type(prior) is dict:
+            for key in ("fact_ledger", "workflow_link"):
+                if key in prior:
+                    references[key] = prior[key]
     references[_QA_KEY] = {
         "checks": [
             {"check": name, "passed": "true" if passed else "false"}
@@ -801,6 +971,7 @@ def _write_qa(
         ],
         "facts": [{"fact": name, "value": value} for name, value in record.facts],
         "proof_page_id": record.proof_page_id,
+        "prose_digest": record.prose_digest,
         "repairs": list(record.repairs),
         "verdict": record.verdict,
     }

@@ -1,5 +1,23 @@
 # Test Evidence
 
+## 2026-10-09 — Session 07 sandbox run, round 12 (re-sync onto the W10 squash)
+
+**Verification scope**: Round 12 of the §11 sandbox runner. One merge commit brings `build/full-automation` at `4b899fcf` (W10, #61) into this branch at `efea4297`. Verifier 6080655092 (FAIL at `efea4297`, text only) and Reviewer 5469709536 nits are folded in. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Tip-sync | STATE `head_sha` `4b899fcf6bf09730b952bf5517d6bd691b72ba9a` is the W10 squash. `state_revision` 58 → 59 (this PR merges second). Base `session_07_w10` note kept; `session_07_sandbox_run` note rewritten | PASS |
+| Merge conflicts | Four `docs/control` files only; no code conflict. Sandbox modules unchanged by the merge. W10 code and tests unchanged from `4b899fcf` | PASS |
+| `fstatfs` lost after creates | `test_libc_losing_fstatfs_after_creates_exits_69_with_ids`: 69, no file, `evidence path is refused` from `_refuse_proc_write`, 5 ids on stderr | PASS |
+| Census | if 218, boolop 72, and 26, or 46, clause 154, ifexp 8, while 3. Total 1207 (unchanged). **1207-row table not run** | PASS (count only) |
+| Sandbox tests | `tests/unit/cli/test_notion_sandbox.py`: 355 passed | PASS |
+| W10 suites after merge | `test_notion_fact_ledger.py` 503 passed, `test_notion_product_qa.py` 162 passed, seven product-builder files 392 passed, `tests/bootstrap` 89 passed 1 skipped | PASS |
+| Lint and types | `ruff format --check` (336 files), `ruff check`, `pyright` 1.1.411: 0 errors | PASS |
+| Full local pytest | 3215 passed, 193 skipped, 12 failed (docker absent). Local-only. CI is the gate | 12 known local docker failures; CI is the gate |
+| Parked survivors | `_WALK_LIMIT = 257` (guard:30); guard 396 F; guard 479 F (`if not text.strip()`); guard 494:8 F and 494:16 ×4 (the mount-point compare); guard 425:7 LF0 (equivalent, Reviewer 5469709536: `hasattr(None, …)` is False, so a missing libc still gives not-ready); guard 437/444/452/459 F (`lib is None` and `result != 0` in the two `statfs` helpers, survived since r8, Reviewer 5469709536); the ids dropped on the first post-open `_fd_on_procfs` raise at guard:823-824 (test gap, not an id loss: the `OSError` path does print the 5 ids, Verifier 6080655092); ns:349 ×10, ns:352 ×3; the r8 6 CLI-masked and 10 no-libc rows (not re-swept); Reviewer 5469228650 sweep survivors at tip coordinates guard 586/589/600 (If F, SWAP, LF0, LF1) ×12, guard 598 F, guard 607 NEG/T/F ×3 (they were 579/582/593, 591 and 600 at `518d5215`). Reviewer SF, fail-closed over-refusal: the `target_key` check at guard:603 refuses a path through a `.` or `..` link repeated in the same path (`here -> .` with `c/here/here/here/ev.json`, `d/x/up -> ..` with `up/x` ×3): 64, 0 reads, 0 creates, no traceback. Over-refusal can start at 2 repeats (1 of Reviewer's 35 fuzz cases, two `.` repeats after a different link); 34 of 35 need 3 or more. A single target string such as `./././x` is accepted | PARKED |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
 ## 2026-10-09 — Session 07 sandbox run, round 11
 
 **Verification scope**: Round 11 of the §11 sandbox runner. Verifier 6079607643 and Reviewer 5469228650 (both FAIL at `518d5215`, text only) are folded into this commit. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited. **No equivalents are claimed.**
@@ -16,7 +34,7 @@
 | Sandbox tests | `tests/unit/cli/test_notion_sandbox.py`: 355 passed | PASS |
 | Lint and types | `ruff format --check`, `ruff check`, `pyright` 1.1.411: 0 errors | PASS |
 | Full local pytest | 2670 passed, 193 skipped, 12 failed (docker absent). Local-only. CI is the gate | 12 known local docker failures; CI is the gate |
-| Parked survivors | `_WALK_LIMIT = 257` (guard:30); guard 396 F, 420 LT1, 472 F, 487:8 F, 487:16 ×4; ns:349 ×10, ns:352 ×3; the r8 6 CLI-masked and 10 no-libc rows (not re-swept); Reviewer sweep guard 579/582/593/591/600 rows; repeated `.`/`..` link over-refusal (fails closed) | PARKED |
+| Parked survivors | `_WALK_LIMIT = 257` (guard:30); guard 396 F, 420 LT1, 472 F, 487:8 F, 487:16 ×4 (corrected in round 12: 420 LT1 deleted, 472/487 are guard:479/:494 at that tip); ns:349 ×10, ns:352 ×3; the r8 6 CLI-masked and 10 no-libc rows (not re-swept); Reviewer sweep guard 579/582/593/591/600 rows; repeated `.`/`..` link over-refusal (fails closed) | PARKED |
 | Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
 
 ## 2026-10-09 — Session 07 sandbox run, round 10
@@ -192,6 +210,25 @@
 | Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
 
 **Status**: Session 07 sandbox-run tip-sync. The session stays incomplete. This is not SESSION_07 COMPLETE. Exit 78 stays HELD. No session exit code is recorded.
+
+## 2026-10-07 — Session 07 W10: fact ledger and workflow link
+
+**Verification scope**: Fixture-only fact ledger and workflow link over the W9 QA checkpoint. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Postgres, Alembic, pnpm, and Compose were not required for this slice and were not run.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `completed_sessions` `[0, 1, 2, 3, 4, 5, 6]`, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`, including `product_fact_ledger_persisted` and `build_workflow_linked`. A07–A09 stay DESIGNED. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` is the intentional tip-sync to the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. `state_revision` is 58. The seven phase tip-sync tests pin that sha and revision. CI verify run `37703308890`, job `113071650103`, failed before those pins moved and is not the gate. Commit `5fcc1f8` CI verify run `37703884278`, job `113073538691`, SUCCESS, is the gate for that pin | PASS |
+| Fact ledger and workflow link | Round 9: `test_notion_fact_ledger.py` 356 passed; `test_notion_product_qa.py` 144 passed. `run_fact_ledger` is async at `notion_fact_ledger.py:158` and awaits `_guarded_read` (`:209`), then raises any failure after that handler has returned. A `BaseException` leaves `_guarded_read` as a fresh instance of the same kind, or its nearest built-in base, with no text or chain, and a `BaseExceptionGroup` keeps its kind with cleaned members (`test_interrupt_keeps_its_kind_and_drops_the_secret`, `test_clean_interrupt_keeps_a_custom_kind_or_its_built_in_base`, `test_clean_interrupt_keeps_a_group_and_cleans_every_member`, `test_interrupt_group_from_the_read_keeps_its_kind`, `test_task_cancel_message_is_dropped_and_the_task_is_cancelled`, `test_timeout_still_becomes_timeout_error`). Any QA provider `Exception` is recorded under the fixed text (`test_any_provider_exception_is_recorded_under_the_fixed_text`). A str-subclass fact and a comma in a variant name are refused with 0 writes. A QA provider response is not stored or raised (`test_provider_response_is_not_stored_raised_or_chained`). `_plan` at `:470` awaits `live_qa_passed` (`notion_qa.py:534`) before `_write` at `:1023`, which calls `write_checkpoint` at `:1063`. A provider error, an own-prefix provider error, and a code error with a secret in `__str__`, an attribute, a note, or a cause leave no reachable secret (`test_provider_failure_leaves_no_chain`, `test_provider_error_with_an_own_prefix_is_redacted`, `test_recorded_provider_response_is_not_an_own_refusal`, `test_code_error_attributes_do_not_survive`). A matching caller keeps the caller spec, so a live purpose, buyer, or practice edit is `BLOCKED` (`test_edited_hub_prose_is_blocked_not_self_compared`). A mismatched caller after that edit raises `fact ledger caller does not match` with 0 writes (`test_unnamed_caller_cannot_adopt_a_live_hub_edit`, 12 combinations). An honest `BLOCKED` is not overwritten. `next_phase` `test_matrix` is the same in memory and on disk. An unnamed 64-character hub name passes with 1 write. `Liar("x;y")` on `current_date` is `BLOCKED`. A whitespace-only purpose raises `ProductBuildError` with 0 writes. A notification subclass is a missing identity. `qa_verdict` is `stored_pass and qa_live` at `:511`. Known ids only, and `page_count` stays 15. The 826-passed figure was tip `45818d9e`. The 791-passed figure was tip `5dc55814`. The 732-passed figure was tip `9eff481e` | PASS for this slice |
+| No live HTTP | `test_ledger_does_not_open_a_socket` patches `socket.socket.connect`, `socket.socket.connect_ex`, and `socket.create_connection` to raise, then runs the ledger. It is a tripwire, not a sandbox. `notion_fact_ledger.py` does not contain `https://`, `httpx`, `requests`, `notion_client`, `APINotionAdapter`, `etsy`, `socket`, `urllib`, or `playwright` | PASS |
+| Mutations | Round 9. Census of `notion_fact_ledger.py` on this commit: if 123, elif 0, compare 185, boolop 56, operand 131, ifexp 13. That is 377 decision sites, and 377 + 131 operands = 508. 173 rows, 161 killed, 12 equivalent, Failed sum 12345. Ledger if-flips: 123 rows, 123 killed, 0 equivalent, Failed sum 11439. Ledger ifexp: 26 rows, 25 killed, 1 equivalent, Failed sum 407. Ledger operands and flips, PARTIAL (the 5 rows at the new `:290` and the 11 Round 8 equivalent rows; the full operand sweep was started and stopped, not counted): 16 rows, 5 killed, 11 equivalent, Failed sum 17. Progress `:135`-`:136`: 7 rows, 7 killed, 0 equivalent, Failed sum 30. QA `:140`-`:153`: 1 rows, 1 killed, 0 equivalent, Failed sum 452. There are 12 equivalents (11 operands, 1 IfExp), listed in `IMPLEMENTATION_LOG.md` Round 9 and the PR round body. The Round 8 IfExp `:748` claim was false at helper level and is now killed. Round 8 (tip `08484bf0`) was 260 rows (operands PARTIAL), 247 killed, 13 claimed equivalents, Failed sum 18218 | PASS (operands PARTIAL) |
+| Lint and types | `ruff format --check` and `ruff check` are clean on the changed modules. `pyright` 1.1.411 reports 0 errors on those modules with SQLAlchemy 2.0.52 | PASS |
+| Next phase | Narrative `next_phase` is `test_matrix` and is not started. It is not a top-level state field. Section 11 is not executed | PASS |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+| Parked items | QA coverage gap scheduled for the W11 test matrix: home nav text, 3 palette callouts, identity callout, 6 hub "returns to Home" texts, and 3 home linked views. Uncovered: `_linked_views` `notion_qa.py:368`, `_palette` `:603`, `_teardown` `:634`. A page that is not a known id before the first ledger run stays `PASS` with one write, and that is pinned. The pull request lists `docs/control` edits | PARKED |
+
+**Status**: Session 07 Wave 10. The session stays incomplete. This is not SESSION_07 COMPLETE. Exit 78 stays HELD. No session exit code is recorded.
 
 ## 2026-10-07 — Session 07 W9: product QA
 

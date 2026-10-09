@@ -1,3 +1,22 @@
+## 2026-10-09 — Session 07 sandbox run, round 12 (re-sync onto the W10 squash)
+
+Not a session close. This is not SESSION_07 COMPLETE. State revision 58 → 59. `head_sha` is the W10 squash `4b899fcf6bf09730b952bf5517d6bd691b72ba9a`. It is the tip-sync pointer. It is not this commit. W10 (#61) merged first and kept revision 58, so this PR, merging second, takes revision 59 on the new base. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. Twelve session 7 evidence keys stay false. `commissioned_agents` stays empty. `session_status` stays incomplete. Exit 78 stays HELD. The §11 sandbox CLI is still not run live. This commit's CI run is not invented here.
+
+Round 12 is one merge commit: `build/full-automation` at `4b899fcf` merged into this branch at `efea4297` (first parent `efea4297`, no rebase, no force-push). It answers Verifier 6080655092 (FAIL at `efea4297`, text only) and carries Reviewer 5469709536 (PASS at `efea4297`) nits.
+
+- Merge: the four sandbox modules are unchanged by the merge. W10's code and tests (`notion_fact_ledger.py`, `notion_progress.py`, `notion_qa.py`, `notion_progress_record.py`, `test_notion_fact_ledger.py`, `test_notion_product_qa.py` and the rest) come in unchanged from `4b899fcf`. Conflicts were in four `docs/control` files only. `IMPLEMENTATION_STATE.json`: both sides kept revision 58 and added a note; resolved to revision 59, `head_sha` `4b899fcf`, the base `session_07_w10` note kept unchanged, this branch's `session_07_sandbox_run` note rewritten for 58 → 59, `updated_at` `2026-10-09T12:15:51Z`. `IMPLEMENTATION_LOG.md` and `TEST_EVIDENCE.md`: both sides inserted new entries at the same point; both kept, this branch's entries first, W10's entry unchanged. `NEXT_SESSION.md`: both sides renamed the W9 heading (this branch to "Wave 9 handoff", W10 to "Wave 10 in progress" with W10 body text); resolved to "Session 07 — Wave 10 handoff" over W10's text unchanged, since W10 is merged. The seven product-builder STATE pins (`HEAD_SHA`, `state_revision`) move to `4b899fcf` / 59.
+- Text (Verifier B1): `420 LT1` is dropped from the park list. That return was deleted in round 11; guard:418-427 is now `_detection_ready`.
+- Text (Verifier B2): `472 F`, `487:8`, `487:16` were `518d5215` coordinates. At this tip they are guard:479 (`if not text.strip()`) and guard:494 (the mount-point compare). The sweep rows are given tip coordinates too.
+- Text (Verifier B3): with `fstatfs` removed after creates, `_detection_ready` is False, so `under_proc` is True and `_refuse_proc_write` (guard:733-736) refuses first and prints `evidence path is refused: <5 ids>` (69, no file, no `.tmp`). `_fd_on_procfs` (guard:822-824, `evidence write failed`) is the `OSError` path, where the symbol exists and `fstatfs` fails. The round-11 body and comment 6079960825 line 13 named the wrong mechanism; the outcome numbers were right. `test_libc_losing_fstatfs_after_creates_exits_69_with_ids` now asserts `evidence path is refused` and its docstring (was `guard:449 via :790`) says so.
+- Should-fix (repeated `.`/`..` links, guard:603): parked as Reviewer SF, fail-closed over-refusal. No code change: telling a `.`/`..` alias apart from a real cycle needs a different cycle test than `target_key in seen_symlinks`, which is not a small change to the procfs guard. Direct probe at this tip: `here -> .` ×1-2 and `up/x` ×1-2 accepted; ×3-5 refused; two-node cycle and self-loop refused. Wording corrected: over-refusal can start at 2 repeats (1 of Reviewer's 35 fuzz cases), not only at 3 or more.
+- Nit: 425:7 LF0 is added to the park list as an equivalent.
+
+Census at this tip (one AST walk of the four sandbox modules): if 218, boolop 72, and 26, or 46, clause 154, ifexp 8, while 3. Total 1207. Unchanged from `efea4297`. The 1207-row table was not run.
+
+PARKED to the next wave, not fixed: `_WALK_LIMIT = 257` (guard:30); guard 396 F; guard 479 F (`if not text.strip()`); guard 494:8 F and 494:16 ×4 (the mount-point compare); guard 425:7 LF0 (equivalent, Reviewer 5469709536: `hasattr(None, …)` is False, so a missing libc still gives not-ready); guard 437/444/452/459 F (`lib is None` and `result != 0` in the two `statfs` helpers, survived since r8, Reviewer 5469709536); the ids dropped on the first post-open `_fd_on_procfs` raise at guard:823-824 (test gap, not an id loss: the `OSError` path does print the 5 ids, Verifier 6080655092); ns:349 ×10, ns:352 ×3; the r8 6 CLI-masked and 10 no-libc rows (not re-swept); Reviewer 5469228650 sweep survivors at tip coordinates guard 586/589/600 (If F, SWAP, LF0, LF1) ×12, guard 598 F, guard 607 NEG/T/F ×3 (they were 579/582/593, 591 and 600 at `518d5215`). Reviewer SF, fail-closed over-refusal: the `target_key` check at guard:603 refuses a path through a `.` or `..` link repeated in the same path (`here -> .` with `c/here/here/here/ev.json`, `d/x/up -> ..` with `up/x` ×3): 64, 0 reads, 0 creates, no traceback. Over-refusal can start at 2 repeats (1 of Reviewer's 35 fuzz cases, two `.` repeats after a different link); 34 of 35 need 3 or more. A single target string such as `./././x` is accepted.
+
+Results at this tip (box, local): `tests/unit/cli/test_notion_sandbox.py` 355 passed. W10 suites after the merge: `test_notion_fact_ledger.py` 503 passed and `test_notion_product_qa.py` 162 passed (665 together); the seven `test_notion_product_builder_*.py` files 392 passed; `tests/bootstrap` 89 passed, 1 skipped. `uv run ruff format --check src tests scripts migrations`: 336 files already formatted. `uv run ruff check src tests scripts apps migrations`: all checks passed. `uv run pyright` 1.1.411: 0 errors, 0 warnings. Full local pytest `uv run pytest -q -p no:cacheprovider`: 3215 passed, 193 skipped, 12 failed. The 12 failures are `test_compose_preserves_the_postgres_password` because `docker` is absent. Local-only. CI is the gate. The 236-run burst and the mutation probes were not re-run this round; the sandbox modules are byte-identical to `efea4297`.
+
 ## 2026-10-09 — Session 07 sandbox run, round 11
 
 Not a session close. This is not SESSION_07 COMPLETE. `state_revision` stays 58. `IMPLEMENTATION_STATE.json` is not edited. `head_sha` stays the W9 squash `a4e9b025021b4effbb2b2879c1db756403cb1676`. Twelve session 7 evidence keys stay false. `commissioned_agents` stays empty. Exit 78 stays HELD. The §11 sandbox CLI is still not run live. This commit's CI run is not invented here.
@@ -13,7 +32,7 @@ Census at this tip (one AST walk of the four sandbox modules): if 218, boolop 72
 
 Named serial probes at this tip (one sandbox-test run each): `_WALK_LIMIT = 257` SURVIVES (355 passed); `target_key` `if False` (guard:603) KILLED, 2 failed; new `statfs` operand forced False KILLED, 1 failed; new `fstatfs` operand forced False KILLED, 1 failed; `statfs` `AttributeError` catch dropped KILLED, 1 failed; `fstatfs` `AttributeError` catch dropped KILLED, 1 failed. The other named probes from Reviewer's 9 were not re-run here; their lines are unchanged.
 
-PARKED to the next wave, not fixed and not claimed equivalent: `_WALK_LIMIT = 257` (guard:30); guard 396 F, 420 LT1, 472 F, 487:8 F, 487:16 ×4; ns:349 ×10, ns:352 ×3; the r8 6 CLI-masked and 10 no-libc rows (not re-swept). Also Reviewer 5469228650's changed-region sweep survivors (already present in r8 or r9): guard 579/582/593 (If F, SWAP, LF0, LF1), guard 591 F, guard 600 NEG/T/F (pre-round-11 line numbers; +7 at this tip). Also Reviewer's should-fix: `target_key` (guard:603 at this tip) refuses a path through a `.` or `..` link repeated three or more times (`here -> .`, `c/here/here/here/ev.json`). It fails closed (64, 0 POSTs); no code change this round.
+PARKED to the next wave, not fixed and not claimed equivalent: `_WALK_LIMIT = 257` (guard:30); guard 396 F, 479 F, 494:8 F, 494:16 ×4 (corrected in round 12: 420 LT1 was deleted with the old return, and 472/487 were `518d5215` coordinates); ns:349 ×10, ns:352 ×3; the r8 6 CLI-masked and 10 no-libc rows (not re-swept). Also Reviewer 5469228650's changed-region sweep survivors (already present in r8 or r9): guard 579/582/593 (If F, SWAP, LF0, LF1), guard 591 F, guard 600 NEG/T/F (pre-round-11 line numbers; +7 at this tip). Also Reviewer's should-fix: `target_key` (guard:603 at this tip) refuses a path through a repeated `.` or `..` link (`here -> .`, `c/here/here/here/ev.json`). It fails closed (64, 0 POSTs); no code change this round. Corrected in round 12: it can start at 2 repeats in 1 of Reviewer's 35 fuzz cases, not only at three or more.
 
 Nits: `test_nested_relative_symlink_chain_is_accepted` is dry-run only (Verifier ran `--execute` on the same shape: 16 reads, 5 creates). The 236-run burst was not repeated this round.
 
@@ -32,7 +51,7 @@ Round 10 answers Reviewer 5468752023 on tip `9d350221` under the frozen criteria
 
 Named probes this round. `target_key` `if False`: KILLED by `test_symlink_cycle_is_refused` and `test_symlink_self_loop_is_refused`. The new nested, hook-order, and hook-restore tests each fail on the `9d350221` source.
 
-PARKED to the next wave, not fixed and not claimed equivalent (corrected in round 11; the original line wrongly parked 590 F and 599 F and counted "23 changed-line survivors"): `_WALK_LIMIT = 257` (guard:30); guard 396 F, 420 LT1, 472 F, 487:8 F, 487:16 ×4; ns:349 ×10, ns:352 ×3; the r8 6 CLI-masked and 10 no-libc rows (not re-swept). `target_key` `if False` (old 599 F) is KILLED; 590 F was deleted with the `prefix_key` check.
+PARKED to the next wave, not fixed and not claimed equivalent (corrected in round 11; the original line wrongly parked 590 F and 599 F and counted "23 changed-line survivors"): `_WALK_LIMIT = 257` (guard:30); guard 396 F, 420 LT1, 472 F, 487:8 F, 487:16 ×4 (`518d5215` coordinates; see round 12 for the tip list); ns:349 ×10, ns:352 ×3; the r8 6 CLI-masked and 10 no-libc rows (not re-swept). `target_key` `if False` (old 599 F) is KILLED; 590 F was deleted with the `prefix_key` check.
 
 `tests/unit/cli/test_notion_sandbox.py`: 351 passed. `ruff format --check`, `ruff check`, and `pyright` 1.1.411 (0 errors) are clean. Full local pytest: `uv run pytest -q -p no:cacheprovider`: 2666 passed, 193 skipped, 12 failed. The 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. Local-only. CI is the gate.
 
@@ -2068,6 +2087,987 @@ Blocker to test. Lying create id: `test_lying_create_id_stops_before_colours` (e
 | 104 | `notion_sandbox_pipeline.py:198` | KILLED | 5 | `ctx.probe is None or ctx.product_page_id is None or type(spec) is not ProductSpec` |
 
 
+## 2026-10-07 — Session 07 W10: fact ledger and workflow link
+
+Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision is 58. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` is the intentional tip-sync to the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-07T23:29:39Z`.
+
+Twelve session 7 evidence keys stay false, including `product_fact_ledger_persisted` and `build_workflow_linked`. No session exit code is recorded. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. Exit 78 scheduler stays HELD. Narrative `next_phase` is `test_matrix` and it is not started. There is no top-level `next_phase` field. Section 11 is not this wave.
+
+Prompt integrity for this wave is the Wave 10 corrective addendum in `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md`. The prompt file is unchanged. SHA-256 `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`. D-0029 records that the section 10 names are labels on `config/workflows.yaml`, not a second engine.
+
+### Round 9 is this commit (2026-10-09)
+
+This commit answers reviewer review 5466065420 (FAIL, one low-severity blocker) on tip `08484bf0`. The verifier had not posted on that tip when this was written. Fixtures only. No live Notion, no Etsy. STATE revision stays 58, `head_sha` stays `a4e9b025`, twelve evidence keys stay false, `commissioned_agents` stays `[]`, Exit 78 stays HELD. Line numbers below are this commit. Tip `08484bf0` lines are in brackets.
+
+Blocker. The Round 8 equivalent `:784` (`:748`) IfExp `title != ""` to `True` in `_hub_names` was false at helper level. Round 8 said `matched` is already false because a stored hub name is never blank. That holds at the public entry only: the loader and `_require_hub_name` refuse a blank hub name first, with 0 writes. At helper level, a stored name `""` and a title `""` give `matched` True on stock (the title becomes `missing`, which the durable loop keeps) and False on the mutant (the durable loop sees `""`). `test_blank_hub_name_with_blank_title_is_matched` asserts stock's `matched` True and `missing`. It fails on the hand-applied mutant and passes on this tree. The row is dropped from the equivalent list, which is now 12.
+
+Other fixes:
+- QA provider errors of any kind (`notion_qa.py:140-153`). `run_product_qa` re-raises an own `ProductBuildError` unchanged and maps any other `Exception` from the provider calls to the fixed `ProviderFailure("qa.duplicate", "provider operation failed")`, raised by `raise_recorded` after the handler has returned. `BaseException` is not caught. `load_qa_record` moved before the handler and `_write_qa` after it, so a local read or write error is not recorded as a provider job and propagates as before. `test_any_provider_exception_is_recorded_under_the_fixed_text` (`ConnectionError`, a `RuntimeError` with a note, and a `RuntimeError` caused by an `OSError`, each carrying `sk-live-secret`): message, args, cause, context, notes, attributes, formatted traceback, and the file carry no secret, and there is one provider job with the fixed response. `test_own_refusal_inside_qa_keeps_its_text`: an own refusal keeps its text and writes nothing. `test_duplicate_crash_then_resume_creates_one_proof` and `test_unpublish_publish_crash_then_resume_passes` now expect the fixed text for a provider `RuntimeError`. Resume still passes.
+- `_clean_interrupt` (`:258`) keeps the kind. A `BaseExceptionGroup` stays a group of the same kind with the fixed text, and each member is cleaned the same way (an `Exception` member becomes `Exception("fact ledger read failed")`). A custom subclass keeps its own type only when `_safe_kind` (`:295`) finds that its `__new__` and `__init__` both come from `builtins` and its metaclass is `type`, so building it runs no caller code. Otherwise it becomes the nearest built-in base (`CancelledError`, `KeyboardInterrupt`, `GeneratorExit`, `SystemExit`, `BaseExceptionGroup`, or `BaseException`). `test_clean_interrupt_keeps_a_custom_kind_or_its_built_in_base` (7), `test_clean_interrupt_keeps_a_group_and_cleans_every_member` (4, including an `ExceptionGroup` member that stays an `ExceptionGroup`), `test_interrupt_group_from_the_read_keeps_its_kind` (public entry, 0 writes).
+- `reject_duplicate_labels` (`notion_progress.py:135`) looks a text up only when it is an exact `str`. `test_forged_str_subclass_refusal_text_is_not_raised` uses a str subclass with a forged `__eq__`, `__ne__`, and `__hash__`.
+
+Hand-applied mutants (`mm-harness/r9/handmut.py`, a copy of `src` per mutant): 10 of 10 fail their listed tests on the mutant and pass on this tree.
+
+Census of `notion_fact_ledger.py` on this commit: if 123, elif 0, compare 185, boolop 56, operand 131, ifexp 13. That is 377 decision sites. 377 + 131 operands = 508.
+
+Mutation results for this commit (operands PARTIAL): 173 rows, 161 killed, 12 equivalent, Failed sum 12345. Ledger if-flips 123 rows, 123 killed, 0 equivalent, Failed sum 11439. Ledger IfExp 26 rows, 25 killed, 1 equivalent, Failed sum 407. Ledger operands and flips, PARTIAL (the 5 rows at the new `:290` and the 11 Round 8 equivalent rows; the full operand sweep was started and stopped, not counted): 16 rows, 5 killed, 11 equivalent, Failed sum 17. Progress `:135`-`:136` 7 rows, 7 killed, 0 equivalent, Failed sum 30. QA `:140`-`:153` 1 rows, 1 killed, 0 equivalent, Failed sum 452. The 12 equivalents are the 11 Round 7 operand rows the verifier probed and IfExp `:850` (`:814`) `type(captured) is str` to `True`. Details are in the PR round body (`BODY_ROUND`).
+
+### Round 8 (tip `08484bf0`, 2026-10-09)
+
+This commit answers reviewer review 5464808945 and verifier comment 6072697310, both FAIL on tip `1e614857`. Fixtures only. No live Notion, no Etsy. STATE revision stays 58, `head_sha` stays `a4e9b025`, twelve evidence keys stay false, `commissioned_agents` stays `[]`, Exit 78 stays HELD. Line numbers below are this commit. Tip `1e614857` lines are in brackets.
+
+Five Round 7 equivalents were false. Each now has a killing test, and each test was run against the hand-applied mutant (fails) and the fixed tree (passes).
+
+- `:487` (`:458`) `type(value) is not str` to `False`. `str()` can return a str subclass. `test_plan_refuses_an_undurable_fact` adds `build_version` `_SelfStr("1")`, `_Lie(" 1")` (padded, with a lying `__eq__`, `__ne__`, and `strip`), and `_StrMaker()` (its `__str__` returns a `_SelfStr`). `test_public_entry_refuses_a_str_subclass_version` runs the same three through `run_fact_ledger` with the loader replaced, and asserts the refusal and unchanged checkpoint bytes.
+- `:226` / `:227` (`:223` / `:224`) `saved_ledger is not None` / `saved_link is not None` to `True`. `test_half_a_saved_pair_is_planned_not_a_read_failure` calls `_guarded_read` with the ledger and no link, and with the link and no ledger. Stock returns a plan. Each mutant returns `fact ledger read failed`.
+- `:867` (`:837`) `expression is None` to `False`. `test_formula_missing_on_both_sides_is_blocked_missing` makes the expected and the stored expression of one formula both `None`. Stock writes a BLOCKED ledger with `dashboard_outputs` `missing`. The mutant reaches `";" in None` and writes nothing.
+- `:869` (`:839`) `";" in expression` to `False`. `test_semicolon_formula_on_both_sides_is_not_stored` makes both expressions the expected one plus `;x`. Stock stores `missing` and no `;x` reaches the file.
+- The own-prefix gate at `:283` (`:254`), replaced with `if False`. `test_in_package_error_without_an_own_prefix_is_redacted` raises `ProductBuildError("sk-live-secret")` from a `RuntimeError` in a function whose globals are this module's. Stock raises `fact ledger read failed` with no chain and no reachable secret.
+
+Other fixes:
+- Comma colour names. `_colour_names` (`:695`) refuses a name that holds a comma, because the fact joins names with commas. `test_colour_name_with_a_comma_is_refused` (helper and `_plan`) and `test_public_comma_colour_name_is_refused_with_no_write` (`red ,Green,Purple`, `,Green,Purple`, `red,Green`, restamped checkpoint, unchanged bytes).
+- QA provider response. `run_product_qa` no longer stores or re-raises the provider response. The handler only marks the failure. After it returns, `raise_recorded` stores and raises the fixed `ProviderFailure("qa.duplicate", "provider operation failed")`. `test_provider_response_is_not_stored_raised_or_chained` (three responses) checks the message, args, cause, cause args, context, formatted traceback, and checkpoint. Three existing QA tests now expect the fixed text.
+- `BaseException` in `_guarded_read`. `CancelledError`, `KeyboardInterrupt`, `GeneratorExit`, and `SystemExit` leave as fresh instances of the same type with no text, notes, or chain (`_clean_interrupt` `:256`). `SystemExit` keeps an integer code only. Any other `BaseException` becomes `BaseException("fact ledger read failed")`. `test_interrupt_keeps_its_kind_and_drops_the_secret` (6 cases), `test_task_cancel_message_is_dropped_and_the_task_is_cancelled` (`Task.cancel(secret)`, the task still ends cancelled), and `test_timeout_still_becomes_timeout_error` (`asyncio.timeout` still raises `TimeoutError`).
+- IfExp survivors. `:721` (`:691`) `notice is not None` to `True` is killed by `test_missing_notice_is_not_a_read_failure`, and `:876` (`:846`) `type(sample) is NotionPage` to `True` is killed by `test_missing_or_subclass_sample_is_missing` (absent sample, `NotionPage` subclass sample).
+- `reject_duplicate_labels` (`notion_progress.py:133`) raises only a known refusal text. Any other text becomes `checkpoint list is duplicated`.
+
+The remaining equivalents are 13: the 11 Round 7 rows the verifier probed as equivalent, plus two IfExp rows. `:748` `title != ""` to `True`: a blank title is turned into `missing` by the durable loop at `:751`, and `matched` is already false because a stored hub name is never blank. `:814` `type(captured) is str` to `True`: the branch is inside `if usable`, which already requires an exact non-empty `str`. `notion_progress_record.py:190` `dict(job) if type(job) is dict else job` is equivalent and is named here: `load_payload` has already validated each job as a dict, and the list is rebuilt from a fresh load, so copying or not copying cannot be observed.
+
+Census of `notion_fact_ledger.py` on this commit: if 119, elif 0, compare 182, boolop 55, operand 129, ifexp 13. That is 369 decision sites. 369 + 129 operands = 498.
+
+Mutation results for this commit are in the PR round body (`BODY_ROUND`). The harness is the Round 7 harness.
+
+### Round 7 (tip `1e614857`, 2026-10-09)
+
+This commit answers verifier comment 6066644759 on tip `0b2007a7`. The tables below are this commit. The Round 6 tables are tip `0b2007a7` and are not these counts. On that tip, 357 decision sites + 128 operands = 485.
+
+Blocker 1, `:430` on tip `0b2007a7`, is `:458` here. `test_plan_refuses_an_undurable_fact` calls `_plan` with `build_version` `""`, `" 1"`, and `"1 "`, and with `database_ids=()`. Stock raises `fact ledger fact is not a durable string` for each. `value == ""` to `False`, `value.strip() != value` to `False`, and both `or` to `and` flips are now KILLED. The public loader still refuses those inputs before `_plan`, with 0 writes. `type(value) is not str` to `False` stays equivalent: every value in `facts` is built by `str(...)`, `",".join(...)`, `";".join(...)` (`_dashboard_outputs`), `",".join(...)` (`_secret_links`), or a literal, so each one is an exact `str` before this loop.
+
+Blockers 2, 3, and 4 share one change. `run_fact_ledger` (`:156`) awaits `_guarded_read` (`:206`), which returns the resumed checkpoint, the plan, or a fixed failure text. No `Exception` leaves `_guarded_read`. The caller raises after that frame has returned, so the raised error has no `__context__`, and no provider or code error object is reachable from it. `_scrub_secret` is gone. Mutating an exception in place did not reach `__notes__`, attributes, or a custom `__str__`.
+
+- A provider failure (`ProviderFailure`, `ConnectionError`, `OSError`) becomes `raise_recorded(path, ..., ProviderFailure("fact_ledger.read", "provider read failed"))`. Its `__cause__` is that fixed `ProviderFailure`, whose own `__context__` is `None`. `test_provider_failure_leaves_no_chain` covers `ConnectionError(secret)`, `ProviderFailure(..., secret)`, `PermissionError` with the secret as `filename`, a `__notes__` secret, and a `RuntimeError(secret)` cause. The test walks `str`, `repr`, `args`, `__notes__`, `vars()`, every cause and context, the formatted traceback, and the traceback frame locals outside the test file. The secret is in none of them and not in the checkpoint. One provider job is stored.
+- An own refusal is kept only when the text starts with an own prefix, its `__cause__` is not a `ProviderFailure`, and the innermost traceback frame is in `money_machine.agents.implementations` (`_own_message` `:247`, `_raised_in_package` `:261`). It is raised again as a new `ProductBuildError` with the same text and no chain (`test_own_refusal_is_raised_without_a_chain`). An error that was never raised has no traceback and is not own (`test_error_without_a_traceback_is_not_own`).
+- A `ProductBuildError` that starts with `qa `, `checkpoint `, `fact ledger `, `progress `, or `workflow link ` but was raised outside the package, with a `RuntimeError(secret)` cause, becomes `fact ledger read failed` with no chain (`test_provider_error_with_an_own_prefix_is_redacted`, 5 prefixes). A provider response re-raised by `raise_recorded` is package code, but its cause is a `ProviderFailure`, so `qa sk-live-secret`, `fact ledger sk-live-secret`, and a bare secret also become `fact ledger read failed` (`test_recorded_provider_response_is_not_an_own_refusal`).
+- A code error with the secret in `__str__`, in a `.token` attribute, in a note, and on a chained cause becomes `fact ledger read failed` with no chain (`test_code_error_attributes_do_not_survive`). No provider job is stored and the checkpoint bytes are unchanged.
+
+On tip `0b2007a7`, 15 of these new test cases fail. The four `_plan` cases pass there, because they kill mutants rather than a defect.
+
+Blocker 5, the QA Failed sum. The verifier measured 3674 serially on tip `0b2007a7`, with `notion_qa.py:255` if-flip at 15 and the `:451` type conjunct at 5. Re-running that tip here with this harness gave 3514 with 4 workers, and those two rows were 11 and 1 when run one at a time. The difference is not explained here. This commit publishes every QA, progress, and variant row below, from a run with 1 worker, so each Failed count can be checked row by row.
+
+Census of `notion_fact_ledger.py` on this commit: if 115, elif 0, compare 180, boolop 55, operand 128, ifexp 12. That is 362 decision sites. 362 decision sites + 128 operands = 490. Operand rows are each operand replaced with `True` and with `False`, plus one flip per `and` or `or` token: 329 rows. If-flips are the 115 `if` tests. The progress, QA, and variant lines are the Round 6 lines. Those three files are unchanged.
+
+Sweep method. Harness `/workspace/mm-harness/run.py` with mutants from `muts.py`. Each worker copies `src` and `config` into `.mutants/<run>/w<pid>/` inside the checkout, so `repo_root()` and git still resolve, sets `PYTHONPATH` to that `src`, and runs `.venv/bin/python -m pytest -q --tb=no -rfE -p no:cacheprovider <tests>` from the checkout. Ledger operands and ledger if-flips ran with 4 workers. QA, progress, and variant lines ran with 1 worker, one pytest at a time. The ledger suite is `tests/unit/agents/test_notion_fact_ledger.py`. QA lines add `tests/unit/agents/test_notion_product_qa.py`. Variant lines use the same four variant tests as Round 6. Failed is the count of lines starting with `FAILED` or `ERROR`. A non-zero exit with zero such lines is still a kill. None occurred. Every exit was 0 or 1. Timeout 300 seconds, none hit. Python 3.12.3. pytest 8.4.2. ruff 0.16.2. pyright 1.1.411.
+
+| Sweep | Rows | Killed | Equivalent | Failed sum |
+|---|---:|---:|---:|---:|
+| Ledger operands (non-if) | 329 | 313 | 16 | 10283 |
+| Ledger if-flips | 115 | 115 | 0 | 10551 |
+| Progress `:215`, `:236`, `:239`, `:300`, dedupe, `:432` | 40 | 40 | 0 | 1579 |
+| QA changed lines | 42 | 42 | 0 | 3687 |
+| Variants `:280`, `:519`, `:904` | 13 | 13 | 0 | 13 |
+| Combined | 539 | 523 | 16 | 26113 |
+
+Progress split, 1 worker: `:215` 1 killed, Failed 3. `:236` 6 killed, Failed sum 13. `:239` 6 killed, Failed sum 15. `:300` 1 killed, Failed 16. Dedupe `:313`, `:316`, `:318`, and `:319`–`:322` is 14 killed, Failed sum 35. `:432` is 12 killed, Failed sum 1497. Total 1579.
+
+QA and progress counts moved because the 19 new ledger tests that build a QA checkpoint also fail when QA is broken. Against the per-row QA run of tip `0b2007a7` with this harness, every changed row moved by 19 or by 1, and no other row moved. `notion_qa.py:255` if-flip is 11 here and the `:451` `type(found.expression) is not str` to `False` row is 1, as on that tip. The QA sum here is 3687. The Round 6 QA figure 3514 and the verifier's 3674 were both tip `0b2007a7`.
+
+Ledger: `:458` `value == ""` to `False` fails 2. `value.strip() != value` to `False` fails 2. The first `or` to `and` fails 2. The second fails 4. The first failing test in each is `test_plan_refuses_an_undurable_fact`. The new `if failure == _PROVIDER_FAILED` (`:184`) flip fails 211. `if plan is None` (`:190`) fails 201.
+
+The 16 equivalents, all in `notion_fact_ledger.py`. Each row ran with Failed 0. Fifteen are the Round 6 rows at new line numbers (tip `0b2007a7` line in brackets). The sixteenth is `:458` `type(value) is not str`, the one `:430` row the verifier agreed is equivalent.
+
+| Line | Mutation | Helper probe | Public probe |
+|---|---|---|---|
+| `:223` (`:181`) | `saved_ledger is not None` to `True` | `_stored_pair` returns both or neither. One `None` never arrives. | `test_missing_qa_and_half_a_pair_write_nothing` writes nothing until both records exist, then the resume writes nothing more. |
+| `:224` (`:182`) | `saved_link is not None` to `True` | Same pair. | Same test. |
+| `:458` (`:430`) | `type(value) is not str` to `False` | Every value in `facts` is `str(...)`, a `",".join` or `";".join` result, or a literal, so it is an exact `str` before this loop. | The public loader refuses a bad version or variant before `_plan`. |
+| `:649` (`:621`) | `len(block.content) > len(prefix)` to `True` | Prefix-only content yields detail `""` either way. `_durable_detail` raises the same `ProductBuildError`. `test_prefix_only_section_is_the_same_refusal`. | The same test's unnamed caller raises that error and leaves the bytes unchanged. |
+| `:703` (`:675`) | `page.title == ""` to `False` | An empty title is returned by the `if` and by the fall-through. Both are `""`. | `test_blank_hub_title_is_missing`. |
+| `:721` (`:693`) | `type(name) is str` to `True` | `_page_title` already returned a `str`. | `test_hub_title_that_is_not_text_is_blocked`. |
+| `:721` (`:693`) | `name == ""` to `False` | The first loop already stored `missing` for `""`. | `test_blank_hub_title_is_missing`. |
+| `:752` (`:724`) | `type(title) is str` to `True` | The preceding ternary already produced a `str`. | `test_database_title_integer_is_missing` and `test_blank_database_title_is_missing_and_blocked`. |
+| `:773` (`:745`) | `captured != ""` to `True` | `_redacted_url("")` returns `missing`. Agreed stays false. | `test_empty_or_missing_public_url_blocks_secret_links`. |
+| `:797` (`:769`) | `captured == ""` to `False` | `""` falls through. `separator == ""` still returns `missing`. | `test_untrusted_scheme_or_host_is_stored_as_missing`. |
+| `:804` (`:776`) | `separator == ""` to `False` | `notaurl` has rest `""`. `rest == ""` still returns `missing`. | Same public test. |
+| `:804` (`:776`) | `rest == ""` to `False` | `http://` has an empty host. `host == ""` still returns `missing`. | Same public test. |
+| `:809` (`:781`) | `host.strip() != host` to `False` | Any space returns `missing` before the host is parsed. | A query token is `missing` and the secret is absent. |
+| `:837` (`:809`) | `expression is None` to `False` | `None` still fails `expression != wanted[1]`. | `test_blank_formula_blocks_dashboard_outputs`. |
+| `:839` (`:811`) | `";" in expression` to `False` | `test_seminame_formula_is_missing` still returns `missing` on the name conjunct. | `test_semicolon_in_a_formula_expression_is_missing` is `BLOCKED` because `expression != wanted[1]` fires first. |
+| `:920` (`:892`) | `allowed is None` to `False` | A predecessor in `_GRAPH` has an allowed set. A mismatched set still fails `frozenset(...) != allowed`. | `test_renamed_workflow_refuses` writes nothing. |
+
+QA changed lines, all 42 rows, 1 worker. Failed sum 3687.
+
+| # | Site | Mutation | Result | Failed |
+|---|---|---|---|---:|
+| 1 | `notion_qa.py:170` | `if-flip: verdict == "PASS" and any(passed is False for _name, passed in parsed_checks)` | KILLED | 284 |
+| 2 | `notion_qa.py:170` | `and operand 0 -> True: verdict == "PASS"` | KILLED | 13 |
+| 3 | `notion_qa.py:170` | `and operand 0 -> False: verdict == "PASS"` | KILLED | 1 |
+| 4 | `notion_qa.py:170` | `and operand 1 -> True: any(passed is False for _name, passed in parsed_checks)` | KILLED | 271 |
+| 5 | `notion_qa.py:170` | `and operand 1 -> False: any(passed is False for _name, passed in parsed_checks)` | KILLED | 1 |
+| 6 | `notion_qa.py:170` | `and->or #0` | KILLED | 283 |
+| 7 | `notion_qa.py:175` | `if-flip: type(digest) is not str or len(digest) != 64 or not _hex_digest(digest)` | KILLED | 286 |
+| 8 | `notion_qa.py:175` | `or operand 0 -> True: type(digest) is not str` | KILLED | 281 |
+| 9 | `notion_qa.py:175` | `or operand 0 -> False: type(digest) is not str` | KILLED | 1 |
+| 10 | `notion_qa.py:175` | `or operand 1 -> True: len(digest) != 64` | KILLED | 281 |
+| 11 | `notion_qa.py:175` | `or operand 1 -> False: len(digest) != 64` | KILLED | 2 |
+| 12 | `notion_qa.py:175` | `or operand 2 -> True: not _hex_digest(digest)` | KILLED | 281 |
+| 13 | `notion_qa.py:175` | `or operand 2 -> False: not _hex_digest(digest)` | KILLED | 2 |
+| 14 | `notion_qa.py:175` | `or->and #0` | KILLED | 3 |
+| 15 | `notion_qa.py:175` | `or->and #1` | KILLED | 4 |
+| 16 | `notion_qa.py:255` | `if-flip: saved.prose_digest != prose_digest(spec)` | KILLED | 11 |
+| 17 | `notion_qa.py:451` | `if-flip: found is None or type(found.expression) is not str or found.expression != expression` | KILLED | 101 |
+| 18 | `notion_qa.py:451` | `or operand 0 -> True: found is None` | KILLED | 101 |
+| 19 | `notion_qa.py:451` | `or operand 0 -> False: found is None` | KILLED | 7 |
+| 20 | `notion_qa.py:451` | `or operand 1 -> True: type(found.expression) is not str` | KILLED | 101 |
+| 21 | `notion_qa.py:451` | `or operand 1 -> False: type(found.expression) is not str` | KILLED | 1 |
+| 22 | `notion_qa.py:451` | `or operand 2 -> True: found.expression != expression` | KILLED | 101 |
+| 23 | `notion_qa.py:451` | `or operand 2 -> False: found.expression != expression` | KILLED | 2 |
+| 24 | `notion_qa.py:451` | `or->and #0` | KILLED | 8 |
+| 25 | `notion_qa.py:451` | `or->and #1` | KILLED | 3 |
+| 26 | `notion_qa.py:639` | `if-flip: type(content) is not str` | KILLED | 420 |
+| 27 | `notion_qa.py:641` | `if-flip: "No access" in content` | KILLED | 103 |
+| 28 | `notion_qa.py:737` | `if-flip: isinstance(database, NotionDatabase) and type(database.title) is str` | KILLED | 102 |
+| 29 | `notion_qa.py:737` | `and operand 0 -> True: isinstance(database, NotionDatabase)` | KILLED | 1 |
+| 30 | `notion_qa.py:737` | `and operand 0 -> False: isinstance(database, NotionDatabase)` | KILLED | 100 |
+| 31 | `notion_qa.py:737` | `and operand 1 -> True: type(database.title) is str` | KILLED | 1 |
+| 32 | `notion_qa.py:737` | `and operand 1 -> False: type(database.title) is str` | KILLED | 100 |
+| 33 | `notion_qa.py:737` | `and->or #0` | KILLED | 2 |
+| 34 | `notion_qa.py:856` | `if-flip: page.is_published is not True or not _is_trusted_link(page.public_url, page.id)` | KILLED | 4 |
+| 35 | `notion_qa.py:856` | `or operand 0 -> True: page.is_published is not True` | KILLED | 1 |
+| 36 | `notion_qa.py:856` | `or operand 0 -> False: page.is_published is not True` | KILLED | 1 |
+| 37 | `notion_qa.py:856` | `or operand 1 -> True: not _is_trusted_link(page.public_url, page.id)` | KILLED | 1 |
+| 38 | `notion_qa.py:856` | `or operand 1 -> False: not _is_trusted_link(page.public_url, page.id)` | KILLED | 2 |
+| 39 | `notion_qa.py:856` | `or->and #0` | KILLED | 3 |
+| 40 | `notion_qa.py:916` | `if-flip: envelope.payload is not None` | KILLED | 1 |
+| 41 | `notion_qa.py:918` | `if-flip: type(prior) is dict` | KILLED | 1 |
+| 42 | `notion_qa.py:920` | `if-flip: key in prior` | KILLED | 414 |
+
+Ledger if-flips, all 115. Every row is killed. Failed sum 10551. The first failing test is the first `FAILED` or `ERROR` line pytest printed.
+
+| Line | Failed | First failing test |
+|---|---:|---|
+| `175` | 256 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `184` | 211 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `190` | 201 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `191` | 82 | `test_resume_of_pass_makes_no_second_write` |
+| `222` | 201 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `237` | 69 | `test_stored_blocked_verdict_replans_a_passing_plan` |
+| `254` | 60 | `test_stored_blocked_verdict_replans_a_passing_plan` |
+| `256` | 62 | `test_stored_blocked_verdict_replans_a_passing_plan` |
+| `264` | 61 | `test_stored_blocked_verdict_replans_a_passing_plan` |
+| `274` | 47 | `test_resume_of_pass_makes_no_second_write` |
+| `277` | 47 | `test_resume_of_pass_makes_no_second_write` |
+| `281` | 211 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `283` | 211 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `290` | 50 | `test_resume_of_pass_makes_no_second_write` |
+| `293` | 60 | `test_resume_of_pass_makes_no_second_write` |
+| `297` | 47 | `test_resume_of_pass_makes_no_second_write` |
+| `300` | 46 | `test_resume_of_pass_makes_no_second_write` |
+| `307` | 39 | `test_resume_of_pass_makes_no_second_write` |
+| `310` | 42 | `test_resume_of_pass_makes_no_second_write` |
+| `313` | 36 | `test_resume_of_pass_makes_no_second_write` |
+| `316` | 36 | `test_resume_of_pass_makes_no_second_write` |
+| `319` | 36 | `test_resume_of_pass_makes_no_second_write` |
+| `327` | 46 | `test_resume_of_pass_makes_no_second_write` |
+| `331` | 47 | `test_resume_of_pass_makes_no_second_write` |
+| `335` | 47 | `test_resume_of_pass_makes_no_second_write` |
+| `343` | 45 | `test_resume_of_pass_makes_no_second_write` |
+| `345` | 21 | `test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes` |
+| `353` | 152 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `355` | 155 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `362` | 23 | `test_resume_of_pass_makes_no_second_write` |
+| `364` | 6 | `test_resume_of_pass_makes_no_second_write` |
+| `380` | 24 | `test_resume_of_pass_makes_no_second_write` |
+| `382` | 25 | `test_resume_of_pass_makes_no_second_write` |
+| `383` | 16 | `test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes` |
+| `385` | 16 | `test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes` |
+| `387` | 14 | `test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes` |
+| `388` | 12 | `test_blocked_ledger_replans_when_the_defect_is_gone` |
+| `392` | 10 | `test_resume_of_pass_makes_no_second_write` |
+| `394` | 6 | `test_resume_of_pass_makes_no_second_write` |
+| `395` | 6 | `test_resume_of_pass_makes_no_second_write` |
+| `397` | 5 | `test_resume_of_pass_makes_no_second_write` |
+| `399` | 3 | `test_resume_of_pass_makes_no_second_write` |
+| `413` | 210 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `425` | 191 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `453` | 52 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `458` | 159 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `493` | 8 | `test_caller_spec_fields_are_not_the_facts` |
+| `499` | 3 | `test_oversized_hub_description_is_not_adopted` |
+| `501` | 18 | `test_edited_hub_prose_is_blocked_not_self_compared[purpose-one]` |
+| `518` | 14 | `test_unnamed_caller_cannot_adopt_a_live_hub_edit[forged-purpose-one]` |
+| `537` | 206 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `544` | 204 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `551` | 3 | `test_oversized_hub_description_is_not_adopted` |
+| `554` | 202 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `580` | 2 | `test_unnamed_sixty_four_character_hub_name_passes` |
+| `583` | 4 | `test_unnamed_caller_cannot_adopt_a_live_hub_edit[forged-purpose-all]` |
+| `590` | 9 | `test_qa_pass_persists_one_ledger_and_one_link[business-Studio Ledger-Studio Home-Desk]` |
+| `592` | 4 | `test_caller_tier_does_not_override_stored_kinds[mass]` |
+| `602` | 214 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `605` | 215 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `608` | 215 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `611` | 216 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `623` | 209 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `626` | 25 | `test_oversized_hub_description_is_not_adopted` |
+| `629` | 209 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `631` | 210 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `645` | 19 | `test_unnamed_caller_cannot_adopt_a_live_hub_edit[forged-purpose-one]` |
+| `649` | 19 | `test_unnamed_caller_cannot_adopt_a_live_hub_edit[forged-purpose-one]` |
+| `656` | 21 | `test_unnamed_caller_cannot_adopt_a_live_hub_edit[forged-purpose-one]` |
+| `666` | 209 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `677` | 49 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `693` | 3 | `test_missing_page_writes_nothing` |
+| `696` | 217 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `703` | 179 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `716` | 49 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `721` | 51 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `734` | 51 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `747` | 215 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `752` | 50 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `754` | 49 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `774` | 58 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `783` | 4 | `test_forged_captured_url_blocks_secret_links` |
+| `797` | 5 | `test_forged_captured_url_blocks_secret_links` |
+| `799` | 11 | `test_forged_captured_url_blocks_secret_links` |
+| `801` | 3 | `test_forged_captured_url_blocks_secret_links` |
+| `804` | 4 | `test_forged_captured_url_blocks_secret_links` |
+| `809` | 5 | `test_forged_captured_url_blocks_secret_links` |
+| `816` | 51 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `818` | 50 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `820` | 50 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `830` | 51 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `837` | 57 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `839` | 52 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `841` | 177 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `848` | 50 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `852` | 179 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `854` | 176 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `856` | 50 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `874` | 52 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `877` | 52 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `880` | 52 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `883` | 53 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `886` | 53 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `906` | 227 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `911` | 226 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `913` | 226 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `915` | 226 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `917` | 226 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `920` | 226 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `922` | 226 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `925` | 226 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `927` | 227 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `966` | 149 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `968` | 149 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `970` | 149 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+
+Product-build tests: 879 passed in 59.97s (the Round 6 set plus 20 new cases). `test_notion_fact_ledger.py`: 306 passed. `ruff format --check`, `ruff check`, and `pyright` 1.1.411 are clean on the whole tree, as CI runs them. Full local `uv run pytest`: 2637 passed, 193 skipped, 12 failed. All 12 failures are `test_compose_preserves_the_postgres_password`, because the `docker` binary is absent here. Sockets stay blocked. No production Notion or Etsy. No commissioning. Revision stays 58. `head_sha` stays `a4e9b025021b4effbb2b2879c1db756403cb1676`. `updated_at` stays `2026-10-07T23:29:39Z`. Exit 78 stays HELD. This is not SESSION_07 COMPLETE.
+
+Not changed this round, all non-blocking: a single variant name that itself holds commas (`red ,Green,Purple`) is still accepted and joined into the colour fact; the `asyncpg`-absent integration failures; and the IfExp `dict(job) if type(job) is dict else job`. The `:649` `>` to `>=` nit stays as described. This commit's CI run is not invented here.
+
+### Round 6 record at tip `0b2007a7` (2026-10-08)
+
+This round answered verifier comment 6060511391 and reviews 5455831580 and 5457879480, all on tip `45818d9e`. The tables below are tip `0b2007a7`. The Round 5 tables are tip `45818d9e` and are not these counts. On that tip, 338 decision sites + 125 operands = 463. Its ledger if-flip run was 104 rows, all killed, Failed sum 8131. The reviewer finished 80 of those 104 under load. This commit does not republish 8845, 8131, or 17052.
+
+`run_fact_ledger` is async at `notion_fact_ledger.py:156`. `_plan` at `:377` awaits `live_qa_passed` (`notion_qa.py:521`) before `_write` at `:929`, which calls `write_checkpoint` at `:969`. `_colour_names` at `:633` checks each variant name on its own (exact `str`, non-empty, stripped) before the joined colour fact. `""`, `" red"`, and `"red "` raise `fact ledger fact is not a durable string` (`test_plan_refuses_an_undurable_colour_name`). A `str` subclass, `5`, and `None` raise that same `ProductBuildError` (`test_plan_refuses_a_non_string_colour_name`). They are not `AttributeError`. The public loader refuses the strings, the int, and null with `checkpoint variant must be a non-empty string` and 0 writes (`test_public_variant_name_is_refused_before_the_plan`, `test_public_non_string_variant_name_is_refused`). A `str` subclass cannot survive the JSON reload. `variants=()` raises the same product error inside `_plan` (`test_empty_variants_are_a_product_error`). The public entry still raises `fact ledger requires the qa checkpoint` before `_plan`.
+
+The semicolon return at `:811` stays first. `type(name) is not str` at `:813` is the next statement. `SemiName("current_date")` returns `missing` (`test_seminame_formula_is_missing`, helper only). Forcing `";" in name` to `False`, or the `or` to `and`, falls through and raises, so both are killed (Failed 1 each). Forcing `";" in expression` to `False` stays equivalent: `SemiName` still hits the name conjunct, a real `x;y` fails `expression != wanted[1]` first (`test_semicolon_in_a_formula_expression_is_missing`), and `Liar("x;y")` is `None` before this line (`test_lying_formula_expression_is_blocked`). `_PlainName` kills the type guard.
+
+`_require_shape` at `notion_progress.py:432` refuses `""`, `" test_matrix"`, `"tést"`, `5`, and `None` as `progress record is tampered` (`test_next_phase_must_be_an_unpadded_ascii_token`). `5` and `None` are `ProductBuildError`, not `AttributeError`. Empty kills `== ""` (Failed 1). Padding kills the strip conjunct (Failed 1). `tést` kills `isascii` (Failed 1). `5` and `None` kill the str-type conjunct (Failed 2). The three `or` to `and` flips fail 3, 2, and 2. The if-flip and the four operand-True rows are killed as well. The whole `:432` group is 12 rows, 12 killed, Failed sum 1402.
+
+QA stores `prose_digest` (`notion_qa.py:187`), the sha256 of the hub descriptions in order, then `buyer_problem`, then `flagship_feature`. Hub names and the row identity are not in it. `_plan` compares it at `:397` before `live_qa_passed` and before any write. A mismatch raises `fact ledger caller does not match` with 0 writes. `_saved_holds` in QA returns false at `:255`, so QA runs again. `test_changed_prose_does_not_pass_without_a_new_qa` covers a description, the buyer, and the flagship. `test_prose_digest_must_be_lowercase_hex` refuses a non-str, a short digest, `""`, a non-hex digest, and uppercase hex, at the helper and at the public restamp, with 0 writes. D-0029 records the limit. The 64-character unnamed path still PASSes when that prose is the prose QA judged.
+
+`_notification_values` at `notion_qa.py:451` requires `type(found.expression) is str`. `test_lying_formula_expression_is_not_a_string` installs a `str` subclass whose text equals the spec expression, so `!=` does not refuse it (`str.__ne__` ignores a lying `__eq__` when the text differs). The helper returns false and the public verdict is `BLOCKED` with 0 adapter writes. Replacing that type conjunct with `False` fails 1.
+
+A provider `ProductBuildError` whose message is not one of this module's refusals is scrubbed. `_scrub_secret` clears `__cause__` and `__context__` and sets `__suppress_context__`, then the handler raises `fact ledger read failed` from `None` (`test_provider_product_error_does_not_carry_a_secret`, `test_chained_secret_is_not_left_on_the_context`). The secret is not in the message and not on the chain. It is not a provider job.
+
+Buyer text of 501 to 1000 characters passes on the named path and the unnamed path. `_durable_detail` uses 1000 for `buyer` and 500 for purpose and practice. `test_long_buyer_passes_on_named_and_unnamed_paths` uses 600 characters. Both public calls PASS, and the helper returns that buyer.
+
+`_require_hub_name` at `:516` accepts 64 and refuses 65 on both paths. `test_legal_bounds_pass_and_one_past_refuses` kills that conjunct: `len(name) > 64` replaced with `False` fails 2. `test_unnamed_sixty_four_character_hub_name_passes` is the 64-character PASS. The same conjunct inside `_durable_detail` at `:617` is killed by `test_detail_bounds_are_a_product_error` (Failed 1), which calls the helper. A 65-character name on the public path does not reach `:617`, because `:516` already returned. The earlier claim that `:580` was the check the unnamed 64-character PASS killed, and that the named path did not reach the detail rule, was only half true. `:516` dominates both paths.
+
+`_teardown` (`notion_qa.py:699`) says it is true when hub prose still matches the spec. The sleep child in `test_keyboard_interrupt_still_exits_130` uses `sys.executable`.
+
+Round-4 temp cleanup and URL checks, re-gated on this tree. `test_temp_names_are_matched_literally` monkeypatches `_pid_alive`. `:236` and `:239` are 12 rows, 12 killed, Failed sum 28. `if pid <= 0` at `:215` is killed, Failed 3. `test_non_positive_pid_is_not_alive` asserts `_pid_alive(0)` is false. PermissionError still means the pid is alive. `_redacted_url` (`:763`) stores scheme and host. `test_redacted_url_drops_a_bare_token` (helper) and `test_untrusted_scheme_or_host_is_stored_as_missing` (public) cover userinfo, a path, a query, a fragment, a port, a bare token, `ftp://example.com`, `https://@`, `https://evil;example`, and `notaurl`. `https://user:sk-live-…@evil.example/p` becomes `https://evil.example` with the secret absent.
+
+`:359` and `:364`, `saved.checks != plan.checks` replaced with `False`, are killed (Failed 2 and 3). They are not equivalent. `test_saved_pass_checks_must_match_the_plan` raises `fact ledger does not match` for a renamed, reordered, or short PASS. The public entry rejects that record in `_require_ledger` (`:260`) before the helper. On tip `45818d9e` the same conjunct was `:333` and failed 3.
+
+`_postgres_available` builds the engine inside the try. A missing `asyncpg` driver raises while the dialect loads, and the function returns false before connect. `unreachable_client` skips on `ModuleNotFoundError`, because those two tests need the driver to prove a refused connection. This round blocked `asyncpg` with a `meta_path` finder and ran `pytest -q tests/integration`: 21 passed, 193 skipped, exit 0. On tip `45818d9e` a missing driver errored instead of skipping. The product suite cannot be collected under `pytest -n 4` (`test_bad_checkpoint_does_not_create_a_page` puts `uuid4()` in its node id). Sums below are one serial pass of this tree, on a quiet machine, with `ProcessPoolExecutor` and 4 workers. They are not a `pytest -n` run.
+
+Product-build tests: 859 passed in 45.01s (`test_notion_fact_ledger.py`, `test_notion_product_qa.py`, the variants file, the progress file, and the six phase files). The 826 figure was tip `45818d9e`. `ruff format --check` and `ruff check` are clean on the changed modules. `pyright` 1.1.411 reports 0 errors on those modules and on the two touched test files. The notice that 1.1.414 exists is not a failure. SQLAlchemy is 2.0.52. `asyncpg` is 0.31.0. Sockets stay blocked. No production Notion or Etsy. No commissioning. Revision stays 58. `head_sha` stays `a4e9b025021b4effbb2b2879c1db756403cb1676`. `updated_at` stays `2026-10-07T23:29:39Z`. Exit 78 stays HELD. This is not SESSION_07 COMPLETE. `test_session_seven_stays_incomplete_with_false_evidence` passed.
+
+Census of `notion_fact_ledger.py` on this commit: if 112, elif 0, compare 178, boolop 55, operand 128, ifexp 12. That is 357 decision sites. 357 decision sites + 128 operands = 485. Progress sites 183. QA sites 288. Variant sites 264. Operand rows are each operand replaced with `True` and with `False`, plus one flip per `and` or `or`. If-flips are the 112 `if` tests. Progress rows are `notion_progress.py:215`, `:236`, `:239`, `:300`, `:313`, `:316`, `:318`, `:319` through `:322`, and `:432`. QA rows are `notion_qa.py:170`, `:175`, `:255`, `:451`, `:639`, `:641`, `:737`, `:856`, `:916`, `:918`, and `:920`. Variant rows are `notion_variants.py:280`, `:519`, and `:904`.
+
+Sweep method. One uninterrupted pass after the killing tests were in the tree. Command: `python /tmp/sweep_operands.py` from `/workspace`, 4 workers (`nproc` 4). Each worker copied `src` and `config` to its own directory, set `PYTHONPATH` to that `src`, and ran `pytest -q --tb=no -rfE -p no:cacheprovider -o pythonpath=`. The editable install was not the mutant. A canary import checked the copy. The ledger and progress suite was `tests/unit/agents/test_notion_fact_ledger.py`. QA lines used that file and `tests/unit/agents/test_notion_product_qa.py`. Variant lines used `test_aligned_pairs_refuse_a_duplicated_palette_name`, `test_non_workspace_home_is_refused_by_the_source_check`, `test_spec_page_must_be_the_stored_home`, and `test_duplicate_palette_token_names_refuse_before_any_write`. The Failed column is the count of lines starting with `FAILED` or `ERROR`. A non-zero exit with zero such lines is still a kill. A syntax error is not a kill. None occurred. Timeout was 300 seconds. None occurred. Python 3.12.3. pytest 8.4.2. ruff 0.16.2.
+
+| Sweep | Rows | Killed | Equivalent | Failed sum |
+|---|---:|---:|---:|---:|
+| Ledger operands (non-if) | 329 | 309 | 20 | 9826 |
+| Ledger if-flips | 112 | 112 | 0 | 9328 |
+| Progress `:215`, `:236`, `:239`, `:300`, dedupe, `:432` | 40 | 40 | 0 | 1479 |
+| QA changed lines | 42 | 42 | 0 | 3514 |
+| Variants `:280`, `:519`, `:904` | 13 | 13 | 0 | 13 |
+| Combined | 536 | 516 | 20 | 24160 |
+
+Progress split: `:215` is 1 killed, Failed sum 3. `:236` and `:239` are 12 killed, Failed sum 28. `:300` is 1 killed, Failed sum 11. Dedupe `:313`, `:316`, `:318`, and `:319`–`:322` is 14 killed, Failed sum 35. `:432` is 12 killed, Failed sum 1402.
+
+The 20 equivalents, all in `notion_fact_ledger.py`. Each one was run. Failed is 0. The helper and the public entry agree.
+
+| Line | Mutation | Helper probe | Public probe |
+|---|---|---|---|
+| `:181` | `saved_ledger is not None` to `True` | `_stored_pair` returns both or neither. One `None` never arrives. | `test_missing_qa_and_half_a_pair_write_nothing` writes nothing until both records exist, then the resume writes nothing more. |
+| `:182` | `saved_link is not None` to `True` | Same pair. | Same test. |
+| `:430` | `type(value) is not str` to `False`, `value == ""` to `False`, `value.strip() != value` to `False`, and both `or` flips | Bad names raise in `_colour_names` (`test_plan_refuses_an_undurable_colour_name`, `test_plan_refuses_a_non_string_colour_name`) and never reach this loop. A durable plan still passes. Five rows. | `test_public_variant_name_is_refused_before_the_plan` and `test_public_non_string_variant_name_is_refused` refuse before `_plan`. The 64-character unnamed PASS still passes. |
+| `:621` | `len(block.content) > len(prefix)` to `True` | Prefix-only content yields detail `""` either way. `_durable_detail` raises the same `ProductBuildError`. `test_prefix_only_section_is_the_same_refusal`. | The same test's unnamed caller (`identity` `Not The Row`) raises that error and leaves the bytes unchanged. It does not kill a literal `>=`. |
+| `:675` | `page.title == ""` to `False` | An empty title is returned by the `if` and by the fall-through. Both are `""`. | `test_blank_hub_title_is_missing`. The hub fact is `missing` either way. |
+| `:693` | `type(name) is str` to `True` | `_page_title` already returned a `str`. | `test_hub_title_that_is_not_text_is_blocked`. |
+| `:693` | `name == ""` to `False` | The first loop already stored `missing` for `""`. | `test_blank_hub_title_is_missing`. |
+| `:724` | `type(title) is str` to `True` | The preceding ternary already produced a `str` (`missing` or the title). | `test_database_title_integer_is_missing` and `test_blank_database_title_is_missing_and_blocked`. |
+| `:745` | `captured != ""` to `True` | `""` becomes usable. `_redacted_url("")` returns `missing`. Agreed stays false. | `test_empty_or_missing_public_url_blocks_secret_links`. The fact component is `missing`. |
+| `:769` | `captured == ""` to `False` | `""` falls through. `separator == ""` still returns `missing`. `test_redacted_url_drops_a_bare_token`. | `test_untrusted_scheme_or_host_is_stored_as_missing`. |
+| `:776` | `separator == ""` to `False` | `notaurl` has rest `""`. `rest == ""` still returns `missing`. | Same public test. `notaurl` is `missing`. |
+| `:776` | `rest == ""` to `False` | `http://` has an empty host. `host == ""` still returns `missing`. | Same public test. |
+| `:781` | `host.strip() != host` to `False` | Any space returns `missing` before the host is parsed (`:773`). | A query token is `missing` and the secret is absent. |
+| `:809` | `expression is None` to `False` | `None` still fails `expression != wanted[1]`. `test_blank_formula_expression_is_missing` returns `missing`. | `test_blank_formula_blocks_dashboard_outputs`. |
+| `:811` | `";" in expression` to `False` | `test_seminame_formula_is_missing` still returns `missing` on the name conjunct. A matching expression has no semicolon. | `test_semicolon_in_a_formula_expression_is_missing` is `BLOCKED` because `expression != wanted[1]` fires first. `test_lying_formula_expression_is_blocked` never reaches this line. |
+| `:892` | `allowed is None` to `False` | A predecessor in `_GRAPH` has an allowed set. A mismatched set still fails `frozenset(...) != allowed`. | `test_renamed_workflow_refuses` writes nothing. |
+
+Killing-test map for the rows that are not equivalent.
+
+| Input | Site | Killing test | Sweep |
+|---|---|---|---|
+| `""`, `" red"`, `"red "` | `:638` | `test_plan_refuses_an_undurable_colour_name` | `name == ""` to `False` fails 1. `strip` to `False` fails 1. |
+| Subclass `"Red"`, `5`, `None` | `:638` | `test_plan_refuses_a_non_string_colour_name` | `type(name) is not str` to `False` fails 3. The subclass does not raise. `5` and `None` raise `AttributeError` on the mutant. Stock raises `ProductBuildError`. |
+| `""`, `" test_matrix"`, `"tést"`, `5`, `None` | `notion_progress.py:432` | `test_next_phase_must_be_an_unpadded_ascii_token` | Seven weakenings killed, as above. Failed sums 2, 1, 1, 1, 3, 2, 2. |
+| `SemiName("current_date")` | `:811` name and `or` | `test_seminame_formula_is_missing` | Each fails 1. The expression conjunct stays equivalent. |
+| `_PlainName` | `:813` | `test_plain_subclass_formula_name_is_refused` | The type guard raises. |
+| Lying formula whose text equals the spec | `notion_qa.py:451` | `test_lying_formula_expression_is_not_a_string` | `type(found.expression) is not str` to `False` fails 1. |
+| Description, buyer, or flagship changed after QA | `:397`, `notion_qa.py:255` | `test_changed_prose_does_not_pass_without_a_new_qa` | `:255` if-flip fails 11. |
+| Digest not 64 lowercase hex | `notion_qa.py:175` | `test_prose_digest_must_be_lowercase_hex` | Nine rows, all killed, Failed sum 1065. |
+| Provider `ProductBuildError("sk-live-secret")` | `:193` | `test_provider_product_error_does_not_carry_a_secret` | Message is `fact ledger read failed`. 0 writes. Not a provider job. |
+| Chained `RuntimeError("sk-live-secret")` | `:205` | `test_chained_secret_is_not_left_on_the_context` | `__context__.__cause__` is cleared. |
+| Buyer of 600 characters | `:627` | `test_long_buyer_passes_on_named_and_unnamed_paths` | Named PASS, then unnamed PASS. |
+| 65-character hub name | `:516` | `test_legal_bounds_pass_and_one_past_refuses` | `len(name) > 64` to `False` fails 2. |
+| 65-character name inside `_durable_detail` | `:617` | `test_detail_bounds_are_a_product_error` | `len(name) > 64` to `False` fails 1. |
+| 64-character unnamed hub | both length checks allow 64 | `test_unnamed_sixty_four_character_hub_name_passes` | PASS, 1 write. |
+| PASS checks renamed, reordered, or one short | `:359`, `:364` | `test_saved_pass_checks_must_match_the_plan` | `saved.checks != plan.checks` to `False` fails 2 at `:359` and 3 at `:364`. |
+| Prefix-only section | `:621` operand `True` | `test_prefix_only_section_is_the_same_refusal` | That operand stays equivalent. The if-flip fails 19. |
+| pid 0 | `notion_progress.py:215` | `test_non_positive_pid_is_not_alive` | If-flip fails 3. |
+| Dead temp, live pid, literal name | `:236`, `:239` | `test_temp_names_are_matched_literally` | 12 of 12 killed, Failed sum 28. |
+
+Ledger if-flips, all 112. Every row is killed. Failed sum 9328. The first failing test is the first `FAILED` or `ERROR` line pytest printed.
+
+| Line | Failed | First failing test |
+|---|---:|---|
+| `175` | 241 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `180` | 186 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `194` | 60 | `test_stored_blocked_verdict_replans_a_passing_plan` |
+| `228` | 6 | `test_code_errors_are_redacted_and_not_provider_jobs[RuntimeError]` |
+| `237` | 8 | `test_runtime_error_is_not_a_provider_job` |
+| `239` | 8 | `test_runtime_error_is_not_a_provider_job` |
+| `246` | 47 | `test_resume_of_pass_makes_no_second_write` |
+| `249` | 47 | `test_resume_of_pass_makes_no_second_write` |
+| `253` | 196 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `255` | 196 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `262` | 50 | `test_resume_of_pass_makes_no_second_write` |
+| `265` | 60 | `test_resume_of_pass_makes_no_second_write` |
+| `269` | 47 | `test_resume_of_pass_makes_no_second_write` |
+| `272` | 46 | `test_resume_of_pass_makes_no_second_write` |
+| `279` | 39 | `test_resume_of_pass_makes_no_second_write` |
+| `282` | 42 | `test_resume_of_pass_makes_no_second_write` |
+| `285` | 36 | `test_resume_of_pass_makes_no_second_write` |
+| `288` | 36 | `test_resume_of_pass_makes_no_second_write` |
+| `291` | 36 | `test_resume_of_pass_makes_no_second_write` |
+| `299` | 46 | `test_resume_of_pass_makes_no_second_write` |
+| `303` | 47 | `test_resume_of_pass_makes_no_second_write` |
+| `307` | 47 | `test_resume_of_pass_makes_no_second_write` |
+| `315` | 45 | `test_resume_of_pass_makes_no_second_write` |
+| `317` | 21 | `test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes` |
+| `325` | 152 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `327` | 155 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `334` | 23 | `test_resume_of_pass_makes_no_second_write` |
+| `336` | 6 | `test_resume_of_pass_makes_no_second_write` |
+| `352` | 24 | `test_resume_of_pass_makes_no_second_write` |
+| `354` | 25 | `test_resume_of_pass_makes_no_second_write` |
+| `355` | 16 | `test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes` |
+| `357` | 16 | `test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes` |
+| `359` | 14 | `test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes` |
+| `360` | 12 | `test_blocked_ledger_replans_when_the_defect_is_gone` |
+| `364` | 10 | `test_resume_of_pass_makes_no_second_write` |
+| `366` | 6 | `test_resume_of_pass_makes_no_second_write` |
+| `367` | 6 | `test_resume_of_pass_makes_no_second_write` |
+| `369` | 5 | `test_resume_of_pass_makes_no_second_write` |
+| `371` | 3 | `test_resume_of_pass_makes_no_second_write` |
+| `385` | 195 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `397` | 172 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `425` | 52 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `430` | 159 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `465` | 7 | `test_caller_spec_fields_are_not_the_facts` |
+| `471` | 3 | `test_oversized_hub_description_is_not_adopted` |
+| `473` | 18 | `test_edited_hub_prose_is_blocked_not_self_compared[purpose-one]` |
+| `490` | 14 | `test_unnamed_caller_cannot_adopt_a_live_hub_edit[forged-purpose-one]` |
+| `509` | 191 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `516` | 189 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `523` | 3 | `test_oversized_hub_description_is_not_adopted` |
+| `526` | 187 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `552` | 2 | `test_unnamed_sixty_four_character_hub_name_passes` |
+| `555` | 4 | `test_unnamed_caller_cannot_adopt_a_live_hub_edit[forged-purpose-all]` |
+| `562` | 9 | `test_qa_pass_persists_one_ledger_and_one_link[business-Studio Ledger-Studio Home-Desk]` |
+| `564` | 4 | `test_caller_tier_does_not_override_stored_kinds[mass]` |
+| `574` | 195 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `577` | 196 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `580` | 196 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `583` | 197 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `595` | 190 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `598` | 25 | `test_oversized_hub_description_is_not_adopted` |
+| `601` | 190 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `603` | 191 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `617` | 19 | `test_unnamed_caller_cannot_adopt_a_live_hub_edit[forged-purpose-one]` |
+| `621` | 19 | `test_unnamed_caller_cannot_adopt_a_live_hub_edit[forged-purpose-one]` |
+| `628` | 21 | `test_unnamed_caller_cannot_adopt_a_live_hub_edit[forged-purpose-one]` |
+| `638` | 194 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `649` | 49 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `665` | 3 | `test_missing_page_writes_nothing` |
+| `668` | 198 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `675` | 162 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `688` | 49 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `693` | 51 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `706` | 51 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `719` | 197 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `724` | 50 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `726` | 49 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `746` | 58 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `755` | 4 | `test_forged_captured_url_blocks_secret_links` |
+| `769` | 5 | `test_forged_captured_url_blocks_secret_links` |
+| `771` | 11 | `test_forged_captured_url_blocks_secret_links` |
+| `773` | 3 | `test_forged_captured_url_blocks_secret_links` |
+| `776` | 4 | `test_forged_captured_url_blocks_secret_links` |
+| `781` | 5 | `test_forged_captured_url_blocks_secret_links` |
+| `788` | 51 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `790` | 50 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `792` | 50 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `802` | 51 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `809` | 56 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `811` | 52 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `813` | 163 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `820` | 50 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `824` | 162 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `826` | 162 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `828` | 50 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `846` | 52 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `849` | 52 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `852` | 52 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `855` | 53 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `858` | 53 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `878` | 208 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `883` | 207 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `885` | 207 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `887` | 207 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `889` | 207 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `892` | 207 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `894` | 207 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `897` | 207 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `899` | 208 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `938` | 149 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `940` | 149 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+| `942` | 149 | `test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub]` |
+
+
+### Round 5 record at tip `45818d9e` (2026-10-08)
+
+Round 5 is tip `45818d9e`, not the round 6 commit. It answers reviewer review 5454105031 and verifier comment 6056684351, both on tip `5dc55814`. The tables in this section are tip `45818d9e`. The Round 4 tables below are tip `5dc55814` and are not these counts. The round-3 tables are tip `9eff481e`. This tip's CI run is not invented here. The verifier later showed that four colour-name weakenings and two semicolon weakenings in this record were false equivalents. Round 6 kills them. The counts below stay the published tip `45818d9e` pass.
+
+`run_fact_ledger` is async at `notion_fact_ledger.py:155`. `_plan` at `:346` awaits `live_qa_passed` (`notion_qa.py:496`) before `_write` at `:876`, which calls `write_checkpoint` at `:915`. `qa_verdict` is `stored_pass and qa_live` at `:382`. A matching caller keeps the caller hubs (`_comparison_spec` `:437`). A live purpose, buyer, or practice edit on that caller is `BLOCKED` (`test_edited_hub_prose_is_blocked_not_self_compared`). A mismatched caller is the else branch at `:441`. It parses live section text with `_durable_detail` (`:572`) and refuses when that text is not the caller's prose (`_caller_prose_matches` `:506`), raising `fact ledger caller does not match` with 0 writes. Identity `Not The Row`, hubs named `Other ` plus the judged name, and rotated hubs are the three callers. One purpose edit is hub 2. All-purpose, all-buyer, and all-practice are the other three. That is 12 combinations (`test_unnamed_caller_cannot_adopt_a_live_hub_edit`). An honest named `BLOCKED` is not overwritten to `PASS` on resume (`test_stored_blocked_is_not_overwritten_on_a_forged_resume`). The first mismatched call does not write `PASS`. A mismatched caller whose descriptions still equal the live text can `PASS`. An unnamed 64-character hub name does (`test_unnamed_sixty_four_character_hub_name_passes`, 1 write). `>=` on that length raises `ProductBuildError` and writes nothing. The named path uses `_require_hub_name` (`:480`) and does not execute `_durable_detail`. D-0029 records the caller-trust limit: a caller who rewrites descriptions to the edited pages still matches.
+
+`_formula_expression` (`:781`) returns `None` unless `type(expression) is str` (`:805`). `Liar("x;y")` on `current_date` is `BLOCKED`, the dashboard fact is `missing`, `x;y` is not stored, adapter writes are 0, and the checkpoint write is 1 (`test_lying_formula_expression_is_blocked`). The semicolon BoolOp at `:760` is not reached for that value. Forcing `";" in expression` to `False`, `";" in name` to `False`, or the `or` to `and` leaves both the stock code and the mutant `BLOCKED`. Those three rows are equivalent. The exact-str check is killed: `type(expression) is not str` replaced with `False` fails 1, and replaced with `True` fails 47.
+
+`_saved_holds` (`:310`) raises `fact ledger does not match` when a stored `PASS` has checks that are all true but renamed, reordered, or one short (`:333`, `test_saved_pass_checks_must_match_the_plan`). Replacing `saved.checks != plan.checks` with `False` fails 3. The public entry rejects that record in `_require_ledger` (`:229`) before the helper. The `BLOCKED` branch at `:328` still returns false when the checks changed (`test_a_changed_blocked_check_is_replanned`).
+
+`_redacted_url` (`:712`) stores scheme and host. Userinfo, the path, the query, the fragment, a port, and a bare token are not stored. `ftp://example.com`, `https://@`, and `https://evil;example` are `missing` at the helper and at the public entry (`test_redacted_url_drops_a_bare_token`, `test_untrusted_scheme_or_host_is_stored_as_missing`). A provider read failure is `ProviderFailure`, `ConnectionError`, or `OSError` (`:194`). `RuntimeError`, `Exception`, `LookupError`, `ValueError`, and `KeyError` are redacted to `fact ledger read failed` and are not provider jobs (`:201`, `test_code_errors_are_redacted_and_not_provider_jobs`).
+
+The on-disk progress record stores `next_phase` (`notion_progress_record.py:220`). `_require_shape` requires it (`notion_progress.py:431`). A named `BLOCKED` ledger's in-memory `next_phase` is that same value, `test_matrix`. `test_legal_bounds_pass_and_one_past_refuses` runs a 64-character name, a 500-character purpose, and 8 hubs to `PASS`, then a 65-character name in `_require_hub_name` and on the public restamp, and 9 hubs in `_require_hub_count` and on the public loader (`checkpoint hubs must be six to eight`). `test_temp_names_are_matched_literally` monkeypatches `_pid_alive` (`notion_progress.py:209`) so only a `sleep` pid is alive. `.bx.json.999.tmp` is not parsed as a pid. The child script in `test_keyboard_interrupt_still_exits_130` maps an escaped `KeyboardInterrupt` to exit 130. This VM's Python 3.12.3 reports an uncaught interrupt as 130. The verifier VM reported 1. The script no longer depends on that default. Four cases passed. `asyncpg` 0.31.0 is installed. The suite skips 193 tests when it is present. Without it those tests error instead of skipping. The 12 `test_compose_preserves_the_postgres_password` failures are the absent `docker` binary. They are local-only. CI is the gate.
+
+Product-build tests: 826 passed (`test_notion_fact_ledger.py`, `test_notion_product_qa.py`, the variants file, the progress file, and the six phase files), in 42.76s. `ruff format --check` and `ruff check` are clean on the changed modules. `pyright` 1.1.411 reports 0 errors on those modules. The notice that 1.1.414 exists is not a failure. SQLAlchemy is 2.0.52. Sockets stay blocked. No production Notion or Etsy. No commissioning. Revision stays 58. `head_sha` stays `a4e9b025021b4effbb2b2879c1db756403cb1676`. Exit 78 stays HELD. This is not SESSION_07 COMPLETE.
+
+Census of `notion_fact_ledger.py` on tip `45818d9e`: if 104, elif 0, compare 169, boolop 54, operand 125, ifexp 11. That is 338 decision sites. 338 decision sites + 125 operands = 463. Operand rows are each operand replaced with `True` and with `False`, plus one flip per `and` or `or` (125 times 2, plus 71 flips, which is 321). If-flips are the 104 `if` tests. Progress rows are `notion_progress.py:236`, `:239`, `:313`, `:316`, `:318`, and the BoolOp whose operands are `:319` through `:322`. Variant rows are `notion_variants.py:280`, `:519`, and `:904`.
+
+Sweep method. One uninterrupted pass. Command: `python /tmp/sweep_operands.py` from `/workspace`, 4 workers (`nproc` 4). Each worker copied `src` and `config` to its own directory, set `PYTHONPATH` to that `src`, and ran `pytest -q --tb=no -rfE -p no:cacheprovider -o pythonpath=`. The editable install was not the mutant. The ledger and progress suite was `tests/unit/agents/test_notion_fact_ledger.py`. Variant lines used `test_aligned_pairs_refuse_a_duplicated_palette_name`, `test_non_workspace_home_is_refused_by_the_source_check`, `test_spec_page_must_be_the_stored_home`, and `test_duplicate_palette_token_names_refuse_before_any_write`. The Failed column is the count of lines starting with `FAILED` or `ERROR`. A non-zero exit with zero such lines is still a kill. A syntax error is not a kill. None occurred. Python 3.12.3. pytest 8.4.2. `asyncpg` 0.31.0 is what lets the collected suite skip rather than error. `_pid_alive` is monkeypatched in `test_temp_names_are_matched_literally`.
+
+The Failed sums published for tip `5dc55814` (7464, 6756, and 14261) do not reproduce. The reviewer and the verifier both measured 7591, 6861, and 14493 on that tip. Rows, kills, and the 20 equivalent names matched. The gap is 127 operand failures and 105 if-flip failures. That published merge was an earlier suite, overlaid by later equivalent re-runs, and only one of those equivalents was remeasured after tests were added. It was not one pass of that tip. This commit does not claim those sums. The sums below are one pass of this tree.
+
+| Sweep | Rows | Killed | Equivalent | Failed sum |
+|---|---:|---:|---:|---:|
+| Ledger operands (non-if) | 321 | 299 | 22 | 8845 |
+| Ledger if-flips | 104 | 104 | 0 | 8131 |
+| Progress `:236` and `:239` | 12 | 12 | 0 | 28 |
+| Progress dedupe `:313`, `:316`, `:318`, `:319`–`:322` | 14 | 14 | 0 | 35 |
+| Variants `:280`, `:519`, `:904` | 13 | 13 | 0 | 13 |
+| Combined | 464 | 442 | 22 | 17052 |
+
+The 22 equivalents, all in `notion_fact_ledger.py`. Each one was run. Failed is 0. The probe is the helper call and the public entry. Both agree.
+
+The BoolOp at `:180` is one site. Its node lineno is 180. The second operand's own lineno is 181. The previous log's separate `:181` row is that operand. They are folded here onto `:180`.
+
+| Line | Mutation | Probe |
+|---|---|---|
+| `:180` | `saved_ledger is not None` to `True`, and `saved_link is not None` to `True` (operand lineno 181) | `_stored_pair` returns both or neither. One `None` never arrives. Forcing either conjunct to `True` still short-circuits when the pair is absent, and still calls `_saved_holds` when both exist. |
+| `:394` | `type(value) is not str` to `False`, `value == ""` to `False`, `value.strip() != value` to `False`, and both `or` flips | Facts built above the loop are non-empty stripped strings. `identity_hubs=()` raises in `_require_hub_count` (`:470`) before this loop. Helper and public entry both refuse the empty hub list. |
+| `:584` | `len(block.content) > len(prefix)` to `True` | Prefix-only content yields detail `""` either way, and the empty-detail check raises the same `ProductBuildError` with 0 writes. |
+| `:624` | `page.title == ""` to `False` | An empty title is returned by the `if` and by the fall-through. Both are `""`. The public hub fact is `missing` either way. |
+| `:642` | `type(name) is str` to `True` | `_page_title` already returned a `str`. |
+| `:642` | `name == ""` to `False` | The first loop already stored `missing` for `""`. |
+| `:673` | `type(title) is str` to `True` | The preceding ternary already produced a `str` (`missing` or the title). |
+| `:694` | `captured != ""` to `True` | `""` becomes usable. `_redacted_url("")` returns `missing`. The fact component is `missing` either way, and agreed stays false. |
+| `:718` | `captured == ""` to `False` | `""` falls through. `separator == ""` still returns `missing`. |
+| `:725` | `separator == ""` to `False` | A string with no `://` has rest `""`. `rest == ""` still returns `missing`. Helper `notaurl` is `missing` either way. |
+| `:725` | `rest == ""` to `False` | `http://` has an empty host. `host == ""` still returns `missing`. |
+| `:730` | `host.strip() != host` to `False` | Any space in the captured string returns `missing` before the host is parsed (`:722`). The strip conjunct is not reached. |
+| `:758` | `expression is None` to `False` | `None` still fails `expression != wanted[1]`. The dashboard fact is `missing`. The helper returns `None` for a blank formula (`test_blank_formula_expression_is_missing`). |
+| `:760` | `";" in name` to `False`, `";" in expression` to `False`, and `or` to `and` | A non-str never reaches this line. `Liar("x;y")` on `current_date` is `None` at `:805`, so stock and mutant are both `BLOCKED`, dashboard `missing`, 1 checkpoint write, 0 adapter writes. A matching canonical expression has no semicolon. |
+| `:839` | `allowed is None` to `False` | A predecessor in `_GRAPH` has an allowed set. A mismatched set still fails `frozenset(...) != allowed`. The public renamed workflow refuses with 0 writes. |
+
+Killing-test map for this commit.
+
+| Input | Site | Killing test | Sweep |
+|---|---|---|---|
+| Identity `Not The Row`, hubs `Other ` plus the name, or rotated hubs, after one purpose (hub 2), all purposes, all buyer, or all practice | `:441`–`:455` | `test_unnamed_caller_cannot_adopt_a_live_hub_edit` (12). QA does not pass the same pair. 0 writes. | The refusal is the prose compare, not one operand row. |
+| Honest named `BLOCKED`, then the same mismatched caller | `:328` returns false only when the caller matches | `test_stored_blocked_is_not_overwritten_on_a_forged_resume`. Verdict stays `BLOCKED`. `next_phase` is `test_matrix` in memory and on disk. | |
+| Stored `PASS`, then a live edit, then the mismatched caller | `:441` | `test_forged_caller_does_not_return_a_stale_pass`. Bytes unchanged. Verdict stays `PASS`. | |
+| Named caller, live purpose (one and all), buyer, or practice | `:437` | `test_edited_hub_prose_is_blocked_not_self_compared`. `BLOCKED`, `qa_verdict` false, `next_phase` matches the file. | |
+| `Liar("x;y")` on `current_date` | `:805` | `test_lying_formula_expression_is_blocked`. Helper returns `None`. Public `BLOCKED`, dashboard `missing`, `x;y` absent, 1 checkpoint write. | `type(expression) is not str` to `False` fails 1. To `True` fails 47. The `:760` weakenings are the equivalent rows above. |
+| PASS checks renamed, reordered, or one short | `:333` | `test_saved_pass_checks_must_match_the_plan`. Helper raises `fact ledger does not match`. Public `_require_ledger` (`:229`) rejects the record first. | `saved.checks != plan.checks` to `False` fails 3. |
+| Unnamed 64-character hub name | `:580` `len(name) > 64` | `test_unnamed_sixty_four_character_hub_name_passes`. `PASS`, 1 write. `>=` raises and writes nothing. Named 64 uses `:480`. | Operand to `True` fails 18. Operand to `False` fails 1 (`test_detail_bounds_are_a_product_error`). |
+| 65-character name and 9 hubs | `:480`, `:470`, loader | `test_legal_bounds_pass_and_one_past_refuses` calls `_require_hub_name("N"*65)` and `_require_hub_count` of 9, restamps a 65-character public name, and appends hubs until the loader raises `checkpoint hubs must be six to eight`. | |
+| Provider stream counts 2, 2, 2, 1 | `:313`, `:319`–`:321` | `test_provider_stream_job_counts_are_exact`. DIFF_PHASE, DIFF_OP, DIFF_KIND, SAME. | Kind `True` `:319` fails 1. Operation `True` `:320` fails 2. Phase `True` `:321` fails 2. The three `and` to `or` flips fail 4. The kind guard `:313` fails 2. |
+| Dead temp deleted, live pid kept, literal name | `:236`, `:239` | `test_temp_names_are_matched_literally` monkeypatches `_pid_alive`. | 12 of 12 killed, Failed sum 28. |
+| Scheme, empty host, delimiter host | `:725`, `:730` | `test_redacted_url_drops_a_bare_token` and `test_untrusted_scheme_or_host_is_stored_as_missing`. | `scheme not in` to `False` fails 2. `host == ""` to `False` fails 2. The delimiter `any` to `False` fails 2. The three `or` flips fail 2. `separator == ""`, `rest == ""`, and `host.strip()` stay equivalent, as the table says. |
+| Code errors and provider errors | `:194`, `:201` | `test_live_read_failure_is_a_redacted_job` (`ConnectionError`, `OSError`, `TimeoutError`). `test_code_errors_are_redacted_and_not_provider_jobs` (`RuntimeError`, `Exception`, `LookupError`, `ValueError`, `KeyError`). | |
+| Keyboard interrupt | child script | `test_keyboard_interrupt_still_exits_130`. Four cases, exit 130. The secret is not in stdout or stderr. | |
+
+### Round 4 record at tip 5dc55814
+
+Round 4 is tip `5dc55814`, not this commit. It answers the verifier FAIL on tip `9eff481e` (comment 6053693235, CI run 37729558421, job 113155351185) and the reviewer FAIL on the same tip. The tables below this paragraph are tip `5dc55814`. The verifier recorded CI verify run 37745545575, job 113206034345, on that tip. The round-3 tables later in this section are tip `9eff481e` and are not these counts. The Failed sums in this record (7464, 6756, 14261) are the merged earlier suite described in the sweep paragraph. They are not a single pass of tip `5dc55814`. The reviewer and the verifier measured 7591, 6861, and 14493 on that tip.
+
+`run_fact_ledger` is async at `notion_fact_ledger.py:155`. `_plan` at `:342` awaits `live_qa_passed` (`notion_qa.py:496`) before `_write` at `:829`, which calls `write_checkpoint` at `:868`. `qa_verdict` is `stored_pass and qa_live` at `:378`. `stored_pass` is the stored verdict and the stored checks, at `:376`. A stored non-PASS whose live state would pass raises `qa record does not match` in `_require_stored_qa` at `:287`, with 0 writes. A `BLOCKED` ledger whose checks changed is re-planned (`_saved_holds` returns false at `:327`). A check-equal fact change stays a refusal. When the caller names the same hub names and `spec.identity` equals the notification row Name, `_comparison_spec` at `:408` keeps the caller hubs, buyer, and flagship. A live purpose edit on one hub, the same edit on every hub, or a buyer or practice edit is then `BLOCKED`, with ready `""` and `qa_verdict` false (`test_edited_hub_prose_is_blocked_not_self_compared`). A caller that does not name that identity is not a fact source. Stored blocks are parsed, and a missing block id is a refusal. Tier follows the stored database kinds (`_tier_from_kinds` at `:493`). A whitespace-only purpose suffix raises `ProductBuildError` (`fact ledger fact is not a durable string`) with 0 writes, not `ValidationError`. A `NotionPage` subclass on the notification row raises `fact ledger identity is missing` (`_stable_identity` at `:504`). `_formula_expression` at `:737` returns `str | None`. A missing or empty expression is `None`, never `""`. The workflow link still checks each of the ten edges three ways. Successor sets are exact (`_walk_chain` at `:765`). An extra successor or a cycle refuses. Known ids only. The proof copy is not a known id, and `page_count` stays 15. `_write_qa` keeps a stored ledger and link at `notion_qa.py:869`. Exit 78 stays HELD. This is not SESSION_07 COMPLETE.
+
+Product-build tests: 791 passed (`test_notion_fact_ledger.py`, `test_notion_product_qa.py`, the variants file, the progress file, and the six phase files), in 41.23s. `ruff format --check` and `ruff check` are clean on the five changed modules. `pyright` 1.1.411 reports 0 errors on those modules. The notice that 1.1.414 exists is not a failure. SQLAlchemy in this workspace is 2.0.52. Sockets stay blocked. No production Notion or Etsy. No commissioning. `IMPLEMENTATION_STATE.json` is not in this commit. Revision stays 58. `head_sha` stays `a4e9b025021b4effbb2b2879c1db756403cb1676`.
+
+Census of `notion_fact_ledger.py` on this tip, counted the same way as round 3 (an `If` that is not an `elif`, an `elif`, a `Compare`, a `BoolOp`, each `BoolOp` value, and an `IfExp`). The counts are if 97, elif 0, compare 160, boolop 52, operand 120, ifexp 11. That is 440 sites. The operand sweep replaces each operand with `True` and with `False`, and flips each `and` or `or`. Ledger non-if rows: 308 (120 times 2, plus 68 operator flips). If-flips: one `not` wrapped around each of the 97 `if` tests. Progress rows are the bool operands and if-flips at `notion_progress.py:235` and `:238`. Variant rows are the bool operands and if-flips at `notion_variants.py:280`, `:519`, and `:904`.
+
+Sweep method. Each worker imported a copy of `src` (`PYTHONPATH` set to that copy, pytest `-o pythonpath=`), with `config` copied beside it. The editable install was not the mutant. The owning suite for ledger and progress mutants was `tests/unit/agents/test_notion_fact_ledger.py`. Variant lines used `test_aligned_pairs_refuse_a_duplicated_palette_name`, `test_non_workspace_home_is_refused_by_the_source_check`, `test_spec_page_must_be_the_stored_home`, and `test_duplicate_palette_token_names_refuse_before_any_write`. The Failed column is the count of lines starting with `FAILED` or `ERROR`. A non-zero exit with zero such lines is still a kill. A syntax error is not a kill. None occurred. The 430-row merge is round 1, overlaid by the re-run of the then-equivalent keys, overlaid by the seven `:547` mutants. After that merge, `:758` `formula.expression == ""` replaced with `False` was still equivalent. `test_blank_formula_expression_is_missing` now requires the helper to return `None`. That one mutant was remeasured and is killed (Failed 1). The other 20 equivalents were not re-run after that assertion. The assertion does not call the sites those 20 mutate.
+
+| Sweep | Rows | Killed | Equivalent | Failed sum |
+|---|---:|---:|---:|---:|
+| Ledger operands (non-if) | 308 | 288 | 20 | 7464 |
+| Ledger if-flips | 97 | 97 | 0 | 6756 |
+| Progress `:235` and `:238` | 12 | 12 | 0 | 28 |
+| Variants `:280`, `:519`, `:904` | 13 | 13 | 0 | 13 |
+| Combined | 430 | 410 | 20 | 14261 |
+
+The 20 equivalents, all in `notion_fact_ledger.py`. Each one was run. Failed is 0. The probe is the input that used to distinguish the old line, or the reachable case on this tip.
+
+| Line | Mutation | Probe |
+|---|---|---|
+| `:180` | `saved_ledger is not None` to `True` | `_stored_pair` returns both or neither. One `None` still fails the `and`. |
+| `:181` | `saved_link is not None` to `True` | Same pair. |
+| `:329` | PASS-branch `saved.checks != plan.checks` to `False` | A foreign check name raises `fact ledger record is incomplete` at `:234` (`test_permuted_check_names_are_incomplete`). A PASS with a false saved check raises in `_verdict_agrees`. A PASS whose live plan has a false check raises `fact ledger does not match` at `plan.blocked` (`:332`), with 0 writes. The BLOCKED-branch twin at `:324` is killed by `test_a_changed_blocked_check_is_replanned`. |
+| `:390` | `type(value) is not str` to `False` | Facts built above the loop are non-empty stripped strings. `identity_hubs=()` raises in `_require_hub_count` at `:465` before this loop. |
+| `:390` | `value == ""` to `False` | Same. The empty fact never arrives. |
+| `:390` | `value.strip() != value` to `False` | Same. |
+| `:390` | first `or` to `and` | Same. The strip conjunct is not what keeps the fact out. |
+| `:390` | second `or` to `and` | Same. |
+| `:551` | `len(block.content) > len(prefix)` to `True` | Prefix-only content yields detail `""` either way, and `:555` raises. |
+| `:591` | `page.title == ""` to `False` | The empty title is returned by the `if` and by the fall-through. Both are `""`. |
+| `:609` | `type(name) is str` to `True` | The first loop and `_page_title` already produce a `str`. |
+| `:609` | `name == ""` to `False` | The first loop already stores `missing` for `""`. |
+| `:640` | `type(title) is str` to `True` | The preceding line already coerces a non-str title to `missing`. |
+| `:661` | `captured != ""` to `True` | `""` becomes usable, `_redacted_url("")` returns `missing`, and agreed stays false. The fact component is `missing` either way. |
+| `:681` | `captured == ""` to `False` | Stock returns `missing`. The mutant falls through and `bare == ""` returns `missing`. |
+| `:714` | `expression is None` to `False` | `None` still fails `expression != wanted[1]`. The dashboard fact is `missing`. |
+| `:716` | `";" in name` to `False` | A wanted expression has no semicolon. A live semicolon already failed equality at `:714`. |
+| `:716` | `";" in expression` to `False` | Same. |
+| `:716` | `or` to `and` | Same. |
+| `:792` | `allowed is None` to `False` | An unknown predecessor still has `frozenset(...) != None`, so the same raise happens. |
+
+Killing-test map for the verifier's distinguishing inputs on tip `9eff481e`. The old line is the verifier's line. The new line is this tip. Where the old mutant is gone, the test is the one that runs the distinguishing input.
+
+| Verifier input | Old line | This tip | Killing test |
+|---|---|---|---|
+| Purpose edit on one hub, on every hub, or a buyer edit, with stored QA PASS and no QA re-run | `:345`, `:424-426` | `_comparison_spec` `:408` | `test_edited_hub_prose_is_blocked_not_self_compared` |
+| `_require_pairs([])` | `:253` | `:264` | `test_empty_pair_list_is_incomplete` |
+| Stored PASS with a false check | `:279` ×2 | `:290` | `test_pass_with_a_false_check_is_not_stored` |
+| All-true checks under a foreign name | `:318` | `:234` | `test_permuted_check_names_are_incomplete`. The PASS-branch checks operand at `:329` is the equivalent row above. |
+| Stored BLOCKED with every check true | `:363` ×3, `:365` | `:376` | `test_blocked_all_true_checks_are_not_a_pass` |
+| `identity_hubs=()` | `:377` | `:465` before `:390` | `test_hub_count_accepts_six_through_eight`. The `:390` weakenings are the equivalent rows above. |
+| Blank notification row, cleared buyer or feature | `:403-:405` | `:408`, `:504` | `test_row_name_must_be_a_token`, `test_edited_hub_prose_is_blocked_not_self_compared`, `test_caller_identity_must_match_the_row` |
+| Duplicate or non-catalogue kinds, and the business tier | `:407`, `:409` ×5 | `:493` | `test_tier_follows_the_stored_kind_set`, `test_caller_tier_does_not_override_stored_kinds`, `test_caller_tier_does_not_override_mass_kinds`, `test_verifier_shapes_are_refused` |
+| Notification subclass | `:437` | `:510` | `test_row_subclass_is_a_missing_identity` |
+| Padded row Name | `:439` | `:513` | `test_padded_row_name_is_a_missing_identity`, `test_row_name_must_be_a_token` |
+| List section, 3-tuple, wrong role | `:468` ×2, `:471` ×4 | `:528` | `test_section_shape_is_a_pair` |
+| Non-text purpose block, `content=5` | `:474` ×3 | `:531`, `:533` | `test_non_text_purpose_block_is_refused`, `test_numeric_purpose_content_is_a_product_error` |
+| 65-character name, 501-character detail, and the legal bounds | `:491` | `:472`, `:547`, `:555` | `test_hub_name_bounds_are_a_product_error`, `test_detail_bounds_are_a_product_error`, `test_legal_bounds_pass_and_one_past_refuses` |
+| Five hubs and nine hubs, and a legal eight | `:494` | `:465` | `test_hub_count_accepts_six_through_eight`, `test_verifier_shapes_are_refused`, `test_legal_bounds_pass_and_one_past_refuses` |
+| Hub title `"Hub 1 "` | `:540` | `:609` strip | `test_trailing_space_in_a_hub_title_can_be_repaired`, `test_database_title_with_edge_space_is_missing` for the database twin. `name == ""` and `type(name) is str` on the second loop stay equivalent, as the table says. |
+| `_safe_label(1)` | `:612` | `_safe_label` `:691` | `test_numeric_sample_title_is_missing` |
+| Palette name duplicated | `:280` if-flip | `:280` | `test_aligned_pairs_refuse_a_duplicated_palette_name`. The public build still raises `checkpoint aesthetics accent is duplicated` first. |
+| Home id | `:904` if-flip | `:904` | `test_spec_page_must_be_the_stored_home` |
+| Parent type | `:519` if-flip | `:519` | `test_non_workspace_home_is_refused_by_the_source_check` |
+| Dead temp deleted, live pid kept, literal name | progress `:229`, `:232` | `:235`, `:238` | `test_stale_checkpoint_tmp_is_removed_on_the_next_write`, `test_foreign_pid_temp_is_kept`, `test_temp_cleanup_keeps_unrelated_names`, `test_temp_names_are_matched_literally`. 12 of 12 killed, Failed sum 28. |
+| Empty formula returns `None` | `:671` | `:758` | `test_blank_formula_expression_is_missing` |
+
+`test_inconsistent_stored_qa_writes_nothing` covers an inconsistent stored QA record. Its docstring says a forged but consistent PASS with a live defect writes one `BLOCKED` ledger. That name does not claim the consistent case writes nothing.
+
+Legal bounds that must pass: a 64-character hub name, a 500-character purpose detail, and 8 hubs. One past each bound must refuse: 65, 501, and 9. `test_legal_bounds_pass_and_one_past_refuses` runs the public path. The direct helpers cover 6 and 8 against 5 and 9, and 64 against 65.
+
+### Round 3 record at tip 9eff481e
+
+These counts are not this commit. Round 2's 176-row and 39-row counts were an earlier tip. They are not these counts either.
+
+`run_fact_ledger` on that tip was async at `notion_fact_ledger.py:144`. The plan at `_plan` (`:331`) awaited `live_qa_passed` (`notion_qa.py:476`) before `_write` (`:739`), which called `write_checkpoint` at `:778`. The observed spec was read from the stored pages. That is the behaviour the verifier rejected.
+
+Empty captured URL is two contracts. QA still skips `""` the same as a missing URL (`notion_qa.py:557`). `test_empty_captured_url_repairs_like_a_missing_url` records `PASS` with repairs `("published",)`. The ledger does not skip `""` or `None` on a published page. `test_empty_or_missing_public_url_blocks_secret_links` records `BLOCKED`, the secret-link fact component `missing`, and 0 adapter writes.
+
+`write_checkpoint` keeps earlier `repair_jobs` when the file already exists (`notion_progress_record.py:185`). A garbage, empty, or forged prior is refused and the file is left unchanged. `write_document` matches a sibling temp by the literal prefix `.{name}.` and the suffix `.tmp` (`notion_progress.py:219`). A character class in the file name is not a glob. A temp whose middle is a live pid is kept. A provider that publishes and then leaves the URL untrusted stays `BLOCKED` after one `publish_page`, records repairs `("published",)`, and does not call `duplicate_page` (`notion_qa.py:787`).
+
+The ledger covers known ids only. Popping a page that is not a known id before the first ledger run stays `PASS` with one checkpoint write. The proof page is the only extra page and it is not a known id. `test_unknown_page_before_the_ledger_is_not_a_fact` pins that. An extra `NotionPage` subclass is a page and blocks. A known id replaced by a subclass raises `fact ledger page is missing`.
+
+SQLAlchemy in this workspace is 2.0.52, the same version as `uv.lock`. A verifier environment on a different SQLAlchemy build is not a product defect. `pyright` 1.1.411 reports 0 errors on the changed modules. The notice that 1.1.414 exists is not a failure.
+
+Blocker map. Reviewer A and verifier 1, stored QA verdict: `test_blocked_qa_with_a_live_pass_writes_nothing`, `test_fresh_duplicate_block_is_not_a_ledger_pass`, and `test_forged_qa_verdict_writes_nothing`. Reviewer B and verifier 4, edge whitespace before persist: `test_edge_whitespace_is_refused_before_persist`. Verifier 2, each of ten edges three ways: `test_each_edge_is_read_three_ways`. Verifier 3, padded sample and padded row recover: `test_padded_sample_title_recovers_after_the_trim` and the whitespace test. Verifier 5, exact `str`: `test_captured_url_must_be_exact_str`. Verifier 6, secret-fact component, QA publish guard, and the prior rebuild job: `test_wrong_host_path_is_stored_as_the_captured_url`, `test_lying_publish_stays_blocked_without_a_duplicate`, `test_unpublished_and_duplicate_off_repairs_both`, `test_untrusted_publish_does_not_set_the_duplicate`, `test_publish_that_stays_unpublished_does_not_set_duplicate`, and `test_prior_rebuild_job_survives_the_ledger_write`. SF1 per-field dashboard: `test_blank_dashboard_row_title_refuses`, `test_blank_sample_title_is_missing`, `test_invisible_sample_mark_is_missing`, and `test_dashboard_delimiter_is_not_a_fact`. SF2 permuted names, `maybe`, forged repair, renamed workflow, and the false QA flag in the ledger file: `test_permuted_check_names_are_incomplete`, `test_permuted_fact_names_are_incomplete`, `test_check_flag_maybe_is_incomplete`, `test_forged_repair_required_on_a_pass_refuses`, `test_renamed_workflow_refuses`, and `test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes`. SF3 missing hub: `test_missing_hub_in_the_spec_is_a_product_error` (`notion_hubs.py:145`). SF4 caller narrative: `test_caller_spec_fields_are_not_the_facts`. SF5 shape change stays refused: `test_wrong_hub_shape_stays_refused_until_the_name_matches`. SF6 redacted read failure: `test_live_read_failure_is_a_redacted_job`. SF7 applied repairs: the four QA publish-guard tests above. SF8 PASS plus a false check: `test_pass_with_a_false_check_is_refused`. Page subclass: `test_page_subclass_is_not_accepted` and `test_extra_page_subclass_blocks_the_ledger`. Direct `_write`: `test_missing_record_raises_product_error`. Literal temp names: `test_temp_names_are_matched_literally`. Oversized hub description: `test_oversized_hub_description_is_not_adopted`.
+
+Product-build tests: 732 passed (`test_notion_fact_ledger.py`, `test_notion_product_qa.py`, the variants file, the progress file, and the six phase files). `ruff format --check`, `ruff check`, and `pyright` 1.1.411 report 0 errors on the changed modules. Sockets stay blocked. No production Notion or Etsy. No commissioning.
+
+Census of `notion_fact_ledger.py` on tip `9eff481e`. An AST walk counts an `If` that is not an `elif`, an `elif` (`If` that is the sole `orelse` of another `If`), a `Compare`, a `BoolOp`, each `BoolOp` value as an operand, and an `IfExp`. The counts are if 85, elif 1, compare 136, boolop 49, operand 109, ifexp 9. That is 389 sites. The operand sweep replaces each operand span with `True` and with `False`, and flips the first ` or ` or ` and ` token of each `BoolOp`. That is 109 times 2 plus 49, which is 267 mutants. The owning file is `tests/unit/agents/test_notion_fact_ledger.py`, run with `pytest -q --tb=line`. The Failed column is the FAILED-line count. A syntax error is not a kill. None occurred. Workers imported a copy of `src` so the workspace file was not the mutant. The round-2 176 and the verifier's earlier 174 are not the counts of tip `9eff481e`.
+
+Operand sweep: 267 rows, 212 killed, 55 equivalent. The Failed column sums to 3610. The equivalents are probe-backed in the table. The `:377` `strip` conjunct is killed (Failed 2). The same line's `or` to `and` flip is equivalent because every fact is a non-empty `str` and `and` binds tighter, so the strip conjunct still raises. Probe `test_edge_whitespace_is_refused_before_persist`. The old `:546` `None` `or` was split into three separate `if`s (`:748-753`) and is not a row. `test_missing_record_raises_product_error` raises `ProductBuildError`.
+
+If-flip table: 49 rows, 46 killed, 3 equivalent. The Failed column sums to 273. The 17 variant-file rows were remeasured. Their Failed counts sum to 20. Three of them are equivalent. Ten rows were added for the admitted-event check, the successor-type check, the prior-file check, the secret-fact compare, the secret-fact if-exp, and the five `notion_qa.py:787` publish-guard mutants.
+
+| Mutation | Site (file:line) | Failing tests | Failed |
+|---|---|---|---|
+| delete secret-link compare | `notion_variants.py:847` | test_replay_rejects_a_changed_secret_link | 1 |
+| delete accent and vocabulary id compare | `notion_variants.py:844` | test_replay_rejects_a_moved_accent_block_id | 1 |
+| delete saved-path _require_original | `notion_variants.py:837` | test_saved_home_original_flag_refuses[duplicate_as_template-True] | 2 |
+| replace navigation block type check with False | `notion_aesthetics.py:346` | test_navigation_callout_fails_the_created_hub_pair | 1 |
+| delete palette token name uniqueness | `notion_variants.py:280` | Equivalent. `test_duplicate_palette_token_names_refuse_before_any_write` still raises `checkpoint aesthetics accent is duplicated`. 0 writes. | 0 |
+| delete variant name dedup | `notion_variants.py:198` | test_replay_rejects_a_duplicated_variant_label[name] | 1 |
+| delete variant page-id dedup | `notion_variants.py:202` | test_replay_rejects_a_duplicated_variant_label[page_id] | 1 |
+| delete len(children) != 2 | `notion_variants.py:895` | test_replay_rejects_an_extra_variant_child | 1 |
+| delete home id check | `notion_variants.py:904` | Equivalent. `test_replay_rejects_a_home_without_the_spec_id` still raises `checkpoint page is missing from the fixture probe`. 0 writes. | 0 |
+| delete _source_page parent_type | `notion_variants.py:519` | Equivalent. `test_replay_rejects_a_home_that_is_not_workspace` still raises `checkpoint page is not the stored top-level page`. 0 writes. | 0 |
+| delete _find_titled len(matches) > 1 | `notion_variants.py:534` | test_two_colour_titles_refuse_before_any_write | 1 |
+| delete _find_copy len(matches) > 1 | `notion_variants.py:548` | test_two_copy_titles_refuse_before_any_write | 1 |
+| publish before blocks | `notion_variants.py:738` | test_each_variant_step_crash_resumes_without_a_second_page[add_callout_block] | 2 |
+| skip retained created ids | `notion_progress_record.py:192` | test_reversed_dashboard_created_ids_survive_variants | 1 |
+| delete plan nested-database refuse | `notion_variants.py:388` | test_database_under_a_structure_block_refuses_before_any_write[home] | 3 |
+| drop hub and home blocks from nested parents | `notion_variants.py:624` | test_saved_database_under_a_structure_block_refuses[home] | 2 |
+| exact type instead of isinstance | `notion_variants.py:584` | test_database_subclass_under_a_hub_block_is_refused | 2 |
+| fresh-duplicate title is True | `notion_qa.py:574` on tip `9eff481e` | Replace `page.title == title` with True. test_renamed_variant_page_fails_fresh_duplicate. Re-checked: `:574` is the title compare. `:572` is the title assignment, not this conjunct | 1 |
+| fresh-duplicate spec id is True | `notion_qa.py:576` on tip `9eff481e` | Replace `SPEC_ID_PROPERTY not in page.properties` with True. test_forged_spec_id_fails_fresh_duplicate. Re-checked: the spec-id conjunct is `:576`, not `:572` | 1 |
+| empty captured url is checked | `notion_qa.py:557` | Delete `captured != ""`. QA only. test_empty_captured_url_repairs_like_a_missing_url | 1 |
+| qa verdict check is True | `notion_fact_ledger.py:365` | Replace `stored_pass and qa_live` with True. test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 21 |
+| ready is always ListingCopyJob | `notion_fact_ledger.py:383` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 13 |
+| repair_required is always false | `notion_fact_ledger.py:382` | test_repaired_publish_keeps_the_listing_ready | 1 |
+| supported_devices is desktop | `notion_fact_ledger.py:355` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 2 |
+| free_update_policy is free | `notion_fact_ledger.py:357` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 2 |
+| build_version is a constant | `notion_fact_ledger.py:358` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 3 |
+| colour names ignore the adapter title | `notion_fact_ledger.py:372` | test_renamed_variant_page_blocks_qa_facts | 3 |
+| hubs_present is True | `notion_fact_ledger.py:367` | test_renamed_hub_is_blocked_with_no_adapter_writes | 5 |
+| databases_present is True | `notion_fact_ledger.py:368` | test_renamed_database_blocks_the_database_check | 4 |
+| dashboard_outputs check is True | `notion_fact_ledger.py:369` | test_blank_formula_blocks_dashboard_outputs | 11 |
+| secret_links check is True | `notion_fact_ledger.py:370` | test_forged_captured_url_blocks_secret_links | 8 |
+| blocked is False | `notion_fact_ledger.py:381` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 53 |
+| stored facts are not compared | `notion_fact_ledger.py:318` | test_forged_fact_does_not_match_and_writes_nothing | 1 |
+| stored steps are not compared | `notion_fact_ledger.py:323` | test_forged_step_does_not_match_and_writes_nothing | 1 |
+| blocked ledger does not replan | `notion_fact_ledger.py:316` | The check-diff `return False` becomes `return True`. test_blocked_ledger_replans_when_the_defect_is_gone | 10 |
+| event-map route check is False | `notion_fact_ledger.py:704` | Replace the event-map compare with False. test_broken_workflow_graph_writes_nothing | 20 |
+| ListingPackage output is skipped | `notion_fact_ledger.py:709` | test_missing_listing_package_refuses | 1 |
+| stop stripping fact_ledger and workflow_link | `notion_aesthetics.py:151` | test_resume_of_pass_makes_no_second_write | 53 |
+| qa rewrite drops the ledger keys | `notion_qa.py:845` | test_blocked_ledger_replans_when_the_defect_is_gone | 1 |
+| admitted event check is False | `notion_fact_ledger.py:700` | Dropping the admitted-event check. Killed on every edge. test_each_edge_is_read_three_ways[admitted-edge0] | 10 |
+| successor job types check is False | `notion_fact_ledger.py:702` | Dropping the successor-type check. Killed on every edge. test_each_edge_is_read_three_ways[successor-edge0] | 10 |
+| prior file check is flipped | `notion_progress_record.py:185` | `is_file` flipped. A prior `rebuild_refused` job must survive. test_prior_rebuild_job_survives_the_ledger_write | 1 |
+| secret shown compare is flipped | `notion_fact_ledger.py:603` | Compare flip stores a leading empty component. Killed. test_forged_captured_url_blocks_secret_links | 4 |
+| secret shown ifexp is flipped | `notion_fact_ledger.py:603` | If-exp flip stores a leading empty component. Killed. test_forged_captured_url_blocks_secret_links | 4 |
+| publish guard or becomes and | `notion_qa.py:787` | or to and. An untrusted URL must not set duplicate. test_lying_publish_stays_blocked_without_a_duplicate | 3 |
+| publish guard left is True | `notion_qa.py:787` | Left conjunct forced True. An honest publish must still repair duplicate. test_unpublished_and_duplicate_off_repairs_both | 1 |
+| publish guard left is False | `notion_qa.py:787` | Left conjunct forced False. An unpublished page must not set duplicate. test_publish_that_stays_unpublished_does_not_set_duplicate | 1 |
+| publish guard right is True | `notion_qa.py:787` | Right conjunct forced True. An honest publish must still repair duplicate. test_unpublished_and_duplicate_off_repairs_both | 1 |
+| publish guard right is False | `notion_qa.py:787` | Right conjunct forced False. An untrusted URL must not set duplicate. test_lying_publish_stays_blocked_without_a_duplicate | 2 |
+
+Per-operand sweep of `notion_fact_ledger.py`. Site, operator, mutation, killing test or probe, Failed.
+
+| Site | Op | Mutation | Failing tests | Failed |
+|---|---|---|---|---|
+| `notion_fact_ledger.py:163` | or | replace operand with True `qa is None` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 165 |
+| `notion_fact_ledger.py:163` | or | replace operand with False `qa is None` | test_missing_qa_and_half_a_pair_write_nothing | 1 |
+| `notion_fact_ledger.py:163` | or | replace operand with True `not stored.variants` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 165 |
+| `notion_fact_ledger.py:163` | or | replace operand with False `not stored.variants` | Equivalent. `load_variant_checkpoint` returns only after variants exist, or it raises. Probe `test_qa_pass_persists_one_ledger_and_one_link`. | 0 |
+| `notion_fact_ledger.py:163` | or | flip or to and `boolop or` | test_missing_qa_and_half_a_pair_write_nothing | 1 |
+| `notion_fact_ledger.py:168` | and | replace operand with True `saved_ledger is not None` | Equivalent. `_stored_pair` returns both records or neither. A half pair raises first. Probe `test_missing_qa_and_half_a_pair_write_nothing`. | 0 |
+| `notion_fact_ledger.py:168` | and | replace operand with False `saved_ledger is not None` | test_resume_of_pass_makes_no_second_write | 16 |
+| `notion_fact_ledger.py:169` | and | replace operand with True `saved_link is not None` | Equivalent. `_stored_pair` returns both records or neither. A half pair raises first. Probe `test_missing_qa_and_half_a_pair_write_nothing`. | 0 |
+| `notion_fact_ledger.py:169` | and | replace operand with False `saved_link is not None` | test_resume_of_pass_makes_no_second_write | 16 |
+| `notion_fact_ledger.py:170` | and | replace operand with True `await _saved_holds(fixture, stored, validated, qa, saved_ledger, saved_link, ...` | test_blocked_ledger_replans_when_the_defect_is_gone | 23 |
+| `notion_fact_ledger.py:170` | and | replace operand with False `await _saved_holds(fixture, stored, validated, qa, saved_ledger, saved_link, ...` | test_resume_of_pass_makes_no_second_write | 16 |
+| `notion_fact_ledger.py:168` | and | flip and to or `boolop and` | test_blocked_ledger_replans_when_the_defect_is_gone | 23 |
+| `notion_fact_ledger.py:216` | or | replace operand with True `type(value) is not dict` | test_resume_of_pass_makes_no_second_write | 38 |
+| `notion_fact_ledger.py:216` | or | replace operand with False `type(value) is not dict` | test_wrong_record_shapes_refuse[ledger-number-fact ledger record is incomplete] | 1 |
+| `notion_fact_ledger.py:216` | or | replace operand with True `not exact_keys(value, _LEDGER_KEYS)` | test_resume_of_pass_makes_no_second_write | 38 |
+| `notion_fact_ledger.py:216` | or | replace operand with False `not exact_keys(value, _LEDGER_KEYS)` | test_extra_key_is_incomplete[ledger-fact ledger record is incomplete] | 1 |
+| `notion_fact_ledger.py:216` | or | flip or to and `boolop or` | test_extra_key_is_incomplete[ledger-fact ledger record is incomplete] | 2 |
+| `notion_fact_ledger.py:219` | or | replace operand with True `type(verdict) is not str` | test_resume_of_pass_makes_no_second_write | 46 |
+| `notion_fact_ledger.py:219` | or | replace operand with False `type(verdict) is not str` | test_wrong_record_shapes_refuse[verdict-list-fact ledger verdict is unsupported] | 1 |
+| `notion_fact_ledger.py:219` | or | replace operand with True `verdict not in _VERDICTS` | test_resume_of_pass_makes_no_second_write | 46 |
+| `notion_fact_ledger.py:219` | or | replace operand with False `verdict not in _VERDICTS` | test_unsupported_verdict_writes_nothing | 1 |
+| `notion_fact_ledger.py:219` | or | flip or to and `boolop or` | test_unsupported_verdict_writes_nothing | 2 |
+| `notion_fact_ledger.py:233` | or | replace operand with True `type(value) is not dict` | test_resume_of_pass_makes_no_second_write | 27 |
+| `notion_fact_ledger.py:233` | or | replace operand with False `type(value) is not dict` | test_wrong_record_shapes_refuse[link-number-workflow link record is incomplete] | 1 |
+| `notion_fact_ledger.py:233` | or | replace operand with True `not exact_keys(value, _LINK_KEYS)` | test_resume_of_pass_makes_no_second_write | 27 |
+| `notion_fact_ledger.py:233` | or | replace operand with False `not exact_keys(value, _LINK_KEYS)` | test_extra_key_is_incomplete[link-workflow link record is incomplete] | 1 |
+| `notion_fact_ledger.py:233` | or | flip or to and `boolop or` | test_extra_key_is_incomplete[link-workflow link record is incomplete] | 2 |
+| `notion_fact_ledger.py:236` | or | replace operand with True `type(verdict) is not str` | test_resume_of_pass_makes_no_second_write | 31 |
+| `notion_fact_ledger.py:236` | or | replace operand with False `type(verdict) is not str` | test_wrong_record_shapes_refuse[link-verdict-list-workflow link verdict is unsupported] | 1 |
+| `notion_fact_ledger.py:236` | or | replace operand with True `verdict not in _VERDICTS` | test_resume_of_pass_makes_no_second_write | 31 |
+| `notion_fact_ledger.py:236` | or | replace operand with False `verdict not in _VERDICTS` | test_link_verdict_maybe_is_unsupported | 1 |
+| `notion_fact_ledger.py:236` | or | flip or to and `boolop or` | test_link_verdict_maybe_is_unsupported | 2 |
+| `notion_fact_ledger.py:239` | or | replace operand with True `type(ready) is not str` | test_resume_of_pass_makes_no_second_write | 25 |
+| `notion_fact_ledger.py:239` | or | replace operand with False `type(ready) is not str` | test_wrong_record_shapes_refuse[ready-list-workflow link record is incomplete] | 1 |
+| `notion_fact_ledger.py:239` | or | replace operand with True `ready not in {"", _READY_JOB}` | test_resume_of_pass_makes_no_second_write | 25 |
+| `notion_fact_ledger.py:239` | or | replace operand with False `ready not in {"", _READY_JOB}` | test_ready_nope_is_incomplete | 1 |
+| `notion_fact_ledger.py:239` | or | flip or to and `boolop or` | test_ready_nope_is_incomplete | 2 |
+| `notion_fact_ledger.py:242` | or | replace operand with True `type(repair) is not str` | test_resume_of_pass_makes_no_second_write | 25 |
+| `notion_fact_ledger.py:242` | or | replace operand with False `type(repair) is not str` | test_repair_required_list_is_incomplete | 1 |
+| `notion_fact_ledger.py:242` | or | replace operand with True `repair not in {"true", "false"}` | test_resume_of_pass_makes_no_second_write | 25 |
+| `notion_fact_ledger.py:242` | or | replace operand with False `repair not in {"true", "false"}` | test_wrong_record_shapes_refuse[repair-word-workflow link record is incomplete] | 1 |
+| `notion_fact_ledger.py:242` | or | flip or to and `boolop or` | test_repair_required_list_is_incomplete | 2 |
+| `notion_fact_ledger.py:245` | or | replace operand with True `type(steps) is not list` | test_resume_of_pass_makes_no_second_write | 25 |
+| `notion_fact_ledger.py:245` | or | replace operand with False `type(steps) is not list` | test_wrong_record_shapes_refuse[steps-string-workflow link record is incomplete] | 1 |
+| `notion_fact_ledger.py:245` | or | replace operand with True `not steps` | test_resume_of_pass_makes_no_second_write | 25 |
+| `notion_fact_ledger.py:245` | or | replace operand with False `not steps` | test_empty_steps_are_incomplete | 1 |
+| `notion_fact_ledger.py:245` | or | flip or to and `boolop or` | test_empty_steps_are_incomplete | 2 |
+| `notion_fact_ledger.py:253` | or | replace operand with True `type(value) is not list` | test_resume_of_pass_makes_no_second_write | 36 |
+| `notion_fact_ledger.py:253` | or | replace operand with False `type(value) is not list` | test_facts_json_number_is_incomplete | 1 |
+| `notion_fact_ledger.py:253` | or | replace operand with True `not value` | test_resume_of_pass_makes_no_second_write | 36 |
+| `notion_fact_ledger.py:253` | or | replace operand with False `not value` | Equivalent. An empty list still fails the name-tuple check with `fact ledger record is incomplete`. | 0 |
+| `notion_fact_ledger.py:253` | or | flip or to and `boolop or` | test_facts_json_number_is_incomplete | 1 |
+| `notion_fact_ledger.py:257` | or | replace operand with True `type(item) is not dict` | test_resume_of_pass_makes_no_second_write | 36 |
+| `notion_fact_ledger.py:257` | or | replace operand with False `type(item) is not dict` | test_wrong_record_shapes_refuse[check-number-fact ledger record is incomplete] | 1 |
+| `notion_fact_ledger.py:257` | or | replace operand with True `not exact_keys(item, frozenset({left, right}))` | test_resume_of_pass_makes_no_second_write | 36 |
+| `notion_fact_ledger.py:257` | or | replace operand with False `not exact_keys(item, frozenset({left, right}))` | test_extra_key_is_incomplete[check-fact ledger record is incomplete] | 1 |
+| `notion_fact_ledger.py:257` | or | flip or to and `boolop or` | test_extra_key_is_incomplete[check-fact ledger record is incomplete] | 2 |
+| `notion_fact_ledger.py:261` | or | replace operand with True `type(label) is not str` | test_resume_of_pass_makes_no_second_write | 36 |
+| `notion_fact_ledger.py:261` | or | replace operand with False `type(label) is not str` | test_wrong_record_shapes_refuse[check-label-number-fact ledger record is incomplete] | 1 |
+| `notion_fact_ledger.py:261` | or | replace operand with True `type(stored) is not str` | test_resume_of_pass_makes_no_second_write | 36 |
+| `notion_fact_ledger.py:261` | or | replace operand with False `type(stored) is not str` | test_check_flag_number_is_incomplete | 1 |
+| `notion_fact_ledger.py:261` | or | flip or to and `boolop or` | test_check_flag_number_is_incomplete | 2 |
+| `notion_fact_ledger.py:279` | and | replace operand with True `qa.verdict == "PASS"` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 9 |
+| `notion_fact_ledger.py:279` | and | replace operand with False `qa.verdict == "PASS"` | Equivalent. `load_qa_record` already raises `qa record does not match` for PASS plus a false check. Probe `test_pass_with_a_false_check_is_refused`. | 0 |
+| `notion_fact_ledger.py:279` | and | replace operand with True `failed` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 105 |
+| `notion_fact_ledger.py:279` | and | replace operand with False `failed` | Equivalent. `load_qa_record` already raises `qa record does not match` for PASS plus a false check. Probe `test_pass_with_a_false_check_is_refused`. | 0 |
+| `notion_fact_ledger.py:279` | and | flip and to or `boolop and` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 113 |
+| `notion_fact_ledger.py:281` | and | replace operand with True `qa.verdict != "PASS"` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 73 |
+| `notion_fact_ledger.py:281` | and | replace operand with False `qa.verdict != "PASS"` | test_blocked_qa_with_a_live_pass_writes_nothing | 4 |
+| `notion_fact_ledger.py:281` | and | replace operand with True `live_pass` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 9 |
+| `notion_fact_ledger.py:281` | and | replace operand with False `live_pass` | test_blocked_qa_with_a_live_pass_writes_nothing | 4 |
+| `notion_fact_ledger.py:281` | and | flip and to or `boolop and` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 81 |
+| `notion_fact_ledger.py:309` | or | replace operand with True `link.verdict != "BLOCKED"` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 12 |
+| `notion_fact_ledger.py:309` | or | replace operand with False `link.verdict != "BLOCKED"` | test_blocked_ledger_with_a_pass_link_refuses | 1 |
+| `notion_fact_ledger.py:309` | or | replace operand with True `link.ready != ""` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 12 |
+| `notion_fact_ledger.py:309` | or | replace operand with False `link.ready != ""` | test_blocked_link_ready_job_refuses | 1 |
+| `notion_fact_ledger.py:309` | or | flip or to and `boolop or` | test_blocked_ledger_with_a_pass_link_refuses | 2 |
+| `notion_fact_ledger.py:311` | or | replace operand with True `link.steps != plan.steps` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 12 |
+| `notion_fact_ledger.py:311` | or | replace operand with False `link.steps != plan.steps` | test_blocked_forged_step_refuses | 1 |
+| `notion_fact_ledger.py:311` | or | replace operand with True `link.repair_required != plan.repair_required` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 12 |
+| `notion_fact_ledger.py:311` | or | replace operand with False `link.repair_required != plan.repair_required` | test_blocked_ledger_with_forged_repair_required_refuses | 1 |
+| `notion_fact_ledger.py:311` | or | flip or to and `boolop or` | test_blocked_ledger_with_forged_repair_required_refuses | 2 |
+| `notion_fact_ledger.py:313` | or | replace operand with True `saved.facts != plan.facts` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 1 |
+| `notion_fact_ledger.py:313` | or | replace operand with False `saved.facts != plan.facts` | test_forged_blocked_fact_does_not_match_and_writes_nothing | 2 |
+| `notion_fact_ledger.py:313` | or | replace operand with True `saved.checks != plan.checks` | test_blocked_qa_records_blocked_and_holds_with_no_adapter_writes | 1 |
+| `notion_fact_ledger.py:313` | or | replace operand with False `saved.checks != plan.checks` | test_blocked_ledger_replans_when_the_defect_is_gone | 1 |
+| `notion_fact_ledger.py:313` | or | flip or to and `boolop or` | test_blocked_ledger_replans_when_the_defect_is_gone | 3 |
+| `notion_fact_ledger.py:318` | or | replace operand with True `saved.facts != plan.facts` | test_resume_of_pass_makes_no_second_write | 5 |
+| `notion_fact_ledger.py:318` | or | replace operand with False `saved.facts != plan.facts` | test_forged_fact_does_not_match_and_writes_nothing | 1 |
+| `notion_fact_ledger.py:318` | or | replace operand with True `saved.checks != plan.checks` | test_resume_of_pass_makes_no_second_write | 5 |
+| `notion_fact_ledger.py:318` | or | replace operand with False `saved.checks != plan.checks` | Equivalent. A PASS whose checks disagree raises in `_verdict_agrees` before this compare. | 0 |
+| `notion_fact_ledger.py:318` | or | flip or to and `boolop or` | test_forged_fact_does_not_match_and_writes_nothing | 1 |
+| `notion_fact_ledger.py:323` | or | replace operand with True `link.verdict != "PASS"` | test_resume_of_pass_makes_no_second_write | 1 |
+| `notion_fact_ledger.py:323` | or | replace operand with False `link.verdict != "PASS"` | test_forged_link_verdict_on_a_pass_refuses | 1 |
+| `notion_fact_ledger.py:323` | or | replace operand with True `link.ready != plan.ready` | test_resume_of_pass_makes_no_second_write | 1 |
+| `notion_fact_ledger.py:323` | or | replace operand with False `link.ready != plan.ready` | test_forged_ready_on_a_pass_refuses | 1 |
+| `notion_fact_ledger.py:323` | or | replace operand with True `link.steps != plan.steps` | test_resume_of_pass_makes_no_second_write | 1 |
+| `notion_fact_ledger.py:323` | or | replace operand with False `link.steps != plan.steps` | test_forged_step_does_not_match_and_writes_nothing | 1 |
+| `notion_fact_ledger.py:323` | or | flip or to and `boolop or` | test_forged_ready_on_a_pass_refuses | 2 |
+| `notion_fact_ledger.py:363` | and | replace operand with True `qa.verdict == "PASS"` | Equivalent. A loaded PASS already has every check true. A non-PASS live success raises before a write. Probe `test_blocked_qa_with_a_live_pass_writes_nothing`. | 0 |
+| `notion_fact_ledger.py:363` | and | replace operand with False `qa.verdict == "PASS"` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:363` | and | replace operand with True `all(passed is True for _name, passed in qa.checks)` | Equivalent. A loaded PASS already has every check true. Probe `test_pass_with_a_false_check_is_refused`. | 0 |
+| `notion_fact_ledger.py:363` | and | replace operand with False `all(passed is True for _name, passed in qa.checks)` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:363` | and | flip and to or `boolop and` | Equivalent. The two conjuncts agree on every loaded QA record that reaches a write. | 0 |
+| `notion_fact_ledger.py:365` | and | replace operand with True `stored_pass` | Equivalent. A write happens only when `stored_pass` equals `qa_live`. A live pass on a non-PASS verdict raises first. Probe `test_blocked_qa_with_a_live_pass_writes_nothing`. | 0 |
+| `notion_fact_ledger.py:365` | and | replace operand with False `stored_pass` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:365` | and | replace operand with True `qa_live` | test_live_state_qa_rejects_is_not_a_pass[unpublished] | 12 |
+| `notion_fact_ledger.py:365` | and | replace operand with False `qa_live` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:365` | and | flip and to or `boolop and` | test_live_state_qa_rejects_is_not_a_pass[unpublished] | 12 |
+| `notion_fact_ledger.py:377` | or | replace operand with True `type(value) is not str` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 117 |
+| `notion_fact_ledger.py:377` | or | replace operand with False `type(value) is not str` | Equivalent. Every fact value is built with `str` or `join`. The strip conjunct is the live one. | 0 |
+| `notion_fact_ledger.py:377` | or | replace operand with True `value == ""` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 117 |
+| `notion_fact_ledger.py:377` | or | replace operand with False `value == ""` | Equivalent. Loaded joins are non-empty (`missing`, a count, or a token list). Edge whitespace still raises. | 0 |
+| `notion_fact_ledger.py:377` | or | replace operand with True `value.strip() != value` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 117 |
+| `notion_fact_ledger.py:377` | or | replace operand with False `value.strip() != value` | test_edge_whitespace_is_refused_before_persist[leading-url] | 2 |
+| `notion_fact_ledger.py:377` | or | flip or to and `boolop or` | Equivalent. `and` binds tighter, and the only reachable failure is `strip`. Probe `test_edge_whitespace_is_refused_before_persist` still raises. | 0 |
+| `notion_fact_ledger.py:402` | and | replace operand with True `type(home_title) is str` | test_home_title_integer_keeps_live_qa | 1 |
+| `notion_fact_ledger.py:402` | and | replace operand with False `type(home_title) is str` | test_renamed_home_title_fails_live_qa | 1 |
+| `notion_fact_ledger.py:402` | and | replace operand with True `home_title != ""` | test_blank_home_title_keeps_live_qa | 1 |
+| `notion_fact_ledger.py:402` | and | replace operand with False `home_title != ""` | test_renamed_home_title_fails_live_qa | 1 |
+| `notion_fact_ledger.py:402` | and | flip and to or `boolop and` | test_blank_home_title_keeps_live_qa | 2 |
+| `notion_fact_ledger.py:403` | or | replace operand with True `_row_identity(probe, stored)` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 37 |
+| `notion_fact_ledger.py:403` | or | replace operand with False `_row_identity(probe, stored)` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:403` | or | replace operand with True `spec.identity` | Equivalent. A loaded row title is the identity. A title that does not parse raises in the dashboard check before a write. | 0 |
+| `notion_fact_ledger.py:403` | or | replace operand with False `spec.identity` | Equivalent. A loaded row title is the identity. A title that does not parse raises in the dashboard check before a write. | 0 |
+| `notion_fact_ledger.py:403` | or | flip or to and `boolop or` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:404` | or | replace operand with True `_role_detail(probe, stored, identity, "buyer")` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 37 |
+| `notion_fact_ledger.py:404` | or | replace operand with False `_role_detail(probe, stored, identity, "buyer")` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:404` | or | replace operand with True `spec.buyer_problem` | Equivalent. The stored section detail is the buyer text on a checkpoint that returns. Caller text is not the fact. Probe `test_caller_spec_fields_are_not_the_facts`. | 0 |
+| `notion_fact_ledger.py:404` | or | replace operand with False `spec.buyer_problem` | Equivalent. The stored section detail is the buyer text on a checkpoint that returns. Caller text is not the fact. Probe `test_caller_spec_fields_are_not_the_facts`. | 0 |
+| `notion_fact_ledger.py:404` | or | flip or to and `boolop or` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:405` | or | replace operand with True `_role_detail(probe, stored, identity, "practice")` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 37 |
+| `notion_fact_ledger.py:405` | or | replace operand with False `_role_detail(probe, stored, identity, "practice")` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:405` | or | replace operand with True `spec.flagship_feature` | Equivalent. The stored section detail is the flagship text on a checkpoint that returns. Probe `test_caller_spec_fields_are_not_the_facts`. | 0 |
+| `notion_fact_ledger.py:405` | or | replace operand with False `spec.flagship_feature` | Equivalent. The stored section detail is the flagship text on a checkpoint that returns. Probe `test_caller_spec_fields_are_not_the_facts`. | 0 |
+| `notion_fact_ledger.py:405` | or | flip or to and `boolop or` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:407` | and | replace operand with True `set(kinds) == set(PLANNER_SHARED_DATABASES)` | test_qa_pass_persists_one_ledger_and_one_link[business-Studio Ledger-Studio Home-Desk] | 1 |
+| `notion_fact_ledger.py:407` | and | replace operand with False `set(kinds) == set(PLANNER_SHARED_DATABASES)` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:407` | and | replace operand with True `len(kinds) == len(PLANNER_SHARED_DATABASES)` | Equivalent. Stored kinds are unique, so set equality has the same length. | 0 |
+| `notion_fact_ledger.py:407` | and | replace operand with False `len(kinds) == len(PLANNER_SHARED_DATABASES)` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:407` | and | flip and to or `boolop and` | test_qa_pass_persists_one_ledger_and_one_link[business-Studio Ledger-Studio Home-Desk] | 1 |
+| `notion_fact_ledger.py:409` | and | replace operand with True `set(kinds) == set(BUSINESS_SHARED_DATABASES)` | Equivalent. A mass checkpoint takes the planner branch. A business checkpoint already matches this set, and `spec.tier` is `business`. Probe the business pass. | 0 |
+| `notion_fact_ledger.py:409` | and | replace operand with False `set(kinds) == set(BUSINESS_SHARED_DATABASES)` | Equivalent. Falling through uses `spec.tier`, which is `business` on that checkpoint. Probe the business pass. | 0 |
+| `notion_fact_ledger.py:409` | and | replace operand with True `len(kinds) == len( BUSINESS_SHARED_DATABASES )` | Equivalent. The business set match already implies this length. Probe the business pass. | 0 |
+| `notion_fact_ledger.py:409` | and | replace operand with False `len(kinds) == len( BUSINESS_SHARED_DATABASES )` | Equivalent. Falling through uses `spec.tier`, which is `business` on that checkpoint. Probe the business pass. | 0 |
+| `notion_fact_ledger.py:409` | and | flip and to or `boolop and` | Equivalent. Both sides are true together on a business checkpoint, and a mass checkpoint never reaches this branch. | 0 |
+| `notion_fact_ledger.py:437` | or | replace operand with True `type(page) is not NotionPage` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:437` | or | replace operand with False `type(page) is not NotionPage` | Equivalent. `_require_pages` already rejected a subclass. Probe `test_page_subclass_is_not_accepted`. | 0 |
+| `notion_fact_ledger.py:438` | or | replace operand with True `type(page.title) is not str` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:438` | or | replace operand with False `type(page.title) is not str` | test_blank_dashboard_row_title_refuses[None] | 1 |
+| `notion_fact_ledger.py:439` | or | replace operand with True `page.title.strip() != page.title` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:439` | or | replace operand with False `page.title.strip() != page.title` | Equivalent. A padded row raises in `_dashboard_outputs` before a write. Probe `test_edge_whitespace_is_refused_before_persist`. | 0 |
+| `notion_fact_ledger.py:437` | or | flip or to and `boolop or` | test_blank_dashboard_row_title_refuses[None] | 1 |
+| `notion_fact_ledger.py:468` | or | replace operand with True `type(sections) is not tuple` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:468` | or | replace operand with False `type(sections) is not tuple` | Equivalent. Loaded hub sections are tuples. A bad shape never arrives from the checkpoint loader. | 0 |
+| `notion_fact_ledger.py:468` | or | replace operand with True `type(name) is not str` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:468` | or | replace operand with False `type(name) is not str` | Equivalent. Loaded hub names are strings. | 0 |
+| `notion_fact_ledger.py:468` | or | flip or to and `boolop or` | Equivalent. Both type checks are true together on a loaded hub. | 0 |
+| `notion_fact_ledger.py:471` | or | replace operand with True `type(item) is not tuple` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:471` | or | replace operand with False `type(item) is not tuple` | Equivalent. Loaded section rows are pairs. Probe `test_caller_spec_fields_are_not_the_facts`. | 0 |
+| `notion_fact_ledger.py:471` | or | replace operand with True `len(item) != 2` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:471` | or | replace operand with False `len(item) != 2` | Equivalent. Loaded section rows are pairs. | 0 |
+| `notion_fact_ledger.py:471` | or | replace operand with True `item[0] != role` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:471` | or | replace operand with False `item[0] != role` | Equivalent. The role loop still skips other roles, and a missing role returns empty before a caller fallback is persisted as a fact. | 0 |
+| `notion_fact_ledger.py:471` | or | flip or to and `boolop or` | Equivalent. The three checks are false together on a loaded pair for the requested role. | 0 |
+| `notion_fact_ledger.py:474` | or | replace operand with True `type(block) is not NotionTextBlock` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:474` | or | replace operand with False `type(block) is not NotionTextBlock` | Equivalent. The purpose block on a loaded hub is a text block. | 0 |
+| `notion_fact_ledger.py:474` | or | replace operand with True `type(block.content) is not str` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:474` | or | replace operand with False `type(block.content) is not str` | Equivalent. Loaded text-block content is a string. | 0 |
+| `notion_fact_ledger.py:474` | or | flip or to and `boolop or` | Equivalent. Both type checks are true together on a loaded text block. | 0 |
+| `notion_fact_ledger.py:477` | and | replace operand with True `block.content.startswith(prefix)` | Equivalent. A matching block still returns the same slice. Section detail is not itself a ledger fact. | 0 |
+| `notion_fact_ledger.py:477` | and | replace operand with False `block.content.startswith(prefix)` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:477` | and | replace operand with True `len(block.content) > len(prefix)` | Equivalent. A matching stored section is longer than the prefix. Probe `test_caller_spec_fields_are_not_the_facts`. | 0 |
+| `notion_fact_ledger.py:477` | and | replace operand with False `len(block.content) > len(prefix)` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:477` | and | flip and to or `boolop and` | Equivalent. Both sides are true on a matching stored section. | 0 |
+| `notion_fact_ledger.py:491` | or | replace operand with True `description == ""` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:491` | or | replace operand with False `description == ""` | test_dashboard_delimiter_is_not_a_fact | 1 |
+| `notion_fact_ledger.py:491` | or | replace operand with True `len(hub.name) > 64` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:491` | or | replace operand with False `len(hub.name) > 64` | Equivalent. A loaded hub name fits `Hub.name` max length 64. The description bound is the killed conjunct. | 0 |
+| `notion_fact_ledger.py:491` | or | replace operand with True `len(description) > 500` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:491` | or | replace operand with False `len(description) > 500` | test_oversized_hub_description_is_not_adopted | 1 |
+| `notion_fact_ledger.py:491` | or | flip or to and `boolop or` | test_dashboard_delimiter_is_not_a_fact | 1 |
+| `notion_fact_ledger.py:494` | or | replace operand with True `len(rows) < 6` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:494` | or | replace operand with False `len(rows) < 6` | Equivalent. A loaded checkpoint has 6 to 8 hubs, so this bound is false. | 0 |
+| `notion_fact_ledger.py:494` | or | replace operand with True `len(rows) > 8` | test_caller_spec_fields_are_not_the_facts | 1 |
+| `notion_fact_ledger.py:494` | or | replace operand with False `len(rows) > 8` | Equivalent. A loaded checkpoint has 6 to 8 hubs, so this bound is false. | 0 |
+| `notion_fact_ledger.py:494` | or | flip or to and `boolop or` | Equivalent. Both bounds are false on a loaded checkpoint, and `and` stays false. | 0 |
+| `notion_fact_ledger.py:522` | or | replace operand with True `type(page.title) is not str` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:522` | or | replace operand with False `type(page.title) is not str` | test_hub_title_that_is_not_text_is_blocked | 2 |
+| `notion_fact_ledger.py:522` | or | replace operand with True `page.title == ""` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:522` | or | replace operand with False `page.title == ""` | Equivalent. An empty title is a str and both versions return `""`. Probe `test_blank_dashboard_row_title_refuses`. | 0 |
+| `notion_fact_ledger.py:522` | or | flip or to and `boolop or` | test_hub_title_that_is_not_text_is_blocked | 2 |
+| `notion_fact_ledger.py:540` | and | replace operand with True `type(name) is str` | Equivalent. Titles are already strings or the word `missing`. | 0 |
+| `notion_fact_ledger.py:540` | and | replace operand with False `type(name) is str` | test_trailing_space_in_a_hub_title_can_be_repaired | 1 |
+| `notion_fact_ledger.py:540` | and | replace operand with True `name == "" or name.strip() != name` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:540` | and | replace operand with False `name == "" or name.strip() != name` | test_trailing_space_in_a_hub_title_can_be_repaired | 1 |
+| `notion_fact_ledger.py:540` | and | flip and to or `boolop and` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:540` | or | replace operand with True `name == ""` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:540` | or | replace operand with False `name == ""` | Equivalent. An empty title is replaced with `missing` before this `or`. Probe `test_blank_hub_title_is_missing`. | 0 |
+| `notion_fact_ledger.py:540` | or | replace operand with True `name.strip() != name` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:540` | or | replace operand with False `name.strip() != name` | test_trailing_space_in_a_hub_title_can_be_repaired | 1 |
+| `notion_fact_ledger.py:540` | or | flip or to and `boolop or` | test_trailing_space_in_a_hub_title_can_be_repaired | 1 |
+| `notion_fact_ledger.py:566` | or | replace operand with True `not isinstance(database, NotionDatabase)` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 119 |
+| `notion_fact_ledger.py:566` | or | replace operand with False `not isinstance(database, NotionDatabase)` | test_missing_database_writes_nothing | 1 |
+| `notion_fact_ledger.py:566` | or | replace operand with True `database.parent_id != stored.page_id` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 119 |
+| `notion_fact_ledger.py:566` | or | replace operand with False `database.parent_id != stored.page_id` | test_database_parent_other_than_home_writes_nothing | 1 |
+| `notion_fact_ledger.py:566` | or | flip or to and `boolop or` | test_database_parent_other_than_home_writes_nothing | 2 |
+| `notion_fact_ledger.py:569` | and | replace operand with True `type(database.title) is str` | test_database_title_integer_is_missing | 1 |
+| `notion_fact_ledger.py:569` | and | replace operand with False `type(database.title) is str` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 31 |
+| `notion_fact_ledger.py:569` | and | replace operand with True `database.title != ""` | test_blank_database_title_is_missing_and_blocked | 1 |
+| `notion_fact_ledger.py:569` | and | replace operand with False `database.title != ""` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 31 |
+| `notion_fact_ledger.py:569` | and | flip and to or `boolop and` | test_blank_database_title_is_missing_and_blocked | 2 |
+| `notion_fact_ledger.py:571` | and | replace operand with True `type(title) is str` | Equivalent. The title was already narrowed to str or replaced with `missing`. Probe `test_database_title_integer_is_missing`. | 0 |
+| `notion_fact_ledger.py:571` | and | replace operand with False `type(title) is str` | test_database_title_with_edge_space_is_missing | 1 |
+| `notion_fact_ledger.py:571` | and | replace operand with True `title.strip() != title` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 31 |
+| `notion_fact_ledger.py:571` | and | replace operand with False `title.strip() != title` | test_database_title_with_edge_space_is_missing | 1 |
+| `notion_fact_ledger.py:571` | and | flip and to or `boolop and` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 31 |
+| `notion_fact_ledger.py:592` | and | replace operand with True `type(captured) is str` | test_empty_or_missing_public_url_blocks_secret_links[None] | 3 |
+| `notion_fact_ledger.py:592` | and | replace operand with False `type(captured) is str` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:592` | and | replace operand with True `captured != ""` | test_empty_or_missing_public_url_blocks_secret_links[] | 1 |
+| `notion_fact_ledger.py:592` | and | replace operand with False `captured != ""` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:592` | and | flip and to or `boolop and` | test_empty_or_missing_public_url_blocks_secret_links[] | 4 |
+| `notion_fact_ledger.py:594` | and | replace operand with True `page.is_published is True` | test_unpublished_trusted_url_blocks_secret_links | 1 |
+| `notion_fact_ledger.py:594` | and | replace operand with False `page.is_published is True` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 31 |
+| `notion_fact_ledger.py:595` | and | replace operand with True `usable` | test_captured_url_must_be_exact_str[subclass] | 2 |
+| `notion_fact_ledger.py:595` | and | replace operand with False `usable` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 31 |
+| `notion_fact_ledger.py:596` | and | replace operand with True `captured == trusted` | test_forged_captured_url_blocks_secret_links | 4 |
+| `notion_fact_ledger.py:596` | and | replace operand with False `captured == trusted` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 31 |
+| `notion_fact_ledger.py:597` | and | replace operand with True `record.secret_link == trusted` | test_forged_stored_secret_link_blocks | 1 |
+| `notion_fact_ledger.py:597` | and | replace operand with False `record.secret_link == trusted` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 31 |
+| `notion_fact_ledger.py:594` | and | flip and to or `boolop and` | test_forged_captured_url_blocks_secret_links | 10 |
+| `notion_fact_ledger.py:612` | or | replace operand with True `type(value) is not str` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:612` | or | replace operand with False `type(value) is not str` | Equivalent. `_page_title` returns a str. Empty and padded titles are the killed conjuncts. Probe `test_blank_sample_title_is_missing`. | 0 |
+| `notion_fact_ledger.py:612` | or | replace operand with True `value == ""` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:612` | or | replace operand with False `value == ""` | test_blank_sample_title_is_missing | 1 |
+| `notion_fact_ledger.py:612` | or | replace operand with True `value.strip() != value` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:612` | or | replace operand with False `value.strip() != value` | test_padded_sample_title_recovers_after_the_trim[SAMPLE Tasks ] | 3 |
+| `notion_fact_ledger.py:612` | or | flip or to and `boolop or` | test_blank_sample_title_is_missing | 1 |
+| `notion_fact_ledger.py:616` | or | replace operand with True `"\u200b" in value` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:616` | or | replace operand with False `"\u200b" in value` | test_invisible_sample_mark_is_missing[\u200b] | 1 |
+| `notion_fact_ledger.py:616` | or | replace operand with True `"\ufeff" in value` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:616` | or | replace operand with False `"\ufeff" in value` | test_invisible_sample_mark_is_missing[\ufeff] | 1 |
+| `notion_fact_ledger.py:616` | or | flip or to and `boolop or` | test_invisible_sample_mark_is_missing[\u200b] | 2 |
+| `notion_fact_ledger.py:633` | or | replace operand with True `expression is None` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:633` | or | replace operand with False `expression is None` | Equivalent. `None != wanted[1]` still returns missing. Probe `test_blank_formula_expression_is_missing`. | 0 |
+| `notion_fact_ledger.py:633` | or | replace operand with True `wanted is None` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:633` | or | replace operand with False `wanted is None` | test_unknown_formula_name_is_missing | 1 |
+| `notion_fact_ledger.py:633` | or | replace operand with True `wanted[0] != kind` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:633` | or | replace operand with False `wanted[0] != kind` | test_formula_recorded_on_the_wrong_database_is_missing | 1 |
+| `notion_fact_ledger.py:633` | or | replace operand with True `expression != wanted[1]` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:633` | or | replace operand with False `expression != wanted[1]` | test_one_fixed_defect_replans_the_other | 2 |
+| `notion_fact_ledger.py:633` | or | flip or to and `boolop or` | test_unknown_formula_name_is_missing | 1 |
+| `notion_fact_ledger.py:635` | or | replace operand with True `";" in name` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:635` | or | replace operand with False `";" in name` | Equivalent. A formula name from the checkpoint has no semicolon, and a changed expression already fails equality. | 0 |
+| `notion_fact_ledger.py:635` | or | replace operand with True `";" in expression` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:635` | or | replace operand with False `";" in expression` | Equivalent. An expression that contains `;` already fails `expression != wanted[1]` first. Probe `test_semicolon_in_a_formula_expression_is_missing`. | 0 |
+| `notion_fact_ledger.py:635` | or | flip or to and `boolop or` | Equivalent. Generated names and matching expressions do not contain `;`, so both sides are false together. | 0 |
+| `notion_fact_ledger.py:668` | or | replace operand with True `prop.id != property_id` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:668` | or | replace operand with False `prop.id != property_id` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:668` | or | replace operand with True `prop.type != "formula"` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:668` | or | replace operand with False `prop.type != "formula"` | test_text_property_is_not_a_dashboard_formula | 1 |
+| `notion_fact_ledger.py:668` | or | flip or to and `boolop or` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 33 |
+| `notion_fact_ledger.py:671` | or | replace operand with True `type(formula) is not NotionFormula` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:671` | or | replace operand with False `type(formula) is not NotionFormula` | test_non_formula_config_is_missing | 1 |
+| `notion_fact_ledger.py:671` | or | replace operand with True `formula.expression == ""` | test_qa_pass_persists_one_ledger_and_one_link[mass-Weekly Planner-Home Dashboard Planner-Hub] | 32 |
+| `notion_fact_ledger.py:671` | or | replace operand with False `formula.expression == ""` | Equivalent. `"" != wanted[1]` still returns missing. Probe `test_blank_formula_expression_is_missing`. | 0 |
+| `notion_fact_ledger.py:671` | or | flip or to and `boolop or` | test_non_formula_config_is_missing | 1 |
+
+Parked for the W11 test matrix, not fixed here: QA still records PASS when the home nav text, the 3 palette callouts, the identity callout, the 6 hub "returns to Home" texts, or the 3 home linked views are deleted. Uncovered code is `_linked_views` (`notion_qa.py:368`), `_palette` (`:603`), and `_teardown` (`:634`). The pull request lists the `docs/control` edits.
+
 ## 2026-10-07 — Session 07 W9: product QA
 
 Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision stays 57. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. STATE `head_sha` `6b087370eaaf1a5e09d9868643cca7b3654ddc4a` is the intentional tip-sync to the W8 squash. It is not `9bc56b2c`. It is not the revision that produced the test or mutation figures below. Those figures were measured on this commit, the child of `1a18b932987f709e66a5a158171c0a4505e39ef7`. Commit `1a18b93` CI verify run is `37682862874`, job `113003102755`, SUCCESS. Commit `8cf3e2b` CI verify run is `37641427600`, job `112861113785`, SUCCESS. Commit `548ed86d` CI verify run is `37626840209`, job `112810680638`, SUCCESS. Commit `ef7366e0` CI verify run is `37614528839`, job `112769557533`, SUCCESS. This commit's CI run is not invented here. `evidence_closure_commit_sha` stays the Session 06 closure tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. `updated_at` is `2026-10-07T21:59:24Z`.
@@ -2196,8 +3196,8 @@ Mutation checks. 110 mutations were each applied, the owning test file was run, 
 | delete payload none return | `notion_qa.py:143`. Delete `if envelope.payload is None: return None` | Equivalent. Dead on the public entry. `load_variant_checkpoint` already refuses a missing payload before `_stored_qa`. Probe `test_public_entry_payload_and_qa_record_are_present` passes on both versions, with one `duplicate_page` and a written qa object | 0 |
 | delete missing qa record check | `notion_qa.py:794`. Delete `if record is None` | Equivalent. Dead on the public entry. `_with_qa` sets `qa` before `_write_qa`. The same probe passes on both versions | 0 |
 | delete shared database parent check | `notion_qa.py:335`. Delete `or database.parent_id != stored.page_id` | `test_shared_database_off_the_home_page_is_blocked`. The good path records `BLOCKED` with false checks `("shared_databases",)` and 0 writes. The mutant records `PASS` and calls `duplicate_page` | 1 |
-| delete fresh-duplicate title compare | `notion_qa.py:542`. Delete `page.title == title` | `test_renamed_variant_page_fails_fresh_duplicate`. The good path records `BLOCKED` with false checks `("fresh_duplicate",)` and 0 writes. The mutant calls `duplicate_page` and then raises | 1 |
-| delete fresh-duplicate spec-id check | `notion_qa.py:544`. Delete `SPEC_ID_PROPERTY not in page.properties` | `test_forged_spec_id_fails_fresh_duplicate`. Same split as the title row: `BLOCKED` and 0 writes on the good path. The mutant writes `duplicate_page` and then raises | 1 |
+| replace fresh-duplicate title compare with True | `notion_qa.py:574` on tip `9eff481e`. Replace `page.title == title` with `True`. The earlier `:543` citation does not match that file | `test_renamed_variant_page_fails_fresh_duplicate`. The good path records `BLOCKED` with false checks `("fresh_duplicate",)` and 0 writes. Re-checked against tip `9eff481e` | 1 |
+| replace fresh-duplicate spec-id check with True | `notion_qa.py:576` on tip `9eff481e`. Replace `SPEC_ID_PROPERTY not in page.properties` with `True`. The earlier `:545` and `:572` citations do not match that conjunct | `test_forged_spec_id_fails_fresh_duplicate`. The good path records `BLOCKED` with false checks `("fresh_duplicate",)` and 0 writes. Re-checked against tip `9eff481e` | 1 |
 | delete vocabulary sample type check | `notion_qa.py:598`. Delete `type(block) is NotionTextBlock` on the SAMPLE block | `test_vocabulary_callout_fails_palette`. The good path records `BLOCKED` with false checks `("palette",)` and 0 writes. The mutant records `PASS` and calls `duplicate_page` | 1 |
 | delete fresh-duplicate icon check | `notion_qa.py:545`. Delete `page.icon == hub_icon(token)` | `test_fresh_duplicate_icon_and_cover_stay_in_the_false_set` for `icon`. The good path's false checks are `("fresh_duplicate", "palette")`. The mutant drops `fresh_duplicate` from that set | 1 |
 | delete fresh-duplicate cover check | `notion_qa.py:546`. Delete `page.cover == hub_cover(token)` | `test_fresh_duplicate_icon_and_cover_stay_in_the_false_set` for `cover`. The good path's false checks are `("fresh_duplicate", "palette")`. The mutant drops `fresh_duplicate` from that set | 1 |

@@ -141,7 +141,10 @@ class _FoundHub:
 
 def section_content(spec: ProductSpec, hub_name: str, role: str) -> str:
     """Identity-specific section text. The role label keeps sections distinct."""
-    hub = next(item for item in spec.hubs if item.name == hub_name)
+    matched = [item for item in spec.hubs if item.name == hub_name]
+    if len(matched) != 1:
+        raise ProductBuildError("hub section is missing")
+    hub = matched[0]
     details = {
         "purpose": hub.description,
         "practice": spec.flagship_feature,

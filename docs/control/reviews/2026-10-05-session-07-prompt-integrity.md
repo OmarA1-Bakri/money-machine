@@ -587,3 +587,91 @@ This addendum governs Wave 9. The prompt remains the unamended source of record.
 | In-place formula or linked-view repair | Later wave if the fixture grows an update method | A new id would not match the stored checkpoint. Those defects are `BLOCKED` with zero adapter writes |
 | Action 12 commissioning | Operator decision after full implementation | S-02 |
 | Twelve evidence keys | Session close, after the prompt's own criteria | Fixture QA is not that gate |
+
+# Session 07 Prompt Integrity Review — Wave 10
+
+**Date:** 2026-10-07
+**Prompt:** `prompts/implementation/10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`
+**Verified SHA-256:** `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`
+**Workbook authority:** `hands-off-money-machine-full-implementation-workbook.md` appendix row for this prompt (5,255 bytes, 237 lines)
+**Scope:** Wave 10 only. Fixture-only product fact ledger (prompt section 9) and workflow link (prompt section 10) over the merged W8 variants and W9 QA records, plus the four carried items from the #59 final PASS. Waves 1–9 above still govern their phases. This record is the corrective addendum for Wave 10.
+
+The prompt file is not amended.
+
+## 1. Prompt authenticity
+
+**Status:** VERIFIED
+
+- The extracted file's SHA-256 equals the workbook appendix value `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`.
+- The prompt stays the unamended source of record.
+
+## 2. Three-dimensional review
+
+### Fidelity
+
+**Verdict:** CONDITIONAL APPROVE. Two high findings, resolved by the addendum and by D-0029.
+
+**F-01 [HIGH] — Section 9 lists a second fact set beside the QA snapshot**
+
+- **Prompt lines:** 155–170, against section 8 facts already stored on the QA reference.
+- **Authority:** W9 stores colours, hubs, databases, variant count, page count, and secret links on `provider_object_references["qa"]`. Those are a QA snapshot. They are not the section 9 ledger. `write_checkpoint` is the only progress writer. `BUILD_PHASES` has six names.
+- **Consequence of literal execution:** Copying the QA snapshot, or reading `colour_variants`, `hubs`, `title`, or `version` off the caller spec, would let merchandising claim facts the fixture did not prove.
+- **Amendment:** The ledger is a later read of the persisted checkpoint and the fixture adapter. Page count is the known ids. Hub and database titles come from the adapter. Variant names and secret links come from the stored records, checked against the adapter. Dashboard outputs are the adapter formula expressions. `supported_devices` is `unverified`. `free_update_policy` is `not_configured`. `build_version` is the checkpoint value. Caller spec fields are ignored. QA facts are compared where they overlap. They are not copied in as the ledger.
+
+**F-02 [HIGH] — Section 10 names are not the workflow job types, and "ready" is not a created job**
+
+- **Prompt lines:** 172–184, and exit criterion line 223 ("Downstream merchandising job is created"), against section 11 line 200 ("automatic successor creation").
+- **Authority:** `config/workflows.yaml` is the graph. Session 03 prompt-integrity finding M11 voided the prompt's example job names as a parallel authority. D-0029 records the label map: BUILD_NOTION_TEMPLATE is ProductBuildJob, RUN_PRODUCT_QA is ProductQAJob, REPAIR is BuildRepairJob, CREATE_VARIANTS is VariantBuildJob, RUN_VARIANT_QA is VariantPublishJob, and GENERATE_LISTING_PACKAGE ready is ListingCopyJob through ScreenshotJob.
+- **Consequence of literal execution:** Editing `config/workflows.yaml`, inserting a second engine, or creating ListingCopyJob would invent a graph the Session 03 decision already refused.
+- **Amendment:** Walk the existing YAML graph through `load_workflows_config`. Store the prompt names only as labels on that path. Record the REPAIR edge. Do not execute it. "Ready" means the last step names ListingCopyJob and its output contracts include ListingPackage. Do not create the job. Do not edit `config/workflows.yaml`.
+
+**What the prompt already gets right**
+
+- Section 9 names the facts merchandising may claim, and it forbids claims from anywhere else (lines 155–170).
+- Section 10 names one chain that ends at GENERATE_LISTING_PACKAGE ready (lines 172–184).
+- Supported devices and the free-update policy are conditional ("if verified", "if configured"). Neither is verified on this fixture.
+
+### Safety and executability
+
+**Verdict:** CONDITIONAL APPROVE. The Wave 1 critical and high findings still apply and stay in force.
+
+**S-01 [CRITICAL] — Action 11 live sandbox.** Still deferred. This wave uses `FixtureNotionAdapter` only. No live HTTP, no real Notion workspace, no Etsy listing, no socket, no Exit 78 lift. Do not import `httpx`, `requests`, `notion_client`, or `APINotionAdapter`. The ledger module must not contain an `https://` literal.
+
+**S-02 [HIGH] — Action 12 commissioning.** A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. `product_fact_ledger_persisted` and `build_workflow_linked` stay false. Do not edit `config/agents.yaml`.
+
+**S-03 [HIGH] — Two ProductSpec types.** This phase accepts only `product_spec.ProductSpec`. The catalogue spec is rejected. The probe must be `FixtureNotionAdapter`.
+
+**S-04 [HIGH] — Tip-sync must not look like completion.** `head_sha` becomes the W9 squash `a4e9b025021b4effbb2b2879c1db756403cb1676`, the merged base of this wave. It does not become this wave's own commit. `evidence_closure_commit_sha` stays the Session 06 tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. All twelve session 7 evidence keys stay false. `session_status` stays `incomplete`. This wave does not print `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE`. Narrative `next_phase` becomes `test_matrix` and is not started. Section 11 is not this wave.
+
+### Gameability
+
+**Verdict:** CONDITIONAL APPROVE. One high finding, resolved by the addendum.
+
+**G-01 [HIGH] — A PASS string, caller-spec facts, a second write, or a ready link on a blocked QA satisfies a careless reading**
+
+- **Prompt lines:** 155–184.
+- **Cheap fake:** Write `PASS` and `ListingCopyJob` without reading the fixture, copy colour names from the caller spec, write the checkpoint again on resume, or mark the listing ready while QA is `BLOCKED`.
+- **Ungameable for this wave:** The plan runs before any adapter write. Every ledger fact is deterministic and comes from persisted state and adapter facts. A stored record that does not match the live plan raises `fact ledger does not match` or `workflow link does not match`, with 0 adapter writes and unchanged file bytes. Every refusal path makes 0 writes. A `BLOCKED` record is re-planned only when the live plan is no longer blocked. Resume of a matching record does not write. A crash inside `write_checkpoint` leaves no ledger key, and the resume writes once to a single `PASS`. There is one `write_checkpoint`. The YAML walk is read from `load_workflows_config`. A missing edge or a missing ListingPackage output raises before that write. An empty captured URL `""` is skipped, the same as a missing URL, so a real unpublish can still repair. That skip is the documented contract at `notion_qa.py:526`. It is pinned, not turned into a refusal.
+
+## 3. Corrective addendum
+
+This addendum governs Wave 10. The prompt remains the unamended source of record.
+
+1. Prove the prompt hash, then implement only the slice below.
+2. Tip-sync only: `head_sha` becomes `a4e9b025021b4effbb2b2879c1db756403cb1676`. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. Advance `state_revision` from 57 to 58. `session_status` stays `incomplete`. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays this prompt. Narrative `next_phase` becomes `test_matrix` and this wave does not run it.
+3. Leave all twelve session 7 evidence keys false, including `product_fact_ledger_persisted` and `build_workflow_linked`. Do not set `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE`. The log and the pull request say this is not SESSION_07 COMPLETE and Exit 78 stays HELD.
+4. Keep A07, A08, and A09 DESIGNED. `commissioned_agents` stays empty. Do not edit `config/agents.yaml` or `config/workflows.yaml`.
+5. The ledger and the link go through one `write_checkpoint`. `write_document` stays the single progress writer. `checkpoint_names` stay the six build phases. The aesthetics parser also strips `fact_ledger` and `workflow_link`. `_write_qa` keeps both keys when QA rewrites, so a later `BLOCKED` to `PASS` replan can still see them.
+6. Facts are the persisted checkpoint and the fixture adapter, never the caller spec. A stored mismatch raises `does not match` with 0 adapter writes. A `BLOCKED` result can be re-planned when the live plan is no longer blocked. Crash-resume reaches a single `PASS`. The workflow link records the YAML path, including ScreenshotJob, and does not create ListingCopyJob. D-0029 is the label map.
+7. Close the four carried items from the #59 final PASS. The fresh-duplicate title and spec-id tests keep going after the proof error, so each mutant fails at `assert false_checks == ("fresh_duplicate",)`. The applicable mutants replace the title compare and the spec-id check with `True`. An empty captured URL `""` repairs like a missing URL, and a test pins that skip. Re-measure the 17 variant-file mutation rows. Reword the title row so the mutant is literally applicable. Park the section 8 QA coverage gap, the crash-resume repair drop, and the pull-request `docs/control` list in `NEXT_SESSION.md`, marked scheduled for the W11 test matrix. Do not fix them here.
+8. Tests use the fixture only, with sockets blocked. Do not start section 11, the live sandbox, or commissioning.
+
+## 4. Deferrals
+
+| Finding | Owner | Reason |
+|---|---|---|
+| Section 11 test matrix and live sandbox | W11, and explicit authorization for the sandbox | S-01. Narrative next phase is `test_matrix`, not started |
+| Section 8 QA coverage gap | W11 test matrix | QA records PASS when the home nav text, the 3 palette callouts, the identity callout, the 6 hub "returns to Home" texts, or the 3 home linked views are deleted. Uncovered: `_linked_views` `notion_qa.py:366`, `_palette` `:576`, `_teardown` `:607` |
+| Crash-resume drops earlier repairs | W11 test matrix | Parked with the coverage gap. Not fixed in W10 |
+| Action 12 commissioning | Operator decision after full implementation | S-02 |
+| Twelve evidence keys | Session close, after the prompt's own criteria | Fixture ledger and link are not that gate |
