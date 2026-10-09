@@ -1,3 +1,20 @@
+## 2026-10-09 — Session 07 sandbox run, round 10
+
+Not a session close. This is not SESSION_07 COMPLETE. `state_revision` stays 58. `IMPLEMENTATION_STATE.json` is not edited. `head_sha` stays the W9 squash `a4e9b025021b4effbb2b2879c1db756403cb1676`. Twelve session 7 evidence keys stay false. `commissioned_agents` stays empty. Exit 78 stays HELD. The §11 sandbox CLI is still not run live. This commit's CI run is not invented here. No Verifier verdict had landed on `9d350221` when this round was written.
+
+Round 10 answers Reviewer 5468752023 on tip `9d350221` under the frozen criteria. Only the listed items are changed.
+
+- Blocker 1 (guard:590-591): the `prefix_key in seen_symlinks` refusal is deleted. It refused an ordinary nested relative chain (`c/s1 -> x1`, `c/x1/s2 -> x2`, path `c/s1/s2/sub/ev.json`) from K=2. Cycles and self-loops stay refused by the `target_key` check. Tests: `test_nested_relative_symlink_chain_is_accepted[2|8|16]` (public entry, exit 0, file written under the physical target, 0 creates), `test_symlink_self_loop_is_refused`, and the existing `test_symlink_cycle_is_refused`. Direct probe: nested K=1..32 `under_proc` False; two-node cycle, self-loop, and nested-to-`/proc/self/root` True.
+- Blocker 2: "a K≥16 relative chain is accepted" now holds for the sibling chain and the nested chain.
+- ns:363-366: `_raise_interrupt` installs the race-filtering `sys.unraisablehook` before `signal.signal(SIGINT, SIG_IGN)`. `main` saves the original hook and restores it in its `finally`. The docstring no longer says the race traceback is never printed. Tests: `test_raise_interrupt_installs_race_hook_before_sig_ign`, `test_main_restores_unraisablehook_after_interrupt`. Burst harness (r9 `burst8` schedule, fake adapter, sockets blocked): 236 runs, 0 tracebacks (r9 tip: 4/236), all exit 69, ids printed, 0 token leaks. Zero in 236 runs is a measurement, not a guarantee.
+- NIT `_detection_ready` redundancy: left as is.
+
+Named probes this round. `target_key` `if False`: KILLED by `test_symlink_cycle_is_refused` and `test_symlink_self_loop_is_refused`. The new nested, hook-order, and hook-restore tests each fail on the `9d350221` source.
+
+PARKED to the next wave, not fixed and not claimed equivalent: the 23 changed-line survivors from the Reviewer sweep (guard 396 F, 420 LT1, 472 F, 487:8 F, 487:16 ×4, 590 F, 599 F; ns:349 ×10, ns:352 ×3); the r8 6 CLI-masked and 10 no-libc survivors (not re-swept). guard 590 F refers to the deleted line.
+
+`tests/unit/cli/test_notion_sandbox.py`: 351 passed. `ruff format --check`, `ruff check`, and `pyright` 1.1.411 (0 errors) are clean. Full local pytest: `uv run pytest -q -p no:cacheprovider`: 2666 passed, 193 skipped, 12 failed. The 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. Local-only. CI is the gate.
+
 ## 2026-10-09 — Session 07 sandbox run, round 9
 
 Not a session close. This is not SESSION_07 COMPLETE. `state_revision` stays 58. `IMPLEMENTATION_STATE.json` is not edited. `head_sha` stays the W9 squash `a4e9b025021b4effbb2b2879c1db756403cb1676`. Twelve session 7 evidence keys stay false. `commissioned_agents` stays empty. Exit 78 stays HELD. The §11 sandbox CLI is still not run live. This commit's CI run is not invented here. No Verifier verdict had landed on `fc9c01c3` when this round was written.

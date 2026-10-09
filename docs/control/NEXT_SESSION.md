@@ -32,6 +32,12 @@
 
 Router browser and combined config modes still raise `NotImplementedError` (W4a). Fixture mode stays the default.
 
+## Session 07 — sandbox run, round 10
+
+**Status**: Incomplete (2026-10-09, state revision 58). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `commissioned_agents` stays empty. STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. Exit 78 scheduler stays HELD. The §11 sandbox CLI is still not run live.
+
+Round 10 answers Reviewer 5468752023 at `9d350221`. The guard no longer refuses a nested relative symlink chain (K=2, 8, 16 accepted at the public entry). Cycles and self-loops stay refused. The SIGINT race hook is installed before `SIG_IGN` and restored by `main`. Parked: 23 changed-line survivors plus the r8 CLI-masked and no-libc sets. Sandbox tests: 351 passed. Full local pytest: 2666 passed, 193 skipped, 12 failed (`docker` absent).
+
 ## Session 07 — sandbox run, round 9
 
 **Status**: Incomplete (2026-10-09, state revision 58). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD. The §11 sandbox CLI is still not run live. `origin/build/full-automation` is still `a4e9b025`.

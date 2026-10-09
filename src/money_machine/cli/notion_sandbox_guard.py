@@ -586,10 +586,7 @@ def under_proc(path: Path) -> bool:
             except OSError:
                 continue
             if stat.S_ISLNK(info.st_mode):
-                prefix_key = str(prefix)
-                if prefix_key in seen_symlinks:
-                    return True
-                seen_symlinks.add(prefix_key)
+                seen_symlinks.add(str(prefix))
                 target = _symlink_target(prefix)
                 if target is None:
                     continue

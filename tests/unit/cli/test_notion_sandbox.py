@@ -6351,6 +6351,7 @@ def test_raise_interrupt_sets_sig_ign_before_raising(
 
     monkeypatch.setattr(sandbox_module.signal, "signal", _track)
     before = signal.getsignal(signal.SIGINT)
+    hook_before = sys.unraisablehook
     try:
         with pytest.raises(KeyboardInterrupt):
             sandbox_module._raise_interrupt(signal.SIGINT, None)  # pyright: ignore[reportPrivateUsage]
@@ -6359,6 +6360,65 @@ def test_raise_interrupt_sets_sig_ign_before_raising(
         assert signal.getsignal(signal.SIGINT) is signal.SIG_IGN
     finally:
         signal.signal(signal.SIGINT, before)
+        sys.unraisablehook = hook_before
+
+
+def test_raise_interrupt_installs_race_hook_before_sig_ign(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ns:363-366: the race hook is in place before SIG_IGN can trip the race."""
+    from money_machine.cli import notion_sandbox as sandbox_module
+
+    seen: list[object] = []
+    real = signal.signal
+
+    def _track(sig: int, handler: object) -> object:
+        seen.append(sys.unraisablehook)
+        return real(sig, handler)  # pyright: ignore[reportArgumentType]
+
+    monkeypatch.setattr(sandbox_module.signal, "signal", _track)
+    before = signal.getsignal(signal.SIGINT)
+    hook_before = sys.unraisablehook
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            sandbox_module._raise_interrupt(signal.SIGINT, None)  # pyright: ignore[reportPrivateUsage]
+        assert seen
+        assert seen[0] is sandbox_module._ignore_sigint_race  # pyright: ignore[reportPrivateUsage]
+    finally:
+        signal.signal(signal.SIGINT, before)
+        sys.unraisablehook = hook_before
+
+
+def test_main_restores_unraisablehook_after_interrupt(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """ns:366: the process-wide hook is put back when main returns."""
+    from money_machine.cli import notion_sandbox as sandbox_module
+
+    class _Interrupting(FakeSandbox):
+        def create_child_page(self, parent_id: str, title: str) -> PageView:
+            sandbox_module._raise_interrupt(signal.SIGINT, None)  # pyright: ignore[reportPrivateUsage]
+            raise AssertionError("unreachable")
+
+    def _marker(_unraisable: object) -> None:
+        return None
+
+    before = signal.getsignal(signal.SIGINT)
+    hook_before = sys.unraisablehook
+    sys.unraisablehook = _marker
+    try:
+        evidence = tmp_path / "ev.json"
+        code, _payload, _out, err, _logs = _invoke(
+            evidence, capsys, caplog, ["--execute"], client=_Interrupting()
+        )
+        assert code == EXIT_API
+        assert err.startswith("sandbox interrupted")
+        assert sys.unraisablehook is _marker
+    finally:
+        signal.signal(signal.SIGINT, before)
+        sys.unraisablehook = hook_before
 
 
 def test_gap0_double_sigint_at_post2_keeps_ids_across_runs(
@@ -6632,6 +6692,41 @@ def test_relative_symlink_chain_of_16_is_accepted(
     assert payload["mode"] == "dry-run"
     assert evidence.is_file()
     assert client.creates == []
+
+
+@pytest.mark.parametrize("depth", [2, 8, 16])
+def test_nested_relative_symlink_chain_is_accepted(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    depth: int,
+) -> None:
+    """Each link sits inside the previous link's target: c/s1->x1, c/x1/s2->x2, ..."""
+    base = tmp_path / "c"
+    base.mkdir()
+    real = base
+    for index in range(1, depth + 1):
+        (real / f"s{index}").symlink_to(f"x{index}")
+        real = real / f"x{index}"
+        real.mkdir()
+    (real / "sub").mkdir()
+    evidence = base.joinpath(*[f"s{index}" for index in range(1, depth + 1)], "sub", "ev.json")
+    assert under_proc(evidence) is False
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(evidence, capsys, caplog, [], client=client)
+    assert code == EXIT_OK
+    assert err == ""
+    assert payload["mode"] == "dry-run"
+    assert evidence.is_file()
+    assert (real / "sub" / "ev.json").is_file()
+    assert client.creates == []
+
+
+def test_symlink_self_loop_is_refused(tmp_path: Path) -> None:
+    """A symlink to itself is refused by the target check, not walked forever."""
+    loop = tmp_path / "loop"
+    loop.symlink_to("loop")
+    assert under_proc(loop / "ev.json") is True
 
 
 def test_unique_walk_limit_refuses_an_overlong_chain(

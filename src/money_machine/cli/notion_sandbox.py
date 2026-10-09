@@ -357,13 +357,17 @@ def _raise_interrupt(_signum: int, _frame: object) -> None:
     """Turn SIGINT into KeyboardInterrupt. Ignore further SIGINTs first.
 
     A gap-0 second SIGINT must not restore the default handler and drop the
-    stderr ids. ``SIG_IGN`` is installed before anything else in this handler.
-    SIGINT is also blocked so CPython's race traceback is not printed.
+    stderr ids. ``SIG_IGN`` is the first signal disposition this handler sets.
+    The race-filtering ``sys.unraisablehook`` is installed just before it, so
+    a SIGINT already pending when ``SIG_IGN`` lands is dropped quietly.
+    CPython can still print its "Signal 2 ignored due to race condition"
+    traceback in rare burst runs; the exit code and stderr ids are unaffected.
+    ``main`` restores the original hook when it returns.
     """
-    with contextlib.suppress(ValueError, OSError):
-        signal.signal(signal.SIGINT, signal.SIG_IGN)
     with contextlib.suppress(AttributeError, TypeError):
         sys.unraisablehook = _ignore_sigint_race
+    with contextlib.suppress(ValueError, OSError):
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
     raise KeyboardInterrupt
 
 
@@ -505,6 +509,7 @@ def main(
         previous = signal.getsignal(signal.SIGINT)
     except ValueError:
         previous = signal.SIG_DFL
+    previous_hook = sys.unraisablehook
     _reset_held()
     _arm_interrupt()
     try:
@@ -522,6 +527,7 @@ def main(
             with contextlib.suppress(ValueError, TypeError, OSError):
                 signal.signal(signal.SIGINT, signal.SIG_IGN)
                 signal.signal(signal.SIGINT, previous)
+        sys.unraisablehook = previous_hook
         _HELD.__init__()
 
 

@@ -1,5 +1,22 @@
 # Test Evidence
 
+## 2026-10-09 — Session 07 sandbox run, round 10
+
+**Verification scope**: Round 10 of the §11 sandbox runner. Reviewer FAIL 5468752023 at `9d350221` is folded into this commit. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited. **No equivalents are claimed.**
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. `state_revision` stays 58 | PASS |
+| Nested relative chain | `test_nested_relative_symlink_chain_is_accepted[2,8,16]`: exit 0, file written, 0 creates | PASS |
+| Cycle and self-loop | `test_symlink_cycle_is_refused`, `test_symlink_self_loop_is_refused` | PASS |
+| Race hook | Installed before `SIG_IGN`, restored by `main`. Burst harness 236 runs: 0 tracebacks, ids kept, 0 leaks | PASS |
+| Sandbox tests | `tests/unit/cli/test_notion_sandbox.py`: 351 passed | PASS |
+| Lint and types | `ruff format --check`, `ruff check`, `pyright` 1.1.411: 0 errors | PASS |
+| Full local pytest | 2666 passed, 193 skipped, 12 failed (docker absent). Local-only. CI is the gate | 12 known local docker failures; CI is the gate |
+| Parked survivors | 23 changed-line survivors, r8 6 CLI-masked and 10 no-libc. Not re-swept | PARKED |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
 ## 2026-10-09 — Session 07 sandbox run, round 9
 
 **Verification scope**: Round 9 of the §11 sandbox runner. Reviewer FAIL 5468348253 at `fc9c01c3` is folded into this commit. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited. **No equivalents are claimed.**
