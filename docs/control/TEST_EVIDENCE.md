@@ -16,6 +16,217 @@
 
 **Status**: Session 07 Wave 11. The session stays incomplete. This is not SESSION_07 COMPLETE. Exit 78 stays HELD.
 
+## 2026-10-09 — Session 07 sandbox run, round 12 (re-sync onto the W10 squash)
+
+**Verification scope**: Round 12 of the §11 sandbox runner. One merge commit brings `build/full-automation` at `4b899fcf` (W10, #61) into this branch at `efea4297`. Verifier 6080655092 (FAIL at `efea4297`, text only) and Reviewer 5469709536 nits are folded in. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Tip-sync | STATE `head_sha` `4b899fcf6bf09730b952bf5517d6bd691b72ba9a` is the W10 squash. `state_revision` 58 → 59 (this PR merges second). Base `session_07_w10` note kept; `session_07_sandbox_run` note rewritten | PASS |
+| Merge conflicts | Four `docs/control` files only; no code conflict. Sandbox modules unchanged by the merge. W10 code and tests unchanged from `4b899fcf` | PASS |
+| `fstatfs` lost after creates | `test_libc_losing_fstatfs_after_creates_exits_69_with_ids`: 69, no file, `evidence path is refused` from `_refuse_proc_write`, 5 ids on stderr | PASS |
+| Census | if 218, boolop 72, and 26, or 46, clause 154, ifexp 8, while 3. Total 1207 (unchanged). **1207-row table not run** | PASS (count only) |
+| Sandbox tests | `tests/unit/cli/test_notion_sandbox.py`: 355 passed | PASS |
+| W10 suites after merge | `test_notion_fact_ledger.py` 503 passed, `test_notion_product_qa.py` 162 passed, seven product-builder files 392 passed, `tests/bootstrap` 89 passed 1 skipped | PASS |
+| Lint and types | `ruff format --check` (336 files), `ruff check`, `pyright` 1.1.411: 0 errors | PASS |
+| Full local pytest | 3215 passed, 193 skipped, 12 failed (docker absent). Local-only. CI is the gate | 12 known local docker failures; CI is the gate |
+| Parked survivors | `_WALK_LIMIT = 257` (guard:30); guard 396 F; guard 479 F (`if not text.strip()`); guard 494:8 F and 494:16 ×4 (the mount-point compare); guard 425:7 LF0 (equivalent, Reviewer 5469709536: `hasattr(None, …)` is False, so a missing libc still gives not-ready); guard 437/444/452/459 F (`lib is None` and `result != 0` in the two `statfs` helpers, survived since r8, Reviewer 5469709536); the ids dropped on the first post-open `_fd_on_procfs` raise at guard:823-824 (test gap, not an id loss: the `OSError` path does print the 5 ids, Verifier 6080655092); ns:349 ×10, ns:352 ×3; the r8 6 CLI-masked and 10 no-libc rows (not re-swept); Reviewer 5469228650 sweep survivors at tip coordinates guard 586/589/600 (If F, SWAP, LF0, LF1) ×12, guard 598 F, guard 607 NEG/T/F ×3 (they were 579/582/593, 591 and 600 at `518d5215`). Reviewer SF, fail-closed over-refusal: the `target_key` check at guard:603 refuses a path through a `.` or `..` link repeated in the same path (`here -> .` with `c/here/here/here/ev.json`, `d/x/up -> ..` with `up/x` ×3): 64, 0 reads, 0 creates, no traceback. Over-refusal can start at 2 repeats (1 of Reviewer's 35 fuzz cases, two `.` repeats after a different link); 34 of 35 need 3 or more. A single target string such as `./././x` is accepted | PARKED |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
+## 2026-10-09 — Session 07 sandbox run, round 11
+
+**Verification scope**: Round 11 of the §11 sandbox runner. Verifier 6079607643 and Reviewer 5469228650 (both FAIL at `518d5215`, text only) are folded into this commit. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited. **No equivalents are claimed.**
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete. This is not SESSION_07 COMPLETE | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. `state_revision` stays 58 | PASS |
+| libc without `statfs` / `fstatfs` | `test_libc_without_statfs_symbol_refuses_before_any_post[statfs,fstatfs]`: 64, 0 reads, 0 creates, no traceback | PASS |
+| `fstatfs` lost after creates | `test_libc_losing_fstatfs_after_creates_exits_69_with_ids`: 69, no file, 5 ids on stderr | PASS |
+| New tests on old source | All 4 fail on the `518d5215` source | PASS |
+| Census | if 218, boolop 72, and 26, or 46, clause 154, ifexp 8, while 3. Total 1207. **1207-row table not run** | PASS (count only) |
+| Named serial probes | 6 run at this tip: 5 KILLED, 1 SURVIVED (`_WALK_LIMIT = 257`) | PARTIAL |
+| Sandbox tests | `tests/unit/cli/test_notion_sandbox.py`: 355 passed | PASS |
+| Lint and types | `ruff format --check`, `ruff check`, `pyright` 1.1.411: 0 errors | PASS |
+| Full local pytest | 2670 passed, 193 skipped, 12 failed (docker absent). Local-only. CI is the gate | 12 known local docker failures; CI is the gate |
+| Parked survivors | `_WALK_LIMIT = 257` (guard:30); guard 396 F, 420 LT1, 472 F, 487:8 F, 487:16 ×4 (corrected in round 12: 420 LT1 deleted, 472/487 are guard:479/:494 at that tip); ns:349 ×10, ns:352 ×3; the r8 6 CLI-masked and 10 no-libc rows (not re-swept); Reviewer sweep guard 579/582/593/591/600 rows; repeated `.`/`..` link over-refusal (fails closed) | PARKED |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
+## 2026-10-09 — Session 07 sandbox run, round 10
+
+**Verification scope**: Round 10 of the §11 sandbox runner. Reviewer FAIL 5468752023 at `9d350221` is folded into this commit. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited. **No equivalents are claimed.**
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. `state_revision` stays 58 | PASS |
+| Nested relative chain | `test_nested_relative_symlink_chain_is_accepted[2,8,16]`: exit 0, file written, 0 creates | PASS |
+| Cycle and self-loop | `test_symlink_cycle_is_refused`, `test_symlink_self_loop_is_refused` | PASS |
+| Race hook | Installed before `SIG_IGN`, restored by `main`. Burst harness 236 runs: 0 tracebacks, ids kept, 0 leaks | PASS |
+| Sandbox tests | `tests/unit/cli/test_notion_sandbox.py`: 351 passed | PASS |
+| Lint and types | `ruff format --check`, `ruff check`, `pyright` 1.1.411: 0 errors | PASS |
+| Full local pytest | 2666 passed, 193 skipped, 12 failed (docker absent). Local-only. CI is the gate | 12 known local docker failures; CI is the gate |
+| Parked survivors | Corrected in round 11: `_WALK_LIMIT = 257` (guard:30); guard 396 F, 420 LT1, 472 F, 487:8 F, 487:16 ×4; ns:349 ×10, ns:352 ×3; the r8 6 CLI-masked and 10 no-libc rows (not re-swept). `target_key` `if False` is KILLED | PARKED |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
+## 2026-10-09 — Session 07 sandbox run, round 9
+
+**Verification scope**: Round 9 of the §11 sandbox runner. Reviewer FAIL 5468348253 at `fc9c01c3` is folded into this commit. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited. **No equivalents are claimed.**
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. `state_revision` stays 58 | PASS |
+| Sandbox CLI | Still not run live. `uv run --frozen pytest -q -p no:cacheprovider tests/unit/cli/test_notion_sandbox.py --basetemp /tmp/p60r9sb2/bt`: 345 passed | PASS |
+| Fail-closed | missing libc and empty mountinfo: 64, 0 POSTs. `_fd_on_procfs` does not call mountinfo with `/proc/self/fd/N` | PASS |
+| Mountinfo | `\\040` space mount refused. Later short proc line does not win | PASS |
+| tmpfs `/proc` | `test_literal_proc_is_refused_when_fstype_is_tmpfs`: 64, 0 POSTs, `/proc/ev_p60.json` absent | PASS |
+| Walk | K=16 accepted. Cycle refused. Unique-limit 8 refuses the 16-chain | PASS |
+| ns:456 | helper test: KI after complete file is 69 | PASS |
+| Census | if 218, boolop 72, and 27, or 45, clause 153, ifexp 8, while 3. Total 1204. **1204-row table not run** | PASS (count only) |
+| Named serial mutants | 8 named probes KILLED. 3 SURVIVORS listed in IMPLEMENTATION_LOG. No EQ claim | PARTIAL |
+| Lint and types | `ruff format --check`, `ruff check`, and `pyright` 1.1.411 report 0 errors on the touched modules | PASS |
+| Full local pytest | `uv run --frozen pytest -q -p no:cacheprovider --basetemp /tmp/p60r9all`: 2660 passed, 193 skipped, 12 failed. docker absent. Local-only. CI is the gate | 12 known local docker failures; CI is the gate |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
+## 2026-10-09 — Session 07 sandbox run, round 8
+
+**Verification scope**: Round 8 of the §11 sandbox runner. Reviewer FAIL 5467032904 at `e571b8e7` is folded into this commit. No Verifier verdict had landed on that tip. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. `state_revision` stays 58 | PASS |
+| Sandbox CLI | Still not run live. `uv run --frozen pytest -q -p no:cacheprovider tests/unit/cli/test_notion_sandbox.py --basetemp /tmp/p60r8sb2/bt`: 336 passed | PASS |
+| Procfs by fstype | `test_on_procfs_uses_filesystem_type_not_st_dev`, bind-mount, second procfs, mountinfo fallback: refused when `f_type` is `0x9fa0` or mountinfo fstype is `proc`. No user namespace | PASS |
+| Public survivors | relative `/proc/self/root` symlink 64; cycle bounded and not proc; ordinary-dir ancestor accepted 0; dry-run after-link SIGINT 69 `sandbox interrupted`; `workspace_id` null execute 0 after 5 | PASS |
+| SIG_IGN | hook installs `SIG_IGN` first. 20-run gap-0 at POST:2: `dropped == 0` | PASS |
+| SF / nits | LINK ENOENT after creates 69 with ids; leftover regular tmp log; `_fsync` `from None`; dry-run WRITE:1 gap-0 69 | PASS |
+| Census | if 212, boolop 71, and 26, or 45, clause 151, ifexp 8, while 3. Total 1179. **1179-row table not run; no file-level sum claimed** | PASS (count only) |
+| Named serial mutants | 11 named probes KILLED. 3 probe-backed EQs on the named tests only (`_is_proc`→False, walk-limit if False, except complete-check if False). Listed in IMPLEMENTATION_LOG | PARTIAL |
+| Lint and types | `ruff format --check`, `ruff check`, and `pyright` 1.1.411 report 0 errors on the touched modules | PASS |
+| Full local pytest | `uv run --frozen pytest -q -p no:cacheprovider --basetemp /tmp/p60r8all`: 2651 passed, 193 skipped, 12 failed. The failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because the `docker` binary is absent. Local-only. CI is the gate | 12 known local docker failures; CI is the gate |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
+## 2026-10-09 — Session 07 sandbox run, round 7
+
+**Verification scope**: Round 7 of the §11 sandbox runner. Reviewer FAIL 5465945944 at `8f77434c` is folded into this commit. The Verifier verdict on that tip had not landed. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. `state_revision` stays 58 | PASS |
+| Sandbox CLI | Still not run live. `uv run --frozen pytest -q -p no:cacheprovider tests/unit/cli/test_notion_sandbox.py --basetemp /tmp/p60r7full3`: 320 passed | PASS |
+| `/proc` device + symlink | `test_symlink_to_proc_self_root_is_refused`, `test_symlink_to_proc_self_plus_root_dir_is_refused`: exit 64, 0 calls. `test_under_proc_on_foreign_pid_root_does_not_raise`: True, no `PermissionError`. `test_grandparent_swapped_to_proc_self_root_does_not_write`: 69, no write through the swap | PASS |
+| Leftover tmp | `test_leftover_hostile_tmp_is_refused_before_any_call`: 64, 0 calls. `test_leftover_tmp_symlink_after_creates_exits_69_without_writing_through_it`: 69, canary unchanged | PASS |
+| Gap-0 / double SIGINT | `test_gap0_sigint_at_post2_prints_ids`: ids on stderr, `after >= 1`. `test_double_sigint_at_50ms_exits_69`: 69, not -2 | PASS |
+| SF5 / SF6 / space | write errno after creates 69 with ids; dest appearing mid-run 69 with ids; malformed space refused | PASS |
+| Census | if 190, boolop 65, and 25, or 40, clause 138, ifexp 8, while 4. Total 1069. **1069-row table not run; no file-level sum claimed** | PASS (count only) |
+| Named serial mutants | 12 named probes KILLED (including 3 timeouts 137). 4 probe-backed EQs listed in IMPLEMENTATION_LOG | PARTIAL |
+| Lint and types | `ruff format --check`, `ruff check`, and `pyright` 1.1.411 report 0 errors on the touched modules | PASS |
+| Full local pytest | `uv run --frozen pytest -q -p no:cacheprovider --basetemp /tmp/p60r7all`: 2635 passed, 193 skipped, 12 failed. The failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because the `docker` binary is absent. Local-only. CI is the gate | 12 known local docker failures; CI is the gate |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
+## 2026-10-09 — Session 07 sandbox run, round 6
+
+**Verification scope**: Round 6 of the §11 sandbox runner. Reviewer FAIL 5465433904 and Verifier FAIL 6073572255 at `bcf9a36c` are folded into this commit series. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. `state_revision` stays 58 | PASS |
+| Sandbox CLI | Still not run live. `tests/unit/cli/test_notion_sandbox.py`: 300 passed. Parent `bcf9a36c` CI verify run `37871343909`, job `113629916678`, SUCCESS. This commit's CI is not invented here | PASS |
+| Census | if 164, boolop 57, and 23, or 34, clause 121, ifexp 8, while 3. Total mutations 931. **931-row table not re-run; no file-level sum claimed** | PASS (count only) |
+| Named serial mutants | Replacement ifs for the 8 `bcf9a36c` survivors, `under_proc` prefix walk, leftover tmp, EEXIST, and all 10 remaining `notion_sandbox.py` IfExp T/F mutants: each KILLED. Two probe-backed EQs: first `under_proc` check only, and `//` collapse only | PASS |
+| `//proc` and symlink | `test_leading_double_slash_proc_path_is_refused`, `test_symlink_to_proc_is_refused`: exit 64, 0 network | PASS |
+| Gap-0 SIGINT / EEXIST | `test_tmp_eexist_after_creates_exits_69_with_ids`, `test_interrupt_during_tmp_unlink_keeps_ids`, `test_leftover_tmp_is_replaced`: exit 69 with ids, not 64 | PASS |
+| Lint and types | `ruff format --check`, `ruff check`, and `pyright` 1.1.411 report 0 errors on the touched modules | PASS |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
+## 2026-10-09 — Session 07 sandbox run, round 5
+
+**Verification scope**: Round 5 of the §11 sandbox runner. The round-4 Reviewer FAIL, the round-4 Verifier FAIL, and CodeRabbit's CHANGES_REQUESTED at `69a2b421` are folded into this commit. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. `state_revision` stays 58. `origin/build/full-automation` is still that SHA | PASS |
+| Sandbox CLI | Still not run live. `tests/unit/cli/test_notion_sandbox.py`: 291 passed. Parent `69a2b421` CI verify run `37786526950`, job `113342585729`, SUCCESS. This commit's CI is not invented here | PASS |
+| Census | if 156, boolop 55, and 23, or 32, clause 117, ifexp 14, while 3. Mutations: if-flip 156, force-true 156, force-false 156, operator swap 55, clause negation 117, literal clause True/False 234, ifexp True/False 28, while-flip 3. Total 905 | PASS |
+| Mutation sweep (PARTIAL) | **The final-tree sweep is PARTIAL.** It was stopped at 07:43 (UTC+7) so this round would not block on it. `notion_sandbox.py` is COMPLETE: 213 of 213 mutations, 213 killed, 0 survived, 0 timeouts, Failed sum 6371 (if-flip 32 rows, 32 killed, Failed sum 1475; force-true 32 rows, 32 killed, Failed sum 1157; force-false 32 rows, 32 killed, Failed sum 458; operator swap 13 rows, 13 killed, Failed sum 223; clause negation 28 rows, 28 killed, Failed sum 1221; literal clause True/False 56 rows, 56 killed, Failed sum 1385; ifexp True/False 20 rows, 20 killed, Failed sum 452; while-flip 0 rows, 0 killed, Failed sum 0). `notion_sandbox_guard.py` is PARTIAL: 71 of 286 mutations finished (force_false 12, force_true 12, if 12, negate 10, operand 20, swap 5), 71 killed, 0 survived, Failed sum 2848. Those rows come from the worker log, which has no first-failing-test column. `notion_sandbox_live.py` (225 mutations) and `notion_sandbox_pipeline.py` (181) were NOT swept on this tree. Run so far: 284 of 905 mutations, 284 killed, 0 survived, 0 timeouts, Failed sum 9219. 621 mutations are not run and carry no claim. | PARTIAL: `notion_sandbox.py` complete, guard partial, live and pipeline not run |
+| SIGINT keeps passed stages | `test_real_sigint_during_the_evidence_write_leaves_a_complete_file`, `test_one_interrupt_during_the_evidence_write_keeps_passed_stages`, `test_interrupt_in_asyncio_teardown_keeps_passed_stages`, `test_interrupted_rows_keep_finished_stages`: build and variants stay `PASS`, exit 69, every id kept | PASS |
+| Repeated SIGINT | `test_repeated_sigint_during_the_evidence_write_keeps_one_file`: five real SIGINTs, exit 69, one complete file, handler restored | PASS |
+| Freshness bounds | `test_created_time_bounds_are_exact`: `11:58:00Z` and `12:02:37Z` accepted, `11:57:59Z`, `12:02:38Z`, and +1 day refused. `test_future_created_time_is_refused_end_to_end` exits 69 | PASS |
+| False equivalents killed | guard `:355` (now `:352`) force-false, swap, operand 3: `test_proc_alias_of_a_real_directory_is_refused`. pipeline `:200` (now `:205`) force-false: `test_interrupt_while_aligning_keeps_the_created_id`. guard `:462` (now `:460`) force-true: `test_temporary_evidence_fd_is_closed` | PASS |
+| Lint and types | `ruff format --check`, `ruff check`, and `pyright` 1.1.411 report 0 errors | PASS |
+| Full local pytest | 2811 collected, 2606 passed, 193 skipped, 12 failed. The failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because the `docker` binary is absent. Local-only. CI is the gate | 12 known local docker failures; CI is the gate |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
+## 2026-10-08 — Session 07 sandbox run, round 4
+
+**Verification scope**: Round 4 of the §11 sandbox runner. Reviewer FAIL at `9cf574c0` and Verifier FAIL at the same SHA are folded into this commit. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `completed_sessions` `[0, 1, 2, 3, 4, 5, 6]`, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. It is not this commit. `state_revision` stays 58. `origin/build/full-automation` was fetched and is still that SHA | PASS |
+| Sandbox CLI | Still not run live. `tests/unit/cli/test_notion_sandbox.py`: 231 passed. Parent `9cf574c0` CI verify run `37718039964`, job `113118993744`, SUCCESS. This commit's CI is not invented here | PASS |
+| Census | One AST walk of the four sandbox modules, in source order. if 159, boolop 63, and 26, or 37, clause 141, ifexp 16, while 3. If-flip is one row per `if` (159). Operand rows are one swap per boolop plus one negation per clause (204). Total mutations 681 | PASS |
+| If-flip | 159 rows, 159 killed, 0 equivalent. Failed column sums to 5924. `__name__ == "__main__"` is row 33, `notion_sandbox.py:762`, KILLED, Failed 1. The second `if leaks(text, token)` is row 68, `notion_sandbox_guard.py:336`, Failed 3. The full table is in `IMPLEMENTATION_LOG.md` | PASS |
+| Force-true | 159 rows, 154 killed, 5 equivalent, Failed sum 5320. The five equivalents are probe-backed in the log | PASS |
+| Force-false | 159 rows, 156 killed, 3 equivalent, Failed sum 813 | PASS |
+| Boolean operands | 204 rows, 200 killed, 4 equivalent, Failed sum 5824 | PASS |
+| Real SIGINT | `test_real_sigint_records_created_ids` keeps the ids created before stops `2` and `5`. `test_real_sigint_during_the_evidence_write_leaves_a_complete_file` leaves a complete file. `test_real_sigint_preserves_a_passing_stage` keeps build `PASS`. Exit 69. Return code is not `-2` | PASS |
+| Minute floor | `test_off_minute_clock_accepts_the_same_minute`: clock `12:00:37Z`, created time `12:00:00Z`, exit 0, five ids | PASS |
+| False equivalents killed | guard `:304` `test_percent_and_base64_tokens_are_not_folded_hex`. guard `:336` `test_marker_token_fails_the_redaction_self_check`. guard `:372` `test_unwritable_parent_mode_is_refused_before_open`. pipeline `:203` both mutations `test_later_create_returning_an_earlier_foreign_id_drops_it`. pipeline `:146` `test_drop_keeps_an_earlier_id_and_ignores_a_missing_one`. guard `:509` force-true `test_repo_root_outside_the_checkout_still_uses_the_repo`. guard `:509` swap `test_partial_marker_between_cwd_and_the_repo_is_not_root` | PASS |
+| Lint and types | `ruff format --check`, `ruff check`, and `pyright` 1.1.411 are clean on the four sandbox modules and the sandbox test | PASS |
+| Full local pytest | 2751 collected, 2546 passed, 193 skipped, 12 failed. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because the `docker` binary is absent. Local-only. One `StarletteDeprecationWarning` comes from FastAPI's test client. The sandbox modules do not import Starlette. CI is the gate | 12 known local docker failures; CI is the gate |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
+## 2026-10-07 — Session 07 sandbox run, round 3
+
+**Verification scope**: Round 3 of the §11 sandbox runner. Reviewer FAIL at `6dc72f1e` and Verifier FAIL at the same SHA are folded into this commit. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `completed_sessions` `[0, 1, 2, 3, 4, 5, 6]`, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. It is not this commit. `state_revision` stays 58. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap | PASS |
+| Sandbox CLI | Still not run live. `tests/unit/cli/test_notion_sandbox.py`: 185 passed. Parent `6dc72f1e` CI verify run `37700540263`, job `113062667081`, SUCCESS. This commit's CI is not invented here | PASS |
+| Census | One AST walk of the four sandbox modules, in source order. if 133, boolop 52, and 20, or 32, clause 116, ifexp 11, while 2. If-flip is one row per `if` (133). Operand rows are one swap per boolop plus one negation per clause (168) | PASS |
+| If-flip | 133 rows, 133 killed, 0 equivalent. Failed column sums to 4364. T45 is row 55, `notion_sandbox_guard.py:304`, the second `if leaks(text, token)`, KILLED, Failed 1. Row 54 is the first leaks check, Failed 104. `__name__ == "__main__"` is row 27, `notion_sandbox.py:595`, KILLED, Failed 1 (collection error counted as 1). The full table is in `IMPLEMENTATION_LOG.md` | PASS |
+| Force-true | 133 rows, 128 killed, 5 equivalent, Failed sum 3894 | PASS |
+| Force-false | 133 rows, 125 killed, 8 equivalent, Failed sum 629 | PASS |
+| Boolean operands | 168 rows, 162 killed, 6 equivalent, Failed sum 4460. The six equivalents are probe-backed in the log. None accepts a bad build | PASS |
+| Lint and types | `ruff format --check`, `ruff check`, and `pyright` 1.1.411 are clean on the four sandbox modules and the sandbox test | PASS |
+| Full local pytest | 2705 collected, 2500 passed, 193 skipped, 12 failed. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because the `docker` binary is absent. Local-only. One `StarletteDeprecationWarning` comes from FastAPI's test client. The sandbox modules do not import Starlette. CI is the gate | 12 known local docker failures; CI is the gate |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
+**Status**: Session 07 sandbox-run round 3. The session stays incomplete. This is not SESSION_07 COMPLETE. Exit 78 stays HELD. No session exit code is recorded.
+
+## 2026-10-07 — Session 07 sandbox run tip-sync
+
+**Verification scope**: Tip-sync of the §11 sandbox runner onto the merged W9 squash. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `completed_sessions` `[0, 1, 2, 3, 4, 5, 6]`, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` is the intentional tip-sync to the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. `state_revision` is 58 | PASS |
+| Sandbox CLI | Still not run live. The four sandbox modules are unchanged from `df5413ac6f3df278d91a5bfc28601760931e62af`. That commit's CI verify run is `37698651795`, job `113056508051`, SUCCESS. If-flip: 104 rows, 104 killed, 0 equivalent, Failed sum 2109. T45 is row 54, `notion_sandbox_guard.py:288`, Failed 1 | PASS |
+| Full local pytest | 2630 collected, 2425 passed, 193 skipped, 12 failed. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because the `docker` binary is absent. Local-only. CI is the gate. `ruff format --check`, `ruff check`, and `pyright` 1.1.411 are clean | 12 known local docker failures; CI is the gate |
+| W10 | In flight from `a4e9b025`. It will also bump STATE. Whichever PR merges second re-syncs | NOTED |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
+**Status**: Session 07 sandbox-run tip-sync. The session stays incomplete. This is not SESSION_07 COMPLETE. Exit 78 stays HELD. No session exit code is recorded.
+
 ## 2026-10-07 — Session 07 W10: fact ledger and workflow link
 
 **Verification scope**: Fixture-only fact ledger and workflow link over the W9 QA checkpoint. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Postgres, Alembic, pnpm, and Compose were not required for this slice and were not run.
