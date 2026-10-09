@@ -1,5 +1,26 @@
 # Test Evidence
 
+## 2026-10-09 — Session 07 W11: QA coverage matrix and crash-resume repairs
+
+**Verification scope**: Fixture-only QA coverage and crash-resume repair retention. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Round 2 sets `IMPLEMENTATION_STATE.json` revision 60 and `head_sha` `6575c567fcadde636846131f98d7599067babb66`.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, revision 60, `head_sha` `6575c567fcadde636846131f98d7599067babb66`, twelve evidence keys stay false. This is not SESSION_07 COMPLETE | PASS |
+| Home contract deletions | `test_deleted_home_contract_is_blocked`, 14 cases. On `4b899fcf` each verdict was `PASS`. On this tree each is `BLOCKED`, repairs `()`, proof `""`, adapter writes `[]`, `repair_jobs` `[]` | PASS for this slice |
+| Crash-resume repair job | `test_crash_resume_keeps_the_earlier_repair_job`. On `4b899fcf` the stored jobs were `[]`. On this tree the job is `qa_repair` / `qa.repair` / `qa` / `published` before resume, and the resume keeps that one job with repairs `("published",)` and 0 further adapter writes | PASS for this slice |
+| Crash between repairs | `test_crash_between_repairs_keeps_the_published_job`. On `4b899fcf` the stored `qa_repair` jobs were `[]`. On this tree `published` is stored before resume and the resume still lists it | PASS for this slice |
+| Package errors outside the old fixed set | `test_package_error_outside_the_old_fixed_set_is_local` for `ValueError` and `RuntimeError`. On `4b899fcf` both were `provider operation failed`. On this tree both are `qa failed in local code` and the checkpoint bytes are unchanged | PASS for this slice |
+| GeneratorExit subclass | `test_generator_exit_subclass_becomes_the_builtin`. Passes on `4b899fcf` and on this tip. Kills `notion_progress.py:182` `return type(error)()` | PASS on stock; kills the mutant |
+| int-subclass SystemExit | `test_system_exit_drops_an_int_subclass_code`. Passes on `4b899fcf` and on this tip. Kills `notion_progress.py:185` `isinstance(code, int)` | PASS on stock; kills the mutant |
+| ExceptionGroup of Exceptions | `test_exception_group_of_only_exceptions_is_a_local_read_failure`. Passes on `4b899fcf` and on this tip. Kills ledger `:243` and `:245` | PASS on stock; kills both mutants |
+| `from None` | Closed. Ledger test line 4561 and QA test line 2547 assert `__suppress_context__ is True`. Both pass on `4b899fcf` | CLOSED |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+| Full local pytest | `uv run pytest -q --tb=line` on this tip: 12 failed, 3236 passed, 193 skipped, 1 warning, 363.34s. Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` for the `docker` binary. Pre-existing | 12 known local docker failures |
+| Lint and types | `uv run ruff format --check .` exit 0, 336 files already formatted. `uv run ruff check .` exit 0, all checks passed. `uv run pyright` 1.1.411, strict, exit 0, 0 errors, 0 warnings, 0 informations | PASS |
+
+**Status**: Session 07 Wave 11. The session stays incomplete. This is not SESSION_07 COMPLETE. Exit 78 stays HELD.
+
 ## 2026-10-09 — Session 07 sandbox run, round 12 (re-sync onto the W10 squash)
 
 **Verification scope**: Round 12 of the §11 sandbox runner. One merge commit brings `build/full-automation` at `4b899fcf` (W10, #61) into this branch at `efea4297`. Verifier 6080655092 (FAIL at `efea4297`, text only) and Reviewer 5469709536 nits are folded in. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift.

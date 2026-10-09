@@ -20,6 +20,7 @@ import pytest
 from money_machine.agents.implementations import notion_fact_ledger as ledger_module
 from money_machine.agents.implementations import notion_progress as progress_module
 from money_machine.agents.implementations import notion_qa as qa_module
+from money_machine.agents.implementations.notion_dashboard import identity_callout
 from money_machine.agents.implementations.notion_fact_ledger import (
     PHASE_TEST_MATRIX,
     run_fact_ledger,
@@ -2818,6 +2819,8 @@ async def test_edited_hub_prose_is_blocked_not_self_compared(
             else spec.flagship_feature,
         }
     )
+    if role == "buyer":
+        _set_identity_callout(probe, stored.page_id, identity_callout(derived))
     assert await live_qa_passed(probe, stored, derived) is True
     calls = watch_adapter_writes(probe)
 
@@ -4011,6 +4014,20 @@ async def test_plain_subclass_formula_name_is_refused(tmp_path: Path) -> None:
         read_dashboard(probe, mutated, spec)
 
 
+def _set_identity_callout(probe: FixtureNotionAdapter, page_id: str, content: str) -> None:
+    """Point the home identity callout at this spec. Buyer text lives in that callout."""
+    prefix = content.split(":", 1)[0] + ":"
+    matches = [
+        block
+        for block in probe.blocks.values()
+        if type(block) is NotionCalloutBlock
+        and block.parent_id == page_id
+        and block.content.startswith(prefix)
+    ]
+    assert len(matches) == 1
+    matches[0].content = content
+
+
 def _align_live_sections(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> None:
@@ -4018,6 +4035,7 @@ def _align_live_sections(
         for role in ("purpose", "practice", "buyer"):
             block = _role_block(probe, stored, index, role)
             block.content = section_content(spec, hub.name, role)
+    _set_identity_callout(probe, stored.page_id, identity_callout(spec))
 
 
 def _prose_caller(spec: ProductSpec, kind: str) -> ProductSpec:
@@ -4540,7 +4558,38 @@ async def test_interrupt_keeps_its_kind_and_drops_the_secret(
     assert error.args == args
     assert error.__cause__ is None
     assert error.__context__ is None
+    assert error.__suppress_context__ is True
     assert getattr(error, "__notes__", None) is None
+    assert _secret_reachable(error) == []
+    assert path.read_bytes() == raw
+    assert _jobs(path) == []
+
+
+@pytest.mark.asyncio
+async def test_exception_group_of_only_exceptions_is_a_local_read_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An ExceptionGroup of Exceptions is a local read failure, not a provider job.
+
+    Adding ExceptionGroup to the provider tuple (ledger:243) would report
+    provider read failed. Re-raising the group from the Exception handler
+    (ledger:245) would not be a ProductBuildError.
+    """
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+
+    async def _boom(*_args: object, **_kwargs: object) -> bool:
+        raise ExceptionGroup(SECRET, [RuntimeError(SECRET), ValueError(SECRET)])
+
+    monkeypatch.setattr(ledger_module, "live_qa_passed", _boom)
+    with pytest.raises(ProductBuildError) as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    error = caught.value
+    assert type(error) is ProductBuildError
+    assert error.args == ("fact ledger read failed",)
+    assert error.__cause__ is None
+    assert error.__context__ is None
+    assert SECRET not in str(error)
     assert _secret_reachable(error) == []
     assert path.read_bytes() == raw
     assert _jobs(path) == []
@@ -4940,6 +4989,43 @@ def test_clean_interrupt_always_gives_the_built_in_base(
     assert getattr(error, "__notes__", None) is None
     assert vars(error) == {}
     assert _secret_reachable(error) == []
+
+
+class _SecretCode(int):
+    """An int subclass. type(code) is int is false; isinstance(code, int) is true."""
+
+    def __repr__(self) -> str:
+        return SECRET
+
+
+def test_generator_exit_subclass_becomes_the_builtin() -> None:
+    """progress:182 returns the built-in GeneratorExit, not the caller's subclass."""
+    kind = cast(
+        type[BaseException],
+        type(SECRET, (GeneratorExit,), {"__module__": SECRET, "__qualname__": SECRET}),
+    )
+    cleaned = progress_module.clean_interrupt(kind(), "provider operation failed")
+    assert type(cleaned) is GeneratorExit
+    assert cleaned.args == ()
+    assert cleaned.__cause__ is None
+    assert cleaned.__context__ is None
+    assert type(cleaned).__module__ == "builtins"
+    assert type(cleaned).__qualname__ == "GeneratorExit"
+    assert SECRET not in repr(type(cleaned))
+    assert SECRET not in repr(cleaned)
+
+
+def test_system_exit_drops_an_int_subclass_code() -> None:
+    """progress:185 keeps a code only when type(code) is int."""
+    cleaned = progress_module.clean_interrupt(
+        SystemExit(_SecretCode(7)), "provider operation failed"
+    )
+    assert type(cleaned) is SystemExit
+    assert isinstance(cleaned, SystemExit)
+    assert type(cleaned.code) is int
+    assert cleaned.code == 1
+    assert cleaned.args == (1,)
+    assert SECRET not in repr(cleaned)
 
 
 @pytest.mark.parametrize(

@@ -21,7 +21,19 @@ from money_machine.agents.implementations.notion_aesthetics import (
     hub_cover,
     hub_icon,
 )
-from money_machine.agents.implementations.notion_hubs import section_content
+from money_machine.agents.implementations.notion_dashboard import (
+    identity_callout,
+)
+from money_machine.agents.implementations.notion_dashboard import (
+    navigation_content as home_navigation_content,
+)
+from money_machine.agents.implementations.notion_hubs import (
+    navigation_content as hub_navigation_content,
+)
+from money_machine.agents.implementations.notion_hubs import (
+    section_content,
+)
+from money_machine.agents.implementations.notion_linked_views import view_matches
 from money_machine.agents.implementations.notion_product_builder import (
     BUILD_PHASES,
     SPEC_ID_PROPERTY,
@@ -45,6 +57,8 @@ from money_machine.agents.implementations.notion_progress import (
     load_payload,
     raise_recorded,
     raised_in_package,
+    record_applied_repairs,
+    stored_qa_repair_names,
 )
 from money_machine.agents.implementations.notion_progress_record import write_checkpoint
 from money_machine.agents.implementations.notion_shared_databases import shared_database_kinds
@@ -56,6 +70,7 @@ from money_machine.agents.implementations.notion_variants import (
 )
 from money_machine.domain.models.product_spec import ProductSpec
 from money_machine.integrations.notion.domain import (
+    NotionCalloutBlock,
     NotionDatabase,
     NotionFormula,
     NotionLinkedView,
@@ -70,14 +85,18 @@ from money_machine.integrations.notion.formulas import (
     compile_formula,
     generate_notification_dashboard_formulas,
 )
+from money_machine.integrations.notion.relations import (
+    CanonicalDatabase,
+    CanonicalDatabases,
+    dashboard_today_view,
+    monthly_calendar,
+    quick_notes,
+)
 from money_machine.integrations.notion.schema_builder import schema_definitions
 
 PHASE_FACT_LEDGER = "fact_ledger"
 _QA_PROVIDER_FAILED = "provider operation failed"
 _QA_LOCAL_FAILED = "qa failed in local code"
-# Errors that only a bug raises. A provider's own TypeError still counts as
-# a provider error, because the innermost frame decides (raised_in_package).
-_CODE_ERRORS = (TypeError, AttributeError, NameError, AssertionError, LookupError)
 _QA_KEY = "qa"
 _NOTIFICATION_TITLE = "Notification dashboard"
 _SECTION_ROLES = ("purpose", "practice", "buyer")
@@ -133,8 +152,12 @@ async def run_product_qa(
         plan = await _plan(fixture, stored, validated)
         repairs: tuple[str, ...] = ()
         if not plan.blocked and plan.repairs:
-            repairs = await _apply_repairs(fixture, stored, plan.repairs)
+            repairs = await _apply_repairs(fixture, stored, plan.repairs, path)
+            # Each name was stored as its write returned. This call only
+            # fills a name that the loop returned and had not stored yet.
+            record_applied_repairs(path, repairs)
             plan = await _plan(fixture, stored, validated)
+        repairs = tuple(dict.fromkeys((*stored_qa_repair_names(path), *repairs)))
         if plan.blocked or plan.repairs:
             verdict = "BLOCKED"
             proof = ""
@@ -182,8 +205,15 @@ def _own_refusal(error: ProductBuildError) -> bool:
 
 
 def _local_bug(error: Exception) -> bool:
-    """True for a programming error raised by package code, not by a provider."""
-    return isinstance(error, _CODE_ERRORS) and raised_in_package(error)
+    """True when package code raised this, and it is not a provider failure.
+
+    The innermost frame decides. A provider TypeError, ValueError, or
+    RuntimeError stays a provider job. ProviderFailure is raised inside this
+    package and stays a provider job too.
+    """
+    if isinstance(error, ProviderFailure):
+        return False
+    return raised_in_package(error)
 
 
 def load_qa_record(path: Path) -> QaRecord | None:
@@ -449,7 +479,7 @@ def _hubs_present(
 
 
 def _linked_views(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -> bool:
-    """True when each hub's linked views resolve."""
+    """True when each hub view and each home view resolves."""
     by_kind = dict(stored.database_ids)
     for hub in stored.identity_hubs:
         for slug, view_id in hub.views:
@@ -459,6 +489,28 @@ def _linked_views(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -
                 return False
             if view.source_database_id != by_kind[kind] or view.parent_page_id != hub.page_id:
                 return False
+    return _home_linked_views(probe, stored)
+
+
+def _home_linked_views(probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint) -> bool:
+    """True when home has one Today, one Quick notes, and one Month when Events exist."""
+    kinds = tuple(kind for kind, _database_id in stored.database_ids)
+    by_kind = dict(stored.database_ids)
+    try:
+        canonical = CanonicalDatabases(
+            data_types=kinds,
+            by_type={kind: CanonicalDatabase(data_type=kind) for kind in kinds},
+        )
+        planned = [dashboard_today_view(canonical)]
+        if "Events" in by_kind:
+            planned.append(monthly_calendar(canonical))
+        planned.append(quick_notes(canonical))
+    except SchemaBuilderError:
+        return False
+    for view in planned:
+        source = by_kind.get(view.data_type)
+        if type(source) is not str or len(view_matches(probe, stored.page_id, source, view)) != 1:
+            return False
     return True
 
 
@@ -738,13 +790,23 @@ def _palette(
         ]
         if len(accents) != 1 or len(samples) != 1:
             return False
+    for token in tokens:
+        home = [
+            block
+            for block in probe.blocks.values()
+            if type(block) is NotionCalloutBlock
+            and block.parent_id == stored.page_id
+            and block.content == accent_content(token.name, token.hex)
+        ]
+        if len(home) != 1:
+            return False
     return True
 
 
 def _teardown(
     probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
 ) -> bool:
-    """True when hub prose still matches the spec."""
+    """True when hub prose, the home nav, the identity callout, and hub returns match."""
     if not spec.evidence:
         return False
     for hub in stored.identity_hubs:
@@ -758,7 +820,33 @@ def _teardown(
             )
             if not found:
                 return False
+    if not _one_text(probe, stored.page_id, home_navigation_content(spec)):
+        return False
+    identity = [
+        block
+        for block in probe.blocks.values()
+        if type(block) is NotionCalloutBlock
+        and block.parent_id == stored.page_id
+        and block.content == identity_callout(spec)
+    ]
+    if len(identity) != 1:
+        return False
+    for hub in stored.identity_hubs:
+        if not _one_text(probe, hub.page_id, hub_navigation_content(spec, hub.name)):
+            return False
     return True
+
+
+def _one_text(probe: FixtureNotionAdapter, parent_id: str, content: str) -> bool:
+    """True when that parent has exactly one text block with this content."""
+    found = [
+        block
+        for block in probe.blocks.values()
+        if type(block) is NotionTextBlock
+        and block.parent_id == parent_id
+        and block.content == content
+    ]
+    return len(found) == 1
 
 
 def _facts_persisted(
@@ -885,10 +973,13 @@ async def _apply_repairs(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
     repairs: tuple[str, ...],
+    path: Path,
 ) -> tuple[str, ...]:
     """Apply repairable flags. A publish that is not trusted stops the rest.
 
-    The returned names are the repairs whose adapter call ran, including a
+    Each repair is stored as soon as its adapter call returns, before the next
+    repair runs. A later crash keeps every earlier completed repair. The
+    returned names are the repairs whose adapter call ran, including a
     publish that wrote and then failed the trusted-link check.
     """
     guard_operation(probe, OP_QA)
@@ -898,14 +989,17 @@ async def _apply_repairs(
         if "published" in repairs and page.is_published is not True:
             page = await probe.publish_page(page.id)
             done.append("published")
+            record_applied_repairs(path, ("published",))
             if page.is_published is not True or not _is_trusted_link(page.public_url, page.id):
                 return tuple(dict.fromkeys(done))
         if "duplicate_button" in repairs and page.duplicate_as_template is not True:
             page = await probe.set_duplicate_as_template(page.id, True)
             done.append("duplicate_button")
+            record_applied_repairs(path, ("duplicate_button",))
         if "search_indexing" in repairs and page.search_indexing is not False:
             await probe.set_search_indexing(page.id, False)
             done.append("search_indexing")
+            record_applied_repairs(path, ("search_indexing",))
     return tuple(dict.fromkeys(done))
 
 
