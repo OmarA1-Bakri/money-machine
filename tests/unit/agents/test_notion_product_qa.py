@@ -2746,6 +2746,52 @@ async def test_crash_resume_keeps_the_earlier_repair_job(tmp_path: Path) -> None
     assert resumed_jobs == jobs
 
 
+@pytest.mark.asyncio
+async def test_crash_between_repairs_keeps_the_published_job(tmp_path: Path) -> None:
+    """A publish that wrote stays stored when the next repair in that run raises."""
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    await probe.unpublish_page(page.id)
+    page.duplicate_as_template = False
+    original = probe.set_duplicate_as_template
+
+    async def _boom(page_id: str, enabled: bool) -> NotionPage:
+        del page_id, enabled
+        raise ConnectionError("sk-live-secret")
+
+    probe.set_duplicate_as_template = _boom  # type: ignore[method-assign]
+    with pytest.raises(ProductBuildError) as caught:
+        await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    probe.set_duplicate_as_template = original  # type: ignore[method-assign]
+
+    assert caught.value.args == ("provider operation failed",)
+    assert caught.value.__context__ is None
+    assert "sk-live-secret" not in _every_text(caught.value)
+    crashed = json.loads(path.read_text(encoding="ascii"))
+    jobs = [job for job in crashed["progress"]["repair_jobs"] if job["kind"] == "qa_repair"]
+    assert jobs == [
+        {
+            "kind": "qa_repair",
+            "operation": "qa.repair",
+            "phase": "qa",
+            "response": "published",
+        }
+    ]
+    assert "sk-live-secret" not in path.read_text(encoding="ascii")
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "PASS"
+    assert "published" in checkpoint.qa.repairs
+    resumed = json.loads(path.read_text(encoding="ascii"))
+    resumed_names = [
+        job["response"] for job in resumed["progress"]["repair_jobs"] if job["kind"] == "qa_repair"
+    ]
+    assert resumed_names[0] == "published"
+    assert "published" in resumed_names
+
+
 def _raiser_in_package(error_type: type[Exception]) -> Callable[..., None]:
     """Raise from a frame whose module name is the QA package."""
     namespace: dict[str, object] = {

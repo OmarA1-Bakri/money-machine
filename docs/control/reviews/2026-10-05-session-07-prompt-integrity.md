@@ -694,3 +694,5 @@ The prompt file is unchanged. SHA-256 `d52011a6f0b725b16427629dc664cfc9f3432c4b5
 | Section 11 test matrix and live sandbox | Later wave, and explicit authorization for the sandbox | S-01. Narrative next phase stays `test_matrix`, not started |
 | Action 12 commissioning | Operator decision after full implementation | S-02 |
 | Twelve evidence keys and STATE revision 59 | After the other revision-59 change merges | This wave does not edit `IMPLEMENTATION_STATE.json` |
+
+Round 2 (2026-10-09): #60 merged as `6575c567fcadde636846131f98d7599067babb66` and took revision 59. The final commit of this wave takes revision 60 and sets `head_sha` to that commit. It is the tip-sync pointer, not this commit. Twelve evidence keys stay false. `commissioned_agents` stays empty. `session_status` stays incomplete. The prompt file is still unchanged. The hash above is unchanged.

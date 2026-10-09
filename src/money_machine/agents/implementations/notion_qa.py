@@ -152,9 +152,9 @@ async def run_product_qa(
         plan = await _plan(fixture, stored, validated)
         repairs: tuple[str, ...] = ()
         if not plan.blocked and plan.repairs:
-            repairs = await _apply_repairs(fixture, stored, plan.repairs)
-            # The job is written before the QA checkpoint. A crash in that
-            # later write must still leave the repair on the progress record.
+            repairs = await _apply_repairs(fixture, stored, plan.repairs, path)
+            # Each name was stored as its write returned. This call only
+            # fills a name that the loop returned and had not stored yet.
             record_applied_repairs(path, repairs)
             plan = await _plan(fixture, stored, validated)
         repairs = tuple(dict.fromkeys((*stored_qa_repair_names(path), *repairs)))
@@ -973,10 +973,13 @@ async def _apply_repairs(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
     repairs: tuple[str, ...],
+    path: Path,
 ) -> tuple[str, ...]:
     """Apply repairable flags. A publish that is not trusted stops the rest.
 
-    The returned names are the repairs whose adapter call ran, including a
+    Each repair is stored as soon as its adapter call returns, before the next
+    repair runs. A later crash keeps every earlier completed repair. The
+    returned names are the repairs whose adapter call ran, including a
     publish that wrote and then failed the trusted-link check.
     """
     guard_operation(probe, OP_QA)
@@ -986,14 +989,17 @@ async def _apply_repairs(
         if "published" in repairs and page.is_published is not True:
             page = await probe.publish_page(page.id)
             done.append("published")
+            record_applied_repairs(path, ("published",))
             if page.is_published is not True or not _is_trusted_link(page.public_url, page.id):
                 return tuple(dict.fromkeys(done))
         if "duplicate_button" in repairs and page.duplicate_as_template is not True:
             page = await probe.set_duplicate_as_template(page.id, True)
             done.append("duplicate_button")
+            record_applied_repairs(path, ("duplicate_button",))
         if "search_indexing" in repairs and page.search_indexing is not False:
             await probe.set_search_indexing(page.id, False)
             done.append("search_indexing")
+            record_applied_repairs(path, ("search_indexing",))
     return tuple(dict.fromkeys(done))
 
 

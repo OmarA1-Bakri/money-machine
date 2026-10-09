@@ -1338,7 +1338,7 @@ Blocker to test.
 
 ## 2026-10-09 — Session 07 W11: QA coverage matrix and crash-resume repairs
 
-Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. State revision stays 58. `IMPLEMENTATION_STATE.json` is not edited. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. STATE `head_sha` stays `a4e9b025021b4effbb2b2879c1db756403cb1676`. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. Twelve session 7 evidence keys stay false. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. Exit 78 stays HELD. Narrative `next_phase` stays `test_matrix` and is not started.
+Session 07 stays incomplete. This wave is not SESSION_07 COMPLETE. Round 2 merges `6575c567` (#60, revision 59) and takes revision 60. STATE `head_sha` is `6575c567fcadde636846131f98d7599067babb66`. It is the tip-sync pointer. It is not this commit. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. Twelve session 7 evidence keys stay false. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. Exit 78 stays HELD. Narrative `next_phase` stays `test_matrix` and is not started.
 
 Prompt integrity is the Wave 11 addendum in `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md`. The prompt file is unchanged. SHA-256 `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`.
 
@@ -1349,9 +1349,21 @@ Fixtures only. No live Notion, no Etsy, no `--execute`.
 - Local bugs. `_local_bug` (`notion_qa.py:207`) is any in-package `Exception` except `ProviderFailure`. The fixed `_CODE_ERRORS` tuple is gone. `test_package_error_outside_the_old_fixed_set_is_local` raises `ValueError` and `RuntimeError` from a frame named as this package. A provider `TypeError` is still one provider job.
 - On `4b899fcf`, with these tests and the W10 sources, those 17 tests failed: 14 verdicts were `PASS`, the crash left `repair_jobs` `[]`, and both package errors were `provider operation failed`. On this tree the same 17 passed.
 
-`__suppress_context__ is True` was added to the existing interrupt tests that go through `raise escaped from None` at `notion_fact_ledger.py:254` and `notion_qa.py:189`. That assertion passes on `4b899fcf` because `from None` is already there. It is not one of the 17 fail-on-base tests. No mutation sweep was run.
+`from None` at `notion_fact_ledger.py:254` and `notion_qa.py:189` is closed. It is killed by `test_interrupt_keeps_its_kind_and_drops_the_secret` (`__suppress_context__ is True` at line 4561) and `test_provider_interrupt_in_qa_becomes_its_built_in_base` (line 2547). Those assertions pass on `4b899fcf` because `from None` is already there.
 
-Verification on this tip: `uv run pytest -q --tb=line` was 12 failed, 2876 passed, 193 skipped, 1 warning, 346.98s. The 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. `uv run ruff format --check .` exit 0, 331 files already formatted. `uv run ruff check .` exit 0. `uv run pyright` 1.1.411 strict, 0 errors, 0 warnings, 0 informations.
+Round 2 stores each repair inside `_apply_repairs` as soon as that adapter call returns, before the next repair. `test_crash_between_repairs_keeps_the_published_job` publishes, then `set_duplicate_as_template` raises `ConnectionError`. The stored `qa_repair` jobs are `published` before resume, and the resume still lists `published`. On `4b899fcf` those jobs were `[]`.
+
+Hand mutants, one pytest each, then the file restored. No sweep.
+
+- `test_generator_exit_subclass_becomes_the_builtin` kills `notion_progress.py:182` `return type(error)()`. The type was `sk-live-secret`, not `GeneratorExit`.
+- `test_system_exit_drops_an_int_subclass_code` kills `notion_progress.py:185` `isinstance(code, int)`. The code type was `_SecretCode`, not `int`.
+- `test_exception_group_of_only_exceptions_is_a_local_read_failure` kills `notion_fact_ledger.py:243` with `ExceptionGroup` added to the provider tuple (`provider read failed`) and `:245` re-raising the group (`ExceptionGroup: sk-live-secret`).
+
+Those three pins passed on the `4b899fcf` sources and on this tip. They are not fail-on-base tests.
+
+Parked: `notion_qa.py:143` and `:154` operand survivors, six equivalents. `_prose_digest` join collision and query-string forms. D-0029 QA-rerun limit on a caller mismatch.
+
+Verification on this tip: `uv run pytest -q --tb=line` was 12 failed, 3236 passed, 193 skipped, 1 warning, 363.34s. The 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. `uv run ruff format --check .` exit 0, 336 files already formatted. `uv run ruff check .` exit 0. `uv run pyright` 1.1.411 strict, 0 errors, 0 warnings, 0 informations.
 
 ## 2026-10-07 — Session 07 sandbox run, round 3
 
