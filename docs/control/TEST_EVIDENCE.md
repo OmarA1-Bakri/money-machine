@@ -17,6 +17,7 @@
 | Census | if 190, boolop 65, and 25, or 40, clause 138, ifexp 8, while 4. Total 1069. **1069-row table not run; no file-level sum claimed** | PASS (count only) |
 | Named serial mutants | 12 named probes KILLED (including 3 timeouts 137). 4 probe-backed EQs listed in IMPLEMENTATION_LOG | PARTIAL |
 | Lint and types | `ruff format --check`, `ruff check`, and `pyright` 1.1.411 report 0 errors on the touched modules | PASS |
+| Full local pytest | `uv run --frozen pytest -q -p no:cacheprovider --basetemp /tmp/p60r7all`: 2635 passed, 193 skipped, 12 failed. The failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because the `docker` binary is absent. Local-only. CI is the gate | 12 known local docker failures; CI is the gate |
 | Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
 
 ## 2026-10-09 — Session 07 sandbox run, round 6

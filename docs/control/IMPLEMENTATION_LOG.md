@@ -46,7 +46,7 @@ Probe-backed equivalents. Both versions produced the same output on the named te
 - `_tmp_kind` `S_ISLNK` force-false alone (falls through to `"other"`). Hostile leftover is still refused. 4 passed.
 - `_scrub_hex` `nxt <= index` force-false alone, or `_write_all` `written <= 0` force-false alone. The sibling `steps > limit` bound still raises. 1 passed each.
 
-`tests/unit/cli/test_notion_sandbox.py`: 320 passed. Sockets stay blocked. `ruff format --check`, `ruff check`, and `pyright` 1.1.411 (0 errors) are clean on the four sandbox modules and the sandbox test.
+`tests/unit/cli/test_notion_sandbox.py`: 320 passed. Sockets stay blocked. `ruff format --check`, `ruff check`, and `pyright` 1.1.411 (0 errors) are clean on the four sandbox modules and the sandbox test. Full local pytest: `uv run --frozen pytest -q -p no:cacheprovider --basetemp /tmp/p60r7all`: 2635 passed, 193 skipped, 12 failed. The 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. Local-only. CI is the gate.
 
 ## 2026-10-09 — Session 07 sandbox run, round 6
 
