@@ -1,3 +1,53 @@
+## 2026-10-09 — Session 07 sandbox run, round 7
+
+Not a session close. This is not SESSION_07 COMPLETE. `state_revision` stays 58. `IMPLEMENTATION_STATE.json` is not edited. `head_sha` stays the W9 squash `a4e9b025021b4effbb2b2879c1db756403cb1676`. Twelve session 7 evidence keys stay false. `commissioned_agents` stays empty. Exit 78 stays HELD. The §11 sandbox CLI is still not run live. This commit's CI run is not invented here. Verifier verdict on `8f77434c` had not landed when this round was written.
+
+Round 7 answers Reviewer 5465945944 on tip `8f77434c`. Prompt-integrity addendum: `docs/control/reviews/2026-10-09-session-07-round-7-prompt-integrity.md`.
+
+Blocker to fix to test.
+
+- B1 `/proc` bypass: `under_proc` (`notion_sandbox_guard.py`) walks every lexical and resolved ancestor. It compares `lstat(component).st_dev` to `lstat('/proc').st_dev`, checks the `/proc` name, and follows symlink targets. `realpath('/proc/self/root')` is `/` and is no longer the only check. `realpath` `OSError`/`PermissionError` is not a crash. `_refuse_proc_write` re-checks immediately before `os.open`, `_write_all`, and `os.link`. Tests: `test_symlink_to_proc_self_root_is_refused`, `test_symlink_to_proc_self_plus_root_dir_is_refused`, `test_grandparent_swapped_to_proc_self_root_does_not_write`.
+- B2 four survivors: LF1 (`/proc/self` + `/root/<dir>`) exits 64 with 0 calls; leftover tmp symlink at commit exits 69 and does not write through the target; `under_proc('/proc/1/root/x')` is True and does not raise `PermissionError`. Tests: `test_symlink_to_proc_self_plus_root_dir_is_refused`, `test_leftover_tmp_symlink_after_creates_exits_69_without_writing_through_it`, `test_under_proc_on_foreign_pid_root_does_not_raise`.
+- B3 leftover `.ev.json.tmp` (symlink, dir, FIFO) is refused in `open_evidence` before any POST: exit 64, 0 reads, 0 creates. Test: `test_leftover_hostile_tmp_is_refused_before_any_call`.
+- B4 gap-0 SIGINT at POST:2: `_run_stages` ignores SIGINT around `redact_text` and the id-bearing row. `_fail` also ignores SIGINT while printing. After an interrupt, `main` leaves SIGINT ignored so a 0.5-100 ms follow-up is not -2. Tests: `test_gap0_sigint_at_post2_prints_ids` (asserts the kill after `os.kill` still ran), `test_double_sigint_at_50ms_exits_69`.
+
+Should-fixes that were done.
+
+- SF5: `EACCES`/`EROFS`/`EPERM`/`EEXIST` during `commit_evidence` after creates exit 69 with ids (`_WRITE_ERRNO`). Unknown `OSError` stays 64. Test: `test_write_errno_after_creates_exits_69_with_ids`.
+- SF6: `_emit` uses `commit_evidence` only. A dest that appears after creates exits 69 with ids, not 64. Test: `test_evidence_path_appearing_mid_run_exits_69_with_ids`.
+- `explicit_space` raises on a present non-UUID `space_id`/`workspace_id`. Tests: `test_explicit_space_refuses_a_malformed_id`, `test_malformed_space_id_on_a_created_page_is_refused`.
+- `_align`, `_scrub_hex`, and `_write_all` are bounded. Tests: `test_align_fails_fast_when_the_list_does_not_shrink`, `test_scrub_hex_fails_fast_when_the_match_does_not_advance`, `test_write_all_fails_fast_on_a_zero_byte_write`.
+- FSYNC `EINTR` / `"race condition"` retries once (`_fsync`).
+- Dry-run interrupt keeps build `NOT_RUN`. `_HELD` is cleared at the start and end of `main`.
+
+Census on this tree, one AST walk of the four modules: if 190, boolop 65, and 25, or 40, clause 138, ifexp 8, while 4. Mutations: if-flip 190, force-true 190, force-false 190, operator swap 65, clause negation 138, literal clause True/False 276, ifexp True/False 16, while-flip 4. Total 1069. **The 1069-row table was not run. No file-level killed/survived/sum is claimed.**
+
+Serial probes that were actually run (named tests; stock first: 320 passed). Command: `uv run --frozen pytest -q -p no:cacheprovider tests/unit/cli/test_notion_sandbox.py --basetemp /tmp/p60r7mut/<name>/bt -k '<expr>'`. Hanging mutants used `timeout --signal=KILL 5`.
+
+| Site | Mutant | Result | Failed | Test |
+|---|---|---|---|---|
+| guard symlink follow `if S_ISLNK` | `if False` | KILLED | 1 | `test_symlink_to_proc_self_root_is_refused` |
+| guard `_is_proc` + `_on_procfs` | both `return False` | KILLED | 4 | `//proc`, self/root, LF1, `/proc/1/root` |
+| guard `_safe_realpath` | no `OSError` catch | KILLED | 1 | `test_under_proc_on_foreign_pid_root_does_not_raise` |
+| guard `open_evidence` leftover | `if False` | KILLED | 3 | leftover hostile symlink/dir/fifo |
+| guard `_discard_leftover_tmp` `kind != "file"` | `if False` | KILLED | 1 | leftover tmp symlink after creates |
+| guard `_tmp_kind` symlink | return `"file"` | KILLED | 2 | leftover hostile symlink + leftover after creates |
+| guard `_refuse_proc_write` | `if False` | KILLED | 1 | grandparent swapped to `/proc/self/root` |
+| ns `_run_stages` ignore/mask | removed | KILLED | 1 | `test_gap0_sigint_at_post2_prints_ids` (`after` stayed 0) |
+| live `explicit_space` `found == ""` | `if False` | KILLED | 1 | `test_explicit_space_refuses_a_malformed_id` |
+| pipeline `_align` `guard <= 0` | `if False` | KILLED | timeout 137 | `test_align_fails_fast_when_the_list_does_not_shrink` |
+| guard `_scrub_hex` both bounds | both `if False` | KILLED | timeout 137 | `test_scrub_hex_fails_fast_when_the_match_does_not_advance` |
+| guard `_write_all` both bounds | both off | KILLED | timeout 137 | `test_write_all_fails_fast_on_a_zero_byte_write` |
+
+Probe-backed equivalents. Both versions produced the same output on the named tests.
+
+- `_on_procfs` force-false alone. `_is_proc` on `/proc/self` and `/proc/1/root` still refuses. 3 passed.
+- `_is_proc` force-false alone. `_on_procfs` on the `/proc` prefix still refuses. 3 passed.
+- `_tmp_kind` `S_ISLNK` force-false alone (falls through to `"other"`). Hostile leftover is still refused. 4 passed.
+- `_scrub_hex` `nxt <= index` force-false alone, or `_write_all` `written <= 0` force-false alone. The sibling `steps > limit` bound still raises. 1 passed each.
+
+`tests/unit/cli/test_notion_sandbox.py`: 320 passed. Sockets stay blocked. `ruff format --check`, `ruff check`, and `pyright` 1.1.411 (0 errors) are clean on the four sandbox modules and the sandbox test.
+
 ## 2026-10-09 — Session 07 sandbox run, round 6
 
 Not a session close. This is not SESSION_07 COMPLETE. `state_revision` stays 58. `IMPLEMENTATION_STATE.json` is not edited. `head_sha` stays the W9 squash `a4e9b025021b4effbb2b2879c1db756403cb1676`. Twelve session 7 evidence keys stay false. `commissioned_agents` stays empty. Exit 78 stays HELD. The §11 sandbox CLI is still not run live. This commit's CI run is not invented here.

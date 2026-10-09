@@ -242,14 +242,23 @@ def _scrub_hex(text: str, folded: str) -> str:
     pieces: list[str] = []
     index = 0
     lowered = text.lower()
+    # A zero-width or non-advancing match would loop forever. Bound it.
+    limit = len(text) + 1
+    steps = 0
     while True:
+        steps += 1
+        if steps > limit:
+            raise SandboxError("redaction did not advance")
         found = lowered.find(folded, index)
         if found < 0:
             pieces.append(text[index:])
             return "".join(pieces)
+        nxt = found + len(folded)
+        if nxt <= index:
+            raise SandboxError("redaction did not advance")
         pieces.append(text[index:found])
         pieces.append("[REDACTED]")
-        index = found + len(folded)
+        index = nxt
 
 
 def stage_status(runner_name: str | None, outcome: str | None) -> str:
@@ -354,25 +363,128 @@ def _is_proc(path: Path) -> bool:
     return path == Path("/proc") or Path("/proc") in path.parents
 
 
-def under_proc(path: Path) -> bool:
-    """True when the path is ``/proc``, under it, or reached through a ``/proc`` symlink.
+def _proc_device() -> int | None:
+    try:
+        return os.lstat("/proc").st_dev
+    except OSError:
+        return None
 
-    ``abspath('//proc/...')`` keeps the ``//`` root, so a leading-slash check
-    would miss it. ``realpath`` of ``/proc/self/root/<dir>`` is ``<dir>``, so the
-    unresolved form still has to be checked. A symlink to ``/proc`` is found by
-    resolving each prefix.
+
+def _on_procfs(path: Path) -> bool:
+    """True when ``path`` itself is an inode on the procfs device.
+
+    ``realpath('/proc/self/root')`` is ``/``, and ``stat`` follows that link, so
+    only ``lstat`` sees the procfs inode. ``PermissionError`` is not procfs.
+    """
+    proc_dev = _proc_device()
+    if proc_dev is None:
+        return False
+    try:
+        return os.lstat(path).st_dev == proc_dev
+    except OSError:
+        return False
+
+
+def _safe_realpath(path: Path) -> Path | None:
+    try:
+        return Path(os.path.realpath(path))
+    except OSError:
+        return None
+
+
+def _prefixes(path: Path) -> tuple[Path, ...]:
+    collapsed = Path(_collapsed_abs(path))
+    return (collapsed, *collapsed.parents)
+
+
+def _symlink_target(path: Path) -> Path | None:
+    try:
+        target = Path(os.readlink(path))
+    except OSError:
+        return None
+    if not target.is_absolute():
+        target = path.parent / target
+    return Path(_collapsed_abs(target))
+
+
+def _component_touches_proc(path: Path) -> bool:
+    if _on_procfs(path) or _is_proc(path):
+        return True
+    resolved = _safe_realpath(path)
+    if resolved is None:
+        return False
+    return _on_procfs(resolved) or _is_proc(resolved)
+
+
+def under_proc(path: Path) -> bool:
+    """True when the path is ``/proc``, under it, or reached through procfs.
+
+    ``abspath('//proc/...')`` keeps the ``//`` root. ``realpath`` of
+    ``/proc/self/root/<dir>`` is ``<dir>``, and a symlink to
+    ``/proc/self/root`` also resolves to ``/``. Every existing ancestor is
+    checked on the lexical path and on each resolved/symlink target, by
+    name and by procfs ``st_dev``. ``realpath`` of ``/proc/1/root/...``
+    may raise ``PermissionError``; that is treated as proc, not as a crash.
     """
     collapsed = Path(_collapsed_abs(path))
-    if _is_proc(collapsed) or _is_proc(Path(os.path.realpath(path))):
-        return True
-    for prefix in (collapsed, *collapsed.parents):
-        try:
-            resolved = Path(os.path.realpath(prefix))
-        except OSError:
-            continue
-        if _is_proc(resolved):
+    pending: list[Path] = [collapsed]
+    resolved = _safe_realpath(path)
+    if resolved is None:
+        if _is_proc(collapsed):
             return True
-    return False
+    else:
+        pending.append(resolved)
+    seen: set[str] = set()
+    while pending:
+        current = pending.pop()
+        key = str(current)
+        if key in seen:
+            continue
+        seen.add(key)
+        if _is_proc(current) or _component_touches_proc(current):
+            return True
+        for prefix in _prefixes(current):
+            if _is_proc(prefix) or _component_touches_proc(prefix):
+                return True
+            try:
+                info = os.lstat(prefix)
+            except OSError:
+                continue
+            if stat.S_ISLNK(info.st_mode):
+                target = _symlink_target(prefix)
+                if target is None:
+                    continue
+                if _is_proc(target) or _component_touches_proc(target):
+                    return True
+                pending.append(target)
+                target_resolved = _safe_realpath(target)
+                if target_resolved is not None:
+                    pending.append(target_resolved)
+    return _is_proc(collapsed)
+
+
+def _tmp_path(path: Path) -> Path:
+    return path.with_name(f".{path.name}.tmp")
+
+
+def _tmp_kind(temporary: Path) -> str | None:
+    """Classify a leftover sibling tmp, or ``None`` when it is absent."""
+    try:
+        info = temporary.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError:
+        return "other"
+    mode = info.st_mode
+    if stat.S_ISLNK(mode):
+        return "symlink"
+    if stat.S_ISDIR(mode):
+        return "dir"
+    if stat.S_ISFIFO(mode):
+        return "fifo"
+    if stat.S_ISREG(mode):
+        return "file"
+    return "other"
 
 
 def open_evidence(path: Path) -> None:
@@ -398,9 +510,13 @@ def open_evidence(path: Path) -> None:
         _refuse_path()
     if parent_info.st_mode & 0o200 == 0:
         _refuse_path()
+    leftover = _tmp_kind(_tmp_path(path))
+    if leftover is not None and leftover != "file":
+        _refuse_path()
 
 
 _DISK_ERRNO = {errno.EDQUOT, errno.EFBIG, errno.EIO, errno.ENOSPC}
+_WRITE_ERRNO = _DISK_ERRNO | {errno.EACCES, errno.EEXIST, errno.EPERM, errno.EROFS}
 
 
 def _failure_text(payload: Mapping[str, object], token: str | None, prefix: str) -> str:
@@ -424,8 +540,15 @@ def _created_page_ids(payload: Mapping[str, object]) -> str:
 
 
 def _write_all(fd: int, encoded: bytes) -> None:
+    if len(encoded) == 0:
+        return
     pending = memoryview(encoded)
+    steps = 0
+    limit = len(encoded)
     while len(pending) > 0:
+        steps += 1
+        if steps > limit:
+            raise SandboxError("evidence write failed")
         written = os.write(fd, pending)
         if written <= 0 or written > len(pending):
             raise SandboxError("evidence write failed")
@@ -443,37 +566,56 @@ def _destination_appeared(path: Path) -> bool:
 
 
 @contextlib.contextmanager
-def _sigint_ignored() -> Generator[None, None, None]:
+def ignore_sigint() -> Generator[None, None, None]:
+    """Keep SIGINT from raising while ids are printed or a tmp is discarded."""
     try:
         previous = signal.getsignal(signal.SIGINT)
         signal.signal(signal.SIGINT, signal.SIG_IGN)
-    except ValueError:
+    except (ValueError, OSError):
         yield
         return
     try:
         yield
     finally:
-        with contextlib.suppress(ValueError, TypeError):
+        with contextlib.suppress(ValueError, TypeError, OSError):
             signal.signal(signal.SIGINT, previous)
 
 
-def _discard_leftover_tmp(temporary: Path) -> None:
-    """Remove a leftover sibling tmp from an interrupted first write.
+_sigint_ignored = ignore_sigint
 
-    A symlink is left for ``O_EXCL|O_NOFOLLOW`` to refuse. SIGINT is ignored so a
-    second Ctrl-C cannot leave the file behind and turn the retry into EEXIST.
+
+def _refuse_proc_write(path: Path, payload: Mapping[str, object], token: str | None) -> None:
+    """Re-check immediately before a write or link. Never write through procfs."""
+    if under_proc(path) or under_proc(_tmp_path(path)):
+        raise SandboxError(_failure_text(payload, token, "evidence path is refused"))
+
+
+def _discard_leftover_tmp(
+    temporary: Path, payload: Mapping[str, object], token: str | None
+) -> None:
+    """Remove a leftover regular sibling tmp from an interrupted first write.
+
+    A leftover symlink, directory, FIFO, or other non-file is refused. Evidence
+    is never written through it. SIGINT is ignored so a second Ctrl-C cannot
+    leave a regular file behind and turn the retry into EEXIST.
     """
     with _sigint_ignored():
-        try:
-            info = temporary.lstat()
-        except FileNotFoundError:
+        kind = _tmp_kind(temporary)
+        if kind is None:
             return
-        except OSError:
-            return
-        if stat.S_ISLNK(info.st_mode):
-            return
+        if kind != "file":
+            raise SandboxError(_failure_text(payload, token, "evidence write failed"))
         with contextlib.suppress(OSError):
             os.unlink(temporary)
+
+
+def _fsync(fd: int) -> None:
+    try:
+        os.fsync(fd)
+    except OSError as exc:
+        if exc.errno != errno.EINTR and "race condition" not in str(exc):
+            raise
+        os.fsync(fd)
 
 
 def commit_evidence(path: Path, payload: Mapping[str, object], token: str | None) -> str:
@@ -481,14 +623,16 @@ def commit_evidence(path: Path, payload: Mapping[str, object], token: str | None
 
     The destination is absent until the temporary file holds every byte.
     An interrupt unlinks the temporary file and leaves the previous destination.
+    A destination that appears after creates, or a procfs swap, is exit 69.
     """
-    open_evidence(path)
     text, result = render_evidence(payload, token)
     encoded = text.encode("utf-8")
-    temporary = path.with_name(f".{path.name}.tmp")
-    _discard_leftover_tmp(temporary)
+    temporary = _tmp_path(path)
+    _discard_leftover_tmp(temporary, payload, token)
+    _refuse_proc_write(path, payload, token)
     tmp_fd = -1
     try:
+        _refuse_proc_write(path, payload, token)
         tmp_fd = os.open(
             temporary,
             os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_WRONLY,
@@ -497,18 +641,20 @@ def commit_evidence(path: Path, payload: Mapping[str, object], token: str | None
         opened = os.fstat(tmp_fd)
         if stat.S_IMODE(opened.st_mode) != 0o600:
             raise OSError(errno.EPERM, "mode")
+        _refuse_proc_write(path, payload, token)
         _write_all(tmp_fd, encoded)
         os.fchmod(tmp_fd, 0o600)
-        os.fsync(tmp_fd)
+        _fsync(tmp_fd)
         os.close(tmp_fd)
         tmp_fd = -1
+        _refuse_proc_write(path, payload, token)
         if _destination_appeared(path):
             raise SandboxError(
                 _failure_text(payload, token, "evidence file changed during the run")
             )
         os.link(temporary, path)
         current = path.lstat()
-        if stat.S_ISLNK(current.st_mode) or current.st_size != len(encoded):
+        if stat.S_ISLNK(current.st_mode) or current.st_size != len(encoded) or under_proc(path):
             with contextlib.suppress(OSError):
                 os.unlink(path)
             raise SandboxError(
@@ -517,9 +663,12 @@ def commit_evidence(path: Path, payload: Mapping[str, object], token: str | None
     except SandboxError:
         raise
     except OSError as exc:
-        if exc.errno in _DISK_ERRNO or exc.errno == errno.EEXIST:
+        if exc.errno in _WRITE_ERRNO or "race condition" in str(exc):
             raise SandboxError(_failure_text(payload, token, "evidence write failed")) from None
-        raise SandboxError("evidence path is refused", code=EXIT_USAGE) from None
+        raise SandboxError(
+            _failure_text(payload, token, "evidence path is refused"),
+            code=EXIT_USAGE,
+        ) from None
     finally:
         with _sigint_ignored():
             if tmp_fd >= 0:
@@ -532,6 +681,7 @@ def commit_evidence(path: Path, payload: Mapping[str, object], token: str | None
 
 def write_evidence(path: Path, payload: Mapping[str, object], token: str | None) -> str:
     """Write JSON once the path is acceptable. ``PASS`` means it was clean."""
+    open_evidence(path)
     return commit_evidence(path, payload, token)
 
 

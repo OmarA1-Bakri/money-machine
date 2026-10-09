@@ -200,7 +200,12 @@ def _latest(moment: datetime) -> datetime:
 def _align(ctx: SandboxRun, page: PageView, before: int) -> str:
     """Keep the evidence id equal to the page the create returned."""
     page_id = canonical_id(page.page_id)
+    remaining = len(ctx.created_ids) - before
+    guard = remaining + 1
     while len(ctx.created_ids) > before:
+        if guard <= 0:
+            raise SandboxError("created id list did not shrink")
+        guard -= 1
         tail = ctx.created_ids[-1]
         if tail == page_id:
             break

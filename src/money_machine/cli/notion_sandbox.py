@@ -8,7 +8,8 @@ Exit codes: 0 ok, 64 usage, a bad token, an evidence-path refusal, a set
 ``NOTION_CONFIG`` / ``NOTION_SANDBOX_CONFIG`` / ``NOTION_TOKEN_FILE``, or a set
 ``SSL_CERT_FILE`` / ``SSL_CERT_DIR`` / ``SSLKEYLOGFILE``, 65 target mismatch,
 66 missing token, 69 git, control, read, stage, clock, an interrupted run
-including SIGINT, a full disk (ENOSPC, EIO, EDQUOT, EFBIG), a swapped evidence
+including SIGINT, a full disk (ENOSPC, EIO, EDQUOT, EFBIG), EACCES, EROFS,
+EPERM, a leftover hostile tmp, a swapped or newly appeared evidence
 file, or unprintable stdout, 70 redaction self-check failure. Exit 78 is not
 used, and this module does not change that hold.
 
@@ -56,6 +57,7 @@ from money_machine.cli.notion_sandbox_guard import (
     empty_write_counts,
     evidence_sections,
     git_sha,
+    ignore_sigint,
     leaks,
     open_evidence,
     qa_verdict,
@@ -174,11 +176,13 @@ async def _run_stages(
             failed = True
             continue
         except BaseException as exc:
-            row = _stage_row(name, True, "INTERRUPTED", planned=False)
-            row["error"] = redact_text(f"{type(exc).__name__}: {exc}", token)
-            rows.append(row)
-            rows.extend(_remaining(index + 1))
-            return rows
+            _mark_leave_sigint_ignored()
+            with ignore_sigint():
+                row = _stage_row(name, True, "INTERRUPTED", planned=False)
+                row["error"] = redact_text(f"{type(exc).__name__}: {exc}", token)
+                rows.append(row)
+                rows.extend(_remaining(index + 1))
+                return rows
         rows.append(_stage_row(name, True, stage_status(runner_name, "PASS"), planned=False))
     return rows
 
@@ -219,10 +223,11 @@ def _sink_stdout() -> None:
 
 
 def _fail(message: str, code: int) -> int:
-    cleaned = redact_text(message, None)
-    LOGGER.info("%s", cleaned)
-    print(cleaned, file=sys.stderr)
-    return code
+    with ignore_sigint():
+        cleaned = redact_text(message, None)
+        LOGGER.info("%s", cleaned)
+        print(cleaned, file=sys.stderr)
+        return code
 
 
 def _now(clock: Callable[[], datetime] | None, token: str | None) -> datetime:
@@ -324,7 +329,7 @@ class _Held:
         self.mode: str = "dry-run"
         self.stages: list[dict[str, object]] = []
         self.created: list[dict[str, str]] = []
-        self.counts: dict[str, int] = {}
+        self.counts: dict[str, int] = empty_write_counts()
         self.bot_user_id: str | None = None
         self.git: str = ""
         self.control: dict[str, object] = {}
@@ -335,6 +340,7 @@ class _Held:
 
 
 _HELD = _Held()
+_leave_sigint_ignored = False
 
 
 def _raise_interrupt(_signum: int, _frame: object) -> None:
@@ -347,7 +353,7 @@ def _arm_interrupt() -> None:
         current = signal.getsignal(signal.SIGINT)
     except ValueError:
         return
-    if current not in (signal.SIG_DFL, signal.default_int_handler):
+    if current not in (signal.SIG_DFL, signal.default_int_handler, signal.SIG_IGN):
         return
     signal.signal(signal.SIGINT, _raise_interrupt)
 
@@ -386,24 +392,23 @@ def _remember_held(
     held.git = git
     held.control = dict(control)
     held.counts = counts
+    held.stages = planned_stages()
     held.ready = True
 
 
 def _publish_held() -> int:
-    """Write INTERRUPTED evidence with further SIGINTs ignored, then restore the handler.
+    """Write INTERRUPTED evidence with further SIGINTs ignored.
 
-    The operator already asked to stop. A second Ctrl-C must not cost the evidence.
-    Off the main thread the handler cannot change, so the write runs as it is.
+    The operator already asked to stop. A second Ctrl-C must not cost the
+    evidence or become exit -2. SIGINT stays ignored after this returns so a
+    0.5-100 ms follow-up is discarded. Off the main thread the handler cannot
+    change, so the write runs as it is.
     """
-    previous = signal.getsignal(signal.SIGINT)
-    with contextlib.suppress(ValueError):
-        signal.signal(signal.SIGINT, signal.SIG_IGN)
+    _hold_sigint()
     try:
         return _publish_interrupted()
     finally:
-        # A handler installed outside Python reads back as None and cannot be restored.
-        with contextlib.suppress(ValueError, TypeError):
-            signal.signal(signal.SIGINT, previous)
+        _hold_sigint()
 
 
 def _publish_interrupted() -> int:
@@ -417,8 +422,6 @@ def _publish_interrupted() -> int:
         return _fail(log, EXIT_API)
     stages = _interrupted_rows(held.stages)
     counts = held.counts
-    if not counts:
-        counts = empty_write_counts()
     try:
         return _finish(
             path,
@@ -446,6 +449,25 @@ def _publish_interrupted() -> int:
         raise
 
 
+def _reset_held() -> None:
+    global _leave_sigint_ignored
+    _HELD.__init__()
+    _leave_sigint_ignored = False
+
+
+def _mark_leave_sigint_ignored() -> None:
+    """Remember that this run was interrupted so main leaves SIGINT ignored."""
+    global _leave_sigint_ignored
+    _leave_sigint_ignored = True
+
+
+def _hold_sigint() -> None:
+    """Keep SIGINT ignored after an interrupt so a 0.5-100 ms follow-up is not -2."""
+    _mark_leave_sigint_ignored()
+    with contextlib.suppress(ValueError, OSError):
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -455,6 +477,11 @@ def main(
     clock: Callable[[], datetime] | None = None,
 ) -> int:
     """Run the sandbox checks. Writes only when ``--execute`` is present."""
+    try:
+        previous = signal.getsignal(signal.SIGINT)
+    except ValueError:
+        previous = signal.SIG_DFL
+    _reset_held()
     _arm_interrupt()
     try:
         return _main(argv, client=client, environ=environ, spec=spec, clock=clock)
@@ -464,6 +491,14 @@ def main(
         return _fail("evidence path is refused", EXIT_USAGE)
     except (KeyboardInterrupt, asyncio.CancelledError):
         return _publish_held()
+    finally:
+        if _leave_sigint_ignored:
+            _hold_sigint()
+        else:
+            with contextlib.suppress(ValueError, TypeError, OSError):
+                signal.signal(signal.SIGINT, signal.SIG_IGN)
+                signal.signal(signal.SIGINT, previous)
+        _HELD.__init__()
 
 
 def _main(
@@ -641,6 +676,7 @@ def _main(
             stages = asyncio.run(_run_stages(ctx, secret, done))
         except (KeyboardInterrupt, asyncio.CancelledError):
             # Between stages or in asyncio teardown. A finished row keeps its status.
+            _hold_sigint()
             stages = _interrupted_rows(done)
             signalled = True
         created = list(ctx.created)

@@ -18,6 +18,7 @@ import ssl
 import stat
 import subprocess
 import sys
+import threading
 import time
 import urllib.request
 from collections.abc import Coroutine
@@ -257,6 +258,16 @@ def _block_sockets(monkeypatch: pytest.MonkeyPatch) -> None:  # pyright: ignore[
     monkeypatch.setattr(socket.socket, "connect", _refuse)
     monkeypatch.setattr(socket.socket, "connect_ex", _refuse)
     monkeypatch.setattr(socket, "create_connection", _refuse)
+
+
+@pytest.fixture(autouse=True)
+def _restore_sigint() -> object:  # pyright: ignore[reportUnusedFunction]
+    previous = signal.getsignal(signal.SIGINT)
+    try:
+        yield
+    finally:
+        with contextlib.suppress(ValueError, TypeError, OSError):
+            signal.signal(signal.SIGINT, previous)
 
 
 @pytest.fixture
@@ -2631,6 +2642,7 @@ def test_proc_path_helper_rejects_proc_itself() -> None:
     assert under_proc(Path("//proc/self/ev.json")) is True
     assert under_proc(Path("///proc/self/ev.json")) is True
     assert under_proc(Path("/tmp/evidence.json")) is False
+    assert under_proc(Path("/proc/1/root/x")) is True
 
 
 def test_string_revision_is_unreadable(
@@ -2763,9 +2775,13 @@ def test_proxy_map_drops_non_strings() -> None:
     assert proxy_map(director) == {"http": "http://127.0.0.1:9"}
 
 
-def test_explicit_space_skips_a_non_id() -> None:
-    found = explicit_space({"space_id": "nope", "workspace_id": SANDBOX_SPACE_ID})
-    assert found == SANDBOX_SPACE_ID
+def test_explicit_space_refuses_a_malformed_id() -> None:
+    with pytest.raises(SandboxError, match="notion api error"):
+        explicit_space({"space_id": "nope", "workspace_id": SANDBOX_SPACE_ID})
+    with pytest.raises(SandboxError, match="notion api error"):
+        explicit_space({"space_id": 5, "workspace_id": _SPACE_RAW})
+    assert explicit_space({"workspace_id": SANDBOX_SPACE_ID}) == SANDBOX_SPACE_ID
+    assert explicit_space({"space_id": "", "workspace_id": SANDBOX_SPACE_ID}) == SANDBOX_SPACE_ID
 
 
 def test_variants_without_a_product_page_are_a_sandbox_error() -> None:
@@ -3374,7 +3390,8 @@ def test_loose_created_mode_is_refused(
         environ={"NOTION_SANDBOX_TOKEN": _SECRET},
         clock=_clock,
     )
-    assert code == EXIT_USAGE
+    assert code == EXIT_API
+    assert code != EXIT_USAGE
     assert evidence.exists() is False
 
 
@@ -3726,7 +3743,8 @@ def test_interrupt_does_not_keep_a_symlink(
         environ={"NOTION_SANDBOX_TOKEN": _SECRET},
         clock=_clock,
     )
-    assert code == EXIT_USAGE
+    assert code == EXIT_API
+    assert code != EXIT_USAGE
     assert evidence.is_symlink()
     assert good.read_text(encoding="utf-8") == '{"ok": true}\n'
 
@@ -5129,7 +5147,8 @@ def test_parse_helpers_refuse_mistyped_fields() -> None:
     page = parse_page({**base, "url": ""}, fallback_space="", expected_id="")
     assert page is not None
     assert page.url == "https://www.notion.so/" + canonical_id(_PARENT_RAW).replace("-", "")
-    assert explicit_space({"space_id": 5, "workspace_id": _SPACE_RAW}) == SANDBOX_SPACE_ID
+    with pytest.raises(SandboxError, match="notion api error"):
+        explicit_space({"space_id": 5, "workspace_id": _SPACE_RAW})
     assert parse_created_time("") is None
     assert parse_created_time(7) is None
 
@@ -5315,7 +5334,7 @@ def test_repeated_sigint_during_the_evidence_write_keeps_one_file(
     assert code == EXIT_API
     # The first write is interrupted. The publish ignores the next three signals.
     assert sent == {"n": 4, "writes": 2}
-    assert after is not signal.SIG_IGN
+    assert after is signal.SIG_IGN
     payload = json.loads(evidence.read_text(encoding="utf-8"))
     assert payload["run_status"] == "INTERRUPTED"
     assert [page["id"] for page in cast(list[dict[str, str]], payload["created_pages"])] == [
@@ -5520,3 +5539,413 @@ def test_interrupt_during_tmp_unlink_keeps_ids(
     ]
     assert _stage(payload, "build")["status"] == "PASS"
     assert _stage(payload, "variants")["status"] == "PASS"
+
+
+def test_symlink_to_proc_self_root_is_refused(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """``realpath('/proc/self/root')`` is ``/``. Device check must still refuse."""
+    link = tmp_path / "l_root"
+    link.symlink_to("/proc/self/root")
+    alias = link / tmp_path.relative_to("/") / "e3.json"
+    assert under_proc(alias) is True
+    with pytest.raises(SandboxError, match="evidence path is refused"):
+        open_evidence(alias)
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(alias, capsys, caplog, ["--execute"], client=client)
+    assert code == EXIT_USAGE
+    assert err == "evidence path is refused\n"
+    assert payload == {}
+    assert client.reads == []
+    assert client.creates == []
+    assert alias.exists() is False
+
+
+def test_symlink_to_proc_self_plus_root_dir_is_refused(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """guard:354 LF1: a symlink to ``/proc/self`` plus ``/root/<dir>`` is still proc."""
+    link = tmp_path / "self"
+    link.symlink_to("/proc/self")
+    alias = link / "root" / tmp_path.relative_to("/") / "ev.json"
+    assert under_proc(alias) is True
+    with pytest.raises(SandboxError, match="evidence path is refused"):
+        open_evidence(alias)
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(alias, capsys, caplog, ["--execute"], client=client)
+    assert code == EXIT_USAGE
+    assert err == "evidence path is refused\n"
+    assert payload == {}
+    assert client.reads == []
+    assert client.creates == []
+    assert alias.exists() is False
+
+
+def test_under_proc_on_foreign_pid_root_does_not_raise() -> None:
+    """guard:366 SWAP/LF0: ``/proc/1/root/x`` is True and must not raise PermissionError."""
+    assert under_proc(Path("/proc/1/root/x")) is True
+    assert under_proc(Path("/proc/1/root/ev.json")) is True
+
+
+@pytest.mark.parametrize("kind", ["symlink", "dir", "fifo"])
+def test_leftover_hostile_tmp_is_refused_before_any_call(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    kind: str,
+) -> None:
+    leftover = evidence.with_name(f".{evidence.name}.tmp")
+    canary = evidence.with_name("canary")
+    canary.write_text("keep", encoding="utf-8")
+    if kind == "symlink":
+        leftover.symlink_to(canary)
+    elif kind == "dir":
+        leftover.mkdir()
+    else:
+        os.mkfifo(leftover)
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_USAGE
+    assert err == "evidence path is refused\n"
+    assert payload == {}
+    assert client.reads == []
+    assert client.creates == []
+    assert evidence.exists() is False
+    assert canary.read_text(encoding="utf-8") == "keep"
+
+
+def test_leftover_tmp_symlink_after_creates_exits_69_without_writing_through_it(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """guard:473: leftover tmp symlink at commit is 69 and never followed."""
+    leftover = evidence.with_name(f".{evidence.name}.tmp")
+    canary = evidence.with_name("canary")
+    canary.write_text("keep", encoding="utf-8")
+
+    class _Plant(FakeSandbox):
+        def create_child_page(self, parent_id: str, title: str) -> PageView:
+            page = super().create_child_page(parent_id, title)
+            if len(self.creates) == 5:
+                leftover.symlink_to(canary)
+            return page
+
+    client = _Plant()
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_API
+    assert code != EXIT_USAGE
+    assert evidence.exists() is False
+    assert leftover.is_symlink()
+    assert canary.read_text(encoding="utf-8") == "keep"
+    assert payload == {}
+    for page_id in _CHILD_IDS:
+        assert canonical_id(page_id) in err
+    assert len(client.creates) == 5
+
+
+def test_grandparent_swapped_to_proc_self_root_does_not_write(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A grandparent swapped after POST 3 must not write through procfs."""
+    other = tmp_path / "other" / "parent"
+    other.mkdir(parents=True)
+    grand = tmp_path / "grand"
+    parent = grand / "parent"
+    parent.mkdir(parents=True)
+    evidence = parent / "ev.json"
+
+    class _Swap(FakeSandbox):
+        def create_child_page(self, parent_id: str, title: str) -> PageView:
+            page = super().create_child_page(parent_id, title)
+            if len(self.creates) == 3 and grand.is_dir() and not grand.is_symlink():
+                backup = grand.with_name("grand.bak")
+                grand.rename(backup)
+                grand.symlink_to(Path("/proc/self/root") / other.parent.relative_to("/"))
+            return page
+
+    client = _Swap()
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_API
+    assert code != EXIT_OK
+    assert "evidence path is refused" in err or "evidence write failed" in err
+    assert payload == {}
+    assert list(other.iterdir()) == []
+    assert (tmp_path / "other" / "parent" / "ev.json").exists() is False
+    assert len(client.creates) == 5
+    for page_id in _CHILD_IDS:
+        assert canonical_id(page_id) in err
+
+
+def test_gap0_sigint_at_post2_prints_ids(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A KeyboardInterrupt inside redact_text at POST:2 must still print the ids."""
+    from money_machine.cli import notion_sandbox as sandbox_module
+
+    real_redact = sandbox_module.redact_text
+    hits = {"n": 0, "after": 0}
+
+    def _redact(text: str, token: str | None) -> str:
+        if "Interrupt" in text or "Cancelled" in text:
+            hits["n"] += 1
+            os.kill(os.getpid(), signal.SIGINT)
+            hits["after"] = hits.get("after", 0) + 1
+        return real_redact(text, token)
+
+    monkeypatch.setattr(sandbox_module, "redact_text", _redact)
+    before = signal.getsignal(signal.SIGINT)
+    try:
+        code = main(
+            ["--evidence-out", str(evidence), "--execute"],
+            client=_SignalAtSecondCreate(),
+            environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+            clock=_clock,
+        )
+    except KeyboardInterrupt:
+        pytest.fail("KeyboardInterrupt escaped the id-print path")
+    finally:
+        signal.signal(signal.SIGINT, before)
+    captured = capsys.readouterr()
+    assert code == EXIT_API
+    assert hits["n"] >= 1
+    assert hits.get("after", 0) >= 1
+    assert canonical_id(_CHILD_IDS[0]) in captured.err
+    assert canonical_id(_CHILD_IDS[1]) in captured.err
+
+
+def test_double_sigint_at_50ms_exits_69(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A follow-up SIGINT 50 ms after POST:2 must not exit -2."""
+
+    class _Burst(FakeSandbox):
+        def create_child_page(self, parent_id: str, title: str) -> PageView:
+            page = super().create_child_page(parent_id, title)
+            if len(self.creates) == 2:
+                threading.Timer(0.05, lambda: os.kill(os.getpid(), signal.SIGINT)).start()
+                os.kill(os.getpid(), signal.SIGINT)
+            return page
+
+    before = signal.getsignal(signal.SIGINT)
+    try:
+        code = main(
+            ["--evidence-out", str(evidence), "--execute"],
+            client=_Burst(),
+            environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+            clock=_clock,
+        )
+    except KeyboardInterrupt:
+        pytest.fail("second SIGINT escaped main")
+    finally:
+        time.sleep(0.08)
+        signal.signal(signal.SIGINT, before)
+    captured = capsys.readouterr()
+    assert code == EXIT_API
+    assert code != -2
+    assert canonical_id(_CHILD_IDS[0]) in captured.err
+    assert canonical_id(_CHILD_IDS[1]) in captured.err
+
+
+@pytest.mark.parametrize("err", [errno.EACCES, errno.EROFS, errno.EPERM])
+def test_write_errno_after_creates_exits_69_with_ids(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    err: int,
+) -> None:
+    real_open = os.open
+    wanted = evidence.with_name(f".{evidence.name}.tmp")
+
+    def _open(
+        path: str | os.PathLike[str],
+        flags: int = 0,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        if os.fspath(path) == str(wanted) and flags & os.O_EXCL:
+            raise OSError(err, "denied")
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.open", _open)
+    client = FakeSandbox()
+    code, payload, _out, err_text, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_API
+    assert code != EXIT_USAGE
+    assert evidence.exists() is False
+    assert payload == {}
+    assert client.creates
+    for page_id in _CHILD_IDS:
+        assert canonical_id(page_id) in err_text
+
+
+def test_evidence_path_appearing_mid_run_exits_69_with_ids(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class _Appear(FakeSandbox):
+        def create_child_page(self, parent_id: str, title: str) -> PageView:
+            page = super().create_child_page(parent_id, title)
+            if len(self.creates) == 5:
+                evidence.write_text("appeared", encoding="utf-8")
+            return page
+
+    client = _Appear()
+    code, raw, _logs = _run(
+        evidence,
+        ["--evidence-out", str(evidence), "--execute"],
+        client=client,
+        environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+        caplog=caplog,
+    )
+    captured = capsys.readouterr()
+    err = captured.err
+    assert code == EXIT_API
+    assert code != EXIT_USAGE
+    assert "evidence file changed" in err or "evidence write failed" in err
+    assert raw == "appeared"
+    assert evidence.read_text(encoding="utf-8") == "appeared"
+    for page_id in _CHILD_IDS:
+        assert canonical_id(page_id) in err
+
+
+def test_malformed_space_id_on_a_created_page_is_refused(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    created = canonical_id(_CHILD_IDS[0])
+    opener = _Opener(
+        [
+            _bot_body(),
+            _page_body(_PARENT_RAW, parent=_PARENT_RAW),
+            _page_body(_CHILD_IDS[0], parent=_PARENT_RAW, space="not-a-uuid"),
+        ]
+    )
+    client = LiveSandboxClient(_SECRET, opener)
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_API
+    assert code != EXIT_OK
+    assert [call[0] for call in opener.calls].count("POST") == 1
+    assert _stage(payload, "build")["status"] == "FAILED"
+    assert created not in json.dumps(payload.get("created_pages"))
+    assert err == "sandbox stage failed\n"
+
+
+def test_align_fails_fast_when_the_list_does_not_shrink(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from money_machine.cli import notion_sandbox_pipeline as pipeline_module
+
+    client = FakeSandbox()
+    ctx = _bound_run(client)
+    page = client.create_child_page(SANDBOX_PARENT_PAGE_ID, "Sandbox Weekly Planner")
+    ctx.created_ids.append(canonical_id(_CHILD_IDS[1]))
+
+    def _keep_tail(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    monkeypatch.setattr(pipeline_module, "_drop_tail", _keep_tail)
+    with pytest.raises(SandboxError, match="did not shrink"):
+        pipeline_module._align(ctx, page, 0)  # pyright: ignore[reportPrivateUsage]
+
+
+def test_scrub_hex_fails_fast_when_the_match_does_not_advance() -> None:
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    class _Stuck(str):
+        __slots__ = ()
+
+        def lower(self) -> str:
+            return self
+
+        def find(self, _sub: str, _start: object = 0, _end: object = None) -> int:
+            return 0
+
+    with pytest.raises(SandboxError, match="did not advance"):
+        guard_module._scrub_hex(_Stuck("abcdef"), "abcd")  # pyright: ignore[reportPrivateUsage]
+
+
+def test_write_all_fails_fast_on_a_zero_byte_write(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    target = tmp_path / "out.bin"
+    fd = os.open(target, os.O_CREAT | os.O_WRONLY, 0o600)
+
+    def _zero(_fd: int, _data: object) -> int:
+        return 0
+
+    monkeypatch.setattr(guard_module.os, "write", _zero)
+    try:
+        with pytest.raises(SandboxError, match="evidence write failed"):
+            guard_module._write_all(fd, b"abc")  # pyright: ignore[reportPrivateUsage]
+    finally:
+        monkeypatch.undo()
+        os.close(fd)
+
+
+def test_dry_run_interrupt_during_write_keeps_build_not_run(
+    evidence: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_write = os.write
+    seen = {"n": 0}
+
+    def _write(fd: int, data: bytes) -> int:
+        if bytes(data).startswith(b"{"):
+            seen["n"] += 1
+            if seen["n"] == 1:
+                raise KeyboardInterrupt
+        return real_write(fd, data)
+
+    monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.write", _write)
+    code = main(
+        ["--evidence-out", str(evidence)],
+        client=FakeSandbox(),
+        environ={"NOTION_SANDBOX_TOKEN": _SECRET},
+        clock=_clock,
+    )
+    assert code == EXIT_API
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    assert _stage(payload, "build")["status"] == "NOT_RUN"
+    assert payload["run_status"] == "INTERRUPTED"
+
+
+def test_held_is_reset_between_main_calls(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    from money_machine.cli import notion_sandbox as sandbox_module
+
+    sandbox_module._HELD.created = [{"id": "stale-id"}]  # pyright: ignore[reportPrivateUsage]
+    sandbox_module._HELD.ready = True  # pyright: ignore[reportPrivateUsage]
+    code, payload, _out, err, _logs = _invoke(evidence, capsys, caplog, [], client=FakeSandbox())
+    assert code == EXIT_OK
+    assert "stale-id" not in err
+    assert payload["created_pages"] == []
+    assert sandbox_module._HELD.created == []  # pyright: ignore[reportPrivateUsage]

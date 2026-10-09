@@ -1,5 +1,24 @@
 # Test Evidence
 
+## 2026-10-09 — Session 07 sandbox run, round 7
+
+**Verification scope**: Round 7 of the §11 sandbox runner. Reviewer FAIL 5465945944 at `8f77434c` is folded into this commit. The Verifier verdict on that tip had not landed. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. `state_revision` stays 58 | PASS |
+| Sandbox CLI | Still not run live. `uv run --frozen pytest -q -p no:cacheprovider tests/unit/cli/test_notion_sandbox.py --basetemp /tmp/p60r7full3`: 320 passed | PASS |
+| `/proc` device + symlink | `test_symlink_to_proc_self_root_is_refused`, `test_symlink_to_proc_self_plus_root_dir_is_refused`: exit 64, 0 calls. `test_under_proc_on_foreign_pid_root_does_not_raise`: True, no `PermissionError`. `test_grandparent_swapped_to_proc_self_root_does_not_write`: 69, no write through the swap | PASS |
+| Leftover tmp | `test_leftover_hostile_tmp_is_refused_before_any_call`: 64, 0 calls. `test_leftover_tmp_symlink_after_creates_exits_69_without_writing_through_it`: 69, canary unchanged | PASS |
+| Gap-0 / double SIGINT | `test_gap0_sigint_at_post2_prints_ids`: ids on stderr, `after >= 1`. `test_double_sigint_at_50ms_exits_69`: 69, not -2 | PASS |
+| SF5 / SF6 / space | write errno after creates 69 with ids; dest appearing mid-run 69 with ids; malformed space refused | PASS |
+| Census | if 190, boolop 65, and 25, or 40, clause 138, ifexp 8, while 4. Total 1069. **1069-row table not run; no file-level sum claimed** | PASS (count only) |
+| Named serial mutants | 12 named probes KILLED (including 3 timeouts 137). 4 probe-backed EQs listed in IMPLEMENTATION_LOG | PARTIAL |
+| Lint and types | `ruff format --check`, `ruff check`, and `pyright` 1.1.411 report 0 errors on the touched modules | PASS |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
 ## 2026-10-09 — Session 07 sandbox run, round 6
 
 **Verification scope**: Round 6 of the §11 sandbox runner. Reviewer FAIL 5465433904 and Verifier FAIL 6073572255 at `bcf9a36c` are folded into this commit series. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited.

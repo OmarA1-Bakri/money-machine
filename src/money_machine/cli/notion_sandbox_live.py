@@ -321,9 +321,19 @@ def proxy_map(director: urllib.request.OpenerDirector) -> dict[str, str]:
 
 
 def explicit_space(payload: Mapping[str, object]) -> str:
-    """A space id carried on the payload, or empty."""
+    """A space id carried on the payload, or empty.
+
+    A present non-empty value that is not a UUID is a provider lie, not an
+    absent space.
+    """
     for key in ("space_id", "workspace_id"):
-        found = canonical_id(payload.get(key))
-        if found != "":
-            return found
+        if key not in payload:
+            continue
+        raw = payload.get(key)
+        if raw is None or raw == "":
+            continue
+        found = canonical_id(raw)
+        if found == "":
+            raise SandboxError("notion api error")
+        return found
     return ""
