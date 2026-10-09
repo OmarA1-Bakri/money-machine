@@ -1,3 +1,42 @@
+## 2026-10-09 — Session 07 sandbox run, round 9
+
+Not a session close. This is not SESSION_07 COMPLETE. `state_revision` stays 58. `IMPLEMENTATION_STATE.json` is not edited. `head_sha` stays the W9 squash `a4e9b025021b4effbb2b2879c1db756403cb1676`. Twelve session 7 evidence keys stay false. `commissioned_agents` stays empty. Exit 78 stays HELD. The §11 sandbox CLI is still not run live. This commit's CI run is not invented here. No Verifier verdict had landed on `fc9c01c3` when this round was written.
+
+Round 9 answers Reviewer 5468348253 on tip `fc9c01c3`. Prompt-integrity addendum: `docs/control/reviews/2026-10-09-session-07-round-9-prompt-integrity.md`. **No equivalents are claimed.** The round-8 `_is_proc`→False, walk-limit, and ns:456 EQ claims, and the `11/3 EQ` label, are withdrawn.
+
+Blocker to fix to test.
+
+- Fail-closed: `_detection_ready` requires cached `ctypes.CDLL(None)` and a non-empty mountinfo. Otherwise `under_proc` is True and `open_evidence` is 64 before any POST. `_fd_on_procfs` uses `fstatfs` only; a missing `f_type` is True; `/proc/self/fd/N` is not consulted. Tests: `test_missing_libc_refuses_before_any_post`, `test_empty_mountinfo_refuses_before_any_post`, `test_fd_on_procfs_uses_fstatfs_not_proc_self_fd`.
+- Mountinfo unescape: `_unescape_mount_field` decodes `\\040` / `\\011` / `\\012` / `\\134` before the longest-match compare. A later shorter `proc` line does not win. Tests: `test_mountinfo_decodes_octal_escaped_space`, `test_later_short_proc_mount_does_not_win`.
+- tmpfs over `/proc`: `_is_proc` still refuses `/proc/ev_p60.json` when `f_type` is tmpfs. Test: `test_literal_proc_is_refused_when_fstype_is_tmpfs`.
+- Unique walk: `under_proc` counts unique nodes. A relative chain of 16 is accepted. A two-node cycle is refused. An overlong chain against `_WALK_LIMIT` 8 is refused. Tests: `test_relative_symlink_chain_of_16_is_accepted`, `test_symlink_cycle_is_refused`, `test_unique_walk_limit_refuses_an_overlong_chain`.
+- ns:456: `test_publish_interrupted_ki_after_complete_file_returns_69`.
+
+Census on this tree, one AST walk of the four modules: if 218, boolop 72, and 27, or 45, clause 153, ifexp 8, while 3. Mutations: if-flip 218, force-true 218, force-false 218, operator swap 72, clause negation 153, literal clause True/False 306, ifexp True/False 16, while-flip 3. Total 1204. **The 1204-row table was not run. No file-level killed/survived/sum is claimed.**
+
+Serial probes that were actually run (named tests; stock first: 345 passed). Command: `uv run --frozen pytest -q -p no:cacheprovider tests/unit/cli/test_notion_sandbox.py --basetemp /tmp/p60r9mut/<name>/bt -k '<expr>'`.
+
+| Site | Mutant | Result | Failed | Test |
+|---|---|---|---|---|
+| guard `_is_proc` | `return False` | KILLED | 1 | `test_literal_proc_is_refused_when_fstype_is_tmpfs` |
+| guard unique walk limit | `if False` | KILLED | 1 | `test_unique_walk_limit_refuses_an_overlong_chain` |
+| ns:456 except complete | `if False` | KILLED | 1 | `test_publish_interrupted_ki_after_complete_file_returns_69` |
+| guard mount unescape | raw field | KILLED | 1 | `test_mountinfo_decodes_octal_escaped_space` |
+| guard longest-match skip | `if False` | KILLED | 1 | `test_later_short_proc_mount_does_not_win` |
+| guard `_detection_ready` | `if False` | KILLED | 1 | missing libc / empty mountinfo |
+| guard `_fd_on_procfs` | `/proc/self/fd/N` | KILLED | 1 | `test_fd_on_procfs_uses_fstatfs_not_proc_self_fd` |
+| guard both cycle checks | both `if False` | KILLED | 1 | `test_symlink_cycle_is_refused` |
+
+SURVIVORS (named probes this tip; not claimed equivalent).
+
+- `prefix_key in seen_symlinks` `if False` alone: the sibling `target_key` check still refuses a two-node cycle.
+- `target_key in seen_symlinks` `if False` alone: the sibling `prefix_key` check still refuses a two-node cycle.
+- Walk-limit `+1` on a 16-chain: unique-node count stays far below 256.
+
+The Reviewer 126-row survivor split at `fc9c01c3` (8 public-with-libc, 6 CLI-masked, 10 no-libc, 18 helper-only, 84 no-diff) was not re-swept. The 6 CLI-masked and 10 no-libc rows are SURVIVORS: not re-enumerated this tip. Fail-closed and unescape tests cover the named public blockers. PARTIAL.
+
+`tests/unit/cli/test_notion_sandbox.py`: 345 passed. Sockets stay blocked. `ruff format --check`, `ruff check`, and `pyright` 1.1.411 (0 errors) are clean on the four sandbox modules and the sandbox test. Full local pytest: `uv run --frozen pytest -q -p no:cacheprovider --basetemp /tmp/p60r9all`: 2660 passed, 193 skipped, 12 failed. The 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. Local-only. CI is the gate.
+
 ## 2026-10-09 — Session 07 sandbox run, round 8
 
 Not a session close. This is not SESSION_07 COMPLETE. `state_revision` stays 58. `IMPLEMENTATION_STATE.json` is not edited. `head_sha` stays the W9 squash `a4e9b025021b4effbb2b2879c1db756403cb1676`. Twelve session 7 evidence keys stay false. `commissioned_agents` stays empty. Exit 78 stays HELD. The §11 sandbox CLI is still not run live. This commit's CI run is not invented here. No Verifier verdict had landed on `e571b8e7` when this round was written.

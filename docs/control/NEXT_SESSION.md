@@ -32,6 +32,12 @@
 
 Router browser and combined config modes still raise `NotImplementedError` (W4a). Fixture mode stays the default.
 
+## Session 07 — sandbox run, round 9
+
+**Status**: Incomplete (2026-10-09, state revision 58). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD. The §11 sandbox CLI is still not run live. `origin/build/full-automation` is still `a4e9b025`.
+
+Round 9 answers Reviewer 5468348253 at `fc9c01c3`. Missing libc or empty mountinfo is 64 before any POST. libc is cached `CDLL(None)`. Mountinfo octal escapes are decoded. Unique walk nodes accept K≥16 and refuse a cycle. **No equivalents are claimed.** The `_is_proc`→False, walk-limit, and ns:456 EQ claims and the `11/3 EQ` label are withdrawn. Census: if 218, boolop 72, and 27, or 45, clause 153, ifexp 8, while 3. Total 1204. **The 1204-row table was not run.** Named probes are in `IMPLEMENTATION_LOG.md`. Sandbox tests: 345 passed. Full local pytest: 2660 passed, 193 skipped, 12 failed (`docker` absent).
+
 ## Session 07 — sandbox run, round 8
 
 **Status**: Incomplete (2026-10-09, state revision 58). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD. The §11 sandbox CLI is still not run live. `origin/build/full-automation` is still `a4e9b025`. Whichever PR merges second re-syncs STATE.

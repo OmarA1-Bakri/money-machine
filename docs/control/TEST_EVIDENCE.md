@@ -1,5 +1,26 @@
 # Test Evidence
 
+## 2026-10-09 — Session 07 sandbox run, round 9
+
+**Verification scope**: Round 9 of the §11 sandbox runner. Reviewer FAIL 5468348253 at `fc9c01c3` is folded into this commit. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited. **No equivalents are claimed.**
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, `next_session` 7, `next_prompt` unchanged. This is not SESSION_07 COMPLETE | PASS |
+| Evidence keys | Twelve session 7 keys remain `false`. `commissioned_agents` stays `[]` | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. `state_revision` stays 58 | PASS |
+| Sandbox CLI | Still not run live. `uv run --frozen pytest -q -p no:cacheprovider tests/unit/cli/test_notion_sandbox.py --basetemp /tmp/p60r9sb2/bt`: 345 passed | PASS |
+| Fail-closed | missing libc and empty mountinfo: 64, 0 POSTs. `_fd_on_procfs` does not call mountinfo with `/proc/self/fd/N` | PASS |
+| Mountinfo | `\\040` space mount refused. Later short proc line does not win | PASS |
+| tmpfs `/proc` | `test_literal_proc_is_refused_when_fstype_is_tmpfs`: 64, 0 POSTs, `/proc/ev_p60.json` absent | PASS |
+| Walk | K=16 accepted. Cycle refused. Unique-limit 8 refuses the 16-chain | PASS |
+| ns:456 | helper test: KI after complete file is 69 | PASS |
+| Census | if 218, boolop 72, and 27, or 45, clause 153, ifexp 8, while 3. Total 1204. **1204-row table not run** | PASS (count only) |
+| Named serial mutants | 8 named probes KILLED. 3 SURVIVORS listed in IMPLEMENTATION_LOG. No EQ claim | PARTIAL |
+| Lint and types | `ruff format --check`, `ruff check`, and `pyright` 1.1.411 report 0 errors on the touched modules | PASS |
+| Full local pytest | `uv run --frozen pytest -q -p no:cacheprovider --basetemp /tmp/p60r9all`: 2660 passed, 193 skipped, 12 failed. docker absent. Local-only. CI is the gate | 12 known local docker failures; CI is the gate |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
 ## 2026-10-09 — Session 07 sandbox run, round 8
 
 **Verification scope**: Round 8 of the §11 sandbox runner. Reviewer FAIL 5467032904 at `e571b8e7` is folded into this commit. No Verifier verdict had landed on that tip. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited.
