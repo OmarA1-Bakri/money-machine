@@ -1,3 +1,24 @@
+## 2026-10-09 — Session 07 sandbox run, round 11
+
+Not a session close. This is not SESSION_07 COMPLETE. `state_revision` stays 58. `IMPLEMENTATION_STATE.json` is not edited. `head_sha` stays the W9 squash `a4e9b025021b4effbb2b2879c1db756403cb1676`. Twelve session 7 evidence keys stay false. `commissioned_agents` stays empty. Exit 78 stays HELD. The §11 sandbox CLI is still not run live. This commit's CI run is not invented here.
+
+Round 11 answers Verifier 6079607643 and Reviewer 5469228650, both FAIL at `518d5215` under the frozen criteria on false text only; the round-10 code fix holds. Only the listed items are changed.
+
+- Text: the round-10 park line above is corrected. "All 6 new tests fail on `9d350221`" was false: 5 fail and 1 passes (`test_symlink_self_loop_is_refused`, already refused through `target_key`); it guards against regression. The census at `518d5215` was if 217, total 1201, not 1204 (1204 was the `9d350221` tree). The named-probe row at `518d5215` was 9 rows, 8 killed, 1 survived (Reviewer), not 11/8/3.
+- Should-fix (guard:434 via :505): a libc without `statfs` raised `AttributeError` out of `main`. `_detection_ready` now also requires `statfs` and `fstatfs` on the cached libc, so the path is refused (64) before any read or create. `_statfs_f_type` and `_fstatfs_f_type` also catch `AttributeError` and return `None`.
+- Should-fix (guard:449 via :790): a libc without `fstatfs` raised `AttributeError` after creates with empty ids. Up front it is now 64 with 0 reads and 0 creates. If `fstatfs` disappears after creates, `commit_evidence` refuses (69), no file, and the created ids are printed on stderr.
+- Tests: `test_libc_without_statfs_symbol_refuses_before_any_post[statfs|fstatfs]`, `test_statfs_helpers_return_none_when_the_symbol_is_missing`, `test_libc_losing_fstatfs_after_creates_exits_69_with_ids`. All 4 fail on the `518d5215` source and pass at this tip.
+
+Census at this tip (one AST walk of the four sandbox modules): if 218, boolop 72, and 26, or 46, clause 154, ifexp 8, while 3. Total 1207 (218×3 + 72 + 154 + 308 + 16 + 3). The 1207-row table was not run.
+
+Named serial probes at this tip (one sandbox-test run each): `_WALK_LIMIT = 257` SURVIVES (355 passed); `target_key` `if False` (guard:603) KILLED, 2 failed; new `statfs` operand forced False KILLED, 1 failed; new `fstatfs` operand forced False KILLED, 1 failed; `statfs` `AttributeError` catch dropped KILLED, 1 failed; `fstatfs` `AttributeError` catch dropped KILLED, 1 failed. The other named probes from Reviewer's 9 were not re-run here; their lines are unchanged.
+
+PARKED to the next wave, not fixed and not claimed equivalent: `_WALK_LIMIT = 257` (guard:30); guard 396 F, 420 LT1, 472 F, 487:8 F, 487:16 ×4; ns:349 ×10, ns:352 ×3; the r8 6 CLI-masked and 10 no-libc rows (not re-swept). Also Reviewer 5469228650's changed-region sweep survivors (already present in r8 or r9): guard 579/582/593 (If F, SWAP, LF0, LF1), guard 591 F, guard 600 NEG/T/F (pre-round-11 line numbers; +7 at this tip). Also Reviewer's should-fix: `target_key` (guard:603 at this tip) refuses a path through a `.` or `..` link repeated three or more times (`here -> .`, `c/here/here/here/ev.json`). It fails closed (64, 0 POSTs); no code change this round.
+
+Nits: `test_nested_relative_symlink_chain_is_accepted` is dry-run only (Verifier ran `--execute` on the same shape: 16 reads, 5 creates). The 236-run burst was not repeated this round.
+
+`tests/unit/cli/test_notion_sandbox.py`: 355 passed. `ruff format --check`, `ruff check`, and `pyright` 1.1.411 (0 errors) are clean. Full local pytest: `uv run pytest -q -p no:cacheprovider`: 2670 passed, 193 skipped, 12 failed. The 12 failures are `test_compose_preserves_the_postgres_password` because `docker` is absent. Local-only. CI is the gate.
+
 ## 2026-10-09 — Session 07 sandbox run, round 10
 
 Not a session close. This is not SESSION_07 COMPLETE. `state_revision` stays 58. `IMPLEMENTATION_STATE.json` is not edited. `head_sha` stays the W9 squash `a4e9b025021b4effbb2b2879c1db756403cb1676`. Twelve session 7 evidence keys stay false. `commissioned_agents` stays empty. Exit 78 stays HELD. The §11 sandbox CLI is still not run live. This commit's CI run is not invented here. No Verifier verdict had landed on `9d350221` when this round was written.
@@ -11,7 +32,7 @@ Round 10 answers Reviewer 5468752023 on tip `9d350221` under the frozen criteria
 
 Named probes this round. `target_key` `if False`: KILLED by `test_symlink_cycle_is_refused` and `test_symlink_self_loop_is_refused`. The new nested, hook-order, and hook-restore tests each fail on the `9d350221` source.
 
-PARKED to the next wave, not fixed and not claimed equivalent: the 23 changed-line survivors from the Reviewer sweep (guard 396 F, 420 LT1, 472 F, 487:8 F, 487:16 ×4, 590 F, 599 F; ns:349 ×10, ns:352 ×3); the r8 6 CLI-masked and 10 no-libc survivors (not re-swept). guard 590 F refers to the deleted line.
+PARKED to the next wave, not fixed and not claimed equivalent (corrected in round 11; the original line wrongly parked 590 F and 599 F and counted "23 changed-line survivors"): `_WALK_LIMIT = 257` (guard:30); guard 396 F, 420 LT1, 472 F, 487:8 F, 487:16 ×4; ns:349 ×10, ns:352 ×3; the r8 6 CLI-masked and 10 no-libc rows (not re-swept). `target_key` `if False` (old 599 F) is KILLED; 590 F was deleted with the `prefix_key` check.
 
 `tests/unit/cli/test_notion_sandbox.py`: 351 passed. `ruff format --check`, `ruff check`, and `pyright` 1.1.411 (0 errors) are clean. Full local pytest: `uv run pytest -q -p no:cacheprovider`: 2666 passed, 193 skipped, 12 failed. The 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. Local-only. CI is the gate.
 

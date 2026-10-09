@@ -6807,3 +6807,96 @@ def test_publish_interrupted_ki_after_complete_file_returns_69(
         sandbox_module._reset_held()  # pyright: ignore[reportPrivateUsage]
     assert code == EXIT_API
     assert path.is_file()
+
+
+class _LibcWithout:
+    """Process libc with one symbol hidden, as a libc built without it."""
+
+    def __init__(self, real: object, missing: str) -> None:
+        self._real = real
+        self._missing = missing
+
+    def __getattr__(self, name: str) -> object:
+        if name == self._missing:
+            raise AttributeError(name)
+        return getattr(self._real, name)
+
+
+@pytest.mark.parametrize("missing", ["statfs", "fstatfs"])
+def test_libc_without_statfs_symbol_refuses_before_any_post(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    missing: str,
+) -> None:
+    """guard:434 / :449: a libc without statfs or fstatfs is 64 with 0 reads, not a crash."""
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    real = guard_module._libc()  # pyright: ignore[reportPrivateUsage]
+    assert real is not None
+    stub = _LibcWithout(real, missing)
+    monkeypatch.setattr(guard_module, "_libc", lambda: stub)
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_USAGE
+    assert err == "evidence path is refused\n"
+    assert "Traceback" not in err
+    assert payload == {}
+    assert client.reads == []
+    assert client.creates == []
+    assert evidence.exists() is False
+
+
+def test_statfs_helpers_return_none_when_the_symbol_is_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    real = guard_module._libc()  # pyright: ignore[reportPrivateUsage]
+    assert real is not None
+    monkeypatch.setattr(guard_module, "_libc", lambda: _LibcWithout(real, "statfs"))
+    assert guard_module._statfs_f_type(tmp_path) is None  # pyright: ignore[reportPrivateUsage]
+    monkeypatch.setattr(guard_module, "_libc", lambda: _LibcWithout(real, "fstatfs"))
+    fd = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    try:
+        assert guard_module._fstatfs_f_type(fd) is None  # pyright: ignore[reportPrivateUsage]
+        assert guard_module._fd_on_procfs(fd) is True  # pyright: ignore[reportPrivateUsage]
+    finally:
+        os.close(fd)
+
+
+def test_libc_losing_fstatfs_after_creates_exits_69_with_ids(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """guard:449 via :790: fstatfs gone after creates is a refusal with the ids printed."""
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    real = guard_module._libc()  # pyright: ignore[reportPrivateUsage]
+    assert real is not None
+    stub = _LibcWithout(real, "fstatfs")
+
+    class _DropFstatfs(FakeSandbox):
+        def create_child_page(self, parent_id: str, title: str) -> PageView:
+            page = super().create_child_page(parent_id, title)
+            if len(self.creates) == len(_CHILD_IDS):
+                monkeypatch.setattr(guard_module, "_libc", lambda: stub)
+            return page
+
+    client = _DropFstatfs()
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_API
+    assert "Traceback" not in err
+    assert evidence.exists() is False
+    assert payload == {}
+    assert len(client.creates) == len(_CHILD_IDS)
+    for page_id in _CHILD_IDS:
+        assert canonical_id(page_id) in err

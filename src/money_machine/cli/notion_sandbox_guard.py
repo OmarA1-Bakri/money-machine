@@ -416,8 +416,15 @@ def _mountinfo_usable() -> bool:
 
 
 def _detection_ready() -> bool:
-    """False when libc/statfs or mountinfo cannot be used. Callers refuse."""
-    return _libc() is not None and _mountinfo_usable()
+    """False when libc/statfs or mountinfo cannot be used. Callers refuse.
+
+    A libc without ``statfs`` or ``fstatfs`` is not ready, so the path is
+    refused (64) before any read or create instead of an ``AttributeError``.
+    """
+    lib = _libc()
+    if lib is None or not hasattr(lib, "statfs") or not hasattr(lib, "fstatfs"):
+        return False
+    return _mountinfo_usable()
 
 
 def _statfs_f_type(path: Path) -> int | None:
@@ -432,7 +439,7 @@ def _statfs_f_type(path: Path) -> int | None:
     buf = _Statfs()
     try:
         result = lib.statfs(os.fsencode(path), ctypes.byref(buf))
-    except OSError:
+    except (OSError, AttributeError):
         return None
     if result != 0:
         return None
@@ -447,7 +454,7 @@ def _fstatfs_f_type(fd: int) -> int | None:
     buf = _Statfs()
     try:
         result = lib.fstatfs(fd, ctypes.byref(buf))
-    except OSError:
+    except (OSError, AttributeError):
         return None
     if result != 0:
         return None

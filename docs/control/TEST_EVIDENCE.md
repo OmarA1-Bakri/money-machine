@@ -1,5 +1,24 @@
 # Test Evidence
 
+## 2026-10-09 — Session 07 sandbox run, round 11
+
+**Verification scope**: Round 11 of the §11 sandbox runner. Verifier 6079607643 and Reviewer 5469228650 (both FAIL at `518d5215`, text only) are folded into this commit. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited. **No equivalents are claimed.**
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete. This is not SESSION_07 COMPLETE | PASS |
+| Tip-sync | STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. `state_revision` stays 58 | PASS |
+| libc without `statfs` / `fstatfs` | `test_libc_without_statfs_symbol_refuses_before_any_post[statfs,fstatfs]`: 64, 0 reads, 0 creates, no traceback | PASS |
+| `fstatfs` lost after creates | `test_libc_losing_fstatfs_after_creates_exits_69_with_ids`: 69, no file, 5 ids on stderr | PASS |
+| New tests on old source | All 4 fail on the `518d5215` source | PASS |
+| Census | if 218, boolop 72, and 26, or 46, clause 154, ifexp 8, while 3. Total 1207. **1207-row table not run** | PASS (count only) |
+| Named serial probes | 6 run at this tip: 5 KILLED, 1 SURVIVED (`_WALK_LIMIT = 257`) | PARTIAL |
+| Sandbox tests | `tests/unit/cli/test_notion_sandbox.py`: 355 passed | PASS |
+| Lint and types | `ruff format --check`, `ruff check`, `pyright` 1.1.411: 0 errors | PASS |
+| Full local pytest | 2670 passed, 193 skipped, 12 failed (docker absent). Local-only. CI is the gate | 12 known local docker failures; CI is the gate |
+| Parked survivors | `_WALK_LIMIT = 257` (guard:30); guard 396 F, 420 LT1, 472 F, 487:8 F, 487:16 ×4; ns:349 ×10, ns:352 ×3; the r8 6 CLI-masked and 10 no-libc rows (not re-swept); Reviewer sweep guard 579/582/593/591/600 rows; repeated `.`/`..` link over-refusal (fails closed) | PARKED |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
 ## 2026-10-09 — Session 07 sandbox run, round 10
 
 **Verification scope**: Round 10 of the §11 sandbox runner. Reviewer FAIL 5468752023 at `9d350221` is folded into this commit. The sandbox CLI is still not run live. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. `IMPLEMENTATION_STATE.json` is not edited. **No equivalents are claimed.**
@@ -14,7 +33,7 @@
 | Sandbox tests | `tests/unit/cli/test_notion_sandbox.py`: 351 passed | PASS |
 | Lint and types | `ruff format --check`, `ruff check`, `pyright` 1.1.411: 0 errors | PASS |
 | Full local pytest | 2666 passed, 193 skipped, 12 failed (docker absent). Local-only. CI is the gate | 12 known local docker failures; CI is the gate |
-| Parked survivors | 23 changed-line survivors, r8 6 CLI-masked and 10 no-libc. Not re-swept | PARKED |
+| Parked survivors | Corrected in round 11: `_WALK_LIMIT = 257` (guard:30); guard 396 F, 420 LT1, 472 F, 487:8 F, 487:16 ×4; ns:349 ×10, ns:352 ×3; the r8 6 CLI-masked and 10 no-libc rows (not re-swept). `target_key` `if False` is KILLED | PARKED |
 | Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
 
 ## 2026-10-09 — Session 07 sandbox run, round 9

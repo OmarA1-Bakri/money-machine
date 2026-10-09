@@ -32,11 +32,13 @@
 
 Router browser and combined config modes still raise `NotImplementedError` (W4a). Fixture mode stays the default.
 
-## Session 07 — sandbox run, round 10
+## Session 07 — sandbox run, rounds 10–11
 
 **Status**: Incomplete (2026-10-09, state revision 58). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `commissioned_agents` stays empty. STATE `head_sha` `a4e9b025021b4effbb2b2879c1db756403cb1676` stays the W9 squash. Exit 78 scheduler stays HELD. The §11 sandbox CLI is still not run live.
 
-Round 10 answers Reviewer 5468752023 at `9d350221`. The guard no longer refuses a nested relative symlink chain (K=2, 8, 16 accepted at the public entry). Cycles and self-loops stay refused. The SIGINT race hook is installed before `SIG_IGN` and restored by `main`. Parked: 23 changed-line survivors plus the r8 CLI-masked and no-libc sets. Sandbox tests: 351 passed. Full local pytest: 2666 passed, 193 skipped, 12 failed (`docker` absent).
+Round 11 answers Verifier 6079607643 and Reviewer 5469228650 at `518d5215` (text only). Body and log claims are relabelled. A libc without `statfs` or `fstatfs` is refused (64) before any read; `fstatfs` lost after creates is 69 with ids printed. Sandbox tests: 355 passed. Full local pytest: 2670 passed, 193 skipped, 12 failed (`docker` absent).
+
+Round 10 answers Reviewer 5468752023 at `9d350221`. The guard no longer refuses a nested relative symlink chain (K=2, 8, 16 accepted at the public entry). Cycles and self-loops stay refused. The SIGINT race hook is installed before `SIG_IGN` and restored by `main`. Parked (corrected in round 11): `_WALK_LIMIT = 257`, guard 396 F, 420 LT1, 472 F, 487:8 F, 487:16 ×4, ns:349 ×10, ns:352 ×3, plus the r8 CLI-masked and no-libc sets. Sandbox tests: 351 passed. Full local pytest: 2666 passed, 193 skipped, 12 failed (`docker` absent).
 
 ## Session 07 — sandbox run, round 9
 
