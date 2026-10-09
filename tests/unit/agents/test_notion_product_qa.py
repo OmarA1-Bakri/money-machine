@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import socket
+import traceback
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -23,8 +25,13 @@ from money_machine.agents.implementations.notion_progress import (
     OP_QA,
     ProviderFailure,
     load_payload,
+    raise_recorded,
 )
-from money_machine.agents.implementations.notion_qa import PHASE_FACT_LEDGER, run_product_qa
+from money_machine.agents.implementations.notion_qa import (
+    PHASE_FACT_LEDGER,
+    load_qa_record,
+    run_product_qa,
+)
 from money_machine.agents.implementations.notion_variants import (
     PHASE_QA,
     build_variants,
@@ -218,6 +225,26 @@ async def test_no_access_block_is_blocked_with_no_adapter_writes(tmp_path: Path)
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("content", [None, 5])
+async def test_non_text_block_content_is_a_product_error(tmp_path: Path, content: object) -> None:
+    """None or an int in block content is a typed error, not a TypeError."""
+    spec = planner_spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _variants(spec, probe, path)
+    home = next(iter(probe.pages.values()))
+    block = NotionTextBlock(id="block_bad_content", parent_id=home.id, content="ok")
+    block.content = content  # pyright: ignore[reportAttributeAccessIssue]
+    probe.blocks[block.id] = block
+    raw = path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match="qa block content is not text"):
+        await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
 async def test_extra_database_is_blocked_with_no_adapter_writes(tmp_path: Path) -> None:
     spec = planner_spec()
     probe = FixtureNotionAdapter()
@@ -261,6 +288,44 @@ async def test_wrong_formula_expression_is_blocked(tmp_path: Path) -> None:
     assert checkpoint.qa is not None and checkpoint.qa.verdict == "BLOCKED"
     assert _flag(checkpoint, "notification_values") is False
     assert _flag(checkpoint, "formulas_compile") is True
+    assert calls == []
+
+
+class _LyingFormula(str):
+    """A str subclass that claims to equal any non-empty expression."""
+
+    def __eq__(self, other: object) -> bool:
+        return other != ""
+
+
+@pytest.mark.asyncio
+async def test_lying_formula_expression_is_not_a_string(tmp_path: Path) -> None:
+    """QA refuses a str subclass. Equality that always matches is not enough."""
+    spec, probe, path = await _built(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    changed = False
+    for database in probe.databases.values():
+        for prop in database.properties:
+            formula = prop.config.get("formula")
+            if (
+                type(formula) is NotionFormula
+                and type(formula.expression) is str
+                and formula.expression != ""
+            ):
+                # The text matches the spec, so ``!=`` does not refuse it.
+                # ``str.__ne__`` ignores a lying ``__eq__`` when the text differs.
+                formula.expression = _LyingFormula(formula.expression)
+                changed = True
+                break
+        if changed:
+            break
+    assert changed
+    values = notion_qa_module._notification_values  # pyright: ignore[reportPrivateUsage]
+    assert values(probe, stored, spec) is False
+    calls = watch_adapter_writes(probe)
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "BLOCKED"
+    assert _flag(checkpoint, "notification_values") is False
     assert calls == []
 
 
@@ -375,8 +440,10 @@ async def test_duplicate_crash_then_resume_creates_one_proof(tmp_path: Path) -> 
         return await original(page_id)
 
     probe.duplicate_page = _boom  # type: ignore[method-assign]
-    with pytest.raises(RuntimeError, match="step crashed"):
+    # A provider error of any kind is recorded under the fixed text, not raised raw.
+    with pytest.raises(ProductBuildError, match=r"^provider operation failed$") as caught:
         await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert "step crashed" not in str(caught.value)
     assert len(probe.pages) == started
     assert "qa" not in json.loads(path.read_text(encoding="ascii"))["provider_object_references"]
 
@@ -430,13 +497,15 @@ async def test_public_url_provider_failure_records_a_repair_job(tmp_path: Path) 
 
     probe.get_public_url = _boom  # type: ignore[method-assign]
     calls = watch_adapter_writes(probe)
-    with pytest.raises(ProductBuildError, match="url refused"):
+    with pytest.raises(ProductBuildError, match=r"^provider operation failed$"):
         await run_product_qa(spec, probe, path, recorded_at=QA_AT)
 
     stored = json.loads(path.read_text(encoding="ascii"))
     job = stored["progress"]["repair_jobs"][-1]
     assert job["kind"] == "provider_response"
-    assert job["response"] == "url refused"
+    assert job["operation"] == OP_QA
+    assert job["response"] == "provider operation failed"
+    assert "url refused" not in path.read_text(encoding="ascii")
     assert calls == []
     assert len(probe.pages) == raw_pages
     assert "qa" not in stored["provider_object_references"]
@@ -452,7 +521,7 @@ async def test_guarded_duplicate_records_a_repair_job(tmp_path: Path) -> None:
     probe.fail_response = "qa refused"  # type: ignore[attr-defined]
     calls = watch_adapter_writes(probe)
 
-    with pytest.raises(ProductBuildError, match="qa refused"):
+    with pytest.raises(ProductBuildError, match=r"^provider operation failed$"):
         await run_product_qa(spec, probe, path, recorded_at=QA_AT)
 
     stored = json.loads(path.read_text(encoding="ascii"))
@@ -795,6 +864,28 @@ async def test_unpublish_page_is_repaired_then_passes(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_empty_captured_url_repairs_like_a_missing_url(tmp_path: Path) -> None:
+    """Empty captured URL is skipped, the same as a missing URL, then repaired.
+
+    The public-link contract skips a captured value that is missing or "".
+    A real unpublish leaves public_url as None. "" takes that same repair.
+    """
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    await probe.unpublish_page(page.id)
+    page.public_url = ""
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "PASS"
+    assert checkpoint.qa.repairs == ("published",)
+    assert calls == ["publish_page", "duplicate_page"]
+    assert page.is_published is True
+
+
+@pytest.mark.asyncio
 async def test_unpublish_publish_crash_then_resume_passes(tmp_path: Path) -> None:
     spec, probe, path = await _built(tmp_path)
     page = _colour_pages(probe, spec)[0]
@@ -809,8 +900,10 @@ async def test_unpublish_publish_crash_then_resume_passes(tmp_path: Path) -> Non
         return await original(page_id)
 
     probe.publish_page = _boom  # type: ignore[method-assign]
-    with pytest.raises(RuntimeError, match="publish crashed"):
+    # A provider error of any kind is recorded under the fixed text, not raised raw.
+    with pytest.raises(ProductBuildError, match=r"^provider operation failed$") as caught:
         await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert "publish crashed" not in str(caught.value)
     assert page.is_published is False
     assert "qa" not in json.loads(path.read_text(encoding="ascii"))["provider_object_references"]
 
@@ -1303,7 +1396,7 @@ async def test_repair_guard_refuses_before_publish(tmp_path: Path) -> None:
     probe.fail_response = "qa refused"  # type: ignore[attr-defined]
     calls = watch_adapter_writes(probe)
 
-    with pytest.raises(ProductBuildError, match="qa refused"):
+    with pytest.raises(ProductBuildError, match=r"^provider operation failed$"):
         await run_product_qa(spec, probe, path, recorded_at=QA_AT)
 
     assert calls == []
@@ -1433,6 +1526,30 @@ async def test_incomplete_qa_record_is_refused(tmp_path: Path, kind: str, match:
     with pytest.raises(ProductBuildError, match=match):
         await run_product_qa(spec, probe, path, recorded_at=QA_AT)
 
+    assert calls == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("digest", [5, "a" * 63, "", "g" * 64, "A" * 64])
+async def test_prose_digest_must_be_lowercase_hex(tmp_path: Path, digest: object) -> None:
+    """Helper and public entry. A short, empty, non-hex, or non-string digest is incomplete."""
+    spec, probe, path = await _built(tmp_path)
+    await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    stored = dict(_qa_body(path))
+    stored["prose_digest"] = digest
+    require = notion_qa_module._require_qa  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ProductBuildError, match="qa record is incomplete"):
+        require(stored)
+
+    def _mutate(document: dict[str, object]) -> None:
+        _qa_reference(document)["prose_digest"] = digest
+
+    restamp_checkpoint(path, _mutate)
+    raw = path.read_bytes()
+    calls = watch_adapter_writes(probe)
+    with pytest.raises(ProductBuildError, match="qa record is incomplete"):
+        await run_product_qa(spec, probe, path, recorded_at=LATER)
     assert calls == []
     assert path.read_bytes() == raw
 
@@ -1873,20 +1990,37 @@ async def test_shared_database_off_the_home_page_is_blocked(tmp_path: Path) -> N
     assert calls == []
 
 
+def _fresh_duplicate_outcome(
+    checkpoint: ProductBuildCheckpoint | None, caught: ProductBuildError | None
+) -> tuple[tuple[str, ...], ProductBuildError | None]:
+    """Return the false checks. The caller asserts adapter writes before this result."""
+    if caught is not None:
+        return (), caught
+    assert checkpoint is not None and checkpoint.qa is not None
+    return _false_checks(checkpoint), None
+
+
 @pytest.mark.asyncio
 async def test_renamed_variant_page_fails_fresh_duplicate(tmp_path: Path) -> None:
     spec, probe, path = await _built(tmp_path)
     page = _colour_pages(probe, spec)[0]
     page.title = "TAMPERED"
     calls = watch_adapter_writes(probe)
+    checkpoint: ProductBuildCheckpoint | None = None
+    caught: ProductBuildError | None = None
+    try:
+        checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    except ProductBuildError as error:
+        caught = error
 
-    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    false_checks, error = _fresh_duplicate_outcome(checkpoint, caught)
 
-    assert checkpoint.qa is not None
+    assert calls == []
+    assert false_checks == ("fresh_duplicate",)
+    assert error is None
+    assert checkpoint is not None and checkpoint.qa is not None
     assert checkpoint.qa.verdict == "BLOCKED"
     assert checkpoint.qa.repairs == ()
-    assert _false_checks(checkpoint) == ("fresh_duplicate",)
-    assert calls == []
 
 
 @pytest.mark.asyncio
@@ -1895,14 +2029,139 @@ async def test_forged_spec_id_fails_fresh_duplicate(tmp_path: Path) -> None:
     page = _colour_pages(probe, spec)[0]
     page.properties[SPEC_ID_PROPERTY] = "forged-spec"
     calls = watch_adapter_writes(probe)
+    checkpoint: ProductBuildCheckpoint | None = None
+    caught: ProductBuildError | None = None
+    try:
+        checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    except ProductBuildError as error:
+        caught = error
+
+    false_checks, error = _fresh_duplicate_outcome(checkpoint, caught)
+
+    assert calls == []
+    assert false_checks == ("fresh_duplicate",)
+    assert error is None
+    assert checkpoint is not None and checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "BLOCKED"
+    assert checkpoint.qa.repairs == ()
+
+
+@pytest.mark.asyncio
+async def test_lying_publish_stays_blocked_without_a_duplicate(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    await probe.unpublish_page(page.id)
+    page.duplicate_as_template = False
+    original = probe.publish_page
+
+    async def _lie(page_id: str) -> NotionPage:
+        published = await original(page_id)
+        published.public_url = ""
+        return published
+
+    probe.publish_page = _lie  # type: ignore[method-assign]
+    calls = watch_adapter_writes(probe)
 
     checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
 
     assert checkpoint.qa is not None
     assert checkpoint.qa.verdict == "BLOCKED"
-    assert checkpoint.qa.repairs == ()
-    assert _false_checks(checkpoint) == ("fresh_duplicate",)
-    assert calls == []
+    assert checkpoint.qa.repairs == ("published",)
+    assert checkpoint.qa.proof_page_id == ""
+    assert calls == ["publish_page"]
+    assert page.is_published is True
+    assert page.public_url == ""
+
+
+@pytest.mark.asyncio
+async def test_unpublished_and_duplicate_off_repairs_both(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    await probe.unpublish_page(page.id)
+    page.duplicate_as_template = False
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "PASS"
+    assert checkpoint.qa.repairs == ("published", "duplicate_button")
+    assert calls == ["publish_page", "set_duplicate_as_template", "duplicate_page"]
+    assert page.is_published is True
+    assert page.duplicate_as_template is True
+
+
+@pytest.mark.asyncio
+async def test_untrusted_publish_does_not_set_the_duplicate(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    await probe.unpublish_page(page.id)
+    page.duplicate_as_template = False
+    original = probe.publish_page
+
+    async def _lie(page_id: str) -> NotionPage:
+        published = await original(page_id)
+        published.is_published = True
+        published.public_url = "https://evil.example/not-trusted"
+        return published
+
+    probe.publish_page = _lie  # type: ignore[method-assign]
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "BLOCKED"
+    assert checkpoint.qa.repairs == ("published",)
+    assert calls == ["publish_page"]
+    assert page.duplicate_as_template is False
+
+
+@pytest.mark.asyncio
+async def test_publish_that_stays_unpublished_does_not_set_duplicate(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    await probe.unpublish_page(page.id)
+    page.duplicate_as_template = False
+    original = probe.publish_page
+
+    async def _lie(page_id: str) -> NotionPage:
+        published = await original(page_id)
+        published.is_published = False
+        published.public_url = "https://fixture.notion.site/" + page_id
+        return published
+
+    probe.publish_page = _lie  # type: ignore[method-assign]
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "BLOCKED"
+    assert checkpoint.qa.repairs == ("published",)
+    assert calls == ["publish_page"]
+    assert page.duplicate_as_template is False
+
+
+@pytest.mark.asyncio
+async def test_pass_with_a_false_check_is_refused(tmp_path: Path) -> None:
+    spec, probe, path = await _built(tmp_path)
+    await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    def _false_check(document: dict[str, object]) -> None:
+        references = document["provider_object_references"]
+        assert type(references) is dict
+        qa = references["qa"]
+        assert type(qa) is dict
+        checks = qa["checks"]
+        assert type(checks) is list
+        row = checks[0]
+        assert type(row) is dict
+        row["passed"] = "false"
+
+    restamp_checkpoint(path, _false_check)
+    with pytest.raises(ProductBuildError, match="qa record does not match"):
+        load_qa_record(path)
 
 
 @pytest.mark.asyncio
@@ -1978,7 +2237,7 @@ async def test_notification_row_subclass_fails_notification_values(tmp_path: Pat
     assert checkpoint.qa is not None
     assert checkpoint.qa.verdict == "BLOCKED"
     assert checkpoint.qa.repairs == ()
-    assert _false_checks(checkpoint) == ("notification_values", "page_count", "facts_persisted")
+    assert _false_checks(checkpoint) == ("notification_values", "facts_persisted")
     assert calls == []
 
 
@@ -2015,3 +2274,322 @@ async def test_qa_does_not_open_a_socket(tmp_path: Path, monkeypatch: pytest.Mon
         "ETSY",
     ):
         assert token.casefold() not in source.casefold()
+
+
+QA_SECRET = "sk-live-qa-secret"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("response", [QA_SECRET, "qa " + QA_SECRET, "fact ledger " + QA_SECRET])
+async def test_provider_response_is_not_stored_raised_or_chained(
+    tmp_path: Path, response: str
+) -> None:
+    """The QA provider job and the raised error carry fixed text only."""
+    spec = planner_spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _variants(spec, probe, path)
+    probe.fail_operation = OP_QA  # type: ignore[attr-defined]
+    probe.fail_response = response  # type: ignore[attr-defined]
+
+    with pytest.raises(ProductBuildError) as caught:
+        await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    error = caught.value
+    assert str(error) == "provider operation failed"
+    assert error.args == ("provider operation failed",)
+    assert error.__context__ is None
+    cause = error.__cause__
+    assert type(cause) is ProviderFailure
+    assert cause.operation == OP_QA
+    assert cause.response == "provider operation failed"
+    assert cause.args == ("provider operation failed",)
+    assert cause.__cause__ is None
+    assert cause.__context__ is None
+    assert QA_SECRET not in "".join(traceback.format_exception(error))
+    assert QA_SECRET not in path.read_text(encoding="ascii")
+    stored = json.loads(path.read_text(encoding="ascii"))
+    jobs = [job for job in stored["progress"]["repair_jobs"] if job["kind"] == "provider_response"]
+    assert len(jobs) == 1
+    assert jobs[0]["response"] == "provider operation failed"
+    assert "qa" not in stored["provider_object_references"]
+
+
+def _connection_error() -> Exception:
+    return ConnectionError("sk-live-secret")
+
+
+def _runtime_error() -> Exception:
+    error = RuntimeError("upstream said sk-live-secret")
+    error.add_note("sk-live-secret")
+    return error
+
+
+def _chained_runtime_error() -> Exception:
+    try:
+        raise OSError("sk-live-secret")
+    except OSError as inner:
+        error = RuntimeError("sk-live-secret")
+        error.__cause__ = inner
+        return error
+
+
+def _all_text(error: BaseException) -> str:
+    """Every string reachable from the error: text, args, notes, chain, traceback."""
+    seen: list[str] = []
+    stack: list[BaseException | None] = [error]
+    while stack:
+        item = stack.pop()
+        if item is None:
+            continue
+        seen.append(str(item))
+        seen.append(repr(item.args))
+        seen.extend(str(note) for note in getattr(item, "__notes__", ()))
+        seen.append(repr(vars(item)))
+        stack.extend([item.__cause__, item.__context__])
+    seen.append("".join(traceback.format_exception(error)))
+    return "\n".join(seen)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "make",
+    [
+        _connection_error,
+        _runtime_error,
+        _chained_runtime_error,
+        lambda: OSError("sk-live-secret"),
+        lambda: ValueError("sk-live-secret"),
+    ],
+)
+async def test_any_provider_exception_is_recorded_under_the_fixed_text(
+    tmp_path: Path, make: Callable[[], Exception]
+) -> None:
+    """A non-ProviderFailure provider error carrying a secret is mapped, not raised raw.
+
+    Message, args, cause, context, notes, and traceback hold no secret, and the
+    stored provider job has the fixed response only.
+    """
+    spec = planner_spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _variants(spec, probe, path)
+
+    async def _boom(*_args: object, **_kwargs: object) -> NotionPage:
+        raise make()
+
+    probe.duplicate_page = _boom  # type: ignore[method-assign]
+
+    with pytest.raises(ProductBuildError) as caught:
+        await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    error = caught.value
+    assert str(error) == "provider operation failed"
+    assert error.args == ("provider operation failed",)
+    assert error.__context__ is None
+    cause = error.__cause__
+    assert type(cause) is ProviderFailure
+    assert cause.args == ("provider operation failed",)
+    assert cause.__cause__ is None
+    assert cause.__context__ is None
+    assert "sk-live-secret" not in _all_text(error)
+    assert "sk-live-secret" not in path.read_text(encoding="ascii")
+    stored = json.loads(path.read_text(encoding="ascii"))
+    jobs = [job for job in stored["progress"]["repair_jobs"] if job["kind"] == "provider_response"]
+    assert len(jobs) == 1
+    assert jobs[0]["response"] == "provider operation failed"
+    assert "qa" not in stored["provider_object_references"]
+
+
+@pytest.mark.asyncio
+async def test_own_refusal_inside_qa_keeps_its_text(tmp_path: Path) -> None:
+    """A ProductBuildError raised by QA's own code is an own refusal, not a provider job."""
+    spec, probe, path = await _built(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    del probe.pages[stored.variants[0].page_id]
+    raw = path.read_bytes()
+
+    with pytest.raises(ProductBuildError, match=r"^qa variant page is missing$"):
+        await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert path.read_bytes() == raw
+
+
+def _provider_jobs(path: Path) -> list[dict[str, str]]:
+    stored = json.loads(path.read_text(encoding="ascii"))
+    jobs = stored["progress"]["repair_jobs"]
+    return [job for job in jobs if job["kind"] == "provider_response"]
+
+
+def _every_text(error: BaseException) -> str:
+    """_all_text plus repr and each non-dunder attribute of the error and its group members."""
+    seen = [_all_text(error)]
+    pending: list[BaseException] = [error]
+    while pending:
+        item = pending.pop()
+        seen.append(repr(item))
+        seen.extend(repr(getattr(item, name)) for name in dir(item) if not name.startswith("__"))
+        if isinstance(item, BaseExceptionGroup):
+            pending.extend(cast(tuple[BaseException, ...], item.exceptions))
+    return "\n".join(seen)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prefix", ["", "qa ", "checkpoint "])
+async def test_provider_product_build_error_is_a_provider_job(tmp_path: Path, prefix: str) -> None:
+    """A provider-raised ProductBuildError is recorded under the fixed text, not raised raw."""
+    spec, probe, path = await _built(tmp_path)
+
+    async def _boom(*_args: object, **_kwargs: object) -> NotionPage:
+        raise ProductBuildError(prefix + "sk-live-secret")
+
+    probe.duplicate_page = _boom  # type: ignore[method-assign]
+    with pytest.raises(ProductBuildError) as caught:
+        await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert caught.value.args == ("provider operation failed",)
+    assert caught.value.__context__ is None
+    assert type(caught.value.__cause__) is ProviderFailure
+    assert "sk-live-secret" not in _every_text(caught.value)
+    assert "sk-live-secret" not in path.read_text(encoding="ascii")
+    assert [job["response"] for job in _provider_jobs(path)] == ["provider operation failed"]
+
+
+class _StrInterrupt(KeyboardInterrupt):
+    """A provider interrupt whose text is the secret."""
+
+    def __str__(self) -> str:
+        return "token=sk-live-secret"
+
+
+def _noted_keyboard() -> BaseException:
+    error = KeyboardInterrupt("sk-live-secret")
+    error.add_note("sk-live-secret")
+    return error
+
+
+def _interrupt_group() -> BaseException:
+    return BaseExceptionGroup("sk-live-secret", [_StrInterrupt(), RuntimeError("sk-live-secret")])
+
+
+def _identity_interrupt(shape: str) -> type[BaseException]:
+    """Round 11: a KeyboardInterrupt subclass whose name, qualname, module, or doc is the secret."""
+    secret = "sk-live-secret"
+    bodies: dict[str, tuple[str, dict[str, object]]] = {
+        "name": (secret, {"__module__": __name__}),
+        "qualname": ("_Qualname", {"__module__": __name__, "__qualname__": "probe." + secret}),
+        "module": ("_Module", {"__module__": secret}),
+        "doc": ("_Doc", {"__module__": __name__, "__doc__": secret}),
+    }
+    name, body = bodies[shape]
+    return cast(type[BaseException], type(name, (KeyboardInterrupt,), body))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("make", "kinds", "args"),
+    [
+        (_noted_keyboard, [KeyboardInterrupt], ()),
+        (lambda: asyncio.CancelledError("sk-live-secret"), [asyncio.CancelledError], ()),
+        (lambda: SystemExit("sk-live-secret"), [SystemExit], (1,)),
+        (_StrInterrupt, [KeyboardInterrupt], ()),
+        (_identity_interrupt("name"), [KeyboardInterrupt], ()),
+        (_identity_interrupt("qualname"), [KeyboardInterrupt], ()),
+        (_identity_interrupt("module"), [KeyboardInterrupt], ()),
+        (_identity_interrupt("doc"), [KeyboardInterrupt], ()),
+        (
+            lambda: BaseExceptionGroup("w", [_identity_interrupt("name")()]),
+            [BaseExceptionGroup, KeyboardInterrupt],
+            ("provider operation failed", [KeyboardInterrupt()]),
+        ),
+        (
+            _interrupt_group,
+            [BaseExceptionGroup, KeyboardInterrupt, Exception],
+            (
+                "provider operation failed",
+                [KeyboardInterrupt(), Exception("provider operation failed")],
+            ),
+        ),
+    ],
+)
+async def test_provider_interrupt_in_qa_becomes_its_built_in_base(
+    tmp_path: Path,
+    make: Callable[[], BaseException],
+    kinds: list[type[BaseException]],
+    args: tuple[object, ...],
+) -> None:
+    """A BaseException from the provider propagates cleaned, with no text, chain, or write."""
+    spec, probe, path = await _built(tmp_path)
+    raw = path.read_bytes()
+
+    async def _boom(*_args: object, **_kwargs: object) -> NotionPage:
+        raise make()
+
+    probe.duplicate_page = _boom  # type: ignore[method-assign]
+    with pytest.raises(BaseException) as caught:
+        await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    error = caught.value
+    members = [error]
+    if isinstance(error, BaseExceptionGroup):
+        members.extend(cast(tuple[BaseException, ...], error.exceptions))
+    assert [type(member) for member in members] == kinds
+    assert repr(error.args) == repr(args)
+    for member in members:
+        assert member.__cause__ is None
+        assert member.__context__ is None
+        assert getattr(member, "__notes__", None) is None
+        assert vars(member) == {}
+    assert "sk-live-secret" not in _every_text(error)
+    assert "sk-live-secret" not in "".join(traceback.format_exception(error))
+    for member in members:
+        assert "sk-live-secret" not in repr(type(member))
+        assert "sk-live-secret" not in (type(member).__doc__ or "")
+    assert path.read_bytes() == raw
+
+
+def test_recorded_provider_response_is_not_an_own_refusal(tmp_path: Path) -> None:
+    """raise_recorded is package code, but its error carries the provider response."""
+    own_refusal = notion_qa_module._own_refusal  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ProductBuildError) as caught:
+        raise_recorded(
+            tmp_path / "absent.json", "phase", ProviderFailure("op", "qa sk-live-secret")
+        )
+    assert own_refusal(caught.value) is False
+    broken = tmp_path / "broken.json"
+    broken.write_text("x\n", encoding="ascii")
+    with pytest.raises(ProductBuildError, match="checkpoint is not JSON") as refused:
+        load_qa_record(broken)
+    assert own_refusal(refused.value) is True
+
+
+@pytest.mark.asyncio
+async def test_local_programming_error_is_not_a_provider_job(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A TypeError raised by QA's own code is a fixed local failure with no provider job."""
+    spec, probe, path = await _built(tmp_path)
+    raw = path.read_bytes()
+    # A code bug inside run_product_qa itself: the digest helper is not callable.
+    monkeypatch.setattr(notion_qa_module, "prose_digest", "sk-live-secret")
+    with pytest.raises(ProductBuildError) as caught:
+        await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert caught.value.args == ("qa failed in local code",)
+    assert caught.value.__cause__ is None
+    assert caught.value.__context__ is None
+    assert "sk-live-secret" not in _every_text(caught.value)
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_provider_type_error_is_still_a_provider_job(tmp_path: Path) -> None:
+    """A TypeError raised inside the provider is a provider error, recorded once."""
+    spec, probe, path = await _built(tmp_path)
+
+    async def _boom(*_args: object, **_kwargs: object) -> NotionPage:
+        raise TypeError("sk-live-secret")
+
+    probe.duplicate_page = _boom  # type: ignore[method-assign]
+    with pytest.raises(ProductBuildError) as caught:
+        await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert caught.value.args == ("provider operation failed",)
+    assert "sk-live-secret" not in _every_text(caught.value)
+    assert "sk-live-secret" not in path.read_text(encoding="ascii")
+    assert [job["response"] for job in _provider_jobs(path)] == ["provider operation failed"]

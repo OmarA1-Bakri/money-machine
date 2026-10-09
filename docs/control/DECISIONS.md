@@ -296,3 +296,38 @@ Wave 9 is a bounded slice within Session 04 that conditionally lifts Exit 78 wit
 - Session 02 addendum point 1 — "Job claiming is commissioned in Session 03" (later superseded by Session 03 addendum)
 - Session 03 addendum point 4 — "commissioning evidence, agent promotion to COMMISSIONED, and removal of exit 78 are Session 04's scope"
 - Session 04 addendum point 1 — "Exit 78 stays until decision record + commissioning evidence gate"
+
+## D-0029 — Session 07 section 10 names are labels on the workflow graph
+
+**Status:** accepted for Session 07 Wave 10, 2026-10-07.
+
+### Context
+
+Prompt section 10 names the chain DEDUPE_PASSED, BUILD_NOTION_TEMPLATE, RUN_PRODUCT_QA, REPAIR, CREATE_VARIANTS, RUN_VARIANT_QA, and GENERATE_LISTING_PACKAGE. Those names are not the job types in `config/workflows.yaml`. The Session 03 prompt-integrity review, finding M11, already voided the prompt's example job names as a parallel authority and bound implementation to `config/workflows.yaml`.
+
+### Decision
+
+The workflow link records the existing graph. It does not edit `config/workflows.yaml` and it does not create jobs.
+
+- BUILD_NOTION_TEMPLATE is ProductBuildJob. DEDUPE_PASSED maps to that job alone.
+- RUN_PRODUCT_QA is ProductQAJob.
+- REPAIR is BuildRepairJob. The edge is recorded. This wave does not execute it.
+- CREATE_VARIANTS is VariantBuildJob.
+- RUN_VARIANT_QA is VariantPublishJob, because VARIANT_LINKS_VERIFIED maps to ScreenshotJob on `event_successor_map`.
+- GENERATE_LISTING_PACKAGE ready is ListingCopyJob, whose output contract includes ListingPackage. The path reaches it through ScreenshotJob. SCREENSHOTS_CAPTURED maps to ListingCopyJob, AssetFactoryJob, and DeliveryBuildJob. There is no direct VariantPublishJob to ListingCopyJob edge.
+
+Each of the ten edges is checked three ways. The predecessor must admit the event. The predecessor must name the successor. `event_successor_map` must list that event's successors in canonical order. The eight persisted step labels stay the section-10 names. An extra successor refuses. The real three-job SCREENSHOTS_CAPTURED list still passes.
+
+Caller `buyer_problem`, `flagship_feature`, `hubs`, `identity`, and `tier` are not a second fact source. The expected hubs are the caller's hubs when that caller is the hub set QA judged: the same hub names, in order, and `spec.identity` equal to the notification row Name. That ordered name tuple is the stored spec. A mismatched caller is refused when the live section prose is not that caller's prose. Identity `Not The Row`, or hubs named `Other ` plus the judged name, after a post-QA hub, buyer, or practice edit, raises `fact ledger caller does not match` and writes nothing. A stored BLOCKED ledger is not overwritten to PASS when that caller resumes. A live purpose, buyer, or practice edit on a matching caller is BLOCKED, with ready empty and `qa_verdict` false. A missing block id is still a refusal. Tier follows the stored database kinds. The ledger counts known ids only. The proof copy is not a known id, and `page_count` stays 15. No ListingCopyJob reads the ledger in this wave.
+
+A mismatched caller whose descriptions still equal the live section text is not that edit. `_require_hub_name` accepts a 64-character hub name and refuses 65, on the named path and on the unnamed path. The unnamed detail check repeats that name rule. A 65-character name is refused by `_require_hub_name` and does not reach the detail check. `test_legal_bounds_pass_and_one_past_refuses` kills `_require_hub_name`. `test_unnamed_sixty_four_character_hub_name_passes` is the 64-character PASS. A buyer problem of 501 to 1000 characters passes on both paths. The on-disk progress record stores `next_phase`, and a named BLOCKED ledger's in-memory `next_phase` is that same value (`test_matrix`).
+
+Amended 2026-10-08 after the verifier FAIL on tip `9eff481e`: reading buyer, flagship, and hub prose back off the live pages had turned a live edit into a ledger PASS. Amended again after reviewer review 5454105031 on tip `5dc55814`: the unmatched-caller branch was still reading that prose off the live pages. Amended again after verifier comment 6056684351 on the same tip: the refusal is the post-QA edit, and a 64-character name on the unmatched path stays legal. Amended again after verifier comment 6060511391 and CodeRabbit review 5455831580 on tip `45818d9e`: the checkpoint stores a digest of the QA-approved descriptions, buyer, and flagship. Amended again after reviewer review 5457879480 on the same tip: each variant name is checked on its own, a QA formula expression must be an exact `str`, and a provider `ProductBuildError` does not leave with its message or its cause chain. Amended again after verifier comment 6066644759 on tip `0b2007a7`: the read failure is raised after its handler has returned, so no provider or code error is reachable on `__cause__` or `__context__`, and an own-prefix message counts as an own refusal only when package code raised it and its cause is not a `ProviderFailure`. Amended again after reviewer review 5464808945 and verifier comment 6072697310 on tip `1e614857`: a fact that is a str subclass is refused, a variant name with a comma is refused, a QA provider response is neither stored nor raised, and a cancellation or other `BaseException` leaves the ledger read as a fresh error of the same kind with no text or chain. Amended again after reviewer review 5466065420 on tip `08484bf0`: any `Exception` from a QA provider call is recorded and raised under the fixed provider text, a custom `BaseException` keeps its kind only when building it runs no caller code (otherwise its nearest built-in base), and a `BaseExceptionGroup` keeps its kind with cleaned members.
+
+Caller-trust limit. The QA record stores `prose_digest`, the sha256 of the hub descriptions in order, then `buyer_problem`, then `flagship_feature`. Hub names and the row identity are not in that digest. `_plan` compares the stored digest with the caller's prose before `live_qa_passed` and before any write. A mismatch raises `fact ledger caller does not match` and writes nothing. `_saved_holds` returns false on that mismatch, so QA runs again and stores the new digest before a later ledger PASS. A caller who keeps the judged hub names and the row identity, and who changes a description, the buyer, or the flagship after QA, does not get a ledger PASS until that re-run. A mismatched caller who rewrites descriptions to edited pages is the same refusal when that prose is not the stored digest. The 64-character unnamed path still PASSes when the descriptions, buyer, and flagship are the ones QA judged. Forged prose that QA has not re-judged is not a ledger PASS.
+
+Supported devices are recorded as `unverified`. The free-update policy is recorded as `not_configured`. Nothing persisted verifies either one. Those tokens are not a device claim and not a free-update claim.
+
+### Consequences
+
+A missing admitted event, a missing successor type, a missing edge, an extra successor, or a missing ListingPackage output raises `workflow link does not match` before any write. Merchandising may claim only the facts in the ledger. Section 11 and commissioning stay out of this wave.

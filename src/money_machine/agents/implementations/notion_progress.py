@@ -12,6 +12,7 @@ kind is provider_response.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import hashlib
 import json
@@ -59,6 +60,7 @@ _PROGRESS_FIELDS = (
     "formula_state",
     "repair_jobs",
     "recovery",
+    "next_phase",
 )
 _PROGRESS_KEYS = frozenset((*_PROGRESS_FIELDS, "record_digest"))
 _COUNT_KEYS = frozenset({"blocks", "databases", "pages"})
@@ -110,10 +112,80 @@ class CheckpointEnvelope:
     created_notion_ids: dict[str, object] | None = None
 
 
+_DUPLICATE_MESSAGES = frozenset(
+    {
+        "checkpoint variant is duplicated",
+        "checkpoint aesthetics accent is duplicated",
+        "checkpoint aesthetics sample is duplicated",
+        "checkpoint notification relation is duplicated",
+        "checkpoint notification rollup is duplicated",
+        "checkpoint notification sample is duplicated",
+    }
+)
+_DUPLICATE_FALLBACK = "checkpoint list is duplicated"
+
+
 def reject_duplicate_labels(labels: list[str], message: str) -> None:
-    """Raise when a checkpoint list repeats a name."""
+    """Raise when a checkpoint list repeats a name.
+
+    Only a known refusal text is raised. Any other text could carry a value
+    from the checkpoint, so it becomes the fixed fallback. A str subclass can
+    forge its hash and equality, so only an exact str is looked up.
+    """
     if len(labels) != len(set(labels)):
-        raise ProductBuildError(message)
+        known = type(message) is str and message in _DUPLICATE_MESSAGES
+        raise ProductBuildError(message if known else _DUPLICATE_FALLBACK)
+
+
+_PACKAGE = "money_machine.agents.implementations."
+
+
+def raised_in_package(error: BaseException) -> bool:
+    """True when the innermost frame that raised the error is package code."""
+    trace = error.__traceback__
+    if trace is None:
+        return False
+    while trace.tb_next is not None:
+        trace = trace.tb_next
+    return str(trace.tb_frame.f_globals.get("__name__", "")).startswith(_PACKAGE)
+
+
+def clean_interrupt(error: BaseException, text: str) -> BaseException:
+    """A fresh built-in base error, with no text, notes, attributes, or chain.
+
+    The result is always one of the fixed classes below, never the caller's
+    own type. A provider-defined subclass is dropped, because its __name__,
+    __qualname__, __module__, class dict, and methods are the caller's, and a
+    class built at runtime can put a secret in any of them. Only the control
+    flow kind survives: a KeyboardInterrupt is a fresh KeyboardInterrupt, a
+    CancelledError a fresh asyncio.CancelledError (asyncio.timeout and
+    Task.cancel match it by type), a GeneratorExit a fresh GeneratorExit, and a
+    SystemExit a fresh SystemExit with an integer code only (any other code
+    becomes 1). A BaseExceptionGroup becomes a fresh BaseExceptionGroup of its
+    cleaned members under the fixed text. Any other BaseException becomes a
+    plain BaseException with the fixed text.
+    """
+    if isinstance(error, BaseExceptionGroup):
+        members = cast(tuple[BaseException, ...], error.exceptions)
+        cleaned = [_clean_member(member, text) for member in members]
+        return BaseExceptionGroup(text, cleaned)
+    if isinstance(error, asyncio.CancelledError):
+        return asyncio.CancelledError()
+    if isinstance(error, KeyboardInterrupt):
+        return KeyboardInterrupt()
+    if isinstance(error, GeneratorExit):
+        return GeneratorExit()
+    if isinstance(error, SystemExit):
+        code = error.code
+        return SystemExit(code if type(code) is int else 1)
+    return BaseException(text)
+
+
+def _clean_member(member: BaseException, text: str) -> BaseException:
+    """One cleaned group member. An Exception member keeps no text either."""
+    if isinstance(member, Exception) and not isinstance(member, BaseExceptionGroup):
+        return Exception(text)
+    return clean_interrupt(member, text)
 
 
 def guard_operation(probe: object, operation: str) -> None:
@@ -205,6 +277,42 @@ def stamp_integrity_digest(document: Mapping[str, object]) -> dict[str, object]:
     return raw
 
 
+def _pid_alive(pid: int) -> bool:
+    """True when a process still owns this pid. A dead pid's temp is stale.
+
+    PermissionError means the pid is alive and owned by someone else. Treating
+    that as a dead process would delete another user's in-flight temp.
+    """
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def _remove_dead_temps(path: Path) -> None:
+    """Delete this checkpoint's leftover temps. The name is matched literally.
+
+    A glob would treat ``[`` in the file name as a character class and could
+    delete a different file. A temp whose pid is still running is left alone.
+    """
+    marker = f".{path.name}."
+    suffix = ".tmp"
+    for stale in path.parent.iterdir():
+        name = stale.name
+        if not name.startswith(marker) or not name.endswith(suffix):
+            continue
+        pid_text = name[len(marker) : -len(suffix)]
+        if pid_text.isdigit() and _pid_alive(int(pid_text)):
+            continue
+        with contextlib.suppress(OSError):
+            stale.unlink()
+
+
 def write_document(
     path: Path, payload: Mapping[str, object], progress: Mapping[str, object]
 ) -> None:
@@ -217,6 +325,7 @@ def write_document(
     stored["record_digest"] = _digest(body)
     body[PROGRESS_KEY] = stored
     text = json.dumps(body, sort_keys=True, separators=(",", ":")) + "\n"
+    _remove_dead_temps(path)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     try:
         temporary.write_text(text, encoding="ascii")
@@ -258,8 +367,33 @@ def _append_job(path: Path, job: Mapping[str, str]) -> None:
     jobs = progress["repair_jobs"]
     if type(jobs) is not list:
         raise ProductBuildError("progress record is tampered")
-    progress["repair_jobs"] = [*list(jobs), dict(job)]
+    fresh = dict(job)
+    if _same_provider_job(jobs, fresh):
+        return
+    progress["repair_jobs"] = [*list(jobs), fresh]
     _write_through_checkpoint(path, _string_payload(raw), progress)
+
+
+def _same_provider_job(jobs: list[object], fresh: Mapping[str, str]) -> bool:
+    """True when this exact provider_response job is already on the checkpoint.
+
+    Kind, operation, phase, and response all have to match. A second failure
+    with a different response, operation, or phase is a different job. A
+    rebuild refusal is not a provider response and is never collapsed here.
+    """
+    if fresh.get("kind") != "provider_response":
+        return False
+    for item in jobs:
+        if type(item) is not dict:
+            continue
+        if (
+            item.get("kind") == fresh.get("kind")
+            and item.get("operation") == fresh.get("operation")
+            and item.get("phase") == fresh.get("phase")
+            and item.get("response") == fresh.get("response")
+        ):
+            return True
+    return False
 
 
 def _write_through_checkpoint(
@@ -365,6 +499,9 @@ def _require_shape(body: Mapping[str, object]) -> None:
         raise ProductBuildError("progress record is tampered")
     if recovery not in _RECOVERIES:
         raise ProductBuildError("progress record is forged")
+    phase = body["next_phase"]
+    if type(phase) is not str or phase == "" or phase.strip() != phase or not phase.isascii():
+        raise ProductBuildError("progress record is tampered")
 
 
 def _require_alignment(body: Mapping[str, object], checkpoint_names: object) -> None:
