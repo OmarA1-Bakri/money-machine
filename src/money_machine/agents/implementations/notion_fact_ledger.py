@@ -10,6 +10,7 @@ This module does not open a network connection or create a job.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -214,10 +215,12 @@ async def _guarded_read(
 ) -> tuple[ProductBuildCheckpoint | None, _Plan | None, str]:
     """The resumed checkpoint, or the plan, or a fixed failure text.
 
-    No exception leaves this function except BaseException. The caller raises
-    the failure text after this frame is gone, so the raised error has no
-    __cause__ or __context__ that points back at a provider or code error.
+    No Exception leaves this function. The caller raises the failure text after
+    this frame is gone, so the raised error has no __cause__ or __context__ that
+    points back at a provider or code error. A BaseException such as
+    cancellation still propagates, as a fresh instance with no text or chain.
     """
+    escaped: BaseException
     try:
         if (
             saved_ledger is not None
@@ -242,6 +245,32 @@ async def _guarded_read(
     except Exception:
         # A code bug is not a provider job. Its text can carry a secret.
         return None, None, _READ_FAILED
+    except BaseException as error:
+        # Cancellation and interrupts keep their type. Their text, args,
+        # notes, and chain can carry a secret, so none of it is kept.
+        escaped = _clean_interrupt(error)
+    # Raised after the handler has returned, so the fresh error has no context.
+    raise escaped
+
+
+def _clean_interrupt(error: BaseException) -> BaseException:
+    """A fresh error of the same built-in kind, with no text and no chain.
+
+    asyncio.timeout and Task.cancel match CancelledError by type, so a fresh
+    CancelledError keeps cancellation working. A SystemExit keeps an integer
+    code only. Any other BaseException becomes a plain BaseException with the
+    fixed read failure text.
+    """
+    if isinstance(error, asyncio.CancelledError):
+        return asyncio.CancelledError()
+    if isinstance(error, KeyboardInterrupt):
+        return KeyboardInterrupt()
+    if isinstance(error, GeneratorExit):
+        return GeneratorExit()
+    if isinstance(error, SystemExit):
+        code = error.code
+        return SystemExit(code if type(code) is int else 1)
+    return BaseException(_READ_FAILED)
 
 
 def _own_message(error: ProductBuildError) -> bool:
@@ -663,7 +692,8 @@ def _colour_names(stored: ProductBuildCheckpoint) -> tuple[str, ...]:
     names: list[str] = []
     for record in stored.variants:
         name = record.name
-        if type(name) is not str or name == "" or name.strip() != name:
+        if type(name) is not str or name == "" or name.strip() != name or "," in name:
+            # The fact joins names with commas, so one name must not hold one.
             raise ProductBuildError("fact ledger fact is not a durable string")
         names.append(name)
     return tuple(names)

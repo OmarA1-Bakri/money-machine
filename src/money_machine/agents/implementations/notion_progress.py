@@ -111,10 +111,27 @@ class CheckpointEnvelope:
     created_notion_ids: dict[str, object] | None = None
 
 
+_DUPLICATE_MESSAGES = frozenset(
+    {
+        "checkpoint variant is duplicated",
+        "checkpoint aesthetics accent is duplicated",
+        "checkpoint aesthetics sample is duplicated",
+        "checkpoint notification relation is duplicated",
+        "checkpoint notification rollup is duplicated",
+        "checkpoint notification sample is duplicated",
+    }
+)
+_DUPLICATE_FALLBACK = "checkpoint list is duplicated"
+
+
 def reject_duplicate_labels(labels: list[str], message: str) -> None:
-    """Raise when a checkpoint list repeats a name."""
+    """Raise when a checkpoint list repeats a name.
+
+    Only a known refusal text is raised. Any other text could carry a value
+    from the checkpoint, so it becomes the fixed fallback.
+    """
     if len(labels) != len(set(labels)):
-        raise ProductBuildError(message)
+        raise ProductBuildError(message if message in _DUPLICATE_MESSAGES else _DUPLICATE_FALLBACK)
 
 
 def guard_operation(probe: object, operation: str) -> None:

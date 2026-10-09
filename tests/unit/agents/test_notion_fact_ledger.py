@@ -8,7 +8,7 @@ import socket
 import subprocess
 import sys
 from collections.abc import Callable, Mapping
-from dataclasses import replace
+from dataclasses import fields, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -4125,6 +4125,48 @@ async def test_next_phase_must_be_an_unpadded_ascii_token(tmp_path: Path, phase:
     assert path.read_bytes() == raw
 
 
+class _SelfStr(str):
+    """A str subclass whose ``str()`` is itself, so ``str(value)`` is not a str."""
+
+    __slots__ = ()
+
+    def __str__(self) -> str:
+        return self
+
+
+class _Lie(str):
+    """A padded str subclass that says it is neither empty nor padded."""
+
+    __slots__ = ()
+
+    def __str__(self) -> str:
+        return self
+
+    def __eq__(self, other: object) -> bool:
+        return False if other == "" else str.__eq__(self, other)
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+    __hash__ = str.__hash__
+
+    def strip(self, chars: str | None = None) -> str:
+        return self
+
+
+class _StrMaker:
+    """Not a str. Its ``__str__`` returns a str subclass."""
+
+    def __str__(self) -> str:
+        return _SelfStr("1")
+
+
+def test_str_of_a_subclass_is_not_an_exact_str() -> None:
+    """The premise of the two subclass cases below."""
+    assert type(str(_SelfStr("1"))) is _SelfStr
+    assert type(str(_StrMaker())) is _SelfStr
+
+
 def test_non_positive_pid_is_not_alive() -> None:
     """pid 0 is refused before os.kill. The temp test does not cover this branch."""
     assert progress_module._pid_alive(0) is False  # pyright: ignore[reportPrivateUsage]
@@ -4137,6 +4179,9 @@ def test_non_positive_pid_is_not_alive() -> None:
         ("build_version", ""),
         ("build_version", " 1"),
         ("build_version", "1 "),
+        ("build_version", _SelfStr("1")),
+        ("build_version", _StrMaker()),
+        ("build_version", _Lie(" 1")),
         ("database_ids", ()),
     ],
 )
@@ -4145,7 +4190,8 @@ async def test_plan_refuses_an_undurable_fact(tmp_path: Path, field: str, value:
 
     The public loader refuses each of these before ``_plan``. The helper must
     refuse them too: empty kills ``value == ""``, padding kills the strip
-    conjunct, and both kill the two ``or`` to ``and`` flips.
+    conjunct, and both kill the two ``or`` to ``and`` flips. ``str()`` can
+    return a str subclass, so the two subclass cases kill the type conjunct.
     """
     spec, probe, path = await _qa(tmp_path)
     stored, _created = load_variant_checkpoint(path)
@@ -4364,3 +4410,418 @@ def test_error_without_a_traceback_is_not_own() -> None:
         raise ProductBuildError("fact ledger caller does not match")
     except ProductBuildError as error:
         assert own(error) is False
+
+
+# Round 8: ifexp kills, interrupts, comma colour names, duplicate-label text.
+
+
+@pytest.mark.asyncio
+async def test_missing_notice_is_not_a_read_failure(tmp_path: Path) -> None:
+    """No notification record is the own identity refusal, not a code error.
+
+    Kills ``notice is not None`` to True in ``_require_pages``: the mutant reads
+    ``None.row_page_id`` and the run reports "fact ledger read failed".
+    """
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    stored = replace(stored, notification_dashboard=None)
+    ledger_module._require_pages(probe, stored)  # pyright: ignore[reportPrivateUsage]
+    qa = load_qa_record(path)
+    assert qa is not None
+    steps = ledger_module._walk_chain()  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ProductBuildError, match=r"^fact ledger identity is missing$"):
+        await ledger_module._plan(probe, stored, spec, qa, steps)  # pyright: ignore[reportPrivateUsage]
+    guarded = ledger_module._guarded_read  # pyright: ignore[reportPrivateUsage]
+    result = await guarded(probe, stored, spec, qa, None, None, steps)
+    assert result == (None, None, "fact ledger identity is missing")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["absent", "subclass"])
+async def test_missing_or_subclass_sample_is_missing(tmp_path: Path, mode: str) -> None:
+    """A sample that is absent or not an exact NotionPage is a missing output.
+
+    Kills ``type(sample) is NotionPage`` to True in ``_dashboard_outputs``.
+    ``_require_pages`` refuses both first in ``_plan``, so this is helper level.
+    """
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    notice = stored.notification_dashboard
+    assert notice is not None and notice.samples
+    _kind, page_id = notice.samples[0]
+    if mode == "absent":
+        del probe.pages[page_id]
+    else:
+
+        class _Page(NotionPage):
+            pass
+
+        page = probe.pages[page_id]
+        values = {item.name: getattr(page, item.name) for item in fields(page)}
+        probe.pages[page_id] = _Page(**values)
+    outputs = ledger_module._dashboard_outputs  # pyright: ignore[reportPrivateUsage]
+    assert outputs(probe, stored, spec) == (False, "missing")
+
+
+@pytest.mark.asyncio
+async def test_colour_name_with_a_comma_is_refused(tmp_path: Path) -> None:
+    """The colour fact joins names with commas. A name holding one is refused."""
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    first = replace(stored.variants[0], name="red ,Green,Purple")
+    forged = replace(stored, variants=(first, *stored.variants[1:]))
+    names = ledger_module._colour_names  # pyright: ignore[reportPrivateUsage]
+    assert names(stored) == tuple(record.name for record in stored.variants)
+    with pytest.raises(ProductBuildError, match="fact ledger fact is not a durable string"):
+        names(forged)
+    qa = load_qa_record(path)
+    assert qa is not None
+    steps = ledger_module._walk_chain()  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ProductBuildError, match="fact ledger fact is not a durable string"):
+        await ledger_module._plan(probe, forged, spec, qa, steps)  # pyright: ignore[reportPrivateUsage]
+
+
+class _SecretInterrupt(BaseException):
+    """A non-Exception error that carries the secret."""
+
+    def __init__(self) -> None:
+        super().__init__(SECRET)
+        self.token = SECRET
+
+
+def _cancelled() -> BaseException:
+    import asyncio
+
+    return asyncio.CancelledError(SECRET)
+
+
+def _noted_interrupt() -> BaseException:
+    error = KeyboardInterrupt(SECRET)
+    error.add_note(SECRET)
+    return error
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("make", "expected", "args"),
+    [
+        (_cancelled, "CancelledError", ()),
+        (_noted_interrupt, "KeyboardInterrupt", ()),
+        (lambda: GeneratorExit(SECRET), "GeneratorExit", ()),
+        (lambda: SystemExit(SECRET), "SystemExit", (1,)),
+        (lambda: SystemExit(3), "SystemExit", (3,)),
+        (_SecretInterrupt, "BaseException", ("fact ledger read failed",)),
+    ],
+)
+async def test_interrupt_keeps_its_kind_and_drops_the_secret(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    make: Callable[[], BaseException],
+    expected: str,
+    args: tuple[object, ...],
+) -> None:
+    """A BaseException still propagates. Its text, notes, attributes, and chain do not."""
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+
+    async def _boom(*_args: object, **_kwargs: object) -> bool:
+        try:
+            raise RuntimeError(SECRET)
+        except RuntimeError:
+            raise make() from None
+
+    monkeypatch.setattr(ledger_module, "live_qa_passed", _boom)
+    with pytest.raises(BaseException) as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    error = caught.value
+    assert type(error).__name__ == expected
+    assert type(error).__module__ in {"builtins", "asyncio.exceptions"}
+    assert error.args == args
+    assert error.__cause__ is None
+    assert error.__context__ is None
+    assert getattr(error, "__notes__", None) is None
+    assert _secret_reachable(error) == []
+    assert path.read_bytes() == raw
+    assert _jobs(path) == []
+
+
+@pytest.mark.asyncio
+async def test_task_cancel_message_is_dropped_and_the_task_is_cancelled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Task.cancel(msg) puts msg on the CancelledError. The task still ends cancelled."""
+    import asyncio
+
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+    started = asyncio.Event()
+
+    async def _wait(*_args: object, **_kwargs: object) -> bool:
+        started.set()
+        await asyncio.Event().wait()
+        return True
+
+    monkeypatch.setattr(ledger_module, "live_qa_passed", _wait)
+    task = asyncio.ensure_future(run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT))
+    # Bounded, so a broken QA or ledger that never reaches the read fails here.
+    async with asyncio.timeout(30):
+        await started.wait()
+    task.cancel(SECRET)
+    with pytest.raises(asyncio.CancelledError) as caught:
+        await task
+    assert task.cancelled() is True
+    assert caught.value.args == ()
+    assert _secret_reachable(caught.value) == []
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+async def test_timeout_still_becomes_timeout_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """asyncio.timeout matches the fresh CancelledError by type and raises TimeoutError."""
+    import asyncio
+
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+
+    async def _wait(*_args: object, **_kwargs: object) -> bool:
+        await asyncio.Event().wait()
+        return True
+
+    monkeypatch.setattr(ledger_module, "live_qa_passed", _wait)
+    with pytest.raises(TimeoutError):
+        async with asyncio.timeout(0.05):
+            await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "checkpoint variant is duplicated",
+        "checkpoint aesthetics accent is duplicated",
+        "checkpoint aesthetics sample is duplicated",
+        "checkpoint notification relation is duplicated",
+        "checkpoint notification rollup is duplicated",
+        "checkpoint notification sample is duplicated",
+    ],
+)
+def test_known_duplicate_refusal_keeps_its_text(message: str) -> None:
+    progress_module.reject_duplicate_labels(["a", "b"], message)
+    with pytest.raises(ProductBuildError) as caught:
+        progress_module.reject_duplicate_labels(["a", "a"], message)
+    assert str(caught.value) == message
+
+
+@pytest.mark.parametrize("message", ["fact ledger " + SECRET, SECRET, "checkpoint " + SECRET])
+def test_unknown_duplicate_refusal_text_is_not_raised(message: str) -> None:
+    """An own refusal never carries caller text that is not a known message."""
+    with pytest.raises(ProductBuildError) as caught:
+        progress_module.reject_duplicate_labels(["a", "a"], message)
+    # The caller's own argument stays in its frame. The raised error holds none of it.
+    assert str(caught.value) == "checkpoint list is duplicated"
+    assert caught.value.args == ("checkpoint list is duplicated",)
+    assert caught.value.__cause__ is None
+    assert caught.value.__context__ is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("value", [_SelfStr("1"), _Lie(" 1"), _StrMaker()])
+async def test_public_entry_refuses_a_str_subclass_version(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, value: object
+) -> None:
+    """Through run_fact_ledger, a version whose str() is not an exact str writes nothing.
+
+    The real loader refuses these first. The loader is replaced here so the
+    ``type(value) is not str`` conjunct in ``_plan`` is the only guard left.
+    """
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+    real = ledger_module.load_variant_checkpoint
+
+    def _load(target: Path) -> tuple[ProductBuildCheckpoint, object]:
+        stored, created = real(target)
+        return replace(stored, build_version=cast(int, value)), created
+
+    monkeypatch.setattr(ledger_module, "load_variant_checkpoint", _load)
+    with pytest.raises(ProductBuildError, match="fact ledger fact is not a durable string"):
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("half", ["ledger", "link"])
+async def test_half_a_saved_pair_is_planned_not_a_read_failure(tmp_path: Path, half: str) -> None:
+    """Only one saved record is not a resume. ``_guarded_read`` plans instead.
+
+    Kills ``saved_ledger is not None`` and ``saved_link is not None`` to True:
+    each mutant passes None into ``_saved_holds`` and reports "fact ledger read failed".
+    """
+    spec, probe, path = await _qa(tmp_path)
+    await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    saved_ledger, saved_link = ledger_module._stored_pair(path)  # pyright: ignore[reportPrivateUsage]
+    assert saved_ledger is not None and saved_link is not None
+    stored, _created = load_variant_checkpoint(path)
+    qa = load_qa_record(path)
+    assert qa is not None
+    steps = ledger_module._walk_chain()  # pyright: ignore[reportPrivateUsage]
+    guarded = ledger_module._guarded_read  # pyright: ignore[reportPrivateUsage]
+    if half == "ledger":
+        resumed, plan, failure = await guarded(probe, stored, spec, qa, saved_ledger, None, steps)
+    else:
+        resumed, plan, failure = await guarded(probe, stored, spec, qa, None, saved_link, steps)
+    assert failure == ""
+    assert resumed is None
+    assert plan is not None
+    assert plan.blocked is False
+
+
+def _override_formula(
+    monkeypatch: pytest.MonkeyPatch,
+    spec: ProductSpec,
+    stored: ProductBuildCheckpoint,
+    value: str | None,
+) -> str:
+    """Make one dashboard formula's expected and stored expression both ``value``."""
+    notice = stored.notification_dashboard
+    assert notice is not None and notice.formulas
+    kind, name, property_id = notice.formulas[0]
+    real_expected = ledger_module.dashboard_formula_expressions
+    real_stored = ledger_module._formula_expression  # pyright: ignore[reportPrivateUsage]
+
+    def _expected(target: ProductSpec) -> dict[str, tuple[str, str | None]]:
+        found: dict[str, tuple[str, str | None]] = dict(real_expected(target))
+        found[name] = (kind, value)
+        return found
+
+    def _stored(
+        probe: FixtureNotionAdapter, checkpoint: ProductBuildCheckpoint, wanted: str, pid: str
+    ) -> str | None:
+        if pid == property_id:
+            return value
+        return real_stored(probe, checkpoint, wanted, pid)
+
+    monkeypatch.setattr(ledger_module, "dashboard_formula_expressions", _expected)
+    monkeypatch.setattr(ledger_module, "_formula_expression", _stored)
+    del spec
+    return name
+
+
+@pytest.mark.asyncio
+async def test_formula_missing_on_both_sides_is_blocked_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Expected and stored expression both None is a BLOCKED ledger with ``missing``.
+
+    Kills ``expression is None`` to False in ``_dashboard_outputs``: the mutant
+    reaches ``";" in None``, and the run writes nothing.
+    """
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    _override_formula(monkeypatch, spec, stored, None)
+    checkpoint = await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    assert checkpoint.fact_ledger is not None
+    assert checkpoint.fact_ledger.verdict == "BLOCKED"
+    assert _check(checkpoint, "dashboard_outputs") is False
+    assert _fact(checkpoint, "dashboard_outputs") == "missing"
+
+
+@pytest.mark.asyncio
+async def test_semicolon_formula_on_both_sides_is_not_stored(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An expression with ``;`` is ``missing`` even when it matches. It is never stored.
+
+    Kills ``";" in expression`` to False in ``_dashboard_outputs``.
+    """
+    spec, probe, path = await _qa(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    notice = stored.notification_dashboard
+    assert notice is not None
+    kind, _name, property_id = notice.formulas[0]
+    base = ledger_module._formula_expression(probe, stored, kind, property_id)  # pyright: ignore[reportPrivateUsage]
+    assert base is not None and ";" not in base
+    name = _override_formula(monkeypatch, spec, stored, base + ";x")
+    checkpoint = await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    assert checkpoint.fact_ledger is not None
+    assert checkpoint.fact_ledger.verdict == "BLOCKED"
+    assert _fact(checkpoint, "dashboard_outputs") == "missing"
+    assert f"{name}={base};x" not in path.read_text(encoding="utf-8")
+    assert ";x" not in path.read_text(encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_in_package_error_without_an_own_prefix_is_redacted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Package code that raises a non-refusal text is not an own refusal.
+
+    Kills deleting the own-prefix gate in ``_own_message``: the cause is not a
+    ProviderFailure and the innermost frame is package code, so only the
+    prefix check keeps ``sk-live-secret`` out of the raised message.
+    """
+    spec, probe, path = await _qa(tmp_path)
+    raw = path.read_bytes()
+    namespace: dict[str, object] = {
+        "__name__": ledger_module.__name__,
+        "ProductBuildError": ProductBuildError,
+        "SECRET": SECRET,
+    }
+    source = (
+        "def _package_raise():\n"
+        "    try:\n"
+        "        raise RuntimeError(SECRET)\n"
+        "    except RuntimeError as inner:\n"
+        "        raise ProductBuildError(SECRET) from inner\n"
+    )
+    exec(compile(source, "<package_raise>", "exec"), namespace)
+    package_raise = cast(Callable[[], None], namespace["_package_raise"])
+
+    async def _boom(*_args: object, **_kwargs: object) -> bool:
+        package_raise()
+        return True
+
+    monkeypatch.setattr(ledger_module, "live_qa_passed", _boom)
+    with pytest.raises(ProductBuildError) as caught:
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    assert str(caught.value) == "fact ledger read failed"
+    assert caught.value.__cause__ is None
+    assert caught.value.__context__ is None
+    assert _secret_reachable(caught.value) == []
+    assert path.read_bytes() == raw
+    assert _jobs(path) == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("colour", ["red ,Green,Purple", ",Green,Purple", "red,Green"])
+async def test_public_comma_colour_name_is_refused_with_no_write(
+    tmp_path: Path, colour: str
+) -> None:
+    """A variant name with a comma cannot be split back out of the joined fact."""
+    spec, probe, path = await _qa(tmp_path)
+
+    def _rename(document: dict[str, object]) -> None:
+        references = document["provider_object_references"]
+        assert type(references) is dict
+        variants = references["variants"]
+        assert type(variants) is list
+        row = variants[0]
+        assert type(row) is dict
+        row["name"] = colour
+        progress = document["progress"]
+        assert type(progress) is dict
+        created = progress["created_notion_ids"]
+        assert type(created) is dict
+        created_variants = created["variants"]
+        assert type(created_variants) is list
+        created_row = created_variants[0]
+        assert type(created_row) is dict
+        if "name" in created_row:
+            created_row["name"] = colour
+
+    restamp_checkpoint(path, _rename)
+    raw = path.read_bytes()
+    with pytest.raises(ProductBuildError, match="fact ledger fact is not a durable string"):
+        await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
+    assert path.read_bytes() == raw

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import socket
+import traceback
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -492,13 +493,15 @@ async def test_public_url_provider_failure_records_a_repair_job(tmp_path: Path) 
 
     probe.get_public_url = _boom  # type: ignore[method-assign]
     calls = watch_adapter_writes(probe)
-    with pytest.raises(ProductBuildError, match="url refused"):
+    with pytest.raises(ProductBuildError, match=r"^provider operation failed$"):
         await run_product_qa(spec, probe, path, recorded_at=QA_AT)
 
     stored = json.loads(path.read_text(encoding="ascii"))
     job = stored["progress"]["repair_jobs"][-1]
     assert job["kind"] == "provider_response"
-    assert job["response"] == "url refused"
+    assert job["operation"] == OP_QA
+    assert job["response"] == "provider operation failed"
+    assert "url refused" not in path.read_text(encoding="ascii")
     assert calls == []
     assert len(probe.pages) == raw_pages
     assert "qa" not in stored["provider_object_references"]
@@ -514,7 +517,7 @@ async def test_guarded_duplicate_records_a_repair_job(tmp_path: Path) -> None:
     probe.fail_response = "qa refused"  # type: ignore[attr-defined]
     calls = watch_adapter_writes(probe)
 
-    with pytest.raises(ProductBuildError, match="qa refused"):
+    with pytest.raises(ProductBuildError, match=r"^provider operation failed$"):
         await run_product_qa(spec, probe, path, recorded_at=QA_AT)
 
     stored = json.loads(path.read_text(encoding="ascii"))
@@ -1387,7 +1390,7 @@ async def test_repair_guard_refuses_before_publish(tmp_path: Path) -> None:
     probe.fail_response = "qa refused"  # type: ignore[attr-defined]
     calls = watch_adapter_writes(probe)
 
-    with pytest.raises(ProductBuildError, match="qa refused"):
+    with pytest.raises(ProductBuildError, match=r"^provider operation failed$"):
         await run_product_qa(spec, probe, path, recorded_at=QA_AT)
 
     assert calls == []
@@ -2265,3 +2268,42 @@ async def test_qa_does_not_open_a_socket(tmp_path: Path, monkeypatch: pytest.Mon
         "ETSY",
     ):
         assert token.casefold() not in source.casefold()
+
+
+QA_SECRET = "sk-live-qa-secret"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("response", [QA_SECRET, "qa " + QA_SECRET, "fact ledger " + QA_SECRET])
+async def test_provider_response_is_not_stored_raised_or_chained(
+    tmp_path: Path, response: str
+) -> None:
+    """The QA provider job and the raised error carry fixed text only."""
+    spec = planner_spec()
+    probe = FixtureNotionAdapter()
+    path = tmp_path / "build.json"
+    await _variants(spec, probe, path)
+    probe.fail_operation = OP_QA  # type: ignore[attr-defined]
+    probe.fail_response = response  # type: ignore[attr-defined]
+
+    with pytest.raises(ProductBuildError) as caught:
+        await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    error = caught.value
+    assert str(error) == "provider operation failed"
+    assert error.args == ("provider operation failed",)
+    assert error.__context__ is None
+    cause = error.__cause__
+    assert type(cause) is ProviderFailure
+    assert cause.operation == OP_QA
+    assert cause.response == "provider operation failed"
+    assert cause.args == ("provider operation failed",)
+    assert cause.__cause__ is None
+    assert cause.__context__ is None
+    assert QA_SECRET not in "".join(traceback.format_exception(error))
+    assert QA_SECRET not in path.read_text(encoding="ascii")
+    stored = json.loads(path.read_text(encoding="ascii"))
+    jobs = [job for job in stored["progress"]["repair_jobs"] if job["kind"] == "provider_response"]
+    assert len(jobs) == 1
+    assert jobs[0]["response"] == "provider operation failed"
+    assert "qa" not in stored["provider_object_references"]

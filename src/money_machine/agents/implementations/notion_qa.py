@@ -71,6 +71,7 @@ from money_machine.integrations.notion.formulas import (
 from money_machine.integrations.notion.schema_builder import schema_definitions
 
 PHASE_FACT_LEDGER = "fact_ledger"
+_QA_PROVIDER_FAILED = "provider operation failed"
 _QA_KEY = "qa"
 _NOTIFICATION_TITLE = "Notification dashboard"
 _SECTION_ROLES = ("purpose", "practice", "buyer")
@@ -116,6 +117,7 @@ async def run_product_qa(
     require_same_spec(stored, validated)
     if not stored.variants or stored.next_phase != PHASE_QA:
         raise ProductBuildError("qa requires the variants checkpoint")
+    checkpoint: ProductBuildCheckpoint | None = None
     try:
         saved = load_qa_record(path)
         if saved is not None and await _saved_holds(fixture, stored, validated, saved):
@@ -136,8 +138,12 @@ async def run_product_qa(
             stored, plan.checks, repairs, verdict, proof, facts, moment, prose_digest(validated)
         )
         _write_qa(path, checkpoint, created)
-    except ProviderFailure as failure:
-        raise_recorded(path, BUILD_PHASES[-1], failure)
+    except ProviderFailure:
+        # The provider response can carry a secret. It is not stored, raised,
+        # or chained. The handler returns first, so the raise has no context.
+        checkpoint = None
+    if checkpoint is None:
+        raise_recorded(path, BUILD_PHASES[-1], ProviderFailure(OP_QA, _QA_PROVIDER_FAILED))
     return checkpoint
 
 

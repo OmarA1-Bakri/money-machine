@@ -8,7 +8,32 @@ Twelve session 7 evidence keys stay false, including `product_fact_ledger_persis
 
 Prompt integrity for this wave is the Wave 10 corrective addendum in `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md`. The prompt file is unchanged. SHA-256 `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`. D-0029 records that the section 10 names are labels on `config/workflows.yaml`, not a second engine.
 
-### Round 7 is this commit (2026-10-09)
+### Round 8 is this commit (2026-10-09)
+
+This commit answers reviewer review 5464808945 and verifier comment 6072697310, both FAIL on tip `1e614857`. Fixtures only. No live Notion, no Etsy. STATE revision stays 58, `head_sha` stays `a4e9b025`, twelve evidence keys stay false, `commissioned_agents` stays `[]`, Exit 78 stays HELD. Line numbers below are this commit. Tip `1e614857` lines are in brackets.
+
+Five Round 7 equivalents were false. Each now has a killing test, and each test was run against the hand-applied mutant (fails) and the fixed tree (passes).
+
+- `:487` (`:458`) `type(value) is not str` to `False`. `str()` can return a str subclass. `test_plan_refuses_an_undurable_fact` adds `build_version` `_SelfStr("1")`, `_Lie(" 1")` (padded, with a lying `__eq__`, `__ne__`, and `strip`), and `_StrMaker()` (its `__str__` returns a `_SelfStr`). `test_public_entry_refuses_a_str_subclass_version` runs the same three through `run_fact_ledger` with the loader replaced, and asserts the refusal and unchanged checkpoint bytes.
+- `:226` / `:227` (`:223` / `:224`) `saved_ledger is not None` / `saved_link is not None` to `True`. `test_half_a_saved_pair_is_planned_not_a_read_failure` calls `_guarded_read` with the ledger and no link, and with the link and no ledger. Stock returns a plan. Each mutant returns `fact ledger read failed`.
+- `:867` (`:837`) `expression is None` to `False`. `test_formula_missing_on_both_sides_is_blocked_missing` makes the expected and the stored expression of one formula both `None`. Stock writes a BLOCKED ledger with `dashboard_outputs` `missing`. The mutant reaches `";" in None` and writes nothing.
+- `:869` (`:839`) `";" in expression` to `False`. `test_semicolon_formula_on_both_sides_is_not_stored` makes both expressions the expected one plus `;x`. Stock stores `missing` and no `;x` reaches the file.
+- The own-prefix gate at `:283` (`:254`), replaced with `if False`. `test_in_package_error_without_an_own_prefix_is_redacted` raises `ProductBuildError("sk-live-secret")` from a `RuntimeError` in a function whose globals are this module's. Stock raises `fact ledger read failed` with no chain and no reachable secret.
+
+Other fixes:
+- Comma colour names. `_colour_names` (`:695`) refuses a name that holds a comma, because the fact joins names with commas. `test_colour_name_with_a_comma_is_refused` (helper and `_plan`) and `test_public_comma_colour_name_is_refused_with_no_write` (`red ,Green,Purple`, `,Green,Purple`, `red,Green`, restamped checkpoint, unchanged bytes).
+- QA provider response. `run_product_qa` no longer stores or re-raises the provider response. The handler only marks the failure. After it returns, `raise_recorded` stores and raises the fixed `ProviderFailure("qa.duplicate", "provider operation failed")`. `test_provider_response_is_not_stored_raised_or_chained` (three responses) checks the message, args, cause, cause args, context, formatted traceback, and checkpoint. Three existing QA tests now expect the fixed text.
+- `BaseException` in `_guarded_read`. `CancelledError`, `KeyboardInterrupt`, `GeneratorExit`, and `SystemExit` leave as fresh instances of the same type with no text, notes, or chain (`_clean_interrupt` `:256`). `SystemExit` keeps an integer code only. Any other `BaseException` becomes `BaseException("fact ledger read failed")`. `test_interrupt_keeps_its_kind_and_drops_the_secret` (6 cases), `test_task_cancel_message_is_dropped_and_the_task_is_cancelled` (`Task.cancel(secret)`, the task still ends cancelled), and `test_timeout_still_becomes_timeout_error` (`asyncio.timeout` still raises `TimeoutError`).
+- IfExp survivors. `:721` (`:691`) `notice is not None` to `True` is killed by `test_missing_notice_is_not_a_read_failure`, and `:876` (`:846`) `type(sample) is NotionPage` to `True` is killed by `test_missing_or_subclass_sample_is_missing` (absent sample, `NotionPage` subclass sample).
+- `reject_duplicate_labels` (`notion_progress.py:133`) raises only a known refusal text. Any other text becomes `checkpoint list is duplicated`.
+
+The remaining equivalents are 13: the 11 Round 7 rows the verifier probed as equivalent, plus two IfExp rows. `:748` `title != ""` to `True`: a blank title is turned into `missing` by the durable loop at `:751`, and `matched` is already false because a stored hub name is never blank. `:814` `type(captured) is str` to `True`: the branch is inside `if usable`, which already requires an exact non-empty `str`. `notion_progress_record.py:190` `dict(job) if type(job) is dict else job` is equivalent and is named here: `load_payload` has already validated each job as a dict, and the list is rebuilt from a fresh load, so copying or not copying cannot be observed.
+
+Census of `notion_fact_ledger.py` on this commit: if 119, elif 0, compare 182, boolop 55, operand 129, ifexp 13. That is 369 decision sites. 369 + 129 operands = 498.
+
+Mutation results for this commit are in the PR round body (`BODY_ROUND`). The harness is the Round 7 harness.
+
+### Round 7 (tip `1e614857`, 2026-10-09)
 
 This commit answers verifier comment 6066644759 on tip `0b2007a7`. The tables below are this commit. The Round 6 tables are tip `0b2007a7` and are not these counts. On that tip, 357 decision sites + 128 operands = 485.
 
