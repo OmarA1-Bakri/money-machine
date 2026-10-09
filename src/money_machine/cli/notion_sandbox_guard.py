@@ -14,7 +14,7 @@ import os
 import signal
 import stat
 import subprocess
-from collections.abc import Mapping, Sequence
+from collections.abc import Generator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -442,20 +442,19 @@ def _destination_appeared(path: Path) -> bool:
     return True
 
 
-def _mask_sigint() -> object:
+@contextlib.contextmanager
+def _sigint_ignored() -> Generator[None, None, None]:
     try:
         previous = signal.getsignal(signal.SIGINT)
         signal.signal(signal.SIGINT, signal.SIG_IGN)
-        return previous
     except ValueError:
-        return None
-
-
-def _restore_sigint(previous: object) -> None:
-    if previous is None:
+        yield
         return
-    with contextlib.suppress(ValueError, TypeError):
-        signal.signal(signal.SIGINT, previous)
+    try:
+        yield
+    finally:
+        with contextlib.suppress(ValueError, TypeError):
+            signal.signal(signal.SIGINT, previous)
 
 
 def _discard_leftover_tmp(temporary: Path) -> None:
@@ -464,8 +463,7 @@ def _discard_leftover_tmp(temporary: Path) -> None:
     A symlink is left for ``O_EXCL|O_NOFOLLOW`` to refuse. SIGINT is ignored so a
     second Ctrl-C cannot leave the file behind and turn the retry into EEXIST.
     """
-    previous = _mask_sigint()
-    try:
+    with _sigint_ignored():
         try:
             info = temporary.lstat()
         except FileNotFoundError:
@@ -476,8 +474,6 @@ def _discard_leftover_tmp(temporary: Path) -> None:
             return
         with contextlib.suppress(OSError):
             os.unlink(temporary)
-    finally:
-        _restore_sigint(previous)
 
 
 def commit_evidence(path: Path, payload: Mapping[str, object], token: str | None) -> str:
@@ -525,15 +521,12 @@ def commit_evidence(path: Path, payload: Mapping[str, object], token: str | None
             raise SandboxError(_failure_text(payload, token, "evidence write failed")) from None
         raise SandboxError("evidence path is refused", code=EXIT_USAGE) from None
     finally:
-        previous = _mask_sigint()
-        try:
+        with _sigint_ignored():
             if tmp_fd >= 0:
                 with contextlib.suppress(OSError):
                     os.close(tmp_fd)
             with contextlib.suppress(OSError):
                 os.unlink(temporary)
-        finally:
-            _restore_sigint(previous)
     return result
 
 

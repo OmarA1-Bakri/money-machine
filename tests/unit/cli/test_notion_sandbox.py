@@ -1428,7 +1428,7 @@ def test_https_proxy_is_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:9")
     client = LiveSandboxClient(_SECRET)
     assert client.proxy_targets() == {}
-    assert client._opener is not None
+    assert client._opener is not None  # pyright: ignore[reportPrivateUsage]
 
 
 def _flagged_page(**flags: object) -> bytes:
@@ -5371,7 +5371,7 @@ def test_symlink_to_proc_is_refused(
 
 def test_live_client_default_opener_is_callable() -> None:
     client = LiveSandboxClient(_SECRET)
-    assert callable(client._opener)
+    assert callable(client._opener)  # pyright: ignore[reportPrivateUsage]
 
 
 def test_absent_injected_client_writes_evidence(
@@ -5398,13 +5398,17 @@ def test_production_client_dry_run_uses_sandbox_opener(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A dry-run without an injected client must use ``sandbox_opener().open``."""
-    opener = _Opener(
-        [_bot_body(), _page_body(_PARENT_RAW, parent=_PARENT_RAW, space=_SPACE_RAW)]
-    )
+    opener = _Opener([_bot_body(), _page_body(_PARENT_RAW, parent=_PARENT_RAW, space=_SPACE_RAW)])
 
     class _Director:
-        def open(self, *args: object, **kwargs: object) -> _Response:
-            return opener(*args, **kwargs)
+        def open(
+            self,
+            request: urllib.request.Request,
+            data: object = None,
+            *,
+            timeout: object = None,
+        ) -> _Response:
+            return opener(request, data, timeout=timeout)
 
     monkeypatch.setattr(
         "money_machine.cli.notion_sandbox_live.sandbox_opener",
@@ -5434,9 +5438,9 @@ def test_leftover_tmp_is_replaced(
     assert code == EXIT_OK
     assert err == ""
     assert leftover.exists() is False
-    assert [page["id"] for page in payload["created_pages"]] == [
-        canonical_id(item) for item in _CHILD_IDS
-    ]
+    created = payload["created_pages"]
+    assert isinstance(created, list)
+    assert [page["id"] for page in created] == [canonical_id(item) for item in _CHILD_IDS]
 
 
 def test_tmp_eexist_after_creates_exits_69_with_ids(
@@ -5449,10 +5453,16 @@ def test_tmp_eexist_after_creates_exits_69_with_ids(
     real_open = os.open
     wanted = evidence.with_name(f".{evidence.name}.tmp")
 
-    def _open(path: str | os.PathLike[str], flags: int = 0, mode: int = 0o777, **kwargs: object) -> int:
+    def _open(
+        path: str | os.PathLike[str],
+        flags: int = 0,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
         if os.fspath(path) == str(wanted) and flags & os.O_EXCL:
             raise OSError(errno.EEXIST, "File exists")
-        return real_open(path, flags, mode, **kwargs)
+        return real_open(path, flags, mode, dir_fd=dir_fd)
 
     monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.open", _open)
     client = FakeSandbox()
@@ -5487,12 +5497,12 @@ def test_interrupt_during_tmp_unlink_keeps_ids(
 
     wanted = evidence.with_name(f".{evidence.name}.tmp")
 
-    def _unlink(path: str | os.PathLike[str], **kwargs: object) -> None:
+    def _unlink(path: str | os.PathLike[str], *, dir_fd: int | None = None) -> None:
         if os.fspath(path) == str(wanted):
             state["unlinked"] += 1
             if state["unlinked"] == 1:
                 raise KeyboardInterrupt
-        real_unlink(path, **kwargs)
+        real_unlink(path, dir_fd=dir_fd)
 
     monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.write", _write)
     monkeypatch.setattr("money_machine.cli.notion_sandbox_guard.os.unlink", _unlink)
