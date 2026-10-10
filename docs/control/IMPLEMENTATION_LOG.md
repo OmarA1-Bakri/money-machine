@@ -4,7 +4,9 @@ Session 08 is not activated. This wave is actions 1 and 2 only. `current_session
 
 Prompt integrity is the Wave 1 addendum in `docs/control/reviews/2026-10-10-session-08-w1-prompt-integrity.md`. The prompt file is unchanged. SHA-256 `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The canonical `2026-10-10-session-08-prompt-integrity.md` name is the unmerged Wave 0 record on #66. This wave does not overwrite it and does not edit `AGENTS.md`, `CLAUDE.md`, `src/money_machine/control/state.py`, or `tests/bootstrap/test_control_state.py`.
 
-Fixtures only. No live HTTP, no Notion, no Etsy, no LLM network call. Copy is a deterministic function of ProductFacts. A failed claim returns to the generator with the exact correction. Three attempts, then fail closed. The full pytest, ruff, and pyright quotes are on the pull request after that run.
+Fixtures only. No live HTTP, no Notion, no Etsy, no LLM network call. Copy is a deterministic function of ProductFacts. A failed claim returns to the generator with the exact correction. Three attempts, then fail closed.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-pytest`: 12 failed, 3339 passed, 193 skipped, 1 warning in 370.39s. Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (341 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those three commands and the pytest run are this tree. The sentences that name the counts were written after that run.
 
 ## 2026-10-10 — Session 07 close recorded, and the :408/:413 adopt mutants are killed
 
