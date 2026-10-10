@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import json
+import sys
 import types
 from pathlib import Path
 
@@ -18,6 +19,8 @@ from money_machine.agents.contracts.merchandising import (
     ListingCopy,
     ListingDraft,
     MerchandisingInput,
+    encode_dashboard,
+    encode_support,
 )
 from money_machine.agents.implementations.merchandising import (
     MAX_CLAIM_ATTEMPTS,
@@ -37,6 +40,7 @@ from money_machine.domain.services.listing_text import (
     render,
 )
 from tests.fixtures.merchandising import SHOP_NAME, consistent_request
+from tests.fixtures.products import create_fixture_product_spec
 
 _AGENT = Path("src/money_machine/agents/implementations/merchandising.py")
 _EXPECTED_TAGS = (
@@ -385,3 +389,340 @@ def test_state_commissioning_and_exit_78_are_unchanged() -> None:
     assert all(value is False for value in evidence.values())
     worker = Path("src/money_machine/orchestration/worker.py").read_text(encoding="utf-8")
     assert "Exit 78 held" in worker
+
+
+class _MustNotGenerate:
+    def generate(
+        self,
+        request: MerchandisingInput,
+        corrections: tuple[ClaimCorrection, ...],
+    ) -> ListingDraft:
+        del request, corrections
+        raise AssertionError("generator must not run")
+
+
+def _refuse(request: MerchandisingInput) -> None:
+    with pytest.raises(MerchandisingInputError, match="class claim"):
+        merchandise(request, _MustNotGenerate())
+
+
+def _bound(kind: str, value: str) -> MerchandisingInput:
+    if kind == "base_category":
+        return consistent_request(create_fixture_product_spec(base_category=value))
+    if kind == "identity":
+        return consistent_request(create_fixture_product_spec(identity=value))
+    if kind == "buyer_problem":
+        return consistent_request(create_fixture_product_spec(buyer_problem=value))
+    if kind == "feature":
+        features = (
+            "Hyperlinked navigation",
+            "Interactive checkboxes",
+            "Monthly calendar views",
+            "Weekly spread templates",
+            value,
+        )
+        return consistent_request(create_fixture_product_spec(features=features))
+    if kind == "hub":
+        hubs = (
+            value,
+            "Goal Tracking",
+            "Habit Builder",
+            "Budget Tracker",
+            "Meal Planner",
+            "Fitness Log",
+        )
+        return consistent_request(create_fixture_product_spec(hubs=hubs))
+    if kind == "colour":
+        return consistent_request(
+            create_fixture_product_spec(colour_variants=("Sage Green", "Navy Blue", value))
+        )
+    raise AssertionError(kind)
+
+
+_PAGE_FACTS = (
+    ("base_category", "200pp Planners"),
+    ("feature", "200pp of printable spreads"),
+    ("hub", "300pp Fitness Log"),
+    ("base_category", "300 printable pages"),
+    ("base_category", "<b>200</b> pages"),
+    ("identity", "One hundred pages Planner"),
+    ("identity", "Two Hundred Page Planner"),
+    ("buyer_problem", "Over one hundred pages of spreads"),
+    ("feature", "One hundred printable pages"),
+    ("colour", "Hundred Page Rose"),
+    ("base_category", "200 pp"),
+    ("feature", "plus 100 bonus pages"),
+    ("base_category", "200\u00a0pages"),
+    ("feature", "200+ pages"),
+    ("base_category", "**200** pages"),
+)
+
+
+@pytest.mark.parametrize(("kind", "value"), _PAGE_FACTS)
+def test_each_page_count_shape_in_a_fact_is_refused(kind: str, value: str) -> None:
+    _refuse(_bound(kind, value))
+
+
+_FORMAT_MARKS = ("\u200b", "\u200c", "\u200d", "\u2060", "\ufeff", "\u00ad")
+
+
+@pytest.mark.parametrize("mark", _FORMAT_MARKS)
+def test_each_format_character_in_a_fact_is_refused(mark: str) -> None:
+    _refuse(_bound("buyer_problem", f"Get Re{mark}views of planning"))
+
+
+@pytest.mark.parametrize(
+    ("kind", "value"),
+    (
+        ("hub", "Rated 5 st\u200bars by buyers"),
+        ("feature", "Fully auto\u200bmated bank sync"),
+        ("hub", "Best\u00adseller planner kit"),
+        ("identity", "Top-rated"),
+        ("identity", "Top-Rated Planner"),
+        ("base_category", "5k downloads"),
+        ("buyer_problem", "Featured in Vogue and Forbes"),
+        ("buyer_problem", "Loved by 5,000 teachers"),
+        ("base_category", "Hands-free"),
+        ("identity", "Bestsel\u2060ler"),
+        ("feature", "auto\u200bmated"),
+    ),
+)
+def test_class_paraphrase_in_a_fact_is_refused(kind: str, value: str) -> None:
+    _refuse(_bound(kind, value))
+
+
+def test_review_and_star_nouns_are_allowed() -> None:
+    journal = consistent_request(create_fixture_product_spec(identity="Book Review Journal"))
+    journal_copy = merchandise(journal)
+    assert journal_copy.draft.title.text.startswith("Book Review Journal")
+    assert validate_claims(journal_copy.draft, journal).passed is True
+    chart = consistent_request(create_fixture_product_spec(identity="Star Chart Planner"))
+    chart_copy = merchandise(chart)
+    assert chart_copy.draft.title.text.startswith("Star Chart Planner")
+    assert validate_claims(chart_copy.draft, chart).passed is True
+    hubs = (
+        "Book Reviews",
+        "Goal Tracking",
+        "Habit Builder",
+        "Budget Tracker",
+        "Meal Planner",
+        "Fitness Log",
+    )
+    reviewed = consistent_request(create_fixture_product_spec(hubs=hubs))
+    reviewed_copy = merchandise(reviewed)
+    assert any(
+        "Book Reviews" in section.text for section in reviewed_copy.draft.description_sections
+    )
+    assert validate_claims(reviewed_copy.draft, reviewed).passed is True
+
+
+@pytest.mark.parametrize(
+    "identity",
+    ("Top-rated", "Top-Rated Planner", "Rated 5 stars", "five-star reviews"),
+)
+def test_rating_language_in_a_name_is_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+def test_lookalike_tokens_are_refused() -> None:
+    _refuse(_bound("identity", "\u0422\u043e\u0440 seller"))
+    request = consistent_request()
+    shop = "fieldnote \u0455\u04bb\u043e\u0440"
+    broken = _with_fact_value(request, "shop_name", shop).model_copy(update={"shop_name": shop})
+    _refuse(broken)
+
+
+def test_secret_link_stays_on_the_notion_domain() -> None:
+    request = consistent_request()
+    refused = (
+        "https://evil.example/checkout?ref=paid",
+        "https://notion.site.evil.example/pay",
+        "https://fixture.notion.site\u200b",
+    )
+    for value in refused:
+        broken = _with_fact_value(request, "secret_links", value)
+        with pytest.raises(MerchandisingInputError, match="secret_links"):
+            merchandise(broken, _MustNotGenerate())
+    notes = "https://notes.notion.so/fixture"
+    copy = merchandise(_with_fact_value(request, "secret_links", notes))
+    how = next(
+        section for section in copy.draft.description_sections if section.role == "how_it_works"
+    )
+    assert notes in how.text
+    _refuse(_bound("identity", "See https://evil.example/now"))
+    _refuse(_bound("feature", "Visit www.evil.example today"))
+
+
+@pytest.mark.parametrize(
+    "phrase",
+    (
+        "Automated \u2717",
+        "Automated \u2718",
+        "Money-back \u2717",
+        "Bank sync \u2717",
+        "Auto-sync: \u2014",
+        "5\u2605 reviews: \u2014",
+        "Bestseller \u2718",
+        "Customers love it \u2717",
+    ),
+)
+def test_a_symbol_refuses_the_whole_tag(phrase: str) -> None:
+    assert etsy_tag(phrase) == ""
+
+
+def test_negated_feature_is_not_published_as_a_short_tag() -> None:
+    features = (
+        "Hyperlinked navigation",
+        "Interactive checkboxes",
+        "Monthly calendar views",
+        "Weekly spread templates",
+        "Bank sync \u2717",
+    )
+    request = consistent_request(create_fixture_product_spec(features=features))
+    copy = merchandise(request)
+    assert tuple(tag.text for tag in copy.draft.tags) == _EXPECTED_TAGS
+    section = next(item for item in copy.draft.description_sections if item.role == "features")
+    assert "Bank sync \u2717" in section.text
+
+
+def test_concealed_dashboard_and_support_are_refused() -> None:
+    request = consistent_request()
+    dashboard = request.notification_dashboard.model_copy(
+        update={"outputs": ("Bestsel\u2060ler", "Reminder list")}
+    )
+    encoded = encode_dashboard(dashboard)
+    hidden_dashboard = _with_fact_value(request, "dashboard_outputs", encoded).model_copy(
+        update={"notification_dashboard": dashboard}
+    )
+    _refuse(hidden_dashboard)
+    support = request.support.model_copy(update={"channel": "Trusted\u200b by Google"})
+    hidden_support = _with_fact_value(request, "support", encode_support(support)).model_copy(
+        update={"support": support}
+    )
+    _refuse(hidden_support)
+
+
+class _DropColourGuard(ast.NodeTransformer):
+    def __init__(self) -> None:
+        self.hits = 0
+
+    def visit_If(self, node: ast.If) -> ast.AST:
+        test = node.test
+        if (
+            isinstance(test, ast.Compare)
+            and isinstance(test.left, ast.Name)
+            and test.left.id == "colours"
+            and len(test.ops) == 1
+            and isinstance(test.ops[0], ast.NotEq)
+        ):
+            self.hits += 1
+            return ast.Pass()
+        return self.generic_visit(node)
+
+
+class _FactSourcedTrue(ast.NodeTransformer):
+    def __init__(self) -> None:
+        self.hits = 0
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST:
+        if node.name == "_fact_sourced":
+            self.hits += 1
+            node.body = [ast.Return(value=ast.Constant(value=True))]
+            return node
+        return self.generic_visit(node)
+
+
+class _DropFactGate(ast.NodeTransformer):
+    def __init__(self) -> None:
+        self.hits = 0
+
+    def visit_If(self, node: ast.If) -> ast.AST:
+        if _calls(node.test, "fact_text_problem"):
+            self.hits += 1
+            return ast.Pass()
+        return self.generic_visit(node)
+
+
+def _calls(node: ast.AST, name: str) -> bool:
+    return any(
+        isinstance(child, ast.Call) and isinstance(child.func, ast.Name) and child.func.id == name
+        for child in ast.walk(node)
+    )
+
+
+def _load_module(tree: ast.AST, label: str) -> types.ModuleType:
+    if not isinstance(tree, ast.Module):
+        raise AssertionError(label)
+    ast.fix_missing_locations(tree)
+    module = types.ModuleType(label)
+    module.__file__ = str(_AGENT)
+    sys.modules[label] = module
+    exec(compile(tree, str(_AGENT), "exec"), module.__dict__)
+    return module
+
+
+def test_midnight_black_needs_both_variant_guards() -> None:
+    request = consistent_request()
+    facts = tuple(
+        fact.model_copy(update={"fact_value": f"{fact.fact_value}|Midnight Black"})
+        if fact.fact_key == "colour_names"
+        else fact
+        for fact in request.facts
+    )
+    broken = request.model_copy(update={"facts": facts})
+    with pytest.raises(MerchandisingInputError, match="colour"):
+        merchandise(broken, _MustNotGenerate())
+
+    colour_drop = _DropColourGuard()
+    module = _load_module(
+        colour_drop.visit(ast.parse(_AGENT.read_text(encoding="utf-8"))), "colour_guard"
+    )
+    assert colour_drop.hits == 1
+    sourced = _FactSourcedTrue()
+    validator_tree = sourced.visit(
+        ast.parse(
+            Path("src/money_machine/domain/services/claim_validation.py").read_text(
+                encoding="utf-8"
+            )
+        )
+    )
+    assert sourced.hits == 1
+    if not isinstance(validator_tree, ast.Module):
+        raise AssertionError("sourced_true")
+    ast.fix_missing_locations(validator_tree)
+    validator = types.ModuleType("sourced_true")
+    validator.__file__ = "src/money_machine/domain/services/claim_validation.py"
+    sys.modules[validator.__name__] = validator
+    exec(compile(validator_tree, validator.__file__, "exec"), validator.__dict__)
+    module.__dict__["validate_claims"] = validator.__dict__["validate_claims"]
+    copy = module.__dict__["merchandise"](broken)
+    assert isinstance(copy, ListingCopy)
+    shown = " ".join(section.text for section in copy.draft.description_sections)
+    assert "Midnight Black" in shown
+    assert any(tag.text == "midnight black" for tag in copy.draft.tags)
+
+
+def test_deleting_the_fact_gate_generates_a_page_count() -> None:
+    request = _bound("base_category", "200pp Planners")
+    with pytest.raises(MerchandisingInputError, match="class claim"):
+        merchandise(request, _MustNotGenerate())
+    drop = _DropFactGate()
+    module = _load_module(drop.visit(ast.parse(_AGENT.read_text(encoding="utf-8"))), "fact_gate")
+    assert drop.hits == 1
+
+    class _Called:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def generate(
+            self,
+            request: MerchandisingInput,
+            corrections: tuple[ClaimCorrection, ...],
+        ) -> ListingDraft:
+            self.calls += 1
+            return module.__dict__["DeterministicCopyGenerator"]().generate(request, corrections)
+
+    spy = _Called()
+    with pytest.raises(module.__dict__["ClaimValidationClosed"]):
+        module.__dict__["merchandise"](request, spy)
+    assert spy.calls == MAX_CLAIM_ATTEMPTS

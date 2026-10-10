@@ -1,16 +1,20 @@
 """Fixed listing sentences and the normalization claim checks share.
 
 Buyer-facing text is a template of cited fact values. The generator and the
-validator both call ``render``. Comparison folds case, compatibility forms,
-and Latin lookalikes. A token that mixes a Latin letter with a non-Latin
-letter is rejected before that fold. A tag that does not fit in 20 characters
+validator both call ``render``. Comparison strips markup and format characters,
+then folds case, compatibility forms, and Latin lookalikes. A token that mixes
+scripts, or whose letters are all Latin lookalikes, is rejected before that
+fold. A tag that would drop a symbol, or that does not fit in 20 characters,
 is refused whole; it is never cut down to a prefix.
 """
 
 from __future__ import annotations
 
+import html
+import re
 import unicodedata
 from dataclasses import dataclass
+from re import Pattern
 from typing import Final
 
 _HYPHENS: Final[str] = "\u2010\u2011\u2012\u2013\u2014\u2015\u2212\ufe63\uff0d"
@@ -48,6 +52,8 @@ _CONFUSABLES: Final[dict[str, str]] = {
     **{char: " " for char in _SPACES},
 }
 _TITLE_LIMIT: Final = 140
+_MARKUP: Final[Pattern[str]] = re.compile(r"<[^>]*>")
+_TAG_SEPARATORS: Final[frozenset[str]] = frozenset("&/+-|")
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,10 +65,25 @@ class TextSlot:
 
 
 def normalize_text(value: str) -> str:
-    """NFKC, casefold, homoglyph fold, and collapsed whitespace."""
-    text = unicodedata.normalize("NFKC", value).casefold()
+    """Unescape, strip markup and format characters, then fold for comparison."""
+    text = _visible(value)
+    text = unicodedata.normalize("NFKC", text).casefold()
     folded = "".join(_CONFUSABLES.get(char, char) for char in text)
     return " ".join(folded.split())
+
+
+def has_concealment(value: str) -> bool:
+    """True when format characters or HTML tags hide the letters buyers read."""
+    if any(unicodedata.category(char) == "Cf" for char in value):
+        return True
+    unescaped = html.unescape(value)
+    return _MARKUP.search(value) is not None or _MARKUP.search(unescaped) is not None
+
+
+def script_rejected(value: str) -> bool:
+    """True for a mixed-script token or a token made only of Latin lookalikes."""
+    text = unicodedata.normalize("NFKC", value)
+    return any(_token_rejected(token) for token in text.split())
 
 
 def normalize_tag(value: str) -> str:
@@ -77,12 +98,20 @@ def mixed_script(value: str) -> bool:
 
 
 def etsy_tag(value: str) -> str:
-    """Full lowercase tag, or empty when that phrase does not fit in 20 characters."""
+    """Full lowercase tag, or empty when the phrase drops a symbol or exceeds 20."""
     words: list[str] = []
-    for raw in value.casefold().split():
-        cleaned = "".join(char for char in raw if char.isalnum())
-        if cleaned:
-            words.append(cleaned)
+    current: list[str] = []
+    for char in value.casefold():
+        if char.isspace() or char in _TAG_SEPARATORS:
+            if current:
+                words.append("".join(current))
+                current = []
+            continue
+        if not char.isalnum():
+            return ""
+        current.append(char)
+    if current:
+        words.append("".join(current))
     tag = " ".join(words)
     if tag == "" or len(tag) > 20:
         return ""
@@ -233,10 +262,26 @@ def _all(slots: tuple[TextSlot, ...], kind: str) -> tuple[str, ...]:
     return tuple(slot.value for slot in slots)
 
 
+def _visible(value: str) -> str:
+    text = html.unescape(value)
+    text = _MARKUP.sub(" ", text)
+    text = "".join(char for char in text if unicodedata.category(char) != "Cf")
+    return text.replace("*", "")
+
+
 def _fit(title: str) -> str:
     if len(title) <= _TITLE_LIMIT:
         return title
     return title[:_TITLE_LIMIT].rstrip()
+
+
+def _token_rejected(token: str) -> bool:
+    if _token_mixes_scripts(token):
+        return True
+    letters = [char for char in token if unicodedata.category(char).startswith("L")]
+    if not letters or any(_latin_letter(char) for char in letters):
+        return False
+    return all(char.casefold() in _CONFUSABLES for char in letters)
 
 
 def _token_mixes_scripts(token: str) -> bool:

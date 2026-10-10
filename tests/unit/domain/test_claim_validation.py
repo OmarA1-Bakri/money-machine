@@ -237,25 +237,47 @@ def test_each_rejection_class_has_a_failing_input(rule: str) -> None:
     assert all(item.correction.startswith(expected) for item in outcome.corrections)
 
 
-def _fourteen_unique_tags(draft: ListingDraft) -> ListingDraft:
-    currency = next(claim for claim in draft.claims if claim.kind == "currency")
-    extra = draft.tags[0].model_copy(update={"text": "usd", "claim_ids": (currency.claim_id,)})
+def _fourteen_unique_tags(
+    draft: ListingDraft,
+    request: MerchandisingInput,
+) -> tuple[MerchandisingInput, ListingDraft]:
+    hubs = next(fact for fact in request.facts if fact.fact_key == "hubs")
+    extra_name = "Desk Calendar"
+    facts = tuple(
+        fact.model_copy(update={"fact_value": f"{fact.fact_value}|{extra_name}"})
+        if fact.fact_key == "hubs"
+        else fact
+        for fact in request.facts
+    )
+    request = request.model_copy(update={"facts": facts})
+    claim = ListingClaim(
+        claim_id=uuid4(),
+        kind="hub",
+        fact_id=hubs.fact_id,
+        stated_value=extra_name,
+    )
+    extra = draft.tags[0].model_copy(
+        update={"text": "desk calendar", "claim_ids": (claim.claim_id,)}
+    )
     tags = (*draft.tags, extra)
     assert len(tags) == 14
     assert len({tag.text for tag in tags}) == 14
-    return draft.model_copy(update={"tags": tags})
+    copy = draft.model_copy(update={"tags": tags, "claims": (*draft.claims, claim)})
+    return request, copy
 
 
 def test_twelve_and_fourteen_tags_are_rejected() -> None:
     request, draft = _request_and_draft()
     short = draft.model_copy(update={"tags": draft.tags[:-1]})
-    long = _fourteen_unique_tags(draft)
+    long_request, long = _fourteen_unique_tags(draft, request)
     assert len(short.tags) == 12
     assert len(long.tags) == 14
-    for copy in (short, long):
-        outcome = validate_claims(copy, request)
-        assert outcome.passed is False
-        assert {item.rejection_class for item in outcome.corrections} == {"tag_count"}
+    short_outcome = validate_claims(short, request)
+    long_outcome = validate_claims(long, long_request)
+    assert short_outcome.passed is False
+    assert long_outcome.passed is False
+    assert {item.rejection_class for item in short_outcome.corrections} == {"tag_count"}
+    assert {item.rejection_class for item in long_outcome.corrections} == {"tag_count"}
 
 
 def test_seven_and_nine_sections_are_rejected() -> None:
@@ -872,14 +894,14 @@ def test_swapped_template_is_unbound() -> None:
 
 def test_fourteen_unique_tags_kill_the_at_least_count() -> None:
     request, draft = _request_and_draft()
-    long = _fourteen_unique_tags(draft)
-    real = validate_claims(long, request)
+    long_request, long = _fourteen_unique_tags(draft, request)
+    real = validate_claims(long, long_request)
     assert real.passed is False
     assert {item.rejection_class for item in real.corrections} == {"tag_count"}
     mutant_tree = _CountAtLeast()
     mutant = _load_mutant(mutant_tree, "tag_ge")
     assert mutant_tree.hits == 1
-    forged = cast(ClaimValidation, mutant(long, request))
+    forged = cast(ClaimValidation, mutant(long, long_request))
     assert forged.passed is True
     assert forged.corrections == ()
 
@@ -998,3 +1020,246 @@ def test_shortened_automation_tag_is_unbound() -> None:
     outcome = validate_claims(copy, request)
     assert outcome.passed is False
     assert {item.rejection_class for item in outcome.corrections} == {"unbound_text"}
+
+
+class _DropTemplateBinding(ast.NodeTransformer):
+    """Render whenever a surface cites claims, ignoring its required template."""
+
+    def __init__(self) -> None:
+        self.hits = 0
+        self._inside = False
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST:
+        if node.name != "reject_unbound_text":
+            return node
+        self._inside = True
+        visited = self.generic_visit(node)
+        self._inside = False
+        return visited
+
+    def visit_BoolOp(self, node: ast.BoolOp) -> ast.AST:
+        second = node.values[1] if len(node.values) > 1 else None
+        if (
+            self._inside
+            and isinstance(node.op, ast.And)
+            and isinstance(second, ast.Compare)
+            and len(second.ops) == 1
+            and isinstance(second.ops[0], ast.Eq)
+            and isinstance(second.left, ast.Name)
+            and second.left.id == "template_id"
+        ):
+            self.hits += 1
+            return node.values[0]
+        return self.generic_visit(node)
+
+
+def test_wrong_template_on_matching_slots_is_refused() -> None:
+    request, draft = _request_and_draft()
+    identity = next(claim for claim in draft.claims if claim.kind == "identity")
+    problem = next(claim for claim in draft.claims if claim.kind == "buyer_problem")
+    category = next(claim for claim in draft.claims if claim.kind == "category")
+    quantity = request.rules.quantity
+    hero = render(
+        "hero",
+        (
+            TextSlot("identity", identity.stated_value),
+            TextSlot("buyer_problem", problem.stated_value),
+        ),
+        quantity=quantity,
+    )
+    hook = render(
+        "hook",
+        (
+            TextSlot("identity", identity.stated_value),
+            TextSlot("category", category.stated_value),
+            TextSlot("buyer_problem", problem.stated_value),
+        ),
+        quantity=quantity,
+    )
+    title = draft.title.model_copy(
+        update={
+            "template_id": "hero",
+            "claim_ids": (identity.claim_id, problem.claim_id),
+            "text": hero,
+        }
+    )
+    sections = tuple(
+        section.model_copy(
+            update={
+                "template_id": "hook",
+                "claim_ids": (identity.claim_id, category.claim_id, problem.claim_id),
+                "text": hook,
+            }
+        )
+        if section.role == "offer"
+        else section
+        for section in draft.description_sections
+    )
+    copy = draft.model_copy(update={"title": title, "description_sections": sections})
+    offer = next(section for section in copy.description_sections if section.role == "offer")
+    assert "Price" not in offer.text
+    assert copy.title.text == hero
+    real = validate_claims(copy, request)
+    assert real.passed is False
+    assert {item.rejection_class for item in real.corrections} == {"unbound_text"}
+    mutant_tree = _DropTemplateBinding()
+    mutant = _load_mutant(mutant_tree, "template_binding")
+    assert mutant_tree.hits == 1
+    forged = cast(ClaimValidation, mutant(copy, request))
+    assert forged.passed is True
+    assert forged.corrections == ()
+
+
+class _DropTagKind(ast.NodeTransformer):
+    """Stop refusing a tag whose cited claim is not a tag kind."""
+
+    def __init__(self) -> None:
+        self.hits = 0
+
+    def visit_If(self, node: ast.If) -> ast.AST:
+        if _calls(node.test, "_tag_kind_allowed"):
+            self.hits += 1
+            return ast.Pass()
+        return self.generic_visit(node)
+
+
+def test_class_claim_tag_is_refused_and_dropping_the_kind_accepts_it() -> None:
+    mutant_tree = _DropTagKind()
+    mutant = _load_mutant(mutant_tree, "tag_kind")
+    assert mutant_tree.hits == 1
+    cases: tuple[tuple[ClaimKind, FactKey, str], ...] = (
+        ("automation", "automation", "not automated"),
+        ("review", "reviews", "recorded review note"),
+        ("sales_performance", "sales_count", "0 orders on file"),
+        ("trust_bar", "trust_bar", "no trust bar"),
+        ("social_proof", "social_proof", "loved by buyers"),
+    )
+    for kind, key, phrase in cases:
+        request, draft = _request_and_draft()
+        request = _with_fact(request, key, phrase)
+        fact = next(item for item in request.facts if item.fact_key == key)
+        claim = ListingClaim(
+            claim_id=uuid4(),
+            kind=kind,
+            fact_id=fact.fact_id,
+            stated_value=phrase,
+        )
+        tag = draft.tags[-1].model_copy(update={"text": phrase, "claim_ids": (claim.claim_id,)})
+        copy = draft.model_copy(
+            update={"claims": (*draft.claims, claim), "tags": (*draft.tags[:-1], tag)}
+        )
+        real = validate_claims(copy, request)
+        assert real.passed is False
+        assert {item.rejection_class for item in real.corrections} == {"unbound_text"}
+        forged = cast(ClaimValidation, mutant(copy, request))
+        assert forged.passed is True
+        assert forged.corrections == ()
+
+
+class _FactListSubset(ast.NodeTransformer):
+    """Treat a longer fact list as sourced when it merely contains the built values."""
+
+    def __init__(self) -> None:
+        self.hits = 0
+        self._inside = False
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST:
+        entered = node.name == "_fact_sourced"
+        previous = self._inside
+        if entered:
+            self._inside = True
+        visited = self.generic_visit(node)
+        self._inside = previous
+        return visited
+
+    def visit_Compare(self, node: ast.Compare) -> ast.AST:
+        if (
+            self._inside
+            and len(node.ops) == 1
+            and isinstance(node.ops[0], ast.Eq)
+            and isinstance(node.left, ast.Call)
+            and isinstance(node.left.func, ast.Name)
+            and node.left.func.id == "fact_items"
+        ):
+            self.hits += 1
+            return ast.Compare(
+                left=ast.Call(
+                    func=ast.Name(id="set", ctx=ast.Load()),
+                    args=[node.comparators[0]],
+                    keywords=[],
+                ),
+                ops=[ast.LtE()],
+                comparators=[
+                    ast.Call(
+                        func=ast.Name(id="set", ctx=ast.Load()),
+                        args=[node.left],
+                        keywords=[],
+                    )
+                ],
+            )
+        return node
+
+
+def test_extra_colour_fact_is_rejected_and_a_subset_accepts_it() -> None:
+    request, draft = _request_and_draft()
+    facts = tuple(
+        fact.model_copy(update={"fact_value": f"{fact.fact_value}|Midnight Black"})
+        if fact.fact_key == "colour_names"
+        else fact
+        for fact in request.facts
+    )
+    request = request.model_copy(update={"facts": facts})
+    real = validate_claims(draft, request)
+    assert real.passed is False
+    assert {item.rejection_class for item in real.corrections} == {"variant_not_built"}
+    mutant_tree = _FactListSubset()
+    mutant = _load_mutant(mutant_tree, "colour_subset")
+    assert mutant_tree.hits == 1
+    forged = cast(ClaimValidation, mutant(draft, request))
+    assert forged.passed is True
+    assert forged.corrections == ()
+
+
+class _LicenseEveryPage(ast.NodeTransformer):
+    """Treat every page phrase as licensed."""
+
+    def __init__(self) -> None:
+        self.hits = 0
+
+    def visit_Assign(self, node: ast.Assign) -> ast.AST:
+        if (
+            len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == "licensed"
+        ):
+            self.hits += 1
+            node.value = ast.Constant(value=True)
+        return node
+
+
+def test_rendered_page_phrase_needs_the_citation_check() -> None:
+    request, draft = _request_and_draft()
+    value = "A 200 page planner"
+    spec = request.spec.model_copy(update={"identity": value})
+    facts = tuple(
+        fact.model_copy(update={"fact_value": value}) if fact.fact_key == "identity" else fact
+        for fact in request.facts
+    )
+    request = request.model_copy(update={"spec": spec, "facts": facts})
+    copy = _rerender(_replace_stated(draft, "identity", value), request)
+    real = validate_claims(copy, request)
+    assert real.passed is False
+    assert "invented_page_count" in {item.rejection_class for item in real.corrections}
+    mutant_tree = _LicenseEveryPage()
+    mutant = _load_mutant(mutant_tree, "license_pages")
+    assert mutant_tree.hits == 1
+    forged = cast(ClaimValidation, mutant(copy, request))
+    assert forged.passed is True
+    assert forged.corrections == ()
+
+
+def _calls(node: ast.AST, name: str) -> bool:
+    return any(
+        isinstance(child, ast.Call) and isinstance(child.func, ast.Name) and child.func.id == name
+        for child in ast.walk(node)
+    )

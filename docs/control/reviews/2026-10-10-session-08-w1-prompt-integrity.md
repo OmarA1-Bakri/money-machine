@@ -158,3 +158,12 @@ Review on tip `209508ea` showed fact values and tag cutting were still open. Thi
 2. A tag that does not fit in 20 characters is refused. It is not cut to a prefix. Tags are not built from automation, review, sales, trust, or social claims. Identity and the fixture feature names are longer than 20 characters, so they are skipped. Product type, variants, shop, hubs, and devices fill the playbook count of 13 without dropping a word.
 3. Mixed script is checked per token, so a non-Latin shop name can sit beside Latin words. A homoglyph inside one token is still rejected. Each surface renders only its own template id. Secret links must be one `https` URL. Device facts must be a clean list.
 4. This round does not edit `state.py`, `test_control_state.py`, the Wave 0 review file, `IMPLEMENTATION_STATE.json`, or `config/agents.yaml`. A10 stays DESIGNED. Session 08 stays inactive.
+
+## 7. Round 4 amendment
+
+Review on tip `04dfb5e5` showed fact text was still rendered when the bad phrase was the fact itself. Round 3 rejected those phrases only as unbound surface text. This amendment is part of the same wave.
+
+1. Every bound fact is scanned before rendering. Format characters and HTML tags are rejected, not published. Comparison strips them so a hidden word still matches the class pattern. A token whose letters are all Latin lookalikes is rejected. A non-Latin token that does not fold entirely to Latin stays allowed.
+2. Page counts in digits, `pp`, and spelled-out number words are the same pattern. The only licensed count is the built page-count fact. Review, sales, trust, social, and automation checks are claims, not the nouns `review` and `star` in a product name. A class fact is exempt from its own pattern.
+3. A tag whose cleaning would drop a symbol is refused whole. `&`, `/`, `+`, `-`, and `|` stay separators, so the category tag remains `planners organizers`. The validator, not only the generator, refuses a tag cited from a claim outside the tag kinds. Secret links must be one `https` URL on `notion.so` or `notion.site`, including subdomains. Other facts may not carry a URL.
+4. This round does not edit `state.py`, `test_control_state.py`, the Wave 0 review file, `IMPLEMENTATION_STATE.json`, or `config/agents.yaml`. It does not edit `src/money_machine/control/` or `tests/bootstrap/`. A10 stays DESIGNED. Session 08 stays inactive.

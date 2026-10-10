@@ -27,39 +27,58 @@ from money_machine.agents.contracts.merchandising import (
 )
 from money_machine.domain.services.listing_text import (
     TextSlot,
-    mixed_script,
+    has_concealment,
     normalize_tag,
     normalize_text,
     render,
+    script_rejected,
 )
 
-_PAGE_NUMBERS: Final[Pattern[str]] = re.compile(
-    r"(?<!\d)(\d+)\s*-?\s*pages?\b",
-    re.IGNORECASE,
+_NUMBER_WORDS: Final[str] = (
+    "one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|"
+    "fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|"
+    "fifty|sixty|seventy|eighty|ninety|hundred|thousand"
 )
-_PAGE_PHRASE: Final[Pattern[str]] = re.compile(
-    r"(?<!\d)\d+\s*-?\s*(?:pages?|pp)\b",
+_PAGE_UNIT: Final[str] = r"(?:printable\s+|bonus\s+)?(?:pp|pages?)\b"
+_PAGE_NUMBERS: Final[Pattern[str]] = re.compile(
+    rf"(?<!\d)(\d+)\s*[+\-]?\s*{_PAGE_UNIT}"
+    rf"|\b((?:(?:over|plus)\s+)?(?:{_NUMBER_WORDS})(?:[\s\-]+(?:{_NUMBER_WORDS}))*)"
+    rf"\s+{_PAGE_UNIT}",
     re.IGNORECASE,
 )
 _AUTOMATION: Final[Pattern[str]] = re.compile(
-    r"\b(automat\w*|auto-[\w-]+|unattended)\b",
+    r"automat\w*|auto-[\w-]+|unattended|hands-free|hands free|autofill\w*",
     re.IGNORECASE,
 )
 _REVIEW: Final[Pattern[str]] = re.compile(
-    r"\b(reviews?|ratings?|stars?|testimonials?)\b",
+    r"top[-\s]?rated|highly reviewed|testimonials?|\brated\b|five-star|rave"
+    r"|(?:\d[\d,]*|five|four|three|two|one)[\s-]*stars?"
+    r"|stars?[\s-]+reviews?",
     re.IGNORECASE,
 )
 _SALES: Final[Pattern[str]] = re.compile(
-    r"\b(bestsellers?|best-sellers?|best sellers?|units sold|\d[\d,]*\s+sold|orders)\b",
+    r"bestsellers?|best-sellers?|best sellers?|bestselling|best-selling|best selling"
+    r"|units sold|\d[\d,]*\s+sold|\d[\d,]*\s+downloads|\d+\s*k\s+downloads"
+    r"|#\s*1|\d[\d,]*\s+orders|orders on file",
     re.IGNORECASE,
 )
 _TRUST: Final[Pattern[str]] = re.compile(
-    r"(trust bars?|trusted by|as seen in|as seen on|money-back)",
+    r"trust bars?|trusted by|as seen in|as seen on|money-back|money back"
+    r"|featured in|satisfaction guaranteed",
     re.IGNORECASE,
 )
 _SOCIAL: Final[Pattern[str]] = re.compile(
-    r"(customers love|users say|thousands of|community of\s+\d+)",
+    r"customers love|users say|thousands of|community of\s+\d+|loved by"
+    r"|\d[\d,]*\+?\s+happy customers|join\s+\d[\d,]*\+?",
     re.IGNORECASE,
+)
+_URL: Final[Pattern[str]] = re.compile(r"https?://|www\.", re.IGNORECASE)
+_CLASS_FACT: Final[tuple[tuple[str, Pattern[str]], ...]] = (
+    ("automation", _AUTOMATION),
+    ("reviews", _REVIEW),
+    ("sales_count", _SALES),
+    ("trust_bar", _TRUST),
+    ("social_proof", _SOCIAL),
 )
 _SPECIAL_KINDS: Final[frozenset[ClaimKind]] = frozenset(
     {
@@ -99,6 +118,9 @@ _ROLE_TEMPLATE: Final[dict[str, str]] = {
     "strongest_hubs": "video_hubs",
     "duplication_access": "access_line",
 }
+TAG_KINDS: Final[frozenset[ClaimKind]] = frozenset(
+    {"identity", "category", "feature", "variant", "shop", "hub", "device"}
+)
 _KIND_KEY: Final[dict[ClaimKind, str]] = {
     "page_count": "page_count",
     "feature": "features",
@@ -133,11 +155,25 @@ class ClaimValidation:
     corrections: tuple[ClaimCorrection, ...]
 
 
-def freeform_denied(value: str) -> bool:
-    """True when identity or buyer-problem text itself makes a class claim."""
+def fact_text_problem(key: str, value: str) -> str | None:
+    """Why this fact must not be rendered, or None when the value may be shown.
+
+    A class fact is exempt from its own pattern, so the recorded statement can
+    still be cited. Every other fact is scanned, including page counts.
+    """
+    if has_concealment(value) or script_rejected(value):
+        return "concealed"
+    if key != "secret_links" and _URL.search(value) is not None:
+        return "url"
     folded = normalize_text(value)
-    patterns = (_PAGE_PHRASE, _AUTOMATION, _REVIEW, _SALES, _TRUST, _SOCIAL)
-    return any(pattern.search(folded) for pattern in patterns)
+    if key != "page_count" and _PAGE_NUMBERS.search(folded) is not None:
+        return "page"
+    for fact_key, pattern in _CLASS_FACT:
+        if key == fact_key:
+            continue
+        if pattern.search(folded) is not None:
+            return "class"
+    return None
 
 
 def validate_claims(copy: ListingDraft, request: MerchandisingInput) -> ClaimValidation:
@@ -205,8 +241,9 @@ def reject_invented_page_count(
         folded = normalize_text(text)
         holders = _holding_values(copy, request, claim_ids, "page_count")
         for match in _PAGE_NUMBERS.finditer(folded):
-            number = match.group(1)
-            licensed = number == actual and any(normalize_text(item) == number for item in holders)
+            digits = match.group(1)
+            number = digits if digits is not None else match.group(0)
+            licensed = any(normalize_text(item) == number for item in holders)
             if licensed:
                 continue
             anchor = _first(copy, "page_count")
@@ -378,8 +415,26 @@ def reject_unbound_text(
     corrections: list[ClaimCorrection] = []
     by_id = {claim.claim_id: claim for claim in copy.claims}
     for text, claim_ids, template_id, required in _bound_surfaces(copy):
+        if has_concealment(text):
+            corrections.append(
+                _surface_issue(
+                    copy,
+                    claim_ids,
+                    f"unbound_text: {template_id} hides characters in the cited facts",
+                )
+            )
+            continue
         cited = _resolve(by_id, claim_ids)
         if cited is not None and any(not _holds(claim, request) for claim in cited):
+            continue
+        if required == "tag" and cited is not None and not _tag_kind_allowed(cited):
+            corrections.append(
+                _surface_issue(
+                    copy,
+                    claim_ids,
+                    "unbound_text: tag kind is not a tag fact",
+                )
+            )
             continue
         slots = (
             ()
@@ -409,7 +464,7 @@ def reject_mixed_script(
     del request
     corrections: list[ClaimCorrection] = []
     for text, claim_ids, template_id, _required in _bound_surfaces(copy):
-        if not mixed_script(text):
+        if not script_rejected(text):
             continue
         corrections.append(
             _surface_issue(
@@ -522,6 +577,10 @@ def _reject_special(
             )
             break
     return tuple(corrections)
+
+
+def _tag_kind_allowed(cited: tuple[ListingClaim, ...]) -> bool:
+    return len(cited) == 1 and cited[0].kind in TAG_KINDS
 
 
 def _kind_matches(

@@ -7,8 +7,10 @@ Notion, or Etsy.
 
 from __future__ import annotations
 
+import unicodedata
 from pathlib import Path
 from typing import Protocol
+from urllib.parse import urlparse
 from uuid import UUID, uuid5
 
 from money_machine.agents.contracts.merchandising import (
@@ -42,8 +44,9 @@ from money_machine.config.loader import load_yaml_model
 from money_machine.config.settings import ProductRulesConfig
 from money_machine.domain.models.rules import ListingRules
 from money_machine.domain.services.claim_validation import (
+    TAG_KINDS,
     ClaimValidation,
-    freeform_denied,
+    fact_text_problem,
     validate_claims,
 )
 from money_machine.domain.services.listing_text import TextSlot, render
@@ -52,9 +55,6 @@ MAX_CLAIM_ATTEMPTS = 3
 """Initial draft plus two regenerations. The third failure is closed."""
 
 _NAMESPACE = UUID("a1000000-0000-4000-8000-000000000010")
-_TAG_KINDS: frozenset[ClaimKind] = frozenset(
-    {"identity", "category", "feature", "variant", "shop", "hub", "device"}
-)
 _HUB_FRAMES: tuple[ImageRole, ...] = ("hub_1", "hub_2", "hub_3", "hub_4", "hub_5")
 
 
@@ -165,10 +165,9 @@ def require_consistent(request: MerchandisingInput) -> None:
         raise MerchandisingInputError("features fact does not match the product spec")
     _require_clean_list(facts["supported_devices"].fact_value, "supported_devices")
     _require_one_https_link(facts["secret_links"].fact_value)
-    if freeform_denied(facts["identity"].fact_value):
-        raise MerchandisingInputError("identity fact carries a class claim")
-    if freeform_denied(facts["buyer_problem"].fact_value):
-        raise MerchandisingInputError("buyer_problem fact carries a class claim")
+    for fact in request.facts:
+        if fact_text_problem(fact.fact_key, fact.fact_value) is not None:
+            raise MerchandisingInputError(f"{fact.fact_key} fact carries a class claim")
 
 
 def configured_listing_rules() -> ListingRules:
@@ -398,7 +397,7 @@ def _tags(request: MerchandisingInput, sources: tuple[ListingClaim, ...]) -> tup
     tags: list[CitedText] = []
     seen: set[str] = set()
     for claim in sources:
-        if claim.kind not in _TAG_KINDS:
+        if claim.kind not in TAG_KINDS:
             continue
         text, claim_ids = _rendered("tag", (claim,), request.rules.quantity)
         if text == "" or text in seen:
@@ -434,8 +433,29 @@ def _require_clean_list(value: str, label: str) -> None:
 
 def _require_one_https_link(value: str) -> None:
     items = fact_items(value)
-    if len(items) != 1 or items[0] != value or not value.startswith("https://") or " " in value:
+    parsed = urlparse(value)
+    host = (parsed.hostname or "").casefold().rstrip(".")
+    concealed = any(unicodedata.category(char) == "Cf" for char in value)
+    if (
+        len(items) != 1
+        or items[0] != value
+        or any(char.isspace() for char in value)
+        or concealed
+        or parsed.scheme != "https"
+        or parsed.username is not None
+        or parsed.password is not None
+        or not _notion_host(host)
+    ):
         raise MerchandisingInputError("secret_links fact is not one https link")
+
+
+def _notion_host(host: str) -> bool:
+    return (
+        host == "notion.so"
+        or host == "notion.site"
+        or host.endswith(".notion.so")
+        or host.endswith(".notion.site")
+    )
 
 
 def validation_outcome(copy: ListingDraft, request: MerchandisingInput) -> ClaimValidation:
