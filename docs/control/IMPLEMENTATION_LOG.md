@@ -14,7 +14,7 @@ Mutation check: each fix was reverted on a copy of this tree and the focused sui
 
 Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/domain/test_claim_validation.py tests/unit/domain/test_listing_binding.py tests/unit/agents/test_merchandising.py` — 573 passed in 13.57s.
 
-Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /workspace/p67r5-pytest`: 12 failed, 3871 passed, 193 skipped, 1 warning in 125.82s (0:02:05). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those commands and the pytest run are the tree at `b2834703`. This paragraph was written after that run.
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /workspace/p67r5-pytest`: 12 failed, 3871 passed, 193 skipped, 1 warning in 125.82s (0:02:05). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those commands and the pytest run are the tree at `4c6f982`. This paragraph was written after that run.
 
 ## 2026-10-10 — Session 08 W1 round 4: fact text is scanned before rendering
 

@@ -16,6 +16,7 @@ from pydantic import ValidationError
 
 from money_machine.agents.contracts.merchandising import (
     DESCRIPTION_ROLES,
+    ClaimCorrection,
     ClaimKind,
     FactKey,
     ListingClaim,
@@ -258,6 +259,177 @@ def test_price_sale_field_mismatch_is_rejected(update: dict[str, object]) -> Non
     assert outcome.passed is False
     assert {item.rejection_class for item in outcome.corrections} == {"unknown_fact"}
     assert all(item.correction.startswith("unknown_fact") for item in outcome.corrections)
+
+
+class _DropPriceTupleField(ast.NodeTransformer):
+    """Drop one field from both sides of the price_sale equality."""
+
+    def __init__(self, index: int) -> None:
+        self.index = index
+        self.hits = 0
+        self._inside = False
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST:
+        previous = self._inside
+        if node.name == "reject_price_mismatch":
+            self._inside = True
+        visited = self.generic_visit(node)
+        self._inside = previous
+        return visited
+
+    def visit_Compare(self, node: ast.Compare) -> ast.AST:
+        if (
+            self._inside
+            and len(node.ops) == 1
+            and isinstance(node.ops[0], ast.Eq)
+            and isinstance(node.left, ast.Tuple)
+            and len(node.comparators) == 1
+            and isinstance(node.comparators[0], ast.Tuple)
+            and len(node.left.elts) == 3
+            and len(node.comparators[0].elts) == 3
+        ):
+            self.hits += 1
+            node.left = _tuple_without(node.left.elts, self.index)
+            node.comparators = [_tuple_without(node.comparators[0].elts, self.index)]
+        return node
+
+
+def _tuple_without(elts: list[ast.expr], index: int) -> ast.Tuple:
+    return ast.Tuple(
+        elts=[elt for position, elt in enumerate(elts) if position != index],
+        ctx=ast.Load(),
+    )
+
+
+class _UseFirstClaimAsPriceAnchor(ast.NodeTransformer):
+    """Cite claims[0] even when a price claim exists."""
+
+    def __init__(self) -> None:
+        self.hits = 0
+        self._inside = False
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST:
+        previous = self._inside
+        if node.name == "reject_price_mismatch":
+            self._inside = True
+        visited = self.generic_visit(node)
+        self._inside = previous
+        return visited
+
+    def visit_BoolOp(self, node: ast.BoolOp) -> ast.AST:
+        fallback = _price_anchor_fallback(node)
+        if self._inside and fallback is not None:
+            self.hits += 1
+            return fallback
+        return self.generic_visit(node)
+
+
+class _DropPriceAnchorFallback(ast.NodeTransformer):
+    """Drop the claims[0] fallback on a missing price claim."""
+
+    def __init__(self) -> None:
+        self.hits = 0
+        self._inside = False
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST:
+        previous = self._inside
+        if node.name == "reject_price_mismatch":
+            self._inside = True
+        visited = self.generic_visit(node)
+        self._inside = previous
+        return visited
+
+    def visit_BoolOp(self, node: ast.BoolOp) -> ast.AST:
+        call = _price_anchor_call(node)
+        if self._inside and call is not None:
+            self.hits += 1
+            return call
+        return self.generic_visit(node)
+
+
+def _price_anchor_call(node: ast.BoolOp) -> ast.Call | None:
+    if not isinstance(node.op, ast.Or) or len(node.values) != 2:
+        return None
+    call = node.values[0]
+    if isinstance(call, ast.Call) and isinstance(call.func, ast.Name) and call.func.id == "_first":
+        return call
+    return None
+
+
+def _price_anchor_fallback(node: ast.BoolOp) -> ast.expr | None:
+    if _price_anchor_call(node) is None:
+        return None
+    return node.values[1]
+
+
+def _price_sale_correction(outcome: ClaimValidation) -> ClaimCorrection:
+    hits = [
+        item
+        for item in outcome.corrections
+        if item.correction.startswith("unknown_fact: price_sale")
+    ]
+    assert len(hits) == 1
+    return hits[0]
+
+
+@pytest.mark.parametrize(
+    ("index", "update"),
+    (
+        (0, {"currency": "EUR"}),
+        (1, {"price": Decimal("1")}),
+        (2, {"anchor_price": Decimal("99.99")}),
+    ),
+)
+def test_dropping_one_price_field_accepts_that_mismatch(
+    index: int,
+    update: dict[str, object],
+) -> None:
+    request, draft = _request_and_draft()
+    copy = draft.model_copy(update={"price_sale": draft.price_sale.model_copy(update=update)})
+    real = validate_claims(copy, request)
+    assert real.passed is False
+    assert _price_sale_correction(real).rejection_class == "unknown_fact"
+    drop = _DropPriceTupleField(index)
+    mutant = _load_mutant(drop, f"price_field_{index}")
+    assert drop.hits == 1
+    forged = cast(ClaimValidation, mutant(copy, request))
+    assert forged.passed is True
+    assert forged.corrections == ()
+
+
+def test_price_mismatch_cites_the_price_claim() -> None:
+    request, draft = _request_and_draft()
+    price = next(claim for claim in draft.claims if claim.kind == "price")
+    assert draft.claims[0].claim_id != price.claim_id
+    copy = draft.model_copy(
+        update={"price_sale": draft.price_sale.model_copy(update={"currency": "EUR"})}
+    )
+    real = validate_claims(copy, request)
+    assert _price_sale_correction(real).claim_id == price.claim_id
+    always_first = _UseFirstClaimAsPriceAnchor()
+    mutant = _load_mutant(always_first, "price_anchor_first")
+    assert always_first.hits == 1
+    forged = cast(ClaimValidation, mutant(copy, request))
+    assert _price_sale_correction(forged).claim_id == draft.claims[0].claim_id
+
+
+def test_price_mismatch_without_a_price_claim_uses_the_first_claim() -> None:
+    request, draft = _request_and_draft()
+    claims = tuple(claim for claim in draft.claims if claim.kind != "price")
+    assert claims
+    copy = draft.model_copy(
+        update={
+            "claims": claims,
+            "price_sale": draft.price_sale.model_copy(update={"currency": "EUR"}),
+        }
+    )
+    real = validate_claims(copy, request)
+    assert _price_sale_correction(real).claim_id == claims[0].claim_id
+    drop = _DropPriceAnchorFallback()
+    mutant = _load_mutant(drop, "price_anchor_fallback")
+    assert drop.hits == 1
+    with pytest.raises(AttributeError):
+        mutant(copy, request)
 
 
 def _fourteen_unique_tags(

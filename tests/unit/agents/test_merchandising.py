@@ -479,6 +479,8 @@ _PAGE_FACTS = (
     ("buyer_problem", "Hundred-Page Planner"),
     ("identity", "Four Page Planner"),
     ("feature", "12-page starter kit"),
+    ("identity", "One-Hundred-Printable-Pages"),
+    ("identity", "200-printable-pages"),
 )
 
 
@@ -622,6 +624,14 @@ def test_review_and_order_counts_are_refused(field: str, value: str) -> None:
         ("feature", "4 page weekly layout"),
         ("identity", "Book Review Journal"),
         ("identity", "Star Chart Planner"),
+        ("identity", "Raven"),
+        ("identity", "Step #1"),
+        ("identity", "Part #1"),
+        ("identity", "Week #1"),
+        ("identity", "Day #1"),
+        ("identity", "Year in Review 2026"),
+        ("identity", "2026 Review"),
+        ("identity", "Rating 1-10 Mood"),
     ),
 )
 def test_names_without_a_claim_publish(kind: str, value: str) -> None:
@@ -657,6 +667,41 @@ def test_review_and_star_nouns_are_allowed() -> None:
         "Book Reviews" in section.text for section in reviewed_copy.draft.description_sections
     )
     assert validate_claims(reviewed_copy.draft, reviewed).passed is True
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        "Top #1 Planner",
+        "Rank #1",
+        "Number #1",
+        "World #1",
+        "Planner #1 on Etsy",
+        "Ranks #1 on Etsy",
+        "Room #1 on Etsy",
+        "Goal #1 in stock",
+        "Week #1 pick",
+        "Day #1 seller",
+    ),
+)
+def test_rank_number_one_in_a_name_is_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        "EtsyBestseller Planner",
+        "BestsellerPlanner",
+        "TopRatedPlanner",
+        "CustomerTestimonials Planner",
+        "FullyAutomated sync",
+        "SmartAutofill budget",
+        "Raved about by buyers",
+    ),
+)
+def test_joined_claim_stems_are_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
 
 
 @pytest.mark.parametrize(

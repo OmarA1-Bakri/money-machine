@@ -39,7 +39,7 @@ _NUMBER_WORDS: Final[str] = (
     "fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|"
     "fifty|sixty|seventy|eighty|ninety|hundred|thousand"
 )
-_PAGE_UNIT: Final[str] = r"(?:printable\s+|bonus\s+)?(?:pp|pages?)\b"
+_PAGE_UNIT: Final[str] = r"(?:(?:printable|bonus)[\s\-]+)?(?:pp|pages?)\b"
 _PAGE_NUMBERS: Final[Pattern[str]] = re.compile(
     rf"(?<!\d)(\d+)\s*[+\-]?\s*{_PAGE_UNIT}"
     rf"|\b((?:(?:over|plus)\s+)?(?:{_NUMBER_WORDS})(?:[\s\-]+(?:{_NUMBER_WORDS}))*)"
@@ -57,26 +57,31 @@ _LAYOUT_TAIL: Final[Pattern[str]] = re.compile(
     r"[\s\-]+(?:(?:daily|weekly|monthly|yearly|annual)\s+)?"
     r"(?:per|layouts?|spreads?|summary|summaries|views?|overviews?)\b"
 )
+# Long stems are unanchored so a joined token still matches. Short tokens keep
+# boundaries. ``rave`` stays bounded so Travel, Gravel, Brave, and Raven publish.
 _AUTOMATION: Final[Pattern[str]] = re.compile(
-    r"\bautomat(?!ic\s+savings\b)\w*|\bauto-[\w-]+|\bunattended\b|\bhands[-\s]free\b"
-    r"|\bautofill\w*",
+    r"automat(?!ic\s+savings\b)\w*|\bauto-[\w-]+|\bunattended\b|\bhands[-\s]free\b"
+    r"|autofill\w*",
     re.IGNORECASE,
 )
 _REVIEW: Final[Pattern[str]] = re.compile(
-    r"\btop[-\s]?rated\b|\bhighly reviewed\b|\btestimonials?\b|\brated\b|\bfive-star\b"
-    r"|\braves?\b"
+    r"top[-\s]?rated|\bhighly reviewed\b|testimonials?|\brated\b|\bfive-star\b"
+    r"|\brav(?:e[sd]?|ing)\b"
     r"|\b(?:\d[\d,]*|five|four|three|two|one)[\s-]*stars?\b"
     r"|\bstars?[\s-]+reviews?\b"
-    r"|\d[\d,.]*\+?\s*(?:(?:average|avg\.?|customer|buyer|verified)\s+)?(?:reviews?|ratings?)\b"
-    r"|\b(?:reviews?|ratings?)\s*[:=]?\s*\d"
+    r"|(?<![\d.])(?!(?:19|20)\d\d\s+review\b)"
+    r"\d[\d,.]*\+?\s*(?:(?:average|avg\.?|customer|buyer|verified)\s+)?(?:reviews?|ratings?)\b"
+    r"|\b(?:reviews?|ratings?)\s*[:=]?\s*(?!(?:19|20)\d\d\b)(?!\d+\s*[-\s]\s*\d)\d"
     r"|\baverage\s+(?:reviews?|ratings?)\b",
     re.IGNORECASE,
 )
+# ``#1`` is a rank claim except immediately after room, goal, step, part, week,
+# or day. Those labels are still rank claims when on, in, pick, or seller follows.
 _SALES: Final[Pattern[str]] = re.compile(
-    r"\bbest[-\s]?sell(?:ers?|ing)\b"
+    r"best[-\s]?sell(?:ers?|ing)"
     r"|\bunits sold\b|\d[\d,]*\+?\s+sold\b|\d[\d,]*\+?\s+downloads\b|\d+\s*k\s+downloads\b"
-    r"|(?:^|[^\w\s]\s*|\b(?:the|our|your|a|an|is|rated|ranked|voted|etsy|amazon)\s+|\w['\u2019]s?\s+)"
-    r"#\s*1(?!\d)"
+    r"|(?<!\b(?:room|goal|step|part|week)\s)(?<!\bday\s)#\s*1(?!\d)"
+    r"|#\s*1(?!\d)\s+(?:on|in|pick|seller)\b"
     r"|\d[\d,]*\+?\s+orders\b|\borders on file\b",
     re.IGNORECASE,
 )
