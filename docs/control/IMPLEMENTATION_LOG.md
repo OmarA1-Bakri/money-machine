@@ -1,3 +1,19 @@
+## 2026-10-10 — Session 08 W1 follow-up: #1 rank claims, long stems, price_sale kills
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
+
+This follow-up does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, or `IMPLEMENTATION_STATE.json`. It answers Reviewer review 5479034788, which still stood when #67 squash-merged as `c3d20082`.
+
+1. `#1` is a rank claim unless the word immediately before it is `room`, `goal`, `step`, `part`, `week`, or `day`. `on`, `in`, `pick`, and `seller` after `#1` stay rank claims, including after those labels. `Room #1 Inventory` and `Goal #1` publish.
+2. `bestsell`, `automat`, `autofill`, `testimonial`, and `top-rated` have no word boundaries. Short tokens keep theirs. Review stems use `\brav(?:e[sd]?|ing)\b`. `Travel Planner`, `Gravel Bike Log`, `Brave Habits Planner`, `Raven`, and the other #67 round-5 names publish.
+3. Dropping `currency`, `price`, or `anchor_price` from the `price_sale` comparison is killed by that field's own mismatch. With no price claim, the correction cites `claims[0]`. Dropping that fallback raises `AttributeError`. Citing `claims[0]` while a price claim exists is killed.
+4. The round-5 log cited unpushed `b2834703`. The commit on #67 is `4c6f982`.
+5. `One-Hundred-Printable-Pages` and `200-printable-pages` are refused. `Year in Review 2026`, `2026 Review`, and `Rating 1-10 Mood` publish.
+
+Parked: further Verifier items on `6c853b7c`, plus `200 pgs`, `pg`, and `sheets`.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-followup-pytest`: 12 failed, 3909 passed, 193 skipped, 1 warning in 381.67s (0:06:21). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those commands and the pytest run are the tree at `6312d14`. This paragraph was written after that run.
+
 ## 2026-10-10 — Session 08 W1 round 5: ignorable characters, count claims, and word boundaries
 
 Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
