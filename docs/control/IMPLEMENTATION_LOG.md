@@ -1,3 +1,15 @@
+## 2026-10-10 — Session 08 W1 round 3: fact values and tag truncation
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD.
+
+This round does not edit `src/money_machine/control/state.py`, `tests/bootstrap/test_control_state.py`, or `docs/control/reviews/2026-10-10-session-08-prompt-integrity.md`.
+
+A features fact must equal `spec.features` item for item. Variant facts must equal the built variant names. Page count must equal the built count. A review, sales, trust, social, automation, or page-count hit is allowed only from that class's own fact kind. Identity and buyer-problem values must pass that deny-list themselves. A tag that does not fit in 20 characters is refused whole. Tags are not built from automation, review, sales, trust, or social claims. The fixture identity and feature names are longer than 20 characters, so they are skipped. Product type, variants, shop, hubs, and devices fill the 13 tags. Mixed script is checked per token. Each surface uses only its own template id.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/domain/test_claim_validation.py tests/unit/domain/test_listing_binding.py tests/unit/agents/test_merchandising.py` — 463 passed in 3.73s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-r3-pytest`: 12 failed, 3761 passed, 193 skipped, 1 warning in 369.53s (0:06:09). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those three commands and the pytest run are the tree at `5d7704c`. This paragraph was prepended after that run.
+
 ## 2026-10-10 — Session 08 W1 round 2: listing text is bound to cited facts
 
 Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD.
