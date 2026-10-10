@@ -1,3 +1,21 @@
+## 2026-10-10 — Session 08 W1 follow-up: year counts, joined stems, exact cents
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
+
+This paragraph answers Reviewer review 5479413274 and Verifier comment 6098830346 on `f983fe5`. The code commits on this branch are `6312d14`, `d13c5f1`, and `de26e94`. It does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, or `IMPLEMENTATION_STATE.json`.
+
+1. A year is exempt only beside singular `review`, with no `:`, `=`, `+`, `k`, or further digit. `1900` and `2000` stay counts, so `2000 review` is refused and `Year in Review 2026` and `2026 Review` still publish. A number after `rating`, `ratings`, or `reviews` is never a year. A range is exempt only for 0 or 1 through 5, 10, or 100. `Reviews: 2000`, `Reviews 2000+`, `Ratings: 1999`, `Ratings = 2024`, `Reviews 2 500`, `Reviews 12 000`, `Rating 4 9`, and `Rating 5-5` are refused. `Rating 1-10 Mood` still publishes.
+2. `RaveReviews`, `5StarPlanner`, `FiveStarPlanner`, `Unattendedsync`, `top_rated`, `Best_seller`, `best.seller`, and `raving fans` are refused. `_` and `.` join tokens. `Travel Planner`, `Brave Habits Planner`, and `Raven` still publish.
+3. `Automatic Savings Planner` is compared per `|` item. It publishes as a hub, feature, variant, dashboard output, support channel, or gift name. A longer item is still scanned.
+4. Sale price `8.90` and `8.01` against `8.99` are rejected, and the same values as anchors against anchor `8.99`. An `int()` coercion accepts `8.01`. A three-character string coercion accepts `8.90`.
+5. `#01 Planner`, `#1-on Etsy`, `#1, on Etsy`, and `# 1 Planner` are refused. `Chapter #1`, `Book #1`, `Level #1`, and `Lap #1 Running` publish. `#10 Planner` publishes. `10 k reviews`, `2.5k sold`, `1.5k orders`, and `5k+ sold` are refused. `Twelve page overview` publishes when the built count is 12. `13 page layout` is refused at that count.
+
+Parked: `10K+ happy buyers`, `12k sales`, k-download forms, `Goal #1 choice` / `Goal #1 at`, and `Over 12 page layouts` at built 12.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/domain/test_claim_validation.py tests/unit/domain/test_listing_binding.py tests/unit/agents/test_merchandising.py` — 668 passed in 13.88s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-r2-pytest`: 12 failed, 3966 passed, 193 skipped, 1 warning in 379.53s (0:06:19). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those commands and the pytest run are the tree at `de26e94`. This paragraph was written after that run.
+
 ## 2026-10-10 — Session 08 W1 follow-up: k counts, savings name, layout count
 
 Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
