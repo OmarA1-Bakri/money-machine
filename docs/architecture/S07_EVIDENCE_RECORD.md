@@ -40,7 +40,7 @@ Revoke flips cited keys true to false, removes those citations, and appends `{ke
 
 `replay_state_history` walks `git log --first-parent` from the hardcoded anchor `00b952a83bffcec8d442468223d64dd9b2d3e6df`. The CLI never takes an anchor from argv, the environment, or config. A shallow repository, an unresolvable anchor, or an anchor that is not a first-parent ancestor of HEAD fails closed. Only in-process `_apply_activation_transition`, `_apply_completion_transition`, and `replay_state_history` may inject an anchor.
 
-The window runs through the first first-parent state commit whose `current_session` is not 7. That commit must be a valid activation into 8. While the window is open it runs to HEAD, and the worktree state must equal HEAD. After it closes, later state commits are not replayed. The worktree rule does not apply to a dirty tree on an activation whose `next_session` is not 8 or 9.
+The window runs through the first first-parent state commit whose `current_session` is not 7. That commit must be a valid activation into 8. While the window is open it runs to HEAD, and the worktree state must equal HEAD. A caller that requires a closed window, and a history that is still session 7 with no Session 08 activation, is refused with `bad window-end`. Deleting that raise accepts the history. After it closes, later state commits are not replayed. The worktree rule does not apply to a dirty tree on an activation whose `next_session` is not 8 or 9.
 
 The pin helper, activation into 8 (open) and 9 (closed), and completion of session 8 call the replay. Activations 1–7 and completions 0–7 do not.
 
@@ -100,7 +100,7 @@ The browser guard in `s07_navigation_guard.py` is the testable rule for later na
 | 40 | Replay is not called when `next_session` is 1 or 2 |
 | 41 | Revoke key 3, re-record it, close; `7_revoked` stays byte-identical. Editing it on a later record or on closure is refused |
 | 43 | Candidates pass their own validators first. A hand-made session 08 activation is refused by completion and by activation into 9, with a replay message. `_apply_completion_transition` accepts an injected anchor |
-| 44 | Open window runs to HEAD. A valid activation ends the window. An invalid window end is `bad window-end`, not `invalid step` |
+| 44 | Open window runs to HEAD. A valid activation ends the window. History that is still session 7, with no Session 08 activation, is `bad window-end` when a closed window is required. Deleting that raise accepts the history |
 | 45 | Missing, stale, past (reminder four hours earlier), or too-far deadline; mode, a symlink to a valid file, missing field, empty `omar_notified_at`, or wrong owner. Zero browser writes. A valid 0600 file allows one write |
 | 46 | One lock per run id. A live holder returns false. An old lock without `exec.json` is refused. A completed exec returns false and does not act again; a new run id does |
 | 47 | Foreign space, broken parent, redirect, unlisted URL, signed-out sandbox, or a signed-in anonymous session. `evilnotion.site` is refused. A listed `notion.site` URL is allowed |

@@ -1907,18 +1907,16 @@ def test_44_window_runs_to_head_until_a_valid_activation(tmp_path: Path) -> None
     assert window_tip["head_sha"] == commit_c
 
     invalid = _anchor(tmp_path / "invalid")
-    broken = _advance(invalid.state, "2026-10-10T21:00:00Z")
-    broken["current_session"] = 8
-    broken["session_status"] = "incomplete"
-    broken["required_completion_evidence"] = dict.fromkeys(SESSION_08_EVIDENCE_KEYS, False)
-    _evidence_false = cast(dict[str, bool], invalid.state["required_completion_evidence"])
-    assert _evidence_false[KEY_ONE] is False
-    write_state(invalid.repo / "docs/control/IMPLEMENTATION_STATE.json", broken)
-    _commit(invalid.repo, "test: invalid window end")
+    citations = _plant(invalid.repo, (KEY_ONE,))
+    merge = _commit(invalid.repo, "test: evidence")
+    recorded = _apply_record(
+        invalid, invalid.state, (KEY_ONE,), citations, merge, "2026-10-10T21:00:00Z"
+    )
+    _commit(invalid.repo, "test: still session 7")
+    assert recorded["current_session"] == 7
     with pytest.raises(ControlStateError, match="bad window-end") as caught:
         replay_state_history(invalid.repo, invalid.sha, require_closed_window=True)
-    assert "invalid step" not in str(caught.value)
-    assert "prior-session evidence" in str(caught.value)
+    assert str(caught.value) == "replay refused: bad window-end"
 
 
 def test_state_py_frozen_ranges_stay_byte_identical() -> None:

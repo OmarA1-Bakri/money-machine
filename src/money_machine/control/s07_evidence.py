@@ -1013,9 +1013,9 @@ def replay_state_history(
         if state["current_session"] != 7:
             end_index = index
             break
-    if end_index is None and require_closed_window:
-        raise ControlStateError(NO_WINDOW)
     last_index = end_index if end_index is not None else len(commits) - 1
+    if end_index is None and require_closed_window and last_index < 1:
+        raise ControlStateError(NO_WINDOW)
     for index in range(1, last_index + 1):
         commit = commits[index]
         previous = states[index - 1]
@@ -1038,10 +1038,12 @@ def replay_state_history(
             matches.append("revoke")
         if _activation_step(previous, current):
             matches.append("activation")
-        if is_end and "activation" not in matches:
-            if activation_error is None:
-                raise ControlStateError(BAD_WINDOW)
-            raise ControlStateError(f"{BAD_WINDOW}: {activation_error}") from activation_error
+        # Session 7 with no Session 08 activation is a bad window end when one is required.
+        still_session_seven = require_closed_window and end_index is None and index == last_index
+        if (is_end or still_session_seven) and "activation" not in matches:
+            if activation_error is not None:
+                raise ControlStateError(f"{BAD_WINDOW}: {activation_error}") from activation_error
+            raise ControlStateError(BAD_WINDOW)
         if not is_end and "activation" in matches:
             raise ControlStateError(INVALID_STEP)
         if len(matches) != 1:
