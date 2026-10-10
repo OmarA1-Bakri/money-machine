@@ -632,9 +632,7 @@ def test_review_and_order_counts_are_refused(field: str, value: str) -> None:
         ("identity", "Book #1"),
         ("identity", "Level #1"),
         ("identity", "Lap #1 Running"),
-        ("identity", "Year in Review 2026"),
-        ("identity", "2026 Review"),
-        ("identity", "Rating 1-10 Mood"),
+        ("identity", "One Starry Night"),
         ("identity", "#10 Planner"),
     ),
 )
@@ -729,6 +727,48 @@ def test_year_and_range_exceptions_do_not_hide_counts(identity: str) -> None:
 @pytest.mark.parametrize(
     "identity",
     (
+        "Reviews 1 100",
+        "Ratings 1 100",
+        "Reviews 1 10 000",
+        "Ratings 1 10 000",
+        "Ratings 1-5+",
+        "Rating 1-5.5",
+        "Ratings 1-5: 5",
+        "Rating 1-10 = 10",
+        "Review 2026 500",
+        "Year in Review 2026 4.9",
+        "1999 review",
+        "Review 2000",
+        "2026 reviews",
+        "Review 2026+",
+        "review 2026k",
+        "2026 review+",
+        "Review: 2026",
+        "Rating 1-50",
+        "Over 2026 review",
+    ),
+)
+def test_review_or_rating_beside_a_number_is_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        "Year in Review 2026",
+        "2026 Review",
+        "Rating 1-10 Mood",
+        "Rating 0-100 Score",
+        "Rating 1-5",
+    ),
+)
+def test_year_and_scale_names_fail_closed(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
         "RaveReviews",
         "5StarPlanner",
         "FiveStarPlanner",
@@ -752,6 +792,7 @@ def test_joined_review_and_sales_forms_are_refused(identity: str) -> None:
         "# 1 Planner",
         "Room #1-on Etsy",
         "Goal #1, on Etsy",
+        "Goal #01 on Etsy",
     ),
 )
 def test_rank_punctuation_is_refused(identity: str) -> None:
@@ -816,6 +857,26 @@ def test_twelve_page_overview_publishes_when_the_built_count_is_twelve() -> None
 
 def test_thirteen_page_layout_is_refused_when_the_built_count_is_twelve() -> None:
     _refuse(_with_built_pages(_bound("identity", "13 page layout"), 12))
+
+
+def test_built_page_count_without_a_layout_noun_is_refused() -> None:
+    _refuse(_bound("identity", "42 Page Planner"))
+
+
+def test_savings_name_does_not_hide_a_later_automation_hub() -> None:
+    request = consistent_request(
+        create_fixture_product_spec(
+            hubs=(
+                "Automatic Savings Planner",
+                "Auto-sync savings",
+                "Habit Builder",
+                "Budget Tracker",
+                "Meal Planner",
+                "Fitness Log",
+            )
+        )
+    )
+    _refuse(request)
 
 
 @pytest.mark.parametrize(

@@ -76,24 +76,20 @@ _AUTOMATION: Final[Pattern[str]] = re.compile(
 )
 _SAVINGS_NAME: Final[str] = "automatic savings planner"
 _EXACT_SAVINGS: Final[Pattern[str]] = re.compile(rf"\b{_SAVINGS_NAME}\b")
-# A year beside singular ``review`` is not a count. 1900 and 2000 stay counts.
-# A following ``+``, ``k``, digit, or decimal is still a count. A sentence
-# period is not. A scale is only 0 or 1 through 5, 10, or 100.
-# ``_`` and ``.`` join tokens.
-_REVIEW_YEAR: Final[str] = r"(?:19|20)(?!00)\d\d"
-_REVIEW_SCALE: Final[str] = r"(?:0|1)\s*[-\s]\s*(?:5|10|100)\b"
+# A review or rating word next to a number is a count. There is no year
+# exemption and no rating-scale exemption. ``_`` and ``.`` join tokens.
+_REVIEW_BEFORE: Final[str] = (
+    r"(?<![\d.])\d[\d,]*(?:\.\d+)?\s*k?\+?\s*"
+    r"(?:(?:average|avg\.?|customer|buyer|verified)\s+)?(?:reviews?|ratings?)\b"
+)
+_REVIEW_AFTER: Final[str] = r"\breviews?\s*[:=]?\s*\d|\bratings?\s*[:=]?\s*\d"
 _REVIEW: Final[Pattern[str]] = re.compile(
     rf"top[-\s_.]?rated|\bhighly reviewed\b|testimonials?|\brated\b|\bfive-star\b"
     rf"|\brav(?:ing|es|ed|e)(?:reviews?|(?!\w))"
-    rf"|\b(?:\d[\d,]*|five|four|three|two|one)[\s-]*stars?"
+    rf"|\b(?:\d[\d,]*|five|four|three|two|one)[\s-]*stars?(?!ry\b)"
     rf"|\bstars?[\s-]+reviews?\b"
-    rf"|(?<![\d.])(?!{_REVIEW_YEAR}\s+review\b(?![\d+k]|[.,]\d))"
-    rf"\d[\d,]*(?:\.\d+)?\s*k?\+?\s*"
-    rf"(?:(?:average|avg\.?|customer|buyer|verified)\s+)?(?:reviews?|ratings?)\b"
-    rf"|\breview\s*[:=]\s*\d"
-    rf"|\breview\s+(?!{_REVIEW_YEAR}(?![\d+k]|[.,]\d))\d"
-    rf"|\breviews\s*[:=]?\s*(?!{_REVIEW_SCALE})\d"
-    rf"|\bratings?\s*[:=]?\s*(?!{_REVIEW_SCALE})\d"
+    rf"|{_REVIEW_BEFORE}"
+    rf"|{_REVIEW_AFTER}"
     rf"|\baverage\s+(?:reviews?|ratings?)\b",
     re.IGNORECASE,
 )

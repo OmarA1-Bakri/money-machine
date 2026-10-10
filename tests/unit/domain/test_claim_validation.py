@@ -25,7 +25,11 @@ from money_machine.agents.contracts.merchandising import (
     ProductFact,
 )
 from money_machine.agents.implementations.merchandising import DeterministicCopyGenerator
-from money_machine.domain.services.claim_validation import ClaimValidation, validate_claims
+from money_machine.domain.services.claim_validation import (
+    ClaimValidation,
+    fact_text_problem,
+    validate_claims,
+)
 from money_machine.domain.services.listing_text import TextSlot, render
 from tests.fixtures.merchandising import consistent_request
 
@@ -181,18 +185,41 @@ class _DropCall(ast.NodeTransformer):
         return self.generic_visit(node)
 
 
-def _load_mutant(transform: ast.NodeTransformer, label: str) -> Callable[..., object]:
+def _load_mutant_module(transform: ast.NodeTransformer, label: str) -> types.ModuleType:
     tree = transform.visit(ast.parse(_VALIDATOR.read_text(encoding="utf-8")))
+    if not isinstance(tree, ast.Module):
+        raise AssertionError(label)
+    return _exec_mutant(tree, label)
+
+
+def _load_mutant(transform: ast.NodeTransformer, label: str) -> Callable[..., object]:
+    validate = _load_mutant_module(transform, label).__dict__["validate_claims"]
+    if not callable(validate):
+        raise AssertionError(label)
+    return validate
+
+
+def _exec_mutant(tree: ast.Module, label: str) -> types.ModuleType:
     ast.fix_missing_locations(tree)
     name = f"claim_mutant_{label}"
     module = types.ModuleType(name)
     module.__file__ = str(_VALIDATOR)
     sys.modules[name] = module
     exec(compile(tree, str(_VALIDATOR), "exec"), module.__dict__)
-    validate = module.__dict__["validate_claims"]
-    if not callable(validate):
+    return module
+
+
+def _replaced_problem(old: str, new: str, label: str) -> Callable[..., str | None]:
+    source = _VALIDATOR.read_text(encoding="utf-8")
+    found = source.count(old)
+    if found != 1:
+        raise AssertionError(f"{label} matched {found}")
+    problem = _exec_mutant(ast.parse(source.replace(old, new, 1)), label).__dict__[
+        "fact_text_problem"
+    ]
+    if not callable(problem):
         raise AssertionError(label)
-    return validate
+    return cast(Callable[..., str | None], problem)
 
 
 def _mutant_validate(rule: str) -> Callable[..., object]:
@@ -470,16 +497,25 @@ def _near_sale(
     return draft.model_copy(update={"price_sale": draft.price_sale.model_copy(update=update)})
 
 
-@pytest.mark.parametrize("price", (Decimal("8.90"), Decimal("8.01")))
+@pytest.mark.parametrize(
+    "price",
+    (Decimal("8.90"), Decimal("8.01"), Decimal("8.98"), Decimal("9.00")),
+)
 def test_price_sale_rejects_a_near_price(price: Decimal) -> None:
     request, draft = _request_and_draft()
     assert request.price == Decimal("8.99")
     outcome = validate_claims(_near_sale(draft, price=price), request)
     assert outcome.passed is False
-    assert _price_sale_correction(outcome).rejection_class == "unknown_fact"
+    correction = _price_sale_correction(outcome)
+    assert correction.rejection_class == "unknown_fact"
+    price_fact = next(fact for fact in request.facts if fact.fact_key == "price")
+    assert correction.fact_id == price_fact.fact_id
 
 
-@pytest.mark.parametrize("anchor", (Decimal("8.90"), Decimal("8.01")))
+@pytest.mark.parametrize(
+    "anchor",
+    (Decimal("8.90"), Decimal("8.01"), Decimal("8.98"), Decimal("9.00")),
+)
 def test_price_sale_rejects_a_near_anchor(anchor: Decimal) -> None:
     request, draft = _request_and_draft()
     request = request.model_copy(update={"price": Decimal("8.00"), "anchor_price": Decimal("8.99")})
@@ -487,7 +523,10 @@ def test_price_sale_rejects_a_near_anchor(anchor: Decimal) -> None:
         _near_sale(draft, price=Decimal("8.00"), anchor_price=anchor), request
     )
     assert outcome.passed is False
-    assert _price_sale_correction(outcome).rejection_class == "unknown_fact"
+    correction = _price_sale_correction(outcome)
+    assert correction.rejection_class == "unknown_fact"
+    price_fact = next(fact for fact in request.facts if fact.fact_key == "price")
+    assert correction.fact_id == price_fact.fact_id
 
 
 def test_int_price_coercion_accepts_eight_cents_off() -> None:
@@ -505,6 +544,145 @@ def test_int_price_coercion_accepts_eight_cents_off() -> None:
     anchor_copy = _near_sale(draft, price=Decimal("8.00"), anchor_price=Decimal("8.01"))
     assert validate_claims(anchor_copy, anchored).passed is False
     assert cast(ClaimValidation, mutant(anchor_copy, anchored)).passed is True
+
+
+_YEAR_BEFORE = r"(?<![\d.])\d[\d,]*(?:\.\d+)?\s*k?\+?\s*"
+_YEAR_EXEMPT = r"(?<![\d.])(?!(?:19|20)\d\d\s+review\b)\d[\d,]*(?:\.\d+)?\s*k?\+?\s*"
+_SCALE_AFTER = r"\breviews?\s*[:=]?\s*\d|\bratings?\s*[:=]?\s*\d"
+_SCALE_EXEMPT = (
+    r"\breviews?\s*[:=]?\s*(?!(?:0|1)\s*[-\s]\s*(?:5|10|100)\b)\d"
+    r"|\bratings?\s*[:=]?\s*(?!(?:0|1)\s*[-\s]\s*(?:5|10|100)\b)\d"
+)
+_RANK_FOLLOWER = r"#\s*0*1(?!\d)[\s\-,]+(?:on|in|pick|seller)\b"
+_RANK_FOLLOWER_BARE = r"#\s*1(?!\d)[\s\-,]+(?:on|in|pick|seller)\b"
+
+
+def test_readding_a_review_exemption_publishes_a_count() -> None:
+    assert fact_text_problem("identity", "1999 review", page_count=42) == "class"
+    assert fact_text_problem("identity", "Reviews 1 100", page_count=42) == "class"
+    year = _replaced_problem(_YEAR_BEFORE, _YEAR_EXEMPT, "review_year")
+    assert year("identity", "1999 review", page_count=42) is None
+    scale = _replaced_problem(_SCALE_AFTER, _SCALE_EXEMPT, "review_scale")
+    assert scale("identity", "Reviews 1 100", page_count=42) is None
+
+
+def test_dropping_the_rank_follower_zero_publishes_goal_zero_one() -> None:
+    assert fact_text_problem("identity", "Goal #01 on Etsy", page_count=42) == "class"
+    bare = _replaced_problem(_RANK_FOLLOWER, _RANK_FOLLOWER_BARE, "rank_zero")
+    assert bare("identity", "Goal #01 on Etsy", page_count=42) is None
+
+
+class _SavingsEarlyExit(ast.NodeTransformer):
+    """Return before later list items once the exact savings name is seen."""
+
+    def __init__(self) -> None:
+        self.hits = 0
+
+    def visit_If(self, node: ast.If) -> ast.AST:
+        test = node.test
+        if (
+            isinstance(test, ast.Compare)
+            and isinstance(test.left, ast.Name)
+            and test.left.id == "item"
+            and len(test.ops) == 1
+            and isinstance(test.ops[0], ast.Eq)
+            and len(test.comparators) == 1
+            and isinstance(test.comparators[0], ast.Name)
+            and test.comparators[0].id == "_SAVINGS_NAME"
+            and len(node.body) == 1
+            and isinstance(node.body[0], ast.Continue)
+        ):
+            self.hits += 1
+            node.body = [ast.Return(value=ast.Constant(value=False))]
+            return node
+        return self.generic_visit(node)
+
+
+def test_savings_early_exit_publishes_a_later_automation_item() -> None:
+    value = "Automatic Savings Planner|Auto-sync savings"
+    assert fact_text_problem("hubs", value, page_count=42) == "class"
+    early = _SavingsEarlyExit()
+    problem = _load_mutant_module(early, "savings_early").__dict__["fact_text_problem"]
+    assert early.hits == 1
+    assert callable(problem)
+    assert problem("hubs", value, page_count=42) is None
+
+
+class _DropLayoutTail(ast.NodeTransformer):
+    """Treat every page mention as a layout span, noun or not."""
+
+    def __init__(self) -> None:
+        self.hits = 0
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST:
+        if node.name != "_layout_span":
+            return self.generic_visit(node)
+        kept: list[ast.stmt] = []
+        for stmt in node.body:
+            if _layout_tail_guard(stmt):
+                self.hits += 1
+                continue
+            kept.append(stmt)
+        node.body = kept
+        return node
+
+
+def _layout_tail_guard(stmt: ast.stmt) -> bool:
+    if not isinstance(stmt, ast.If) or not isinstance(stmt.test, ast.Compare):
+        return False
+    left = stmt.test.left
+    return (
+        isinstance(left, ast.Call)
+        and isinstance(left.func, ast.Attribute)
+        and left.func.attr == "match"
+        and isinstance(left.func.value, ast.Name)
+        and left.func.value.id == "_LAYOUT_TAIL"
+    )
+
+
+def test_dropping_the_layout_noun_publishes_the_built_page_count() -> None:
+    assert fact_text_problem("identity", "42 Page Planner", page_count=42) == "page"
+    drop = _DropLayoutTail()
+    problem = _load_mutant_module(drop, "layout_tail").__dict__["fact_text_problem"]
+    assert drop.hits == 1
+    assert callable(problem)
+    assert problem("identity", "42 Page Planner", page_count=42) is None
+
+
+class _PriceFactIdNone(ast.NodeTransformer):
+    """Cite no fact when the sale price does not match."""
+
+    def __init__(self) -> None:
+        self.hits = 0
+        self._inside = False
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST:
+        if node.name != "reject_price_mismatch":
+            return node
+        self._inside = True
+        updated = self.generic_visit(node)
+        self._inside = False
+        return updated
+
+    def visit_keyword(self, node: ast.keyword) -> ast.AST:
+        if self._inside and node.arg == "fact_id" and isinstance(node.value, ast.IfExp):
+            self.hits += 1
+            node.value = ast.Constant(value=None)
+        return node
+
+
+def test_price_sale_none_fact_id_drops_the_price_fact() -> None:
+    request, draft = _request_and_draft()
+    copy = _near_sale(draft, price=Decimal("8.98"))
+    real = _price_sale_correction(validate_claims(copy, request))
+    price_fact = next(fact for fact in request.facts if fact.fact_key == "price")
+    assert real.fact_id == price_fact.fact_id
+    blank = _PriceFactIdNone()
+    mutant = _load_mutant(blank, "price_fact_none")
+    assert blank.hits == 1
+    forged = cast(ClaimValidation, mutant(copy, request))
+    assert forged.passed is False
+    assert _price_sale_correction(forged).fact_id is None
 
 
 def test_three_character_price_coercion_accepts_eight_ninety() -> None:
