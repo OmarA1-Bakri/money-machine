@@ -4587,9 +4587,9 @@ async def test_exception_group_of_only_exceptions_is_a_local_read_failure(
 ) -> None:
     """An ExceptionGroup of Exceptions is a local read failure, not a provider job.
 
-    Adding ExceptionGroup to the provider tuple (ledger:243) would report
+    Adding ExceptionGroup to the provider tuple (ledger:286) would report
     provider read failed. Re-raising the group from the Exception handler
-    (ledger:245) would not be a ProductBuildError.
+    (ledger:288) would not be a ProductBuildError.
     """
     spec, probe, path = await _qa(tmp_path)
     raw = path.read_bytes()

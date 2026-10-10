@@ -370,4 +370,4 @@ D-0029 stores a sha256 of the hub descriptions, the buyer problem, and the flags
 
 ### Consequences
 
-The ledger still refuses a mismatched caller whose live prose is not the caller's prose (D-0029). A judged caller can still be judged again after a prose edit. W13 did not start the live sandbox. The close records that title-only Eng Ops run and records the QA operand checks at the public entry as equivalent. In-place repair, commissioning, and the twelve evidence keys stay out.
+The ledger still refuses a mismatched caller whose live prose is not the caller's prose (D-0029). A judged caller can still be judged again after a prose edit. W13 did not start the live sandbox. The close records that title-only Eng Ops run. It records the `:145` operand check as equivalent at the public entry. It records `:156` as a survivor when a proof page already exists. In-place repair, commissioning, and the twelve evidence keys stay out.

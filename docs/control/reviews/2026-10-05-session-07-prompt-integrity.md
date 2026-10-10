@@ -747,7 +747,7 @@ The prompt file is not amended.
 
 **Verdict:** CONDITIONAL APPROVE. The Wave 1 critical and high findings still apply and stay in force.
 
-**S-01 [CRITICAL] — Action 11 live sandbox.** Still deferred. This wave uses `FixtureNotionAdapter` only. No live HTTP, no real Notion workspace, no Etsy listing, no `--execute`, no Exit 78 lift. Narrative `next_phase` after a recorded matrix is `sandbox_build`, and this wave does not run it.
+**S-01 [CRITICAL] — Action 11 live sandbox.** This wave's matrix slice does not run it. The title-only Eng Ops run at 2026-10-10 08:54 ICT is recorded by the close addendum below. It is not this matrix. This wave uses `FixtureNotionAdapter` only. No live HTTP, no real Notion workspace, no Etsy listing, no `--execute`, no Exit 78 lift. Narrative `next_phase` after a recorded matrix is `sandbox_build`, and this wave does not run it.
 
 **S-02 [HIGH] — Action 12 commissioning.** A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. Do not edit `config/agents.yaml`.
 
@@ -825,7 +825,7 @@ The prompt file is not amended.
 
 **Verdict:** CONDITIONAL APPROVE. The Wave 1 critical and high findings still apply and stay in force.
 
-**S-01 [CRITICAL] — Action 11 live sandbox.** Still deferred. This wave uses `FixtureNotionAdapter` only. No live HTTP, no real Notion workspace, no Etsy listing, no `--execute`, no Exit 78 lift.
+**S-01 [CRITICAL] — Action 11 live sandbox.** This wave's caller-trust slice does not run it. The title-only Eng Ops run at 2026-10-10 08:54 ICT is recorded by the close addendum below. It is not this slice. This wave uses `FixtureNotionAdapter` only. No live HTTP, no real Notion workspace, no Etsy listing, no `--execute`, no Exit 78 lift.
 
 **S-02 [HIGH] — Action 12 commissioning.** A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. Do not edit `config/agents.yaml`.
 
@@ -871,11 +871,12 @@ The prompt file is unchanged. SHA-256 `d52011a6f0b725b16427629dc664cfc9f3432c4b5
 5. `STAGE_REGISTRY` for `qa`, `fact_ledger`, `workflow_link`, and `w11` stays None. The stale "not merged" comment is replaced with that reason. Wiring those names would let a later `--execute` report them PASS. `w11` is not a sandbox runner.
 6. Fixture only. No live Notion, no Etsy, no `--execute`.
 7. Lines about `s11_cleanup.py`, the plan §9, the token-scan, and the Ops token rotation are owned outside this repo. They are not implemented here.
-8. The QA operand checks at `notion_qa.py:145` and `:156` are equivalent at the public entry. The close records that proof. It does not change the conditions.
+8. The QA operand check at `notion_qa.py:145` is equivalent at the public entry. `notion_qa.py:156` `and` changed to `or` is a survivor when a proof page already exists: `_prove_duplicate` returns before `guard_operation`, and fixture fault injection on `qa.duplicate` makes the mutant raise `provider operation failed`. The close records that. It does not change the conditions.
 
 | Finding | Owner | Reason |
 |---|---|---|
 | `s11_cleanup.py` re-read claim, plan §9 round/ruff claim, token-scan gaps, SIGKILL cleanup record, Ops `NOTION_SANDBOX_TOKEN` rotation | Outside this repo | Not files in this checkout |
 | Session close | Omar, after CI, Reviewer, Verifier, and Lead Reviewer | This wave prepares the close. It does not put it in effect |
-| QA operand survivors | Recorded equivalent at the public entry | `notion_qa.py:145` and `:156`. See the close log |
+| QA operand at `:145` | Recorded equivalent at the public entry | See the close log |
+| QA operand at `:156` | Survivor, not equivalent | Proof page already exists. `and` to `or` raises `provider operation failed` under fixture fault injection |
 

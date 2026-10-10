@@ -34,7 +34,7 @@ Router browser and combined config modes still raise `NotImplementedError` (W4a)
 
 ## Session 07 — Wave 12 close prepared (pending Omar close gate)
 
-**Status**: Incomplete (2026-10-10, W12 close, state revision 63). SESSION_07 COMPLETE markers in this handoff are prepared only. Completion is not in effect until CI, Reviewer and Verifier PASS, a Lead Reviewer LEAD PASS, and Omar's explicit close gate. Twelve evidence keys stay false. No evidence key flips because of §11. `shared_databases_built` and `home_dashboard_built` stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `98fc06d2d37b206075b6bc91cf1dc964d2f0258f` is the W13 squash. It is the tip-sync pointer. It is not this commit. The required branch point was `ae2ca6e41a0c6ff87437a53db91feb50bc5a82b3`. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD.
+**Status**: Incomplete (2026-10-10, W12 close, state revision 63). Session 07 is not marked complete in this handoff. Completion is not in effect until CI, Reviewer and Verifier PASS, a Lead Reviewer LEAD PASS, and Omar's explicit close gate. Twelve evidence keys stay false. No evidence key flips because of §11. `shared_databases_built` and `home_dashboard_built` stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `98fc06d2d37b206075b6bc91cf1dc964d2f0258f` is the W13 squash. It is the tip-sync pointer. It is not this commit. The required branch point was `ae2ca6e41a0c6ff87437a53db91feb50bc5a82b3`. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD.
 
 Section 11 ran in sandbox MM S06 Sandbox only. X1 at 2026-10-10 08:54 ICT created 5 title-only pages. Cleanup at 2026-10-10 09:05 ICT trashed them. Evidence `exec-1791597254.json` sha256 `fc642066fa96470ac77b5bc4621945927e6c7265a6e23ff68ffab0ae4b2cea10`. `cleanup/exec.json` sha256 `e3d4a547d6f4a1cf0a4bb3d4934ec89099341bf7779fb4074249fc326820a97d`. Reviewer and Verifier PASS on all three evidence gates. The run is title-only with QA NOT_RUN. It is not citable for `shared_databases_built` or `home_dashboard_built`. It is not the matrix `sandbox_build` phase.
 
@@ -48,7 +48,7 @@ QA caller trust is tightened. `prose_digest` length-prefixes each field with 4 b
 
 `docs/control` edits on that commit: `IMPLEMENTATION_STATE.json` (revision 61 to 62, `head_sha` `48b93bccf1e1688baf287aeb9e0b428caa0761e3`), `IMPLEMENTATION_LOG.md`, `NEXT_SESSION.md`, `TEST_EVIDENCE.md`, `DECISIONS.md`, and `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md`.
 
-W13 parked the live sandbox; in-place formula, linked-view, and section repair; action 12 commissioning; the twelve evidence keys; and the QA operand survivors. The close records those operand checks as equivalent at the public entry (`notion_qa.py:145` and `:156`). W13 did not re-run that sweep.
+W13 parked the live sandbox; in-place formula, linked-view, and section repair; action 12 commissioning; the twelve evidence keys; and the QA operand survivors. The close records `:145` as equivalent at the public entry and `:156` as a survivor when a proof page already exists. W13 did not re-run that sweep.
 
 
 ## Session 07 — Wave 12 fixture matrix (merged as 48b93bc)
