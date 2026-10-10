@@ -52,6 +52,10 @@ SQUASH_REQUIRED = "replay refused: state must be squash-merged"
 BAD_WINDOW = "replay refused: bad window-end"
 NO_WINDOW = "replay refused: no window end"
 INVALID_STEP = "replay refused: invalid step"
+ONE_STATE_TRANSITION = "one state transition per PR"
+REBASE_NOT_MERGE = (
+    "pull request base is not an ancestor of HEAD; rebase onto the base, do not merge"
+)
 CITATION_REQUIRED = "session 07 true evidence keys must be cited"
 PRE_CLOSURE_PINS = "session 07 pre-closure commits are not pinned"
 CLOSURE_CITATION_PINS = "session 07 closure commits must equal the closure citation"
@@ -1098,6 +1102,39 @@ def assert_session_seven_tip(state: Mapping[str, object]) -> None:
         return
     if head != S07_CLOSE_TIP or closure != S06_PRIOR_WAVE_TIP or head == closure:
         raise ControlStateError(PRE_CLOSURE_PINS)
+
+
+def _is_commit(repo_root: Path, sha: str) -> bool:
+    if SHA_PATTERN.fullmatch(sha) is None:
+        return False
+    result = _git(
+        repo_root,
+        "cat-file",
+        "-t",
+        sha,
+        allowed_returncodes=frozenset({0, 128}),
+    )
+    return result.returncode == 0 and result.stdout.strip() == "commit"
+
+
+def assert_pull_request_state_transitions(repo_root: Path, base_sha: str) -> None:
+    """Refuse a stale pull-request base, or more than one state commit on the pull request.
+
+    Push CI does not call this. ``base_sha`` is the pull request's ``base.sha``.
+    """
+    head = _git(repo_root, "rev-parse", "--verify", "HEAD^{commit}").stdout.strip()
+    if not _is_commit(repo_root, base_sha) or not _is_ancestor(repo_root, base_sha, head):
+        raise ControlStateError(REBASE_NOT_MERGE)
+    merge_base = _git(repo_root, "merge-base", base_sha, head).stdout.strip()
+    listed = _git(
+        repo_root,
+        "rev-list",
+        f"{merge_base}..{head}",
+        "--",
+        _STATE_RELATIVE,
+    ).stdout.splitlines()
+    if len([line for line in listed if line]) > 1:
+        raise ControlStateError(ONE_STATE_TRANSITION)
 
 
 def assert_session_seven_continuity(repo_root: Path) -> None:

@@ -12,7 +12,7 @@ Q4 (closure sets both `head_sha` and `evidence_closure_commit_sha` to the new co
 
 They run only where the state file's `repo_root` is Omar's WSL checkout (`/mnt/d/Money Machine`), by Omar or through machine-targeted Shell with his approval. Tests use a temporary clone whose first commit rewrites `repo_root` and `branch`. That rewrite is the history's start, never a later step. The real checkout's `repo_root` is never rewritten.
 
-HEAD must be attached to `build/full-automation` with a clean tracked tree. Each record pull request is one squash-merged commit that changes the state by exactly one validated step.
+HEAD must be attached to `build/full-automation` with a clean tracked tree. Each record pull request is one squash-merged commit that changes the state by exactly one validated step. Each evidence key goes in its own pull request.
 
 ## Allowed proof
 
@@ -46,9 +46,11 @@ The pin helper, activation into 8 (open) and 9 (closed), and completion of sessi
 
 Pull-request CI checks out `github.event.pull_request.head.sha` with `fetch-depth: 0`. The default `refs/pull/N/merge` checkout is a two-parent commit, and the replay refuses that for any state-touching pull request. The pull-request head, one squash commit, replays.
 
+Pull-request CI also fetches the base ref and refuses the run unless `base.sha` is an ancestor of HEAD. The message tells the author to rebase onto the base and not merge. It counts state-file commits in `merge-base..head` and refuses more than one with `one state transition per PR`, before merge. Zero state commits still pass. Push CI does not apply this check; it replays the merged history.
+
 ## WSL record flow
 
-On `/mnt/d/Money Machine`: fetch, switch to `build/full-automation`, require a clean tracked tree, no unpushed commits, and a non-shallow clone, then fast-forward only. Write the candidate outside the repo and run the command. Carry the state change onto `s07/<step>`, commit only the state file, and squash-merge. Fast-forward the checkout back. Do not reset, rebase, or force-push.
+On `/mnt/d/Money Machine`: fetch, switch to `build/full-automation`, require a clean tracked tree, no unpushed commits, and a non-shallow clone, then fast-forward only. Write the candidate outside the repo and run the command. Carry the state change onto `s07/<step>`, commit only the state file, and squash-merge. Each evidence key goes in its own pull request, so a squash merge stays one validated step. Fast-forward the checkout back. Do not reset, rebase, or force-push the integration checkout. A pull request whose base has moved is rebased onto that base; do not merge the base in.
 
 ## Not in this pull request
 
@@ -104,7 +106,9 @@ The browser guard in `s07_navigation_guard.py` is the testable rule for later na
 | 45 | Missing, stale, past (reminder four hours earlier), or too-far deadline; mode, a symlink to a valid file, missing field, empty `omar_notified_at`, or wrong owner. Zero browser writes. A valid 0600 file allows one write |
 | 46 | One lock per run id. A live holder returns false. An old lock without `exec.json` is refused. A completed exec returns false and does not act again; a new run id does |
 | 47 | Foreign space, broken parent, redirect, unlisted URL, signed-out sandbox, or a signed-in anonymous session. `evilnotion.site` is refused. A listed `notion.site` URL is allowed |
+| 48 | Two state-file commits in `merge-base..head` are `one state transition per PR`. One state-file commit passes, including beside a commit that does not touch the state file. Zero state commits pass |
+| 49 | A missing `base.sha`, or a `base.sha` that is not an ancestor of HEAD, tells the author to rebase onto the base and not merge. Deleting that check accepts the stale base |
 
-The table has 46 rows and covers tests 1–47. Tests 30 and 42 share one row.
+The table has 48 rows and covers tests 1–49. Tests 30 and 42 share one row.
 
 `evidence_citations cannot be created a second time` is unreachable: a field cannot be both newly added and already present. The reachable refusal is `evidence_citations keys cannot be added or removed`. Replay trigger `current_session == 7` versus `next_session == 8` is equivalent by the activation validator and is parked.

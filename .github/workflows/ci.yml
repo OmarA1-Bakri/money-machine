@@ -47,6 +47,27 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: uv sync --frozen
+      - name: Refuse a stale base or a second state transition
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git fetch --no-tags origin "$PR_BASE_REF"
+          uv run python - <<'PY'
+          import os
+          from pathlib import Path
+
+          from money_machine.control.s07_evidence import (
+              ControlStateError,
+              assert_pull_request_state_transitions,
+          )
+
+          try:
+              assert_pull_request_state_transitions(Path.cwd(), os.environ["PR_BASE_SHA"])
+          except ControlStateError as error:
+              raise SystemExit(str(error)) from error
+          PY
       - run: uv run ruff format --check src tests scripts migrations
       - run: uv run ruff check src tests scripts apps migrations
       - run: uv run pyright

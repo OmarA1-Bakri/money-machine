@@ -3,7 +3,7 @@
 # pyright: reportArgumentType=false, reportGeneralTypeIssues=false, reportUnnecessaryCast=false
 """Killing tests for Session 07 record-evidence, record-closure, revoke-evidence, and replay.
 
-Tests 1-36 and 38-44 live here. Test 37 is the frozen #66 re-proof in
+Tests 1-36, 38-44, 48, and 49 live here. Test 37 is the frozen #66 re-proof in
 ``test_control_state.py``. Tests 45-47 live beside this module. Nothing here
 writes ``docs/control/IMPLEMENTATION_STATE.json`` in the real worktree.
 """
@@ -34,12 +34,15 @@ from money_machine.control.s07_evidence import (
     CLOSURE_NAMES_ITSELF,
     CLOSURE_STATE_MISMATCH,
     NON_CLOSURE_KEYS,
+    ONE_STATE_TRANSITION,
     PRE_CLOSURE_PINS,
+    REBASE_NOT_MERGE,
     S06_PRIOR_WAVE_TIP,
     S07_CLOSE_TIP,
     S07_EVIDENCE_KINDS,
     WORKTREE_MISMATCH,
     ControlStateError,
+    assert_pull_request_state_transitions,
     assert_session_seven_continuity,
     assert_session_seven_tip,
     replay_state_history,
@@ -1374,6 +1377,52 @@ def test_pull_request_head_replays_and_the_merge_ref_does_not(tmp_path: Path) ->
         replay_state_history(anchor.repo, anchor.sha)
     _git(anchor.repo, "checkout", "--detach", "pr-head")
     replay_state_history(anchor.repo, anchor.sha)
+
+
+def test_48_one_state_commit_passes_pull_request_ci_and_two_fail(tmp_path: Path) -> None:
+    """A second state commit fails before merge. One state commit, and zero, pass."""
+    one = _anchor(tmp_path / "one")
+    (one.repo / "note.txt").write_text("not state\n", encoding="utf-8")
+    _commit(one.repo, "test: not state")
+    stepped = copy.deepcopy(one.state)
+    stepped["updated_at"] = "2026-10-10T13:00:00Z"
+    _commit_state(one, stepped, "test: one state step")
+    assert_pull_request_state_transitions(one.repo, one.sha)
+
+    none = _anchor(tmp_path / "none")
+    (none.repo / "note.txt").write_text("not state\n", encoding="utf-8")
+    _commit(none.repo, "test: not state")
+    assert_pull_request_state_transitions(none.repo, none.sha)
+
+    two = _anchor(tmp_path / "two")
+    first = copy.deepcopy(two.state)
+    first["updated_at"] = "2026-10-10T13:00:00Z"
+    _commit_state(two, first, "test: first state step")
+    second = copy.deepcopy(first)
+    second["updated_at"] = "2026-10-10T14:00:00Z"
+    _commit_state(two, second, "test: second state step")
+    with pytest.raises(ControlStateError, match=f"^{re.escape(ONE_STATE_TRANSITION)}$"):
+        assert_pull_request_state_transitions(two.repo, two.sha)
+
+
+def test_49_pull_request_base_must_be_an_ancestor_of_head(tmp_path: Path) -> None:
+    """A stale or missing base fails the pull-request run and names rebase, not merge."""
+    anchor = _anchor(tmp_path)
+    _git(anchor.repo, "checkout", "-b", "pr")
+    changed = copy.deepcopy(anchor.state)
+    changed["updated_at"] = "2026-10-10T16:00:00Z"
+    head = _commit_state(anchor, changed, "test: pr state step")
+    _git(anchor.repo, "checkout", BRANCH)
+    moved = copy.deepcopy(anchor.state)
+    moved["updated_at"] = "2026-10-10T15:00:00Z"
+    write_state(anchor.repo / "docs/control/IMPLEMENTATION_STATE.json", moved)
+    new_base = _commit(anchor.repo, "test: base moved").strip()
+    _git(anchor.repo, "checkout", "--detach", head)
+    with pytest.raises(ControlStateError, match=f"^{re.escape(REBASE_NOT_MERGE)}$"):
+        assert_pull_request_state_transitions(anchor.repo, new_base)
+    with pytest.raises(ControlStateError, match=f"^{re.escape(REBASE_NOT_MERGE)}$"):
+        assert_pull_request_state_transitions(anchor.repo, "a" * 40)
+    assert_pull_request_state_transitions(anchor.repo, anchor.sha)
 
 
 def test_34_replay_rechecks_record_closure_and_revoke(
