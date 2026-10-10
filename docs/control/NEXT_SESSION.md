@@ -32,6 +32,16 @@
 
 Router browser and combined config modes still raise `NotImplementedError` (W4a). Fixture mode stays the default.
 
+## Session 07 — Wave 12 in progress
+
+**Status**: Incomplete (2026-10-10, W12, state revision 61). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `ae2ca6e41a0c6ff87437a53db91feb50bc5a82b3` is the W11 squash. It is the tip-sync pointer. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD.
+
+The fixture test matrix is recorded. `run_test_matrix` reads a passing fact ledger through `FixtureNotionAdapter` only. A mass or business build with three or four colours records `PASS`. `next_phase` on that record is `sandbox_build`. The live sandbox is not started. A wrong formula or a wrong linked view records `BLOCKED` with 0 adapter writes (D-0030). A missing hub section raises `fact ledger section is missing` and writes nothing. ListingCopyJob is named on the stored link and is not created (D-0029). Counts are in `IMPLEMENTATION_LOG.md` and `TEST_EVIDENCE.md`.
+
+`docs/control` edits this wave: `IMPLEMENTATION_STATE.json` (revision 60 to 61, `head_sha` `ae2ca6e41a0c6ff87437a53db91feb50bc5a82b3`), `IMPLEMENTATION_LOG.md`, `NEXT_SESSION.md`, `TEST_EVIDENCE.md`, `DECISIONS.md`, and `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md`.
+
+Parked: the live sandbox; in-place formula, linked-view, and section repair; action 12 commissioning; the twelve evidence keys; the W11 QA operand survivors, `_prose_digest` join collision, and the D-0029 QA-rerun limit.
+
 ## Session 07 — Wave 11 in progress
 
 **Status**: Incomplete (2026-10-09, W11 round 2, state revision 60). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false, including `product_fact_ledger_persisted` and `build_workflow_linked`. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `6575c567fcadde636846131f98d7599067babb66` is the #60 sandbox-run commit. It is the tip-sync pointer. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD.

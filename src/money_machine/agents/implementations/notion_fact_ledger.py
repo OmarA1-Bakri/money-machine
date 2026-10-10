@@ -155,6 +155,49 @@ class _Plan:
     repair_required: str
 
 
+@dataclass(frozen=True, slots=True)
+class LedgerRead:
+    """A write-free ledger plan. The matrix records this. It does not copy it."""
+
+    blocked: bool
+    facts: tuple[tuple[str, str], ...]
+    checks: tuple[tuple[str, bool], ...]
+    steps: tuple[str, ...]
+    ready: str
+    repair_required: str
+
+
+def workflow_steps() -> tuple[str, ...]:
+    """The section 10 route. Reading it does not create a job."""
+    return _walk_chain()
+
+
+def load_stored_ledger(
+    path: Path,
+) -> tuple[FactLedgerRecord | None, WorkflowLinkRecord | None]:
+    """The stored ledger and link, or neither. One without the other is incomplete."""
+    return _stored_pair(path)
+
+
+async def read_ledger_plan(
+    probe: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+    qa: QaRecord,
+    steps: tuple[str, ...],
+) -> LedgerRead:
+    """The live ledger plan. No checkpoint write and no adapter write."""
+    plan = await _plan(probe, stored, spec, qa, steps)
+    return LedgerRead(
+        blocked=plan.blocked,
+        facts=plan.facts,
+        checks=plan.checks,
+        steps=plan.steps,
+        ready=plan.ready,
+        repair_required=plan.repair_required,
+    )
+
+
 async def run_fact_ledger(
     spec: object,
     probe: object,
@@ -1000,4 +1043,9 @@ def _write(
         "steps": list(link.steps),
         "verdict": link.verdict,
     }
+    envelope = load_payload(path)
+    if envelope.payload is not None:
+        prior = envelope.payload.get("provider_object_references")
+        if type(prior) is dict and "test_matrix" in prior:
+            references["test_matrix"] = prior["test_matrix"]
     write_checkpoint(path, checkpoint, references, retained_created_ids=created)

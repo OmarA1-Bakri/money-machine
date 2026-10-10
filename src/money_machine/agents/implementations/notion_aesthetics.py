@@ -148,7 +148,15 @@ def _parse_aesthetics_checkpoint(payload: dict[object, object]) -> ProductBuildC
     phase_five["checkpoint_names"] = list(_PHASE_FIVE)
     phase_five["provider_object_references"] = {
         key: refs[key]
-        for key in set(refs) - {_AESTHETICS_KEY, "variants", "qa", "fact_ledger", "workflow_link"}
+        for key in set(refs)
+        - {
+            _AESTHETICS_KEY,
+            "variants",
+            "qa",
+            "fact_ledger",
+            "workflow_link",
+            "test_matrix",
+        }
     }
     base = parse_notification_checkpoint(phase_five)
     return replace(

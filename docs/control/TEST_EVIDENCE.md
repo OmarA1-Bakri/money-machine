@@ -1,5 +1,26 @@
 # Test Evidence
 
+## 2026-10-10 — Session 07 W12: fixture section 11 test matrix
+
+**Verification scope**: Fixture-only section 11 matrix. No live HTTP, no real Notion workspace, no Etsy listing, no `--execute`, no Exit 78 lift. State revision 60 → 61. `head_sha` `ae2ca6e41a0c6ff87437a53db91feb50bc5a82b3` is the W11 squash and the tip-sync pointer. It is not this commit.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, revision 61, twelve evidence keys stay false. This is not SESSION_07 COMPLETE | PASS |
+| Mass and business matrix | `test_passing_ledger_records_the_matrix_once`. Verdict `PASS`, tier matches, ten checks true, 3 variants, 0 adapter writes, one checkpoint write, on-disk `next_phase` `sandbox_build` | PASS for this slice |
+| Four variants | `test_four_colours_pass_the_variant_count`. 4 variants, `variant_count` true, 0 adapter writes | PASS for this slice |
+| Resume and crash | `test_resume_of_pass_makes_no_second_write` writes 0. `test_crash_before_the_write_resumes_once` leaves no key, then one `PASS` | PASS for this slice |
+| Formula and linked view | `test_wrong_formula_is_blocked_and_not_rewritten` and `test_wrong_linked_view_is_blocked_and_not_retargeted`. Verdict `BLOCKED`, 0 adapter writes, the defect is still present | PASS for this slice |
+| Missing section | `test_missing_section_is_blocked_and_not_recreated`. Raises `fact ledger section is missing`, bytes unchanged, block stays gone | PASS for this slice |
+| No job and no network | `test_matrix_source_does_not_create_a_job_or_open_a_network`. Ready name stays ListingCopyJob. Source has no job factory and no HTTP client | PASS for this slice |
+| Secret handling | `test_provider_failure_stores_the_fixed_text`, `test_local_error_writes_nothing`, `test_interrupt_is_cleaned_and_writes_nothing` | PASS for this slice |
+| Affected regression | `test_notion_fact_ledger.py`, `test_notion_product_qa.py`, `test_notion_product_builder_aesthetics.py`, `test_notion_product_builder_variants.py`: 922 passed | PASS |
+| Lint and types | `ruff check` and `pyright` 1.1.411 on the changed modules: 0 errors | PASS |
+| Full local pytest | Not run this wave | NOT RUN |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
+**Status**: Session 07 Wave 12. The session stays incomplete. This is not SESSION_07 COMPLETE. Exit 78 stays HELD. The live sandbox is not started.
+
 ## 2026-10-09 — Session 07 W11: QA coverage matrix and crash-resume repairs
 
 **Verification scope**: Fixture-only QA coverage and crash-resume repair retention. No live HTTP, no real Notion workspace, no Etsy listing, no Exit 78 lift. Round 2 sets `IMPLEMENTATION_STATE.json` revision 60 and `head_sha` `6575c567fcadde636846131f98d7599067babb66`.

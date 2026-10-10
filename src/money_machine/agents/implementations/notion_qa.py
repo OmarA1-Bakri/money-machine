@@ -615,6 +615,24 @@ def dashboard_formula_expressions(spec: ProductSpec) -> dict[str, tuple[str, str
     }
 
 
+async def fixture_matrix_flags(
+    probe: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+) -> dict[str, bool]:
+    """Live fixture flags for the section 11 matrix. This function only reads."""
+    proof = _existing_proof_id(probe, stored, spec)
+    return {
+        "public_links": await _public_links(probe, stored),
+        "isolation": _no_access(probe) and _cross_catalogue(probe, stored),
+        "fresh_duplicate": _fresh_duplicate(probe, stored, spec, proof),
+        "formulas_match": _formulas_compile(probe, stored, spec)
+        and _notification_values(probe, stored, spec),
+        "linked_views": _linked_views(probe, stored),
+        "sections_present": _teardown(probe, stored, spec),
+    }
+
+
 async def live_qa_passed(
     probe: FixtureNotionAdapter,
     stored: ProductBuildCheckpoint,
@@ -1055,7 +1073,7 @@ def _write_qa(
     if envelope.payload is not None:
         prior = envelope.payload.get("provider_object_references")
         if type(prior) is dict:
-            for key in ("fact_ledger", "workflow_link"):
+            for key in ("fact_ledger", "workflow_link", "test_matrix"):
                 if key in prior:
                     references[key] = prior[key]
     references[_QA_KEY] = {

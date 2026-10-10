@@ -152,6 +152,15 @@ class WorkflowLinkRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class TestMatrixRecord:
+    """Section 11 fixture proofs. The live sandbox is not this record."""
+
+    verdict: str
+    checks: tuple[tuple[str, bool], ...]
+    tier: str
+
+
+@dataclass(frozen=True, slots=True)
 class ProductBuildCheckpoint:
     """Persisted build progress. The next phase is not executed."""
 
@@ -176,6 +185,7 @@ class ProductBuildCheckpoint:
     qa: QaRecord | None = None
     fact_ledger: FactLedgerRecord | None = None
     workflow_link: WorkflowLinkRecord | None = None
+    test_matrix: TestMatrixRecord | None = None
 
 
 def design_shell_content(spec: ProductSpec) -> str:

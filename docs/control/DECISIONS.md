@@ -331,3 +331,24 @@ Supported devices are recorded as `unverified`. The free-update policy is record
 ### Consequences
 
 A missing admitted event, a missing successor type, a missing edge, an extra successor, or a missing ListingPackage output raises `workflow link does not match` before any write. Merchandising may claim only the facts in the ledger. Section 11 and commissioning stay out of this wave.
+
+## D-0030 — Section 11 fixture defects are not repaired in place
+
+**Status:** accepted for Session 07 Wave 12, 2026-10-10.
+
+### Context
+
+Prompt section 11 says to prove broken-formula repair, wrong-linked-view repair, and missing-sub-page repair. Wave 9 already recorded that the fixture has no in-place update, and that a new id would not match the stored checkpoint. Those defects are refused or recorded `BLOCKED` with zero adapter writes. Wave 12 is the fixture test matrix. It does not add update methods.
+
+### Decision
+
+The matrix proves the fixture contract. It does not repair the three defects.
+
+- A wrong formula expression, or a linked view pointed at another known database, records `BLOCKED` with zero adapter writes. The expression and the view target stay as they were.
+- A missing hub section makes the ledger read raise `fact ledger section is missing`. The matrix writes nothing and does not recreate the block. Hub sections in this fixture are text blocks, not child pages.
+- ListingCopyJob stays a recorded ready name (D-0029). The matrix does not create the job.
+- The live sandbox stays unauthorized. Narrative `next_phase` after a recorded matrix is `sandbox_build`, and that phase is not run.
+
+### Consequences
+
+A matrix `PASS` means the live fixture still matches the passing ledger. It is not a repair. Commissioning and the twelve evidence keys stay false. In-place repair waits for a later wave that adds fixture update methods without breaking stored ids.

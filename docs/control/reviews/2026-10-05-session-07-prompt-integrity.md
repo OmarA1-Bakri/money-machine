@@ -696,3 +696,89 @@ The prompt file is unchanged. SHA-256 `d52011a6f0b725b16427629dc664cfc9f3432c4b5
 | Twelve evidence keys and STATE revision 59 | After the other revision-59 change merges | This wave does not edit `IMPLEMENTATION_STATE.json` |
 
 Round 2 (2026-10-09): #60 merged as `6575c567fcadde636846131f98d7599067babb66` and took revision 59. The final commit of this wave takes revision 60 and sets `head_sha` to that commit. It is the tip-sync pointer, not this commit. Twelve evidence keys stay false. `commissioned_agents` stays empty. `session_status` stays incomplete. The prompt file is still unchanged. The hash above is unchanged.
+
+# Session 07 Prompt Integrity Review — Wave 12
+
+**Date:** 2026-10-10
+**Prompt:** `prompts/implementation/10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`
+**Verified SHA-256:** `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`
+**Workbook authority:** `hands-off-money-machine-full-implementation-workbook.md` appendix row for this prompt (5,255 bytes, 237 lines)
+**Scope:** Wave 12 only. Fixture section 11 test matrix over a passing fact ledger. The live sandbox is not this wave. Waves 1–11 above still govern their phases. This record is the corrective addendum for Wave 12.
+
+The prompt file is not amended.
+
+## 1. Prompt authenticity
+
+**Status:** VERIFIED
+
+- The extracted file's SHA-256 equals the workbook appendix value `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`.
+- The file is 5,255 bytes and 237 lines, matching the appendix row.
+- The prompt stays the unamended source of record.
+
+## 2. Three-dimensional review
+
+### Fidelity
+
+**Verdict:** CONDITIONAL APPROVE. Two high findings, resolved by the addendum and by D-0030.
+
+**F-01 [HIGH] — Section 11 names repairs the fixture cannot apply in place**
+
+- **Prompt lines:** 192–196, against the Wave 9 deferral and the stored checkpoint ids.
+- **Authority:** Hub sections, formulas, and linked views are stored by id. The fixture has no in-place update. A new id would not match the checkpoint. D-0030 records the contract.
+- **Consequence of literal execution:** Creating a replacement formula, view, or section would record a second object and still fail the stored-id checks, or it would mark `PASS` without changing the defect.
+- **Amendment:** A wrong formula or a wrong linked view records `BLOCKED` with zero adapter writes. A missing hub section raises `fact ledger section is missing` and writes nothing. The matrix does not recreate the object.
+
+**F-02 [HIGH] — "Automatic successor creation" is not a new job**
+
+- **Prompt line:** 200, and exit criterion line 223, against D-0029.
+- **Authority:** D-0029. The link records ListingCopyJob. It does not create the job. `config/workflows.yaml` is not edited.
+- **Consequence of literal execution:** Inserting ListingCopyJob would invent a second engine the Session 03 decision already refused.
+- **Amendment:** `successor_recorded` is true only when the stored link names ListingCopyJob and matches the live route. The matrix creates no job.
+
+**What the prompt already gets right**
+
+- The matrix is fixture Notion, not an Etsy publish (lines 188–202).
+- Mass and business builds, three or four variants, public links, a fresh duplicate, and fact extraction are observable on the checkpoint the earlier waves already persist.
+- Crash and resume is a property of the checkpoint writer, not a second product.
+
+### Safety and executability
+
+**Verdict:** CONDITIONAL APPROVE. The Wave 1 critical and high findings still apply and stay in force.
+
+**S-01 [CRITICAL] — Action 11 live sandbox.** Still deferred. This wave uses `FixtureNotionAdapter` only. No live HTTP, no real Notion workspace, no Etsy listing, no `--execute`, no Exit 78 lift. Narrative `next_phase` after a recorded matrix is `sandbox_build`, and this wave does not run it.
+
+**S-02 [HIGH] — Action 12 commissioning.** A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. Do not edit `config/agents.yaml`.
+
+**S-03 [HIGH] — Two ProductSpec types.** This phase accepts only `product_spec.ProductSpec`. The catalogue spec is rejected. The probe must be `FixtureNotionAdapter`.
+
+**S-04 [HIGH] — Tip-sync must not look like completion.** `head_sha` becomes the W11 squash `ae2ca6e41a0c6ff87437a53db91feb50bc5a82b3`. It does not become this wave's own commit. `evidence_closure_commit_sha` stays the Session 06 tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. All twelve session 7 evidence keys stay false. `session_status` stays `incomplete`. This wave does not print `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE`. Advance `state_revision` from 60 to 61.
+
+### Gameability
+
+**Verdict:** CONDITIONAL APPROVE. One high finding, resolved by the addendum.
+
+**G-01 [HIGH] — A PASS string without a live read satisfies a careless reading**
+
+- **Prompt lines:** 188–202.
+- **Cheap fake:** Write `PASS` and `sandbox_build` without reading the fixture, copy the ledger verdict, or repair a formula by flipping a flag.
+- **Ungameable for this wave:** The plan runs before any adapter write. Every check is a live read or a comparison with the live ledger plan. A stored matrix that disagrees raises `test matrix does not match` with zero adapter writes and unchanged file bytes. A wrong formula and a wrong linked view record `BLOCKED` and leave the defect in place. A missing section writes nothing. Resume of a matching record does not write. A crash inside `write_checkpoint` leaves no `test_matrix` key. No ListingCopyJob is constructed.
+
+## 3. Corrective addendum
+
+This addendum governs Wave 12. The prompt remains the unamended source of record.
+
+1. Prove the prompt hash, then implement only the slice below. Do not edit the prompt file.
+2. Tip-sync only: `head_sha` becomes `ae2ca6e41a0c6ff87437a53db91feb50bc5a82b3`. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. Advance `state_revision` from 60 to 61. `session_status` stays `incomplete`. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays this prompt.
+3. Leave all twelve session 7 evidence keys false. Do not set `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. Do not edit `config/agents.yaml` or `config/workflows.yaml`. Exit 78 stays HELD.
+4. Record the fixture matrix on a passing fact ledger. Mass and business builds with three or four colours can record `PASS`. `next_phase` becomes `sandbox_build`. Do not run that phase.
+5. Do not repair a formula, a linked view, or a missing section in place. D-0030 is the contract. Do not create ListingCopyJob. D-0029 still holds.
+6. Tests use the fixture only, with sockets blocked. No live Notion, no Etsy, no `--execute`. A new test that already passes before `run_test_matrix` exists is not the proof of this wave.
+
+## 4. Deferrals
+
+| Finding | Owner | Reason |
+|---|---|---|
+| Live sandbox build | A later wave with explicit authorization | S-01. Narrative next phase becomes `sandbox_build`, not started |
+| In-place formula, linked-view, and section repair | A later wave that adds fixture update methods | D-0030. A new id would not match the stored checkpoint |
+| Action 12 commissioning | Operator decision after full implementation | S-02 |
+| Twelve evidence keys | Session close, after the prompt's own criteria | A fixture matrix is not that gate |
