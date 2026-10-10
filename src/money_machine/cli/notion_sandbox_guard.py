@@ -529,11 +529,31 @@ def _prefixes(path: Path) -> tuple[Path, ...]:
     return (collapsed, *collapsed.parents)
 
 
-def _symlink_target(path: Path) -> Path | None:
+def _readlink_text(path: Path) -> str | None:
     try:
-        target = Path(os.readlink(path))
+        return os.readlink(path)
     except OSError:
         return None
+
+
+def _is_dot_alias(raw: str | None) -> bool:
+    """True when every path part is ``.`` or ``..``.
+
+    ``Path('.').parts`` is empty, so the raw ``readlink`` text is split here.
+    A dot alias is not a cycle. A target that is actually proc is still refused
+    by the proc check that runs before this exemption.
+    """
+    if raw is None:
+        return False
+    parts = [part for part in raw.split("/") if part != ""]
+    return bool(parts) and all(part in {".", ".."} for part in parts)
+
+
+def _symlink_target(path: Path) -> Path | None:
+    raw = _readlink_text(path)
+    if raw is None:
+        return None
+    target = Path(raw)
     if not target.is_absolute():
         target = path.parent / target
     return Path(_collapsed_abs(target))
@@ -558,7 +578,8 @@ def under_proc(path: Path) -> bool:
     name and by filesystem type (``statfs`` ``f_type`` or mountinfo
     ``proc``). A relative symlink is joined to its parent before the walk.
     The walk counts unique nodes, not pushes, so a deep relative chain is
-    accepted while a symlink cycle is refused. Missing libc or empty
+    accepted while a symlink cycle is refused. A raw target whose parts are
+    only ``.`` and ``..`` is not treated as a cycle. Missing libc or empty
     mountinfo is refused. The literal ``/proc`` prefix is proc even when
     ``f_type`` is tmpfs. ``realpath`` of ``/proc/1/root/...`` may raise
     ``PermissionError``; that is treated as proc, not as a crash.
@@ -594,13 +615,14 @@ def under_proc(path: Path) -> bool:
                 continue
             if stat.S_ISLNK(info.st_mode):
                 seen_symlinks.add(str(prefix))
+                raw_target = _readlink_text(prefix)
                 target = _symlink_target(prefix)
                 if target is None:
                     continue
                 if _is_proc(target) or _component_touches_proc(target):
                     return True
                 target_key = str(target)
-                if target_key in seen_symlinks:
+                if not _is_dot_alias(raw_target) and target_key in seen_symlinks:
                     return True
                 pending.append(target)
                 target_resolved = _safe_realpath(target)

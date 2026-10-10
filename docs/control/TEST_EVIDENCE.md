@@ -1,5 +1,25 @@
 # Test Evidence
 
+## 2026-10-10 — Session 07 W12: session close prepared (pending Omar close gate)
+
+**Verification scope**: Fixture-only close wave, rebased onto the W13 squash `98fc06d2d37b206075b6bc91cf1dc964d2f0258f`. No live HTTP, no real Notion workspace, no Etsy listing, no `--execute`, no Exit 78 lift. STATE revision 63. `head_sha` `98fc06d2d37b206075b6bc91cf1dc964d2f0258f` is that squash, the tip-sync pointer, not this commit. The branch point required by the close instruction was `ae2ca6e41a0c6ff87437a53db91feb50bc5a82b3`.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, revision 63, twelve evidence keys false. This is not SESSION_07 COMPLETE | PASS |
+| §11 title-only | X1 2026-10-10 08:54 ICT, cleanup 09:05 ICT, sandbox MM S06 Sandbox, 5 pages created then trashed. `exec-1791597254.json` sha256 `fc642066fa96470ac77b5bc4621945927e6c7265a6e23ff68ffab0ae4b2cea10`. `cleanup/exec.json` sha256 `e3d4a547d6f4a1cf0a4bb3d4934ec89099341bf7779fb4074249fc326820a97d`. QA NOT_RUN. Not citable for `shared_databases_built` or `home_dashboard_built`. No evidence-key flip | PASS (recorded; the live run is outside this checkout) |
+| Replace crash keeps the repair | `test_replace_crash_keeps_the_repair_on_resume` for `published`, `duplicate_button`, `search_indexing` | PASS on this tree. Fails on `ae2ca6e4` (measured in the PR body) |
+| Prose boundary | `test_newline_boundary_does_not_share_a_prose_digest`, `test_newline_boundary_is_not_the_same_caller` | PASS on this tree. The 4-byte digest is D-0031, already on `98fc06d`. The tests fail on `ae2ca6e4` |
+| Query and fragment | `test_query_or_fragment_token_is_not_a_qa_fact`, four suffixes. The fact is `scheme://host` | PASS on this tree. The host-only fact is D-0031, already on `98fc06d`. The tests fail on `ae2ca6e4` |
+| Dot alias | `test_repeated_dot_symlink_is_accepted`, `test_repeated_dotdot_symlink_is_accepted` | PASS on this tree. Fails on `ae2ca6e4` (measured in the PR body) |
+| Walk limit 256 | `test_real_walk_limit_refuses_a_255_chain` | PASS on stock. Kills `_WALK_LIMIT = 257` |
+| Helper and guard kills that pass on stock | `test_unrequested_repair_is_not_applied`, `test_libc_is_loaded_once`, `test_statfs_nonzero_returns_none`, `test_empty_mountinfo_helper_is_proc`, `test_exact_proc_mount_matches`, `test_unrelated_proc_mount_does_not_match`, `test_proc_parent_is_refused_when_the_leaf_is_not`, `test_unreadable_symlink_is_not_a_proc_path`, `test_resolved_proc_target_is_refused`, `test_missing_realpath_is_not_appended`, `test_fd_oserror_after_creates_prints_the_ids`, `test_sigint_race_hook_filters_only_the_race_oserror`, `test_missing_unraisablehook_does_not_raise` | PASS on `ae2ca6e4` and on this tree |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+| Full local pytest | `uv run pytest -q -p no:cacheprovider --basetemp /tmp/w12-pytest3` on this rebase: 12 failed, 3286 passed, 193 skipped, 1 warning, 365.58s. Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` for the `docker` binary. Pre-existing | 12 known local docker failures |
+| Lint and types | `uv run ruff format --check .` exit 0, 338 files already formatted. `uv run ruff check .` exit 0, all checks passed. ruff 0.16.2, `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations | PASS |
+
+**Status**: Session 07 Wave 12 close. The session stays incomplete. Completion is not in effect until CI, Reviewer and Verifier PASS, a Lead Reviewer LEAD PASS, and Omar's explicit close gate. Exit 78 stays HELD.
+
 ## 2026-10-10 — Session 07 W13: QA caller-trust limits
 
 **Verification scope**: Fixture-only QA digest, caller re-run limit, and secret-link facts. No live HTTP, no real Notion workspace, no Etsy listing, no `--execute`, no Exit 78 lift. State revision 61 → 62. `head_sha` `48b93bccf1e1688baf287aeb9e0b428caa0761e3` is the W12 commit and the tip-sync pointer. It is not this commit.
@@ -17,7 +37,8 @@
 | Full local pytest | Not run this wave | NOT RUN |
 | Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
 
-**Status**: Session 07 Wave 13. The session stays incomplete. This is not SESSION_07 COMPLETE. Exit 78 stays HELD. The live sandbox is not started.
+**Status**: Session 07 Wave 13. The session stays incomplete. This is not SESSION_07 COMPLETE. Exit 78 stays HELD. W13 did not start the live sandbox. The title-only run is in the close section above.
+
 
 ## 2026-10-10 — Session 07 W12: fixture section 11 test matrix
 
@@ -38,7 +59,7 @@
 | Full local pytest | Not run this wave | NOT RUN |
 | Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
 
-**Status**: Session 07 Wave 12. The session stays incomplete. This is not SESSION_07 COMPLETE. Exit 78 stays HELD. The live sandbox is not started.
+**Status**: Session 07 Wave 12 fixture matrix, commit `48b93bc`. The session stays incomplete. This is not SESSION_07 COMPLETE. Exit 78 stays HELD. That matrix commit did not start the live sandbox. The title-only run is in the close section above.
 
 ## 2026-10-09 — Session 07 W11: QA coverage matrix and crash-resume repairs
 

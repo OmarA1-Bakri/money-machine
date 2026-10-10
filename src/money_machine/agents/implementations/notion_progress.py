@@ -318,6 +318,46 @@ def _remove_dead_temps(path: Path) -> None:
             stale.unlink()
 
 
+def _complete_checkpoint_file(path: Path) -> bool:
+    """True when the file is a digest-checked checkpoint load_payload accepts."""
+    try:
+        load_payload(path)
+    except (OSError, ProductBuildError, UnicodeError, ValueError):
+        return False
+    return path.is_file()
+
+
+def adopt_checkpoint_temps(path: Path) -> None:
+    """Install a complete temp left behind when os.replace failed.
+
+    The adapter call had already returned, so that temp holds the repair.
+    Resume adopts it before it reads the checkpoint. The name stays, and the
+    adapter is not called again. An incomplete temp is left for the dead-pid
+    cleanup.
+    """
+    parent = path.parent
+    if not parent.is_dir():
+        return
+    marker = f".{path.name}."
+    suffix = ".tmp"
+    found: list[Path] = []
+    for stale in parent.iterdir():
+        name = stale.name
+        if not name.startswith(marker) or not name.endswith(suffix):
+            continue
+        pid_text = name[len(marker) : -len(suffix)]
+        if not pid_text.isdigit() or not _complete_checkpoint_file(stale):
+            continue
+        found.append(stale)
+    found.sort(key=lambda item: item.stat().st_mtime_ns, reverse=True)
+    for candidate in found:
+        try:
+            os.replace(candidate, path)
+        except OSError:
+            continue
+        return
+
+
 def write_document(
     path: Path, payload: Mapping[str, object], progress: Mapping[str, object]
 ) -> None:
@@ -334,10 +374,16 @@ def write_document(
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     try:
         temporary.write_text(text, encoding="ascii")
-        os.replace(temporary, path)
     except BaseException:
         with contextlib.suppress(OSError):
             temporary.unlink(missing_ok=True)
+        raise
+    try:
+        os.replace(temporary, path)
+    except BaseException:
+        if not _complete_checkpoint_file(temporary):
+            with contextlib.suppress(OSError):
+                temporary.unlink(missing_ok=True)
         raise
 
 

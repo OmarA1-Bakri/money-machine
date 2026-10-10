@@ -44,6 +44,7 @@ from money_machine.agents.implementations.notion_progress_record import Checkpoi
 from money_machine.agents.implementations.notion_qa import (
     live_qa_passed,
     load_qa_record,
+    prose_digest,
     run_product_qa,
 )
 from money_machine.agents.implementations.notion_shared_databases import (
@@ -5540,3 +5541,54 @@ def test_forged_str_subclass_refusal_text_is_not_raised() -> None:
     assert type(caught.value.args[0]) is str
     assert caught.value.args == ("checkpoint list is duplicated",)
     assert SECRET not in str(caught.value)
+
+
+def _boundary_specs(spec: ProductSpec) -> tuple[ProductSpec, ProductSpec]:
+    """Two callers a newline-join digest cannot tell apart."""
+    first, second = spec.hubs[0], spec.hubs[1]
+    left, right = "alpha", "beta"
+    shifted = spec.model_copy(
+        update={
+            "hubs": (
+                first.model_copy(update={"description": f"{left}\n{right}"}),
+                second,
+                *spec.hubs[2:],
+            )
+        }
+    )
+    split = spec.model_copy(
+        update={
+            "hubs": (
+                first.model_copy(update={"description": left}),
+                second.model_copy(update={"description": f"{right}\n{second.description}"}),
+                *spec.hubs[2:],
+            )
+        }
+    )
+    return shifted, split
+
+
+@pytest.mark.asyncio
+async def test_newline_boundary_is_not_the_same_caller(tmp_path: Path) -> None:
+    """D-0029: a boundary shift is a caller mismatch and writes nothing.
+
+    Hub builds refuse a newline, so the stored digest is rewritten to the
+    shifted caller's digest. The split caller is the same newline-join and a
+    different length-prefixed digest.
+    """
+    spec, probe, path = await _qa(tmp_path)
+    shifted, split = _boundary_specs(spec)
+    assert prose_digest(shifted) != prose_digest(split)
+
+    def _stamp(document: dict[str, object]) -> None:
+        references = document["provider_object_references"]
+        assert type(references) is dict
+        qa = references["qa"]
+        assert type(qa) is dict
+        qa["prose_digest"] = prose_digest(shifted)
+
+    restamp_checkpoint(path, _stamp)
+    raw = path.read_bytes()
+    with pytest.raises(ProductBuildError, match="fact ledger caller does not match"):
+        await run_fact_ledger(split, probe, path, recorded_at=LEDGER_AT)
+    assert path.read_bytes() == raw
