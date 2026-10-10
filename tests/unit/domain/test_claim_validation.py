@@ -566,6 +566,22 @@ def test_readding_a_review_exemption_publishes_a_count() -> None:
     assert scale("identity", "Reviews 1 100", page_count=42) is None
 
 
+@pytest.mark.parametrize(
+    "value",
+    [
+        "120_reviews",
+        "120.reviews",
+        "4_ratings",
+        "reviews_120",
+        "reviews.120",
+        "rating_5",
+        "rating.5",
+    ],
+)
+def test_underscore_and_period_join_a_review_or_rating_count(value: str) -> None:
+    assert fact_text_problem("identity", value, page_count=42) == "class"
+
+
 def test_dropping_the_rank_follower_zero_publishes_goal_zero_one() -> None:
     assert fact_text_problem("identity", "Goal #01 on Etsy", page_count=42) == "class"
     bare = _replaced_problem(_RANK_FOLLOWER, _RANK_FOLLOWER_BARE, "rank_zero")

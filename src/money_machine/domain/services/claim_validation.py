@@ -77,12 +77,15 @@ _AUTOMATION: Final[Pattern[str]] = re.compile(
 _SAVINGS_NAME: Final[str] = "automatic savings planner"
 _EXACT_SAVINGS: Final[Pattern[str]] = re.compile(rf"\b{_SAVINGS_NAME}\b")
 # A review or rating word next to a number is a count. There is no year
-# exemption and no rating-scale exemption. ``_`` and ``.`` join tokens.
+# exemption and no rating-scale exemption. ``_`` and ``.`` join tokens, so
+# "120_reviews", "120.reviews", "reviews_120", and "rating.5" all count.
 _REVIEW_BEFORE: Final[str] = (
-    r"(?<![\d.])\d[\d,]*(?:\.\d+)?\s*k?\+?\s*"
-    r"(?:(?:average|avg\.?|customer|buyer|verified)\s+)?(?:reviews?|ratings?)\b"
+    r"(?<![\d.])\d[\d,]*(?:\.\d+)?[\s_.]*k?\+?[\s_.]*"
+    r"(?:(?:average|avg\.?|customer|buyer|verified)[\s_.]+)?(?:reviews?|ratings?)\b"
 )
-_REVIEW_AFTER: Final[str] = r"\breviews?\s*[:=]?\s*\d|\bratings?\s*[:=]?\s*\d"
+_REVIEW_AFTER: Final[str] = (
+    r"\breviews?[\s_.]*[:=]?[\s_.]*\d|\bratings?[\s_.]*[:=]?[\s_.]*\d"
+)
 _REVIEW: Final[Pattern[str]] = re.compile(
     rf"top[-\s_.]?rated|\bhighly reviewed\b|testimonials?|\brated\b|\bfive-star\b"
     rf"|\brav(?:ing|es|ed|e)(?:reviews?|(?!\w))"
