@@ -621,7 +621,6 @@ def test_review_and_order_counts_are_refused(field: str, value: str) -> None:
         ("identity", "Automatic Savings Planner"),
         ("feature", "One page per day"),
         ("identity", "One Page Summary"),
-        ("feature", "4 page weekly layout"),
         ("identity", "Book Review Journal"),
         ("identity", "Star Chart Planner"),
         ("identity", "Raven"),
@@ -702,6 +701,70 @@ def test_rank_number_one_in_a_name_is_refused(identity: str) -> None:
 )
 def test_joined_claim_stems_are_refused(identity: str) -> None:
     _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    ("10k reviews", "2.5k ratings", "1k+ orders", "5K sold"),
+)
+def test_count_shorthand_is_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+def test_automatic_savings_planner_exact_name_publishes() -> None:
+    allowed = _bound("identity", "Automatic Savings Planner")
+    copy = merchandise(allowed)
+    assert "Automatic Savings Planner" in copy.draft.title.text
+    assert validate_claims(copy.draft, allowed).passed is True
+
+
+@pytest.mark.parametrize(
+    "identity",
+    ("Automatic Savings sync", "Automatic savings planner runs itself"),
+)
+def test_automatic_savings_other_wording_is_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+def _with_built_pages(request: MerchandisingInput, count: int) -> MerchandisingInput:
+    facts = tuple(
+        fact.model_copy(update={"fact_value": str(count)})
+        if fact.fact_key == "page_count"
+        else fact
+        for fact in request.facts
+    )
+    return request.model_copy(update={"facts": facts, "page_count": count})
+
+
+@pytest.mark.parametrize(
+    ("kind", "value"),
+    (
+        ("identity", "12 Page Monthly View Planner"),
+        ("identity", "12 Page Daily Spread Bundle"),
+        ("feature", "Plus 12 page layout pack"),
+        ("feature", "4 page weekly layout"),
+    ),
+)
+def test_invented_layout_count_is_refused(kind: str, value: str) -> None:
+    _refuse(_bound(kind, value))
+
+
+def test_layout_count_publishes_when_it_is_one_or_the_built_count() -> None:
+    matching = _with_built_pages(_bound("identity", "12 Page Monthly View Planner"), 12)
+    copy = merchandise(matching)
+    assert "12 Page Monthly View Planner" in copy.draft.title.text
+    assert validate_claims(copy.draft, matching).passed is True
+    weekly = _with_built_pages(_bound("feature", "4 page weekly layout"), 4)
+    weekly_copy = merchandise(weekly)
+    shown = " ".join(section.text for section in weekly_copy.draft.description_sections)
+    assert "4 page weekly layout" in shown
+    assert validate_claims(weekly_copy.draft, weekly).passed is True
+    summary = _bound("identity", "One Page Summary")
+    summary_copy = merchandise(summary)
+    assert validate_claims(summary_copy.draft, summary).passed is True
+    per_day = _bound("feature", "One page per day")
+    per_day_copy = merchandise(per_day)
+    assert validate_claims(per_day_copy.draft, per_day).passed is True
 
 
 @pytest.mark.parametrize(

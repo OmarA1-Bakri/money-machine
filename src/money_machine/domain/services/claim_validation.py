@@ -46,31 +46,44 @@ _PAGE_NUMBERS: Final[Pattern[str]] = re.compile(
     rf"[\s\-]+{_PAGE_UNIT}",
     re.IGNORECASE,
 )
-# A layout span ("one page per day", "4 page weekly layout") says how a spread
-# is laid out, not how big the product is: a singular "page" of at most twelve,
-# then an optional cadence word, then a layout noun.
-_LAYOUT_COUNT: Final[Pattern[str]] = re.compile(
-    r"(?:[1-9]|1[0-2]|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)"
-    r"[\s\-]+page"
-)
+# A layout span is a singular "page" plus a layout noun. It is not a product
+# size when it has no number, when the number is one page per unit, or when
+# the number is the built page count. Any other number is an invented count.
 _LAYOUT_TAIL: Final[Pattern[str]] = re.compile(
     r"[\s\-]+(?:(?:daily|weekly|monthly|yearly|annual)\s+)?"
     r"(?:per|layouts?|spreads?|summary|summaries|views?|overviews?)\b"
 )
+_LAYOUT_WORD_VALUE: Final[dict[str, int]] = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+}
 # Long stems are unanchored so a joined token still matches. Short tokens keep
-# boundaries. ``rave`` stays bounded so Travel, Gravel, Brave, and Raven publish.
+# boundaries. The exact name "Automatic Savings Planner" is exempt in
+# ``_fact_mentions_automation``; this pattern itself does not skip a prefix.
 _AUTOMATION: Final[Pattern[str]] = re.compile(
-    r"automat(?!ic\s+savings\b)\w*|\bauto-[\w-]+|\bunattended\b|\bhands[-\s]free\b"
-    r"|autofill\w*",
+    r"automat\w*|\bauto-[\w-]+|\bunattended\b|\bhands[-\s]free\b|autofill\w*",
     re.IGNORECASE,
 )
+_SAVINGS_NAME: Final[str] = "automatic savings planner"
+_EXACT_SAVINGS: Final[Pattern[str]] = re.compile(rf"\b{_SAVINGS_NAME}\b")
 _REVIEW: Final[Pattern[str]] = re.compile(
     r"top[-\s]?rated|\bhighly reviewed\b|testimonials?|\brated\b|\bfive-star\b"
     r"|\brav(?:e[sd]?|ing)\b"
     r"|\b(?:\d[\d,]*|five|four|three|two|one)[\s-]*stars?\b"
     r"|\bstars?[\s-]+reviews?\b"
     r"|(?<![\d.])(?!(?:19|20)\d\d\s+review\b)"
-    r"\d[\d,.]*\+?\s*(?:(?:average|avg\.?|customer|buyer|verified)\s+)?(?:reviews?|ratings?)\b"
+    r"\d[\d,]*(?:\.\d+)?\s*k?\+?\s*"
+    r"(?:(?:average|avg\.?|customer|buyer|verified)\s+)?(?:reviews?|ratings?)\b"
     r"|\b(?:reviews?|ratings?)\s*[:=]?\s*(?!(?:19|20)\d\d\b)(?!\d+\s*[-\s]\s*\d)\d"
     r"|\baverage\s+(?:reviews?|ratings?)\b",
     re.IGNORECASE,
@@ -79,10 +92,11 @@ _REVIEW: Final[Pattern[str]] = re.compile(
 # or day. Those labels are still rank claims when on, in, pick, or seller follows.
 _SALES: Final[Pattern[str]] = re.compile(
     r"best[-\s]?sell(?:ers?|ing)"
-    r"|\bunits sold\b|\d[\d,]*\+?\s+sold\b|\d[\d,]*\+?\s+downloads\b|\d+\s*k\s+downloads\b"
+    r"|\bunits sold\b|\d[\d,]*(?:\.\d+)?\s*k?\+?\s+sold\b"
+    r"|\d[\d,]*\+?\s+downloads\b|\d+\s*k\s+downloads\b"
     r"|(?<!\b(?:room|goal|step|part|week)\s)(?<!\bday\s)#\s*1(?!\d)"
     r"|#\s*1(?!\d)\s+(?:on|in|pick|seller)\b"
-    r"|\d[\d,]*\+?\s+orders\b|\borders on file\b",
+    r"|\d[\d,]*(?:\.\d+)?\s*k?\+?\s+orders\b|\borders on file\b",
     re.IGNORECASE,
 )
 _TRUST: Final[Pattern[str]] = re.compile(
@@ -179,33 +193,75 @@ class ClaimValidation:
     corrections: tuple[ClaimCorrection, ...]
 
 
-def page_counts(folded: str) -> tuple[re.Match[str], ...]:
-    """Page-count mentions in folded text, leaving out layout spans."""
-    return tuple(match for match in _PAGE_NUMBERS.finditer(folded) if not _layout_span(match))
+def page_counts(
+    folded: str,
+    *,
+    built_count: int | None = None,
+) -> tuple[re.Match[str], ...]:
+    """Page-count mentions in folded text, leaving out allowed layout spans."""
+    return tuple(
+        match for match in _PAGE_NUMBERS.finditer(folded) if not _layout_span(match, built_count)
+    )
 
 
-def _layout_span(match: re.Match[str]) -> bool:
-    text = match.group(0)
-    if _LAYOUT_COUNT.fullmatch(text) is None:
+def _layout_number(text: str) -> int | None:
+    """The singular-page number in a layout span, or None when it is not one."""
+    digits = re.fullmatch(r"(\d+)[\s\-]+page", text, re.IGNORECASE)
+    if digits is not None:
+        return int(digits.group(1))
+    word = re.fullmatch(rf"({_NUMBER_WORDS})[\s\-]+page", text, re.IGNORECASE)
+    if word is None:
+        return None
+    return _LAYOUT_WORD_VALUE.get(word.group(1).casefold())
+
+
+def _layout_span(match: re.Match[str], built_count: int | None) -> bool:
+    """True when this page mention is a layout, not an invented product size."""
+    if _LAYOUT_TAIL.match(match.string, match.end()) is None:
         return False
-    return _LAYOUT_TAIL.match(match.string, match.end()) is not None
+    number = _layout_number(match.group(0))
+    if number is None:
+        return False
+    return number == 1 or (built_count is not None and number == built_count)
 
 
-def fact_text_problem(key: str, value: str) -> str | None:
+def _fact_mentions_automation(folded: str) -> bool:
+    """True when a fact other than the exact savings name states automation.
+
+    The whole fact ``automatic savings planner`` is the product name. Any
+    longer fact is scanned in full, so a trailing probe still matches.
+    """
+    if folded == _SAVINGS_NAME:
+        return False
+    return _AUTOMATION.search(folded) is not None
+
+
+def _prose_automation_text(folded: str) -> str:
+    """Drop the exact savings name so probes run on the rest of the prose."""
+    return _EXACT_SAVINGS.sub(" ", folded)
+
+
+def fact_text_problem(key: str, value: str, *, page_count: int | None = None) -> str | None:
     """Why this fact must not be rendered, or None when the value may be shown.
 
     A class fact is exempt from its own pattern, so the recorded statement can
     still be cited. Every other fact is scanned, including page counts.
+    ``page_count`` is the built size. A layout span may repeat that size, or
+    one page per layout unit, and no other number.
     """
     if has_concealment(value) or script_rejected(value):
         return "concealed"
     if key != "secret_links" and _URL.search(value) is not None:
         return "url"
     folded = normalize_text(value)
-    if key != "page_count" and page_counts(folded):
+    if key != "page_count" and page_counts(folded, built_count=page_count):
         return "page"
     for fact_key, pattern in _CLASS_FACT:
         if key == fact_key:
+            continue
+        if fact_key == "automation":
+            if _fact_mentions_automation(folded):
+                return "class"
             continue
         if pattern.search(folded) is not None:
             return "class"
@@ -277,7 +333,7 @@ def reject_invented_page_count(
     for text, claim_ids, _template, _required in _bound_surfaces(copy):
         folded = normalize_text(text)
         holders = _holding_values(copy, request, claim_ids, "page_count")
-        for match in page_counts(folded):
+        for match in page_counts(folded, built_count=request.page_count):
             digits = match.group(1)
             number = digits if digits is not None else match.group(0)
             licensed = any(normalize_text(item) == number for item in holders)
@@ -625,8 +681,9 @@ def _reject_special(
         return tuple(corrections)
     for text, claim_ids, _template, _required in _bound_surfaces(copy):
         folded = normalize_text(text)
+        scanned = _prose_automation_text(folded) if prose_pattern is _AUTOMATION else folded
         cited = _holding_values(copy, request, claim_ids, kind)
-        for match in prose_pattern.finditer(folded):
+        for match in prose_pattern.finditer(scanned):
             if _span_inside(match.group(0), cited):
                 continue
             anchor = _first(copy, kind)
