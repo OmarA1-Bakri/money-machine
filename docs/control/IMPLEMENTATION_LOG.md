@@ -1,3 +1,55 @@
+## 2026-10-10 — Session 08 W1 round 5: ignorable characters, count claims, and word boundaries
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
+
+This round does not edit `src/money_machine/control/state.py`, `tests/bootstrap/test_control_state.py`, or `docs/control/reviews/2026-10-10-session-08-prompt-integrity.md`. It answers Reviewer review 5478865618 and Verifier comment 6097324904 on `74d536d1`, frozen to five items.
+
+1. `invisible_char` (`listing_text.py`) is true for category Cf and for every `Default_Ignorable_Code_Point`. `has_concealment`, `_visible`, and the secret-link check in `merchandising.py` use it. One test per class covers U+034F, U+FE00–FE0F, U+E0100–E01EF, U+180B–180F, U+17B4/17B5, U+115F/1160/3164/FFA0, and U+E0000–E0FFF, each in identity, buyer problem, hub, feature, variant, dashboard, support, gift, and the secret link.
+2. `500 reviews`, `1,000+ reviews`, `4.9 average rating`, `Rating 4.9`, and `1,000+ orders` are refused in identity, buyer problem, hub, and feature. `Book Review Journal`, `Star Chart Planner`, and hub `Book Reviews` stay allowed.
+3. `etsy_tag` refuses a phrase that starts or ends with `&`, `/`, `+`, `-`, or `|`. `-Bank sync` no longer becomes the tag `bank sync`. `Low-Spend Budget` still gives `low spend budget`.
+4. `_PAGE_NUMBERS` accepts `[\s\-]+` before `page`/`pp` after a number word. `One-Hundred-Page Planner`, `Forty-Two-Page`, `Two Hundred-Page Planner`, and `Hundred-Page Planner` are refused. A layout span (`One page per day`, `One Page Summary`, `4 page weekly layout`) is not a page count; `Four Page Planner` and `12-page starter kit` still are. `200 pgs`, `pg`, and `sheets` are parked and still publish.
+5. Word boundaries are back on the class patterns. `Travel Planner`, `Gravel Bike Log`, `Brave Habits Planner`, hub `Travel Log`, `Room #1 Inventory`, `Goal #1`, `Join 30 Day Challenge`, `Automatic Savings Planner`, `One page per day`, `One Page Summary`, `4 page weekly layout`, `Book Review Journal`, and `Star Chart Planner` publish and pass validation (`test_names_without_a_claim_publish`). `Etsy's #1 Planner`, `Top-Rated Planner`, `Best-Selling Planner`, `Loved by 5,000 teachers`, and `rave reviews` stay refused.
+
+Mutation check: each fix was reverted on a copy of this tree and the focused suites were run. 20 of 20 mutants were killed (`/workspace/p67-logs/r5/mutants-r5.log`). The r4 probe scripts re-run on this tree leave only parked forms: `200 pgs`, `200-pg`, `sheets` and other parked page formats, and the visible separators U+2800, U+0336, and U+200A.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/domain/test_claim_validation.py tests/unit/domain/test_listing_binding.py tests/unit/agents/test_merchandising.py` — 573 passed in 13.57s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /workspace/p67r5-pytest`: 12 failed, 3871 passed, 193 skipped, 1 warning in 125.82s (0:02:05). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those commands and the pytest run are the tree at `b2834703`. This paragraph was written after that run.
+
+## 2026-10-10 — Session 08 W1 round 4: fact text is scanned before rendering
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD.
+
+This round does not edit `src/money_machine/control/state.py`, `tests/bootstrap/test_control_state.py`, or `docs/control/reviews/2026-10-10-session-08-prompt-integrity.md`.
+
+Every bound fact is scanned before `merchandise()` renders. Page counts in digits, `pp`, and spelled-out number words are refused unless they are the built page-count fact. Format characters and HTML tags are refused, not published. A token of Latin lookalikes is refused. `Book Review Journal`, `Star Chart Planner`, and hub `Book Reviews` stay allowed. A tag that would drop a symbol is refused whole. The validator enforces the tag kinds. Secret links must be one `https` URL on `notion.so` or `notion.site`.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/domain/test_claim_validation.py tests/unit/domain/test_listing_binding.py tests/unit/agents/test_merchandising.py` — 518 passed in 5.18s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-r4-pytest`: 12 failed, 3816 passed, 193 skipped, 1 warning in 371.63s (0:06:11). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those three commands and the pytest run are the tree at `3acabd9`. This paragraph was prepended after that run.
+
+## 2026-10-10 — Session 08 W1 round 3: fact values and tag truncation
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD.
+
+This round does not edit `src/money_machine/control/state.py`, `tests/bootstrap/test_control_state.py`, or `docs/control/reviews/2026-10-10-session-08-prompt-integrity.md`.
+
+A features fact must equal `spec.features` item for item. Variant facts must equal the built variant names. Page count must equal the built count. A review, sales, trust, social, automation, or page-count hit is allowed only from that class's own fact kind. Identity and buyer-problem values must pass that deny-list themselves. A tag that does not fit in 20 characters is refused whole. Tags are not built from automation, review, sales, trust, or social claims. The fixture identity and feature names are longer than 20 characters, so they are skipped. Product type, variants, shop, hubs, and devices fill the 13 tags. Mixed script is checked per token. Each surface uses only its own template id.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/domain/test_claim_validation.py tests/unit/domain/test_listing_binding.py tests/unit/agents/test_merchandising.py` — 463 passed in 3.73s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-r3-pytest`: 12 failed, 3761 passed, 193 skipped, 1 warning in 369.53s (0:06:09). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those three commands and the pytest run are the tree at `5d7704c`. This paragraph was prepended after that run.
+
+## 2026-10-10 — Session 08 W1 round 2: listing text is bound to cited facts
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD.
+
+This branch merges `da67103731fc03f1b259d9fd83dae0a05c2b1781` (`#66`) with a merge commit. The Wave 0 prompt-integrity file stays `docs/control/reviews/2026-10-10-session-08-prompt-integrity.md`. This wave does not edit that file, `src/money_machine/control/state.py`, or `tests/bootstrap/test_control_state.py`.
+
+Buyer-facing title, description, hero, image-strip, video, and tag text is a fixed template of the claims that line cites. The validator re-renders that template and compares after NFKC, casefold, whitespace collapse, and homoglyph folding. A Latin string that also contains a non-Latin letter is rejected before the fold. The deny-list remains a per-surface backstop. Tags are normalized before the duplicate and length checks.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-r2-pytest`: 12 failed, 3737 passed, 193 skipped, 1 warning in 368.64s. Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those three commands and the pytest run are the tree at `76421d4`. This paragraph was prepended after that run.
+
 ## 2026-10-10 — Session 08 W0: activation requires prior-session evidence
 
 Governance only. Session 08 is not activated. `IMPLEMENTATION_STATE.json` is unchanged: `current_session` stays 7, revision stays 64, and the twelve Session 07 evidence keys stay false. Exit 78 stays HELD. No live HTTP, no Notion, no Etsy.
@@ -9,6 +61,16 @@ Prompt integrity is `docs/control/reviews/2026-10-10-session-08-prompt-integrity
 The checked-in continuity pin still records the twelve Session 07 keys as false (D-0032). That pin is not an activation exemption. Fixture W1 (A10 and claim validation) does not read `current_session` as a gate and does not require Session 08 to be activated.
 
 Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w0-r2-pytest`: 12 failed, 3298 passed, 193 skipped, 1 warning, 365.10s. Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (338 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those three commands and the pytest run are this tree. The sentences that name the counts were written after that run.
+
+## 2026-10-10 — Session 08 W1: A10 merchandising copy and claim validation (fixture-only)
+
+Session 08 is not activated. This wave is actions 1 and 2 only. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD.
+
+Prompt integrity is the Wave 1 addendum in `docs/control/reviews/2026-10-10-session-08-w1-prompt-integrity.md`. The prompt file is unchanged. SHA-256 `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The canonical `2026-10-10-session-08-prompt-integrity.md` name is the unmerged Wave 0 record on #66. This wave does not overwrite it and does not edit `AGENTS.md`, `CLAUDE.md`, `src/money_machine/control/state.py`, or `tests/bootstrap/test_control_state.py`.
+
+Fixtures only. No live HTTP, no Notion, no Etsy, no LLM network call. Copy is a deterministic function of ProductFacts. A failed claim returns to the generator with the exact correction. Three attempts, then fail closed.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-pytest`: 12 failed, 3339 passed, 193 skipped, 1 warning in 370.39s. Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (341 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those three commands and the pytest run are this tree. The sentences that name the counts were written after that run.
 
 ## 2026-10-10 — Session 07 close recorded, and the :408/:413 adopt mutants are killed
 
