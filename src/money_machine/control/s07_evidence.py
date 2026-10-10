@@ -1117,13 +1117,25 @@ def _is_commit(repo_root: Path, sha: str) -> bool:
     return result.returncode == 0 and result.stdout.strip() == "commit"
 
 
-def assert_pull_request_state_transitions(repo_root: Path, base_sha: str) -> None:
+def assert_pull_request_state_transitions(
+    repo_root: Path,
+    base_sha: str | None = None,
+    *,
+    event: str = "pull_request",
+) -> None:
     """Refuse a stale pull-request base, or more than one state commit on the pull request.
 
-    Push CI does not call this. ``base_sha`` is the pull request's ``base.sha``.
+    A push event has no ``base.sha``. This returns without reading one, and push CI
+    keeps replaying the merged history.
     """
+    if event == "push":
+        return
     head = _git(repo_root, "rev-parse", "--verify", "HEAD^{commit}").stdout.strip()
-    if not _is_commit(repo_root, base_sha) or not _is_ancestor(repo_root, base_sha, head):
+    if (
+        not isinstance(base_sha, str)
+        or not _is_commit(repo_root, base_sha)
+        or not _is_ancestor(repo_root, base_sha, head)
+    ):
         raise ControlStateError(REBASE_NOT_MERGE)
     merge_base = _git(repo_root, "merge-base", base_sha, head).stdout.strip()
     listed = _git(

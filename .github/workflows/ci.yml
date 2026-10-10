@@ -48,12 +48,14 @@ jobs:
           cache: pnpm
       - run: uv sync --frozen
       - name: Refuse a stale base or a second state transition
-        if: github.event_name == 'pull_request'
         env:
+          CI_EVENT: ${{ github.event_name }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          git fetch --no-tags origin "$PR_BASE_REF"
+          if [ "$CI_EVENT" = "pull_request" ]; then
+            git fetch --no-tags origin "$PR_BASE_REF"
+          fi
           uv run python - <<'PY'
           import os
           from pathlib import Path
@@ -63,8 +65,12 @@ jobs:
               assert_pull_request_state_transitions,
           )
 
+          event = os.environ["CI_EVENT"]
+          base = os.environ.get("PR_BASE_SHA") or None
+          if event != "pull_request":
+              base = None
           try:
-              assert_pull_request_state_transitions(Path.cwd(), os.environ["PR_BASE_SHA"])
+              assert_pull_request_state_transitions(Path.cwd(), base, event=event)
           except ControlStateError as error:
               raise SystemExit(str(error)) from error
           PY

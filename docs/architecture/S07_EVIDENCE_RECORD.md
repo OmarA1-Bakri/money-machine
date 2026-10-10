@@ -46,7 +46,7 @@ The pin helper, activation into 8 (open) and 9 (closed), and completion of sessi
 
 Pull-request CI checks out `github.event.pull_request.head.sha` with `fetch-depth: 0`. The default `refs/pull/N/merge` checkout is a two-parent commit, and the replay refuses that for any state-touching pull request. The pull-request head, one squash commit, replays.
 
-Pull-request CI also fetches the base ref and refuses the run unless `base.sha` is an ancestor of HEAD. The message tells the author to rebase onto the base and not merge. It counts state-file commits in `merge-base..head` and refuses more than one with `one state transition per PR`, before merge. Zero state commits still pass. Push CI does not apply this check; it replays the merged history.
+Pull-request CI also fetches the base ref and refuses the run unless `base.sha` is an ancestor of HEAD. The message tells the author to rebase onto the base and not merge. It counts state-file commits in `merge-base..head` and refuses more than one with `one state transition per PR`, before merge. Two real record commits still replay at the pull-request head; the refusal is the count, and squashing those two commits is an invalid step. One record commit passes, and its squash replays to the same tip the pull-request head replayed. Push events have no `base.sha`. The ancestor check does not run for them, and push CI still replays the merged history.
 
 ## WSL record flow
 
@@ -106,9 +106,10 @@ The browser guard in `s07_navigation_guard.py` is the testable rule for later na
 | 45 | Missing, stale, past (reminder four hours earlier), or too-far deadline; mode, a symlink to a valid file, missing field, empty `omar_notified_at`, or wrong owner. Zero browser writes. A valid 0600 file allows one write |
 | 46 | One lock per run id. A live holder returns false. An old lock without `exec.json` is refused. A completed exec returns false and does not act again; a new run id does |
 | 47 | Foreign space, broken parent, redirect, unlisted URL, signed-out sandbox, or a signed-in anonymous session. `evilnotion.site` is refused. A listed `notion.site` URL is allowed |
-| 48 | Two state-file commits in `merge-base..head` are `one state transition per PR`. One state-file commit passes, including beside a commit that does not touch the state file. Zero state commits pass |
-| 49 | A missing `base.sha`, or a `base.sha` that is not an ancestor of HEAD, tells the author to rebase onto the base and not merge. Deleting that check accepts the stale base |
+| 48 | Two real record commits replay at the head and are `one state transition per PR` on a pull request. Squashing them is an invalid step. One record commit passes, and the squash replay tip equals the pull-request head replay tip. A push event does not apply the count |
+| 49 | A missing `base.sha`, or a `base.sha` that is not an ancestor of HEAD, tells the author to rebase onto the base and not merge. The recorded head still replays. Deleting that check accepts the stale base |
+| 50 | A push event does not apply the base check, including when `base.sha` is missing or not an ancestor. The same head still replays. Deleting the push return refuses that head |
 
-The table has 48 rows and covers tests 1–49. Tests 30 and 42 share one row.
+The table has 49 rows and covers tests 1–50. Tests 30 and 42 share one row.
 
 `evidence_citations cannot be created a second time` is unreachable: a field cannot be both newly added and already present. The reachable refusal is `evidence_citations keys cannot be added or removed`. Replay trigger `current_session == 7` versus `next_session == 8` is equivalent by the activation validator and is parked.
