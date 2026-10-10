@@ -52,6 +52,7 @@ from money_machine.agents.implementations.notion_product_builder import (
 from money_machine.agents.implementations.notion_progress import (
     OP_QA,
     ProviderFailure,
+    adopt_checkpoint_temps,
     clean_interrupt,
     guard_operation,
     load_payload,
@@ -137,6 +138,7 @@ async def run_product_qa(
     validated = require_spec(spec)
     fixture = require_probe(probe)
     path = require_path(checkpoint_path)
+    adopt_checkpoint_temps(path)
     moment = require_datetime(recorded_at)
     stored, created = load_variant_checkpoint(path)
     require_same_spec(stored, validated)

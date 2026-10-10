@@ -44,6 +44,7 @@ from money_machine.agents.implementations.notion_progress_record import Checkpoi
 from money_machine.agents.implementations.notion_qa import (
     live_qa_passed,
     load_qa_record,
+    prose_digest,
     run_product_qa,
 )
 from money_machine.agents.implementations.notion_shared_databases import (
@@ -1233,10 +1234,25 @@ async def test_unknown_page_before_the_ledger_is_not_a_fact(tmp_path: Path) -> N
     assert proof not in probe.pages
 
 
+def _dead_pid() -> int:
+    """A pid os.kill reports as absent. Pid 999 is alive on some CI runners."""
+    candidate = 1_000_000_000
+    while candidate > 0:
+        try:
+            os.kill(candidate, 0)
+        except PermissionError:
+            candidate -= 1
+            continue
+        except OSError:
+            return candidate
+        candidate -= 1
+    raise AssertionError("no dead pid")
+
+
 @pytest.mark.asyncio
 async def test_stale_checkpoint_tmp_is_removed_on_the_next_write(tmp_path: Path) -> None:
     spec, probe, path = await _qa(tmp_path)
-    orphan = path.with_name(f".{path.name}.999.tmp")
+    orphan = path.with_name(f".{path.name}.{_dead_pid()}.tmp")
     orphan.write_text("stale\n", encoding="ascii")
 
     await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)
@@ -4571,9 +4587,9 @@ async def test_exception_group_of_only_exceptions_is_a_local_read_failure(
 ) -> None:
     """An ExceptionGroup of Exceptions is a local read failure, not a provider job.
 
-    Adding ExceptionGroup to the provider tuple (ledger:243) would report
+    Adding ExceptionGroup to the provider tuple (ledger:286) would report
     provider read failed. Re-raising the group from the Exception handler
-    (ledger:245) would not be a ProductBuildError.
+    (ledger:288) would not be a ProductBuildError.
     """
     spec, probe, path = await _qa(tmp_path)
     raw = path.read_bytes()
@@ -5540,3 +5556,54 @@ def test_forged_str_subclass_refusal_text_is_not_raised() -> None:
     assert type(caught.value.args[0]) is str
     assert caught.value.args == ("checkpoint list is duplicated",)
     assert SECRET not in str(caught.value)
+
+
+def _boundary_specs(spec: ProductSpec) -> tuple[ProductSpec, ProductSpec]:
+    """Two callers a newline-join digest cannot tell apart."""
+    first, second = spec.hubs[0], spec.hubs[1]
+    left, right = "alpha", "beta"
+    shifted = spec.model_copy(
+        update={
+            "hubs": (
+                first.model_copy(update={"description": f"{left}\n{right}"}),
+                second,
+                *spec.hubs[2:],
+            )
+        }
+    )
+    split = spec.model_copy(
+        update={
+            "hubs": (
+                first.model_copy(update={"description": left}),
+                second.model_copy(update={"description": f"{right}\n{second.description}"}),
+                *spec.hubs[2:],
+            )
+        }
+    )
+    return shifted, split
+
+
+@pytest.mark.asyncio
+async def test_newline_boundary_is_not_the_same_caller(tmp_path: Path) -> None:
+    """D-0029: a boundary shift is a caller mismatch and writes nothing.
+
+    Hub builds refuse a newline, so the stored digest is rewritten to the
+    shifted caller's digest. The split caller is the same newline-join and a
+    different length-prefixed digest.
+    """
+    spec, probe, path = await _qa(tmp_path)
+    shifted, split = _boundary_specs(spec)
+    assert prose_digest(shifted) != prose_digest(split)
+
+    def _stamp(document: dict[str, object]) -> None:
+        references = document["provider_object_references"]
+        assert type(references) is dict
+        qa = references["qa"]
+        assert type(qa) is dict
+        qa["prose_digest"] = prose_digest(shifted)
+
+    restamp_checkpoint(path, _stamp)
+    raw = path.read_bytes()
+    with pytest.raises(ProductBuildError, match="fact ledger caller does not match"):
+        await run_fact_ledger(split, probe, path, recorded_at=LEDGER_AT)
+    assert path.read_bytes() == raw

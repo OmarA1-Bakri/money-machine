@@ -318,6 +318,109 @@ def _remove_dead_temps(path: Path) -> None:
             stale.unlink()
 
 
+def _complete_checkpoint_file(path: Path) -> bool:
+    """True when the file is a digest-checked checkpoint load_payload accepts."""
+    try:
+        load_payload(path)
+    except (OSError, ProductBuildError, UnicodeError, ValueError):
+        return False
+    return path.is_file()
+
+
+def _decoded_object(path: Path) -> dict[str, object] | None:
+    """Parsed JSON object, or None when the file is not one."""
+    try:
+        decoded = cast(object, json.loads(path.read_text(encoding="utf-8")))
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
+        return None
+    if type(decoded) is not dict:
+        return None
+    return cast(dict[str, object], decoded)
+
+
+def _job_list(progress: dict[str, object]) -> list[object] | None:
+    jobs = progress.get("repair_jobs")
+    if type(jobs) is not list:
+        return None
+    return cast(list[object], jobs)
+
+
+def _strictly_extends(candidate: Path, live: Path) -> bool:
+    """True when the temp is the live checkpoint plus a non-empty job suffix.
+
+    Appending a job recomputes record_digest. Every other field, including the
+    jobs already stored, has to match. A temp written before that suffix is
+    older and must not replace the live file.
+    """
+    live_raw = _decoded_object(live)
+    temp_raw = _decoded_object(candidate)
+    if live_raw is None or temp_raw is None:
+        return False
+    live_progress = live_raw.get(PROGRESS_KEY)
+    temp_progress = temp_raw.get(PROGRESS_KEY)
+    if type(live_progress) is not dict or type(temp_progress) is not dict:
+        return False
+    live_body = cast(dict[str, object], live_progress)
+    temp_body = cast(dict[str, object], temp_progress)
+    live_jobs = _job_list(live_body)
+    temp_jobs = _job_list(temp_body)
+    if live_jobs is None or temp_jobs is None or len(temp_jobs) <= len(live_jobs):
+        return False
+    if temp_jobs[: len(live_jobs)] != live_jobs:
+        return False
+    live_rest = dict(live_raw)
+    temp_rest = dict(temp_raw)
+    live_progress_rest = dict(live_body)
+    temp_progress_rest = dict(temp_body)
+    live_progress_rest.pop("record_digest", None)
+    temp_progress_rest.pop("record_digest", None)
+    live_progress_rest["repair_jobs"] = []
+    temp_progress_rest["repair_jobs"] = []
+    live_rest[PROGRESS_KEY] = live_progress_rest
+    temp_rest[PROGRESS_KEY] = temp_progress_rest
+    return live_rest == temp_rest
+
+
+def _newest_mtime(item: Path) -> int:
+    return item.stat().st_mtime_ns
+
+
+def adopt_checkpoint_temps(path: Path) -> None:
+    """Install a complete dead-pid temp that extends the live checkpoint.
+
+    The adapter call had already returned, so that temp holds the repair.
+    Resume adopts it before it reads the checkpoint. A temp whose pid is
+    still alive is another writer's file and is left alone. A temp that does
+    not strictly extend the live checkpoint is older or unrelated and is left
+    alone. An incomplete temp is left for the dead-pid cleanup.
+    """
+    parent = path.parent
+    if not parent.is_dir() or not path.is_file():
+        return
+    marker = f".{path.name}."
+    suffix = ".tmp"
+    found: list[Path] = []
+    for stale in parent.iterdir():
+        name = stale.name
+        if not name.startswith(marker) or not name.endswith(suffix):
+            continue
+        pid_text = name[len(marker) : -len(suffix)]
+        if not pid_text.isdigit() or _pid_alive(int(pid_text)):
+            continue
+        if not _complete_checkpoint_file(stale) or not _strictly_extends(stale, path):
+            continue
+        found.append(stale)
+    found.sort(key=_newest_mtime, reverse=True)
+    for candidate in found:
+        if not _strictly_extends(candidate, path):
+            continue
+        try:
+            os.replace(candidate, path)
+        except OSError:
+            continue
+        return
+
+
 def write_document(
     path: Path, payload: Mapping[str, object], progress: Mapping[str, object]
 ) -> None:
@@ -334,10 +437,16 @@ def write_document(
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     try:
         temporary.write_text(text, encoding="ascii")
-        os.replace(temporary, path)
     except BaseException:
         with contextlib.suppress(OSError):
             temporary.unlink(missing_ok=True)
+        raise
+    try:
+        os.replace(temporary, path)
+    except BaseException:
+        if not _complete_checkpoint_file(temporary):
+            with contextlib.suppress(OSError):
+                temporary.unlink(missing_ok=True)
         raise
 
 

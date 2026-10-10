@@ -697,6 +697,8 @@ The prompt file is unchanged. SHA-256 `d52011a6f0b725b16427629dc664cfc9f3432c4b5
 
 Round 2 (2026-10-09): #60 merged as `6575c567fcadde636846131f98d7599067babb66` and took revision 59. The final commit of this wave takes revision 60 and sets `head_sha` to that commit. It is the tip-sync pointer, not this commit. Twelve evidence keys stay false. `commissioned_agents` stays empty. `session_status` stays incomplete. The prompt file is still unchanged. The hash above is unchanged.
 
+Item 6 above ("A new test that already passes on `4b899fcf` is not added") is withdrawn. The three pins pass on `4b899fcf` and were added because they kill mutants the suite missed: `test_generator_exit_subclass_becomes_the_builtin` kills `notion_progress.py` `return type(error)()`; `test_system_exit_drops_an_int_subclass_code` kills `isinstance(code, int)`; `test_exception_group_of_only_exceptions_is_a_local_read_failure` kills the ledger ExceptionGroup branches. `from None` at the ledger interrupt test and the QA interrupt test also passes on `4b899fcf` and is closed, not new behavior.
+
 # Session 07 Prompt Integrity Review — Wave 12
 
 **Date:** 2026-10-10
@@ -745,7 +747,7 @@ The prompt file is not amended.
 
 **Verdict:** CONDITIONAL APPROVE. The Wave 1 critical and high findings still apply and stay in force.
 
-**S-01 [CRITICAL] — Action 11 live sandbox.** Still deferred. This wave uses `FixtureNotionAdapter` only. No live HTTP, no real Notion workspace, no Etsy listing, no `--execute`, no Exit 78 lift. Narrative `next_phase` after a recorded matrix is `sandbox_build`, and this wave does not run it.
+**S-01 [CRITICAL] — Action 11 live sandbox.** This wave's matrix slice does not run it. The title-only Eng Ops run at 2026-10-10 08:54 ICT is recorded by the close addendum below. It is not this matrix. This wave uses `FixtureNotionAdapter` only. No live HTTP, no real Notion workspace, no Etsy listing, no `--execute`, no Exit 78 lift. Narrative `next_phase` after a recorded matrix is `sandbox_build`, and this wave does not run it.
 
 **S-02 [HIGH] — Action 12 commissioning.** A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. Do not edit `config/agents.yaml`.
 
@@ -823,7 +825,7 @@ The prompt file is not amended.
 
 **Verdict:** CONDITIONAL APPROVE. The Wave 1 critical and high findings still apply and stay in force.
 
-**S-01 [CRITICAL] — Action 11 live sandbox.** Still deferred. This wave uses `FixtureNotionAdapter` only. No live HTTP, no real Notion workspace, no Etsy listing, no `--execute`, no Exit 78 lift.
+**S-01 [CRITICAL] — Action 11 live sandbox.** This wave's caller-trust slice does not run it. The title-only Eng Ops run at 2026-10-10 08:54 ICT is recorded by the close addendum below. It is not this slice. This wave uses `FixtureNotionAdapter` only. No live HTTP, no real Notion workspace, no Etsy listing, no `--execute`, no Exit 78 lift.
 
 **S-02 [HIGH] — Action 12 commissioning.** A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. Do not edit `config/agents.yaml`.
 
@@ -857,3 +859,24 @@ This addendum governs Wave 13. The prompt remains the unamended source of record
 | Action 12 commissioning | Operator decision after full implementation | S-02 |
 | Twelve evidence keys | Session close | A caller-trust fix is not that gate |
 | QA operand survivors at `notion_qa.py:143` and `:154` | A later sweep | This wave did not re-run it |
+
+## Wave 12 close addendum (2026-10-10)
+
+The prompt file is unchanged. SHA-256 `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`. This addendum does not cut the prompt. The frozen carry list in the W12 session instruction is the slice. Waves 12 and 13 above already govern the fixture matrix and D-0031. This close does not replace the 4-byte digest or the `scheme://host` secret-link fact.
+
+1. Prove the prompt hash, then implement only that carry list. Do not edit the prompt file.
+2. Record the §11 sandbox run in `IMPLEMENTATION_STATE.json` and the session docs. Evidence `exec-1791597254.json` sha256 `fc642066fa96470ac77b5bc4621945927e6c7265a6e23ff68ffab0ae4b2cea10`. `cleanup/exec.json` sha256 `e3d4a547d6f4a1cf0a4bb3d4934ec89099341bf7779fb4074249fc326820a97d`. X1 at 2026-10-10 08:54 ICT and cleanup at 09:05 ICT, sandbox MM S06 Sandbox only, 5 title-only pages created then trashed, Reviewer and Verifier PASS on all three evidence gates. Label it title-only with QA NOT_RUN. It is not citable for `shared_databases_built` or `home_dashboard_built`. Do not flip an evidence key because of §11.
+3. The fixture matrix took revision 61. W13 took revision 62 and set `head_sha` to `48b93bccf1e1688baf287aeb9e0b428caa0761e3`. This close takes revision 63. `head_sha` becomes `98fc06d2d37b206075b6bc91cf1dc964d2f0258f`, the W13 squash. It is the tip-sync pointer, not this commit. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. `session_status` stays `incomplete`. `current_session` stays 7. `next_session` stays 7. `next_prompt` stays this prompt.
+4. Leave all twelve session 7 evidence keys false. Do not set `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. Do not edit `config/agents.yaml` or `config/workflows.yaml`. Exit 78 stays HELD.
+5. `STAGE_REGISTRY` for `qa`, `fact_ledger`, `workflow_link`, and `w11` stays None. The stale "not merged" comment is replaced with that reason. Wiring those names would let a later `--execute` report them PASS. `w11` is not a sandbox runner.
+6. Fixture only. No live Notion, no Etsy, no `--execute`.
+7. Lines about `s11_cleanup.py`, the plan §9, the token-scan, and the Ops token rotation are owned outside this repo. They are not implemented here.
+8. The QA operand check at `notion_qa.py:145` is equivalent at the public entry. `notion_qa.py:156` `and` changed to `or` is a survivor when a proof page already exists: `_prove_duplicate` returns before `guard_operation`, and fixture fault injection on `qa.duplicate` makes the mutant raise `provider operation failed`. The close records that. It does not change the conditions.
+
+| Finding | Owner | Reason |
+|---|---|---|
+| `s11_cleanup.py` re-read claim, plan §9 round/ruff claim, token-scan gaps, SIGKILL cleanup record, Ops `NOTION_SANDBOX_TOKEN` rotation | Outside this repo | Not files in this checkout |
+| Session close | Omar, after CI, Reviewer, Verifier, and Lead Reviewer | This wave prepares the close. It does not put it in effect |
+| QA operand at `:145` | Recorded equivalent at the public entry | See the close log |
+| QA operand at `:156` | Survivor, not equivalent | Proof page already exists. `and` to `or` raises `provider operation failed` under fixture fault injection |
+

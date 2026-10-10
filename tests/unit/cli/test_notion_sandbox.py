@@ -6906,3 +6906,298 @@ def test_libc_losing_fstatfs_after_creates_exits_69_with_ids(
     assert len(client.creates) == len(_CHILD_IDS)
     for page_id in _CHILD_IDS:
         assert canonical_id(page_id) in err
+
+
+def test_repeated_dot_symlink_is_accepted(tmp_path: Path) -> None:
+    """``.`` repeated five times is not a cycle."""
+    base = tmp_path / "c"
+    base.mkdir()
+    (base / "here").symlink_to(".")
+    evidence = base / "here" / "here" / "here" / "here" / "here" / "ev.json"
+    assert under_proc(evidence) is False
+
+
+def test_repeated_dotdot_symlink_is_accepted(tmp_path: Path) -> None:
+    """``..`` repeated five times through ``up/x`` is not a cycle."""
+    root = tmp_path / "d"
+    nested = root / "x"
+    nested.mkdir(parents=True)
+    (nested / "up").symlink_to("..")
+    evidence = root.joinpath(*(["x", "up"] * 5), "ev.json")
+    assert under_proc(evidence) is False
+
+
+def test_dot_alias_to_proc_is_still_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A dot alias whose collapsed target is proc is still refused."""
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    base = tmp_path / "c"
+    base.mkdir()
+    (base / "here").symlink_to(".")
+    evidence = base / "here" / "here" / "ev.json"
+
+    def _proc(path: Path) -> bool:
+        return Path(path) == base
+
+    monkeypatch.setattr(guard_module, "_is_proc", _proc)
+    assert under_proc(evidence) is True
+
+
+def test_real_walk_limit_refuses_a_255_chain(tmp_path: Path) -> None:
+    """255 sibling links are refused at 256 and would be accepted at 257."""
+    real = tmp_path / "real"
+    (real / "sub").mkdir(parents=True)
+    prev = "real"
+    for index in range(255, 0, -1):
+        link = tmp_path / f"s{index}"
+        link.symlink_to(prev)
+        prev = f"s{index}"
+    evidence = tmp_path / "s1" / "sub" / "ev.json"
+    assert under_proc(evidence) is True
+
+
+def test_libc_is_loaded_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``CDLL(None)`` is cached. A second ``_libc`` call does not load again."""
+    import ctypes
+
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    calls = {"n": 0}
+    real = ctypes.CDLL
+
+    def _cdll(*args: object, **kwargs: object) -> ctypes.CDLL:
+        calls["n"] += 1
+        return real(*args, **kwargs)  # type: ignore[arg-type]
+
+    previous = guard_module._libc_cache  # pyright: ignore[reportPrivateUsage]
+    guard_module._libc_cache = None  # pyright: ignore[reportPrivateUsage]
+    monkeypatch.setattr(ctypes, "CDLL", _cdll)
+    try:
+        first = guard_module._libc()  # pyright: ignore[reportPrivateUsage]
+        second = guard_module._libc()  # pyright: ignore[reportPrivateUsage]
+    finally:
+        guard_module._libc_cache = previous  # pyright: ignore[reportPrivateUsage]
+    assert first is second
+    assert calls["n"] == 1
+
+
+def test_statfs_nonzero_returns_none(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failing statfs or fstatfs is None, not the zeroed buffer."""
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    real = guard_module._libc()  # pyright: ignore[reportPrivateUsage]
+    assert real is not None
+
+    class _NonZero:
+        def statfs(self, _path: object, _buf: object) -> int:
+            return -1
+
+        def fstatfs(self, _fd: int, _buf: object) -> int:
+            return -1
+
+        def __getattr__(self, name: str) -> object:
+            return getattr(real, name)
+
+    monkeypatch.setattr(guard_module, "_libc", lambda: _NonZero())
+    assert guard_module._statfs_f_type(tmp_path) is None  # pyright: ignore[reportPrivateUsage]
+    fd = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    try:
+        assert guard_module._fstatfs_f_type(fd) is None  # pyright: ignore[reportPrivateUsage]
+    finally:
+        os.close(fd)
+
+
+def test_empty_mountinfo_helper_is_proc(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An empty mountinfo text is proc. The public entry never reaches it."""
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    monkeypatch.setattr(guard_module, "_mountinfo_text", lambda: "\n")
+    assert guard_module._mountinfo_is_proc(Path("/tmp/ev.json")) is True  # pyright: ignore[reportPrivateUsage]
+
+
+def test_unrelated_proc_mount_does_not_match(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A proc mount on another path does not make this path proc."""
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    other = "/var/empty-proc-mount"
+
+    def _no_type(_path: Path) -> int | None:
+        return None
+
+    monkeypatch.setattr(guard_module, "_statfs_f_type", _no_type)
+    monkeypatch.setattr(
+        guard_module,
+        "_mountinfo_text",
+        lambda: f"1 0 0:1 / {other} rw - proc proc rw\n",
+    )
+    assert under_proc(tmp_path / "ev.json") is False
+
+
+def test_exact_proc_mount_matches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The path equal to the proc mount point is proc."""
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    mount = os.path.abspath(tmp_path)
+
+    def _no_type(_path: Path) -> int | None:
+        return None
+
+    monkeypatch.setattr(guard_module, "_statfs_f_type", _no_type)
+    monkeypatch.setattr(
+        guard_module,
+        "_mountinfo_text",
+        lambda: f"1 0 0:1 / {mount} rw - proc proc rw\n",
+    )
+    assert under_proc(tmp_path) is True
+
+
+def test_proc_parent_is_refused_when_the_leaf_is_not(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A parent on procfs refuses the leaf even when the leaf itself is not."""
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    leaf = tmp_path / "leaf"
+    leaf.mkdir()
+    parent = leaf.resolve()
+
+    def _touch(path: Path) -> bool:
+        return Path(path) == parent
+
+    monkeypatch.setattr(guard_module, "_component_touches_proc", _touch)
+    assert under_proc(leaf / "ev.json") is True
+
+
+def test_unreadable_symlink_is_not_a_proc_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A symlink whose readlink fails is skipped, not treated as proc."""
+    link = tmp_path / "link"
+    link.symlink_to("missing")
+    real = os.readlink
+
+    def _read(path: object, *args: object, **kwargs: object) -> str:
+        if Path(str(path)) == link:
+            raise OSError(13, "unreadable")
+        return real(path, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(os, "readlink", _read)
+    assert under_proc(link / "ev.json") is False
+
+
+def test_resolved_proc_target_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """realpath of a plain symlink target that is proc is refused."""
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(plain)
+    real_safe = guard_module._safe_realpath  # pyright: ignore[reportPrivateUsage]
+
+    def _safe(path: Path) -> Path | None:
+        if Path(path) == plain:
+            return Path("/proc")
+        return real_safe(path)
+
+    def _not_proc(_path: Path) -> bool:
+        return False
+
+    monkeypatch.setattr(guard_module, "_component_touches_proc", _not_proc)
+    monkeypatch.setattr(guard_module, "_safe_realpath", _safe)
+    assert under_proc(link) is True
+
+
+def test_missing_realpath_is_not_appended(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A symlink target with no realpath is not pushed as None."""
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(plain)
+    real_safe = guard_module._safe_realpath  # pyright: ignore[reportPrivateUsage]
+
+    def _safe(path: Path) -> Path | None:
+        if Path(path) == plain:
+            return None
+        return real_safe(path)
+
+    def _not_proc(_path: Path) -> bool:
+        return False
+
+    monkeypatch.setattr(guard_module, "_component_touches_proc", _not_proc)
+    monkeypatch.setattr(guard_module, "_safe_realpath", _safe)
+    assert under_proc(link / "ev.json") is False
+
+
+def test_fd_oserror_after_creates_prints_the_ids(
+    evidence: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """OSError from the first post-open fstatfs check prints the five ids."""
+    from money_machine.cli import notion_sandbox_guard as guard_module
+
+    def _boom(_fd: int) -> bool:
+        raise OSError(5, "fd check failed")
+
+    monkeypatch.setattr(guard_module, "_fd_on_procfs", _boom)
+    client = FakeSandbox()
+    code, payload, _out, err, _logs = _invoke(
+        evidence, capsys, caplog, ["--execute"], client=client
+    )
+    assert code == EXIT_API
+    assert "Traceback" not in err
+    assert evidence.exists() is False
+    assert payload == {}
+    assert "evidence write failed" in err
+    assert len(client.creates) == len(_CHILD_IDS)
+    for page_id in _CHILD_IDS:
+        assert canonical_id(page_id) in err
+
+
+def test_sigint_race_hook_filters_only_the_race_oserror() -> None:
+    """A race OSError is dropped. Any other error still reaches the hook."""
+    from money_machine.cli import notion_sandbox as sandbox_module
+
+    called: list[str] = []
+
+    def _hook(unraisable: object) -> None:
+        called.append(type(getattr(unraisable, "exc_value", None)).__name__)
+
+    previous = sys.__unraisablehook__
+    sys.__unraisablehook__ = _hook
+    try:
+        sandbox_module._ignore_sigint_race(  # pyright: ignore[reportPrivateUsage]
+            type("Race", (), {"exc_value": OSError(4, "ignored due to race condition")})()
+        )
+        assert called == []
+        sandbox_module._ignore_sigint_race(  # pyright: ignore[reportPrivateUsage]
+            type("Disk", (), {"exc_value": OSError(5, "disk full")})()
+        )
+        sandbox_module._ignore_sigint_race(  # pyright: ignore[reportPrivateUsage]
+            type("Text", (), {"exc_value": ValueError("race condition")})()
+        )
+    finally:
+        sys.__unraisablehook__ = previous
+    assert called == ["OSError", "ValueError"]
+
+
+def test_missing_unraisablehook_does_not_raise() -> None:
+    """A missing original hook returns. It is not called."""
+    from money_machine.cli import notion_sandbox as sandbox_module
+
+    previous = sys.__unraisablehook__
+    sys.__unraisablehook__ = None  # type: ignore[assignment]
+    try:
+        sandbox_module._ignore_sigint_race(  # pyright: ignore[reportPrivateUsage]
+            type("Other", (), {"exc_value": RuntimeError("nope")})()
+        )
+    finally:
+        sys.__unraisablehook__ = previous

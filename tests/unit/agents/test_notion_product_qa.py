@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import socket
 import traceback
 from collections.abc import Callable, Mapping
@@ -2973,3 +2974,223 @@ async def test_package_error_outside_the_old_fixed_set_is_local(
     assert caught.value.__context__ is None
     assert "sk-live-secret" not in _every_text(caught.value)
     assert path.read_bytes() == raw
+
+
+def _boundary_specs(spec: ProductSpec) -> tuple[ProductSpec, ProductSpec]:
+    """Two callers a newline-join digest cannot tell apart."""
+    first, second = spec.hubs[0], spec.hubs[1]
+    left, right = "alpha", "beta"
+    shifted = spec.model_copy(
+        update={
+            "hubs": (
+                first.model_copy(update={"description": f"{left}\n{right}"}),
+                second,
+                *spec.hubs[2:],
+            )
+        }
+    )
+    split = spec.model_copy(
+        update={
+            "hubs": (
+                first.model_copy(update={"description": left}),
+                second.model_copy(update={"description": f"{right}\n{second.description}"}),
+                *spec.hubs[2:],
+            )
+        }
+    )
+    return shifted, split
+
+
+def test_newline_boundary_does_not_share_a_prose_digest() -> None:
+    """A newline that moves a field boundary is a different caller."""
+    shifted, split = _boundary_specs(planner_spec())
+    assert prose_digest(shifted) != prose_digest(split)
+
+
+def _dead_pid() -> int:
+    """A pid os.kill reports as absent. Pid 999 is alive on some CI runners."""
+    candidate = 1_000_000_000
+    while candidate > 0:
+        try:
+            os.kill(candidate, 0)
+        except PermissionError:
+            candidate -= 1
+            continue
+        except OSError:
+            return candidate
+        candidate -= 1
+    raise AssertionError("no dead pid")
+
+
+def _plant_older_temp(path: Path, pid: int, payload: bytes) -> Path:
+    """A complete sibling temp, older than the live checkpoint."""
+    stale = path.with_name(f".{path.name}.{pid}.tmp")
+    stale.write_bytes(payload)
+    current = path.stat()
+    os.utime(stale, ns=(current.st_atime_ns - 10**9, current.st_mtime_ns - 10**9))
+    return stale
+
+
+def _qa_repair_names(path: Path) -> list[str]:
+    names: list[str] = []
+    document = json.loads(path.read_text(encoding="ascii"))
+    for job in document["progress"]["repair_jobs"]:
+        if type(job) is not dict or job.get("kind") != "qa_repair":
+            continue
+        response = job.get("response")
+        if type(response) is str:
+            names.append(response)
+    return names
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("repair", ["published", "duplicate_button", "search_indexing"])
+async def test_replace_crash_keeps_the_repair_on_resume(tmp_path: Path, repair: str) -> None:
+    """os.replace failing after the adapter call keeps that name, with no second write."""
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    if repair == "published":
+        await probe.unpublish_page(page.id)
+    elif repair == "duplicate_button":
+        page.duplicate_as_template = False
+    else:
+        page.search_indexing = True
+    real = os.replace
+    failed = {"n": 0}
+    namespace: dict[str, object] = {
+        "__name__": "money_machine.agents.implementations.notion_progress",
+        "OSError": OSError,
+        "Path": Path,
+        "failed": failed,
+        "path": path,
+        "real": real,
+    }
+    exec(
+        "def _replace(src: object, dst: object) -> None:\n"
+        "    if Path(str(dst)) == path and failed['n'] == 0:\n"
+        "        failed['n'] = 1\n"
+        "        raise OSError(5, 'replace crashed')\n"
+        "    real(src, dst)\n",
+        namespace,
+    )
+    replacement = namespace["_replace"]
+    if not callable(replacement):
+        raise AssertionError("replace hook was not callable")
+    os.replace = replacement  # type: ignore[assignment]
+    try:
+        with pytest.raises(ProductBuildError, match="qa failed in local code"):
+            await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    finally:
+        os.replace = real
+    assert failed["n"] == 1
+    assert _qa_repair_names(path) == []
+    # The leftover temp is this process, which is still alive. Resume adopts
+    # only a dead pid, so the crashed repair is renamed onto one.
+    crashed_temp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    assert crashed_temp.is_file()
+    crashed_temp.rename(path.with_name(f".{path.name}.{_dead_pid()}.tmp"))
+    calls = watch_adapter_writes(probe)
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "PASS"
+    assert checkpoint.qa.repairs == (repair,)
+    assert calls == ["duplicate_page"]
+
+
+@pytest.mark.asyncio
+async def test_live_pid_older_temp_does_not_drop_a_stored_publish(tmp_path: Path) -> None:
+    """A live-pid temp from before the stored publish is not installed.
+
+    The temp is older than the live checkpoint. Installing it would drop
+    repairs ('published',) to () and would neither redo nor record the publish.
+    """
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    await probe.unpublish_page(page.id)
+    before_publish = path.read_bytes()
+    first = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert first.qa is not None
+    assert first.qa.repairs == ("published",)
+    stored = path.read_bytes()
+    assert stored != before_publish
+    stale = _plant_older_temp(path, os.getpid(), before_publish)
+    calls = watch_adapter_writes(probe)
+    second = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert stale.is_file()
+    assert path.read_bytes() == stored
+    assert calls == []
+    assert second.qa is not None
+    assert second.qa.repairs == ("published",)
+    assert _qa_repair_names(path) == ["published"]
+
+
+@pytest.mark.asyncio
+async def test_older_dead_pid_temp_is_not_adopted(tmp_path: Path) -> None:
+    """A dead-pid temp older than the live checkpoint is not installed."""
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    page.search_indexing = True
+    before = path.read_bytes()
+    first = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert first.qa is not None
+    assert first.qa.repairs == ("search_indexing",)
+    stored = path.read_bytes()
+    stale = _plant_older_temp(path, _dead_pid(), before)
+    page.search_indexing = True
+    calls = watch_adapter_writes(probe)
+    with pytest.raises(ProductBuildError, match="qa record does not match"):
+        await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert stale.is_file()
+    assert path.read_bytes() == stored
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_unrequested_repair_is_not_applied(tmp_path: Path) -> None:
+    """A flag left out of the repairs tuple is not written."""
+    spec, probe, path = await _built(tmp_path)
+    stored, _created = load_variant_checkpoint(path)
+    page = _colour_pages(probe, spec)[0]
+    page.search_indexing = True
+    page.duplicate_as_template = False
+    calls = watch_adapter_writes(probe)
+    done = await notion_qa_module._apply_repairs(  # pyright: ignore[reportPrivateUsage]
+        probe, stored, ("published",), path
+    )
+    assert done == ()
+    assert calls == []
+    assert page.search_indexing is True
+    assert page.duplicate_as_template is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "suffix",
+    [
+        "?token=sk-live-secret",
+        "?a=1&token=sk-live-secret",
+        "#token=sk-live-secret",
+        "?token=sk-live-secret#frag",
+    ],
+)
+async def test_query_or_fragment_token_is_not_a_qa_fact(tmp_path: Path, suffix: str) -> None:
+    """A secret in the query or fragment is not stored on the QA fact."""
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    leaked = f"https://fixture.notion.site/{page.id}{suffix}"
+    page.public_url = leaked
+
+    def _forge(document: dict[str, object]) -> None:
+        def _one(row: dict[str, object]) -> None:
+            if row.get("page_id") == page.id:
+                row["secret_link"] = leaked
+
+        _edit_variant_rows(document, _one)
+
+    restamp_checkpoint(path, _forge)
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert checkpoint.qa is not None
+    stored = dict(checkpoint.qa.facts)
+    host = "https://fixture.notion.site"
+    assert stored["secret_links"] == ",".join([host] * len(spec.colour_variants))
+    assert "sk-live-secret" not in stored["secret_links"]

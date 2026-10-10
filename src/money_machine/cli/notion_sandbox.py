@@ -85,9 +85,10 @@ from money_machine.cli.notion_sandbox_pipeline import (
 
 LOGGER = logging.getLogger(__name__)
 
-# Plug-in slots. Replace None with a runner name that ``stage_runners`` defines.
-# qa: W9 notion_qa.py, not merged. fact_ledger and workflow_link: W10, not merged.
-# w11: later close, not merged. A None runner is NOT_RUN and is never PASS.
+# Plug-in slots. qa, fact_ledger, and workflow_link exist as fixture phases.
+# They stay None: the §11 run is title-only with qa NOT_RUN, and a runner here
+# would let a later --execute report those stages PASS. w11 is the session-close
+# gate, not a sandbox runner. A None runner is NOT_RUN and is never PASS.
 STAGE_REGISTRY: tuple[tuple[str, str | None], ...] = (
     ("build", "run_build"),
     ("variants", "run_variants"),
