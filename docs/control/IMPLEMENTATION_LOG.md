@@ -1,3 +1,19 @@
+## 2026-10-10 — Session 08 W1 follow-up: review counts fail closed
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
+
+This paragraph answers Reviewer review 5479821148 and Verifier comment 6099794239 on `317e8c09`. The code commits on this branch are `6312d14`, `d13c5f1`, `de26e94`, and `61dac83`. It does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, or `IMPLEMENTATION_STATE.json`.
+
+1. A review or rating word next to a number is a count. The year exemption and the 0/1 rating-scale exemption are deleted. `Reviews 1 100`, `Ratings 1 100`, `Reviews 1 10 000`, `Ratings 1-5+`, `Rating 1-5.5`, `Ratings 1-5: 5`, `Rating 1-10 = 10`, `Review 2026 500`, `Year in Review 2026 4.9`, `1999 review`, `Review 2000`, and `2026 reviews` are refused. Re-adding the year exemption publishes `1999 review`. Re-adding the scale exemption publishes `Reviews 1 100`.
+2. Sale price `8.98` and `9.00` against `8.99` are rejected, and the same values as anchors against anchor `8.99`. With the three AST meta-tests deselected, both-field `±0.01`, both-field `±0.011`, price-only `±0.01`, anchor-only `±0.01`, and `round(x, 1)` each accept `8.98` or `9.00` and fail those behavioural tests.
+3. `One Starry Night` publishes. `Chapter #1`, `Book #1`, `Level #1`, and `Lap #1 Running` still publish. `Goal #01 on Etsy` is refused. A hub list `Automatic Savings Planner|Auto-sync savings` is refused. `42 Page Planner` is refused when the built count is 42. A near-price correction cites the price fact.
+
+Parked to next wave: known fail-closed over-refusals: `Year in Review 2026`, `2026 Review`, `Rating 1-10 Mood`, `Rating 0-100 Score`, and `Rating 1-5`.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/domain/test_claim_validation.py tests/unit/domain/test_listing_binding.py tests/unit/agents/test_merchandising.py` — 702 passed in 13.91s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-r3-pytest`: 12 failed, 4000 passed, 193 skipped, 1 warning in 378.85s (0:06:18). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those commands and the pytest run are the tree at `61dac83`. This paragraph was written after that run.
+
 ## 2026-10-10 — Session 08 W1 follow-up: year counts, joined stems, exact cents
 
 Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
