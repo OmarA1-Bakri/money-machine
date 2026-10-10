@@ -1234,10 +1234,25 @@ async def test_unknown_page_before_the_ledger_is_not_a_fact(tmp_path: Path) -> N
     assert proof not in probe.pages
 
 
+def _dead_pid() -> int:
+    """A pid os.kill reports as absent. Pid 999 is alive on some CI runners."""
+    candidate = 1_000_000_000
+    while candidate > 0:
+        try:
+            os.kill(candidate, 0)
+        except PermissionError:
+            candidate -= 1
+            continue
+        except OSError:
+            return candidate
+        candidate -= 1
+    raise AssertionError("no dead pid")
+
+
 @pytest.mark.asyncio
 async def test_stale_checkpoint_tmp_is_removed_on_the_next_write(tmp_path: Path) -> None:
     spec, probe, path = await _qa(tmp_path)
-    orphan = path.with_name(f".{path.name}.999.tmp")
+    orphan = path.with_name(f".{path.name}.{_dead_pid()}.tmp")
     orphan.write_text("stale\n", encoding="ascii")
 
     await run_fact_ledger(spec, probe, path, recorded_at=LEDGER_AT)

@@ -33,7 +33,9 @@ Section 11. Sandbox MM S06 Sandbox only. X1 at 2026-10-10 08:54 ICT created 5 ti
 
 `tests/unit/cli/test_notion_sandbox.py` was not split. Sockets stay blocked.
 
-Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/w12-pytest3`: 12 failed, 3286 passed, 193 skipped, 1 warning, 365.58s. Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (338 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations.
+`test_stale_checkpoint_tmp_is_removed_on_the_next_write` used pid 999. CI run 38021335142 had that pid alive, so `_remove_dead_temps` kept the file and the test failed. The test now uses a pid `os.kill` reports as dead. Production cleanup is unchanged.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/w12-pytest4`: 12 failed, 3286 passed, 193 skipped, 1 warning, 364.51s. Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (338 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. The format, check, and pyright commands were run on the tree before this pid selection. The pid selection is in the test file only. `uv run ruff check` on that file after the edit exited 0.
 
 ## 2026-10-10 — Session 07 W13: QA caller-trust limits
 
