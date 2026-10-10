@@ -8,6 +8,8 @@ Prompt integrity is `docs/control/reviews/2026-10-10-session-08-prompt-integrity
 
 The checked-in continuity pin still records the twelve Session 07 keys as false (D-0032). That pin is not an activation exemption. Fixture W1 (A10 and claim validation) does not read `current_session` as a gate and does not require Session 08 to be activated.
 
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w0-pytest`: 12 failed, 3293 passed, 193 skipped, 1 warning, 371.82s. Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (338 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those three commands and the pytest run are this tree. The sentences that name the counts were written after that run.
+
 ## 2026-10-10 — Session 07 close recorded, and the :408/:413 adopt mutants are killed
 
 Session 07 is recorded complete by Omar's merge of #64. That merge is `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` at 2026-10-10 12:36:46 +0700. His words, relayed by Grok Bot from its chat at 2026-10-10 12:39 ICT: "Yes, my merge is the Session 07 close gate. Fix the Verifier items in a follow-up PR." #64 merged while Verifier round 2 was FAIL (comment 6094256754). Those items are what this pull request fixes. No Lead Reviewer pass is on record. Exit 78 stays HELD. The twelve evidence keys stay false. `commissioned_agents` stays empty. This follow-up does not change `src/`.
