@@ -53,7 +53,7 @@ PHASE_TWO_AT = datetime(2026, 10, 5, 20, 0, tzinfo=UTC)
 DASHBOARD_AT = datetime(2026, 10, 5, 22, 30, tzinfo=UTC)
 LATER = datetime(2026, 10, 5, 23, 45, tzinfo=UTC)
 CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "98fc06d2d37b206075b6bc91cf1dc964d2f0258f"
+HEAD_SHA = "b782751fdb1b255c436ff7f6fa655e6d783b1e8c"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 _PHASES = (
     PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL,
@@ -1048,13 +1048,13 @@ async def test_hub_name_longer_than_64_characters_creates_nothing(tmp_path: Path
     assert path.read_bytes() == before
 
 
-def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
+def test_session_seven_close_keeps_evidence_false() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert state["current_session"] == 7
-    assert state["session_status"] == "incomplete"
-    assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6]
-    assert state["next_session"] == 7
-    assert state["next_prompt"] == "10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md"
+    assert state["session_status"] == "complete"
+    assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7]
+    assert state["next_session"] == 8
+    assert state["next_prompt"] == "11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md"
     assert state["head_sha"] == HEAD_SHA
     assert state["evidence_closure_commit_sha"] == CLOSURE_SHA
     assert state["head_sha"] != state["evidence_closure_commit_sha"]
@@ -1066,5 +1066,5 @@ def test_session_seven_stays_incomplete_after_the_tip_sync() -> None:
     assert evidence["identity_hubs_built"] is False
     assert evidence["notification_dashboard_built"] is False
     assert evidence["home_dashboard_built"] is False
-    assert state["state_revision"] == 63
+    assert state["state_revision"] == 64
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")

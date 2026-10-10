@@ -1,5 +1,21 @@
 # Test Evidence
 
+## 2026-10-10 — Session 07 close record and adopt :408/:413 killing tests
+
+**Verification scope**: Fixture-only follow-up to #64. No `src/` change. No live HTTP, no `--execute`, no Exit 78 lift. State revision 63 to 64. `head_sha` `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` is Omar's squash of #64. It is the tip-sync pointer, not this commit.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 recorded complete | `session_status` complete, `current_session` 7, `completed_sessions` `[0, 1, 2, 3, 4, 5, 6, 7]`, `next_session` 8, `next_prompt` `11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md`, revision 64. Twelve evidence keys stay false. `commissioned_agents` stays empty | PASS |
+| Close gate | Merge `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` at 2026-10-10 12:36:46 +0700. Omar, relayed by Grok Bot from its chat at 2026-10-10 12:39 ICT: "Yes, my merge is the Session 07 close gate. Fix the Verifier items in a follow-up PR." | RECORDED |
+| Lead Reviewer | No Lead Reviewer pass is on record | ABSENT |
+| Exit 78 | Scheduler held. Omar did not lift it | HELD |
+| Live-pid extending temp | `test_live_pid_extending_temp_is_not_adopted`. Stock: names `['published']`, bytes unchanged, temp kept, 0 writes. Deleting `_pid_alive` at `notion_progress.py:408`: names `['published', 'duplicate_button']` | PASS on stock. Fails under the :408 deletion |
+| Newest dead extension | `test_newest_dead_extension_is_adopted`. Stock stores `published`, `duplicate_button`, and `search_indexing` and leaves the older temp. `reverse=False` at `:413` stores `['published', 'duplicate_button']` and leaves the newer temp | PASS on stock. Fails under the :413 reversal |
+| Close-tip deselected count | On `b782751`, before these two tests, the #64 `-k` printed `27 passed, 1048 deselected in 2.06s`. The frozen body said 1046 deselected and 1.98s. 1046 is wrong. On this tree the same `-k` printed `27 passed, 1050 deselected in 1.84s` | 1048 at the close tip. 1050 here |
+
+**Status**: Session 07 is recorded complete by Omar's merge. The twelve evidence keys stay false. Exit 78 stays HELD. No Lead Reviewer pass is on record.
+
 ## 2026-10-10 — Session 07 W12: session close prepared (pending Omar close gate)
 
 **Verification scope**: Fixture-only close wave, rebased onto the W13 squash `98fc06d2d37b206075b6bc91cf1dc964d2f0258f`. No live HTTP, no real Notion workspace, no Etsy listing, no `--execute`, no Exit 78 lift. STATE revision 63. `head_sha` `98fc06d2d37b206075b6bc91cf1dc964d2f0258f` is that squash, the tip-sync pointer, not this commit. The branch point required by the close instruction was `ae2ca6e41a0c6ff87437a53db91feb50bc5a82b3`.

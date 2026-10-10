@@ -39,6 +39,7 @@ from money_machine.agents.implementations.notion_progress import (
     ProviderFailure,
     load_payload,
     raise_recorded,
+    record_applied_repairs,
 )
 from money_machine.agents.implementations.notion_qa import (
     PHASE_FACT_LEDGER,
@@ -3031,6 +3032,45 @@ def _plant_older_temp(path: Path, pid: int, payload: bytes) -> Path:
     return stale
 
 
+def _distinct_dead_pids(count: int) -> list[int]:
+    """Distinct pids that os.kill reports as absent."""
+    found: list[int] = []
+    candidate = 1_000_000_000
+    while candidate > 0 and len(found) < count:
+        try:
+            os.kill(candidate, 0)
+        except PermissionError:
+            candidate -= 1
+            continue
+        except OSError:
+            found.append(candidate)
+        candidate -= 1
+    if len(found) != count:
+        raise AssertionError("not enough dead pids")
+    return found
+
+
+def _checkpoint_plus_repairs(path: Path, names: tuple[str, ...]) -> bytes:
+    """Bytes of the live checkpoint plus these repair names, built off to the side.
+
+    The side name is not a ``.{checkpoint}.{pid}.tmp``, so writing it cannot
+    delete a temp planted beside the live file.
+    """
+    side = path.with_name(f"{path.name}.extend-side")
+    side.write_bytes(path.read_bytes())
+    record_applied_repairs(side, names)
+    payload = side.read_bytes()
+    side.unlink()
+    return payload
+
+
+def _plant_temp(path: Path, pid: int, payload: bytes, *, mtime_ns: int) -> Path:
+    stale = path.with_name(f".{path.name}.{pid}.tmp")
+    stale.write_bytes(payload)
+    os.utime(stale, ns=(mtime_ns, mtime_ns))
+    return stale
+
+
 def _qa_repair_names(path: Path) -> list[str]:
     names: list[str] = []
     document = json.loads(path.read_text(encoding="ascii"))
@@ -3122,6 +3162,66 @@ async def test_live_pid_older_temp_does_not_drop_a_stored_publish(tmp_path: Path
     assert second.qa is not None
     assert second.qa.repairs == ("published",)
     assert _qa_repair_names(path) == ["published"]
+
+
+@pytest.mark.asyncio
+async def test_live_pid_extending_temp_is_not_adopted(tmp_path: Path) -> None:
+    """A live pid is left alone even when its temp strictly extends the checkpoint.
+
+    Deleting the live-pid check installs this temp. Stored repair names become
+    published plus duplicate_button, the bytes change, and the temp is consumed.
+    """
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    await probe.unpublish_page(page.id)
+    first = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert first.qa is not None
+    assert first.qa.repairs == ("published",)
+    stored = path.read_bytes()
+    extended = _checkpoint_plus_repairs(path, ("duplicate_button",))
+    assert extended != stored
+    planted = _plant_temp(path, os.getpid(), extended, mtime_ns=path.stat().st_mtime_ns + 10**9)
+    calls = watch_adapter_writes(probe)
+    second = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert _qa_repair_names(path) == ["published"]
+    assert planted.is_file()
+    assert path.read_bytes() == stored
+    assert calls == []
+    assert second.qa is not None
+    assert second.qa.repairs == ("published",)
+
+
+@pytest.mark.asyncio
+async def test_newest_dead_extension_is_adopted(tmp_path: Path) -> None:
+    """Two dead extending temps: the newest one is installed, and it holds all three.
+
+    Sorting oldest-first installs the shorter temp and leaves the newer one
+    behind, so the stored names stop at published and duplicate_button.
+    """
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    await probe.unpublish_page(page.id)
+    first = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert first.qa is not None
+    assert first.qa.repairs == ("published",)
+    shorter = _checkpoint_plus_repairs(path, ("duplicate_button",))
+    longer = _checkpoint_plus_repairs(path, ("duplicate_button", "search_indexing"))
+    older_pid, newer_pid = _distinct_dead_pids(2)
+    base = path.stat().st_mtime_ns
+    older = _plant_temp(path, older_pid, shorter, mtime_ns=base - 2 * 10**9)
+    newer = _plant_temp(path, newer_pid, longer, mtime_ns=base + 2 * 10**9)
+    calls = watch_adapter_writes(probe)
+    second = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert _qa_repair_names(path) == [
+        "published",
+        "duplicate_button",
+        "search_indexing",
+    ]
+    assert not newer.is_file()
+    assert older.is_file()
+    assert calls == []
+    assert second.qa is not None
+    assert second.qa.repairs == ("published",)
 
 
 @pytest.mark.asyncio

@@ -36,6 +36,8 @@ FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 BOOTSTRAP_COMMIT_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 # Session 06 close records the W10 squash (#49), not the state-pointer commit.
 SESSION_06_PRIOR_WAVE_TIP = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
+# Session 07 close tip-syncs head_sha to Omar's #64 squash, not this state file.
+SESSION_07_CLOSE_TIP = "b782751fdb1b255c436ff7f6fa655e6d783b1e8c"
 
 
 class ControlState(TypedDict):
@@ -339,7 +341,11 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
         assert state["next_prompt"] == control_state.SESSION_PROMPTS[session + 1]
         evidence = state["required_completion_evidence"]
         assert evidence.keys() == control_state.SESSION_EVIDENCE_KEYS[session]
-        assert all(evidence.values())
+        if session == 7:
+            # Omar's merge is the close gate. The twelve keys stay false.
+            assert all(value is False for value in evidence.values())
+        else:
+            assert all(evidence.values())
     assert state["transition_contract"]["completion_requires_next_session"] == state["next_session"]
     if state["session_status"] == "complete" and (session >= 6 or state["state_revision"] >= 48):
         assert 6 in state["completed_sessions"]
@@ -355,7 +361,12 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
         # head_sha must equal closure for complete sessions (evidence finalized)
         # For incomplete sessions, head_sha may be ahead of closure (work in progress)
         if state["session_status"] == "complete":
-            assert state["head_sha"] == closure
+            if session == 7:
+                assert state["head_sha"] == SESSION_07_CLOSE_TIP
+                assert closure == SESSION_06_PRIOR_WAVE_TIP
+                assert state["head_sha"] != closure
+            else:
+                assert state["head_sha"] == closure
             if session != 6:
                 close_commit = state_pointer_commit()
                 assert FULL_SHA.fullmatch(close_commit)

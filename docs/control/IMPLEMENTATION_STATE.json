@@ -4,12 +4,12 @@
   "repo_root": "/mnt/d/Money Machine",
   "windows_repo_root": "D:\\Money Machine",
   "branch": "build/full-automation",
-  "head_sha": "98fc06d2d37b206075b6bc91cf1dc964d2f0258f",
+  "head_sha": "b782751fdb1b255c436ff7f6fa655e6d783b1e8c",
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "evidence_closure_commit_sha": "0f94d585f23d79e5ac18479f01e14f67cbaad332",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 63,
-  "session_status": "incomplete",
+  "state_revision": 64,
+  "session_status": "complete",
   "current_session": 7,
   "completed_sessions": [
     0,
@@ -18,7 +18,8 @@
     3,
     4,
     5,
-    6
+    6,
+    7
   ],
   "services": {
     "api": "container_healthy_readiness_true_migrated_2026-09-07",
@@ -109,7 +110,8 @@
     "session_07_w11": "2026-10-09: Session 07 Wave 11 round 2 (revision 59 to 60). STATE head_sha 6575c567fcadde636846131f98d7599067babb66 is the #60 sandbox-run commit. It is the tip-sync pointer. It is not this commit. Twelve evidence keys stay false. commissioned_agents stays empty. session_status stays incomplete. Exit 78 stays HELD. This is not SESSION_07 COMPLETE. Fixture QA only. Section 11 had not been started when this note was written. The §11 record is notes.session_07_w12_close.",
     "session_07_w12": "2026-10-10: Session 07 Wave 12 fixture matrix (revision 60 to 61) at 48b93bccf1e1688baf287aeb9e0b428caa0761e3. STATE head_sha on that commit is ae2ca6e41a0c6ff87437a53db91feb50bc5a82b3, the #62 squash. Twelve evidence keys stay false. The fixture test matrix records the section 11 proofs on a passing fact ledger. Narrative next_phase becomes sandbox_build. That matrix commit did not start the live sandbox. The title-only Eng Ops run is notes.session_07_w12_close. D-0030: a wrong formula or a wrong linked view records BLOCKED with zero adapter writes. A missing hub section refuses with fact ledger section is missing and writes nothing. No ListingCopyJob is created.",
     "session_07_w13": "2026-10-10: Session 07 Wave 13 (revision 61 to 62) at 98fc06d2d37b206075b6bc91cf1dc964d2f0258f. STATE head_sha on that commit is 48b93bccf1e1688baf287aeb9e0b428caa0761e3. D-0031: the QA prose digest is length-prefixed with 4 bytes, a digest change re-runs QA only for the judged caller, and secret-link facts store scheme and host only. W13 did not start the live sandbox. The title-only run is notes.session_07_w12_close. A07, A08, and A09 stay DESIGNED.",
-    "session_07_w12_close": "2026-10-10: Session 07 Wave 12 close prepared (revision 62 to 63). STATE head_sha 98fc06d2d37b206075b6bc91cf1dc964d2f0258f is the W13 squash. It is the tip-sync pointer. It is not this commit. The required branch point was ae2ca6e41a0c6ff87437a53db91feb50bc5a82b3. Twelve evidence keys stay false. No evidence key flips because of §11. commissioned_agents stays empty. session_status stays incomplete. Exit 78 stays HELD. This is not SESSION_07 COMPLETE. Completion waits on CI, Reviewer and Verifier PASS, a Lead Reviewer LEAD PASS, and Omar's explicit close gate. Section 11 ran in sandbox MM S06 Sandbox only. X1 at 2026-10-10 08:54 ICT created 5 title-only pages. Cleanup at 2026-10-10 09:05 ICT trashed them. Evidence exec-1791597254.json sha256 fc642066fa96470ac77b5bc4621945927e6c7265a6e23ff68ffab0ae4b2cea10. cleanup/exec.json sha256 e3d4a547d6f4a1cf0a4bb3d4934ec89099341bf7779fb4074249fc326820a97d. Reviewer and Verifier PASS on all three evidence gates. The run is title-only with QA NOT_RUN. It is not citable for shared_databases_built or home_dashboard_built. STAGE_REGISTRY leaves qa, fact_ledger, workflow_link, and w11 as None. Wiring them would let a later --execute report those stages PASS. w11 is the session-close gate, not a sandbox runner."
+    "session_07_w12_close": "2026-10-10: Session 07 Wave 12 close prepared (revision 62 to 63). STATE head_sha 98fc06d2d37b206075b6bc91cf1dc964d2f0258f is the W13 squash. It is the tip-sync pointer. It is not this commit. The required branch point was ae2ca6e41a0c6ff87437a53db91feb50bc5a82b3. Twelve evidence keys stay false. No evidence key flips because of §11. commissioned_agents stays empty. session_status stays incomplete. Exit 78 stays HELD. This is not SESSION_07 COMPLETE. Completion waits on CI, Reviewer and Verifier PASS, a Lead Reviewer LEAD PASS, and Omar's explicit close gate. Section 11 ran in sandbox MM S06 Sandbox only. X1 at 2026-10-10 08:54 ICT created 5 title-only pages. Cleanup at 2026-10-10 09:05 ICT trashed them. Evidence exec-1791597254.json sha256 fc642066fa96470ac77b5bc4621945927e6c7265a6e23ff68ffab0ae4b2cea10. cleanup/exec.json sha256 e3d4a547d6f4a1cf0a4bb3d4934ec89099341bf7779fb4074249fc326820a97d. Reviewer and Verifier PASS on all three evidence gates. The run is title-only with QA NOT_RUN. It is not citable for shared_databases_built or home_dashboard_built. STAGE_REGISTRY leaves qa, fact_ledger, workflow_link, and w11 as None. Wiring them would let a later --execute report those stages PASS. w11 is the session-close gate, not a sandbox runner.",
+    "session_07_close": "2026-10-10: Session 07 close recorded (revision 63 to 64). Omar merged #64 as b782751fdb1b255c436ff7f6fa655e6d783b1e8c at 2026-10-10 12:36:46 +0700 and declared that merge the Session 07 close gate. His words, relayed by Grok Bot from its chat at 2026-10-10 12:39 ICT: Yes, my merge is the Session 07 close gate. Fix the Verifier items in a follow-up PR. session_status is complete. current_session stays 7. completed_sessions gains 7. next_session is 8. next_prompt is 11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md. head_sha tip-syncs to that merge and is not this commit. evidence_closure_commit_sha stays the Session 06 tip 0f94d585f23d79e5ac18479f01e14f67cbaad332. last_verified_commit stays bootstrap 1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d. Twelve evidence keys stay false. commissioned_agents stays empty. Exit 78 stays HELD. No Lead Reviewer pass is on record. The CLI completion transition still requires every evidence key true. This record is the operator gate, not that transition. updated_at is 2026-10-10T05:36:46Z, the merge commit time."
   },
   "carry_forward": [
     "Prove idempotency uniqueness under concurrent claim path (after commissioning gate)",
@@ -138,7 +140,7 @@
   "transition_contract": {
     "completion_requires_all_evidence_true": true,
     "completion_requires_current_session_in_completed_sessions": true,
-    "completion_requires_next_session": 7,
+    "completion_requires_next_session": 8,
     "completion_requires_distinct_commit_shas": true,
     "completion_requires_existing_git_commits": true,
     "completion_requires_bootstrap_ancestor_of_closure": true,
@@ -146,7 +148,7 @@
     "completion_requires_later_state_pointer_commit": true,
     "unsupported_completion_is_rejected": true
   },
-  "next_session": 7,
-  "next_prompt": "10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md",
-  "updated_at": "2026-10-10T03:50:00Z"
+  "next_session": 8,
+  "next_prompt": "11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md",
+  "updated_at": "2026-10-10T05:36:46Z"
 }

@@ -32,6 +32,12 @@
 
 Router browser and combined config modes still raise `NotImplementedError` (W4a). Fixture mode stays the default.
 
+## Session 07 — closed by Omar's merge of #64
+
+**Status**: Recorded complete (2026-10-10, state revision 64). The close gate is merge `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` at 2026-10-10 12:36:46 +0700. Omar's words, relayed by Grok Bot from its chat at 2026-10-10 12:39 ICT: "Yes, my merge is the Session 07 close gate. Fix the Verifier items in a follow-up PR." No Lead Reviewer pass is on record. Exit 78 stays HELD. The twelve evidence keys stay false. `commissioned_agents` stays empty. `session_status` is complete. `current_session` stays 7. `completed_sessions` is `[0, 1, 2, 3, 4, 5, 6, 7]`. `next_session` is 8. `next_prompt` is `11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md`. `head_sha` `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` is that merge. It is the tip-sync pointer. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Session 08 is not activated. D-0032 records that the CLI completion transition still requires every evidence key true.
+
+`test_live_pid_extending_temp_is_not_adopted` kills a deleted live-pid check at `notion_progress.py:408`. `test_newest_dead_extension_is_adopted` kills `reverse=True` changed to `False` at `:413`. On `b782751`, before those two tests, the #64 `-k` printed `27 passed, 1048 deselected in 2.06s`. The frozen #64 body said 1046 deselected. 1046 is wrong. On this tree the same `-k` printed `27 passed, 1050 deselected in 1.84s`.
+
 ## Session 07 — Wave 12 close prepared (pending Omar close gate)
 
 **Status**: Incomplete (2026-10-10, W12 close, state revision 63). Session 07 is not marked complete in this handoff. Completion is not in effect until CI, Reviewer and Verifier PASS, a Lead Reviewer LEAD PASS, and Omar's explicit close gate. Twelve evidence keys stay false. No evidence key flips because of §11. `shared_databases_built` and `home_dashboard_built` stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `98fc06d2d37b206075b6bc91cf1dc964d2f0258f` is the W13 squash. It is the tip-sync pointer. It is not this commit. The required branch point was `ae2ca6e41a0c6ff87437a53db91feb50bc5a82b3`. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD.

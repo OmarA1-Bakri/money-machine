@@ -371,3 +371,26 @@ D-0029 stores a sha256 of the hub descriptions, the buyer problem, and the flags
 ### Consequences
 
 The ledger still refuses a mismatched caller whose live prose is not the caller's prose (D-0029). A judged caller can still be judged again after a prose edit. W13 did not start the live sandbox. The close records that title-only Eng Ops run. It records the `:145` operand check as equivalent at the public entry. It records `:156` as a survivor when a proof page already exists. In-place repair, commissioning, and the twelve evidence keys stay out.
+
+## D-0032 — Session 07 close is Omar's merge, and the evidence keys stay false
+
+**Status:** accepted 2026-10-10.
+
+### Context
+
+The Session 06 close (`ac6afcfb`, #50) set `session_status` to complete, kept `current_session` on the closed session, appended that session to `completed_sessions`, and advanced `next_session` and `next_prompt`. It also set every Session 06 evidence key true. Session 07's twelve evidence keys are still false. Exit 78 was not lifted. Omar merged #64 himself.
+
+### Decision
+
+Record Session 07 with the Session 06 pointer convention, and do not flip the twelve evidence keys.
+
+- `session_status` is complete. `current_session` stays 7. `completed_sessions` is `[0, 1, 2, 3, 4, 5, 6, 7]`. `next_session` is 8. `next_prompt` is `11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md`. `completion_requires_next_session` is 8.
+- `head_sha` tip-syncs to `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. It is not the commit that contains the state file. `evidence_closure_commit_sha` stays the Session 06 tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap.
+- The twelve evidence keys stay false. `commissioned_agents` stays empty. Exit 78 stays HELD.
+- The close gate is that merge, at 2026-10-10 12:36:46 +0700. Omar's words, relayed by Grok Bot from its chat at 2026-10-10 12:39 ICT: "Yes, my merge is the Session 07 close gate. Fix the Verifier items in a follow-up PR."
+- No Lead Reviewer pass is on record.
+- `validate_completion_transition` still rejects a completion while any evidence key is false. This checked-in record is the operator gate. It is not that CLI transition. State revision 63 to 64. `updated_at` is `2026-10-10T05:36:46Z`, the merge commit time.
+
+### Consequences
+
+Session 08 is named as the next prompt and is not activated. `current_session` stays 7. A later activation would install Session 08's evidence keys and is a separate change. The twelve Session 07 keys stay false, so they are not evidence that the product build or QA is complete.
