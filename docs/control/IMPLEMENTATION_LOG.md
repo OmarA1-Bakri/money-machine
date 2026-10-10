@@ -1,3 +1,21 @@
+## 2026-10-10 — Session 08 W1 round 5: ignorable characters, count claims, and word boundaries
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
+
+This round does not edit `src/money_machine/control/state.py`, `tests/bootstrap/test_control_state.py`, or `docs/control/reviews/2026-10-10-session-08-prompt-integrity.md`. It answers Reviewer review 5478865618 and Verifier comment 6097324904 on `74d536d1`, frozen to five items.
+
+1. `invisible_char` (`listing_text.py`) is true for category Cf and for every `Default_Ignorable_Code_Point`. `has_concealment`, `_visible`, and the secret-link check in `merchandising.py` use it. One test per class covers U+034F, U+FE00–FE0F, U+E0100–E01EF, U+180B–180F, U+17B4/17B5, U+115F/1160/3164/FFA0, and U+E0000–E0FFF, each in identity, buyer problem, hub, feature, variant, dashboard, support, gift, and the secret link.
+2. `500 reviews`, `1,000+ reviews`, `4.9 average rating`, `Rating 4.9`, and `1,000+ orders` are refused in identity, buyer problem, hub, and feature. `Book Review Journal`, `Star Chart Planner`, and hub `Book Reviews` stay allowed.
+3. `etsy_tag` refuses a phrase that starts or ends with `&`, `/`, `+`, `-`, or `|`. `-Bank sync` no longer becomes the tag `bank sync`. `Low-Spend Budget` still gives `low spend budget`.
+4. `_PAGE_NUMBERS` accepts `[\s\-]+` before `page`/`pp` after a number word. `One-Hundred-Page Planner`, `Forty-Two-Page`, `Two Hundred-Page Planner`, and `Hundred-Page Planner` are refused. A layout span (`One page per day`, `One Page Summary`, `4 page weekly layout`) is not a page count; `Four Page Planner` and `12-page starter kit` still are. `200 pgs`, `pg`, and `sheets` are parked and still publish.
+5. Word boundaries are back on the class patterns. `Travel Planner`, `Gravel Bike Log`, `Brave Habits Planner`, hub `Travel Log`, `Room #1 Inventory`, `Goal #1`, `Join 30 Day Challenge`, `Automatic Savings Planner`, `One page per day`, `One Page Summary`, `4 page weekly layout`, `Book Review Journal`, and `Star Chart Planner` publish and pass validation (`test_names_without_a_claim_publish`). `Etsy's #1 Planner`, `Top-Rated Planner`, `Best-Selling Planner`, `Loved by 5,000 teachers`, and `rave reviews` stay refused.
+
+Mutation check: each fix was reverted on a copy of this tree and the focused suites were run. 20 of 20 mutants were killed (`/workspace/p67-logs/r5/mutants-r5.log`). The r4 probe scripts re-run on this tree leave only parked forms: `200 pgs`, `200-pg`, `sheets` and other parked page formats, and the visible separators U+2800, U+0336, and U+200A.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/domain/test_claim_validation.py tests/unit/domain/test_listing_binding.py tests/unit/agents/test_merchandising.py` — FOCUSED_RESULT.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /workspace/p67r5-pytest`: FULL_RESULT. Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those commands ran on the code commit of this round. This paragraph was written after that run.
+
 ## 2026-10-10 — Session 08 W1 round 4: fact text is scanned before rendering
 
 Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD.

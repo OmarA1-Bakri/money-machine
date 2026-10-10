@@ -20,6 +20,7 @@ from money_machine.agents.contracts.merchandising import (
     ListingDraft,
     MerchandisingInput,
     encode_dashboard,
+    encode_free_gift,
     encode_support,
 )
 from money_machine.agents.implementations.merchandising import (
@@ -455,6 +456,12 @@ _PAGE_FACTS = (
     ("base_category", "200\u00a0pages"),
     ("feature", "200+ pages"),
     ("base_category", "**200** pages"),
+    ("identity", "One-Hundred-Page Planner"),
+    ("identity", "Forty-Two-Page"),
+    ("identity", "Two Hundred-Page Planner"),
+    ("buyer_problem", "Hundred-Page Planner"),
+    ("identity", "Four Page Planner"),
+    ("feature", "12-page starter kit"),
 )
 
 
@@ -489,6 +496,125 @@ def test_each_format_character_in_a_fact_is_refused(mark: str) -> None:
 )
 def test_class_paraphrase_in_a_fact_is_refused(kind: str, value: str) -> None:
     _refuse(_bound(kind, value))
+
+
+def _in_field(field: str, value: str) -> MerchandisingInput:
+    """Put one value in one of the eight fact fields the copy shows."""
+    if field in {"identity", "buyer_problem", "feature", "hub", "colour"}:
+        return _bound(field, value)
+    request = consistent_request()
+    if field == "dashboard":
+        dashboard = request.notification_dashboard.model_copy(
+            update={"outputs": (value, "Reminder list")}
+        )
+        return _with_fact_value(
+            request, "dashboard_outputs", encode_dashboard(dashboard)
+        ).model_copy(update={"notification_dashboard": dashboard})
+    if field == "support":
+        support = request.support.model_copy(update={"channel": value})
+        return _with_fact_value(request, "support", encode_support(support)).model_copy(
+            update={"support": support}
+        )
+    if field == "gift":
+        gift = request.free_gift.model_copy(update={"name": value})
+        return _with_fact_value(request, "free_gift", encode_free_gift(gift)).model_copy(
+            update={"free_gift": gift}
+        )
+    raise AssertionError(field)
+
+
+_EIGHT_FIELDS = (
+    "identity",
+    "buyer_problem",
+    "hub",
+    "feature",
+    "colour",
+    "dashboard",
+    "support",
+    "gift",
+)
+
+
+def _refuse_hidden_everywhere(marks: tuple[str, ...]) -> None:
+    for mark in marks:
+        for field in _EIGHT_FIELDS:
+            _refuse(_in_field(field, f"Bestsel{mark}ler"))
+            _refuse(_in_field(field, f"Dai{mark}ly Notes"))
+        hidden = _with_fact_value(
+            consistent_request(), "secret_links", f"https://fixture.notion.site/pl{mark}anner"
+        )
+        with pytest.raises(MerchandisingInputError, match="not one https link"):
+            merchandise(hidden, _MustNotGenerate())
+
+
+def test_comparison_drops_every_ignorable_character() -> None:
+    for mark in ("\u034f", "\ufe0f", "\U000e0100", "\u180b", "\u17b4", "\u3164", "\U000e0001"):
+        assert normalize_text(f"Bestsel{mark}ler") == "bestseller"
+
+
+def test_combining_grapheme_joiner_is_refused() -> None:
+    _refuse_hidden_everywhere(("\u034f",))
+
+
+def test_variation_selectors_are_refused() -> None:
+    _refuse_hidden_everywhere(("\ufe00", "\ufe07", "\ufe0f"))
+
+
+def test_variation_selector_supplement_is_refused() -> None:
+    _refuse_hidden_everywhere(("\U000e0100", "\U000e0150", "\U000e01ef"))
+
+
+def test_mongolian_free_variation_selectors_are_refused() -> None:
+    _refuse_hidden_everywhere(("\u180b", "\u180c", "\u180d", "\u180f"))
+
+
+def test_khmer_inherent_vowels_are_refused() -> None:
+    _refuse_hidden_everywhere(("\u17b4", "\u17b5"))
+
+
+def test_hangul_fillers_are_refused() -> None:
+    _refuse_hidden_everywhere(("\u115f", "\u1160", "\u3164", "\uffa0"))
+
+
+def test_tag_block_and_reserved_ignorables_are_refused() -> None:
+    _refuse_hidden_everywhere(("\U000e0000", "\U000e0001", "\U000e0080", "\U000e0fff"))
+
+
+@pytest.mark.parametrize(
+    "value",
+    ("500 reviews", "1,000+ reviews", "4.9 average rating", "Rating 4.9", "1,000+ orders"),
+)
+@pytest.mark.parametrize("field", ("identity", "buyer_problem", "hub", "feature"))
+def test_review_and_order_counts_are_refused(field: str, value: str) -> None:
+    _refuse(_bound(field, value))
+
+
+@pytest.mark.parametrize(
+    ("kind", "value"),
+    (
+        ("identity", "Travel Planner"),
+        ("identity", "Gravel Bike Log"),
+        ("identity", "Brave Habits Planner"),
+        ("hub", "Travel Log"),
+        ("identity", "Room #1 Inventory"),
+        ("identity", "Goal #1"),
+        ("identity", "Join 30 Day Challenge"),
+        ("identity", "Automatic Savings Planner"),
+        ("feature", "One page per day"),
+        ("identity", "One Page Summary"),
+        ("feature", "4 page weekly layout"),
+        ("identity", "Book Review Journal"),
+        ("identity", "Star Chart Planner"),
+    ),
+)
+def test_names_without_a_claim_publish(kind: str, value: str) -> None:
+    request = _bound(kind, value)
+    copy = merchandise(request)
+    shown = " ".join(
+        (copy.draft.title.text, *(section.text for section in copy.draft.description_sections))
+    )
+    assert value in shown
+    assert validate_claims(copy.draft, request).passed is True
 
 
 def test_review_and_star_nouns_are_allowed() -> None:
@@ -568,6 +694,33 @@ def test_secret_link_stays_on_the_notion_domain() -> None:
 )
 def test_a_symbol_refuses_the_whole_tag(phrase: str) -> None:
     assert etsy_tag(phrase) == ""
+
+
+@pytest.mark.parametrize(
+    "phrase",
+    ("-Bank sync", "- Bank sync", "Bank sync -", "Bank sync /", "+Bank sync", "|Bank sync"),
+)
+def test_an_end_separator_refuses_the_whole_tag(phrase: str) -> None:
+    assert etsy_tag(phrase) == ""
+
+
+def test_an_inner_hyphen_still_joins_tag_words() -> None:
+    assert etsy_tag("Low-Spend Budget") == "low spend budget"
+    assert etsy_tag("Planners & Organizers") == "planners organizers"
+
+
+def test_dash_negated_feature_is_not_published_as_a_tag() -> None:
+    features = (
+        "Hyperlinked navigation",
+        "Interactive checkboxes",
+        "Monthly calendar views",
+        "Weekly spread templates",
+        "-Bank sync",
+    )
+    request = consistent_request(create_fixture_product_spec(features=features))
+    copy = merchandise(request)
+    assert "bank sync" not in {tag.text for tag in copy.draft.tags}
+    assert tuple(tag.text for tag in copy.draft.tags) == _EXPECTED_TAGS
 
 
 def test_negated_feature_is_not_published_as_a_short_tag() -> None:

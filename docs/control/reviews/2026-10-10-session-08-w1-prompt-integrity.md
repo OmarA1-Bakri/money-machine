@@ -167,3 +167,13 @@ Review on tip `04dfb5e5` showed fact text was still rendered when the bad phrase
 2. Page counts in digits, `pp`, and spelled-out number words are the same pattern. The only licensed count is the built page-count fact. Review, sales, trust, social, and automation checks are claims, not the nouns `review` and `star` in a product name. A class fact is exempt from its own pattern.
 3. A tag whose cleaning would drop a symbol is refused whole. `&`, `/`, `+`, `-`, and `|` stay separators, so the category tag remains `planners organizers`. The validator, not only the generator, refuses a tag cited from a claim outside the tag kinds. Secret links must be one `https` URL on `notion.so` or `notion.site`, including subdomains. Other facts may not carry a URL.
 4. This round does not edit `state.py`, `test_control_state.py`, the Wave 0 review file, `IMPLEMENTATION_STATE.json`, or `config/agents.yaml`. It does not edit `src/money_machine/control/` or `tests/bootstrap/`. A10 stays DESIGNED. Session 08 stays inactive.
+
+## 8. Round 5 amendment
+
+Review 5478865618 and Verifier comment 6097324904 on tip `74d536d1` listed five frozen blockers. This amendment is part of the same wave.
+
+1. Concealment means every Unicode `Default_Ignorable_Code_Point` plus category Cf, not Cf alone. That adds the combining grapheme joiner, the variation selectors and their supplement, the Mongolian free variation selectors, the Khmer inherent vowels, the Hangul fillers, and the U+E0000–E0FFF block. The fact scan, the comparison strip, and the secret-link check use one helper, `invisible_char`.
+2. Review and order counts are claims: a number before `reviews` or `ratings`, `rating 4.9`, `average rating`, and `1,000+ orders`. The bare nouns `review`, `rating`, and `star` in a product name stay allowed.
+3. A tag phrase that starts or ends with a separator (`-Bank sync`, `Bank sync -`) is refused whole. Inner separators still join words.
+4. Spelled-out page counts accept a space or a hyphen before the unit, so `One-Hundred-Page` and `Forty-Two-Page` are page counts. A layout span (a singular `page` of at most twelve, then an optional cadence word, then `per`, `layout`, `spread`, `summary`, `view` or `overview`) is not a page count. `200 pgs`, `pg`, and `sheets` are not handled in this round.
+5. Class patterns carry word boundaries again. `#1` is a rank claim after a possessive, an article, `rated`, `ranked`, `voted`, a store name, punctuation, or the start of the text, not after a label like `Room` or `Goal`. `join N` followed by a duration is a challenge name, not social proof. `automatic savings` is a savings method, not an automation claim.

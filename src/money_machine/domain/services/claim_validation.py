@@ -43,33 +43,52 @@ _PAGE_UNIT: Final[str] = r"(?:printable\s+|bonus\s+)?(?:pp|pages?)\b"
 _PAGE_NUMBERS: Final[Pattern[str]] = re.compile(
     rf"(?<!\d)(\d+)\s*[+\-]?\s*{_PAGE_UNIT}"
     rf"|\b((?:(?:over|plus)\s+)?(?:{_NUMBER_WORDS})(?:[\s\-]+(?:{_NUMBER_WORDS}))*)"
-    rf"\s+{_PAGE_UNIT}",
+    rf"[\s\-]+{_PAGE_UNIT}",
     re.IGNORECASE,
 )
+# A layout span ("one page per day", "4 page weekly layout") says how a spread
+# is laid out, not how big the product is: a singular "page" of at most twelve,
+# then an optional cadence word, then a layout noun.
+_LAYOUT_COUNT: Final[Pattern[str]] = re.compile(
+    r"(?:[1-9]|1[0-2]|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)"
+    r"[\s\-]+page"
+)
+_LAYOUT_TAIL: Final[Pattern[str]] = re.compile(
+    r"[\s\-]+(?:(?:daily|weekly|monthly|yearly|annual)\s+)?"
+    r"(?:per|layouts?|spreads?|summary|summaries|views?|overviews?)\b"
+)
 _AUTOMATION: Final[Pattern[str]] = re.compile(
-    r"automat\w*|auto-[\w-]+|unattended|hands-free|hands free|autofill\w*",
+    r"\bautomat(?!ic\s+savings\b)\w*|\bauto-[\w-]+|\bunattended\b|\bhands[-\s]free\b"
+    r"|\bautofill\w*",
     re.IGNORECASE,
 )
 _REVIEW: Final[Pattern[str]] = re.compile(
-    r"top[-\s]?rated|highly reviewed|testimonials?|\brated\b|five-star|rave"
-    r"|(?:\d[\d,]*|five|four|three|two|one)[\s-]*stars?"
-    r"|stars?[\s-]+reviews?",
+    r"\btop[-\s]?rated\b|\bhighly reviewed\b|\btestimonials?\b|\brated\b|\bfive-star\b"
+    r"|\braves?\b"
+    r"|\b(?:\d[\d,]*|five|four|three|two|one)[\s-]*stars?\b"
+    r"|\bstars?[\s-]+reviews?\b"
+    r"|\d[\d,.]*\+?\s*(?:(?:average|avg\.?|customer|buyer|verified)\s+)?(?:reviews?|ratings?)\b"
+    r"|\b(?:reviews?|ratings?)\s*[:=]?\s*\d"
+    r"|\baverage\s+(?:reviews?|ratings?)\b",
     re.IGNORECASE,
 )
 _SALES: Final[Pattern[str]] = re.compile(
-    r"bestsellers?|best-sellers?|best sellers?|bestselling|best-selling|best selling"
-    r"|units sold|\d[\d,]*\s+sold|\d[\d,]*\s+downloads|\d+\s*k\s+downloads"
-    r"|#\s*1|\d[\d,]*\s+orders|orders on file",
+    r"\bbest[-\s]?sell(?:ers?|ing)\b"
+    r"|\bunits sold\b|\d[\d,]*\+?\s+sold\b|\d[\d,]*\+?\s+downloads\b|\d+\s*k\s+downloads\b"
+    r"|(?:^|[^\w\s]\s*|\b(?:the|our|your|a|an|is|rated|ranked|voted|etsy|amazon)\s+|\w['\u2019]s?\s+)"
+    r"#\s*1(?!\d)"
+    r"|\d[\d,]*\+?\s+orders\b|\borders on file\b",
     re.IGNORECASE,
 )
 _TRUST: Final[Pattern[str]] = re.compile(
-    r"trust bars?|trusted by|as seen in|as seen on|money-back|money back"
-    r"|featured in|satisfaction guaranteed",
+    r"\btrust bars?\b|\btrusted by\b|\bas seen (?:in|on)\b|\bmoney[-\s]back\b"
+    r"|\bfeatured in\b|\bsatisfaction guaranteed\b",
     re.IGNORECASE,
 )
 _SOCIAL: Final[Pattern[str]] = re.compile(
-    r"customers love|users say|thousands of|community of\s+\d+|loved by"
-    r"|\d[\d,]*\+?\s+happy customers|join\s+\d[\d,]*\+?",
+    r"\bcustomers love\b|\busers say\b|\bthousands of\b|\bcommunity of\s+\d+|\bloved by\b"
+    r"|\d[\d,]*\+?\s+happy customers\b"
+    r"|\bjoin\s+\d[\d,]*(?![\d,])\+?(?![+\s-]*(?:days?|weeks?|months?|minutes?|hours?)\b)",
     re.IGNORECASE,
 )
 _URL: Final[Pattern[str]] = re.compile(r"https?://|www\.", re.IGNORECASE)
@@ -155,6 +174,18 @@ class ClaimValidation:
     corrections: tuple[ClaimCorrection, ...]
 
 
+def page_counts(folded: str) -> tuple[re.Match[str], ...]:
+    """Page-count mentions in folded text, leaving out layout spans."""
+    return tuple(match for match in _PAGE_NUMBERS.finditer(folded) if not _layout_span(match))
+
+
+def _layout_span(match: re.Match[str]) -> bool:
+    text = match.group(0)
+    if _LAYOUT_COUNT.fullmatch(text) is None:
+        return False
+    return _LAYOUT_TAIL.match(match.string, match.end()) is not None
+
+
 def fact_text_problem(key: str, value: str) -> str | None:
     """Why this fact must not be rendered, or None when the value may be shown.
 
@@ -166,7 +197,7 @@ def fact_text_problem(key: str, value: str) -> str | None:
     if key != "secret_links" and _URL.search(value) is not None:
         return "url"
     folded = normalize_text(value)
-    if key != "page_count" and _PAGE_NUMBERS.search(folded) is not None:
+    if key != "page_count" and page_counts(folded):
         return "page"
     for fact_key, pattern in _CLASS_FACT:
         if key == fact_key:
@@ -240,7 +271,7 @@ def reject_invented_page_count(
     for text, claim_ids, _template, _required in _bound_surfaces(copy):
         folded = normalize_text(text)
         holders = _holding_values(copy, request, claim_ids, "page_count")
-        for match in _PAGE_NUMBERS.finditer(folded):
+        for match in page_counts(folded):
             digits = match.group(1)
             number = digits if digits is not None else match.group(0)
             licensed = any(normalize_text(item) == number for item in holders)

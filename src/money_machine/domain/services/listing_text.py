@@ -1,7 +1,7 @@
 """Fixed listing sentences and the normalization claim checks share.
 
 Buyer-facing text is a template of cited fact values. The generator and the
-validator both call ``render``. Comparison strips markup and format characters,
+validator both call ``render``. Comparison strips markup and invisible characters,
 then folds case, compatibility forms, and Latin lookalikes. A token that mixes
 scripts, or whose letters are all Latin lookalikes, is rejected before that
 fold. A tag that would drop a symbol, or that does not fit in 20 characters,
@@ -54,6 +54,27 @@ _CONFUSABLES: Final[dict[str, str]] = {
 _TITLE_LIMIT: Final = 140
 _MARKUP: Final[Pattern[str]] = re.compile(r"<[^>]*>")
 _TAG_SEPARATORS: Final[frozenset[str]] = frozenset("&/+-|")
+# Unicode DerivedCoreProperties Default_Ignorable_Code_Point. Each range draws
+# nothing, so a forbidden word split by one still reads whole to a buyer.
+_IGNORABLE: Final[tuple[tuple[int, int], ...]] = (
+    (0x00AD, 0x00AD),
+    (0x034F, 0x034F),
+    (0x061C, 0x061C),
+    (0x115F, 0x1160),
+    (0x17B4, 0x17B5),
+    (0x180B, 0x180F),
+    (0x200B, 0x200F),
+    (0x202A, 0x202E),
+    (0x2060, 0x206F),
+    (0x3164, 0x3164),
+    (0xFE00, 0xFE0F),
+    (0xFEFF, 0xFEFF),
+    (0xFFA0, 0xFFA0),
+    (0xFFF0, 0xFFF8),
+    (0x1BCA0, 0x1BCA3),
+    (0x1D173, 0x1D17A),
+    (0xE0000, 0xE0FFF),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,9 +93,17 @@ def normalize_text(value: str) -> str:
     return " ".join(folded.split())
 
 
+def invisible_char(char: str) -> bool:
+    """True for a Cf format character or any Default_Ignorable_Code_Point."""
+    if unicodedata.category(char) == "Cf":
+        return True
+    code = ord(char)
+    return any(low <= code <= high for low, high in _IGNORABLE)
+
+
 def has_concealment(value: str) -> bool:
-    """True when format characters or HTML tags hide the letters buyers read."""
-    if any(unicodedata.category(char) == "Cf" for char in value):
+    """True when invisible characters or HTML tags hide the letters buyers read."""
+    if any(invisible_char(char) for char in value):
         return True
     unescaped = html.unescape(value)
     return _MARKUP.search(value) is not None or _MARKUP.search(unescaped) is not None
@@ -98,7 +127,14 @@ def mixed_script(value: str) -> bool:
 
 
 def etsy_tag(value: str) -> str:
-    """Full lowercase tag, or empty when the phrase drops a symbol or exceeds 20."""
+    """Full lowercase tag, or empty when the phrase drops a symbol or exceeds 20.
+
+    A separator at either end of the phrase (``-Bank sync``) would be dropped
+    with whatever it meant, so the whole tag is refused.
+    """
+    stripped = value.strip()
+    if stripped == "" or stripped[0] in _TAG_SEPARATORS or stripped[-1] in _TAG_SEPARATORS:
+        return ""
     words: list[str] = []
     current: list[str] = []
     for char in value.casefold():
@@ -265,7 +301,7 @@ def _all(slots: tuple[TextSlot, ...], kind: str) -> tuple[str, ...]:
 def _visible(value: str) -> str:
     text = html.unescape(value)
     text = _MARKUP.sub(" ", text)
-    text = "".join(char for char in text if unicodedata.category(char) != "Cf")
+    text = "".join(char for char in text if not invisible_char(char))
     return text.replace("*", "")
 
 

@@ -7,7 +7,6 @@ Notion, or Etsy.
 
 from __future__ import annotations
 
-import unicodedata
 from pathlib import Path
 from typing import Protocol
 from urllib.parse import urlparse
@@ -49,7 +48,7 @@ from money_machine.domain.services.claim_validation import (
     fact_text_problem,
     validate_claims,
 )
-from money_machine.domain.services.listing_text import TextSlot, render
+from money_machine.domain.services.listing_text import TextSlot, invisible_char, render
 
 MAX_CLAIM_ATTEMPTS = 3
 """Initial draft plus two regenerations. The third failure is closed."""
@@ -435,7 +434,7 @@ def _require_one_https_link(value: str) -> None:
     items = fact_items(value)
     parsed = urlparse(value)
     host = (parsed.hostname or "").casefold().rstrip(".")
-    concealed = any(unicodedata.category(char) == "Cf" for char in value)
+    concealed = any(invisible_char(char) for char in value)
     if (
         len(items) != 1
         or items[0] != value
