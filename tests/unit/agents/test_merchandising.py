@@ -769,6 +769,24 @@ def test_year_and_scale_names_fail_closed(identity: str) -> None:
 @pytest.mark.parametrize(
     "identity",
     (
+        "Sold 4 Ways",
+        "Orders 2026 Log",
+        "Orders 2026 Tracker",
+        "Sold 3 Times Journal",
+        "Orders 1-5 Log",
+        "Orders-1 Planner",
+        "Pre-orders 2026 Log",
+        "Back-orders 10 Planner",
+        "Wholesale Orders 2026",
+    ),
+)
+def test_word_first_sold_and_orders_names_fail_closed(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
         "500.reviews",
         "500. reviews",
         "4.9. rating",
@@ -818,7 +836,27 @@ _COUNT_WORDS = ("reviews", "ratings", "sold", "orders")
 def _separator_counts() -> tuple[str, ...]:
     rows = [f"500{sep}{word}" for sep in _COUNT_SEPARATORS for word in _COUNT_WORDS]
     rows.extend(f"{word}{sep}500" for sep in _COUNT_SEPARATORS for word in _COUNT_WORDS)
-    rows.extend(("500 reviews_x", "x_reviews 500"))
+    rows.extend(
+        (
+            "500 reviews_x",
+            "x_reviews 500",
+            # Collapse-word tail `(?![^\W_])` changed to `\b` publishes these.
+            "500.reviews_x",
+            "500_ratings_x",
+            # Collapse-after lead `(?<![^\W_])` changed to `\b` publishes these.
+            "x_reviews.500",
+            "x_sold.500",
+            "x_orders/12",
+            "x_ratings+4.9",
+            # A separator run forced to start on a mark publishes these.
+            "500 . reviews",
+            "500 - reviews",
+            "reviews / 500",
+            "Reviews - 4.9",
+            # The sold/orders word-first lead `(?<![^\W_])` changed to `\b`.
+            "x_sold 500",
+        )
+    )
     return tuple(rows)
 
 
@@ -845,6 +883,10 @@ def test_count_separators_collapse_on_both_sides(identity: str) -> None:
         "RavingFans",
         "500 reviewsX",
         "Xreviews 500",
+        "Sold: 500",
+        "Orders: 12",
+        "500.sold_x",
+        "12-orders_x",
     ),
 )
 def test_parked_count_punctuation_still_publishes(identity: str) -> None:
