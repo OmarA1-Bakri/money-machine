@@ -178,6 +178,24 @@ SESSION_EVIDENCE_KEYS: Mapping[int, frozenset[str]] = MappingProxyType(
                 "evidence_closure_commit_recorded",
             }
         ),
+        8: frozenset(
+            {
+                # Session 08 contract. A future activation installs these all false.
+                # This wave does not activate the session and does not record any key true.
+                "merchandising_agent_implemented",
+                "claim_validation_implemented",
+                "design_tokens_implemented",
+                "creative_asset_agent_implemented",
+                "screenshot_acquisition_implemented",
+                "link_validation_implemented",
+                "asset_lineage_recorded",
+                "asset_storage_implemented",
+                "merchandising_workflow_linked",
+                "merchandising_asset_tests_pass",
+                "control_files_and_checkpoint_current",
+                "evidence_closure_commit_recorded",
+            }
+        ),
     }
 )
 """Each session's completion-evidence contract (D-0010). A session without an entry cannot be
@@ -378,12 +396,36 @@ def _require_same_fields(
             raise ControlStateError(f"unsupported {label}: {field} cannot change")
 
 
+def _require_completed_session_evidence(previous: ControlState) -> None:
+    """Reject activation while the completed session's evidence keys are not all true.
+
+    Session 06 met this rule: its close recorded every evidence key true. No session
+    number is exempt, including session 7.
+    """
+    session = previous["current_session"]
+    if session not in SESSION_EVIDENCE_KEYS:
+        raise ControlStateError(
+            f"unsupported activation: no completion evidence contract for session {session}"
+        )
+    evidence = previous["required_completion_evidence"]
+    if evidence.keys() != SESSION_EVIDENCE_KEYS[session]:
+        raise ControlStateError(
+            f"activation requires exactly the session {session:02d} completion evidence keys"
+        )
+    missing = sorted(key for key, value in evidence.items() if value is not True)
+    if missing:
+        raise ControlStateError(
+            "activation requires every prior-session evidence key to be true: " + ", ".join(missing)
+        )
+
+
 def validate_activation_transition(previous: ControlState, current: ControlState) -> None:
     """Validate the atomic activation of the recorded next session (D-0010).
 
     Activation preserves ``completed_sessions`` and the next-session pointer, moves
     ``current_session`` to ``next_session``, marks the session ``incomplete``, and installs
-    the new session's own (all-false) completion evidence keys.
+    the new session's own (all-false) completion evidence keys. The completed session's
+    evidence keys must already all be true. There is no session exemption.
     """
     if previous["session_status"] != "complete":
         raise ControlStateError(
@@ -409,6 +451,8 @@ def validate_activation_transition(previous: ControlState, current: ControlState
         raise ControlStateError("previous completed_sessions are not contiguous")
     if previous["next_prompt"] != SESSION_PROMPTS[next_session]:
         raise ControlStateError("recorded next_prompt does not identify the canonical prompt")
+
+    _require_completed_session_evidence(previous)
 
     if next_session not in SESSION_EVIDENCE_KEYS:
         raise ControlStateError(

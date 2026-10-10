@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import ast
 import copy
+import inspect
 import json
 import logging
 import os
@@ -1466,3 +1468,299 @@ def test_every_known_session_prompt_has_an_evidence_contract_in_order() -> None:
         "control_files_and_checkpoint_current",
         CLOSURE_EVIDENCE_KEY,
     }
+
+
+# --- Session 08 activation requires prior-session evidence ------------------------------
+
+PRIOR_EVIDENCE_REJECTION = "activation requires every prior-session evidence key to be true"
+SESSION_07_EVIDENCE_KEYS = (
+    "notion_product_builder_implemented",
+    "shared_databases_built",
+    "home_dashboard_built",
+    "notification_dashboard_built",
+    "identity_hubs_built",
+    "variant_builder_implemented",
+    "product_qa_implemented",
+    "product_fact_ledger_persisted",
+    "build_workflow_linked",
+    "product_build_tests_pass",
+    "control_files_and_checkpoint_current",
+    CLOSURE_EVIDENCE_KEY,
+)
+SESSION_08_EVIDENCE_KEYS = (
+    "merchandising_agent_implemented",
+    "claim_validation_implemented",
+    "design_tokens_implemented",
+    "creative_asset_agent_implemented",
+    "screenshot_acquisition_implemented",
+    "link_validation_implemented",
+    "asset_lineage_recorded",
+    "asset_storage_implemented",
+    "merchandising_workflow_linked",
+    "merchandising_asset_tests_pass",
+    "control_files_and_checkpoint_current",
+    CLOSURE_EVIDENCE_KEY,
+)
+
+
+def session_eight_activation_paths(
+    tmp_path: Path, *, prior_evidence_true: bool
+) -> tuple[Path, Path, bytes]:
+    """Build a temp repo whose previous state is the checked-in Session 07 close."""
+    checked_in = STATE_PATH.read_bytes()
+    repo = tmp_path / "repository"
+    state_path = repo / "docs" / "control" / "IMPLEMENTATION_STATE.json"
+    state_path.parent.mkdir(parents=True)
+    state = copy.deepcopy(load_state())
+    assert state["current_session"] == 7
+    assert state["session_status"] == "complete"
+    assert state["next_session"] == 8
+    assert set(state["required_completion_evidence"]) == set(SESSION_07_EVIDENCE_KEYS)
+    assert set(control_state.SESSION_EVIDENCE_KEYS[7]) == set(SESSION_07_EVIDENCE_KEYS)
+    assert set(control_state.SESSION_EVIDENCE_KEYS[8]) == set(SESSION_08_EVIDENCE_KEYS)
+    if prior_evidence_true:
+        state["required_completion_evidence"] = dict.fromkeys(SESSION_07_EVIDENCE_KEYS, True)
+    else:
+        assert all(value is False for value in state["required_completion_evidence"].values())
+    state["repo_root"] = str(repo)
+    state["branch"] = BRANCH
+    write_state(state_path, state)
+    git(repo, "init", "-b", BRANCH)
+    git(repo, "config", "user.name", "Control Test")
+    git(repo, "config", "user.email", "control-test@example.invalid")
+    git(repo, "add", "docs/control/IMPLEMENTATION_STATE.json")
+    git(repo, "commit", "-m", "test fixture")
+    candidate = copy.deepcopy(state)
+    candidate["state_revision"] = state["state_revision"] + 1
+    candidate["session_status"] = "incomplete"
+    candidate["current_session"] = 8
+    candidate["updated_at"] = "2026-10-10T08:00:00Z"
+    candidate["required_completion_evidence"] = dict.fromkeys(SESSION_08_EVIDENCE_KEYS, False)
+    candidate_path = tmp_path / "activation.json"
+    write_state(candidate_path, candidate)
+    return state_path, candidate_path, checked_in
+
+
+def test_session_eight_activation_rejects_false_session_seven_evidence(tmp_path: Path) -> None:
+    """(a) Session 08 activation with every Session 07 evidence key false is rejected."""
+    state_path, candidate_path, checked_in = session_eight_activation_paths(
+        tmp_path, prior_evidence_true=False
+    )
+    original = state_path.read_bytes()
+
+    result = run_transition(state_path, candidate_path, "activate")
+
+    assert result.returncode == 2
+    assert PRIOR_EVIDENCE_REJECTION in result.stderr
+    for key in SESSION_07_EVIDENCE_KEYS:
+        assert key in result.stderr
+    assert state_path.read_bytes() == original
+    assert STATE_PATH.read_bytes() == checked_in
+    assert load_state()["current_session"] == 7
+    assert load_state()["state_revision"] == 64
+
+
+def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: Path) -> None:
+    """(b) The same activation is accepted when every Session 07 evidence key is true."""
+    state_path, candidate_path, checked_in = session_eight_activation_paths(
+        tmp_path, prior_evidence_true=True
+    )
+    before = load_state(state_path)
+
+    result = run_transition(state_path, candidate_path, "activate")
+
+    assert result.returncode == 0, result.stderr
+    after = load_state(state_path)
+    assert after["current_session"] == 8
+    assert after["session_status"] == "incomplete"
+    assert after["completed_sessions"] == before["completed_sessions"]
+    assert after["next_session"] == before["next_session"] == 8
+    assert after["next_prompt"] == before["next_prompt"]
+    assert set(after["required_completion_evidence"]) == set(SESSION_08_EVIDENCE_KEYS)
+    assert not any(after["required_completion_evidence"].values())
+    assert STATE_PATH.read_bytes() == checked_in
+    live = load_state()
+    assert live["current_session"] == 7
+    assert live["next_session"] == 8
+    assert all(value is False for value in live["required_completion_evidence"].values())
+
+
+def _false_key_session_eight_pair() -> tuple[ControlState, ControlState]:
+    previous = copy.deepcopy(load_state())
+    current = copy.deepcopy(previous)
+    current["state_revision"] = previous["state_revision"] + 1
+    current["session_status"] = "incomplete"
+    current["current_session"] = 8
+    current["updated_at"] = "2026-10-10T08:00:00Z"
+    current["required_completion_evidence"] = dict.fromkeys(SESSION_08_EVIDENCE_KEYS, False)
+    return previous, current
+
+
+def _direct_call(statement: ast.stmt) -> bool:
+    return (
+        isinstance(statement, ast.Expr)
+        and isinstance(statement.value, ast.Call)
+        and isinstance(statement.value.func, ast.Name)
+        and statement.value.func.id == "_require_completed_session_evidence"
+    )
+
+
+def _function_mentions_seven(source: str) -> bool:
+    tree = ast.parse(source)
+    return any(isinstance(node, ast.Constant) and node.value == 7 for node in ast.walk(tree))
+
+
+def _activation_without_prior_evidence_call(source: str) -> str:
+    tree = ast.parse(source)
+    function = tree.body[0]
+    assert isinstance(function, ast.FunctionDef)
+    kept: list[ast.stmt] = []
+    removed = 0
+    for statement in function.body:
+        if _direct_call(statement):
+            removed += 1
+            continue
+        kept.append(statement)
+    assert removed == 1
+    function.body = kept
+    return ast.unparse(tree)
+
+
+def _activation_with_session_seven_exemption(source: str) -> str:
+    """Mutant: skip the prior-evidence check when the completed session is 7."""
+    tree = ast.parse(source)
+    function = tree.body[0]
+    assert isinstance(function, ast.FunctionDef)
+    replaced = 0
+    rewritten: list[ast.stmt] = []
+    for statement in function.body:
+        if not _direct_call(statement):
+            rewritten.append(statement)
+            continue
+        replaced += 1
+        comparison = ast.Compare(
+            left=ast.Subscript(
+                value=ast.Name(id="previous", ctx=ast.Load()),
+                slice=ast.Constant(value="current_session"),
+                ctx=ast.Load(),
+            ),
+            ops=[ast.NotEq()],
+            comparators=[ast.Constant(value=7)],
+        )
+        rewritten.append(ast.If(test=comparison, body=[statement], orelse=[]))
+    assert replaced == 1
+    function.body = rewritten
+    ast.fix_missing_locations(tree)
+    return ast.unparse(tree)
+
+
+def _load_activation_mutant(source: str) -> Callable[[ControlState, ControlState], None]:
+    namespace = dict(control_state.validate_activation_transition.__globals__)
+    exec("from __future__ import annotations\n" + source, namespace)
+    mutant = namespace["validate_activation_transition"]
+    assert callable(mutant)
+    return cast(Callable[[ControlState, ControlState], None], mutant)
+
+
+EXACT_SESSION_07_KEYS = "activation requires exactly the session 07 completion evidence keys"
+MISSING_PRIOR_CONTRACT = "unsupported activation: no completion evidence contract for session 9"
+
+
+def _completed_session_evidence(previous: ControlState) -> None:
+    helper = control_state.validate_activation_transition.__globals__[
+        "_require_completed_session_evidence"
+    ]
+    assert callable(helper)
+    cast(Callable[[control_state.ControlState], None], helper)(
+        cast(control_state.ControlState, previous)
+    )
+
+
+def _session_seven_with_evidence(evidence: dict[str, bool]) -> ControlState:
+    state = copy.deepcopy(load_state())
+    assert state["current_session"] == 7
+    state["required_completion_evidence"] = evidence
+    return state
+
+
+def _all_true_session_seven_evidence() -> dict[str, bool]:
+    return dict(zip(SESSION_07_EVIDENCE_KEYS, [True] * len(SESSION_07_EVIDENCE_KEYS), strict=True))
+
+
+def test_prior_evidence_rejects_one_missing_key() -> None:
+    """A subset of the session 07 contract is rejected. Every remaining value is true."""
+    evidence = _all_true_session_seven_evidence()
+    del evidence[SESSION_07_EVIDENCE_KEYS[0]]
+
+    with pytest.raises(control_state.ControlStateError, match=re.escape(EXACT_SESSION_07_KEYS)):
+        _completed_session_evidence(_session_seven_with_evidence(evidence))
+
+
+def test_prior_evidence_rejects_one_extra_key() -> None:
+    """A superset of the session 07 contract is rejected. Every value is true."""
+    evidence = _all_true_session_seven_evidence()
+    evidence["extra_prior_evidence_key"] = True
+
+    with pytest.raises(control_state.ControlStateError, match=re.escape(EXACT_SESSION_07_KEYS)):
+        _completed_session_evidence(_session_seven_with_evidence(evidence))
+
+
+def test_prior_evidence_names_only_the_one_false_key() -> None:
+    """Eleven true keys and one false key reject, and the message names only that key."""
+    false_key = "product_qa_implemented"
+    evidence = _all_true_session_seven_evidence()
+    evidence[false_key] = False
+
+    with pytest.raises(control_state.ControlStateError) as caught:
+        _completed_session_evidence(_session_seven_with_evidence(evidence))
+
+    assert str(caught.value) == f"{PRIOR_EVIDENCE_REJECTION}: {false_key}"
+
+
+def test_missing_prior_contract_fails_closed() -> None:
+    """A previous session with no evidence contract raises ControlStateError, not KeyError."""
+    state = copy.deepcopy(load_state())
+    state["current_session"] = 9
+    state["required_completion_evidence"] = dict.fromkeys(SESSION_07_EVIDENCE_KEYS, True)
+
+    with pytest.raises(control_state.ControlStateError, match=re.escape(MISSING_PRIOR_CONTRACT)):
+        _completed_session_evidence(state)
+
+
+def test_activation_from_session_seven_rejects_false_evidence() -> None:
+    """Behavioural kill of a current_session != 7 wrap. This test does not inspect source."""
+    previous, current = _false_key_session_eight_pair()
+
+    with pytest.raises(control_state.ControlStateError, match=PRIOR_EVIDENCE_REJECTION):
+        control_state.validate_activation_transition(
+            cast(control_state.ControlState, previous),
+            cast(control_state.ControlState, current),
+        )
+
+
+def test_deleting_the_prior_evidence_check_or_a_session_seven_exemption_fails() -> None:
+    """(c) The real check rejects false Session 07 keys. Deletion and the wrap accept them."""
+    activation_source = inspect.getsource(control_state.validate_activation_transition)
+    helper = control_state.validate_activation_transition.__globals__[
+        "_require_completed_session_evidence"
+    ]
+    assert callable(helper)
+    helper_source = inspect.getsource(helper)
+    assert not _function_mentions_seven(activation_source)
+    assert not _function_mentions_seven(helper_source)
+    assert "session == 7" not in activation_source
+    assert "session == 7" not in helper_source
+    parsed = ast.parse(activation_source).body[0]
+    assert isinstance(parsed, ast.FunctionDef)
+    assert sum(1 for statement in parsed.body if _direct_call(statement)) == 1
+
+    previous, current = _false_key_session_eight_pair()
+    parsed_previous = cast(control_state.ControlState, previous)
+    parsed_current = cast(control_state.ControlState, current)
+    with pytest.raises(control_state.ControlStateError, match=PRIOR_EVIDENCE_REJECTION):
+        control_state.validate_activation_transition(parsed_previous, parsed_current)
+
+    deleted = _load_activation_mutant(_activation_without_prior_evidence_call(activation_source))
+    exempt = _load_activation_mutant(_activation_with_session_seven_exemption(activation_source))
+    deleted(previous, current)
+    exempt(previous, current)
