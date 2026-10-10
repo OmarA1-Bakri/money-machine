@@ -1,3 +1,13 @@
+## 2026-10-10 — Session 08 W1 round 2: listing text is bound to cited facts
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD.
+
+This branch merges `da67103731fc03f1b259d9fd83dae0a05c2b1781` (`#66`) with a merge commit. The Wave 0 prompt-integrity file stays `docs/control/reviews/2026-10-10-session-08-prompt-integrity.md`. This wave does not edit that file, `src/money_machine/control/state.py`, or `tests/bootstrap/test_control_state.py`.
+
+Buyer-facing title, description, hero, image-strip, video, and tag text is a fixed template of the claims that line cites. The validator re-renders that template and compares after NFKC, casefold, whitespace collapse, and homoglyph folding. A Latin string that also contains a non-Latin letter is rejected before the fold. The deny-list remains a per-surface backstop. Tags are normalized before the duplicate and length checks.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-r2-pytest`: 12 failed, 3737 passed, 193 skipped, 1 warning in 368.64s. Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those three commands and the pytest run are the tree at `76421d4`. This paragraph was prepended after that run.
+
 ## 2026-10-10 — Session 08 W0: activation requires prior-session evidence
 
 Governance only. Session 08 is not activated. `IMPLEMENTATION_STATE.json` is unchanged: `current_session` stays 7, revision stays 64, and the twelve Session 07 evidence keys stay false. Exit 78 stays HELD. No live HTTP, no Notion, no Etsy.
