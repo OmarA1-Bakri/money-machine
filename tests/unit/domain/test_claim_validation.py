@@ -413,6 +413,117 @@ def test_price_mismatch_cites_the_price_claim() -> None:
     assert _price_sale_correction(forged).claim_id == draft.claims[0].claim_id
 
 
+class _WrapPriceNumbers(_DropPriceTupleField):
+    """Coerce the price and anchor in the price_sale comparison."""
+
+    def __init__(self, mode: str) -> None:
+        super().__init__(0)
+        self.mode = mode
+        self.hits = 0
+
+    def visit_Compare(self, node: ast.Compare) -> ast.AST:
+        if (
+            self._inside
+            and len(node.ops) == 1
+            and isinstance(node.ops[0], ast.Eq)
+            and isinstance(node.left, ast.Tuple)
+            and len(node.comparators) == 1
+            and isinstance(node.comparators[0], ast.Tuple)
+            and len(node.left.elts) == 3
+            and len(node.comparators[0].elts) == 3
+        ):
+            self.hits += 1
+            node.left = _wrap_price_tuple(node.left.elts, self.mode)
+            node.comparators = [_wrap_price_tuple(node.comparators[0].elts, self.mode)]
+        return node
+
+
+def _wrap_price_tuple(elts: list[ast.expr], mode: str) -> ast.Tuple:
+    wrapped = list(elts)
+    for index in (1, 2):
+        wrapped[index] = _coerce_number(elts[index], mode)
+    return ast.Tuple(elts=wrapped, ctx=ast.Load())
+
+
+def _coerce_number(elt: ast.expr, mode: str) -> ast.expr:
+    if mode == "int":
+        return ast.Call(func=ast.Name(id="int", ctx=ast.Load()), args=[elt], keywords=[])
+    text = ast.Call(func=ast.Name(id="str", ctx=ast.Load()), args=[elt], keywords=[])
+    return ast.Subscript(
+        value=text,
+        slice=ast.Slice(upper=ast.Constant(value=3)),
+        ctx=ast.Load(),
+    )
+
+
+def _near_sale(
+    draft: ListingDraft,
+    *,
+    price: Decimal | None = None,
+    anchor_price: Decimal | None = None,
+) -> ListingDraft:
+    update: dict[str, Decimal] = {}
+    if price is not None:
+        update["price"] = price
+    if anchor_price is not None:
+        update["anchor_price"] = anchor_price
+    return draft.model_copy(update={"price_sale": draft.price_sale.model_copy(update=update)})
+
+
+@pytest.mark.parametrize("price", (Decimal("8.90"), Decimal("8.01")))
+def test_price_sale_rejects_a_near_price(price: Decimal) -> None:
+    request, draft = _request_and_draft()
+    assert request.price == Decimal("8.99")
+    outcome = validate_claims(_near_sale(draft, price=price), request)
+    assert outcome.passed is False
+    assert _price_sale_correction(outcome).rejection_class == "unknown_fact"
+
+
+@pytest.mark.parametrize("anchor", (Decimal("8.90"), Decimal("8.01")))
+def test_price_sale_rejects_a_near_anchor(anchor: Decimal) -> None:
+    request, draft = _request_and_draft()
+    request = request.model_copy(update={"price": Decimal("8.00"), "anchor_price": Decimal("8.99")})
+    outcome = validate_claims(
+        _near_sale(draft, price=Decimal("8.00"), anchor_price=anchor), request
+    )
+    assert outcome.passed is False
+    assert _price_sale_correction(outcome).rejection_class == "unknown_fact"
+
+
+def test_int_price_coercion_accepts_eight_cents_off() -> None:
+    request, draft = _request_and_draft()
+    copy = _near_sale(draft, price=Decimal("8.01"))
+    assert validate_claims(copy, request).passed is False
+    coerce = _WrapPriceNumbers("int")
+    mutant = _load_mutant(coerce, "price_int")
+    assert coerce.hits == 1
+    forged = cast(ClaimValidation, mutant(copy, request))
+    assert forged.passed is True
+    anchored = request.model_copy(
+        update={"price": Decimal("8.00"), "anchor_price": Decimal("8.99")}
+    )
+    anchor_copy = _near_sale(draft, price=Decimal("8.00"), anchor_price=Decimal("8.01"))
+    assert validate_claims(anchor_copy, anchored).passed is False
+    assert cast(ClaimValidation, mutant(anchor_copy, anchored)).passed is True
+
+
+def test_three_character_price_coercion_accepts_eight_ninety() -> None:
+    request, draft = _request_and_draft()
+    copy = _near_sale(draft, price=Decimal("8.90"))
+    assert validate_claims(copy, request).passed is False
+    coerce = _WrapPriceNumbers("prefix")
+    mutant = _load_mutant(coerce, "price_prefix")
+    assert coerce.hits == 1
+    forged = cast(ClaimValidation, mutant(copy, request))
+    assert forged.passed is True
+    anchored = request.model_copy(
+        update={"price": Decimal("8.00"), "anchor_price": Decimal("8.99")}
+    )
+    anchor_copy = _near_sale(draft, price=Decimal("8.00"), anchor_price=Decimal("8.90"))
+    assert validate_claims(anchor_copy, anchored).passed is False
+    assert cast(ClaimValidation, mutant(anchor_copy, anchored)).passed is True
+
+
 def test_price_mismatch_without_a_price_claim_uses_the_first_claim() -> None:
     request, draft = _request_and_draft()
     claims = tuple(claim for claim in draft.claims if claim.kind != "price")

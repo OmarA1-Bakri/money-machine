@@ -71,32 +71,44 @@ _LAYOUT_WORD_VALUE: Final[dict[str, int]] = {
 # boundaries. The exact name "Automatic Savings Planner" is exempt in
 # ``_fact_mentions_automation``; this pattern itself does not skip a prefix.
 _AUTOMATION: Final[Pattern[str]] = re.compile(
-    r"automat\w*|\bauto-[\w-]+|\bunattended\b|\bhands[-\s]free\b|autofill\w*",
+    r"automat\w*|\bauto-[\w-]+|\bunattended|\bhands[-\s]free\b|autofill\w*",
     re.IGNORECASE,
 )
 _SAVINGS_NAME: Final[str] = "automatic savings planner"
 _EXACT_SAVINGS: Final[Pattern[str]] = re.compile(rf"\b{_SAVINGS_NAME}\b")
+# A year beside singular ``review`` is not a count. 1900 and 2000 stay counts.
+# A following ``+``, ``k``, digit, or decimal is still a count. A sentence
+# period is not. A scale is only 0 or 1 through 5, 10, or 100.
+# ``_`` and ``.`` join tokens.
+_REVIEW_YEAR: Final[str] = r"(?:19|20)(?!00)\d\d"
+_REVIEW_SCALE: Final[str] = r"(?:0|1)\s*[-\s]\s*(?:5|10|100)\b"
 _REVIEW: Final[Pattern[str]] = re.compile(
-    r"top[-\s]?rated|\bhighly reviewed\b|testimonials?|\brated\b|\bfive-star\b"
-    r"|\brav(?:e[sd]?|ing)\b"
-    r"|\b(?:\d[\d,]*|five|four|three|two|one)[\s-]*stars?\b"
-    r"|\bstars?[\s-]+reviews?\b"
-    r"|(?<![\d.])(?!(?:19|20)\d\d\s+review\b)"
-    r"\d[\d,]*(?:\.\d+)?\s*k?\+?\s*"
-    r"(?:(?:average|avg\.?|customer|buyer|verified)\s+)?(?:reviews?|ratings?)\b"
-    r"|\b(?:reviews?|ratings?)\s*[:=]?\s*(?!(?:19|20)\d\d\b)(?!\d+\s*[-\s]\s*\d)\d"
-    r"|\baverage\s+(?:reviews?|ratings?)\b",
+    rf"top[-\s_.]?rated|\bhighly reviewed\b|testimonials?|\brated\b|\bfive-star\b"
+    rf"|\brav(?:ing|es|ed|e)(?:reviews?|(?!\w))"
+    rf"|\b(?:\d[\d,]*|five|four|three|two|one)[\s-]*stars?"
+    rf"|\bstars?[\s-]+reviews?\b"
+    rf"|(?<![\d.])(?!{_REVIEW_YEAR}\s+review\b(?![\d+k]|[.,]\d))"
+    rf"\d[\d,]*(?:\.\d+)?\s*k?\+?\s*"
+    rf"(?:(?:average|avg\.?|customer|buyer|verified)\s+)?(?:reviews?|ratings?)\b"
+    rf"|\breview\s*[:=]\s*\d"
+    rf"|\breview\s+(?!{_REVIEW_YEAR}(?![\d+k]|[.,]\d))\d"
+    rf"|\breviews\s*[:=]?\s*(?!{_REVIEW_SCALE})\d"
+    rf"|\bratings?\s*[:=]?\s*(?!{_REVIEW_SCALE})\d"
+    rf"|\baverage\s+(?:reviews?|ratings?)\b",
     re.IGNORECASE,
 )
 # ``#1`` is a rank claim except immediately after room, goal, step, part, week,
-# or day. Those labels are still rank claims when on, in, pick, or seller follows.
+# day, book, level, chapter, or lap. A label is still a rank claim when on, in,
+# pick, or seller follows, including after a hyphen or comma. ``#01`` is ``#1``.
 _SALES: Final[Pattern[str]] = re.compile(
-    r"best[-\s]?sell(?:ers?|ing)"
-    r"|\bunits sold\b|\d[\d,]*(?:\.\d+)?\s*k?\+?\s+sold\b"
+    r"best[-\s_.]?sell(?:ers?|ing)"
+    r"|\bunits sold\b|(?<![\d.])\d[\d,]*(?:\.\d+)?\s*k?\+?\s+sold\b"
     r"|\d[\d,]*\+?\s+downloads\b|\d+\s*k\s+downloads\b"
-    r"|(?<!\b(?:room|goal|step|part|week)\s)(?<!\bday\s)#\s*1(?!\d)"
-    r"|#\s*1(?!\d)\s+(?:on|in|pick|seller)\b"
-    r"|\d[\d,]*(?:\.\d+)?\s*k?\+?\s+orders\b|\borders on file\b",
+    r"|(?<!\b(?:room|goal|step|part|week|book)\s)"
+    r"(?<!\blevel\s)(?<!\bchapter\s)(?<!\b(?:day|lap)\s)"
+    r"#\s*0*1(?!\d)"
+    r"|#\s*0*1(?!\d)[\s\-,]+(?:on|in|pick|seller)\b"
+    r"|(?<![\d.])\d[\d,]*(?:\.\d+)?\s*k?\+?\s+orders\b|\borders on file\b",
     re.IGNORECASE,
 )
 _TRUST: Final[Pattern[str]] = re.compile(
@@ -226,14 +238,18 @@ def _layout_span(match: re.Match[str], built_count: int | None) -> bool:
 
 
 def _fact_mentions_automation(folded: str) -> bool:
-    """True when a fact other than the exact savings name states automation.
+    """True when a fact item other than the exact savings name states automation.
 
-    The whole fact ``automatic savings planner`` is the product name. Any
-    longer fact is scanned in full, so a trailing probe still matches.
+    List facts are pipe-joined. Each item is compared on its own, so one hub
+    or channel may be the product name while the other items are still probed.
+    A longer item is scanned in full.
     """
-    if folded == _SAVINGS_NAME:
-        return False
-    return _AUTOMATION.search(folded) is not None
+    for item in fact_items(folded):
+        if item == _SAVINGS_NAME:
+            continue
+        if _AUTOMATION.search(item) is not None:
+            return True
+    return False
 
 
 def _prose_automation_text(folded: str) -> str:

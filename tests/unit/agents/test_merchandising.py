@@ -628,9 +628,14 @@ def test_review_and_order_counts_are_refused(field: str, value: str) -> None:
         ("identity", "Part #1"),
         ("identity", "Week #1"),
         ("identity", "Day #1"),
+        ("identity", "Chapter #1"),
+        ("identity", "Book #1"),
+        ("identity", "Level #1"),
+        ("identity", "Lap #1 Running"),
         ("identity", "Year in Review 2026"),
         ("identity", "2026 Review"),
         ("identity", "Rating 1-10 Mood"),
+        ("identity", "#10 Planner"),
     ),
 )
 def test_names_without_a_claim_publish(kind: str, value: str) -> None:
@@ -701,6 +706,116 @@ def test_rank_number_one_in_a_name_is_refused(identity: str) -> None:
 )
 def test_joined_claim_stems_are_refused(identity: str) -> None:
     _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        "Reviews: 2000",
+        "Reviews 2000+",
+        "Ratings: 1999",
+        "Ratings = 2024",
+        "Reviews 2 500",
+        "Reviews 12 000",
+        "Rating 4 9",
+        "Rating 5-5",
+        "2000 review",
+    ),
+)
+def test_year_and_range_exceptions_do_not_hide_counts(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        "RaveReviews",
+        "5StarPlanner",
+        "FiveStarPlanner",
+        "Unattendedsync",
+        "top_rated",
+        "Best_seller",
+        "best.seller",
+        "raving fans",
+    ),
+)
+def test_joined_review_and_sales_forms_are_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        "#01 Planner",
+        "#1-on Etsy",
+        "#1, on Etsy",
+        "# 1 Planner",
+        "Room #1-on Etsy",
+        "Goal #1, on Etsy",
+    ),
+)
+def test_rank_punctuation_is_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    ("10 k reviews", "2.5k sold", "1.5k orders", "5k+ sold"),
+)
+def test_count_spacing_and_sold_forms_are_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "field",
+    ("hub", "feature", "colour", "dashboard", "support", "gift"),
+)
+def test_automatic_savings_planner_publishes_in_each_list_field(field: str) -> None:
+    name = "Automatic Savings Planner"
+    if field == "hub":
+        # Keep the six tag-producing hubs. The name is one extra item, so the
+        # fact stays a pipe-joined list and still has to be checked per item.
+        request = consistent_request(
+            create_fixture_product_spec(
+                hubs=(
+                    "Daily Planning",
+                    "Goal Tracking",
+                    "Habit Builder",
+                    "Budget Tracker",
+                    "Meal Planner",
+                    "Fitness Log",
+                    name,
+                )
+            )
+        )
+    elif field == "colour":
+        request = consistent_request(
+            create_fixture_product_spec(
+                colour_variants=("Sage Green", "Navy Blue", "Rose Gold", name)
+            )
+        )
+    else:
+        request = _in_field(field, name)
+    copy = merchandise(request)
+    shown = " ".join(
+        (
+            copy.draft.title.text,
+            *(section.text for section in copy.draft.description_sections),
+        )
+    )
+    assert "Automatic Savings Planner" in shown
+    assert validate_claims(copy.draft, request).passed is True
+
+
+def test_twelve_page_overview_publishes_when_the_built_count_is_twelve() -> None:
+    request = _with_built_pages(_bound("identity", "Twelve page overview"), 12)
+    copy = merchandise(request)
+    assert "Twelve page overview" in copy.draft.title.text
+    assert validate_claims(copy.draft, request).passed is True
+
+
+def test_thirteen_page_layout_is_refused_when_the_built_count_is_twelve() -> None:
+    _refuse(_with_built_pages(_bound("identity", "13 page layout"), 12))
 
 
 @pytest.mark.parametrize(
