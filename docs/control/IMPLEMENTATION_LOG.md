@@ -2,7 +2,7 @@
 
 Governance only. Session 08 is not activated. `IMPLEMENTATION_STATE.json` is unchanged: `current_session` stays 7, revision stays 64, and the twelve Session 07 evidence keys stay false. Exit 78 stays HELD. No live HTTP, no Notion, no Etsy.
 
-`validate_activation_transition` now rejects activation of session N+1 unless session N's evidence keys are exactly its contract and every value is true. No session number is exempt. The Session 08 evidence contract is defined so a candidate that installs those keys, all false, is accepted only after the twelve Session 07 keys are true. Those Session 08 keys are not written into the state file.
+On `00b952a8`, `validate_activation_transition` never checked the completed session's evidence keys. A 0→1 activation with every key false was accepted. A Session 08 candidate was rejected earlier, with `unsupported activation: no completion evidence contract for session 8`, because `SESSION_EVIDENCE_KEYS` ended at 7. Adding that contract alone would have accepted the candidate while every Session 07 key was false. This change adds the Session 08 contract and the prior-evidence check. Activation of session N+1 requires session N's keys to be exactly its contract and every value true. No session number is exempt. Those Session 08 keys are not written into the state file. A candidate that installs them, all false, is accepted only after the twelve Session 07 keys are true.
 
 Prompt integrity is `docs/control/reviews/2026-10-10-session-08-prompt-integrity.md`. The prompt file is unchanged. SHA-256 `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
 

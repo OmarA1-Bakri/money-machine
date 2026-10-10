@@ -1470,7 +1470,7 @@ def test_every_known_session_prompt_has_an_evidence_contract_in_order() -> None:
     }
 
 
-# --- Session 08 activation requires Session 07 evidence (no session==7 exemption) ---------
+# --- Session 08 activation requires prior-session evidence ------------------------------
 
 PRIOR_EVIDENCE_REJECTION = "activation requires every prior-session evidence key to be true"
 SESSION_07_EVIDENCE_KEYS = (
@@ -1662,8 +1662,84 @@ def _load_activation_mutant(source: str) -> Callable[[ControlState, ControlState
     return cast(Callable[[ControlState, ControlState], None], mutant)
 
 
+EXACT_SESSION_07_KEYS = "activation requires exactly the session 07 completion evidence keys"
+MISSING_PRIOR_CONTRACT = "unsupported activation: no completion evidence contract for session 9"
+
+
+def _completed_session_evidence(previous: ControlState) -> None:
+    helper = control_state.validate_activation_transition.__globals__[
+        "_require_completed_session_evidence"
+    ]
+    assert callable(helper)
+    cast(Callable[[control_state.ControlState], None], helper)(
+        cast(control_state.ControlState, previous)
+    )
+
+
+def _session_seven_with_evidence(evidence: dict[str, bool]) -> ControlState:
+    state = copy.deepcopy(load_state())
+    assert state["current_session"] == 7
+    state["required_completion_evidence"] = evidence
+    return state
+
+
+def _all_true_session_seven_evidence() -> dict[str, bool]:
+    return dict(zip(SESSION_07_EVIDENCE_KEYS, [True] * len(SESSION_07_EVIDENCE_KEYS), strict=True))
+
+
+def test_prior_evidence_rejects_one_missing_key() -> None:
+    """A subset of the session 07 contract is rejected. Every remaining value is true."""
+    evidence = _all_true_session_seven_evidence()
+    del evidence[SESSION_07_EVIDENCE_KEYS[0]]
+
+    with pytest.raises(control_state.ControlStateError, match=re.escape(EXACT_SESSION_07_KEYS)):
+        _completed_session_evidence(_session_seven_with_evidence(evidence))
+
+
+def test_prior_evidence_rejects_one_extra_key() -> None:
+    """A superset of the session 07 contract is rejected. Every value is true."""
+    evidence = _all_true_session_seven_evidence()
+    evidence["extra_prior_evidence_key"] = True
+
+    with pytest.raises(control_state.ControlStateError, match=re.escape(EXACT_SESSION_07_KEYS)):
+        _completed_session_evidence(_session_seven_with_evidence(evidence))
+
+
+def test_prior_evidence_names_only_the_one_false_key() -> None:
+    """Eleven true keys and one false key reject, and the message names only that key."""
+    false_key = "product_qa_implemented"
+    evidence = _all_true_session_seven_evidence()
+    evidence[false_key] = False
+
+    with pytest.raises(control_state.ControlStateError) as caught:
+        _completed_session_evidence(_session_seven_with_evidence(evidence))
+
+    assert str(caught.value) == f"{PRIOR_EVIDENCE_REJECTION}: {false_key}"
+
+
+def test_missing_prior_contract_fails_closed() -> None:
+    """A previous session with no evidence contract raises ControlStateError, not KeyError."""
+    state = copy.deepcopy(load_state())
+    state["current_session"] = 9
+    state["required_completion_evidence"] = dict.fromkeys(SESSION_07_EVIDENCE_KEYS, True)
+
+    with pytest.raises(control_state.ControlStateError, match=re.escape(MISSING_PRIOR_CONTRACT)):
+        _completed_session_evidence(state)
+
+
+def test_activation_from_session_seven_rejects_false_evidence() -> None:
+    """Behavioural kill of a current_session != 7 wrap. This test does not inspect source."""
+    previous, current = _false_key_session_eight_pair()
+
+    with pytest.raises(control_state.ControlStateError, match=PRIOR_EVIDENCE_REJECTION):
+        control_state.validate_activation_transition(
+            cast(control_state.ControlState, previous),
+            cast(control_state.ControlState, current),
+        )
+
+
 def test_deleting_the_prior_evidence_check_or_a_session_seven_exemption_fails() -> None:
-    """(c) The real check rejects false Session 07 keys; both mutants accept them."""
+    """(c) The real check rejects false Session 07 keys. Deletion and the wrap accept them."""
     activation_source = inspect.getsource(control_state.validate_activation_transition)
     helper = control_state.validate_activation_transition.__globals__[
         "_require_completed_session_evidence"

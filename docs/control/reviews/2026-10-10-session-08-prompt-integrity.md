@@ -18,7 +18,7 @@ The prompt file is not amended. This record is the corrective addendum.
 
 ## 2. Three-dimensional review
 
-The operator instruction for this wave is not the session prompt. It is a governance slice: remove the hole that lets Session 08 activation succeed while every Session 07 evidence key is false.
+The operator instruction for this wave is not the session prompt. It is a governance slice. On `00b952a8` the validator never checked prior-session evidence for any session: a 0→1 activation with every key false was accepted. A Session 08 candidate was rejected earlier, with `unsupported activation: no completion evidence contract for session 8`, because `SESSION_EVIDENCE_KEYS` ended at 7. Adding that contract alone would have exposed the hole. This wave adds both the contract and the check.
 
 ### Fidelity
 
@@ -71,10 +71,10 @@ The operator instruction for this wave is not the session prompt. It is a govern
 
 **Verdict:** CONDITIONAL APPROVE. One high finding, resolved by the addendum.
 
-**G-01 [HIGH] — A session==7 exemption or a deleted check satisfies a careless reading**
+**G-01 [HIGH] — Deleting the new check, or wrapping it, satisfies a careless reading**
 
-- **Cheap fake:** Keep `if session == 7: skip` inside `validate_activation_transition`, or delete the new check and point at the missing-contract error or at the continuity pin.
-- **Ungameable for this wave:** Session 08 activation with the twelve Session 07 keys false is rejected by the CLI and names those keys. The same candidate with those keys true is accepted and installs the Session 08 contract all false. A mutant that deletes the check, and a mutant that wraps it in `current_session != 7`, accept the false-key candidate. The real function rejects it. The function source contains no constant `7`. No Session 07 evidence key is flipped. `current_session` stays 7.
+- **Cheap fake:** Delete the prior-evidence call, or wrap it in `current_session != 7`. The base validator has no `session == 7` branch. The continuity pin is the only `session == 7` branch, and it is a test. Pointing at the old missing-contract error, or at that pin, does not prove the new check.
+- **Ungameable for this wave:** Session 08 activation with the twelve Session 07 keys false is rejected by the CLI and names those keys. The same candidate with those keys true is accepted and installs the Session 08 contract all false. A mutant that deletes the check, and a mutant that wraps it in `current_session != 7`, accept the false-key candidate. The real function rejects it. Direct tests also reject one missing key, one extra key, exactly one false key (and name only that key), and a previous session with no contract (`ControlStateError`, not `KeyError`). A behavioural call, with no source inspection, rejects the session-7 false-key pair, so the wrap fails that test. No Session 07 evidence key is flipped. `current_session` stays 7.
 
 ## 3. Corrective addendum
 
@@ -95,7 +95,7 @@ This addendum governs Wave 0. The prompt remains the unamended source of record.
    - `merchandising_asset_tests_pass`
    - `control_files_and_checkpoint_current`
    - `evidence_closure_commit_recorded`
-4. Killing tests: (a) Session 08 activation with the twelve Session 07 keys false is rejected; (b) with those keys true it is accepted; (c) deleting the check, or reinstating a session-7 exemption, fails a test.
+4. Killing tests: (a) Session 08 activation with the twelve Session 07 keys false is rejected; (b) with those keys true it is accepted; (c) deleting the check, or wrapping it in `current_session != 7`, fails a test. Direct tests reject a missing key, an extra key, exactly one false key (naming only that key), and a previous session with no evidence contract (`ControlStateError`, not `KeyError`).
 5. Do not flip an evidence key. Do not change `current_session`, `next_session`, `next_prompt`, `session_status`, `completed_sessions`, or `state_revision`. Do not activate Session 08. Exit 78 stays HELD.
 6. Do not weaken an existing activation or completion check.
 7. No live HTTP, no Notion, no Etsy, no product code under `src/` except the control-state validator module.
