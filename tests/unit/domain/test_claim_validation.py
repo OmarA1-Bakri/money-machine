@@ -222,6 +222,42 @@ def _replaced_problem(old: str, new: str, label: str) -> Callable[..., str | Non
     return cast(Callable[..., str | None], problem)
 
 
+class _PrependPattern(ast.NodeTransformer):
+    """Prefix one pattern constant. The current pattern text is not an anchor."""
+
+    def __init__(self, name: str, prefix: str) -> None:
+        self.name = name
+        self.prefix = prefix
+        self.hits = 0
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> ast.AST:
+        if isinstance(node.target, ast.Name) and node.target.id == self.name:
+            self.hits += 1
+            node.value = _prepend_str(node.value, self.prefix)
+        return self.generic_visit(node)
+
+
+def _prepend_pattern(name: str, prefix: str, label: str) -> Callable[..., str | None]:
+    """Put ``prefix`` on the named pattern constant, whatever its current text is."""
+    prepend = _PrependPattern(name, prefix)
+    updated = prepend.visit(ast.parse(_VALIDATOR.read_text(encoding="utf-8")))
+    if prepend.hits != 1 or not isinstance(updated, ast.Module):
+        raise AssertionError(f"{label} matched {prepend.hits}")
+    problem = _exec_mutant(updated, label).__dict__["fact_text_problem"]
+    if not callable(problem):
+        raise AssertionError(label)
+    return cast(Callable[..., str | None], problem)
+
+
+def _prepend_str(node: ast.expr | None, prefix: str) -> ast.expr:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return ast.Constant(value=prefix + node.value)
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        node.left = _prepend_str(node.left, prefix)
+        return node
+    raise AssertionError(f"pattern node {type(node).__name__}")
+
+
 def _mutant_validate(rule: str) -> Callable[..., object]:
     drop = _DropCall(rule)
     validate = _load_mutant(drop, rule)
@@ -546,24 +582,24 @@ def test_int_price_coercion_accepts_eight_cents_off() -> None:
     assert cast(ClaimValidation, mutant(anchor_copy, anchored)).passed is True
 
 
-_YEAR_BEFORE = r"(?<![\d.])\d[\d,]*(?:\.\d+)?\s*k?\+?\s*"
-_YEAR_EXEMPT = r"(?<![\d.])(?!(?:19|20)\d\d\s+review\b)\d[\d,]*(?:\.\d+)?\s*k?\+?\s*"
-_SCALE_AFTER = r"\breviews?\s*[:=]?\s*\d|\bratings?\s*[:=]?\s*\d"
-_SCALE_EXEMPT = (
-    r"\breviews?\s*[:=]?\s*(?!(?:0|1)\s*[-\s]\s*(?:5|10|100)\b)\d"
-    r"|\bratings?\s*[:=]?\s*(?!(?:0|1)\s*[-\s]\s*(?:5|10|100)\b)\d"
-)
 _RANK_FOLLOWER = r"#\s*0*1(?!\d)[\s\-,]+(?:on|in|pick|seller)\b"
 _RANK_FOLLOWER_BARE = r"#\s*1(?!\d)[\s\-,]+(?:on|in|pick|seller)\b"
+_YEAR_GUARD = r"(?<!\d)(?!(?:19|20)\d\d[\s._/\-]*review(?![^\W_]))"
+_SCALE_GUARD = (
+    r"(?!(?:reviews?|ratings?)[\s._/\-]*[:=]?[\s._/\-]*"
+    r"(?:0|1)[\s._/\-]*(?:5|10|100)(?![^\W_]))"
+)
 
 
 def test_readding_a_review_exemption_publishes_a_count() -> None:
     assert fact_text_problem("identity", "1999 review", page_count=42) == "class"
     assert fact_text_problem("identity", "Reviews 1 100", page_count=42) == "class"
-    year = _replaced_problem(_YEAR_BEFORE, _YEAR_EXEMPT, "review_year")
+    year = _prepend_pattern("_REVIEW_BEFORE", _YEAR_GUARD, "review_year")
     assert year("identity", "1999 review", page_count=42) is None
-    scale = _replaced_problem(_SCALE_AFTER, _SCALE_EXEMPT, "review_scale")
+    assert year("identity", "500 reviews", page_count=42) == "class"
+    scale = _prepend_pattern("_REVIEW_AFTER", _SCALE_GUARD, "review_scale")
     assert scale("identity", "Reviews 1 100", page_count=42) is None
+    assert scale("identity", "Reviews 500", page_count=42) == "class"
 
 
 @pytest.mark.parametrize(

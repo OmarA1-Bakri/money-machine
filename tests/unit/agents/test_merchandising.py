@@ -769,7 +769,28 @@ def test_year_and_scale_names_fail_closed(identity: str) -> None:
 @pytest.mark.parametrize(
     "identity",
     (
+        "500.reviews",
+        "500. reviews",
+        "4.9. rating",
+        "1,000. ratings",
+        "2026.reviews",
+        "Planner.500 reviews",
+        "Notes...500 reviews",
+        "Planner.500 sold",
+        "Gift.500 orders",
+        "500.sold",
+        "500. sold",
+    ),
+)
+def test_dotted_counts_are_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
         "RaveReviews",
+        "Raves",
         "5StarPlanner",
         "FiveStarPlanner",
         "Unattendedsync",

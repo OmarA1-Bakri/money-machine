@@ -76,16 +76,15 @@ _AUTOMATION: Final[Pattern[str]] = re.compile(
 )
 _SAVINGS_NAME: Final[str] = "automatic savings planner"
 _EXACT_SAVINGS: Final[Pattern[str]] = re.compile(rf"\b{_SAVINGS_NAME}\b")
-# A review or rating word next to a number is a count. There is no year
-# exemption and no rating-scale exemption. ``_`` and ``.`` join tokens, so
-# "120_reviews", "120.reviews", "reviews_120", and "rating.5" all count.
+# A digit run joined to review(s) or rating(s) by spaces, ".", "_", "/", or
+# "-" is a count, in either direction. ":" or "=" may sit between the word
+# and the digit. There is no year exemption and no rating-scale exemption.
+# A letter or digit glued to the far side of the word is not this count.
 _REVIEW_BEFORE: Final[str] = (
-    r"(?<![\d.])\d[\d,]*(?:\.\d+)?[\s_.]*k?\+?[\s_.]*"
-    r"(?:(?:average|avg\.?|customer|buyer|verified)[\s_.]+)?(?:reviews?|ratings?)\b"
+    r"\d[\d,]*(?:\.\d+)?\s*k?\+?[\s._/\-]*"
+    r"(?:(?:average|avg\.?|customer|buyer|verified)[\s._/\-]+)?(?:reviews?|ratings?)(?![^\W_])"
 )
-_REVIEW_AFTER: Final[str] = (
-    r"\breviews?[\s_.]*[:=]?[\s_.]*\d|\bratings?[\s_.]*[:=]?[\s_.]*\d"
-)
+_REVIEW_AFTER: Final[str] = r"(?<![^\W_])(?:reviews?|ratings?)[\s._/\-]*[:=]?[\s._/\-]*\d"
 _REVIEW: Final[Pattern[str]] = re.compile(
     rf"top[-\s_.]?rated|\bhighly reviewed\b|testimonials?|\brated\b|\bfive-star\b"
     rf"|\brav(?:ing|es|ed|e)(?:reviews?|(?!\w))"
@@ -101,13 +100,13 @@ _REVIEW: Final[Pattern[str]] = re.compile(
 # pick, or seller follows, including after a hyphen or comma. ``#01`` is ``#1``.
 _SALES: Final[Pattern[str]] = re.compile(
     r"best[-\s_.]?sell(?:ers?|ing)"
-    r"|\bunits sold\b|(?<![\d.])\d[\d,]*(?:\.\d+)?\s*k?\+?\s+sold\b"
+    r"|\bunits sold\b|\d[\d,]*(?:\.\d+)?\s*k?\+?[\s._/\-]+sold\b"
     r"|\d[\d,]*\+?\s+downloads\b|\d+\s*k\s+downloads\b"
     r"|(?<!\b(?:room|goal|step|part|week|book)\s)"
     r"(?<!\blevel\s)(?<!\bchapter\s)(?<!\b(?:day|lap)\s)"
     r"#\s*0*1(?!\d)"
     r"|#\s*0*1(?!\d)[\s\-,]+(?:on|in|pick|seller)\b"
-    r"|(?<![\d.])\d[\d,]*(?:\.\d+)?\s*k?\+?\s+orders\b|\borders on file\b",
+    r"|\d[\d,]*(?:\.\d+)?\s*k?\+?[\s._/\-]+orders\b|\borders on file\b",
     re.IGNORECASE,
 )
 _TRUST: Final[Pattern[str]] = re.compile(
