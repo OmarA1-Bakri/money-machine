@@ -13,6 +13,8 @@
 | Live-pid extending temp | `test_live_pid_extending_temp_is_not_adopted`. Stock: names `['published']`, bytes unchanged, temp kept, 0 writes. Deleting `_pid_alive` at `notion_progress.py:408`: names `['published', 'duplicate_button']` | PASS on stock. Fails under the :408 deletion |
 | Newest dead extension | `test_newest_dead_extension_is_adopted`. Stock stores `published`, `duplicate_button`, and `search_indexing` and leaves the older temp. `reverse=False` at `:413` stores `['published', 'duplicate_button']` and leaves the newer temp | PASS on stock. Fails under the :413 reversal |
 | Close-tip deselected count | On `b782751`, before these two tests, the #64 `-k` printed `27 passed, 1048 deselected in 2.06s`. The frozen body said 1046 deselected and 1.98s. 1046 is wrong. On this tree the same `-k` printed `27 passed, 1050 deselected in 1.84s` | 1048 at the close tip. 1050 here |
+| Full local pytest | `uv run pytest -q -p no:cacheprovider --basetemp /tmp/w12-pytest-followup`: 12 failed, 3290 passed, 193 skipped, 1 warning, 366.40s. Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` for the `docker` binary. Pre-existing | 12 known local docker failures |
+| Lint and types | `uv run ruff format --check .` exit 0, 338 files already formatted. `uv run ruff check .` exit 0. ruff 0.16.2, line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Same tree as the pytest run above | PASS |
 
 **Status**: Session 07 is recorded complete by Omar's merge. The twelve evidence keys stay false. Exit 78 stays HELD. No Lead Reviewer pass is on record.
 
