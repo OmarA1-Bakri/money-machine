@@ -1,3 +1,17 @@
+## 2026-10-10 — Session 08 W1 follow-up: k counts, savings name, layout count
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
+
+This paragraph answers Verifier comment 6097852533 on `6c853b7c`. It does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, or `IMPLEMENTATION_STATE.json`.
+
+1. `10k reviews`, `2.5k ratings`, `1k+ orders`, and `5K sold` are refused. Review and sales counts accept a `k`/`K` suffix, a decimal, and a trailing `+`.
+2. Only the exact fact `Automatic Savings Planner` is exempt from the automation probes. `Automatic Savings sync` and `Automatic savings planner runs itself` are refused. Rendered prose drops that exact name and runs the probes on the rest.
+3. A singular-page layout span is exempt only when the number is 1 or equals the built `page_count`. With 42 built, `12 Page Monthly View Planner`, `12 Page Daily Spread Bundle`, `Plus 12 page layout pack`, and `4 page weekly layout` are refused. The same number publishes when it is the built count. `One Page Summary` and `One page per day` stay allowed.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/domain/test_claim_validation.py tests/unit/domain/test_listing_binding.py tests/unit/agents/test_merchandising.py` — 622 passed in 13.05s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-b5-pytest`: 12 failed, 3920 passed, 193 skipped, 1 warning in 378.06s (0:06:18). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those commands and the pytest run are the tree at `d13c5f1`. This paragraph was written after that run.
+
 ## 2026-10-10 — Session 08 W1 follow-up: #1 rank claims, long stems, price_sale kills
 
 Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
