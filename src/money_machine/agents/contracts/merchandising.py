@@ -23,6 +23,7 @@ from money_machine.domain.models._base import (
 )
 from money_machine.domain.models.products import ProductSpec
 from money_machine.domain.models.rules import ListingRules
+from money_machine.domain.services.listing_text import normalize_tag
 
 FactKey = Literal[
     "page_count",
@@ -66,6 +67,7 @@ ClaimKind = Literal[
     "device",
     "price",
     "anchor",
+    "currency",
     "support",
     "free_gift",
     "shop",
@@ -86,6 +88,7 @@ RejectionClass = Literal[
     "invented_trust_bar",
     "unsupported_social_proof",
     "unknown_fact",
+    "unbound_text",
     "tag_count",
     "section_count",
 ]
@@ -162,6 +165,7 @@ REJECTION_CLASSES: Final[frozenset[str]] = frozenset(
         "invented_trust_bar",
         "unsupported_social_proof",
         "unknown_fact",
+        "unbound_text",
         "tag_count",
         "section_count",
     }
@@ -298,10 +302,19 @@ class PriceSaleData(ContractModel):
         return self
 
 
+class CitedText(ContractModel):
+    """Buyer-facing text that may only be the named template of its claims."""
+
+    template_id: NonEmptyStr
+    text: NonEmptyStr
+    claim_ids: tuple[UUID, ...] = Field(min_length=1)
+
+
 class DescriptionSection(ContractModel):
     """One of the eight playbook description roles."""
 
     role: DescriptionRole
+    template_id: NonEmptyStr
     text: NonEmptyStr
     claim_ids: tuple[UUID, ...] = Field(min_length=1)
 
@@ -310,6 +323,7 @@ class ImageStripLine(ContractModel):
     """Copy for one of the ten listing-image frames."""
 
     role: ImageRole
+    template_id: NonEmptyStr
     text: NonEmptyStr
     claim_ids: tuple[UUID, ...] = Field(min_length=1)
 
@@ -318,6 +332,7 @@ class VideoBeat(ContractModel):
     """One beat of the single walkthrough video."""
 
     role: VideoRole
+    template_id: NonEmptyStr
     text: NonEmptyStr
     claim_ids: tuple[UUID, ...] = Field(min_length=1)
 
@@ -325,10 +340,10 @@ class VideoBeat(ContractModel):
 class ListingDraft(ContractModel):
     """Copy before claim validation. Tag and section counts are not yet enforced."""
 
-    title: NonEmptyStr
+    title: CitedText
     description_sections: tuple[DescriptionSection, ...]
-    tags: tuple[NonEmptyStr, ...]
-    hero_copy: NonEmptyStr
+    tags: tuple[CitedText, ...]
+    hero_copy: CitedText
     image_strip: tuple[ImageStripLine, ...]
     video_sequence: tuple[VideoBeat, ...]
     price_sale: PriceSaleData
@@ -344,9 +359,12 @@ class ListingDraft(ContractModel):
         if len(set(claim_ids)) != len(claim_ids):
             raise ValueError("claim ids must be unique")
         known = set(claim_ids)
-        cited = [
+        cited = list(self.title.claim_ids)
+        cited.extend(self.hero_copy.claim_ids)
+        cited.extend(claim_id for tag in self.tags for claim_id in tag.claim_ids)
+        cited.extend(
             claim_id for section in self.description_sections for claim_id in section.claim_ids
-        ]
+        )
         cited.extend(claim_id for line in self.image_strip for claim_id in line.claim_ids)
         cited.extend(claim_id for beat in self.video_sequence for claim_id in beat.claim_ids)
         if any(claim_id not in known for claim_id in cited):
@@ -368,7 +386,11 @@ class ListingCopy(ContractModel):
             raise ValueError("configured image count does not match the playbook image strip")
         if len(draft.tags) != rules.tags:
             raise ValueError(f"listing requires exactly {rules.tags} tags")
-        folded = tuple(tag.casefold() for tag in draft.tags)
+        folded = tuple(normalize_tag(tag.text) for tag in draft.tags)
+        if any(tag == "" for tag in folded):
+            raise ValueError("listing tags must be non-empty")
+        if any(len(tag) > ETSY_TAG_MAX for tag in folded):
+            raise ValueError(f"listing tags must be at most {ETSY_TAG_MAX} characters")
         if len(set(folded)) != len(folded):
             raise ValueError("listing tags must be unique")
         roles = tuple(section.role for section in draft.description_sections)

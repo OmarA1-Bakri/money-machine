@@ -29,6 +29,7 @@ from money_machine.agents.implementations.merchandising import (
 from money_machine.agents.registry import AgentRegistry
 from money_machine.config.settings import AgentCommissioningState
 from money_machine.domain.services.claim_validation import validate_claims
+from money_machine.domain.services.listing_text import TextSlot, normalize_text, render
 from tests.fixtures.merchandising import SHOP_NAME, consistent_request
 
 _AGENT = Path("src/money_machine/agents/implementations/merchandising.py")
@@ -91,14 +92,14 @@ def test_merchandise_returns_the_playbook_listing_shape() -> None:
     second = merchandise(request)
     draft = first.draft
     assert first == second
-    assert draft.title.startswith(request.spec.identity)
+    assert draft.title.text.startswith(request.spec.identity)
     assert tuple(section.role for section in draft.description_sections) == DESCRIPTION_ROLES
     assert len(draft.description_sections) == 8
-    assert draft.tags == _EXPECTED_TAGS
+    assert tuple(tag.text for tag in draft.tags) == _EXPECTED_TAGS
     assert len(draft.tags) == request.rules.tags == 13
     assert tuple(line.role for line in draft.image_strip) == IMAGE_ROLES
     assert tuple(beat.role for beat in draft.video_sequence) == VIDEO_BEATS
-    assert draft.hero_copy.startswith(request.spec.identity)
+    assert draft.hero_copy.text.startswith(request.spec.identity)
     assert draft.price_sale.price == request.price
     assert draft.price_sale.anchor_price == request.anchor_price
     assert draft.price_sale.sale_configured is True
@@ -108,9 +109,42 @@ def test_merchandise_returns_the_playbook_listing_shape() -> None:
     assert {claim.fact_id for claim in draft.claims} <= fact_ids
     included = next(section for section in draft.description_sections if section.role == "included")
     assert f"{request.page_count} pages" in included.text
-    assert SHOP_NAME.casefold() in draft.tags
+    assert SHOP_NAME.casefold() in {tag.text for tag in draft.tags}
     outcome = validate_claims(draft, request)
     assert outcome.passed is True
+    by_id = {claim.claim_id: claim for claim in draft.claims}
+    surfaces = (
+        draft.title,
+        draft.hero_copy,
+        *draft.description_sections,
+        *draft.image_strip,
+        *draft.video_sequence,
+        *draft.tags,
+    )
+    for surface in surfaces:
+        slots = tuple(
+            TextSlot(by_id[claim_id].kind, by_id[claim_id].stated_value)
+            for claim_id in surface.claim_ids
+        )
+        expected = render(surface.template_id, slots, quantity=request.rules.quantity)
+        assert normalize_text(surface.text) == normalize_text(expected)
+
+
+def test_blank_or_long_tag_cannot_become_listing_copy() -> None:
+    request = consistent_request()
+    draft = DeterministicCopyGenerator().generate(request, ())
+    blank = draft.tags[-1].model_copy(update={"text": "   "})
+    long = draft.tags[-1].model_copy(update={"text": "a" * 21})
+    with pytest.raises(ValueError, match="non-empty"):
+        ListingCopy(
+            draft=draft.model_copy(update={"tags": (*draft.tags[:-1], blank)}),
+            rules=request.rules,
+        )
+    with pytest.raises(ValueError, match="at most 20"):
+        ListingCopy(
+            draft=draft.model_copy(update={"tags": (*draft.tags[:-1], long)}),
+            rules=request.rules,
+        )
 
 
 def test_off_by_one_tags_cannot_become_listing_copy() -> None:
@@ -184,6 +218,23 @@ def test_deleting_the_fail_closed_raise_returns_the_bad_draft() -> None:
     assert mutant.calls == MAX_CLAIM_ATTEMPTS
 
 
+def test_inconsistent_hubs_are_refused_before_generation() -> None:
+    request = consistent_request()
+    broken = request.model_copy(update={"hubs": tuple(reversed(request.hubs))})
+
+    class _Unused:
+        def generate(
+            self,
+            request: MerchandisingInput,
+            corrections: tuple[ClaimCorrection, ...],
+        ) -> ListingDraft:
+            del request, corrections
+            raise AssertionError("generator must not run")
+
+    with pytest.raises(MerchandisingInputError, match="hubs"):
+        merchandise(broken, _Unused())
+
+
 def test_inconsistent_page_count_is_refused_before_generation() -> None:
     request = consistent_request()
     facts = []
@@ -224,6 +275,7 @@ def test_modules_do_not_import_a_network_provider() -> None:
     paths = (
         _AGENT,
         Path("src/money_machine/domain/services/claim_validation.py"),
+        Path("src/money_machine/domain/services/listing_text.py"),
         Path("src/money_machine/agents/contracts/merchandising.py"),
     )
     banned = ("openai", "httpx", "notion", "etsy", "requests", "llm")

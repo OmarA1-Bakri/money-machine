@@ -14,8 +14,10 @@ from uuid import UUID, uuid5
 from money_machine.agents.contracts.merchandising import (
     DESCRIPTION_ROLES,
     IMAGE_ROLES,
+    REJECTION_CLASSES,
     REQUIRED_FACT_KEYS,
     VIDEO_BEATS,
+    CitedText,
     ClaimCorrection,
     ClaimKind,
     DescriptionRole,
@@ -40,6 +42,7 @@ from money_machine.config.loader import load_yaml_model
 from money_machine.config.settings import ProductRulesConfig
 from money_machine.domain.models.rules import ListingRules
 from money_machine.domain.services.claim_validation import ClaimValidation, validate_claims
+from money_machine.domain.services.listing_text import TextSlot, render
 
 MAX_CLAIM_ATTEMPTS = 3
 """Initial draft plus two regenerations. The third failure is closed."""
@@ -83,19 +86,7 @@ class DeterministicCopyGenerator:
     ) -> ListingDraft:
         require_consistent(request)
         for correction in corrections:
-            if correction.rejection_class not in {
-                "invented_page_count",
-                "nonexistent_feature",
-                "variant_not_built",
-                "unsupported_automation",
-                "invented_review",
-                "invented_sales",
-                "invented_trust_bar",
-                "unsupported_social_proof",
-                "unknown_fact",
-                "tag_count",
-                "section_count",
-            }:
+            if correction.rejection_class not in REJECTION_CLASSES:
                 raise MerchandisingInputError("unknown correction class")
         return _draft_from_facts(request)
 
@@ -215,9 +206,9 @@ def _draft_from_facts(request: MerchandisingInput) -> ListingDraft:
     shop = add("shop", "shop_name", facts["shop_name"].fact_value)
     support = add("support", "support", facts["support"].fact_value)
     gift = add("free_gift", "free_gift", facts["free_gift"].fact_value)
-    currency = facts["currency"].fact_value
+    currency_claim = add("currency", "currency", facts["currency"].fact_value)
+    currency = currency_claim.stated_value
 
-    hub_names = fact_items(facts["hubs"].fact_value)
     sections = _sections(
         identity,
         category,
@@ -231,20 +222,29 @@ def _draft_from_facts(request: MerchandisingInput) -> ListingDraft:
         access,
         price,
         anchor,
+        currency_claim,
         shop,
         support,
         gift,
-        currency,
-        request,
+        request.rules.quantity,
     )
     if tuple(section.role for section in sections) != DESCRIPTION_ROLES:
         raise MerchandisingInputError("generator did not emit the eight description roles")
-    tags = _tags(request, facts)
-    hero = _hero(identity, problem)
-    strip = _image_strip(
-        identity, problem, page, hub_claims, variant_claims, device_claims, access, hub_names
+    tag_sources = (
+        identity,
+        category,
+        shop,
+        *hub_claims,
+        *feature_claims,
+        *variant_claims,
+        *device_claims,
     )
-    video = _video(dashboard, hub_claims, variant_claims, access, hub_names)
+    tags = _tags(request, tag_sources)
+    hero = _cite("hero", (identity, problem), request.rules.quantity)
+    strip = _image_strip(
+        identity, problem, page, hub_claims, variant_claims, device_claims, access, request
+    )
+    video = _video(dashboard, hub_claims, variant_claims, access, request)
     price_sale = PriceSaleData(
         currency=currency,
         price=request.price,
@@ -253,7 +253,7 @@ def _draft_from_facts(request: MerchandisingInput) -> ListingDraft:
         sale_configured=request.anchor_price > request.price,
     )
     return ListingDraft(
-        title=_title(identity, category),
+        title=_cite("title", (identity, category), request.rules.quantity),
         description_sections=sections,
         tags=tags,
         hero_copy=hero,
@@ -277,107 +277,40 @@ def _sections(
     access: ListingClaim,
     price: ListingClaim,
     anchor: ListingClaim,
+    currency: ListingClaim,
     shop: ListingClaim,
     support: ListingClaim,
     gift: ListingClaim,
-    currency: str,
-    request: MerchandisingInput,
+    quantity: int,
 ) -> tuple[DescriptionSection, ...]:
-    hub_text = ", ".join(claim.stated_value for claim in hubs)
-    feature_text = "; ".join(claim.stated_value for claim in features)
-    variant_text = ", ".join(claim.stated_value for claim in variants)
-    device_text = ", ".join(claim.stated_value for claim in devices)
-    dashboard_text = _dashboard_sentence(dashboard, request)
-    support_text = _support_sentence(support, gift, request)
-    ordered: tuple[tuple[DescriptionRole, str, tuple[UUID, ...]], ...] = (
-        (
-            "hook",
-            f"{identity.stated_value} {category.stated_value}. {problem.stated_value}",
-            (identity.claim_id, category.claim_id, problem.claim_id),
-        ),
-        (
-            "included",
-            f"{page.stated_value} pages. Hubs: {hub_text}.",
-            (page.claim_id, *(claim.claim_id for claim in hubs)),
-        ),
-        (
-            "audience",
-            f"Made for {identity.stated_value}. Shop {shop.stated_value}.",
-            (identity.claim_id, shop.claim_id),
-        ),
-        (
-            "how_it_works",
-            f"Duplicate the template. Access link: {access.stated_value}.",
-            (access.claim_id,),
-        ),
-        (
-            "features",
-            f"{feature_text}. {dashboard_text}",
-            (dashboard.claim_id, *(claim.claim_id for claim in features)),
-        ),
-        (
-            "variants",
-            f"Variants: {variant_text}. Devices: {device_text}.",
-            tuple(claim.claim_id for claim in (*variants, *devices)),
-        ),
-        (
-            "support",
-            support_text,
-            (support.claim_id, gift.claim_id),
-        ),
-        (
-            "offer",
-            (
-                f"Price {price.stated_value} {currency}. "
-                f"Anchor {anchor.stated_value} {currency}. "
-                f"Quantity {request.rules.quantity}. Digital delivery."
-            ),
-            (price.claim_id, anchor.claim_id),
-        ),
+    ordered: tuple[tuple[DescriptionRole, str, tuple[ListingClaim, ...]], ...] = (
+        ("hook", "hook", (identity, category, problem)),
+        ("included", "included", (page, *hubs)),
+        ("audience", "audience", (identity, shop)),
+        ("how_it_works", "access_line", (access,)),
+        ("features", "features", (*features, dashboard)),
+        ("variants", "variant_devices", (*variants, *devices)),
+        ("support", "support", (support, gift)),
+        ("offer", "offer", (price, currency, anchor)),
     )
     return tuple(
-        DescriptionSection(role=role, text=text, claim_ids=claim_ids)
-        for role, text, claim_ids in ordered
+        _section(role, template_id, claims, quantity) for role, template_id, claims in ordered
     )
 
 
-def _dashboard_sentence(dashboard: ListingClaim, request: MerchandisingInput) -> str:
-    if not request.notification_dashboard.present:
-        return "Notification dashboard is not in this build."
-    outputs = ", ".join(fact_items(dashboard.stated_value))
-    return f"Notification dashboard: {outputs}."
-
-
-def _support_sentence(
-    support: ListingClaim,
-    gift: ListingClaim,
-    request: MerchandisingInput,
-) -> str:
-    if request.support.offered:
-        support_text = f"Support channel: {request.support.channel}."
-    else:
-        support_text = "Support is not offered."
-    if request.free_gift.offered:
-        gift_text = f"Free gift: {request.free_gift.name}."
-        if request.free_gift.community is not None:
-            gift_text = f"{gift_text} Free community: {request.free_gift.community}."
-    else:
-        gift_text = "No free gift is configured."
-    return (
-        f"{support_text} {gift_text} "
-        f"Fact support {support.stated_value}. Fact gift {gift.stated_value}."
+def _section(
+    role: DescriptionRole,
+    template_id: str,
+    claims: tuple[ListingClaim, ...],
+    quantity: int,
+) -> DescriptionSection:
+    text, claim_ids = _rendered(template_id, claims, quantity)
+    return DescriptionSection(
+        role=role,
+        template_id=template_id,
+        text=text,
+        claim_ids=claim_ids,
     )
-
-
-def _title(identity: ListingClaim, category: ListingClaim) -> str:
-    title = f"{identity.stated_value} {category.stated_value}"
-    if len(title) <= 140:
-        return title
-    return title[:140].rstrip()
-
-
-def _hero(identity: ListingClaim, problem: ListingClaim) -> str:
-    return f"{identity.stated_value}. {problem.stated_value}"
 
 
 def _image_strip(
@@ -388,43 +321,29 @@ def _image_strip(
     variants: tuple[ListingClaim, ...],
     devices: tuple[ListingClaim, ...],
     access: ListingClaim,
-    hub_names: tuple[str, ...],
+    request: MerchandisingInput,
 ) -> tuple[ImageStripLine, ...]:
+    quantity = request.rules.quantity
     lines: dict[ImageRole, ImageStripLine] = {
-        "hero": ImageStripLine(
-            role="hero",
-            text=f"{identity.stated_value}. {problem.stated_value}",
-            claim_ids=(identity.claim_id, problem.claim_id),
-        ),
-        "overview": ImageStripLine(
-            role="overview",
-            text=f"{page.stated_value} pages in {identity.stated_value}.",
-            claim_ids=(page.claim_id, identity.claim_id),
-        ),
-        "colour_options": ImageStripLine(
-            role="colour_options",
-            text="Variants: " + ", ".join(claim.stated_value for claim in variants) + ".",
-            claim_ids=tuple(claim.claim_id for claim in variants),
-        ),
-        "devices": ImageStripLine(
-            role="devices",
-            text="Devices: " + ", ".join(claim.stated_value for claim in devices) + ".",
-            claim_ids=tuple(claim.claim_id for claim in devices),
-        ),
-        "how_it_works": ImageStripLine(
-            role="how_it_works",
-            text=f"Duplicate the template. Access link: {access.stated_value}.",
-            claim_ids=(access.claim_id,),
-        ),
+        "hero": _image("hero", "hero", (identity, problem), quantity),
+        "overview": _image("overview", "overview", (page, identity), quantity),
+        "colour_options": _image("colour_options", "variant_line", variants, quantity),
+        "devices": _image("devices", "device_line", devices, quantity),
+        "how_it_works": _image("how_it_works", "access_line", (access,), quantity),
     }
-    framed = zip(_HUB_FRAMES, hubs[:5], hub_names[:5], strict=True)
-    for role, claim, name in framed:
-        lines[role] = ImageStripLine(
-            role=role,
-            text=f"Hub: {name}.",
-            claim_ids=(claim.claim_id,),
-        )
+    for role, claim in zip(_HUB_FRAMES, hubs[:5], strict=True):
+        lines[role] = _image(role, "hub_frame", (claim,), quantity)
     return tuple(lines[role] for role in IMAGE_ROLES)
+
+
+def _image(
+    role: ImageRole,
+    template_id: str,
+    claims: tuple[ListingClaim, ...],
+    quantity: int,
+) -> ImageStripLine:
+    text, claim_ids = _rendered(template_id, claims, quantity)
+    return ImageStripLine(role=role, template_id=template_id, text=text, claim_ids=claim_ids)
 
 
 def _video(
@@ -432,61 +351,48 @@ def _video(
     hubs: tuple[ListingClaim, ...],
     variants: tuple[ListingClaim, ...],
     access: ListingClaim,
-    hub_names: tuple[str, ...],
+    request: MerchandisingInput,
 ) -> tuple[VideoBeat, ...]:
-    strongest = hubs[:3]
-    names = ", ".join(hub_names[:3])
+    quantity = request.rules.quantity
     beats: dict[VideoRole, VideoBeat] = {
-        "dashboard": VideoBeat(
-            role="dashboard",
-            text=f"Dashboard output: {dashboard.stated_value}.",
-            claim_ids=(dashboard.claim_id,),
+        "dashboard": _beat("dashboard", "video_dashboard", (dashboard,), quantity),
+        "notification_panel": _beat(
+            "notification_panel",
+            "video_notification",
+            (dashboard,),
+            quantity,
         ),
-        "notification_panel": VideoBeat(
-            role="notification_panel",
-            text=f"Notification panel: {dashboard.stated_value}.",
-            claim_ids=(dashboard.claim_id,),
-        ),
-        "strongest_hubs": VideoBeat(
-            role="strongest_hubs",
-            text=f"Hubs: {names}.",
-            claim_ids=tuple(claim.claim_id for claim in strongest),
-        ),
-        "colour_options": VideoBeat(
-            role="colour_options",
-            text="Variants: " + ", ".join(claim.stated_value for claim in variants) + ".",
-            claim_ids=tuple(claim.claim_id for claim in variants),
-        ),
-        "duplication_access": VideoBeat(
-            role="duplication_access",
-            text=f"Duplicate the template. Access link: {access.stated_value}.",
-            claim_ids=(access.claim_id,),
-        ),
+        "strongest_hubs": _beat("strongest_hubs", "video_hubs", hubs[:3], quantity),
+        "colour_options": _beat("colour_options", "variant_line", variants, quantity),
+        "duplication_access": _beat("duplication_access", "access_line", (access,), quantity),
     }
     return tuple(beats[role] for role in VIDEO_BEATS)
 
 
-def _tags(
-    request: MerchandisingInput,
-    facts: dict[str, ProductFact],
-) -> tuple[str, ...]:
-    sources: list[str] = [
-        facts["identity"].fact_value,
-        facts["base_category"].fact_value,
-        facts["shop_name"].fact_value,
-    ]
-    sources.extend(fact_items(facts["hubs"].fact_value))
-    sources.extend(fact_items(facts["features"].fact_value))
-    sources.extend(fact_items(facts["colour_names"].fact_value))
-    sources.extend(fact_items(facts["supported_devices"].fact_value))
-    tags: list[str] = []
+def _beat(
+    role: VideoRole,
+    template_id: str,
+    claims: tuple[ListingClaim, ...],
+    quantity: int,
+) -> VideoBeat:
+    text, claim_ids = _rendered(template_id, claims, quantity)
+    return VideoBeat(role=role, template_id=template_id, text=text, claim_ids=claim_ids)
+
+
+def _cite(template_id: str, claims: tuple[ListingClaim, ...], quantity: int) -> CitedText:
+    text, claim_ids = _rendered(template_id, claims, quantity)
+    return CitedText(template_id=template_id, text=text, claim_ids=claim_ids)
+
+
+def _tags(request: MerchandisingInput, sources: tuple[ListingClaim, ...]) -> tuple[CitedText, ...]:
+    tags: list[CitedText] = []
     seen: set[str] = set()
-    for source in sources:
-        tag = _etsy_tag(source)
-        if tag == "" or tag in seen:
+    for claim in sources:
+        text, claim_ids = _rendered("tag", (claim,), request.rules.quantity)
+        if text == "" or text in seen:
             continue
-        seen.add(tag)
-        tags.append(tag)
+        seen.add(text)
+        tags.append(CitedText(template_id="tag", text=text, claim_ids=claim_ids))
         if len(tags) == request.rules.tags:
             return tuple(tags)
     raise MerchandisingInputError(
@@ -494,19 +400,13 @@ def _tags(
     )
 
 
-def _etsy_tag(value: str) -> str:
-    words: list[str] = []
-    for raw in value.casefold().split():
-        cleaned = "".join(character for character in raw if character.isalnum())
-        if cleaned:
-            words.append(cleaned)
-    tag = ""
-    for word in words:
-        candidate = word if tag == "" else f"{tag} {word}"
-        if len(candidate) > 20:
-            break
-        tag = candidate
-    return tag
+def _rendered(
+    template_id: str,
+    claims: tuple[ListingClaim, ...],
+    quantity: int,
+) -> tuple[str, tuple[UUID, ...]]:
+    slots = tuple(TextSlot(claim.kind, claim.stated_value) for claim in claims)
+    return render(template_id, slots, quantity=quantity), tuple(claim.claim_id for claim in claims)
 
 
 def _require_equal(fact: ProductFact, expected: str, label: str) -> None:

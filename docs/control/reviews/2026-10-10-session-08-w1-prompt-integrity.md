@@ -8,7 +8,7 @@
 
 The prompt file is not amended. This record is the corrective addendum.
 
-The canonical filename `2026-10-10-session-08-prompt-integrity.md` is the unmerged Wave 0 record on #66. This wave does not overwrite that file.
+The canonical filename `2026-10-10-session-08-prompt-integrity.md` is the Wave 0 record. Round 2 merged that record from `da671037` and does not overwrite it.
 
 ## 1. Prompt authenticity
 
@@ -139,3 +139,13 @@ This addendum governs Wave 1. The prompt remains the unamended source of record.
 | Calling `LLMProvider` for prose | Not this wave | S-01; claims are derived from facts in code |
 | Activating Session 08 | A later activation | D-0032; fixture copy does not read `current_session` |
 | Exit 78 | Unchanged | Operator instruction |
+
+## 5. Round 2 amendment
+
+Review on the first tip showed the deny-list could accept buyer-facing prose that no cited fact states. This amendment is part of the same wave.
+
+1. Every buyer-facing string is one fixed template of the claims that string cites. The generator and the validator call the same `render`. A string that is not that template is `unbound_text`.
+2. Comparison folds NFKC, case, whitespace, and Latin lookalikes. A Latin string that also contains a non-Latin letter is rejected before that fold.
+3. The deny-list stays a per-surface backstop. A hit is allowed only when that span sits inside a cited fact value on the same surface. One passing claim does not license every other surface.
+4. Tags are normalized before the duplicate and length checks. Empty normalized tags are rejected.
+5. `#66` merged as `da671037`. This wave merges that commit. It does not edit `state.py`, `test_control_state.py`, or the Wave 0 review file. Session 08 stays inactive.
