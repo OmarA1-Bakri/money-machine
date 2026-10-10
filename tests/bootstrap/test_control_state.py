@@ -21,6 +21,8 @@ from money_machine.control import state as control_state
 
 ROOT = Path(__file__).parents[2]
 STATE_PATH = ROOT / "docs/control/IMPLEMENTATION_STATE.json"
+REV64_FIXTURE = ROOT / "tests/fixtures/control/state_rev64.json"
+REPLAY_ANCHOR_SHA = "00b952a83bffcec8d442468223d64dd9b2d3e6df"
 CONTROL_FILES = {
     "IMPLEMENTATION_STATE.json",
     "IMPLEMENTATION_LOG.md",
@@ -80,6 +82,11 @@ Mutation = Callable[[ControlState], None]
 
 def load_state(path: Path = STATE_PATH) -> ControlState:
     return cast(ControlState, json.loads(path.read_text(encoding="utf-8")))
+
+
+def load_rev64_fixture() -> ControlState:
+    """Frozen Session 07 close (rev 64) from commit 00b952a, not the live state file."""
+    return load_state(REV64_FIXTURE)
 
 
 def load_document(path: Path) -> dict[str, object]:
@@ -1511,7 +1518,7 @@ def session_eight_activation_paths(
     repo = tmp_path / "repository"
     state_path = repo / "docs" / "control" / "IMPLEMENTATION_STATE.json"
     state_path.parent.mkdir(parents=True)
-    state = copy.deepcopy(load_state())
+    state = copy.deepcopy(load_rev64_fixture())
     assert state["current_session"] == 7
     assert state["session_status"] == "complete"
     assert state["next_session"] == 8
@@ -1556,8 +1563,6 @@ def test_session_eight_activation_rejects_false_session_seven_evidence(tmp_path:
         assert key in result.stderr
     assert state_path.read_bytes() == original
     assert STATE_PATH.read_bytes() == checked_in
-    assert load_state()["current_session"] == 7
-    assert load_state()["state_revision"] == 64
 
 
 def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: Path) -> None:
@@ -1579,14 +1584,10 @@ def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: 
     assert set(after["required_completion_evidence"]) == set(SESSION_08_EVIDENCE_KEYS)
     assert not any(after["required_completion_evidence"].values())
     assert STATE_PATH.read_bytes() == checked_in
-    live = load_state()
-    assert live["current_session"] == 7
-    assert live["next_session"] == 8
-    assert all(value is False for value in live["required_completion_evidence"].values())
 
 
 def _false_key_session_eight_pair() -> tuple[ControlState, ControlState]:
-    previous = copy.deepcopy(load_state())
+    previous = copy.deepcopy(load_rev64_fixture())
     current = copy.deepcopy(previous)
     current["state_revision"] = previous["state_revision"] + 1
     current["session_status"] = "incomplete"
@@ -1677,7 +1678,7 @@ def _completed_session_evidence(previous: ControlState) -> None:
 
 
 def _session_seven_with_evidence(evidence: dict[str, bool]) -> ControlState:
-    state = copy.deepcopy(load_state())
+    state = copy.deepcopy(load_rev64_fixture())
     assert state["current_session"] == 7
     state["required_completion_evidence"] = evidence
     return state
@@ -1719,7 +1720,7 @@ def test_prior_evidence_names_only_the_one_false_key() -> None:
 
 def test_missing_prior_contract_fails_closed() -> None:
     """A previous session with no evidence contract raises ControlStateError, not KeyError."""
-    state = copy.deepcopy(load_state())
+    state = copy.deepcopy(load_rev64_fixture())
     state["current_session"] = 9
     state["required_completion_evidence"] = dict.fromkeys(SESSION_07_EVIDENCE_KEYS, True)
 
@@ -1764,3 +1765,153 @@ def test_deleting_the_prior_evidence_check_or_a_session_seven_exemption_fails() 
     exempt = _load_activation_mutant(_activation_with_session_seven_exemption(activation_source))
     deleted(previous, current)
     exempt(previous, current)
+
+
+def test_rev64_fixture_matches_anchor_commit() -> None:
+    """The frozen fixture is byte-identical to the rev-64 state at 00b952a."""
+    completed = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(ROOT),
+            "show",
+            f"{REPLAY_ANCHOR_SHA}:docs/control/IMPLEMENTATION_STATE.json",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    assert REV64_FIXTURE.read_bytes() == completed.stdout
+    frozen = load_rev64_fixture()
+    assert frozen["state_revision"] == 64
+    assert frozen["current_session"] == 7
+    assert all(value is False for value in frozen["required_completion_evidence"].values())
+
+
+def _activation_when_session_below_seven(source: str) -> str:
+    """Mutant: run the prior-evidence check only when current_session < 7."""
+    tree = ast.parse(source)
+    function = tree.body[0]
+    assert isinstance(function, ast.FunctionDef)
+    replaced = 0
+    rewritten: list[ast.stmt] = []
+    for statement in function.body:
+        if not _direct_call(statement):
+            rewritten.append(statement)
+            continue
+        replaced += 1
+        comparison = ast.Compare(
+            left=ast.Subscript(
+                value=ast.Name(id="previous", ctx=ast.Load()),
+                slice=ast.Constant(value="current_session"),
+                ctx=ast.Load(),
+            ),
+            ops=[ast.Lt()],
+            comparators=[ast.Constant(value=7)],
+        )
+        rewritten.append(ast.If(test=comparison, body=[statement], orelse=[]))
+    assert replaced == 1
+    function.body = rewritten
+    ast.fix_missing_locations(tree)
+    return ast.unparse(tree)
+
+
+def _load_helper_mutant(source: str) -> Callable[[ControlState], None]:
+    namespace = dict(control_state.validate_activation_transition.__globals__)
+    exec("from __future__ import annotations\n" + source, namespace)
+    mutant = namespace["_require_completed_session_evidence"]
+    assert callable(mutant)
+    return cast(Callable[[ControlState], None], mutant)
+
+
+def _drop_evidence_key_guard(source: str) -> str:
+    """Mutant: delete the exact session-key-set guard."""
+    tree = ast.parse(source)
+    function = tree.body[0]
+    assert isinstance(function, ast.FunctionDef)
+    kept: list[ast.stmt] = []
+    removed = 0
+    for statement in function.body:
+        if isinstance(statement, ast.If) and "evidence.keys()" in ast.unparse(statement):
+            removed += 1
+            continue
+        kept.append(statement)
+    assert removed == 1
+    function.body = kept
+    ast.fix_missing_locations(tree)
+    return ast.unparse(tree)
+
+
+def test_session_seven_prior_evidence_mutants_still_die_on_rev64_fixture() -> None:
+    """Re-proof of the #66 kills on the frozen rev-64 fixture (test 37).
+
+    Each mutant accepts a state the real check rejects, or rejects a state the real
+    check accepts. The fixture, not the live state file, is the previous state.
+    """
+    false_previous, false_current = _false_key_session_eight_pair()
+    parsed_false_previous = cast(control_state.ControlState, false_previous)
+    parsed_false_current = cast(control_state.ControlState, false_current)
+    activation_source = inspect.getsource(control_state.validate_activation_transition)
+    helper = control_state.validate_activation_transition.__globals__[
+        "_require_completed_session_evidence"
+    ]
+    assert callable(helper)
+    helper_source = inspect.getsource(helper)
+
+    with pytest.raises(control_state.ControlStateError, match=PRIOR_EVIDENCE_REJECTION):
+        control_state.validate_activation_transition(parsed_false_previous, parsed_false_current)
+
+    for mutant_source in (
+        _activation_without_prior_evidence_call(activation_source),
+        _activation_with_session_seven_exemption(activation_source),
+        _activation_when_session_below_seven(activation_source),
+    ):
+        mutant = _load_activation_mutant(mutant_source)
+        mutant(false_previous, false_current)
+
+    one_false = _all_true_session_seven_evidence()
+    one_false["product_qa_implemented"] = False
+    one_false_state = cast(
+        control_state.ControlState,
+        _session_seven_with_evidence(one_false),
+    )
+    with pytest.raises(control_state.ControlStateError, match="product_qa_implemented"):
+        _completed_session_evidence(cast(ControlState, one_false_state))
+    any_mutant_source = helper_source.replace(
+        "if missing:",
+        "if not any(value is True for value in evidence.values()):",
+        1,
+    )
+    assert any_mutant_source != helper_source
+    _load_helper_mutant(any_mutant_source)(cast(ControlState, one_false_state))
+
+    subset = _all_true_session_seven_evidence()
+    del subset[SESSION_07_EVIDENCE_KEYS[0]]
+    subset_state = cast(control_state.ControlState, _session_seven_with_evidence(subset))
+    with pytest.raises(control_state.ControlStateError, match=EXACT_SESSION_07_KEYS):
+        _completed_session_evidence(cast(ControlState, subset_state))
+    superset = _all_true_session_seven_evidence()
+    superset["extra_prior_evidence_key"] = True
+    superset_state = cast(control_state.ControlState, _session_seven_with_evidence(superset))
+    with pytest.raises(control_state.ControlStateError, match=EXACT_SESSION_07_KEYS):
+        _completed_session_evidence(cast(ControlState, superset_state))
+    dropped_guard = _load_helper_mutant(_drop_evidence_key_guard(helper_source))
+    dropped_guard(cast(ControlState, subset_state))
+    dropped_guard(cast(ControlState, superset_state))
+
+    all_false_state = cast(
+        control_state.ControlState,
+        _session_seven_with_evidence(dict.fromkeys(SESSION_07_EVIDENCE_KEYS, False)),
+    )
+    with pytest.raises(control_state.ControlStateError, match=PRIOR_EVIDENCE_REJECTION):
+        _completed_session_evidence(cast(ControlState, all_false_state))
+    inverted_source = helper_source.replace("if value is not True", "if value is True", 1)
+    assert inverted_source != helper_source
+    _load_helper_mutant(inverted_source)(cast(ControlState, all_false_state))
+
+    all_true_state = cast(
+        control_state.ControlState,
+        _session_seven_with_evidence(_all_true_session_seven_evidence()),
+    )
+    _completed_session_evidence(cast(ControlState, all_true_state))
+    with pytest.raises(control_state.ControlStateError):
+        _load_helper_mutant(inverted_source)(cast(ControlState, all_true_state))
