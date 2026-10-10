@@ -626,31 +626,6 @@ def _git(
     return result
 
 
-def _git_bytes(
-    repo_root: Path,
-    *arguments: str,
-    allowed_returncodes: frozenset[int] = frozenset({0}),
-) -> subprocess.CompletedProcess[bytes]:
-    """Run git and return the raw stdout bytes. Used for evidence blob hashes."""
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(repo_root), *arguments],
-            check=False,
-            capture_output=True,
-            timeout=GIT_TIMEOUT_SECONDS,
-        )
-    except subprocess.TimeoutExpired as error:
-        raise ControlStateError(
-            f"Git command timed out after {GIT_TIMEOUT_SECONDS} seconds"
-        ) from error
-    except OSError as error:
-        raise ControlStateError(f"cannot execute Git: {error}") from error
-    if result.returncode not in allowed_returncodes:
-        detail = result.stderr.decode("utf-8", errors="replace").strip() or "unknown Git error"
-        raise ControlStateError(f"Git verification failed for {' '.join(arguments)}: {detail}")
-    return result
-
-
 def _resolve_commit(repo_root: Path, commit_id: str, label: str) -> str:
     result = _git(repo_root, "rev-parse", "--verify", f"{commit_id}^{{commit}}")
     resolved = result.stdout.strip()

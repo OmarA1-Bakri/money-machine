@@ -1,3 +1,6 @@
+# The frozen ControlState TypedDict cannot name evidence_citations. These tests
+# mutate that JSON object anyway, and they pass it to the test helper's writer.
+# pyright: reportArgumentType=false, reportGeneralTypeIssues=false, reportUnnecessaryCast=false
 """Killing tests for Session 07 record-evidence, record-closure, revoke-evidence, and replay.
 
 Tests 1-36 and 38-44 live here. Test 37 is the frozen #66 re-proof in
@@ -14,7 +17,7 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
@@ -50,8 +53,8 @@ from money_machine.control.state import (
     SESSION_EVIDENCE_KEYS,
     SESSION_PROMPTS,
     ControlState,
-    _apply_activation_transition,
-    _apply_completion_transition,
+    _apply_activation_transition,  # pyright: ignore[reportPrivateUsage]
+    _apply_completion_transition,  # pyright: ignore[reportPrivateUsage]
     apply_activation_transition,
     apply_record_closure_transition,
     apply_record_evidence_transition,
@@ -103,13 +106,13 @@ class Anchor:
 
 
 @pytest.fixture(autouse=True)
-def _real_state_stays_byte_identical() -> None:
+def _real_state_stays_byte_identical() -> Iterator[None]:  # pyright: ignore[reportUnusedFunction]
     yield
     assert STATE_FILE.read_bytes() == REAL_STATE_BYTES
 
 
 def _fresh() -> ControlState:
-    return copy.deepcopy(load_rev64_fixture())
+    return cast(ControlState, copy.deepcopy(load_rev64_fixture()))
 
 
 def _advance(state: ControlState, stamp: str = "2026-10-10T12:30:00Z") -> ControlState:
@@ -1410,10 +1413,14 @@ def test_40_replay_is_not_invoked_before_session_08(
     apply_activation_transition(prepared.state_path, prepared.candidate_path)
     previous = cast(ControlState, json.loads(prepared.state_path.read_text(encoding="utf-8")))
     assert previous["next_session"] == 1
-    control_state._verify_activation_repository(prepared.state_path, previous, previous, None)
+    control_state._verify_activation_repository(  # pyright: ignore[reportPrivateUsage]
+        prepared.state_path, previous, previous, None
+    )
     later = copy.deepcopy(previous)
     later["next_session"] = 2
-    control_state._verify_activation_repository(prepared.state_path, later, previous, None)
+    control_state._verify_activation_repository(  # pyright: ignore[reportPrivateUsage]
+        prepared.state_path, later, previous, None
+    )
     assert calls == []
 
 

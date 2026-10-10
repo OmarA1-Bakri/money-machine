@@ -10,27 +10,28 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
-from typing import cast
+from typing import NoReturn, cast
 
 import yaml
 
 from money_machine.cli.notion_sandbox_guard import SANDBOX_PARENT_PAGE_ID, SANDBOX_SPACE_ID
 from money_machine.control.state import (
     CANONICAL_STATE_RELATIVE_PATH,
+    GIT_TIMEOUT_SECONDS,
     SESSION_EVIDENCE_KEYS,
     SHA_PATTERN,
     ControlState,
     ControlStateError,
-    _apply_transition,
-    _assert_repo_at_closure,
-    _git,
-    _git_bytes,
-    _is_int,
-    _resolve_commit,
-    _validate_repo_identity,
+    _apply_transition,  # pyright: ignore[reportPrivateUsage]
+    _assert_repo_at_closure,  # pyright: ignore[reportPrivateUsage]
+    _git,  # pyright: ignore[reportPrivateUsage]
+    _is_int,  # pyright: ignore[reportPrivateUsage]
+    _resolve_commit,  # pyright: ignore[reportPrivateUsage]
+    _validate_repo_identity,  # pyright: ignore[reportPrivateUsage]
     validate_activation_transition,
 )
 
@@ -133,8 +134,33 @@ def _evidence(state: ControlState) -> dict[str, object]:
     return cast(dict[str, object], evidence)
 
 
-def _reject(label: str, detail: str) -> None:
+def _reject(label: str, detail: str) -> NoReturn:
     raise ControlStateError(f"unsupported {label}: {detail}")
+
+
+def _git_bytes(
+    repo_root: Path,
+    *arguments: str,
+    allowed_returncodes: frozenset[int] = frozenset({0}),
+) -> subprocess.CompletedProcess[bytes]:
+    """Run git and return the raw stdout bytes. Evidence hashes use those bytes."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), *arguments],
+            check=False,
+            capture_output=True,
+            timeout=GIT_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise ControlStateError(
+            f"Git command timed out after {GIT_TIMEOUT_SECONDS} seconds"
+        ) from error
+    except OSError as error:
+        raise ControlStateError(f"cannot execute Git: {error}") from error
+    if result.returncode not in allowed_returncodes:
+        detail = result.stderr.decode("utf-8", errors="replace").strip() or "unknown Git error"
+        raise ControlStateError(f"Git verification failed for {' '.join(arguments)}: {detail}")
+    return result
 
 
 def _require_session_seven_contract(previous: ControlState, label: str) -> None:
@@ -176,14 +202,13 @@ def _require_revision_and_timestamp(
         or current["state_revision"] != previous["state_revision"] + 1
     ):
         raise ControlStateError("state revision must advance exactly once")
-    updated_at = current["updated_at"]
-    if updated_at == previous["updated_at"] or not isinstance(updated_at, str):
+    if current["updated_at"] == previous["updated_at"]:
         _reject(label, "updated_at must change")
 
 
 def _require_evidence_shape(state: ControlState, label: str) -> dict[str, bool]:
     evidence = _evidence(state)
-    if set(evidence) != SESSION_EVIDENCE_KEYS[7]:
+    if set(evidence) != set(SESSION_EVIDENCE_KEYS[7]):
         _reject(label, "evidence keys must equal the session 07 contract")
     typed: dict[str, bool] = {}
     for key, value in evidence.items():
@@ -221,20 +246,24 @@ def _require_same_revoked(
     previous_keys = set() if previous is None else set(previous)
     if "7_revoked" in current and "7_revoked" not in previous_keys:
         _reject(label, "7_revoked cannot be created by this command")
-    if "7_revoked" in previous_keys and current.get("7_revoked") != previous.get("7_revoked"):
+    if (
+        previous is not None
+        and "7_revoked" in previous
+        and current.get("7_revoked") != previous.get("7_revoked")
+    ):
         _reject(label, "7_revoked must stay byte-identical")
 
 
 def _require_record_citation(citation: object, key: str) -> None:
     body = _as_object(citation, LABEL_RECORD, f"citation for {key} must be an object")
-    if set(body) != _RECORD_CITATION_FIELDS:
+    if set(body) != set(_RECORD_CITATION_FIELDS):
         _reject(LABEL_RECORD, f"citation for {key} has the wrong fields")
     pr = body["pr"]
     merge = body["merge_commit"]
     manifest = body["manifest"]
     digest = body["manifest_blob_sha256"]
     recorded_at = body["recorded_at"]
-    if not _is_int(pr) or pr <= 0:
+    if not isinstance(pr, int) or isinstance(pr, bool) or pr <= 0:
         _reject(LABEL_RECORD, f"citation for {key} needs a positive pull request number")
     if not isinstance(merge, str) or SHA_PATTERN.fullmatch(merge) is None:
         _reject(LABEL_RECORD, f"citation for {key} needs a 40-character merge commit")
@@ -317,7 +346,7 @@ def validate_record_evidence_transition(previous: ControlState, current: Control
 
 def _require_closure_citation(citation: object, commit: str) -> None:
     body = _as_object(citation, LABEL_CLOSURE, "closure citation must be an object")
-    if set(body) != _CLOSURE_CITATION_FIELDS:
+    if set(body) != set(_CLOSURE_CITATION_FIELDS):
         _reject(LABEL_CLOSURE, "closure citation has the wrong fields")
     if body["closure_commit"] != commit or SHA_PATTERN.fullmatch(commit) is None:
         _reject(LABEL_CLOSURE, "closure citation must name the new closure commit")
@@ -449,7 +478,7 @@ def validate_revoke_evidence_transition(previous: ControlState, current: Control
         _reject(LABEL_REVOKE, "new 7_revoked entries must follow the revoked keys in order")
     for item in appended:
         body = _as_object(item, LABEL_REVOKE, "revoke entry must be an object")
-        if set(body) != _REVOKE_ENTRY_FIELDS:
+        if set(body) != set(_REVOKE_ENTRY_FIELDS):
             _reject(LABEL_REVOKE, "revoke entry has the wrong fields")
         reason = body["reason"]
         revoked_at = body["revoked_at"]
@@ -574,7 +603,7 @@ def _check_kind_payload(
 def _load_manifest(repo_root: Path, commit: str, key: str) -> dict[str, object]:
     path = f"docs/evidence/s07/{key}/manifest.json"
     manifest = _load_json_blob(repo_root, commit, path, LABEL_RECORD)
-    if set(manifest) != _MANIFEST_FIELDS:
+    if set(manifest) != set(_MANIFEST_FIELDS):
         _reject(LABEL_RECORD, f"manifest for {key} has the wrong fields")
     if manifest.get("session") != 7 or manifest.get("key") != key:
         _reject(LABEL_RECORD, f"manifest for {key} must declare session 7 and that key")
@@ -639,7 +668,7 @@ def _check_one_citation(
     payloads: list[dict[str, object]] = []
     for artifact in artifacts:
         body = _as_object(artifact, LABEL_RECORD, f"artifact for {key} must be an object")
-        if set(body) != _ARTIFACT_FIELDS:
+        if set(body) != set(_ARTIFACT_FIELDS):
             _reject(LABEL_RECORD, f"artifact for {key} has the wrong fields")
         kind = body["kind"]
         path = body["path"]
@@ -653,7 +682,7 @@ def _check_one_citation(
             _reject(LABEL_RECORD, f"artifact blob sha256 for {key} does not match the manifest")
         payloads.append(_load_json_blob(repo_root, merge, path, LABEL_RECORD))
         kinds.append(kind)
-    if len(kinds) != len(set(kinds)) or set(kinds) != S07_EVIDENCE_KINDS[key]:
+    if len(kinds) != len(set(kinds)) or set(kinds) != set(S07_EVIDENCE_KINDS[key]):
         _reject(LABEL_RECORD, f"artifact kinds for {key} must equal the frozen set")
     for kind, payload in zip(kinds, payloads, strict=True):
         _check_kind_payload(repo_root, merge, key, kind, payload, citations)
@@ -684,7 +713,7 @@ def _check_g7(repo_root: Path, commit: str, citation: Mapping[str, object]) -> N
         )
     except (UnicodeError, json.JSONDecodeError):
         _reject(LABEL_CLOSURE, "g7 record is not JSON")
-    if set(document) != _G7_FIELDS:
+    if set(document) != set(_G7_FIELDS):
         _reject(LABEL_CLOSURE, "g7 record has the wrong fields")
     if document.get("agents") != list(_G7_AGENTS):
         _reject(LABEL_CLOSURE, "g7 record must name A07, A08 and A09")
