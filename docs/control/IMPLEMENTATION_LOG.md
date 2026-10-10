@@ -1,3 +1,11 @@
+## 2026-10-10 — Session 08 W1: A10 merchandising copy and claim validation (fixture-only)
+
+Session 08 is not activated. This wave is actions 1 and 2 only. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD.
+
+Prompt integrity is the Wave 1 addendum in `docs/control/reviews/2026-10-10-session-08-w1-prompt-integrity.md`. The prompt file is unchanged. SHA-256 `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The canonical `2026-10-10-session-08-prompt-integrity.md` name is the unmerged Wave 0 record on #66. This wave does not overwrite it and does not edit `AGENTS.md`, `CLAUDE.md`, `src/money_machine/control/state.py`, or `tests/bootstrap/test_control_state.py`.
+
+Fixtures only. No live HTTP, no Notion, no Etsy, no LLM network call. Copy is a deterministic function of ProductFacts. A failed claim returns to the generator with the exact correction. Three attempts, then fail closed. The full pytest, ruff, and pyright quotes are on the pull request after that run.
+
 ## 2026-10-10 — Session 07 close recorded, and the :408/:413 adopt mutants are killed
 
 Session 07 is recorded complete by Omar's merge of #64. That merge is `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` at 2026-10-10 12:36:46 +0700. His words, relayed by Grok Bot from its chat at 2026-10-10 12:39 ICT: "Yes, my merge is the Session 07 close gate. Fix the Verifier items in a follow-up PR." #64 merged while Verifier round 2 was FAIL (comment 6094256754). Those items are what this pull request fixes. No Lead Reviewer pass is on record. Exit 78 stays HELD. The twelve evidence keys stay false. `commissioned_agents` stays empty. This follow-up does not change `src/`.
