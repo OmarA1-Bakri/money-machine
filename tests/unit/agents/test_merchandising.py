@@ -479,6 +479,8 @@ _PAGE_FACTS = (
     ("buyer_problem", "Hundred-Page Planner"),
     ("identity", "Four Page Planner"),
     ("feature", "12-page starter kit"),
+    ("identity", "One-Hundred-Printable-Pages"),
+    ("identity", "200-printable-pages"),
 )
 
 
@@ -619,9 +621,19 @@ def test_review_and_order_counts_are_refused(field: str, value: str) -> None:
         ("identity", "Automatic Savings Planner"),
         ("feature", "One page per day"),
         ("identity", "One Page Summary"),
-        ("feature", "4 page weekly layout"),
         ("identity", "Book Review Journal"),
         ("identity", "Star Chart Planner"),
+        ("identity", "Raven"),
+        ("identity", "Step #1"),
+        ("identity", "Part #1"),
+        ("identity", "Week #1"),
+        ("identity", "Day #1"),
+        ("identity", "Chapter #1"),
+        ("identity", "Book #1"),
+        ("identity", "Level #1"),
+        ("identity", "Lap #1 Running"),
+        ("identity", "One Starry Night"),
+        ("identity", "#10 Planner"),
     ),
 )
 def test_names_without_a_claim_publish(kind: str, value: str) -> None:
@@ -657,6 +669,393 @@ def test_review_and_star_nouns_are_allowed() -> None:
         "Book Reviews" in section.text for section in reviewed_copy.draft.description_sections
     )
     assert validate_claims(reviewed_copy.draft, reviewed).passed is True
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        "Top #1 Planner",
+        "Rank #1",
+        "Number #1",
+        "World #1",
+        "Planner #1 on Etsy",
+        "Ranks #1 on Etsy",
+        "Room #1 on Etsy",
+        "Goal #1 in stock",
+        "Week #1 pick",
+        "Day #1 seller",
+    ),
+)
+def test_rank_number_one_in_a_name_is_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        "EtsyBestseller Planner",
+        "BestsellerPlanner",
+        "TopRatedPlanner",
+        "CustomerTestimonials Planner",
+        "FullyAutomated sync",
+        "SmartAutofill budget",
+        "Raved about by buyers",
+    ),
+)
+def test_joined_claim_stems_are_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        "Reviews: 2000",
+        "Reviews 2000+",
+        "Ratings: 1999",
+        "Ratings = 2024",
+        "Reviews 2 500",
+        "Reviews 12 000",
+        "Rating 4 9",
+        "Rating 5-5",
+        "2000 review",
+    ),
+)
+def test_year_and_range_exceptions_do_not_hide_counts(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        "Reviews 1 100",
+        "Ratings 1 100",
+        "Reviews 1 10 000",
+        "Ratings 1 10 000",
+        "Ratings 1-5+",
+        "Rating 1-5.5",
+        "Ratings 1-5: 5",
+        "Rating 1-10 = 10",
+        "Review 2026 500",
+        "Year in Review 2026 4.9",
+        "1999 review",
+        "Review 2000",
+        "2026 reviews",
+        "Review 2026+",
+        "review 2026k",
+        "2026 review+",
+        "Review: 2026",
+        "Rating 1-50",
+        "Over 2026 review",
+    ),
+)
+def test_review_or_rating_beside_a_number_is_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        "Year in Review 2026",
+        "2026 Review",
+        "Rating 1-10 Mood",
+        "Rating 0-100 Score",
+        "Rating 1-5",
+    ),
+)
+def test_year_and_scale_names_fail_closed(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        "Sold 4 Ways",
+        "Orders 2026 Log",
+        "Orders 2026 Tracker",
+        "Sold 3 Times Journal",
+        "Orders 1-5 Log",
+        "Orders-1 Planner",
+        "Pre-orders 2026 Log",
+        "Back-orders 10 Planner",
+        "Wholesale Orders 2026",
+    ),
+)
+def test_word_first_sold_and_orders_names_fail_closed(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        "500.reviews",
+        "500. reviews",
+        "4.9. rating",
+        "1,000. ratings",
+        "2026.reviews",
+        "Planner.500 reviews",
+        "Notes...500 reviews",
+        "Planner.500 sold",
+        "Gift.500 orders",
+        "500.sold",
+        "500. sold",
+        "500.+ reviews",
+        "500.+reviews",
+        "4.9.+ rating",
+        "1,000.+ ratings",
+        "1k.+ sold",
+        "500_+ orders",
+        "Planner.12 sold",
+    ),
+)
+def test_dotted_counts_are_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        "RaveReviews",
+        "Raves",
+        "5StarPlanner",
+        "FiveStarPlanner",
+        "Unattendedsync",
+        "top_rated",
+        "Best_seller",
+        "best.seller",
+        "raving fans",
+    ),
+)
+def test_joined_review_and_sales_forms_are_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+_COUNT_SEPARATORS = (".", "_", "/", "-", "+")
+_COUNT_WORDS = ("reviews", "ratings", "sold", "orders")
+
+
+def _separator_counts() -> tuple[str, ...]:
+    rows = [f"500{sep}{word}" for sep in _COUNT_SEPARATORS for word in _COUNT_WORDS]
+    rows.extend(f"{word}{sep}500" for sep in _COUNT_SEPARATORS for word in _COUNT_WORDS)
+    rows.extend(
+        (
+            "500 reviews_x",
+            "x_reviews 500",
+            # Collapse-word tail `(?![^\W_])` changed to `\b` publishes these.
+            "500.reviews_x",
+            "500_ratings_x",
+            # Collapse-after lead `(?<![^\W_])` changed to `\b` publishes these.
+            "x_reviews.500",
+            "x_sold.500",
+            "x_orders/12",
+            "x_ratings+4.9",
+            # A separator run forced to start on a mark publishes these.
+            "500 . reviews",
+            "500 - reviews",
+            "reviews / 500",
+            "Reviews - 4.9",
+            # The sold/orders word-first lead `(?<![^\W_])` changed to `\b`.
+            "x_sold 500",
+        )
+    )
+    return tuple(rows)
+
+
+@pytest.mark.parametrize("identity", _separator_counts())
+def test_count_separators_collapse_on_both_sides(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        "500; reviews",
+        "reviews, 500",
+        "500 : reviews",
+        "500 = reviews",
+        "500 (reviews)",
+        "Reviews: +500",
+        "500sold",
+        "2.5 thousand sold",
+        "2.5ksold",
+        "Five_Star",
+        "5_Star",
+        "Rave_Reviews",
+        "RavingFans",
+        "500 reviewsX",
+        "Xreviews 500",
+        "Sold: 500",
+        "Orders: 12",
+        "500.sold_x",
+        "12-orders_x",
+    ),
+)
+def test_parked_count_punctuation_still_publishes(identity: str) -> None:
+    request = _bound("identity", identity)
+    copy = merchandise(request)
+    shown = " ".join(
+        (copy.draft.title.text, *(section.text for section in copy.draft.description_sections))
+    )
+    assert identity in shown
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        "#01 Planner",
+        "#1-on Etsy",
+        "#1, on Etsy",
+        "# 1 Planner",
+        "Room #1-on Etsy",
+        "Goal #1, on Etsy",
+        "Goal #01 on Etsy",
+    ),
+)
+def test_rank_punctuation_is_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    ("10 k reviews", "2.5k sold", "1.5k orders", "5k+ sold"),
+)
+def test_count_spacing_and_sold_forms_are_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "field",
+    ("hub", "feature", "colour", "dashboard", "support", "gift"),
+)
+def test_automatic_savings_planner_publishes_in_each_list_field(field: str) -> None:
+    name = "Automatic Savings Planner"
+    if field == "hub":
+        # Keep the six tag-producing hubs. The name is one extra item, so the
+        # fact stays a pipe-joined list and still has to be checked per item.
+        request = consistent_request(
+            create_fixture_product_spec(
+                hubs=(
+                    "Daily Planning",
+                    "Goal Tracking",
+                    "Habit Builder",
+                    "Budget Tracker",
+                    "Meal Planner",
+                    "Fitness Log",
+                    name,
+                )
+            )
+        )
+    elif field == "colour":
+        request = consistent_request(
+            create_fixture_product_spec(
+                colour_variants=("Sage Green", "Navy Blue", "Rose Gold", name)
+            )
+        )
+    else:
+        request = _in_field(field, name)
+    copy = merchandise(request)
+    shown = " ".join(
+        (
+            copy.draft.title.text,
+            *(section.text for section in copy.draft.description_sections),
+        )
+    )
+    assert "Automatic Savings Planner" in shown
+    assert validate_claims(copy.draft, request).passed is True
+
+
+def test_twelve_page_overview_publishes_when_the_built_count_is_twelve() -> None:
+    request = _with_built_pages(_bound("identity", "Twelve page overview"), 12)
+    copy = merchandise(request)
+    assert "Twelve page overview" in copy.draft.title.text
+    assert validate_claims(copy.draft, request).passed is True
+
+
+def test_thirteen_page_layout_is_refused_when_the_built_count_is_twelve() -> None:
+    _refuse(_with_built_pages(_bound("identity", "13 page layout"), 12))
+
+
+def test_built_page_count_without_a_layout_noun_is_refused() -> None:
+    _refuse(_bound("identity", "42 Page Planner"))
+
+
+def test_savings_name_does_not_hide_a_later_automation_hub() -> None:
+    request = consistent_request(
+        create_fixture_product_spec(
+            hubs=(
+                "Automatic Savings Planner",
+                "Auto-sync savings",
+                "Habit Builder",
+                "Budget Tracker",
+                "Meal Planner",
+                "Fitness Log",
+            )
+        )
+    )
+    _refuse(request)
+
+
+@pytest.mark.parametrize(
+    "identity",
+    ("10k reviews", "2.5k ratings", "1k+ orders", "5K sold"),
+)
+def test_count_shorthand_is_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+def test_automatic_savings_planner_exact_name_publishes() -> None:
+    allowed = _bound("identity", "Automatic Savings Planner")
+    copy = merchandise(allowed)
+    assert "Automatic Savings Planner" in copy.draft.title.text
+    assert validate_claims(copy.draft, allowed).passed is True
+
+
+@pytest.mark.parametrize(
+    "identity",
+    ("Automatic Savings sync", "Automatic savings planner runs itself"),
+)
+def test_automatic_savings_other_wording_is_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+def _with_built_pages(request: MerchandisingInput, count: int) -> MerchandisingInput:
+    facts = tuple(
+        fact.model_copy(update={"fact_value": str(count)})
+        if fact.fact_key == "page_count"
+        else fact
+        for fact in request.facts
+    )
+    return request.model_copy(update={"facts": facts, "page_count": count})
+
+
+@pytest.mark.parametrize(
+    ("kind", "value"),
+    (
+        ("identity", "12 Page Monthly View Planner"),
+        ("identity", "12 Page Daily Spread Bundle"),
+        ("feature", "Plus 12 page layout pack"),
+        ("feature", "4 page weekly layout"),
+    ),
+)
+def test_invented_layout_count_is_refused(kind: str, value: str) -> None:
+    _refuse(_bound(kind, value))
+
+
+def test_layout_count_publishes_when_it_is_one_or_the_built_count() -> None:
+    matching = _with_built_pages(_bound("identity", "12 Page Monthly View Planner"), 12)
+    copy = merchandise(matching)
+    assert "12 Page Monthly View Planner" in copy.draft.title.text
+    assert validate_claims(copy.draft, matching).passed is True
+    weekly = _with_built_pages(_bound("feature", "4 page weekly layout"), 4)
+    weekly_copy = merchandise(weekly)
+    shown = " ".join(section.text for section in weekly_copy.draft.description_sections)
+    assert "4 page weekly layout" in shown
+    assert validate_claims(weekly_copy.draft, weekly).passed is True
+    summary = _bound("identity", "One Page Summary")
+    summary_copy = merchandise(summary)
+    assert validate_claims(summary_copy.draft, summary).passed is True
+    per_day = _bound("feature", "One page per day")
+    per_day_copy = merchandise(per_day)
+    assert validate_claims(per_day_copy.draft, per_day).passed is True
 
 
 @pytest.mark.parametrize(

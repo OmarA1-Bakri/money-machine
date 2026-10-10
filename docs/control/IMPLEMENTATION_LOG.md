@@ -1,3 +1,115 @@
+## 2026-10-10 — Session 08 W1 follow-up: collapse-edge tests
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
+
+This paragraph answers Reviewer review 5480871036 and Verifier comment 6102261773 on `5e3560d`. Tests and body only. `src/money_machine/domain/services/claim_validation.py` is unchanged. The code commit remains `ae74bf4`. The test commit is `f3245c0`. It does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, or `IMPLEMENTATION_STATE.json`.
+
+1. `test_count_separators_collapse_on_both_sides` refuses the collapse-edge forms. With the AST meta-tests deselected (62 deselected), each mutant is one site. Changing only the `_COUNT_WORD` tail `(?![^\W_])` to `\b` publishes `500.reviews_x` and `500_ratings_x` (2 failed, 754 passed). Changing only the collapse-after lead `(?<![^\W_])` to `\b` publishes `x_reviews.500`, `x_sold.500`, `x_orders/12`, and `x_ratings+4.9` (4 failed, 752 passed). Forcing the separator run to start with a mark publishes `500 . reviews`, `500 - reviews`, `reviews / 500`, and `Reviews - 4.9` (4 failed, 752 passed). Changing only the word-first sold/orders lead `(?<![^\W_])` to `\b` publishes `x_sold.500`, `x_orders/12`, and `x_sold 500` (3 failed, 753 passed).
+2. The word-first sold/orders rule is an accepted fail-closed over-refusal. `test_word_first_sold_and_orders_names_fail_closed` refuses `Sold 4 Ways`, `Orders 2026 Log`, `Orders 2026 Tracker`, `Sold 3 Times Journal`, `Orders 1-5 Log`, `Orders-1 Planner`, `Pre-orders 2026 Log`, `Back-orders 10 Planner`, and `Wholesale Orders 2026`. `Sold 1 000` and `Orders 12 345` are refused by the same rule. `Sold: 500`, `Orders: 12`, `500.sold_x`, and `12-orders_x` still publish, and they publish at `e47960b` and at `c3d20082`.
+3. Digit-internal marks stay in the number: `4.9` and `1,000` stay whole. A `+` in the separator run next to the count word collapses with that run, so `2.5k+ sold` scans as `2.5k sold`. A separator beside `sold` is rewritten, so `#1.sold` scans as `#1 sold`. Both stay refused. Every check other than the review, rating, sold, and orders counts uses the original text.
+4. Four mutants are equivalent on this tree, with the AST meta-tests deselected: the collapse lookbehind without `+`, deleting the `_COUNT_WORD` tail, deleting the collapse-after lead, and a separator run that needs no mark. Each was 756 passed, 62 deselected, no `FAILED`.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/domain/test_claim_validation.py tests/unit/domain/test_listing_binding.py tests/unit/agents/test_merchandising.py --basetemp /tmp/s08-w1-r6-focused` — 818 passed in 15.21s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-r6-pytest`: 12 failed, 4116 passed, 193 skipped, 1 warning in 381.52s (0:06:21). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Pyright also printed its upgrade notice, v1.1.411 to v1.1.414. Those commands and the pytest run are the tree at `f3245c0`. This paragraph was written after that run.
+
+## 2026-10-10 — Session 08 W1 follow-up: count separators collapse on a scan copy
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
+
+This paragraph answers Reviewer review 5480568197 and Verifier comment 6101283065 on `e47960b`. The code commits on this branch are `6312d14`, `d13c5f1`, `de26e94`, `61dac83`, `62bdf1a`, and `ae74bf4`. CodeRabbit's ungated auto-fix `4de05a6` stays superseded by `62bdf1a`. Round 5 supersedes the separator classes in `62bdf1a`. It does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, or `IMPLEMENTATION_STATE.json`.
+
+1. The review, rating, sold, and orders count checks run on a scan-only copy. A run of `.`, `_`, `/`, `-`, `+`, and whitespace that sits beside a digit run and `review(s)`, `rating(s)`, `sold`, or `orders` becomes one space, on either side of the count. `4.9`, `1,000`, and `2.5k+` stay whole. A dot after a number is a separator. Rank text is not rewritten, and every other check uses the original text. `:` or `=` counts when the word comes first. `500.+ reviews`, `500.+reviews`, `4.9.+ rating`, `1,000.+ ratings`, `1k.+ sold`, `500_+ orders`, and `Planner.12 sold` are refused. `test_count_separators_collapse_on_both_sides` is one table of separator, order, and word for `review`, `rating`, `sold`, and `orders`, both count-before-word and word-before-count, plus `500 reviews_x` and `x_reviews 500`. Deleting `_count_scan` publishes the separator forms (59 failed, 254 passed). Dropping one character from the collapse set publishes that mark. A cited fact `500.+ reviews` still covers the collapsed span.
+2. Dropping the decimal group from sold, from orders, or from the review-before count still refuses the same dotted and separator forms (64 passed, no `FAILED`, on each mutant). Those three mutants are equivalent. Reviewer measured 29 decimal forms across 12 fields with identical output, and a 200,000-string fuzz with 0 differences.
+
+Still publishing, and parked: `;`, a comma between the word and a following number (`reviews, 500`), `:`, `=`, parentheses, `Reviews: +500`, `500sold`, `2.5 thousand sold`, `2.5ksold`, `Five_Star`, `5_Star`, `Five.Star`, `Rave_Reviews`, and `RavingFans`. A comma inside the digit run stays a thousands separator, so `500, reviews` and `1,000. ratings` are refused. `500sold` publishes because sold and orders require a separator. `500 : reviews` and `500 = reviews` publish because `:` and `=` count only when the word comes first.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/domain/test_claim_validation.py tests/unit/domain/test_listing_binding.py tests/unit/agents/test_merchandising.py --basetemp /tmp/s08-w1-r5-focused-commit` — 794 passed in 14.80s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-r5-pytest`: 12 failed, 4092 passed, 193 skipped, 1 warning in 381.56s (0:06:21). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Pyright also printed its upgrade notice, v1.1.411 to v1.1.414. Those commands and the pytest run are the tree at `ae74bf4`. This paragraph was written after that run.
+
+## 2026-10-10 — Session 08 W1 follow-up: dotted review counts
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
+
+This paragraph answers Reviewer review 5480256571 and Verifier comment 6100498026 on `2a835824`. The code commits on this branch are `6312d14`, `d13c5f1`, `de26e94`, `61dac83`, and `62bdf1a`. CodeRabbit's ungated auto-fix `4de05a6` is superseded by `62bdf1a`. It does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, or `IMPLEMENTATION_STATE.json`.
+
+1. A digit run joined to `review(s)` or `rating(s)` by spaces, `.`, `_`, `/`, or `-` is a count, in either direction. `:` or `=` may sit between the word and the digit. There is no year exemption and no rating-scale exemption. The `(?<![\d.])` lookbehind is gone from the review-before count, from sold, and from orders. `500.reviews`, `500. reviews`, `4.9. rating`, `1,000. ratings`, `2026.reviews`, `Planner.500 reviews`, `Notes...500 reviews`, `Planner.500 sold`, `Gift.500 orders`, `500.sold`, and `500. sold` are refused. `500sold` still publishes. Re-adding a year guard publishes `1999 review`, and `test_readding_a_review_exemption_publishes_a_count` fails. Re-adding a scale guard publishes `Reviews 1 100`, and the same test fails. The test prepends those guards onto the named patterns. It does not match source anchors.
+2. `Raves` is refused. Dropping `es` from the rave alternation publishes `Raves` (1 failed, 8 passed).
+3. `One Starry Night`, `Chapter #1`, `Book #1`, `Level #1`, `Lap #1 Running`, `Automatic Savings Planner` per list item, `Book Review Journal`, `Star Chart Planner`, and the price tests stay as they were at `2a835824`.
+
+A letter or digit glued to the side of the word opposite the number still publishes (`500 reviewsX`, `Xreviews 500`). A semicolon does not join (`500; reviews` publishes). A comma between the word and a following number does not join (`reviews, 500` publishes). A comma inside the digit run is a thousands separator, so `500, reviews` is refused. Still publishing, and still parked: `Five_Star`, `5_Star`, `Rave_Reviews`, `RavingFans`.
+
+Re-adding `(?<![\d.])` on the review-before count publishes `Planner.500 reviews` and `Notes...500 reviews` (2 failed, 9 passed). Dropping the decimal group from sold, or from orders, still refuses `2.5k sold` and `1.5k orders` (4 passed, no `FAILED`). Those two mutants survive because the lookbehind is gone.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/domain/test_claim_validation.py tests/unit/domain/test_listing_binding.py tests/unit/agents/test_merchandising.py` — 721 passed in 14.04s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-r4-pytest`: 12 failed, 4019 passed, 193 skipped, 1 warning in 379.25s (0:06:19). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Pyright also printed its upgrade notice, v1.1.411 to v1.1.414. Those commands and the pytest run are the tree at `62bdf1a`. This paragraph was written after that run.
+
+## 2026-10-10 — Session 08 W1 follow-up: review counts fail closed
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
+
+This paragraph answers Reviewer review 5479821148 and Verifier comment 6099794239 on `317e8c09`. The code commits on this branch are `6312d14`, `d13c5f1`, `de26e94`, and `61dac83`. It does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, or `IMPLEMENTATION_STATE.json`.
+
+1. A review or rating word next to a number is a count. The year exemption and the 0/1 rating-scale exemption are deleted. `Reviews 1 100`, `Ratings 1 100`, `Reviews 1 10 000`, `Ratings 1-5+`, `Rating 1-5.5`, `Ratings 1-5: 5`, `Rating 1-10 = 10`, `Review 2026 500`, `Year in Review 2026 4.9`, `1999 review`, `Review 2000`, and `2026 reviews` are refused. Re-adding the year exemption publishes `1999 review`. Re-adding the scale exemption publishes `Reviews 1 100`.
+2. Sale price `8.98` and `9.00` against `8.99` are rejected, and the same values as anchors against anchor `8.99`. With the three AST meta-tests deselected, both-field `±0.01`, both-field `±0.011`, price-only `±0.01`, anchor-only `±0.01`, and `round(x, 1)` each accept `8.98` or `9.00` and fail those behavioural tests.
+3. `One Starry Night` publishes. `Chapter #1`, `Book #1`, `Level #1`, and `Lap #1 Running` still publish. `Goal #01 on Etsy` is refused. A hub list `Automatic Savings Planner|Auto-sync savings` is refused. `42 Page Planner` is refused when the built count is 42. A near-price correction cites the price fact.
+
+Parked to next wave: known fail-closed over-refusals: `Year in Review 2026`, `2026 Review`, `Rating 1-10 Mood`, `Rating 0-100 Score`, and `Rating 1-5`.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/domain/test_claim_validation.py tests/unit/domain/test_listing_binding.py tests/unit/agents/test_merchandising.py` — 702 passed in 13.91s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-r3-pytest`: 12 failed, 4000 passed, 193 skipped, 1 warning in 378.85s (0:06:18). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those commands and the pytest run are the tree at `61dac83`. This paragraph was written after that run.
+
+## 2026-10-10 — Session 08 W1 follow-up: year counts, joined stems, exact cents
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
+
+This paragraph answers Reviewer review 5479413274 and Verifier comment 6098830346 on `f983fe5`. The code commits on this branch are `6312d14`, `d13c5f1`, and `de26e94`. It does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, or `IMPLEMENTATION_STATE.json`.
+
+1. A year is exempt only beside singular `review`, with no `:`, `=`, `+`, `k`, or further digit. `1900` and `2000` stay counts, so `2000 review` is refused and `Year in Review 2026` and `2026 Review` still publish. A number after `rating`, `ratings`, or `reviews` is never a year. A range is exempt only for 0 or 1 through 5, 10, or 100. `Reviews: 2000`, `Reviews 2000+`, `Ratings: 1999`, `Ratings = 2024`, `Reviews 2 500`, `Reviews 12 000`, `Rating 4 9`, and `Rating 5-5` are refused. `Rating 1-10 Mood` still publishes.
+2. `RaveReviews`, `5StarPlanner`, `FiveStarPlanner`, `Unattendedsync`, `top_rated`, `Best_seller`, `best.seller`, and `raving fans` are refused. `_` and `.` join tokens. `Travel Planner`, `Brave Habits Planner`, and `Raven` still publish.
+3. `Automatic Savings Planner` is compared per `|` item. It publishes as a hub, feature, variant, dashboard output, support channel, or gift name. A longer item is still scanned.
+4. Sale price `8.90` and `8.01` against `8.99` are rejected, and the same values as anchors against anchor `8.99`. An `int()` coercion accepts `8.01`. A three-character string coercion accepts `8.90`.
+5. `#01 Planner`, `#1-on Etsy`, `#1, on Etsy`, and `# 1 Planner` are refused. `Chapter #1`, `Book #1`, `Level #1`, and `Lap #1 Running` publish. `#10 Planner` publishes. `10 k reviews`, `2.5k sold`, `1.5k orders`, and `5k+ sold` are refused. `Twelve page overview` publishes when the built count is 12. `13 page layout` is refused at that count.
+
+Parked: `10K+ happy buyers`, `12k sales`, k-download forms, `Goal #1 choice` / `Goal #1 at`, and `Over 12 page layouts` at built 12.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/domain/test_claim_validation.py tests/unit/domain/test_listing_binding.py tests/unit/agents/test_merchandising.py` — 668 passed in 13.88s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-r2-pytest`: 12 failed, 3966 passed, 193 skipped, 1 warning in 379.53s (0:06:19). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those commands and the pytest run are the tree at `de26e94`. This paragraph was written after that run.
+
+## 2026-10-10 — Session 08 W1 follow-up: k counts, savings name, layout count
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
+
+This paragraph answers Verifier comment 6097852533 on `6c853b7c`. It does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, or `IMPLEMENTATION_STATE.json`.
+
+1. `10k reviews`, `2.5k ratings`, `1k+ orders`, and `5K sold` are refused. Review and sales counts accept a `k`/`K` suffix, a decimal, and a trailing `+`.
+2. Only the exact fact `Automatic Savings Planner` is exempt from the automation probes. `Automatic Savings sync` and `Automatic savings planner runs itself` are refused. Rendered prose drops that exact name and runs the probes on the rest.
+3. A singular-page layout span is exempt only when the number is 1 or equals the built `page_count`. With 42 built, `12 Page Monthly View Planner`, `12 Page Daily Spread Bundle`, `Plus 12 page layout pack`, and `4 page weekly layout` are refused. The same number publishes when it is the built count. `One Page Summary` and `One page per day` stay allowed.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/domain/test_claim_validation.py tests/unit/domain/test_listing_binding.py tests/unit/agents/test_merchandising.py` — 622 passed in 13.05s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-b5-pytest`: 12 failed, 3920 passed, 193 skipped, 1 warning in 378.06s (0:06:18). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those commands and the pytest run are the tree at `d13c5f1`. This paragraph was written after that run.
+
+## 2026-10-10 — Session 08 W1 follow-up: #1 rank claims, long stems, price_sale kills
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
+
+This follow-up does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, or `IMPLEMENTATION_STATE.json`. It answers Reviewer review 5479034788, which still stood when #67 squash-merged as `c3d20082`.
+
+1. `#1` is a rank claim unless the word immediately before it is `room`, `goal`, `step`, `part`, `week`, or `day`. `on`, `in`, `pick`, and `seller` after `#1` stay rank claims, including after those labels. `Room #1 Inventory` and `Goal #1` publish.
+2. `bestsell`, `automat`, `autofill`, `testimonial`, and `top-rated` have no word boundaries. Short tokens keep theirs. Review stems use `\brav(?:e[sd]?|ing)\b`. `Travel Planner`, `Gravel Bike Log`, `Brave Habits Planner`, `Raven`, and the other #67 round-5 names publish.
+3. Dropping `currency`, `price`, or `anchor_price` from the `price_sale` comparison is killed by that field's own mismatch. With no price claim, the correction cites `claims[0]`. Dropping that fallback raises `AttributeError`. Citing `claims[0]` while a price claim exists is killed.
+4. The round-5 log cited unpushed `b2834703`. The commit on #67 is `4c6f982`.
+5. `One-Hundred-Printable-Pages` and `200-printable-pages` are refused. `Year in Review 2026`, `2026 Review`, and `Rating 1-10 Mood` publish.
+
+Parked: further Verifier items on `6c853b7c`, plus `200 pgs`, `pg`, and `sheets`.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-followup-pytest`: 12 failed, 3909 passed, 193 skipped, 1 warning in 381.67s (0:06:21). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those commands and the pytest run are the tree at `6312d14`. This paragraph was written after that run.
+
 ## 2026-10-10 — Session 08 W1 round 5: ignorable characters, count claims, and word boundaries
 
 Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
@@ -14,7 +126,7 @@ Mutation check: each fix was reverted on a copy of this tree and the focused sui
 
 Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/domain/test_claim_validation.py tests/unit/domain/test_listing_binding.py tests/unit/agents/test_merchandising.py` — 573 passed in 13.57s.
 
-Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /workspace/p67r5-pytest`: 12 failed, 3871 passed, 193 skipped, 1 warning in 125.82s (0:02:05). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those commands and the pytest run are the tree at `b2834703`. This paragraph was written after that run.
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /workspace/p67r5-pytest`: 12 failed, 3871 passed, 193 skipped, 1 warning in 125.82s (0:02:05). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those commands and the pytest run are the tree at `4c6f982`. This paragraph was written after that run.
 
 ## 2026-10-10 — Session 08 W1 round 4: fact text is scanned before rendering
 
