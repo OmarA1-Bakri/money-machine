@@ -1,5 +1,24 @@
 # Test Evidence
 
+## 2026-10-10 — Session 07 W13: QA caller-trust limits
+
+**Verification scope**: Fixture-only QA digest, caller re-run limit, and secret-link facts. No live HTTP, no real Notion workspace, no Etsy listing, no `--execute`, no Exit 78 lift. State revision 61 → 62. `head_sha` `48b93bccf1e1688baf287aeb9e0b428caa0761e3` is the W12 commit and the tip-sync pointer. It is not this commit.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Session 07 incomplete | `current_session` 7, `session_status` incomplete, revision 62, twelve evidence keys stay false. This is not SESSION_07 COMPLETE | PASS |
+| Newline digest | `test_prose_digest_newline_boundary_does_not_collide`. The newline join is equal. The length-prefixed digest is not | PASS for this slice |
+| Judged re-run | `test_judged_caller_can_refresh_changed_prose`. Same names and row identity, prose edited, verdict `PASS`, digest replaced | PASS for this slice |
+| Mismatched caller | `test_mismatched_caller_cannot_refresh_changed_prose` for renamed hubs and identity `Not The Row`. Raises `qa caller does not match`, bytes unchanged, 0 adapter writes | PASS for this slice |
+| Query, userinfo, fragment | `test_query_userinfo_and_fragment_are_not_secret_link_facts`. Fact is the host repeated. `sk-live-secret` is absent from the QA object | PASS for this slice |
+| Raw token | `test_non_url_secret_link_fact_is_missing`. The fact word is `missing`. The token is absent from the QA object | PASS for this slice |
+| Affected regression | `test_notion_product_qa.py`, `test_notion_fact_ledger.py`, `test_notion_test_matrix.py`: 710 passed | PASS |
+| Lint and types | `ruff check` and `pyright` 1.1.411 on `notion_qa.py` and the QA test: 0 errors | PASS |
+| Full local pytest | Not run this wave | NOT RUN |
+| Exit 78 | Scheduler held. No production Notion or Etsy mutation | HELD |
+
+**Status**: Session 07 Wave 13. The session stays incomplete. This is not SESSION_07 COMPLETE. Exit 78 stays HELD. The live sandbox is not started.
+
 ## 2026-10-10 — Session 07 W12: fixture section 11 test matrix
 
 **Verification scope**: Fixture-only section 11 matrix. No live HTTP, no real Notion workspace, no Etsy listing, no `--execute`, no Exit 78 lift. State revision 60 → 61. `head_sha` `ae2ca6e41a0c6ff87437a53db91feb50bc5a82b3` is the W11 squash and the tip-sync pointer. It is not this commit.

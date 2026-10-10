@@ -32,6 +32,16 @@
 
 Router browser and combined config modes still raise `NotImplementedError` (W4a). Fixture mode stays the default.
 
+## Session 07 — Wave 13 in progress
+
+**Status**: Incomplete (2026-10-10, W13, state revision 62). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `48b93bccf1e1688baf287aeb9e0b428caa0761e3` is the W12 commit. It is the tip-sync pointer. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD.
+
+QA caller trust is tightened. `prose_digest` length-prefixes each field, so a newline cannot move a field boundary. A digest change re-runs QA only for the judged hub names and the notification row Name (D-0031). A renamed hub set, or identity `Not The Row`, raises `qa caller does not match` and writes nothing. Secret-link facts are `scheme://host` or `missing`. Userinfo, the query, and the fragment are not stored. The live sandbox is not started. Counts are in `IMPLEMENTATION_LOG.md` and `TEST_EVIDENCE.md`.
+
+`docs/control` edits this wave: `IMPLEMENTATION_STATE.json` (revision 61 to 62, `head_sha` `48b93bccf1e1688baf287aeb9e0b428caa0761e3`), `IMPLEMENTATION_LOG.md`, `NEXT_SESSION.md`, `TEST_EVIDENCE.md`, `DECISIONS.md`, and `docs/control/reviews/2026-10-05-session-07-prompt-integrity.md`.
+
+Parked: the live sandbox; in-place formula, linked-view, and section repair; action 12 commissioning; the twelve evidence keys; the QA operand survivors at `notion_qa.py:143` and `:154`. This wave did not re-run that sweep.
+
 ## Session 07 — Wave 12 in progress
 
 **Status**: Incomplete (2026-10-10, W12, state revision 61). This is not a session close and it is not SESSION_07 COMPLETE. Twelve evidence keys stay false. `next_session` stays 7. `next_prompt` stays `10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. STATE `head_sha` `ae2ca6e41a0c6ff87437a53db91feb50bc5a82b3` is the W11 squash. It is the tip-sync pointer. It is not this commit. `evidence_closure_commit_sha` stays the Session 06 closure tip. `last_verified_commit` stays bootstrap. Exit 78 scheduler stays HELD.

@@ -42,6 +42,7 @@ from money_machine.agents.implementations.notion_progress import (
 from money_machine.agents.implementations.notion_qa import (
     PHASE_FACT_LEDGER,
     load_qa_record,
+    prose_digest,
     run_product_qa,
 )
 from money_machine.agents.implementations.notion_variants import (
@@ -1564,6 +1565,153 @@ async def test_prose_digest_must_be_lowercase_hex(tmp_path: Path, digest: object
         await run_product_qa(spec, probe, path, recorded_at=LATER)
     assert calls == []
     assert path.read_bytes() == raw
+
+
+def _newline_joined(spec: ProductSpec) -> str:
+    rows = [hub.description for hub in spec.hubs]
+    rows.append(spec.buyer_problem)
+    rows.append(spec.flagship_feature)
+    return "\n".join(rows)
+
+
+def test_prose_digest_newline_boundary_does_not_collide() -> None:
+    """A newline inside one field must not hash as the next field.
+
+    Joining on a newline makes ``alpha\\nbeta`` plus buyer ``gamma`` the same
+    text as description ``alpha`` plus buyer ``beta\\ngamma``.
+    """
+    base = planner_spec()
+    last = base.hubs[-1]
+    left = base.model_copy(
+        update={
+            "hubs": (*base.hubs[:-1], last.model_copy(update={"description": "alpha\nbeta"})),
+            "buyer_problem": "gamma",
+        }
+    )
+    right = base.model_copy(
+        update={
+            "hubs": (*base.hubs[:-1], last.model_copy(update={"description": "alpha"})),
+            "buyer_problem": "beta\ngamma",
+        }
+    )
+    assert _newline_joined(left) == _newline_joined(right)
+    assert prose_digest(left) != prose_digest(right)
+
+
+def _rewrite_purposes(
+    probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
+) -> None:
+    for hub in stored.identity_hubs:
+        for role, block_id in hub.sections:
+            if role != "purpose":
+                continue
+            block = probe.blocks[block_id]
+            assert type(block) is NotionTextBlock
+            block.content = section_content(spec, hub.name, role)
+
+
+@pytest.mark.asyncio
+async def test_judged_caller_can_refresh_changed_prose(tmp_path: Path) -> None:
+    """Same hub names and the same row identity may be judged again."""
+    spec, probe, path = await _built(tmp_path)
+    first_run = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    assert first_run.qa is not None
+    stored, _created = load_variant_checkpoint(path)
+    edited = spec.hubs[0].model_copy(update={"description": spec.hubs[0].description + " Edited"})
+    caller = spec.model_copy(update={"hubs": (edited, *spec.hubs[1:])})
+    _rewrite_purposes(probe, stored, caller)
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(caller, probe, path, recorded_at=LATER)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "PASS"
+    assert checkpoint.qa.prose_digest == prose_digest(caller)
+    assert checkpoint.qa.prose_digest != first_run.qa.prose_digest
+    assert checkpoint.recorded_at == LATER
+    assert calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["renamed", "forged"])
+async def test_mismatched_caller_cannot_refresh_changed_prose(tmp_path: Path, kind: str) -> None:
+    """A digest change from a caller QA did not judge writes nothing."""
+    spec, probe, path = await _built(tmp_path)
+    await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+    edited = spec.hubs[0].model_copy(update={"description": spec.hubs[0].description + " Edited"})
+    hubs = (edited, *spec.hubs[1:])
+    if kind == "renamed":
+        hubs = tuple(hub.model_copy(update={"name": "Other " + hub.name}) for hub in hubs)
+        caller = spec.model_copy(update={"hubs": hubs})
+    else:
+        caller = spec.model_copy(update={"hubs": hubs, "identity": "Not The Row"})
+    raw = path.read_bytes()
+    calls = watch_adapter_writes(probe)
+
+    with pytest.raises(ProductBuildError, match="qa caller does not match"):
+        await run_product_qa(caller, probe, path, recorded_at=LATER)
+
+    assert calls == []
+    assert path.read_bytes() == raw
+    assert prose_digest(caller) != prose_digest(spec)
+
+
+@pytest.mark.asyncio
+async def test_query_userinfo_and_fragment_are_not_secret_link_facts(tmp_path: Path) -> None:
+    """The fact keeps scheme and host. Userinfo, the query, and the fragment do not."""
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    secret = "sk-live-secret"
+    forged = f"https://user:{secret}@fixture.notion.site/{page.id}?{secret}=1#{secret}"
+    page.is_published = False
+    page.public_url = forged
+
+    def _forge(document: dict[str, object]) -> None:
+        def _one(row: dict[str, object]) -> None:
+            if row["page_id"] == page.id:
+                row["secret_link"] = forged
+
+        _edit_variant_rows(document, _one)
+
+    restamp_checkpoint(path, _forge)
+    calls = watch_adapter_writes(probe)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    assert checkpoint.qa.verdict == "BLOCKED"
+    facts = dict(checkpoint.qa.facts)
+    host = "https://fixture.notion.site"
+    assert facts["secret_links"] == ",".join([host] * len(spec.colour_variants))
+    assert secret not in json.dumps(_qa_body(path))
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_non_url_secret_link_fact_is_missing(tmp_path: Path) -> None:
+    """A raw token is not copied into the fact."""
+    spec, probe, path = await _built(tmp_path)
+    page = _colour_pages(probe, spec)[0]
+    secret = "sk-live-secret"
+    page.is_published = False
+    page.public_url = secret
+
+    def _forge(document: dict[str, object]) -> None:
+        def _one(row: dict[str, object]) -> None:
+            if row["page_id"] == page.id:
+                row["secret_link"] = secret
+
+        _edit_variant_rows(document, _one)
+
+    restamp_checkpoint(path, _forge)
+
+    checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
+
+    assert checkpoint.qa is not None
+    facts = dict(checkpoint.qa.facts)
+    hosts = ["missing", *(["https://fixture.notion.site"] * (len(spec.colour_variants) - 1))]
+    assert facts["secret_links"] == ",".join(hosts)
+    assert secret not in json.dumps(_qa_body(path))
 
 
 @pytest.mark.asyncio

@@ -262,13 +262,20 @@ def _require_qa(value: object) -> QaRecord:
 def prose_digest(spec: ProductSpec) -> str:
     """Digest of the descriptions, buyer, and flagship QA judged.
 
-    Hub names and the row identity are not part of it. A later caller that
-    keeps those and changes this prose does not match the stored digest.
+    Hub names and the row identity are not part of it. Each field is
+    length-prefixed, so a newline inside one field cannot slide into the next.
+    A later caller that keeps the judged names and changes this prose does
+    not match the stored digest.
     """
     rows = [hub.description for hub in spec.hubs]
     rows.append(spec.buyer_problem)
     rows.append(spec.flagship_feature)
-    return hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()
+    payload = bytearray()
+    for row in rows:
+        encoded = row.encode("utf-8")
+        payload.extend(len(encoded).to_bytes(4, "big"))
+        payload.extend(encoded)
+    return hashlib.sha256(bytes(payload)).hexdigest()
 
 
 def _hex_digest(value: str) -> bool:
@@ -326,8 +333,15 @@ async def _saved_holds(
     spec: ProductSpec,
     saved: QaRecord,
 ) -> bool:
-    """True when the stored verdict still stands. A fixed BLOCKED record is re-run."""
+    """True when the stored verdict still stands. A fixed BLOCKED record is re-run.
+
+    A digest change is a new judgement only for the caller QA already judged:
+    the same hub names, in order, and the same notification-row identity.
+    Any other caller is refused before a new record is written.
+    """
     if saved.prose_digest != prose_digest(spec):
+        if not _judged_caller(probe, stored, spec):
+            raise ProductBuildError("qa caller does not match")
         return False
     plan = await _plan(probe, stored, spec)
     facts = _facts(stored, spec, probe)
@@ -692,6 +706,35 @@ def _known_page_ids(stored: ProductBuildCheckpoint) -> set[str]:
 _FIXTURE_LINK_HOST = "fixture.notion.site"
 
 
+def _judged_caller(
+    probe: FixtureNotionAdapter,
+    stored: ProductBuildCheckpoint,
+    spec: ProductSpec,
+) -> bool:
+    """True when this caller is the hub set the stored QA record judged.
+
+    The names are the checkpoint hubs, in order. The identity is the
+    notification row Name, not the caller's title. A missing row is not a match.
+    """
+    stored_names = tuple(hub.name for hub in stored.identity_hubs)
+    caller_names = tuple(hub.name for hub in spec.hubs)
+    if stored_names != caller_names:
+        return False
+    notice = stored.notification_dashboard
+    if notice is None:
+        return False
+    page = probe.pages.get(notice.row_page_id)
+    if type(page) is not NotionPage:
+        return False
+    properties = page.properties
+    if type(properties) is not dict:
+        return False
+    name = properties.get("Name")
+    if type(name) is not str:
+        return False
+    return spec.identity == name
+
+
 def _trusted_secret_link(page_id: str) -> str:
     """Fixture publish shape: one host and the page id as the only path segment."""
     return "https" + "://" + _FIXTURE_LINK_HOST + "/" + page_id
@@ -911,12 +954,24 @@ def _accounted_facts(
     }
 
 
-def _normalised_secret_link(link: str, page_id: str) -> str:
-    """Drop a trailing slash and page id. The query and fragment stay."""
-    suffix = "/" + page_id
-    if link.endswith(suffix):
-        return link[: -len(suffix)]
-    return link
+def _normalised_secret_link(link: str, _page_id: str) -> str:
+    """Scheme and host only.
+
+    The page id, userinfo, port, path, query, and fragment are not stored.
+    A value that is not an http(s) URL with a host, or that contains
+    whitespace, is the word missing. The raw string is not copied into the fact.
+    """
+    if link == "" or any(character.isspace() for character in link):
+        return "missing"
+    scheme, separator, rest = link.partition("://")
+    if separator == "" or scheme not in {"http", "https"} or rest == "":
+        return "missing"
+    rest = rest.split("?", 1)[0].split("#", 1)[0]
+    authority = rest.split("/", 1)[0]
+    host = authority.rsplit("@", 1)[-1].split(":", 1)[0]
+    if host == "" or host.strip() != host or any(mark in host for mark in (",", ";", "=", "@")):
+        return "missing"
+    return scheme + "://" + host
 
 
 def _present_page_count(stored: ProductBuildCheckpoint, probe: FixtureNotionAdapter) -> int:

@@ -782,3 +782,78 @@ This addendum governs Wave 12. The prompt remains the unamended source of record
 | In-place formula, linked-view, and section repair | A later wave that adds fixture update methods | D-0030. A new id would not match the stored checkpoint |
 | Action 12 commissioning | Operator decision after full implementation | S-02 |
 | Twelve evidence keys | Session close, after the prompt's own criteria | A fixture matrix is not that gate |
+
+# Session 07 Prompt Integrity Review — Wave 13
+
+**Date:** 2026-10-10
+**Prompt:** `prompts/implementation/10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md`
+**Verified SHA-256:** `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`
+**Workbook authority:** `hands-off-money-machine-full-implementation-workbook.md` appendix row for this prompt (5,255 bytes, 237 lines)
+**Scope:** Wave 13 only. Close the parked QA caller-trust holes: the prose-digest join, the re-run on a mismatched caller, and query-string forms in secret-link facts. The live sandbox is not this wave. Waves 1–12 above still govern their phases.
+
+The prompt file is not amended.
+
+## 1. Prompt authenticity
+
+**Status:** VERIFIED
+
+- The extracted file's SHA-256 equals the workbook appendix value `d52011a6f0b725b16427629dc664cfc9f3432c4b5f71d26ce032d4b6c8ecb39d`.
+- The file is 5,255 bytes and 237 lines, matching the appendix row.
+- The prompt stays the unamended source of record.
+
+## 2. Three-dimensional review
+
+### Fidelity
+
+**Verdict:** CONDITIONAL APPROVE. One high finding, resolved by the addendum and by D-0031.
+
+**F-01 [HIGH] — A joined digest and an open QA re-run are not the D-0029 limit**
+
+- **Prompt lines:** 155–170, against D-0029's caller-trust paragraph.
+- **Authority:** D-0029 stores the digest so a later caller cannot adopt prose QA did not judge. A newline join is not that store. Re-running QA for every mismatch lets a renamed caller refresh the digest.
+- **Consequence of leaving it:** Two different prose values share a digest, or a mismatched caller writes a new PASS and the ledger then accepts it.
+- **Amendment:** D-0031. The digest is length-prefixed. Only the judged caller may re-run. Secret-link facts drop userinfo, the query, and the fragment.
+
+**What the prompt already gets right**
+
+- Product facts and secret links are part of the build (lines 155–184).
+- The live sandbox and commissioning stay out of this slice (lines 202–206).
+
+### Safety and executability
+
+**Verdict:** CONDITIONAL APPROVE. The Wave 1 critical and high findings still apply and stay in force.
+
+**S-01 [CRITICAL] — Action 11 live sandbox.** Still deferred. This wave uses `FixtureNotionAdapter` only. No live HTTP, no real Notion workspace, no Etsy listing, no `--execute`, no Exit 78 lift.
+
+**S-02 [HIGH] — Action 12 commissioning.** A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. Do not edit `config/agents.yaml`.
+
+**S-03 [HIGH] — Tip-sync must not look like completion.** `head_sha` becomes the W12 commit `48b93bccf1e1688baf287aeb9e0b428caa0761e3`. It does not become this wave's own commit. `evidence_closure_commit_sha` stays the Session 06 tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap. All twelve session 7 evidence keys stay false. `session_status` stays `incomplete`. This wave does not print `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE`. Advance `state_revision` from 61 to 62.
+
+### Gameability
+
+**Verdict:** CONDITIONAL APPROVE. One high finding, resolved by the addendum.
+
+**G-01 [HIGH] — A colliding digest or a stored query is a silent pass**
+
+- **Cheap fake:** Join prose on a newline, or copy `?token=` into the secret-link fact, and call the record trusted.
+- **Ungameable for this wave:** The length-prefixed digest differs when the newline join does not. A mismatched caller writes nothing. The QA fact for a credentialed query URL is the host, and the token is absent from that object.
+
+## 3. Corrective addendum
+
+This addendum governs Wave 13. The prompt remains the unamended source of record.
+
+1. Prove the prompt hash, then implement only the slice below. Do not edit the prompt file.
+2. Tip-sync only: `head_sha` becomes `48b93bccf1e1688baf287aeb9e0b428caa0761e3`. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap `1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d`. Advance `state_revision` from 61 to 62. `session_status` stays `incomplete`. `current_session` stays 7. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6]`. `next_session` stays 7. `next_prompt` stays this prompt.
+3. Leave all twelve session 7 evidence keys false. Do not set `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE`. A07, A08, and A09 stay DESIGNED. `commissioned_agents` stays empty. Do not edit `config/agents.yaml` or `config/workflows.yaml`. Exit 78 stays HELD.
+4. Length-prefix the prose digest. Re-run QA on a digest change only for the judged caller. Store secret-link facts as scheme and host, or `missing`. D-0031 is the contract. D-0029 still holds for the ledger refusal.
+5. Tests use the fixture only, with sockets blocked. No live Notion, no Etsy, no `--execute`. Do not run the live sandbox.
+
+## 4. Deferrals
+
+| Finding | Owner | Reason |
+|---|---|---|
+| Live sandbox build | A later wave with explicit authorization | S-01 |
+| In-place formula, linked-view, and section repair | A later wave that adds fixture update methods | D-0030 |
+| Action 12 commissioning | Operator decision after full implementation | S-02 |
+| Twelve evidence keys | Session close | A caller-trust fix is not that gate |
+| QA operand survivors at `notion_qa.py:143` and `:154` | A later sweep | This wave did not re-run it |

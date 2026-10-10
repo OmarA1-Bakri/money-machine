@@ -324,7 +324,7 @@ A mismatched caller whose descriptions still equal the live section text is not 
 
 Amended 2026-10-08 after the verifier FAIL on tip `9eff481e`: reading buyer, flagship, and hub prose back off the live pages had turned a live edit into a ledger PASS. Amended again after reviewer review 5454105031 on tip `5dc55814`: the unmatched-caller branch was still reading that prose off the live pages. Amended again after verifier comment 6056684351 on the same tip: the refusal is the post-QA edit, and a 64-character name on the unmatched path stays legal. Amended again after verifier comment 6060511391 and CodeRabbit review 5455831580 on tip `45818d9e`: the checkpoint stores a digest of the QA-approved descriptions, buyer, and flagship. Amended again after reviewer review 5457879480 on the same tip: each variant name is checked on its own, a QA formula expression must be an exact `str`, and a provider `ProductBuildError` does not leave with its message or its cause chain. Amended again after verifier comment 6066644759 on tip `0b2007a7`: the read failure is raised after its handler has returned, so no provider or code error is reachable on `__cause__` or `__context__`, and an own-prefix message counts as an own refusal only when package code raised it and its cause is not a `ProviderFailure`. Amended again after reviewer review 5464808945 and verifier comment 6072697310 on tip `1e614857`: a fact that is a str subclass is refused, a variant name with a comma is refused, a QA provider response is neither stored nor raised, and a cancellation or other `BaseException` leaves the ledger read as a fresh error of the same kind with no text or chain. Amended again after reviewer review 5466065420 on tip `08484bf0`: any `Exception` from a QA provider call is recorded and raised under the fixed provider text, a custom `BaseException` keeps its kind only when building it runs no caller code (otherwise its nearest built-in base), and a `BaseExceptionGroup` keeps its kind with cleaned members.
 
-Caller-trust limit. The QA record stores `prose_digest`, the sha256 of the hub descriptions in order, then `buyer_problem`, then `flagship_feature`. Hub names and the row identity are not in that digest. `_plan` compares the stored digest with the caller's prose before `live_qa_passed` and before any write. A mismatch raises `fact ledger caller does not match` and writes nothing. `_saved_holds` returns false on that mismatch, so QA runs again and stores the new digest before a later ledger PASS. A caller who keeps the judged hub names and the row identity, and who changes a description, the buyer, or the flagship after QA, does not get a ledger PASS until that re-run. A mismatched caller who rewrites descriptions to edited pages is the same refusal when that prose is not the stored digest. The 64-character unnamed path still PASSes when the descriptions, buyer, and flagship are the ones QA judged. Forged prose that QA has not re-judged is not a ledger PASS.
+Caller-trust limit. The QA record stores `prose_digest`, the sha256 of the hub descriptions in order, then `buyer_problem`, then `flagship_feature`. Hub names and the row identity are not in that digest. `_plan` compares the stored digest with the caller's prose before `live_qa_passed` and before any write. A mismatch raises `fact ledger caller does not match` and writes nothing. Amended 2026-10-10 by D-0031: `_saved_holds` returns false, and QA runs again, only when that caller is the judged hub names and the notification-row identity. Any other caller raises `qa caller does not match` and writes nothing. The digest is length-prefixed. It is not a newline join. A caller who keeps the judged hub names and the row identity, and who changes a description, the buyer, or the flagship after QA, does not get a ledger PASS until that re-run. A mismatched caller who rewrites descriptions to edited pages is the same refusal when that prose is not the stored digest. The 64-character unnamed path still PASSes when the descriptions, buyer, and flagship are the ones QA judged. Forged prose that QA has not re-judged is not a ledger PASS.
 
 Supported devices are recorded as `unverified`. The free-update policy is recorded as `not_configured`. Nothing persisted verifies either one. Those tokens are not a device claim and not a free-update claim.
 
@@ -352,3 +352,22 @@ The matrix proves the fixture contract. It does not repair the three defects.
 ### Consequences
 
 A matrix `PASS` means the live fixture still matches the passing ledger. It is not a repair. Commissioning and the twelve evidence keys stay false. In-place repair waits for a later wave that adds fixture update methods without breaking stored ids.
+
+## D-0031 — QA prose is length-prefixed, and only the judged caller can refresh it
+
+**Status:** accepted for Session 07 Wave 13, 2026-10-10.
+
+### Context
+
+D-0029 stores a sha256 of the hub descriptions, the buyer problem, and the flagship feature. The first encoding joined those fields with a newline. A newline inside one field could hash as the next field. The same decision re-ran QA on every digest mismatch. A caller who was not the judged hub set could refresh the digest and then pass the ledger. Secret-link facts kept the query and the fragment, and a userinfo password survived the page-id strip.
+
+### Decision
+
+- `prose_digest` hashes each field with a 4-byte length prefix. Hub names and the row identity stay out of the digest.
+- A stored digest that differs from the caller is a new judgement only when the hub names match, in order, and `spec.identity` is the notification row Name. That caller may re-run QA.
+- Any other caller raises `qa caller does not match`. The checkpoint bytes stay as they were. No adapter write runs.
+- A secret-link fact is `scheme://host`, or the word `missing`. The page id, userinfo, port, path, query, and fragment are not stored.
+
+### Consequences
+
+The ledger still refuses a mismatched caller whose live prose is not the caller's prose (D-0029). A judged caller can still be judged again after a prose edit. The live sandbox, in-place repair, commissioning, and the twelve evidence keys stay out of this wave. The QA operand survivors at `notion_qa.py:143` and `:154` stay parked. This wave did not re-run that sweep.
