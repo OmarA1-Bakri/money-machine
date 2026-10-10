@@ -1,3 +1,15 @@
+## 2026-10-10 — Session 08 W0: activation requires prior-session evidence
+
+Governance only. Session 08 is not activated. `IMPLEMENTATION_STATE.json` is unchanged: `current_session` stays 7, revision stays 64, and the twelve Session 07 evidence keys stay false. Exit 78 stays HELD. No live HTTP, no Notion, no Etsy.
+
+On `00b952a8`, `validate_activation_transition` never checked the completed session's evidence keys. A 0→1 activation with every key false was accepted. A Session 08 candidate was rejected earlier, with `unsupported activation: no completion evidence contract for session 8`, because `SESSION_EVIDENCE_KEYS` ended at 7. Adding that contract alone would have accepted the candidate while every Session 07 key was false. This change adds the Session 08 contract and the prior-evidence check. Activation of session N+1 requires session N's keys to be exactly its contract and every value true. No session number is exempt. Those Session 08 keys are not written into the state file. A candidate that installs them, all false, is accepted only after the twelve Session 07 keys are true.
+
+Prompt integrity is `docs/control/reviews/2026-10-10-session-08-prompt-integrity.md`. The prompt file is unchanged. SHA-256 `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+The checked-in continuity pin still records the twelve Session 07 keys as false (D-0032). That pin is not an activation exemption. Fixture W1 (A10 and claim validation) does not read `current_session` as a gate and does not require Session 08 to be activated.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w0-r2-pytest`: 12 failed, 3298 passed, 193 skipped, 1 warning, 365.10s. Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError` because `docker` is absent. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (338 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those three commands and the pytest run are this tree. The sentences that name the counts were written after that run.
+
 ## 2026-10-10 — Session 08 W1: A10 merchandising copy and claim validation (fixture-only)
 
 Session 08 is not activated. This wave is actions 1 and 2 only. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD.
