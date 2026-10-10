@@ -1,3 +1,15 @@
+## 2026-10-10 — Session 08 W1 round 4: fact text is scanned before rendering
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD.
+
+This round does not edit `src/money_machine/control/state.py`, `tests/bootstrap/test_control_state.py`, or `docs/control/reviews/2026-10-10-session-08-prompt-integrity.md`.
+
+Every bound fact is scanned before `merchandise()` renders. Page counts in digits, `pp`, and spelled-out number words are refused unless they are the built page-count fact. Format characters and HTML tags are refused, not published. A token of Latin lookalikes is refused. `Book Review Journal`, `Star Chart Planner`, and hub `Book Reviews` stay allowed. A tag that would drop a symbol is refused whole. The validator enforces the tag kinds. Secret links must be one `https` URL on `notion.so` or `notion.site`.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/domain/test_claim_validation.py tests/unit/domain/test_listing_binding.py tests/unit/agents/test_merchandising.py` — 518 passed in 5.18s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-r4-pytest`: 12 failed, 3816 passed, 193 skipped, 1 warning in 371.63s (0:06:11). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those three commands and the pytest run are the tree at `3acabd9`. This paragraph was prepended after that run.
+
 ## 2026-10-10 — Session 08 W1 round 3: fact values and tag truncation
 
 Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD.
