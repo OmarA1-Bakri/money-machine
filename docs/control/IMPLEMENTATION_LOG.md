@@ -1,3 +1,21 @@
+## 2026-10-10 — Session 08 W1 follow-up: dotted review counts
+
+Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
+
+This paragraph answers Reviewer review 5480256571 and Verifier comment 6100498026 on `2a835824`. The code commits on this branch are `6312d14`, `d13c5f1`, `de26e94`, `61dac83`, and `62bdf1a`. CodeRabbit's ungated auto-fix `4de05a6` is superseded by `62bdf1a`. It does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, or `IMPLEMENTATION_STATE.json`.
+
+1. A digit run joined to `review(s)` or `rating(s)` by spaces, `.`, `_`, `/`, or `-` is a count, in either direction. `:` or `=` may sit between the word and the digit. There is no year exemption and no rating-scale exemption. The `(?<![\d.])` lookbehind is gone from the review-before count, from sold, and from orders. `500.reviews`, `500. reviews`, `4.9. rating`, `1,000. ratings`, `2026.reviews`, `Planner.500 reviews`, `Notes...500 reviews`, `Planner.500 sold`, `Gift.500 orders`, `500.sold`, and `500. sold` are refused. `500sold` still publishes. Re-adding a year guard publishes `1999 review`, and `test_readding_a_review_exemption_publishes_a_count` fails. Re-adding a scale guard publishes `Reviews 1 100`, and the same test fails. The test prepends those guards onto the named patterns. It does not match source anchors.
+2. `Raves` is refused. Dropping `es` from the rave alternation publishes `Raves` (1 failed, 8 passed).
+3. `One Starry Night`, `Chapter #1`, `Book #1`, `Level #1`, `Lap #1 Running`, `Automatic Savings Planner` per list item, `Book Review Journal`, `Star Chart Planner`, and the price tests stay as they were at `2a835824`.
+
+A letter or digit glued to the side of the word opposite the number still publishes (`500 reviewsX`, `Xreviews 500`). A semicolon does not join (`500; reviews` publishes). A comma between the word and a following number does not join (`reviews, 500` publishes). A comma inside the digit run is a thousands separator, so `500, reviews` is refused. Still publishing, and still parked: `Five_Star`, `5_Star`, `Rave_Reviews`, `RavingFans`.
+
+Re-adding `(?<![\d.])` on the review-before count publishes `Planner.500 reviews` and `Notes...500 reviews` (2 failed, 9 passed). Dropping the decimal group from sold, or from orders, still refuses `2.5k sold` and `1.5k orders` (4 passed, no `FAILED`). Those two mutants survive because the lookbehind is gone.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/domain/test_claim_validation.py tests/unit/domain/test_listing_binding.py tests/unit/agents/test_merchandising.py` — 721 passed in 14.04s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w1-r4-pytest`: 12 failed, 4019 passed, 193 skipped, 1 warning in 379.25s (0:06:19). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (343 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Pyright also printed its upgrade notice, v1.1.411 to v1.1.414. Those commands and the pytest run are the tree at `62bdf1a`. This paragraph was written after that run.
+
 ## 2026-10-10 — Session 08 W1 follow-up: review counts fail closed
 
 Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
