@@ -224,6 +224,7 @@ def validate_claims(copy: ListingDraft, request: MerchandisingInput) -> ClaimVal
     corrections.extend(reject_mixed_script(copy, request))
     corrections.extend(reject_tag_count(copy, request))
     corrections.extend(reject_section_count(copy, request))
+    corrections.extend(reject_price_mismatch(copy, request))
     return ClaimValidation(passed=len(corrections) == 0, corrections=tuple(corrections))
 
 
@@ -552,6 +553,34 @@ def reject_section_count(
             correction=(
                 "section_count: description requires exactly these eight sections in order: "
                 + ", ".join(DESCRIPTION_ROLES)
+            ),
+        ),
+    )
+
+
+def reject_price_mismatch(
+    copy: ListingDraft,
+    request: MerchandisingInput,
+) -> tuple[ClaimCorrection, ...]:
+    """Reject price/sale data that is not the supplied price, anchor, and currency."""
+    data = copy.price_sale
+    if (data.currency, data.price, data.anchor_price) == (
+        request.spec.currency,
+        request.price,
+        request.anchor_price,
+    ):
+        return ()
+    fact = _by_key(request, "price")
+    anchor = _first(copy, "price") or copy.claims[0]
+    return (
+        ClaimCorrection(
+            claim_id=anchor.claim_id,
+            rejection_class="unknown_fact",
+            fact_id=None if fact is None else fact.fact_id,
+            correction=(
+                f"unknown_fact: price_sale is {data.price} / {data.anchor_price} "
+                f"{data.currency}; facts are {request.price} / {request.anchor_price} "
+                f"{request.spec.currency}"
             ),
         ),
     )

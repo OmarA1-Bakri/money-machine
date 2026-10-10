@@ -193,6 +193,23 @@ def test_exhausted_retries_fail_closed() -> None:
     assert "got 12" in caught.value.corrections[0].correction
 
 
+def _wrong_price_sale(request: MerchandisingInput) -> ListingDraft:
+    draft = DeterministicCopyGenerator().generate(request, ())
+    return draft.model_copy(
+        update={"price_sale": draft.price_sale.model_copy(update={"currency": "EUR"})}
+    )
+
+
+def test_injected_price_sale_mismatch_fails_closed() -> None:
+    request = consistent_request()
+    scripted = _AlwaysBad(_wrong_price_sale(request))
+    with pytest.raises(ClaimValidationClosed) as caught:
+        merchandise(request, scripted)
+    assert scripted.calls == MAX_CLAIM_ATTEMPTS == 3
+    assert {item.rejection_class for item in caught.value.corrections} == {"unknown_fact"}
+    assert all("price_sale" in item.correction for item in caught.value.corrections)
+
+
 class _DropRaise(ast.NodeTransformer):
     def __init__(self) -> None:
         self.replaced = 0

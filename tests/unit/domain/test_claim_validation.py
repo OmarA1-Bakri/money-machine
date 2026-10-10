@@ -6,6 +6,7 @@ import ast
 import sys
 import types
 from collections.abc import Callable
+from decimal import Decimal
 from pathlib import Path
 from typing import cast
 from uuid import UUID, uuid4
@@ -43,6 +44,7 @@ _RULES = (
     "reject_mixed_script",
     "reject_tag_count",
     "reject_section_count",
+    "reject_price_mismatch",
 )
 
 
@@ -149,6 +151,9 @@ def _failing_pair(rule: str) -> tuple[MerchandisingInput, ListingDraft]:
     if rule == "reject_section_count":
         shortened = draft.description_sections[:-1]
         return request, draft.model_copy(update={"description_sections": shortened})
+    if rule == "reject_price_mismatch":
+        wrong = draft.price_sale.model_copy(update={"currency": "EUR"})
+        return request, draft.model_copy(update={"price_sale": wrong})
     raise AssertionError(rule)
 
 
@@ -232,9 +237,27 @@ def test_each_rejection_class_has_a_failing_input(rule: str) -> None:
         "reject_mixed_script": "unbound_text",
         "reject_tag_count": "tag_count",
         "reject_section_count": "section_count",
+        "reject_price_mismatch": "unknown_fact",
     }[rule]
     assert classes == {expected}
     assert all(item.correction.startswith(expected) for item in outcome.corrections)
+
+
+@pytest.mark.parametrize(
+    "update",
+    (
+        {"currency": "EUR"},
+        {"price": Decimal("1")},
+        {"anchor_price": Decimal("99.99")},
+    ),
+)
+def test_price_sale_field_mismatch_is_rejected(update: dict[str, object]) -> None:
+    request, draft = _request_and_draft()
+    copy = draft.model_copy(update={"price_sale": draft.price_sale.model_copy(update=update)})
+    outcome = validate_claims(copy, request)
+    assert outcome.passed is False
+    assert {item.rejection_class for item in outcome.corrections} == {"unknown_fact"}
+    assert all(item.correction.startswith("unknown_fact") for item in outcome.corrections)
 
 
 def _fourteen_unique_tags(
