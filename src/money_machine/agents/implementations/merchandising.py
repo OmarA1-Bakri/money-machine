@@ -165,7 +165,10 @@ def require_consistent(request: MerchandisingInput) -> None:
     _require_clean_list(facts["supported_devices"].fact_value, "supported_devices")
     _require_one_https_link(facts["secret_links"].fact_value)
     for fact in request.facts:
-        if fact_text_problem(fact.fact_key, fact.fact_value) is not None:
+        if (
+            fact_text_problem(fact.fact_key, fact.fact_value, page_count=request.page_count)
+            is not None
+        ):
             raise MerchandisingInputError(f"{fact.fact_key} fact carries a class claim")
 
 
