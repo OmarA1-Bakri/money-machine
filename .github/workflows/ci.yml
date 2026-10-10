@@ -31,6 +31,11 @@ jobs:
       MONEY_MACHINE_DATABASE_URL: postgresql+asyncpg://money_machine:ci-validation-only@127.0.0.1:5432/money_machine
     steps:
       - uses: actions/checkout@v4
+        with:
+          # pull_request otherwise checks out refs/pull/N/merge, a two-parent
+          # commit. Replay refuses that for any state-touching pull request.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
@@ -42,6 +47,33 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: uv sync --frozen
+      - name: Refuse a stale base or a second state transition
+        env:
+          CI_EVENT: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          if [ "$CI_EVENT" = "pull_request" ]; then
+            git fetch --no-tags origin "$PR_BASE_REF"
+          fi
+          uv run python - <<'PY'
+          import os
+          from pathlib import Path
+
+          from money_machine.control.s07_evidence import (
+              ControlStateError,
+              assert_pull_request_state_transitions,
+          )
+
+          event = os.environ["CI_EVENT"]
+          base = os.environ.get("PR_BASE_SHA") or None
+          if event != "pull_request":
+              base = None
+          try:
+              assert_pull_request_state_transitions(Path.cwd(), base, event=event)
+          except ControlStateError as error:
+              raise SystemExit(str(error)) from error
+          PY
       - run: uv run ruff format --check src tests scripts migrations
       - run: uv run ruff check src tests scripts apps migrations
       - run: uv run pyright
