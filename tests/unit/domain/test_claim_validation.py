@@ -24,6 +24,7 @@ from money_machine.agents.contracts.merchandising import (
 )
 from money_machine.agents.implementations.merchandising import DeterministicCopyGenerator
 from money_machine.domain.services.claim_validation import ClaimValidation, validate_claims
+from money_machine.domain.services.listing_text import TextSlot, render
 from tests.fixtures.merchandising import consistent_request
 
 _VALIDATOR = Path("src/money_machine/domain/services/claim_validation.py")
@@ -236,10 +237,19 @@ def test_each_rejection_class_has_a_failing_input(rule: str) -> None:
     assert all(item.correction.startswith(expected) for item in outcome.corrections)
 
 
+def _fourteen_unique_tags(draft: ListingDraft) -> ListingDraft:
+    currency = next(claim for claim in draft.claims if claim.kind == "currency")
+    extra = draft.tags[0].model_copy(update={"text": "usd", "claim_ids": (currency.claim_id,)})
+    tags = (*draft.tags, extra)
+    assert len(tags) == 14
+    assert len({tag.text for tag in tags}) == 14
+    return draft.model_copy(update={"tags": tags})
+
+
 def test_twelve_and_fourteen_tags_are_rejected() -> None:
     request, draft = _request_and_draft()
     short = draft.model_copy(update={"tags": draft.tags[:-1]})
-    long = draft.model_copy(update={"tags": (*draft.tags, draft.tags[0])})
+    long = _fourteen_unique_tags(draft)
     assert len(short.tags) == 12
     assert len(long.tags) == 14
     for copy in (short, long):
@@ -553,10 +563,10 @@ def test_reordered_sections_fail_and_a_length_check_accepts_them() -> None:
     assert forged.passed is True
 
 
-@pytest.mark.parametrize("padded", ["modern digital ", "modern  digital"])
+@pytest.mark.parametrize("padded", ["planners organizers ", "planners  organizers"])
 def test_normalized_tag_duplicate_is_rejected_and_casefold_accepts_it(padded: str) -> None:
     request, draft = _request_and_draft()
-    assert draft.tags[0].text == "modern digital"
+    assert draft.tags[0].text == "planners organizers"
     twin = draft.tags[0].model_copy(update={"text": padded})
     copy = draft.model_copy(update={"tags": (draft.tags[0], twin, *draft.tags[2:])})
     real = validate_claims(copy, request)
@@ -597,3 +607,394 @@ def test_passing_automation_fact_does_not_license_other_prose() -> None:
     classes = {item.rejection_class for item in outcome.corrections}
     assert "unsupported_automation" in classes
     assert "unbound_text" in classes
+
+
+_SUBSTRING = (
+    ("automation", "automation", "not automated", "automated", "unsupported_automation"),
+    ("review", "reviews", "recorded review note", "review", "invented_review"),
+    ("sales_performance", "sales_count", "0 orders on file", "orders", "invented_sales"),
+    ("trust_bar", "trust_bar", "no trust bar configured", "trust", "invented_trust_bar"),
+    (
+        "social_proof",
+        "social_proof",
+        "customers love the build",
+        "love",
+        "unsupported_social_proof",
+    ),
+)
+
+
+class _Scoped(ast.NodeTransformer):
+    def __init__(self, function: str) -> None:
+        self.function = function
+        self.hits = 0
+        self._inside = False
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST:
+        if node.name != self.function:
+            return node
+        self._inside = True
+        visited = self.generic_visit(node)
+        self._inside = False
+        return visited
+
+
+class _EqToIn(_Scoped):
+    """Change ``stated == fact`` into ``stated in fact``."""
+
+    def __init__(self) -> None:
+        super().__init__("_kind_matches")
+
+    def visit_Compare(self, node: ast.Compare) -> ast.AST:
+        if (
+            self._inside
+            and len(node.ops) == 1
+            and isinstance(node.ops[0], ast.Eq)
+            and isinstance(node.left, ast.Attribute)
+            and node.left.attr == "stated_value"
+        ):
+            self.hits += 1
+            node.ops = [ast.In()]
+        return node
+
+
+class _FactItemsToValue(_Scoped):
+    """Change ``stated in fact_items(...)`` into ``stated in cited.fact_value``."""
+
+    def visit_Compare(self, node: ast.Compare) -> ast.AST:
+        comparator = node.comparators[0] if node.comparators else None
+        if (
+            self._inside
+            and len(node.ops) == 1
+            and isinstance(node.ops[0], ast.In)
+            and isinstance(comparator, ast.Call)
+            and isinstance(comparator.func, ast.Name)
+            and comparator.func.id == "fact_items"
+        ):
+            self.hits += 1
+            node.comparators = [
+                ast.Attribute(
+                    value=ast.Name(id="cited", ctx=ast.Load()),
+                    attr="fact_value",
+                    ctx=ast.Load(),
+                )
+            ]
+        return node
+
+
+class _TemplateContained(_Scoped):
+    """Accept a surface when the rendered template is only contained in it."""
+
+    def __init__(self) -> None:
+        super().__init__("reject_unbound_text")
+
+    def visit_Compare(self, node: ast.Compare) -> ast.AST:
+        if not self._inside or not _is_norm_eq(node):
+            return node
+        self.hits += 1
+        return ast.Compare(left=node.comparators[0], ops=[ast.In()], comparators=[node.left])
+
+
+class _TemplatePrefix(_Scoped):
+    """Accept a surface when it merely starts with the rendered template."""
+
+    def __init__(self) -> None:
+        super().__init__("reject_unbound_text")
+
+    def visit_Compare(self, node: ast.Compare) -> ast.AST:
+        if not self._inside or not _is_norm_eq(node):
+            return node
+        self.hits += 1
+        return ast.Call(
+            func=ast.Attribute(value=node.left, attr="startswith", ctx=ast.Load()),
+            args=[node.comparators[0]],
+            keywords=[],
+        )
+
+
+class _NonePasses(_Scoped):
+    """Treat a template that cannot be rendered as a pass."""
+
+    def __init__(self) -> None:
+        super().__init__("reject_unbound_text")
+
+    def visit_BoolOp(self, node: ast.BoolOp) -> ast.AST:
+        first = node.values[0] if node.values else None
+        second = node.values[1] if len(node.values) > 1 else None
+        if (
+            self._inside
+            and isinstance(node.op, ast.And)
+            and isinstance(first, ast.Compare)
+            and len(first.ops) == 1
+            and isinstance(first.ops[0], ast.IsNot)
+            and isinstance(second, ast.Compare)
+            and _is_norm_eq(second)
+        ):
+            self.hits += 1
+            first.ops = [ast.Is()]
+            node.op = ast.Or()
+            return node
+        return self.generic_visit(node)
+
+
+class _CountAtLeast(_Scoped):
+    """Accept 14 tags when the count check is ``>=`` rather than ``==``."""
+
+    def __init__(self) -> None:
+        super().__init__("reject_tag_count")
+
+    def visit_Compare(self, node: ast.Compare) -> ast.AST:
+        if (
+            self._inside
+            and len(node.ops) == 1
+            and isinstance(node.ops[0], ast.Eq)
+            and isinstance(node.left, ast.Call)
+            and isinstance(node.left.func, ast.Name)
+            and node.left.func.id == "len"
+        ):
+            self.hits += 1
+            node.ops = [ast.GtE()]
+        return node
+
+
+def _is_norm_eq(node: ast.Compare) -> bool:
+    if len(node.ops) != 1 or not isinstance(node.ops[0], ast.Eq):
+        return False
+    if len(node.comparators) != 1:
+        return False
+    return _is_normalize(node.left) and _is_normalize(node.comparators[0])
+
+
+def _is_normalize(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "normalize_text"
+        and len(node.args) == 1
+    )
+
+
+@pytest.mark.parametrize(("kind", "key", "fact_value", "stated", "expected"), _SUBSTRING)
+def test_right_key_substring_is_rejected_and_in_accepts_it(
+    kind: ClaimKind,
+    key: FactKey,
+    fact_value: str,
+    stated: str,
+    expected: str,
+) -> None:
+    request, draft = _wrong_value_copy(kind, key, fact_value, stated)
+    real = validate_claims(draft, request)
+    assert real.passed is False
+    assert {item.rejection_class for item in real.corrections} == {expected}
+    mutant_tree = _EqToIn()
+    mutant = _load_mutant(mutant_tree, f"eq_in_{kind}")
+    assert mutant_tree.hits == 1
+    forged = cast(ClaimValidation, mutant(draft, request))
+    assert forged.passed is True
+    assert forged.corrections == ()
+
+
+@pytest.mark.parametrize(
+    ("kind", "cite", "stated", "expected"),
+    (
+        ("feature", "features", "Hyperlinked", "nonexistent_feature"),
+        ("variant", "colour_names", "Sage", "variant_not_built"),
+    ),
+)
+def test_list_substring_needs_item_membership(
+    kind: ClaimKind,
+    cite: FactKey,
+    stated: str,
+    expected: str,
+) -> None:
+    request, draft = _request_and_draft()
+    copy = _add_claim(draft, request, kind, stated, cite)
+    real = validate_claims(copy, request)
+    assert real.passed is False
+    assert {item.rejection_class for item in real.corrections} == {expected}
+    mutant_tree = _FactItemsToValue("_kind_matches")
+    mutant = _load_mutant(mutant_tree, f"items_{kind}")
+    assert mutant_tree.hits == 1
+    forged = cast(ClaimValidation, mutant(copy, request))
+    assert forged.passed is True
+
+
+def test_hub_substring_needs_item_membership() -> None:
+    request, draft = _request_and_draft()
+    copy = _add_claim(draft, request, "hub", "Daily", "hubs")
+    real = validate_claims(copy, request)
+    assert real.passed is False
+    assert {item.rejection_class for item in real.corrections} == {"unknown_fact"}
+    mutant_tree = _FactItemsToValue("_statement_matches")
+    mutant = _load_mutant(mutant_tree, "items_hub")
+    assert mutant_tree.hits == 1
+    forged = cast(ClaimValidation, mutant(copy, request))
+    assert forged.passed is True
+
+
+def test_appended_text_is_rejected_and_containment_accepts_it() -> None:
+    request, draft = _request_and_draft()
+    appended = _retitle(draft, f"{draft.title.text} extra")
+    real = validate_claims(appended, request)
+    assert real.passed is False
+    assert {item.rejection_class for item in real.corrections} == {"unbound_text"}
+    for label, transform in (("contained", _TemplateContained()), ("prefix", _TemplatePrefix())):
+        mutant = _load_mutant(transform, label)
+        assert transform.hits == 1
+        forged = cast(ClaimValidation, mutant(appended, request))
+        assert forged.passed is True
+        assert forged.corrections == ()
+
+
+def test_unknown_template_is_rejected_and_none_accepts_it() -> None:
+    request, draft = _request_and_draft()
+    title = draft.title.model_copy(update={"template_id": "not-a-template"})
+    copy = draft.model_copy(update={"title": title})
+    real = validate_claims(copy, request)
+    assert real.passed is False
+    assert {item.rejection_class for item in real.corrections} == {"unbound_text"}
+    mutant_tree = _NonePasses()
+    mutant = _load_mutant(mutant_tree, "none_passes")
+    assert mutant_tree.hits == 1
+    forged = cast(ClaimValidation, mutant(copy, request))
+    assert forged.passed is True
+    assert forged.corrections == ()
+
+
+def test_swapped_template_is_unbound() -> None:
+    request, draft = _request_and_draft()
+    title = draft.title.model_copy(update={"template_id": "hero"})
+    copy = draft.model_copy(update={"title": title})
+    outcome = validate_claims(copy, request)
+    assert outcome.passed is False
+    assert {item.rejection_class for item in outcome.corrections} == {"unbound_text"}
+
+
+def test_fourteen_unique_tags_kill_the_at_least_count() -> None:
+    request, draft = _request_and_draft()
+    long = _fourteen_unique_tags(draft)
+    real = validate_claims(long, request)
+    assert real.passed is False
+    assert {item.rejection_class for item in real.corrections} == {"tag_count"}
+    mutant_tree = _CountAtLeast()
+    mutant = _load_mutant(mutant_tree, "tag_ge")
+    assert mutant_tree.hits == 1
+    forged = cast(ClaimValidation, mutant(long, request))
+    assert forged.passed is True
+    assert forged.corrections == ()
+
+
+def _rendered_text(
+    claim_ids: tuple[UUID, ...],
+    template_id: str,
+    draft: ListingDraft,
+    quantity: int,
+) -> str:
+    by_id = {claim.claim_id: claim for claim in draft.claims}
+    slots = tuple(
+        TextSlot(by_id[claim_id].kind, by_id[claim_id].stated_value) for claim_id in claim_ids
+    )
+    return render(template_id, slots, quantity=quantity)
+
+
+def _rerender(draft: ListingDraft, request: MerchandisingInput) -> ListingDraft:
+    quantity = request.rules.quantity
+    return draft.model_copy(
+        update={
+            "title": draft.title.model_copy(
+                update={
+                    "text": _rendered_text(
+                        draft.title.claim_ids, draft.title.template_id, draft, quantity
+                    )
+                }
+            ),
+            "hero_copy": draft.hero_copy.model_copy(
+                update={
+                    "text": _rendered_text(
+                        draft.hero_copy.claim_ids, draft.hero_copy.template_id, draft, quantity
+                    )
+                }
+            ),
+            "description_sections": tuple(
+                item.model_copy(
+                    update={
+                        "text": _rendered_text(item.claim_ids, item.template_id, draft, quantity)
+                    }
+                )
+                for item in draft.description_sections
+            ),
+            "image_strip": tuple(
+                item.model_copy(
+                    update={
+                        "text": _rendered_text(item.claim_ids, item.template_id, draft, quantity)
+                    }
+                )
+                for item in draft.image_strip
+            ),
+            "video_sequence": tuple(
+                item.model_copy(
+                    update={
+                        "text": _rendered_text(item.claim_ids, item.template_id, draft, quantity)
+                    }
+                )
+                for item in draft.video_sequence
+            ),
+            "tags": tuple(
+                item.model_copy(
+                    update={
+                        "text": _rendered_text(item.claim_ids, item.template_id, draft, quantity)
+                    }
+                )
+                for item in draft.tags
+            ),
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "kind", "value", "expected"),
+    (
+        ("identity", "identity", "Bestseller Planner 10,000 sold", "invented_sales"),
+        ("identity", "identity", "A 200-Page Digital Planner", "invented_page_count"),
+        ("buyer_problem", "buyer_problem", "As seen on Forbes", "invented_trust_bar"),
+    ),
+)
+def test_freeform_value_does_not_license_its_class(
+    field: FactKey,
+    kind: ClaimKind,
+    value: str,
+    expected: str,
+) -> None:
+    request, draft = _request_and_draft()
+    spec = request.spec.model_copy(update={field: value})
+    facts = tuple(
+        fact.model_copy(update={"fact_value": value}) if fact.fact_key == field else fact
+        for fact in request.facts
+    )
+    request = request.model_copy(update={"spec": spec, "facts": facts})
+    copy = _rerender(_replace_stated(draft, kind, value), request)
+    outcome = validate_claims(copy, request)
+    assert outcome.passed is False
+    assert expected in {item.rejection_class for item in outcome.corrections}
+
+
+def test_shortened_automation_tag_is_unbound() -> None:
+    request, draft = _request_and_draft()
+    phrase = "Automatic bank sync: not included"
+    request = _with_fact(request, "automation", phrase)
+    fact = next(item for item in request.facts if item.fact_key == "automation")
+    claim = ListingClaim(
+        claim_id=uuid4(),
+        kind="automation",
+        fact_id=fact.fact_id,
+        stated_value=phrase,
+    )
+    tag = draft.tags[-1].model_copy(
+        update={"text": "automatic bank sync", "claim_ids": (claim.claim_id,)}
+    )
+    copy = draft.model_copy(
+        update={"claims": (*draft.claims, claim), "tags": (*draft.tags[:-1], tag)}
+    )
+    outcome = validate_claims(copy, request)
+    assert outcome.passed is False
+    assert {item.rejection_class for item in outcome.corrections} == {"unbound_text"}

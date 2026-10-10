@@ -149,3 +149,12 @@ Review on the first tip showed the deny-list could accept buyer-facing prose tha
 3. The deny-list stays a per-surface backstop. A hit is allowed only when that span sits inside a cited fact value on the same surface. One passing claim does not license every other surface.
 4. Tags are normalized before the duplicate and length checks. Empty normalized tags are rejected.
 5. `#66` merged as `da671037`. This wave merges that commit. It does not edit `state.py`, `test_control_state.py`, or the Wave 0 review file. Session 08 stays inactive.
+
+## 6. Round 3 amendment
+
+Review on tip `209508ea` showed fact values and tag cutting were still open. This amendment is part of the same wave.
+
+1. A features fact must equal `spec.features` item for item. Variant facts must equal the built variant names. Page count must equal the built count. A review, sales, trust, social, automation, or page-count hit is allowed only from that class's own fact kind. Identity and buyer-problem values must pass that deny-list themselves.
+2. A tag that does not fit in 20 characters is refused. It is not cut to a prefix. Tags are not built from automation, review, sales, trust, or social claims. Identity and the fixture feature names are longer than 20 characters, so they are skipped. Product type, variants, shop, hubs, and devices fill the playbook count of 13 without dropping a word.
+3. Mixed script is checked per token, so a non-Latin shop name can sit beside Latin words. A homoglyph inside one token is still rejected. Each surface renders only its own template id. Secret links must be one `https` URL. Device facts must be a clean list.
+4. This round does not edit `state.py`, `test_control_state.py`, the Wave 0 review file, `IMPLEMENTATION_STATE.json`, or `config/agents.yaml`. A10 stays DESIGNED. Session 08 stays inactive.

@@ -29,13 +29,21 @@ from money_machine.agents.implementations.merchandising import (
 from money_machine.agents.registry import AgentRegistry
 from money_machine.config.settings import AgentCommissioningState
 from money_machine.domain.services.claim_validation import validate_claims
-from money_machine.domain.services.listing_text import TextSlot, normalize_text, render
+from money_machine.domain.services.listing_text import (
+    TextSlot,
+    etsy_tag,
+    mixed_script,
+    normalize_text,
+    render,
+)
 from tests.fixtures.merchandising import SHOP_NAME, consistent_request
 
 _AGENT = Path("src/money_machine/agents/implementations/merchandising.py")
 _EXPECTED_TAGS = (
-    "modern digital",
     "planners organizers",
+    "sage green",
+    "navy blue",
+    "rose gold",
     "fieldnote shop",
     "daily planning",
     "goal tracking",
@@ -43,10 +51,8 @@ _EXPECTED_TAGS = (
     "budget tracker",
     "meal planner",
     "fitness log",
-    "hyperlinked",
-    "interactive",
-    "monthly calendar",
-    "weekly spread",
+    "tablet",
+    "phone",
 )
 
 
@@ -233,6 +239,82 @@ def test_inconsistent_hubs_are_refused_before_generation() -> None:
 
     with pytest.raises(MerchandisingInputError, match="hubs"):
         merchandise(broken, _Unused())
+
+
+def _with_fact_value(request: MerchandisingInput, key: str, value: str) -> MerchandisingInput:
+    facts = tuple(
+        fact.model_copy(update={"fact_value": value}) if fact.fact_key == key else fact
+        for fact in request.facts
+    )
+    return request.model_copy(update={"facts": facts})
+
+
+@pytest.mark.parametrize("extra", ("AI budget forecaster", "Rated 5 stars by 300 buyers"))
+def test_appended_feature_fact_is_refused(extra: str) -> None:
+    request = consistent_request()
+    current = next(fact.fact_value for fact in request.facts if fact.fact_key == "features")
+    broken = _with_fact_value(request, "features", f"{current}|{extra}")
+    with pytest.raises(MerchandisingInputError, match="features"):
+        merchandise(broken)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("identity", "Bestseller Planner 10,000 sold"),
+        ("identity", "A 200-Page Digital Planner"),
+        ("buyer_problem", "As seen on Forbes"),
+    ),
+)
+def test_freeform_fact_cannot_carry_a_class_claim(field: str, value: str) -> None:
+    request = consistent_request()
+    spec = request.spec.model_copy(update={field: value})
+    broken = _with_fact_value(request, field, value).model_copy(update={"spec": spec})
+    with pytest.raises(MerchandisingInputError, match="class claim"):
+        merchandise(broken)
+
+
+def test_secret_link_and_devices_must_be_clean() -> None:
+    request = consistent_request()
+    cases = (
+        ("secret_links", "http://fixture.notion.site", "secret_links"),
+        ("secret_links", "https://a.example|https://b.example", "secret_links"),
+        ("supported_devices", "Tablet|", "supported_devices"),
+        ("supported_devices", "", "supported_devices"),
+    )
+    for key, value, match in cases:
+        broken = _with_fact_value(request, key, value)
+        with pytest.raises(MerchandisingInputError, match=match):
+            merchandise(broken)
+
+
+def test_oversized_tag_is_refused_and_class_claims_are_not_tags() -> None:
+    assert etsy_tag("Automatic bank sync: not included") == ""
+    request = consistent_request()
+    draft = DeterministicCopyGenerator().generate(request, ())
+    by_id = {claim.claim_id: claim for claim in draft.claims}
+    forbidden = {"automation", "review", "sales_performance", "trust_bar", "social_proof"}
+    for tag in draft.tags:
+        claim = by_id[tag.claim_ids[0]]
+        assert claim.kind not in forbidden
+        assert tag.text == etsy_tag(claim.stated_value)
+        assert tag.text != ""
+
+
+def test_non_latin_shop_token_is_not_mixed_script() -> None:
+    assert mixed_script("Made for planners. Shop Магазин.") is False
+    assert mixed_script("\u041codern planner") is True
+    request = consistent_request()
+    broken = _with_fact_value(request, "shop_name", "Магазин").model_copy(
+        update={"shop_name": "Магазин"}
+    )
+    copy = merchandise(broken)
+    audience = next(
+        section for section in copy.draft.description_sections if section.role == "audience"
+    )
+    assert "Магазин" in audience.text
+    assert mixed_script(audience.text) is False
+    assert validate_claims(copy.draft, broken).passed is True
 
 
 def test_inconsistent_page_count_is_refused_before_generation() -> None:

@@ -41,13 +41,20 @@ from money_machine.agents.contracts.merchandising import (
 from money_machine.config.loader import load_yaml_model
 from money_machine.config.settings import ProductRulesConfig
 from money_machine.domain.models.rules import ListingRules
-from money_machine.domain.services.claim_validation import ClaimValidation, validate_claims
+from money_machine.domain.services.claim_validation import (
+    ClaimValidation,
+    freeform_denied,
+    validate_claims,
+)
 from money_machine.domain.services.listing_text import TextSlot, render
 
 MAX_CLAIM_ATTEMPTS = 3
 """Initial draft plus two regenerations. The third failure is closed."""
 
 _NAMESPACE = UUID("a1000000-0000-4000-8000-000000000010")
+_TAG_KINDS: frozenset[ClaimKind] = frozenset(
+    {"identity", "category", "feature", "variant", "shop", "hub", "device"}
+)
 _HUB_FRAMES: tuple[ImageRole, ...] = ("hub_1", "hub_2", "hub_3", "hub_4", "hub_5")
 
 
@@ -151,14 +158,17 @@ def require_consistent(request: MerchandisingInput) -> None:
         encode_dashboard(request.notification_dashboard),
         "dashboard_outputs",
     )
-    if any(item == "" for item in fact_items(facts["features"].fact_value)):
+    features = fact_items(facts["features"].fact_value)
+    if any(item == "" for item in features):
         raise MerchandisingInputError("features fact contains an empty item")
-    if not fact_items(facts["features"].fact_value):
-        raise MerchandisingInputError("features fact is empty")
-    if not fact_items(facts["supported_devices"].fact_value):
-        raise MerchandisingInputError("supported_devices fact is empty")
-    if any(item == "" for item in fact_items(facts["supported_devices"].fact_value)):
-        raise MerchandisingInputError("supported_devices fact contains an empty item")
+    if features != request.spec.features:
+        raise MerchandisingInputError("features fact does not match the product spec")
+    _require_clean_list(facts["supported_devices"].fact_value, "supported_devices")
+    _require_one_https_link(facts["secret_links"].fact_value)
+    if freeform_denied(facts["identity"].fact_value):
+        raise MerchandisingInputError("identity fact carries a class claim")
+    if freeform_denied(facts["buyer_problem"].fact_value):
+        raise MerchandisingInputError("buyer_problem fact carries a class claim")
 
 
 def configured_listing_rules() -> ListingRules:
@@ -233,10 +243,10 @@ def _draft_from_facts(request: MerchandisingInput) -> ListingDraft:
     tag_sources = (
         identity,
         category,
-        shop,
-        *hub_claims,
         *feature_claims,
         *variant_claims,
+        shop,
+        *hub_claims,
         *device_claims,
     )
     tags = _tags(request, tag_sources)
@@ -388,6 +398,8 @@ def _tags(request: MerchandisingInput, sources: tuple[ListingClaim, ...]) -> tup
     tags: list[CitedText] = []
     seen: set[str] = set()
     for claim in sources:
+        if claim.kind not in _TAG_KINDS:
+            continue
         text, claim_ids = _rendered("tag", (claim,), request.rules.quantity)
         if text == "" or text in seen:
             continue
@@ -412,6 +424,18 @@ def _rendered(
 def _require_equal(fact: ProductFact, expected: str, label: str) -> None:
     if fact.fact_value != expected:
         raise MerchandisingInputError(f"{label} fact does not match the built input")
+
+
+def _require_clean_list(value: str, label: str) -> None:
+    items = fact_items(value)
+    if not items or any(item == "" for item in items) or "|".join(items) != value:
+        raise MerchandisingInputError(f"{label} fact is not a clean list")
+
+
+def _require_one_https_link(value: str) -> None:
+    items = fact_items(value)
+    if len(items) != 1 or items[0] != value or not value.startswith("https://") or " " in value:
+        raise MerchandisingInputError("secret_links fact is not one https link")
 
 
 def validation_outcome(copy: ListingDraft, request: MerchandisingInput) -> ClaimValidation:

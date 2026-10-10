@@ -2,8 +2,9 @@
 
 Buyer-facing text is a template of cited fact values. The generator and the
 validator both call ``render``. Comparison folds case, compatibility forms,
-and Latin lookalikes. A Latin string that also contains a non-Latin letter is
-rejected before that fold, so a homoglyph cannot pass by becoming the template.
+and Latin lookalikes. A token that mixes a Latin letter with a non-Latin
+letter is rejected before that fold. A tag that does not fit in 20 characters
+is refused whole; it is never cut down to a prefix.
 """
 
 from __future__ import annotations
@@ -70,33 +71,21 @@ def normalize_tag(value: str) -> str:
 
 
 def mixed_script(value: str) -> bool:
-    """True when a Latin word also contains a non-Latin letter."""
+    """True when one token mixes a Latin letter with a non-Latin letter."""
     text = unicodedata.normalize("NFKC", value)
-    latin = False
-    other = False
-    for char in text:
-        if not unicodedata.category(char).startswith("L"):
-            continue
-        if _latin_letter(char):
-            latin = True
-        else:
-            other = True
-    return latin and other
+    return any(_token_mixes_scripts(token) for token in text.split())
 
 
 def etsy_tag(value: str) -> str:
-    """Lowercase Etsy tag of at most 20 characters, cut on a word boundary."""
+    """Full lowercase tag, or empty when that phrase does not fit in 20 characters."""
     words: list[str] = []
     for raw in value.casefold().split():
         cleaned = "".join(char for char in raw if char.isalnum())
         if cleaned:
             words.append(cleaned)
-    tag = ""
-    for word in words:
-        candidate = word if tag == "" else f"{tag} {word}"
-        if len(candidate) > 20:
-            break
-        tag = candidate
+    tag = " ".join(words)
+    if tag == "" or len(tag) > 20:
+        return ""
     return tag
 
 
@@ -248,6 +237,19 @@ def _fit(title: str) -> str:
     if len(title) <= _TITLE_LIMIT:
         return title
     return title[:_TITLE_LIMIT].rstrip()
+
+
+def _token_mixes_scripts(token: str) -> bool:
+    latin = False
+    other = False
+    for char in token:
+        if not unicodedata.category(char).startswith("L"):
+            continue
+        if _latin_letter(char):
+            latin = True
+        else:
+            other = True
+    return latin and other
 
 
 def _latin_letter(char: str) -> bool:

@@ -33,7 +33,14 @@ from money_machine.domain.services.listing_text import (
     render,
 )
 
-_PAGE_NUMBERS: Final[Pattern[str]] = re.compile(r"(?<!\d)(\d+)\s+pages?\b", re.IGNORECASE)
+_PAGE_NUMBERS: Final[Pattern[str]] = re.compile(
+    r"(?<!\d)(\d+)\s*-?\s*pages?\b",
+    re.IGNORECASE,
+)
+_PAGE_PHRASE: Final[Pattern[str]] = re.compile(
+    r"(?<!\d)\d+\s*-?\s*(?:pages?|pp)\b",
+    re.IGNORECASE,
+)
 _AUTOMATION: Final[Pattern[str]] = re.compile(
     r"\b(automat\w*|auto-[\w-]+|unattended)\b",
     re.IGNORECASE,
@@ -47,7 +54,7 @@ _SALES: Final[Pattern[str]] = re.compile(
     re.IGNORECASE,
 )
 _TRUST: Final[Pattern[str]] = re.compile(
-    r"(trust bars?|trusted by|as seen in|money-back)",
+    r"(trust bars?|trusted by|as seen in|as seen on|money-back)",
     re.IGNORECASE,
 )
 _SOCIAL: Final[Pattern[str]] = re.compile(
@@ -69,6 +76,29 @@ _SPECIAL_KINDS: Final[frozenset[ClaimKind]] = frozenset(
 _LIST_KINDS: Final[frozenset[ClaimKind]] = frozenset(
     {"feature", "variant", "hub", "device", "database"}
 )
+_ROLE_TEMPLATE: Final[dict[str, str]] = {
+    "hook": "hook",
+    "included": "included",
+    "audience": "audience",
+    "how_it_works": "access_line",
+    "features": "features",
+    "variants": "variant_devices",
+    "support": "support",
+    "offer": "offer",
+    "hero": "hero",
+    "overview": "overview",
+    "hub_1": "hub_frame",
+    "hub_2": "hub_frame",
+    "hub_3": "hub_frame",
+    "hub_4": "hub_frame",
+    "hub_5": "hub_frame",
+    "colour_options": "variant_line",
+    "devices": "device_line",
+    "dashboard": "video_dashboard",
+    "notification_panel": "video_notification",
+    "strongest_hubs": "video_hubs",
+    "duplication_access": "access_line",
+}
 _KIND_KEY: Final[dict[ClaimKind, str]] = {
     "page_count": "page_count",
     "feature": "features",
@@ -101,6 +131,13 @@ class ClaimValidation:
 
     passed: bool
     corrections: tuple[ClaimCorrection, ...]
+
+
+def freeform_denied(value: str) -> bool:
+    """True when identity or buyer-problem text itself makes a class claim."""
+    folded = normalize_text(value)
+    patterns = (_PAGE_PHRASE, _AUTOMATION, _REVIEW, _SALES, _TRUST, _SOCIAL)
+    return any(pattern.search(folded) for pattern in patterns)
 
 
 def validate_claims(copy: ListingDraft, request: MerchandisingInput) -> ClaimValidation:
@@ -164,9 +201,13 @@ def reject_invented_page_count(
     )
     found = list(corrections)
     fact = _by_key(request, "page_count")
-    for text, _claim_ids, _template in _bound_surfaces(copy):
-        for number in _PAGE_NUMBERS.findall(normalize_text(text)):
-            if number == actual:
+    for text, claim_ids, _template, _required in _bound_surfaces(copy):
+        folded = normalize_text(text)
+        holders = _holding_values(copy, request, claim_ids, "page_count")
+        for match in _PAGE_NUMBERS.finditer(folded):
+            number = match.group(1)
+            licensed = number == actual and any(normalize_text(item) == number for item in holders)
+            if licensed:
                 continue
             anchor = _first(copy, "page_count")
             found.append(
@@ -180,6 +221,7 @@ def reject_invented_page_count(
                     ),
                 )
             )
+            break
     return tuple(found)
 
 
@@ -187,14 +229,14 @@ def reject_nonexistent_feature(
     copy: ListingDraft,
     request: MerchandisingInput,
 ) -> tuple[ClaimCorrection, ...]:
-    """Reject a feature that is not listed on the features fact."""
+    """Reject a feature that is not one spec feature, item for item."""
     return _reject_special(
         copy,
         request,
         kind="feature",
         rejection_class="nonexistent_feature",
         list_valued=True,
-        actual_values=None,
+        actual_values=tuple(request.spec.features),
         prose_pattern=None,
     )
 
@@ -335,7 +377,7 @@ def reject_unbound_text(
     """Reject buyer-facing text that is not the template of its cited facts."""
     corrections: list[ClaimCorrection] = []
     by_id = {claim.claim_id: claim for claim in copy.claims}
-    for text, claim_ids, template_id in _bound_surfaces(copy):
+    for text, claim_ids, template_id, required in _bound_surfaces(copy):
         cited = _resolve(by_id, claim_ids)
         if cited is not None and any(not _holds(claim, request) for claim in cited):
             continue
@@ -344,9 +386,9 @@ def reject_unbound_text(
             if cited is None
             else tuple(TextSlot(claim.kind, claim.stated_value) for claim in cited)
         )
-        expected = (
-            None if cited is None else _render_or_none(template_id, slots, request.rules.quantity)
-        )
+        expected = None
+        if cited is not None and template_id == required:
+            expected = _render_or_none(template_id, slots, request.rules.quantity)
         if expected is not None and normalize_text(text) == normalize_text(expected):
             continue
         corrections.append(
@@ -366,7 +408,7 @@ def reject_mixed_script(
     """Reject a Latin sentence that hides a non-Latin letter."""
     del request
     corrections: list[ClaimCorrection] = []
-    for text, claim_ids, template_id in _bound_surfaces(copy):
+    for text, claim_ids, template_id, _required in _bound_surfaces(copy):
         if not mixed_script(text):
             continue
         corrections.append(
@@ -461,9 +503,9 @@ def _reject_special(
         )
     if prose_pattern is None:
         return tuple(corrections)
-    for text, claim_ids, _template in _bound_surfaces(copy):
+    for text, claim_ids, _template, _required in _bound_surfaces(copy):
         folded = normalize_text(text)
-        cited = _holding_values(copy, request, claim_ids)
+        cited = _holding_values(copy, request, claim_ids, kind)
         for match in prose_pattern.finditer(folded):
             if _span_inside(match.group(0), cited):
                 continue
@@ -492,13 +534,13 @@ def _kind_matches(
     expected = _KIND_KEY[claim.kind]
     if cited.fact_key != expected:
         return False
+    if not _fact_sourced(claim.kind, cited, actual_values):
+        return False
     if list_valued:
         allowed = claim.stated_value in fact_items(cited.fact_value)
     else:
         allowed = claim.stated_value == cited.fact_value
-    if not allowed:
-        return False
-    return actual_values is None or claim.stated_value in actual_values
+    return allowed
 
 
 def _statement_matches(claim: ListingClaim, cited: ProductFact) -> bool:
@@ -531,15 +573,26 @@ def _first(copy: ListingDraft, kind: ClaimKind) -> ListingClaim | None:
     return None
 
 
-def _bound_surfaces(copy: ListingDraft) -> tuple[tuple[str, tuple[UUID, ...], str], ...]:
-    rows: list[tuple[str, tuple[UUID, ...], str]] = [
-        (copy.title.text, copy.title.claim_ids, copy.title.template_id),
-        (copy.hero_copy.text, copy.hero_copy.claim_ids, copy.hero_copy.template_id),
+def _bound_surfaces(
+    copy: ListingDraft,
+) -> tuple[tuple[str, tuple[UUID, ...], str, str], ...]:
+    rows: list[tuple[str, tuple[UUID, ...], str, str]] = [
+        (copy.title.text, copy.title.claim_ids, copy.title.template_id, "title"),
+        (copy.hero_copy.text, copy.hero_copy.claim_ids, copy.hero_copy.template_id, "hero"),
     ]
-    rows.extend((item.text, item.claim_ids, item.template_id) for item in copy.description_sections)
-    rows.extend((item.text, item.claim_ids, item.template_id) for item in copy.image_strip)
-    rows.extend((item.text, item.claim_ids, item.template_id) for item in copy.video_sequence)
-    rows.extend((item.text, item.claim_ids, item.template_id) for item in copy.tags)
+    rows.extend(
+        (item.text, item.claim_ids, item.template_id, _ROLE_TEMPLATE[item.role])
+        for item in copy.description_sections
+    )
+    rows.extend(
+        (item.text, item.claim_ids, item.template_id, _ROLE_TEMPLATE[item.role])
+        for item in copy.image_strip
+    )
+    rows.extend(
+        (item.text, item.claim_ids, item.template_id, _ROLE_TEMPLATE[item.role])
+        for item in copy.video_sequence
+    )
+    rows.extend((item.text, item.claim_ids, item.template_id, "tag") for item in copy.tags)
     return tuple(rows)
 
 
@@ -577,19 +630,35 @@ def _actual_for(kind: ClaimKind, request: MerchandisingInput) -> tuple[str, ...]
         return (str(request.page_count),)
     if kind == "variant":
         return tuple(variant.name for variant in request.variants)
+    if kind == "feature":
+        return tuple(request.spec.features)
     return None
+
+
+def _fact_sourced(
+    kind: ClaimKind,
+    cited: ProductFact,
+    actual_values: Sequence[str] | None,
+) -> bool:
+    """The cited fact itself matches the built source, before the stated value is read."""
+    if actual_values is None:
+        return True
+    if kind in _LIST_KINDS:
+        return fact_items(cited.fact_value) == tuple(actual_values)
+    return cited.fact_value in tuple(actual_values)
 
 
 def _holding_values(
     copy: ListingDraft,
     request: MerchandisingInput,
     claim_ids: tuple[UUID, ...],
+    kind: ClaimKind,
 ) -> tuple[str, ...]:
     by_id = {claim.claim_id: claim for claim in copy.claims}
     values: list[str] = []
     for claim_id in claim_ids:
         claim = by_id.get(claim_id)
-        if claim is not None and _holds(claim, request):
+        if claim is not None and claim.kind == kind and _holds(claim, request):
             values.append(claim.stated_value)
     return tuple(values)
 
