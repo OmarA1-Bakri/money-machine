@@ -1,3 +1,13 @@
+## 2026-10-10 — Session 08 W0: activation requires prior-session evidence
+
+Governance only. Session 08 is not activated. `IMPLEMENTATION_STATE.json` is unchanged: `current_session` stays 7, revision stays 64, and the twelve Session 07 evidence keys stay false. Exit 78 stays HELD. No live HTTP, no Notion, no Etsy.
+
+`validate_activation_transition` now rejects activation of session N+1 unless session N's evidence keys are exactly its contract and every value is true. No session number is exempt. The Session 08 evidence contract is defined so a candidate that installs those keys, all false, is accepted only after the twelve Session 07 keys are true. Those Session 08 keys are not written into the state file.
+
+Prompt integrity is `docs/control/reviews/2026-10-10-session-08-prompt-integrity.md`. The prompt file is unchanged. SHA-256 `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+The checked-in continuity pin still records the twelve Session 07 keys as false (D-0032). That pin is not an activation exemption. Fixture W1 (A10 and claim validation) does not read `current_session` as a gate and does not require Session 08 to be activated.
+
 ## 2026-10-10 — Session 07 close recorded, and the :408/:413 adopt mutants are killed
 
 Session 07 is recorded complete by Omar's merge of #64. That merge is `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` at 2026-10-10 12:36:46 +0700. His words, relayed by Grok Bot from its chat at 2026-10-10 12:39 ICT: "Yes, my merge is the Session 07 close gate. Fix the Verifier items in a follow-up PR." #64 merged while Verifier round 2 was FAIL (comment 6094256754). Those items are what this pull request fixes. No Lead Reviewer pass is on record. Exit 78 stays HELD. The twelve evidence keys stay false. `commissioned_agents` stays empty. This follow-up does not change `src/`.
