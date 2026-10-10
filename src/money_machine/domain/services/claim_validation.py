@@ -76,15 +76,15 @@ _AUTOMATION: Final[Pattern[str]] = re.compile(
 )
 _SAVINGS_NAME: Final[str] = "automatic savings planner"
 _EXACT_SAVINGS: Final[Pattern[str]] = re.compile(rf"\b{_SAVINGS_NAME}\b")
-# A digit run joined to review(s) or rating(s) by spaces, ".", "_", "/", or
-# "-" is a count, in either direction. ":" or "=" may sit between the word
-# and the digit. There is no year exemption and no rating-scale exemption.
-# A letter or digit glued to the far side of the word is not this count.
+# After ``_count_scan``, a digit run next to review(s) or rating(s) is a count
+# in either direction. ``:`` or ``=`` counts only when the word comes first.
+# There is no year exemption and no rating-scale exemption. A letter or digit
+# glued to the far side of the word is not this count.
 _REVIEW_BEFORE: Final[str] = (
-    r"\d[\d,]*(?:\.\d+)?\s*k?\+?[\s._/\-]*"
-    r"(?:(?:average|avg\.?|customer|buyer|verified)[\s._/\-]+)?(?:reviews?|ratings?)(?![^\W_])"
+    r"\d[\d,]*(?:\.\d+)?\s*k?\+?\s*"
+    r"(?:(?:average|avg\.?|customer|buyer|verified)\s+)?(?:reviews?|ratings?)(?![^\W_])"
 )
-_REVIEW_AFTER: Final[str] = r"(?<![^\W_])(?:reviews?|ratings?)[\s._/\-]*[:=]?[\s._/\-]*\d"
+_REVIEW_AFTER: Final[str] = r"(?<![^\W_])(?:reviews?|ratings?)\s*[:=]?\s*\d"
 _REVIEW: Final[Pattern[str]] = re.compile(
     rf"top[-\s_.]?rated|\bhighly reviewed\b|testimonials?|\brated\b|\bfive-star\b"
     rf"|\brav(?:ing|es|ed|e)(?:reviews?|(?!\w))"
@@ -100,13 +100,14 @@ _REVIEW: Final[Pattern[str]] = re.compile(
 # pick, or seller follows, including after a hyphen or comma. ``#01`` is ``#1``.
 _SALES: Final[Pattern[str]] = re.compile(
     r"best[-\s_.]?sell(?:ers?|ing)"
-    r"|\bunits sold\b|\d[\d,]*(?:\.\d+)?\s*k?\+?[\s._/\-]+sold\b"
+    r"|\bunits sold\b|\d[\d,]*(?:\.\d+)?\s*k?\+?\s+sold\b"
     r"|\d[\d,]*\+?\s+downloads\b|\d+\s*k\s+downloads\b"
     r"|(?<!\b(?:room|goal|step|part|week|book)\s)"
     r"(?<!\blevel\s)(?<!\bchapter\s)(?<!\b(?:day|lap)\s)"
     r"#\s*0*1(?!\d)"
     r"|#\s*0*1(?!\d)[\s\-,]+(?:on|in|pick|seller)\b"
-    r"|\d[\d,]*(?:\.\d+)?\s*k?\+?[\s._/\-]+orders\b|\borders on file\b",
+    r"|\d[\d,]*(?:\.\d+)?\s*k?\+?\s+orders\b|(?<![^\W_])(?:sold|orders)\s+\d"
+    r"|\borders on file\b",
     re.IGNORECASE,
 )
 _TRUST: Final[Pattern[str]] = re.compile(
@@ -255,6 +256,31 @@ def _prose_automation_text(folded: str) -> str:
     return _EXACT_SAVINGS.sub(" ", folded)
 
 
+# Separator runs beside a count. Digit-internal marks stay put: ``4.9``,
+# ``1,000``, and ``2.5k+``. A dot after a number is a separator. ``;``, ``,``,
+# ``:``, ``=``, and parentheses are not in this set.
+_COUNT_WORD: Final[str] = r"(?:reviews?|ratings?|sold|orders)(?![^\W_])"
+_PUNCT: Final[str] = r"[._/\-+]"
+_SEPARATOR_RUN: Final[str] = rf"(?:\s|{_PUNCT})*{_PUNCT}(?:\s|{_PUNCT})*"
+_COLLAPSE_BEFORE: Final[Pattern[str]] = re.compile(rf"(?<=[\dk+]){_SEPARATOR_RUN}(?={_COUNT_WORD})")
+_COLLAPSE_AFTER: Final[Pattern[str]] = re.compile(
+    rf"(?<![^\W_])(reviews?|ratings?|sold|orders){_SEPARATOR_RUN}(?=\d)"
+)
+
+
+def _count_scan(text: str) -> str:
+    """Scan-only copy: a separator run beside a count word becomes one space.
+
+    The run is ``.``, ``_``, ``/``, ``-``, ``+``, and whitespace, on either
+    side of review(s), rating(s), sold, or orders. Rank text is not rewritten.
+    """
+    return _COLLAPSE_AFTER.sub(r"\1 ", _COLLAPSE_BEFORE.sub(" ", text))
+
+
+def _count_patterns(pattern: Pattern[str]) -> bool:
+    return pattern is _REVIEW or pattern is _SALES
+
+
 def fact_text_problem(key: str, value: str, *, page_count: int | None = None) -> str | None:
     """Why this fact must not be rendered, or None when the value may be shown.
 
@@ -277,7 +303,8 @@ def fact_text_problem(key: str, value: str, *, page_count: int | None = None) ->
             if _fact_mentions_automation(folded):
                 return "class"
             continue
-        if pattern.search(folded) is not None:
+        scanned = _count_scan(folded) if _count_patterns(pattern) else folded
+        if pattern.search(scanned) is not None:
             return "class"
     return None
 
@@ -697,6 +724,9 @@ def _reject_special(
         folded = normalize_text(text)
         scanned = _prose_automation_text(folded) if prose_pattern is _AUTOMATION else folded
         cited = _holding_values(copy, request, claim_ids, kind)
+        if _count_patterns(prose_pattern):
+            scanned = _count_scan(scanned)
+            cited = tuple(_count_scan(normalize_text(value)) for value in cited)
         for match in prose_pattern.finditer(scanned):
             if _span_inside(match.group(0), cited):
                 continue

@@ -28,6 +28,7 @@ from money_machine.agents.implementations.merchandising import DeterministicCopy
 from money_machine.domain.services.claim_validation import (
     ClaimValidation,
     fact_text_problem,
+    reject_invented_review,
     validate_claims,
 )
 from money_machine.domain.services.listing_text import TextSlot, render
@@ -591,6 +592,125 @@ _SCALE_GUARD = (
 )
 
 
+class _DropCountScan(ast.NodeTransformer):
+    """Make the scan-only collapse return the original text."""
+
+    def __init__(self) -> None:
+        self.hits = 0
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST:
+        if node.name != "_count_scan":
+            return self.generic_visit(node)
+        self.hits += 1
+        node.body = [ast.Return(value=ast.Name(id="text", ctx=ast.Load()))]
+        return node
+
+
+class _WeakenPunct(ast.NodeTransformer):
+    """Drop one character from the separator set the collapse step uses."""
+
+    def __init__(self, missing: str) -> None:
+        self.missing = missing
+        self.hits = 0
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> ast.AST:
+        target = node.target
+        value = node.value
+        if (
+            isinstance(target, ast.Name)
+            and target.id == "_PUNCT"
+            and isinstance(value, ast.Constant)
+            and isinstance(value.value, str)
+        ):
+            self.hits += 1
+            updated = value.value.replace(r"\-", "") if self.missing == "-" else value.value
+            if self.missing != "-":
+                updated = updated.replace(self.missing, "")
+            node.value = ast.Constant(value=updated)
+        return self.generic_visit(node)
+
+
+class _ReplaceText(ast.NodeTransformer):
+    """Replace one regex fragment everywhere it appears in a string constant."""
+
+    def __init__(self, old: str, new: str) -> None:
+        self.old = old
+        self.new = new
+        self.hits = 0
+
+    def visit_Constant(self, node: ast.Constant) -> ast.AST:
+        if isinstance(node.value, str) and self.old in node.value:
+            self.hits += node.value.count(self.old)
+            node.value = node.value.replace(self.old, self.new)
+        return node
+
+
+def _count_problem(transform: ast.NodeTransformer, label: str) -> Callable[..., str | None]:
+    problem = _load_mutant_module(transform, label).__dict__["fact_text_problem"]
+    if not callable(problem):
+        raise AssertionError(label)
+    return cast(Callable[..., str | None], problem)
+
+
+def test_plain_word_boundary_publishes_an_underscore_beside_the_word() -> None:
+    assert fact_text_problem("identity", "500 reviews_x", page_count=42) == "class"
+    assert fact_text_problem("identity", "x_reviews 500", page_count=42) == "class"
+    tail = _ReplaceText(r"(?![^\W_])", r"\b")
+    tail_problem = _count_problem(tail, "word_tail")
+    assert tail.hits >= 1
+    assert tail_problem("identity", "500 reviews_x", page_count=42) is None
+    lead = _ReplaceText(r"(?<![^\W_])", r"\b")
+    lead_problem = _count_problem(lead, "word_lead")
+    assert lead.hits >= 1
+    assert lead_problem("identity", "x_reviews 500", page_count=42) is None
+
+
+def test_deleting_the_word_edge_refuses_a_glued_letter() -> None:
+    assert fact_text_problem("identity", "500 reviewsX", page_count=42) is None
+    assert fact_text_problem("identity", "Xreviews 500", page_count=42) is None
+    tail = _ReplaceText(r"(?![^\W_])", "")
+    tail_problem = _count_problem(tail, "drop_word_tail")
+    assert tail.hits >= 1
+    assert tail_problem("identity", "500 reviewsX", page_count=42) == "class"
+    lead = _ReplaceText(r"(?<![^\W_])", "")
+    lead_problem = _count_problem(lead, "drop_word_lead")
+    assert lead.hits >= 1
+    assert lead_problem("identity", "Xreviews 500", page_count=42) == "class"
+
+
+def test_deleting_the_count_collapse_publishes_a_separator() -> None:
+    for value in ("500/reviews", "500.orders", "500.+ reviews", "1k.+ sold"):
+        assert fact_text_problem("identity", value, page_count=42) == "class"
+    drop = _DropCountScan()
+    problem = _count_problem(drop, "count_scan")
+    assert drop.hits == 1
+    for value in ("500/reviews", "500.orders", "500.+ reviews", "1k.+ sold"):
+        assert problem("identity", value, page_count=42) is None
+    assert problem("identity", "500 reviews", page_count=42) == "class"
+    assert problem("identity", "x_reviews 500", page_count=42) == "class"
+
+
+@pytest.mark.parametrize(
+    ("missing", "leaks", "holds"),
+    [
+        ("/", "500/reviews", "500.reviews"),
+        ("-", "500-sold", "500.sold"),
+        ("_", "500_orders", "500.orders"),
+        (".", "500.reviews", "500/reviews"),
+        ("+", "500.+ratings", "500.ratings"),
+    ],
+)
+def test_weakening_the_separator_collapse_publishes_that_mark(
+    missing: str, leaks: str, holds: str
+) -> None:
+    assert fact_text_problem("identity", leaks, page_count=42) == "class"
+    weaken = _WeakenPunct(missing)
+    problem = _count_problem(weaken, f"punct_{missing}")
+    assert weaken.hits == 1
+    assert problem("identity", leaks, page_count=42) is None
+    assert problem("identity", holds, page_count=42) == "class"
+
+
 def test_readding_a_review_exemption_publishes_a_count() -> None:
     assert fact_text_problem("identity", "1999 review", page_count=42) == "class"
     assert fact_text_problem("identity", "Reviews 1 100", page_count=42) == "class"
@@ -616,6 +736,24 @@ def test_readding_a_review_exemption_publishes_a_count() -> None:
 )
 def test_underscore_and_period_join_a_review_or_rating_count(value: str) -> None:
     assert fact_text_problem("identity", value, page_count=42) == "class"
+
+
+def test_cited_punctuated_count_covers_the_collapsed_span() -> None:
+    request, draft = _request_and_draft()
+    value = "500.+ reviews"
+    request = _with_fact(request, "reviews", value)
+    fact = next(item for item in request.facts if item.fact_value == value)
+    claim = ListingClaim(
+        claim_id=uuid4(),
+        kind="review",
+        fact_id=fact.fact_id,
+        stated_value=value,
+    )
+    title = draft.title.model_copy(update={"text": value, "claim_ids": (claim.claim_id,)})
+    cited = draft.model_copy(update={"title": title, "claims": (*draft.claims, claim)})
+    assert reject_invented_review(cited, request) == ()
+    bare = reject_invented_review(_retitle(draft, value), request)
+    assert any(item.rejection_class == "invented_review" for item in bare)
 
 
 def test_dropping_the_rank_follower_zero_publishes_goal_zero_one() -> None:

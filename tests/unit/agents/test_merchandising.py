@@ -780,6 +780,13 @@ def test_year_and_scale_names_fail_closed(identity: str) -> None:
         "Gift.500 orders",
         "500.sold",
         "500. sold",
+        "500.+ reviews",
+        "500.+reviews",
+        "4.9.+ rating",
+        "1,000.+ ratings",
+        "1k.+ sold",
+        "500_+ orders",
+        "Planner.12 sold",
     ),
 )
 def test_dotted_counts_are_refused(identity: str) -> None:
@@ -802,6 +809,51 @@ def test_dotted_counts_are_refused(identity: str) -> None:
 )
 def test_joined_review_and_sales_forms_are_refused(identity: str) -> None:
     _refuse(_bound("identity", identity))
+
+
+_COUNT_SEPARATORS = (".", "_", "/", "-", "+")
+_COUNT_WORDS = ("reviews", "ratings", "sold", "orders")
+
+
+def _separator_counts() -> tuple[str, ...]:
+    rows = [f"500{sep}{word}" for sep in _COUNT_SEPARATORS for word in _COUNT_WORDS]
+    rows.extend(f"{word}{sep}500" for sep in _COUNT_SEPARATORS for word in _COUNT_WORDS)
+    rows.extend(("500 reviews_x", "x_reviews 500"))
+    return tuple(rows)
+
+
+@pytest.mark.parametrize("identity", _separator_counts())
+def test_count_separators_collapse_on_both_sides(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        "500; reviews",
+        "reviews, 500",
+        "500 : reviews",
+        "500 = reviews",
+        "500 (reviews)",
+        "Reviews: +500",
+        "500sold",
+        "2.5 thousand sold",
+        "2.5ksold",
+        "Five_Star",
+        "5_Star",
+        "Rave_Reviews",
+        "RavingFans",
+        "500 reviewsX",
+        "Xreviews 500",
+    ),
+)
+def test_parked_count_punctuation_still_publishes(identity: str) -> None:
+    request = _bound("identity", identity)
+    copy = merchandise(request)
+    shown = " ".join(
+        (copy.draft.title.text, *(section.text for section in copy.draft.description_sections))
+    )
+    assert identity in shown
 
 
 @pytest.mark.parametrize(
