@@ -351,8 +351,7 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
         evidence = state["required_completion_evidence"]
         assert evidence.keys() == control_state.SESSION_EVIDENCE_KEYS[session]
         if session == 7:
-            # Omar's merge is the close gate. The twelve keys stay false.
-            assert all(value is False for value in evidence.values())
+            control_state.assert_session_seven_continuity(ROOT)
         else:
             assert all(evidence.values())
     assert state["transition_contract"]["completion_requires_next_session"] == state["next_session"]
@@ -370,11 +369,7 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
         # head_sha must equal closure for complete sessions (evidence finalized)
         # For incomplete sessions, head_sha may be ahead of closure (work in progress)
         if state["session_status"] == "complete":
-            if session == 7:
-                assert state["head_sha"] == SESSION_07_CLOSE_TIP
-                assert closure == SESSION_06_PRIOR_WAVE_TIP
-                assert state["head_sha"] != closure
-            else:
+            if session != 7:
                 assert state["head_sha"] == closure
             if session != 6:
                 close_commit = state_pointer_commit()
@@ -1559,30 +1554,29 @@ def test_session_eight_activation_rejects_false_session_seven_evidence(tmp_path:
 
     assert result.returncode == 2
     assert PRIOR_EVIDENCE_REJECTION in result.stderr
+    assert "replay refused:" not in result.stderr
     for key in SESSION_07_EVIDENCE_KEYS:
         assert key in result.stderr
     assert state_path.read_bytes() == original
     assert STATE_PATH.read_bytes() == checked_in
 
 
-def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: Path) -> None:
-    """(b) The same activation is accepted when every Session 07 evidence key is true."""
+def test_session_eight_activation_with_true_evidence_is_refused_without_replay_anchor(
+    tmp_path: Path,
+) -> None:
+    """Activation into session 8 with true evidence still needs the hardcoded replay anchor."""
     state_path, candidate_path, checked_in = session_eight_activation_paths(
         tmp_path, prior_evidence_true=True
     )
-    before = load_state(state_path)
+    original = state_path.read_bytes()
 
     result = run_transition(state_path, candidate_path, "activate")
 
-    assert result.returncode == 0, result.stderr
-    after = load_state(state_path)
-    assert after["current_session"] == 8
-    assert after["session_status"] == "incomplete"
-    assert after["completed_sessions"] == before["completed_sessions"]
-    assert after["next_session"] == before["next_session"] == 8
-    assert after["next_prompt"] == before["next_prompt"]
-    assert set(after["required_completion_evidence"]) == set(SESSION_08_EVIDENCE_KEYS)
-    assert not any(after["required_completion_evidence"].values())
+    assert result.returncode == 2
+    assert "anchor does not resolve" in result.stderr
+    assert state_path.read_bytes() == original
+    assert not list(state_path.parent.glob(".IMPLEMENTATION_STATE.json.lock"))
+    assert not list(state_path.parent.glob(".IMPLEMENTATION_STATE.json.*.tmp"))
     assert STATE_PATH.read_bytes() == checked_in
 
 

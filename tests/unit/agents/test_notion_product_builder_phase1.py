@@ -21,7 +21,7 @@ from money_machine.agents.implementations.notion_product_builder import (
     build_top_level_page_and_design_shell,
     design_shell_content,
 )
-from money_machine.control.state import SESSION_EVIDENCE_KEYS
+from money_machine.control.s07_evidence import assert_session_seven_continuity
 from money_machine.domain.models.common import EvidenceReference
 from money_machine.domain.models.product_spec import ColourToken, Hub, ProductSpec
 from money_machine.integrations.notion.domain import NotionCalloutBlock, NotionPage, NotionTextBlock
@@ -29,12 +29,9 @@ from money_machine.integrations.notion.fixture_adapter import FixtureNotionAdapt
 from tests.fixtures.products import create_fixture_product_spec
 
 ROOT = Path(__file__).parents[3]
-STATE_PATH = ROOT / "docs/control/IMPLEMENTATION_STATE.json"
 MODULE_PATH = ROOT / "src/money_machine/agents/implementations/notion_product_builder.py"
 WHEN = datetime(2026, 10, 3, 0, 30, tzinfo=UTC)
 LATER = datetime(2026, 10, 3, 1, 0, tzinfo=UTC)
-CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "b782751fdb1b255c436ff7f6fa655e6d783b1e8c"
 
 
 def _spec(
@@ -577,16 +574,4 @@ async def test_phase_one_checkpoint_parser_rejects_bad_inputs(tmp_path: Path) ->
 
 
 def test_session_seven_close_keeps_evidence_false() -> None:
-    state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    assert state["current_session"] == 7
-    assert state["session_status"] == "complete"
-    assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7]
-    assert state["next_session"] == 8
-    assert state["next_prompt"] == "11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md"
-    assert state["head_sha"] == HEAD_SHA
-    assert state["evidence_closure_commit_sha"] == CLOSURE_SHA
-    assert state["commissioned_agents"] == []
-    evidence = state["required_completion_evidence"]
-    assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
-    assert all(value is False for value in evidence.values())
-    assert state["state_revision"] == 64
+    assert_session_seven_continuity(ROOT)

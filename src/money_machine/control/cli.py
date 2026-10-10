@@ -11,6 +11,9 @@ from money_machine.control.state import (
     ControlStateError,
     apply_activation_transition,
     apply_completion_transition,
+    apply_record_closure_transition,
+    apply_record_evidence_transition,
+    apply_revoke_evidence_transition,
 )
 
 _COMMANDS = {
@@ -23,6 +26,21 @@ _COMMANDS = {
         apply_activation_transition,
         "validate and atomically activate the recorded next session",
         "proposed activated state; this file is never modified",
+    ),
+    "record-evidence": (
+        apply_record_evidence_transition,
+        "validate and atomically record Session 07 evidence",
+        "proposed state with cited evidence; this file is never modified",
+    ),
+    "record-closure": (
+        apply_record_closure_transition,
+        "validate and atomically record the Session 07 closure commit",
+        "proposed closed state; this file is never modified",
+    ),
+    "revoke-evidence": (
+        apply_revoke_evidence_transition,
+        "validate and atomically revoke cited Session 07 evidence",
+        "proposed state with the revoked keys; this file is never modified",
     ),
 }
 
