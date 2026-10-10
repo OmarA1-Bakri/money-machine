@@ -388,8 +388,9 @@ Record Session 07 with the Session 06 pointer convention, and do not flip the tw
 - `head_sha` tip-syncs to `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. It is not the commit that contains the state file. `evidence_closure_commit_sha` stays the Session 06 tip `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `last_verified_commit` stays bootstrap.
 - The twelve evidence keys stay false. `commissioned_agents` stays empty. Exit 78 stays HELD.
 - The close gate is that merge, at 2026-10-10 12:36:46 +0700. Omar's words, relayed by Grok Bot from its chat at 2026-10-10 12:39 ICT: "Yes, my merge is the Session 07 close gate. Fix the Verifier items in a follow-up PR."
+- #64 merged while Verifier round 2 was FAIL (comment 6094256754). Those items are what this pull request fixes.
 - No Lead Reviewer pass is on record.
-- `validate_completion_transition` still rejects a completion while any evidence key is false. This checked-in record is the operator gate. It is not that CLI transition. State revision 63 to 64. `updated_at` is `2026-10-10T05:36:46Z`, the merge commit time.
+- `validate_completion_transition` from the `b782751` state to this record fails first with `unsupported completion: notes cannot change`. With `notes` copied unchanged, it then fails with `pre-transition evidence must be complete except for the evidence-closure commit`, because the twelve evidence keys are false. This checked-in record is the operator gate. It is not that CLI transition. State revision 63 to 64. `updated_at` is `2026-10-10T05:36:46Z`, the merge commit time.
 
 ### Consequences
 
