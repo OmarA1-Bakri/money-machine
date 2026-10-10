@@ -1,9 +1,10 @@
 """One unpublish lock per run id.
 
-An old lock without a completed exec file refuses a new start. A completed exec
-file does not. Trap and finally share the exclusive lock, so exactly one of them
-runs the action. A live holder is detected with ``flock``; a lock file left
-behind after a crash is not a live holder.
+An old lock without a completed exec file refuses a new start. Once this run
+id's exec file is completed, a later caller returns false and does not act,
+including when trap and finally both run. A new run takes a new run id. A live
+holder is detected with ``flock``; a lock file left behind after a crash is not
+a live holder.
 """
 
 from __future__ import annotations
@@ -47,8 +48,8 @@ def begin_run(root: Path, run_id: str, action: Callable[[], None]) -> bool:
     root.mkdir(parents=True, exist_ok=True)
     held = lock_path(root, run_id)
     finished = exec_path(root, run_id)
-    if held.exists() and _exec_completed(finished):
-        held.unlink()
+    if _exec_completed(finished):
+        return False
     try:
         descriptor = os.open(held, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     except FileExistsError:

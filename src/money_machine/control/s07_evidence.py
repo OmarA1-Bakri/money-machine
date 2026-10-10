@@ -703,6 +703,29 @@ def _state_document_at(repo_root: Path, commit: str) -> dict[str, object]:
     )
 
 
+def _require_commissioning_manifest(
+    repo_root: Path, commit: str, agent_id: str, locator: object
+) -> None:
+    """A locator is a JSON manifest blob under the commissioning prefix, committed at C."""
+    prefix = "docs/evidence/s07/commissioning/"
+    if (
+        not isinstance(locator, str)
+        or not locator.startswith(prefix)
+        or locator == prefix
+        or "/" in locator.removeprefix(prefix)
+        or not locator.endswith(".json")
+        or Path(locator).name == "README.md"
+    ):
+        _reject(LABEL_CLOSURE, f"{agent_id} locator must be a commissioning manifest")
+    payload = _blob_bytes(repo_root, commit, locator)
+    try:
+        decoded = cast(object, json.loads(payload.decode("utf-8")))
+    except (UnicodeError, json.JSONDecodeError):
+        _reject(LABEL_CLOSURE, f"{agent_id} locator must be a manifest blob")
+    if not isinstance(decoded, dict):
+        _reject(LABEL_CLOSURE, f"{agent_id} locator must be a manifest blob")
+
+
 def _check_g7(repo_root: Path, commit: str, citation: Mapping[str, object]) -> None:
     payload = _blob_bytes(repo_root, commit, _G7_PATH)
     if _sha256(payload) != citation["g7_record_blob_sha256"]:
@@ -748,9 +771,7 @@ def _check_g7(repo_root: Path, commit: str, citation: Mapping[str, object]) -> N
         if not isinstance(locators, list) or not locators:
             _reject(LABEL_CLOSURE, f"{agent_id} needs commissioning evidence locators")
         for locator in locators:
-            if not isinstance(locator, str) or locator == "":
-                _reject(LABEL_CLOSURE, f"{agent_id} locator must be a path")
-            _blob_bytes(repo_root, commit, locator)
+            _require_commissioning_manifest(repo_root, commit, agent_id, locator)
 
 
 def verify_record_closure_git(
@@ -1002,11 +1023,12 @@ def replay_state_history(
         if _is_merge_commit(repo_root, commit):
             raise ControlStateError(SQUASH_REQUIRED)
         is_end = end_index is not None and index == end_index
+        activation_error: ControlStateError | None = None
         if is_end:
             try:
                 validate_activation_transition(previous, current)
             except ControlStateError as error:
-                raise ControlStateError(f"{BAD_WINDOW}: {error}") from error
+                activation_error = error
         matches: list[str] = []
         if _record_step(repo_root, previous, current, commit):
             matches.append("record")
@@ -1017,7 +1039,9 @@ def replay_state_history(
         if _activation_step(previous, current):
             matches.append("activation")
         if is_end and "activation" not in matches:
-            raise ControlStateError(BAD_WINDOW)
+            if activation_error is None:
+                raise ControlStateError(BAD_WINDOW)
+            raise ControlStateError(f"{BAD_WINDOW}: {activation_error}") from activation_error
         if not is_end and "activation" in matches:
             raise ControlStateError(INVALID_STEP)
         if len(matches) != 1:

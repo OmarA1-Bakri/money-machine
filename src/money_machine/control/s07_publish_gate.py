@@ -45,9 +45,11 @@ def _parse_time(value: object, field: str) -> datetime:
 
 def validate_publish_routine(path: Path, *, now: datetime, owner_uid: int) -> dict[str, object]:
     """Refuse unless the routine file is fresh, private, owned, and notified."""
-    if path.is_symlink() or not path.is_file():
+    if path.is_symlink():
         raise PublishGateError("routine file must be a regular non-symlink file")
-    info = path.lstat()
+    if not path.is_file():
+        raise PublishGateError("routine file must be a regular non-symlink file")
+    info = path.stat()
     if stat.S_IMODE(info.st_mode) != 0o600:
         raise PublishGateError("routine file mode must be 0600")
     if info.st_uid != owner_uid:

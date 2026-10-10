@@ -48,6 +48,7 @@ from money_machine.control.s07_evidence import (
     validate_revoke_evidence_transition,
     verify_record_closure_git,
     verify_record_evidence_git,
+    verify_revoke_evidence_git,
 )
 from money_machine.control.state import (
     SESSION_EVIDENCE_KEYS,
@@ -341,6 +342,10 @@ def test_09_evidence_values_and_key_set_are_strict() -> None:
         previous, current = _valid_record()
         cast(dict[str, object], current["required_completion_evidence"])[KEY_TWO] = bad
         _expect("record", previous, current, "evidence values must be booleans")
+    previous, unchanged = _valid_record()
+    cast(dict[str, object], previous["required_completion_evidence"])[KEY_TWO] = "true"
+    cast(dict[str, object], unchanged["required_completion_evidence"])[KEY_TWO] = "true"
+    _expect("record", previous, unchanged, "evidence values must be booleans")
     previous, extra = _valid_record()
     _evidence(extra)["extra_evidence_key"] = False
     _expect("record", previous, extra, "evidence keys must equal the session 07 contract")
@@ -531,6 +536,13 @@ def _commit(repo: Path, message: str) -> str:
 
 def _anchor(tmp_path: Path) -> Anchor:
     repo = _clone(tmp_path)
+    tracked = subprocess.run(
+        ["git", "-C", str(repo), "ls-files", "docs/evidence/s07"],
+        check=True,
+        capture_output=True,
+    )
+    if tracked.stdout.strip():
+        _git(repo, "rm", "-r", "docs/evidence/s07")
     state = _fresh()
     state["repo_root"] = str(repo)
     state["branch"] = BRANCH
@@ -799,6 +811,7 @@ def test_14_merge_commit_must_descend_from_the_session_07_tip(tmp_path: Path) ->
 
 
 def test_15_evidence_must_exist_at_merge_commit_not_only_at_head(tmp_path: Path) -> None:
+    """The cited commit is the fixture commit, which has no Session 07 evidence tree."""
     anchor = _anchor(tmp_path)
     citations = _plant(anchor.repo, (KEY_ONE,))
     _commit(anchor.repo, "test: evidence added after the cited commit")
@@ -824,10 +837,117 @@ def test_16_blob_sha_is_used_not_the_worktree(tmp_path: Path) -> None:
     current["evidence_citations"] = {"7": {KEY_ONE: body}}
     artifact = anchor.repo / f"docs/evidence/s07/{KEY_ONE}/p2_build_exec.json"
     artifact.write_text('{"mode":"worktree"}\n', encoding="utf-8")
+    manifest = anchor.repo / f"docs/evidence/s07/{KEY_ONE}/manifest.json"
+    manifest.write_bytes(manifest.read_bytes() + b"\n")
     verify_record_evidence_git(anchor.repo, current, head_commit=merge)
-    body["manifest_blob_sha256"] = _sha256(artifact.read_bytes())
+    body["manifest_blob_sha256"] = _sha256(manifest.read_bytes())
     with pytest.raises(ControlStateError, match="manifest blob sha256"):
         verify_record_evidence_git(anchor.repo, current, head_commit=merge)
+
+
+def test_merge_commit_must_be_an_ancestor_of_the_recorded_commit(tmp_path: Path) -> None:
+    anchor = _anchor(tmp_path)
+    citations = _plant(anchor.repo, (KEY_ONE,))
+    side = _commit(anchor.repo, "test: evidence on a side commit")
+    _git(anchor.repo, "branch", "evidence-side")
+    _git(anchor.repo, "checkout", "-B", BRANCH, anchor.sha)
+    current = _advance(anchor.state)
+    _evidence(current)[KEY_ONE] = True
+    body = dict(citations[KEY_ONE])
+    body["merge_commit"] = side
+    current["evidence_citations"] = {"7": {KEY_ONE: body}}
+    with pytest.raises(ControlStateError, match="ancestor of the recorded commit"):
+        verify_record_evidence_git(anchor.repo, current, head_commit=anchor.sha)
+
+
+def test_artifact_must_live_in_its_own_key_folder(tmp_path: Path) -> None:
+    anchor = _anchor(tmp_path)
+    citations = _plant(anchor.repo, (KEY_ONE,))
+    manifest_path = anchor.repo / f"docs/evidence/s07/{KEY_ONE}/manifest.json"
+    manifest = cast(dict[str, object], json.loads(manifest_path.read_text(encoding="utf-8")))
+    artifacts = cast(list[dict[str, object]], manifest["artifacts"])
+    foreign = f"docs/evidence/s07/{KEY_TWO}/p2_build_exec.json"
+    for artifact in artifacts:
+        if artifact["kind"] != "p2_build_exec":
+            continue
+        payload = (anchor.repo / cast(str, artifact["path"])).read_bytes()
+        destination = anchor.repo / foreign
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(payload)
+        artifact["path"] = foreign
+        artifact["sha256"] = _sha256(payload)
+    digest = _write_json(manifest_path, manifest)
+    merge = _commit(anchor.repo, "test: artifact outside its key folder")
+    body = dict(citations[KEY_ONE])
+    body["manifest_blob_sha256"] = digest
+    with pytest.raises(ControlStateError, match="artifact path or kind"):
+        _apply_record(
+            anchor, anchor.state, (KEY_ONE,), {KEY_ONE: body}, merge, "2026-10-10T13:00:00Z"
+        )
+
+
+def test_p5_qa_record_binding_and_p8b_control_digests(tmp_path: Path) -> None:
+    ledger_root = tmp_path / "ledger"
+    ledger_root.mkdir()
+    ledger = _anchor(ledger_root)
+    qa = _plant(ledger.repo, ("product_qa_implemented",))
+
+    def _wrong_qa_binding(kind: str, document: dict[str, object]) -> None:
+        if kind == "p5_ledger":
+            document["qa_record_sha256"] = "ab" * 32
+
+    cited = _plant(
+        ledger.repo,
+        ("product_fact_ledger_persisted",),
+        qa_sha="cd" * 32,
+        mutate=_wrong_qa_binding,
+    )
+    cited.update(qa)
+    merge = _commit(ledger.repo, "test: unbound ledger")
+    with pytest.raises(ControlStateError, match="qa_record_sha256 must equal the cited p4_qa"):
+        _apply_record(
+            ledger,
+            ledger.state,
+            ("product_qa_implemented", "product_fact_ledger_persisted"),
+            cited,
+            merge,
+            "2026-10-10T13:00:00Z",
+        )
+
+    control_root = tmp_path / "control"
+    control_root.mkdir()
+    control = _anchor(control_root)
+
+    def _wrong_control_digest(kind: str, document: dict[str, object]) -> None:
+        if kind == "p8b_control_record":
+            digests = cast(dict[str, object], document["control_file_sha256"])
+            digests["docs/control/DECISIONS.md"] = "c" * 64
+
+    qa_file = control.repo / "docs/evidence/s07/product_qa_implemented/p4_qa.json"
+    planted_qa = _plant(control.repo, ("product_qa_implemented",))
+    qa_sha = _sha256(qa_file.read_bytes())
+    other_keys = tuple(key for key in NON_CLOSURE_KEYS if key != "product_qa_implemented")
+    planted = _plant(control.repo, other_keys, qa_sha=qa_sha, mutate=_wrong_control_digest)
+    planted.update(planted_qa)
+    control_merge = _commit(control.repo, "test: control evidence")
+    recorded = _apply_record(
+        control,
+        control.state,
+        tuple(key for key in NON_CLOSURE_KEYS if key != KEY_ELEVEN),
+        planted,
+        control_merge,
+        "2026-10-10T13:00:00Z",
+    )
+    _commit(control.repo, "test: record keys 1-10")
+    with pytest.raises(ControlStateError, match="digest does not match"):
+        _apply_record(
+            control,
+            recorded,
+            (KEY_ELEVEN,),
+            planted,
+            control_merge,
+            "2026-10-10T14:00:00Z",
+        )
 
 
 def test_17_disallowed_kind_is_refused(tmp_path: Path) -> None:
@@ -893,8 +1013,13 @@ def test_18_qa_must_pass_and_mode_must_be_execute(tmp_path: Path) -> None:
         if kind == "p2_build_exec":
             document["mode"] = "dry-run"
 
+    def _wrong_parent(kind: str, document: dict[str, object]) -> None:
+        if kind == "p2_build_exec":
+            document["parent_page_id"] = "not-the-sandbox-parent"
+
     _refuse(_not_run, "qa_verdict must be PASS", "qa")
     _refuse(_dry_run, "mode must be execute", "mode")
+    _refuse(_wrong_parent, "parent must be the sandbox parent", "parent")
 
 
 def test_21_closure_commit_must_contain_the_pre_transition_state(tmp_path: Path) -> None:
@@ -1061,6 +1186,26 @@ def test_30_and_42_g7_must_match_agents_and_resolve(tmp_path: Path) -> None:
             runtime=False,
         )
 
+    readme_root = tmp_path / "readme-locator"
+    readme_root.mkdir()
+    readme = _anchor(readme_root)
+    readme_state, _readme_c, readme_digest = _record_through_eleven(readme)
+    loaded = yaml.safe_load((readme.repo / "config/agents.yaml").read_text(encoding="utf-8"))
+    rows = cast(list[dict[str, object]], cast(dict[str, object], loaded)["agents"])
+    for row in rows:
+        if row.get("agent_id") in {"A07", "A08", "A09"}:
+            row["commissioning_evidence"] = ["README.md"]
+    (readme.repo / "config/agents.yaml").write_text(yaml.safe_dump(loaded), encoding="utf-8")
+    readme_commit = _commit(readme.repo, "test: readme locator")
+    with pytest.raises(ControlStateError, match="commissioning manifest"):
+        verify_record_closure_git(
+            readme.repo,
+            readme_state,
+            _closure_candidate(readme_state, readme_commit, readme_digest),
+            writing_commit=readme_commit,
+            runtime=False,
+        )
+
 
 def _closure_candidate(state: ControlState, commit_c: str, g7_digest: str) -> ControlState:
     current = _advance(state, "2026-10-10T18:00:00Z")
@@ -1194,6 +1339,168 @@ def test_33_and_34_replay_refuses_bad_history_and_keeps_first_parent(
     _git(ours.repo, "checkout", BRANCH)
     _git(ours.repo, "merge", "-s", "ours", "ignored", "-m", "test: ours merge")
     replay_state_history(ours.repo, ours.sha)
+
+
+def _flip_sha(digest: str) -> str:
+    first = "0" if digest[0] != "0" else "1"
+    return first + digest[1:]
+
+
+def _activation_candidate(state: ControlState, stamp: str) -> ControlState:
+    current = _advance(state, stamp)
+    current["session_status"] = "incomplete"
+    current["current_session"] = 8
+    current["required_completion_evidence"] = dict.fromkeys(SESSION_08_EVIDENCE_KEYS, False)
+    return current
+
+
+def _commit_state(anchor: Anchor, state: ControlState, message: str) -> str:
+    write_state(anchor.repo / "docs/control/IMPLEMENTATION_STATE.json", state)
+    return _commit(anchor.repo, message)
+
+
+def test_pull_request_head_replays_and_the_merge_ref_does_not(tmp_path: Path) -> None:
+    """A state-touching pull request passes at its head and fails on the two-parent merge ref."""
+    anchor = _anchor(tmp_path)
+    citations = _plant(anchor.repo, (KEY_ONE,))
+    merge = _commit(anchor.repo, "test: evidence")
+    _apply_record(anchor, anchor.state, (KEY_ONE,), citations, merge, "2026-10-10T13:00:00Z")
+    _commit(anchor.repo, "test: record key one")
+    _git(anchor.repo, "branch", "pr-head")
+    replay_state_history(anchor.repo, anchor.sha)
+    _git(anchor.repo, "checkout", "-B", BRANCH, anchor.sha)
+    _git(anchor.repo, "merge", "--no-ff", "pr-head", "-m", "test: pull request merge ref")
+    with pytest.raises(ControlStateError, match="squash-merged"):
+        replay_state_history(anchor.repo, anchor.sha)
+    _git(anchor.repo, "checkout", "--detach", "pr-head")
+    replay_state_history(anchor.repo, anchor.sha)
+
+
+def test_34_replay_rechecks_record_closure_and_revoke(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Deleting a replay git re-check accepts a step the stock replay refuses."""
+    bad_root = tmp_path / "bad-hash"
+    bad_root.mkdir()
+    bad = _anchor(bad_root)
+    qa_file = bad.repo / "docs/evidence/s07/product_qa_implemented/p4_qa.json"
+    planted_qa = _plant(bad.repo, ("product_qa_implemented",))
+    qa_sha = _sha256(qa_file.read_bytes())
+    other = tuple(key for key in NON_CLOSURE_KEYS if key != "product_qa_implemented")
+    planted = _plant(bad.repo, other, qa_sha=qa_sha)
+    planted.update(planted_qa)
+    g7_digest = _g7(bad.repo)
+    merge = _commit(bad.repo, "test: evidence blobs")
+    wrong = _advance(bad.state, "2026-10-10T13:00:00Z")
+    _evidence(wrong)[KEY_ONE] = True
+    cited = dict(planted[KEY_ONE])
+    cited["merge_commit"] = merge
+    cited["manifest_blob_sha256"] = _flip_sha(cast(str, cited["manifest_blob_sha256"]))
+    wrong["evidence_citations"] = {"7": {KEY_ONE: cited}}
+    _commit_state(bad, wrong, "test: record with a wrong manifest hash")
+    revoked = _advance(wrong, "2026-10-10T13:10:00Z")
+    _evidence(revoked)[KEY_ONE] = False
+    revoked["evidence_citations"] = {
+        "7": {},
+        "7_revoked": [
+            {
+                "key": KEY_ONE,
+                "reason": "manifest hash did not match the blob",
+                "revoked_at": "2026-10-10T13:10:00Z",
+                "revoked_in_rev": revoked["state_revision"],
+            }
+        ],
+    }
+    _commit_state(bad, revoked, "test: revoke the bad record")
+    recorded = _apply_record(
+        bad,
+        revoked,
+        tuple(key for key in NON_CLOSURE_KEYS if key != KEY_ELEVEN),
+        planted,
+        merge,
+        "2026-10-10T13:20:00Z",
+    )
+    _commit(bad.repo, "test: record keys 1-10")
+    eleven = _apply_record(bad, recorded, (KEY_ELEVEN,), planted, merge, "2026-10-10T14:00:00Z")
+    commit_c = _commit(bad.repo, "test: record key 11")
+    closed = _close(bad, eleven, commit_c, g7_digest)
+    _commit(bad.repo, "test: closure")
+    candidate = bad.tmp_path / "activate-bad-hash.json"
+    write_state(candidate, _activation_candidate(closed, "2026-10-10T18:30:00Z"))
+    with pytest.raises(ControlStateError, match="replay refused"):
+        _apply_activation_transition(
+            bad.repo / "docs/control/IMPLEMENTATION_STATE.json",
+            candidate,
+            replay_anchor=bad.sha,
+        )
+
+    g7_root = tmp_path / "bad-g7"
+    g7_root.mkdir()
+    g7_anchor = _anchor(g7_root)
+    state, commit_c, digest = _record_through_eleven(g7_anchor)
+    bad_closure = _closure_candidate(state, commit_c, _flip_sha(digest))
+    _commit_state(g7_anchor, bad_closure, "test: closure with a bad g7 hash")
+    g7_candidate = g7_anchor.tmp_path / "activate-bad-g7.json"
+    write_state(g7_candidate, _activation_candidate(bad_closure, "2026-10-10T18:40:00Z"))
+    with pytest.raises(ControlStateError, match="replay refused"):
+        _apply_activation_transition(
+            g7_anchor.repo / "docs/control/IMPLEMENTATION_STATE.json",
+            g7_candidate,
+            replay_anchor=g7_anchor.sha,
+        )
+
+    calls: list[str] = []
+    real_revoke = verify_revoke_evidence_git
+
+    def _spy(repo_root: Path, current: ControlState, *, head_commit: str) -> None:
+        calls.append(head_commit)
+        real_revoke(repo_root, current, head_commit=head_commit)
+
+    monkeypatch.setattr(
+        "money_machine.control.s07_evidence.verify_revoke_evidence_git",
+        _spy,
+    )
+    revoke_root = tmp_path / "revoke-recheck"
+    revoke_root.mkdir()
+    revoke_anchor = _anchor(revoke_root)
+    pair = _plant(revoke_anchor.repo, (KEY_ONE, KEY_TWO))
+    pair_merge = _commit(revoke_anchor.repo, "test: two keys")
+    both = _apply_record(
+        revoke_anchor,
+        revoke_anchor.state,
+        (KEY_ONE, KEY_TWO),
+        pair,
+        pair_merge,
+        "2026-10-10T13:00:00Z",
+    )
+    _commit(revoke_anchor.repo, "test: record two keys")
+    dropped = _advance(both, "2026-10-10T13:30:00Z")
+    _evidence(dropped)[KEY_TWO] = False
+    block = cast(dict[str, object], copy.deepcopy(dropped["evidence_citations"]))
+    session = cast(dict[str, object], block["7"])
+    del session[KEY_TWO]
+    block["7_revoked"] = [
+        {
+            "key": KEY_TWO,
+            "reason": "second key was recorded against the wrong parent",
+            "revoked_at": "2026-10-10T13:30:00Z",
+            "revoked_in_rev": dropped["state_revision"],
+        }
+    ]
+    dropped["evidence_citations"] = block
+    _commit_state(revoke_anchor, dropped, "test: revoke key two")
+    replay_state_history(revoke_anchor.repo, revoke_anchor.sha)
+    assert calls
+
+    kept = dict(cast(dict[str, object], session[KEY_ONE]))
+    kept["manifest_blob_sha256"] = _flip_sha(cast(str, kept["manifest_blob_sha256"]))
+    session[KEY_ONE] = kept
+    with pytest.raises(ControlStateError, match="manifest blob sha256"):
+        verify_revoke_evidence_git(
+            revoke_anchor.repo,
+            dropped,
+            head_commit=_git(revoke_anchor.repo, "rev-parse", "HEAD").strip(),
+        )
 
 
 def test_35_pin_helper_mutants_die() -> None:
@@ -1484,6 +1791,18 @@ def test_41_revoke_rerecord_and_close_keep_7_revoked(tmp_path: Path) -> None:
     edited_block["7_revoked"] = []
     edited["evidence_citations"] = edited_block
     _expect("record", revoked, edited, "7_revoked must stay byte-identical")
+    closure_previous, closure_current = _valid_closure()
+    entry = {
+        "key": KEY_THREE,
+        "reason": "dashboard evidence pointed at the wrong parent",
+        "revoked_at": "2026-10-10T12:00:00Z",
+        "revoked_in_rev": 70,
+    }
+    edited_entry = dict(entry)
+    edited_entry["reason"] = "edited after the fact"
+    cast(dict[str, object], closure_previous["evidence_citations"])["7_revoked"] = [entry]
+    cast(dict[str, object], closure_current["evidence_citations"])["7_revoked"] = [edited_entry]
+    _expect("closure", closure_previous, closure_current, "7_revoked must stay byte-identical")
 
 
 def test_43_bad_window_end_is_replayed_for_completion_and_activation_into_nine(
@@ -1596,8 +1915,10 @@ def test_44_window_runs_to_head_until_a_valid_activation(tmp_path: Path) -> None
     assert _evidence_false[KEY_ONE] is False
     write_state(invalid.repo / "docs/control/IMPLEMENTATION_STATE.json", broken)
     _commit(invalid.repo, "test: invalid window end")
-    with pytest.raises(ControlStateError, match="bad window-end"):
+    with pytest.raises(ControlStateError, match="bad window-end") as caught:
         replay_state_history(invalid.repo, invalid.sha, require_closed_window=True)
+    assert "invalid step" not in str(caught.value)
+    assert "prior-session evidence" in str(caught.value)
 
 
 def test_state_py_frozen_ranges_stay_byte_identical() -> None:

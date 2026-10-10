@@ -65,8 +65,24 @@ def test_45_missing_stale_deadline_mode_symlink_field_owner_and_valid(tmp_path: 
     _assert_zero_writes(stale)
 
     past = tmp_path / "past.json"
-    _write(past, _document(deadline_at=(NOW - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%SZ")))
-    _assert_zero_writes(past)
+    past_deadline = NOW - timedelta(minutes=1)
+    _write(
+        past,
+        _document(
+            deadline_at=past_deadline.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            reminder_at=(past_deadline - timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        ),
+    )
+    past_writes: list[str] = []
+    with pytest.raises(PublishGateError, match="within the next 23 hours"):
+        guarded_browser_write(
+            past,
+            lambda: past_writes.append("wrote"),
+            now=NOW,
+            owner_uid=os.getuid(),
+            wait_seconds=0,
+        )
+    assert past_writes == []
 
     too_far = tmp_path / "far.json"
     far_deadline = NOW + timedelta(hours=23, minutes=1)
@@ -88,7 +104,16 @@ def test_45_missing_stale_deadline_mode_symlink_field_owner_and_valid(tmp_path: 
     _write(target)
     link = tmp_path / "link.json"
     link.symlink_to(target)
-    _assert_zero_writes(link)
+    link_writes: list[str] = []
+    with pytest.raises(PublishGateError, match="non-symlink"):
+        guarded_browser_write(
+            link,
+            lambda: link_writes.append("wrote"),
+            now=NOW,
+            owner_uid=os.getuid(),
+            wait_seconds=0,
+        )
+    assert link_writes == []
 
     missing_field = tmp_path / "fields.json"
     document = _document()

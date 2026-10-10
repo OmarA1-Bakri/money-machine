@@ -32,7 +32,7 @@ Run evidence requires `mode == "execute"`, `redaction_self_check == "PASS"`, the
 
 ## Closure and revoke
 
-Closure requires keys 1–11 true and cited, the closure key still false, and the pre-transition pins `b782751…` / `0f94d585…`. Commit C's state equals that pre-transition document and does not name C. Both commit fields become C. `0f94d585` and `b782751` are refused. `docs/evidence/s07/commissioning/g7-record.json` at C must match `commissioning_state` for A07–A09 in `config/agents.yaml`, and each locator must resolve at C.
+Closure requires keys 1–11 true and cited, the closure key still false, and the pre-transition pins `b782751…` / `0f94d585…`. Commit C's state equals that pre-transition document and does not name C. Both commit fields become C. `0f94d585` and `b782751` are refused. `docs/evidence/s07/commissioning/g7-record.json` at C must match `commissioning_state` for A07–A09 in `config/agents.yaml`. Each locator must be a JSON manifest blob at `docs/evidence/s07/commissioning/<name>.json` committed at C. `README.md` is not a locator.
 
 Revoke flips cited keys true to false, removes those citations, and appends `{key, reason, revoked_at, revoked_in_rev}` to `evidence_citations["7_revoked"]`. Record and closure leave that list byte-identical. Revoke is refused once the closure key is true.
 
@@ -43,6 +43,8 @@ Revoke flips cited keys true to false, removes those citations, and appends `{ke
 The window runs through the first first-parent state commit whose `current_session` is not 7. That commit must be a valid activation into 8. While the window is open it runs to HEAD, and the worktree state must equal HEAD. After it closes, later state commits are not replayed. The worktree rule does not apply to a dirty tree on an activation whose `next_session` is not 8 or 9.
 
 The pin helper, activation into 8 (open) and 9 (closed), and completion of session 8 call the replay. Activations 1–7 and completions 0–7 do not.
+
+Pull-request CI checks out `github.event.pull_request.head.sha` with `fetch-depth: 0`. The default `refs/pull/N/merge` checkout is a two-parent commit, and the replay refuses that for any state-touching pull request. The pull-request head, one squash commit, replays.
 
 ## WSL record flow
 
@@ -64,16 +66,16 @@ The browser guard in `s07_navigation_guard.py` is the testable rule for later na
 | 6 | Top-level citation key other than `7` / `7_revoked`, or a key outside the session 07 contract |
 | 7 | Remove `evidence_citations`, or create `7_revoked` on the first record |
 | 8 | Revision +0 or +2, or an unchanged `updated_at`, on all three commands |
-| 9 | Non-bool evidence, or an extra or missing key |
+| 9 | Non-bool evidence, including a non-bool that is unchanged while another key flips, or an extra or missing key |
 | 10 | Session 9 raises `ControlStateError`, not `KeyError` |
-| 11 | `README.md` accepted as proof |
+| 11 | `README.md` accepted as proof. A separate case refuses a valid filename placed in another key's folder |
 | 12 | Manifest `key` does not match the cited key |
 | 13 | Manifest `session` is not 7 |
-| 14 | `merge_commit` does not descend from `b782751` |
+| 14 | `merge_commit` does not descend from `b782751`. A separate case refuses a side-branch evidence commit that is not an ancestor of the recorded commit |
 | 15 | Evidence exists only at HEAD, not at `merge_commit` |
-| 16 | Hash the worktree, or skip the manifest blob hash |
+| 16 | Hash the manifest or an artifact from the worktree instead of the git blob |
 | 17 | Allow a kind outside `S07_EVIDENCE_KINDS` |
-| 18 | Accept `qa_verdict` other than PASS, or a mode other than `execute` |
+| 18 | Accept `qa_verdict` other than PASS, a mode other than `execute`, or a parent other than the sandbox parent. p5 `qa_record_sha256` and p8b control-file digests are bound to the cited blobs |
 | 19 | Record key 11 before keys 1–10 are true |
 | 20 | Close with a non-closure key false or uncited |
 | 21 | C's state is not the pre-transition document |
@@ -85,22 +87,24 @@ The browser guard in `s07_navigation_guard.py` is the testable rule for later na
 | 27 | Only one of the two commit fields equals C |
 | 28 | `head_sha` moves to `0f94d585` |
 | 29 | `evidence_closure_commit_sha` moves to `b782751` |
-| 30 / 42 | G7 record missing, agents.yaml state differs, or a locator does not resolve |
+| 30 / 42 | G7 record missing, agents.yaml state differs, a locator does not resolve, or a locator is not a commissioning manifest |
 | 31 | `record-evidence` flips the closure key |
 | 32 | Revoke an uncited key, revoke after closure, empty reason, revoke while the closure key stays true, move `head_sha`, or close twice |
 | 33 | Hand-edited state, hand revert, two steps in one commit, revision gap, dirty worktree while the window is open, non-squash merge, anchor state differs from the fixture |
-| 34 | Skip citation re-validation; skip replay on activation into 8; skip a missing or shallow anchor (real CLI, tests 38–39); drop `--first-parent` |
+| 34 | Delete the record git re-check and a wrong manifest hash, revoked then validly re-recorded, is accepted through activation. Delete the closure git re-check and a flipped `g7_record_blob_sha256` is accepted the same way. Both are refused by `_apply_activation_transition` with an injected anchor. Delete the revoke git re-check and the replay spy on `verify_revoke_evidence_git` is empty. A direct call with a flipped remaining-key hash expects the manifest mismatch; a linear history cannot fail that check while the earlier record check passes, because the cited blob does not change. Tests 38 and 39 kill a skipped activation replay |
 | 35 | Pin helper uses `any()`, drops the citation lookup, or returns before the sha pins |
 | 36 | Activation into 8 without a closure is refused; a valid closure then activation is accepted; session 08 completion still uses the unchanged completion validator |
 | 37 | #66 mutants re-proved on the frozen rev-64 fixture from `00b952a` |
 | 38 | Real CLI: shallow `file://` clone, stderr names shallow, exit 2, zero writes |
 | 39 | Real CLI: anchor does not resolve, including when `MM_REPLAY_ANCHOR` is set |
 | 40 | Replay is not called when `next_session` is 1 or 2 |
-| 41 | Revoke key 3, re-record it, close; `7_revoked` stays byte-identical. Editing it on a later record is refused |
+| 41 | Revoke key 3, re-record it, close; `7_revoked` stays byte-identical. Editing it on a later record or on closure is refused |
 | 43 | Candidates pass their own validators first. A hand-made session 08 activation is refused by completion and by activation into 9, with a replay message. `_apply_completion_transition` accepts an injected anchor |
-| 44 | Open window runs to HEAD. A valid activation ends the window. An invalid window end fails closed |
-| 45 | Missing, stale, past, or too-far deadline; mode, symlink, missing field, empty `omar_notified_at`, or wrong owner. Zero browser writes. A valid 0600 file allows one write |
-| 46 | One lock per run id. A live holder returns false. An old lock without `exec.json` is refused. A completed exec allows a new start |
+| 44 | Open window runs to HEAD. A valid activation ends the window. An invalid window end is `bad window-end`, not `invalid step` |
+| 45 | Missing, stale, past (reminder four hours earlier), or too-far deadline; mode, a symlink to a valid file, missing field, empty `omar_notified_at`, or wrong owner. Zero browser writes. A valid 0600 file allows one write |
+| 46 | One lock per run id. A live holder returns false. An old lock without `exec.json` is refused. A completed exec returns false and does not act again; a new run id does |
 | 47 | Foreign space, broken parent, redirect, unlisted URL, signed-out sandbox, or a signed-in anonymous session. `evilnotion.site` is refused. A listed `notion.site` URL is allowed |
+
+The table has 46 rows and covers tests 1–47. Tests 30 and 42 share one row.
 
 `evidence_citations cannot be created a second time` is unreachable: a field cannot be both newly added and already present. The reachable refusal is `evidence_citations keys cannot be added or removed`. Replay trigger `current_session == 7` versus `next_session == 8` is equivalent by the activation validator and is parked.

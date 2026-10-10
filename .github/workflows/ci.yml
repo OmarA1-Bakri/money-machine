@@ -32,6 +32,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # pull_request otherwise checks out refs/pull/N/merge, a two-parent
+          # commit. Replay refuses that for any state-touching pull request.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - uses: astral-sh/setup-uv@v6
         with:

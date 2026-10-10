@@ -28,8 +28,10 @@ def test_46_trap_and_finally_run_once_and_a_stale_lock_is_refused(tmp_path: Path
     assert exec_path(root, "run-1").is_file()
 
     again: list[str] = []
-    assert begin_run(root, "run-1", lambda: again.append("again")) is True
-    assert again == ["again"]
+    assert begin_run(root, "run-1", lambda: again.append("again")) is False
+    assert again == []
+    assert begin_run(root, "run-1", lambda: again.append("finally")) is False
+    assert again == []
 
     other: list[str] = []
     assert begin_run(root, "run-2", lambda: other.append("other")) is True
