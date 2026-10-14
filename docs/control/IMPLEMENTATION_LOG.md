@@ -1,3 +1,39 @@
+## 2026-10-14 — Session 08 W4: silent fixture walkthrough
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.
+
+The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The addendum is `docs/control/reviews/2026-10-14-session-08-w4-prompt-integrity.md`. It does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, `AGENTS.md`, `CLAUDE.md`, `claim_validation.py`, or `IMPLEMENTATION_STATE.json`.
+
+`render_walkthrough` draws 160x90 RGB frames at 10 fps from the committed listing-screenshot PNGs and the W2 token colours. Scene order is dashboard, notification panel, strongest hubs, colour options, duplication/access. Per-scene frame counts are 60, 60, 80, 50, and 50, so the container is 30.0 seconds, inside 28-32. There is no audio. The encoder is FFV1 in Matroska from the locked `imageio-ffmpeg==0.6.0` wheel, one thread, bitexact flags, epoch `1767225600`. The same inputs in this process produce the same bytes for this wheel. Duration, width, height, and fps are parsed from the container. A missing screenshot, an unknown screenshot, a caption outside the gift allowlist, a URL-like caption, unvalidated copy, a reordered scene list, a frame buffer without the scene markers, a frame that is not 160x90 at 10 fps, or a duration outside 28-32 seconds raises `VideoRefusal`. On-screen captions are `video_dashboard_caption`, `video_notification_caption`, `video_hubs_caption`, `video_variants_caption`, and `video_duplication_caption`. The duplication caption cites access and does not paint the URL. `validate_claims` runs before a video is returned. Lineage records product id, spec version, build version, the nine screenshot hashes, merchandising version, template version `s08-w4-video-1`, output hash, width, height, fps, scene order, scene frames, and QA status `passed`. The output hash is of the returned bytes and is not written inside them. No storage URI.
+
+Carried from #71 and #70: a leading or trailing space in `font_family` is refused and an internal space still loads; `v1.2.3.4` still renders; `1.2.0x7f` is refused; a `/Link` behind indirect `/Kids` is found; a deep `/Info` chain returns `paid_checkout` and the gift render raises `DeliveryPdfRefusal`.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=no -k "not mutant and not accepts and not dropping"`. The source was restored after each run.
+
+Video guards, on `tests/unit/assets/test_walkthrough_video.py` and `tests/unit/assets/test_walkthrough_video_mutants.py`:
+
+- Deleting the missing-screenshot check: 1 failed, 18 passed, 9 deselected.
+- Deleting the unknown-screenshot check: 1 failed, 18 passed, 9 deselected.
+- Deleting the scene-order check: 1 failed, 18 passed, 9 deselected.
+- Deleting the unvalidated-copy check: 1 failed, 18 passed, 9 deselected.
+- Deleting the caption-charset check: 1 failed, 18 passed, 9 deselected (`a:b`).
+- Deleting the caption-URL check: 2 failed, 17 passed, 9 deselected (`www.example.com` and `checkout`).
+- Deleting the scene-marker check: 1 failed, 18 passed, 9 deselected.
+- Deleting the frame-size check: 1 failed, 18 passed, 9 deselected.
+- Deleting the duration check: 1 failed, 18 passed, 9 deselected.
+
+Carried guards:
+
+- Dropping the font-family pattern, on `tests/unit/assets/test_design_tokens.py`: 8 failed, 12 passed, 5 deselected. The edge-space rows are ` MM Listing` and `MM Listing `.
+- Deleting the IPv4 lookbehind, on the gift policy and gift PDF tests: 2 failed, 106 passed, 4 deselected (`v1.2.3.4` stays, and the same string on the gift render).
+- Deleting the marked-last IPv4 alternative, on the same gift tests: 2 failed, 106 passed, 4 deselected (`1.2.0x7f` is refused, and the same string on the gift render).
+- Deleting the `/Kids` deref, on `tests/unit/assets/test_gift_link_policy.py`: 1 failed, 35 passed, 2 deselected (`test_indirect_kids_link_is_found`). The nested-kids refusal stayed green.
+- Deleting the deep-info `ValueError` catch, on the same policy file: 2 failed, 34 passed, 2 deselected (`test_deep_info_chain_is_paid_checkout` and `test_deep_info_chain_is_delivery_refusal`).
+
+Parked to next wave: live screenshot acquisition; opening or repairing variant links; storage URI and S3; workflow linkage and commissioning; the session exit code; Exit 78; whole-document `/OpenAction`, `/AA`, and outline scanning; non-Link URI annotations; defanged hosts `x . com`, `x[.]com`, `x dot com`, and `x.c0m`; José and Zoë in the gift name or community; bare `127.1`, `0x7f000001`, and `2130706433`; deleting the URI loop while `if count:` stays; the scan reading only the newest xref, with no `/Prev`; #69 publishers and over-refusals; W2 survivors other than the font edge space; Chromium m153 writes no XMP and no `/ID`; hash stability across ffmpeg builds other than this wheel. The contrast nearest-pair wording in the W2 log stays historical and is not rewritten.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/assets/test_walkthrough_video.py tests/unit/assets/test_walkthrough_video_mutants.py tests/unit/assets/test_gift_link_policy.py tests/unit/assets/test_design_tokens.py` — 91 passed in 5.63s. Gift rows `v1.2.3.4` and `1.2.0x7f`: 2 passed, 72 deselected in 1.79s. `tests/unit/assets/test_delivery_pdfs.py`: 18 passed in 8.93s. Full local pytest was not run this wave. The 12 `test_compose_preserves_the_postgres_password` failures recorded in W3 are pre-existing and local (`docker` missing). CI is the gate. `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those commands and the pytest runs are the tree before this paragraph was appended. This paragraph was written after that run.
+
 ## 2026-10-14 — Session 08 W3 r4: unanchored IPv4, percent, allowlist order
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.

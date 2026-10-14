@@ -143,6 +143,19 @@ def nested_kids_link() -> bytes:
     )
 
 
+def deep_info_chain() -> bytes:
+    """``/Info`` is eight references deep, past ``PdfDocument.deref``."""
+    objects: dict[int, bytes] = {
+        1: _dict_object(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+        2: _dict_object(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+        3: _dict_object(3, "<< /Type /Page /Parent 2 0 R >>"),
+    }
+    for number in range(4, 12):
+        objects[number] = f"{number} 0 obj\n{number + 1} 0 R\nendobj\n".encode("ascii")
+    objects[12] = _dict_object(12, "<< /Title (https://x.com) >>")
+    return classic_pdf(objects, info=4)
+
+
 def metadata_packet() -> bytes:
     """XMP carrying ``https://x.com``. The info dictionary does not."""
     packet = b"<?xpacket begin='x'?><dc:description>https://x.com</dc:description>"

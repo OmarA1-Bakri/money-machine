@@ -390,6 +390,28 @@ def test_css_injection_font_family_is_rejected() -> None:
         load_tokens(_with_font_family(_CSS_INJECTION))
 
 
+def test_font_family_internal_space_loads() -> None:
+    tokens = load_tokens(_with_font_family("MM Listing"))
+    assert tokens.typography is not None
+    assert tokens.typography.font_family == "MM Listing"
+
+
+@pytest.mark.parametrize("family", (" MM Listing", "MM Listing "))
+def test_font_family_edge_space_is_rejected(family: str) -> None:
+    with pytest.raises(TokenValidationError, match="invalid_token"):
+        load_tokens(_with_font_family(family))
+
+
+def test_dropping_the_font_pattern_accepts_edge_space() -> None:
+    mutant = _mutant_without_font_pattern()
+    for family in (" MM Listing", "MM Listing "):
+        with pytest.raises(TokenValidationError, match="invalid_token"):
+            load_tokens(_with_font_family(family))
+        opened = mutant(_with_font_family(family))
+        assert opened.typography is not None
+        assert opened.typography.font_family == family
+
+
 def test_dropping_the_font_family_pattern_accepts_the_marks() -> None:
     mutant = _mutant_without_font_pattern()
     for mark in _FONT_MARKS:

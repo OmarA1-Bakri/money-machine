@@ -83,6 +83,7 @@ _DOTTED_ROWS = (
     ".1.2.3.4",
     "Checklist .1.2.3.4",
     "Checklist at a.1.2.3.4",
+    "1.2.0x7f",
 )
 _EXCLUDED_ROWS = (
     "Checklist a:b",
@@ -185,6 +186,7 @@ def test_concealed_gift_domain_text_is_refused(scene: _Scene, name: str) -> None
         ("x.c0m", "x.c0m"),
         ("0x7f000001", "0x7f000001"),
         ("2130706433", "2130706433"),
+        ("v1.2.3.4", "v1.2.3.4"),
     ),
 )
 def test_quantities_and_examples_render(scene: _Scene, name: str, kept: str) -> None:
