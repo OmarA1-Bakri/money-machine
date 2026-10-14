@@ -1,3 +1,11 @@
+## 2026-10-14 — Session 08 W2: font family cannot inject CSS
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `IMPLEMENTATION_STATE.json` is unchanged. A10 and A11 stay DESIGNED. Exit 78 stays HELD. This answers Reviewer r1 on #70 (`5520251077`) at `2e701862`. Claim-validation rules are unchanged. The CodeRabbit swatch note, the 12 surviving mutants, the page-count wording, and the dev-only Playwright import stay parked.
+
+`font_family` must match `^[A-Za-z0-9 ]{1,64}$`. `load_tokens` applies that pattern through `model_validate`. `;`, `}`, `<`, `\`, a newline, and the reviewer's `content:counter(n)` family are refused. Removing the pattern keyword makes those six behavioural tests accept the family (6 failed, 6 deselected). The deselected tests include the AST mutant helper. With the pattern restored, `tests/unit/assets` is 22 passed.
+
+`uv run ruff format` on the two edited files, then `uv run ruff check` on them: exit 0. `uv run pyright` on them: 0 errors, 0 warnings, 0 informations (1.1.411). `uv run pytest -q -p no:cacheprovider tests/unit/assets/test_design_tokens.py --basetemp /tmp/s08-w2-font`: 12 passed in 0.28s. `uv run pytest -q -p no:cacheprovider tests/unit/assets --basetemp /tmp/s08-w2-assets`: 22 passed in 26.78s.
+
 ## 2026-10-10 — Session 08 W2: design tokens and fixture listing images
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.

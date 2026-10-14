@@ -18,6 +18,7 @@ from money_machine.domain.models._base import ContractModel, NonEmptyStr
 
 MIN_CONTRAST = 4.5
 FONT_FAMILY = "MM Listing"
+FONT_FAMILY_PATTERN = r"^[A-Za-z0-9 ]{1,64}$"
 REQUIRED_TOKEN_KEYS = (
     "palette",
     "typography",
@@ -34,6 +35,7 @@ REQUIRED_TOKEN_KEYS = (
 )
 
 HexColor = Annotated[str, StringConstraints(strict=True, pattern=r"^#[0-9A-F]{6}$")]
+FontFamily = Annotated[str, StringConstraints(strict=True, pattern=FONT_FAMILY_PATTERN)]
 PositivePx = Annotated[int, Field(ge=1, le=2000)]
 RadiusPx = Annotated[int, Field(ge=0, le=400)]
 LineHeight = Annotated[str, StringConstraints(strict=True, pattern=r"^[1-2]\.[0-9]{2}$")]
@@ -56,9 +58,13 @@ class Palette(ContractModel):
 
 
 class Typography(ContractModel):
-    """Local font file and the type scale. The family name is the CSS name."""
+    """Local font file and the type scale. The family name is the CSS name.
 
-    font_family: NonEmptyStr
+    ``font_family`` is letters, digits, and spaces only. ``load_tokens`` applies
+    that pattern, so a family cannot close the stylesheet or set ``content``.
+    """
+
+    font_family: FontFamily
     font_file: NonEmptyStr
     hero_px: PositivePx
     body_px: PositivePx
@@ -202,7 +208,11 @@ def listing_token_payload() -> dict[str, object]:
 
 
 def load_tokens(payload: Mapping[str, object]) -> DesignTokens:
-    """Refuse a missing section or a low-contrast pair, then return the set."""
+    """Refuse a missing section, a font family outside the pattern, or low contrast.
+
+    The family pattern is applied by ``model_validate`` on this path. A value
+    with ``;``, ``}``, ``<``, ``\\``, or a newline never becomes a token set.
+    """
     if refuse_missing_token_keys(payload) is not None:
         raise TokenValidationError("missing_token")
     tokens = DesignTokens.model_validate(dict(payload))

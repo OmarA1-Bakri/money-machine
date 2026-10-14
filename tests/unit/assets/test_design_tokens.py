@@ -179,3 +179,87 @@ def test_low_contrast_is_refused_and_the_mutant_accepts() -> None:
 def test_css_requires_every_section() -> None:
     with pytest.raises(TokenValidationError, match="missing_token"):
         emit_css(DesignTokens())
+
+
+_FONT_MARKS = (";", "}", "<", "\\", "\n")
+_CSS_INJECTION = (
+    "X\n;} body::before{counter-reset:n 500;content:counter(n);font-size:200px;color:#FF0000} .z{"
+)
+
+
+class _DropFontFamilyPattern(ast.NodeTransformer):
+    """Remove the font-family pattern so CSS characters are accepted."""
+
+    def __init__(self) -> None:
+        self.dropped = 0
+
+    def visit_Call(self, node: ast.Call) -> ast.AST:
+        if isinstance(node.func, ast.Name) and node.func.id == "StringConstraints":
+            kept: list[ast.keyword] = []
+            for keyword in node.keywords:
+                value = keyword.value
+                if (
+                    keyword.arg == "pattern"
+                    and isinstance(value, ast.Name)
+                    and value.id == "FONT_FAMILY_PATTERN"
+                ):
+                    self.dropped += 1
+                    continue
+                kept.append(keyword)
+            node.keywords = kept
+        return self.generic_visit(node)
+
+
+def _with_font_family(family: str) -> dict[str, object]:
+    payload = listing_token_payload()
+    typography = payload["typography"]
+    if not isinstance(typography, dict):
+        raise AssertionError("typography")
+    replaced = dict(typography)
+    replaced["font_family"] = family
+    payload["typography"] = replaced
+    return payload
+
+
+def _mutant_without_font_pattern() -> Callable[[Mapping[str, object]], DesignTokens]:
+    drop = _DropFontFamilyPattern()
+    tree = drop.visit(ast.parse(_TOKENS.read_text(encoding="utf-8")))
+    if drop.dropped != 1 or not isinstance(tree, ast.Module):
+        raise AssertionError(f"font pattern dropped {drop.dropped}")
+    ast.fix_missing_locations(tree)
+    name = "token_mutant_font_family_pattern"
+    module = types.ModuleType(name)
+    module.__file__ = str(_TOKENS)
+    sys.modules[name] = module
+    exec(compile(tree, str(_TOKENS), "exec"), module.__dict__)
+    load = module.__dict__["load_tokens"]
+    if not callable(load):
+        raise AssertionError("font pattern")
+    return cast(Callable[[Mapping[str, object]], DesignTokens], load)
+
+
+@pytest.mark.parametrize("mark", _FONT_MARKS)
+def test_font_family_marks_are_rejected(mark: str) -> None:
+    with pytest.raises(ValidationError):
+        load_tokens(_with_font_family(f"MM{mark}Listing"))
+
+
+def test_css_injection_font_family_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        load_tokens(_with_font_family(_CSS_INJECTION))
+
+
+def test_dropping_the_font_family_pattern_accepts_the_marks() -> None:
+    mutant = _mutant_without_font_pattern()
+    for mark in _FONT_MARKS:
+        family = f"MM{mark}Listing"
+        with pytest.raises(ValidationError):
+            load_tokens(_with_font_family(family))
+        opened = mutant(_with_font_family(family))
+        assert opened.typography is not None
+        assert opened.typography.font_family == family
+    with pytest.raises(ValidationError):
+        load_tokens(_with_font_family(_CSS_INJECTION))
+    injected = mutant(_with_font_family(_CSS_INJECTION))
+    assert injected.typography is not None
+    assert injected.typography.font_family == _CSS_INJECTION
