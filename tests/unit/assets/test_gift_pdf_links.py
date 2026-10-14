@@ -21,16 +21,16 @@ from money_machine.agents.contracts.merchandising import (
 from money_machine.agents.implementations.merchandising import merchandise
 from money_machine.assets.delivery_pdfs import (
     DeliveryPdfRefusal,
-    gift_blocks,
     pdf_page_count,
     refuse_gift_document_info,
     render_gift_pdf,
     render_readme_pdf,
 )
 from money_machine.assets.design_tokens import DesignTokens, listing_token_payload, load_tokens
-from money_machine.assets.pdf_objects import embed_info_title, link_annotations, page_texts
+from money_machine.assets.pdf_objects import page_texts
 from tests.fixtures.merchandising import consistent_request
-from tests.unit.assets.test_delivery_pdfs import DELIVERY_PDF_PATH, drop_refusal, replace_fact
+from tests.unit.assets.gift_pdf_craft import embed_info_title
+from tests.unit.assets.test_delivery_pdfs import DELIVERY_PDF_PATH, replace_fact
 
 _BUILD = 4
 _TITLE = "https://www.etsy.com/listing/123/planner"
@@ -54,6 +54,25 @@ _LINK_ROWS = (
     "Checklist at pay\uff61com",
     "Checklist at pay\uff0ecom",
     "Checklist at ch\uff0565ckout",
+)
+_CHARSET_ROWS = (
+    "Checklist at x\u00b7com",
+    "Checklist at x\u2027com",
+    "Checklist at x\u30fbcom",
+    "Checklist at x\uff65com",
+    "Checklist at x\u0589com",
+    "Checklist at x\u06d4com",
+    "Checklist at x\u0701com",
+    "Checklist at x\u0702com",
+    "Checklist at x\u1362com",
+    "Checklist at x\u2e33com",
+    "Checklist at x\u2e3ccom",
+    "Checklist at x\U00010a50com",
+    "x.c\u00f3m",
+    "Checklist at ETSY.COM",
+    "Checklist /buy",
+    "Checklist /order",
+    "Notes 127.1/x",
 )
 _CONCEALED_ROWS = (
     "Checklist at www.etsy.com/listing/123456/planner",
@@ -98,19 +117,25 @@ def _named(scene: _Scene, name: str) -> tuple[MerchandisingInput, ListingCopy]:
     return request, merchandise(request)
 
 
-def _concealed_name(scene: _Scene, name: str) -> tuple[MerchandisingInput, ListingCopy]:
-    """Reach the PDF gate when ``require_consistent`` rejects the fact first."""
-    gift = FreeGiftConfig(offered=True, name=name, community="Planning circle")
-    encoded = encode_free_gift(gift)
+def _spliced_claim(scene: _Scene, encoded: str) -> tuple[MerchandisingInput, ListingCopy]:
+    """Reach the PDF gate when the contract or ``merchandise`` rejects the fact."""
+    request = replace_fact(scene.request, "free_gift", encoded)
     claims = tuple(
         claim.model_copy(update={"stated_value": encoded}) if claim.kind == "free_gift" else claim
         for claim in scene.copy.draft.claims
     )
     draft = scene.copy.draft.model_copy(update={"claims": claims})
-    return scene.request, scene.copy.model_copy(update={"draft": draft})
+    return request, scene.copy.model_copy(update={"draft": draft})
 
 
-@pytest.mark.parametrize("name", _LINK_ROWS)
+def _concealed_name(
+    scene: _Scene, name: str, community: str = "Planning circle"
+) -> tuple[MerchandisingInput, ListingCopy]:
+    gift = FreeGiftConfig(offered=True, name=name, community=community)
+    return _spliced_claim(scene, encode_free_gift(gift))
+
+
+@pytest.mark.parametrize("name", (*_LINK_ROWS, *_CHARSET_ROWS))
 def test_gift_domain_text_is_refused(scene: _Scene, name: str) -> None:
     request, copy = _named(scene, name)
     with pytest.raises(DeliveryPdfRefusal, match="paid_checkout"):
@@ -126,7 +151,15 @@ def test_concealed_gift_domain_text_is_refused(scene: _Scene, name: str) -> None
 
 @pytest.mark.parametrize(
     ("name", "kept"),
-    (("Starter 4.9 kit", "4.9"), ("Notes e.g. habits", "e.g.")),
+    (
+        ("Starter 4.9 kit", "4.9"),
+        ("Notes e.g. habits", "e.g."),
+        ("127.1", "127.1"),
+        ("x . com", "x . com"),
+        ("x[.]com", "x[.]com"),
+        ("x dot com", "x dot com"),
+        ("x.c0m", "x.c0m"),
+    ),
 )
 def test_quantities_and_examples_render(scene: _Scene, name: str, kept: str) -> None:
     request, copy = _named(scene, name)
@@ -135,49 +168,47 @@ def test_quantities_and_examples_render(scene: _Scene, name: str, kept: str) -> 
     assert kept in page_texts(rendered.pdf)[0]
 
 
-def test_gift_link_annotation_is_refused(scene: _Scene) -> None:
-    blocks = gift_blocks(scene.copy.draft, scene.request.rules.quantity)
-    assert all("http" not in block.text for block in blocks)
+@pytest.mark.parametrize(
+    ("name", "community"),
+    (
+        ("Jos\u00e9", "Planning circle"),
+        ("Zo\u00eb", "Planning circle"),
+        ("Starter checklist", "Jos\u00e9"),
+        ("Starter checklist", "Zo\u00eb"),
+    ),
+)
+def test_non_ascii_gift_text_is_refused(scene: _Scene, name: str, community: str) -> None:
+    gift = FreeGiftConfig(offered=True, name=name, community=community)
+    request = replace_fact(scene.request, "free_gift", encode_free_gift(gift))
+    request = request.model_copy(update={"free_gift": gift})
+    copy = merchandise(request)
+    with pytest.raises(DeliveryPdfRefusal, match="paid_checkout"):
+        render_gift_pdf(copy, request, scene.tokens, build_version=_BUILD)
+
+
+@pytest.mark.parametrize(
+    "encoded",
+    (
+        "offered|\u043f\u0440\u0438\u043c\u0435\u0440.\u0440\u0444|Planning circle",
+        "offered|Starter checklist|\u043f\u0440\u0438\u043c\u0435\u0440.\u0440\u0444",
+        "offered|Starter checklist|Checklist checkout",
+    ),
+)
+def test_spliced_gift_text_is_refused(scene: _Scene, encoded: str) -> None:
+    request, copy = _spliced_claim(scene, encoded)
+    with pytest.raises(DeliveryPdfRefusal, match="paid_checkout"):
+        render_gift_pdf(copy, request, scene.tokens, build_version=_BUILD)
+
+
+def test_injected_gift_line_is_refused(scene: _Scene) -> None:
     with pytest.raises(DeliveryPdfRefusal, match="paid_checkout"):
         render_gift_pdf(
             scene.copy,
             scene.request,
             scene.tokens,
             build_version=_BUILD,
-            link_uri="https://www.etsy.com/listing/999/hidden",
+            injected_text="ftp://1.2.3.4/x",
         )
-
-
-def test_gift_link_annotation_mutant_accepts(scene: _Scene) -> None:
-    render = drop_refusal("refuse_gift_link_annotations", "render_gift_pdf")
-    result = render(
-        scene.copy,
-        scene.request,
-        scene.tokens,
-        build_version=_BUILD,
-        link_uri="https://www.etsy.com/listing/999/hidden",
-    )
-    pdf = getattr(result, "pdf", b"")
-    assert isinstance(pdf, bytes) and pdf.startswith(b"%PDF")
-    assert link_annotations(pdf)[0] == 1
-
-
-def test_gift_document_title_is_refused(scene: _Scene) -> None:
-    with pytest.raises(DeliveryPdfRefusal, match="paid_checkout"):
-        render_gift_pdf(
-            scene.copy, scene.request, scene.tokens, build_version=_BUILD, info_title=_TITLE
-        )
-
-
-def test_gift_document_title_mutant_accepts(scene: _Scene) -> None:
-    render = drop_refusal("refuse_gift_document_info", "render_gift_pdf")
-    result = render(
-        scene.copy, scene.request, scene.tokens, build_version=_BUILD, info_title=_TITLE
-    )
-    pdf = getattr(result, "pdf", b"")
-    assert isinstance(pdf, bytes) and pdf.startswith(b"%PDF")
-    assert _TITLE.encode("ascii") not in pdf
-    assert refuse_gift_document_info(pdf) == "paid_checkout"
 
 
 def _tuple_call(node: ast.AST) -> bool:
@@ -233,6 +264,8 @@ def test_readme_pages_place_setup_before_access(scene: _Scene) -> None:
     assert "Step 3. Use the included resources" in pages[0]
     assert "Widgets: Today panel, Reminder list." in pages[0]
     assert "Please leave a review" not in pages[0]
+    assert "Access link:" not in pages[0]
+    assert "Variant " not in pages[0]
     assert "Access link:" in pages[1]
     assert "Duplicate the template. Access link" in pages[1]
     assert "Support channel: Email inbox." in pages[1]
@@ -248,6 +281,47 @@ def test_readme_page_swap_mutant_accepts(scene: _Scene) -> None:
     pages = page_texts(pdf)
     assert "Please leave a review for Fieldnote Shop." in pages[0]
     assert "Step 1. Open your template" in pages[1]
+
+
+class _MoveFirstLink(ast.NodeTransformer):
+    def __init__(self) -> None:
+        self.moved = 0
+
+    def visit_Slice(self, node: ast.Slice) -> ast.AST:
+        if isinstance(node.upper, ast.Constant) and node.upper.value == 4:
+            node.upper.value = 5
+            self.moved += 1
+        if isinstance(node.lower, ast.Constant) and node.lower.value == 4:
+            node.lower.value = 5
+            self.moved += 1
+        return node
+
+
+def _moved_readme() -> Callable[..., object]:
+    module = types.ModuleType("moved_readme_pdfs")
+    module.__file__ = str(DELIVERY_PDF_PATH)
+    move = _MoveFirstLink()
+    tree = move.visit(ast.parse(DELIVERY_PDF_PATH.read_text(encoding="utf-8")))
+    if move.moved != 2 or not isinstance(tree, ast.Module):
+        raise AssertionError(f"page slices moved {move.moved}")
+    ast.fix_missing_locations(tree)
+    sys.modules[module.__name__] = module
+    exec(compile(tree, str(DELIVERY_PDF_PATH), "exec"), module.__dict__)
+    render = module.__dict__["render_readme_pdf"]
+    if not callable(render):
+        raise AssertionError("render_readme_pdf")
+    return render
+
+
+def test_readme_first_variant_on_page_one_mutant_accepts(scene: _Scene) -> None:
+    render = _moved_readme()
+    result = render(scene.copy, scene.request, scene.tokens, build_version=_BUILD)
+    pdf = getattr(result, "pdf", b"")
+    assert isinstance(pdf, bytes) and pdf.startswith(b"%PDF")
+    pages = page_texts(pdf)
+    assert "Variant " in pages[0]
+    assert "Access link:" in pages[0]
+    assert "Step 1. Open your template" in pages[0]
 
 
 def test_object_stream_title_is_not_a_byte_search(scene: _Scene) -> None:

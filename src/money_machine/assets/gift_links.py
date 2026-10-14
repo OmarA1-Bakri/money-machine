@@ -1,6 +1,8 @@
-"""Folded check for URL-like gift text. Painted strings are not rewritten.
+"""Gift-link refusal. Painted strings are not rewritten.
 
-``/OpenAction``, ``/AA``, and outline scanning are intentionally absent.
+The raw allowlist runs on gift fields before any fold. Folded checks stay
+scheme, ``www.``, host, IPv4, percent, and ``_PAID``. ``/OpenAction``, ``/AA``,
+and outline scanning are intentionally absent.
 """
 
 from __future__ import annotations
@@ -23,22 +25,61 @@ _HOST = re.compile(
     r"\.[A-Za-z]{2,}(?![A-Za-z0-9])",
     re.IGNORECASE,
 )
+_MARKED_OCTET = r"(?:0[xX][0-9A-Fa-f]+|0\d+)"
+_IPV4 = re.compile(
+    rf"(?<![A-Za-z0-9:/.])(?:"
+    rf"\d{{1,3}}(?:\.\d{{1,3}}){{2,3}}"
+    rf"|{_MARKED_OCTET}(?:\.(?:0[xX][0-9A-Fa-f]+|\d+)){{1,3}}"
+    rf"|(?:\d+\.){{1,3}}{_MARKED_OCTET}"
+    rf")(?![A-Za-z0-9])"
+)
 _PERCENT = re.compile(r"%[0-9A-Fa-f]{2}")
 _FOLD_DOTS = str.maketrans({"\u3002": ".", "\uff61": ".", "\uff0e": "."})
+_ALLOWED = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,'-!?()[]&")
+_FIELD_PREFIXES = ("Free gift: ", "Free community: ")
 
 
 def fold_gift_text(value: str) -> str:
     """Check-only copy: NFKC, dot folds, then strip Unicode format characters."""
     folded = unicodedata.normalize("NFKC", value).translate(_FOLD_DOTS)
-    return "".join(char for char in folded if unicodedata.category(char) != "Cf")
+    return _strip_format(folded)
+
+
+def _strip_format(value: str) -> str:
+    return "".join(char for char in value if unicodedata.category(char) != "Cf")
+
+
+def refuse_gift_charset(text: str) -> str | None:
+    """Refuse raw gift fields that use characters outside the allowlist.
+
+    Template prefixes and the trailing sentence period are not part of the field.
+    Annotation URIs, document info, and XMP are not scanned here.
+    """
+    for line in text.split("\n"):
+        field = line
+        for prefix in _FIELD_PREFIXES:
+            if field.startswith(prefix):
+                field = field[len(prefix) :]
+                break
+        if field.endswith("."):
+            field = field[:-1]
+        if any(char not in _ALLOWED for char in field):
+            return "paid_checkout"
+    return None
 
 
 def refuse_paid_checkout(text: str) -> str | None:
-    """Return ``paid_checkout`` when folded gift text looks like a URL or domain."""
+    """Return ``paid_checkout`` when folded gift text looks like a URL or address."""
     folded = fold_gift_text(text)
-    if _SCHEME.search(folded) is not None or _WWW.search(folded) is not None:
+    if _SCHEME.search(folded) is not None:
         return "paid_checkout"
-    if _HOST.search(folded) is not None or _PERCENT.search(folded) is not None:
+    if _WWW.search(folded) is not None:
+        return "paid_checkout"
+    if _HOST.search(folded) is not None:
+        return "paid_checkout"
+    if _IPV4.search(folded) is not None:
+        return "paid_checkout"
+    if _PERCENT.search(folded) is not None:
         return "paid_checkout"
     if _PAID.search(folded) is not None:
         return "paid_checkout"

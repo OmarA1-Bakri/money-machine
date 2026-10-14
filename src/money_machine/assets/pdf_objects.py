@@ -8,7 +8,6 @@ are not walked.
 from __future__ import annotations
 
 import re
-import zlib
 
 from money_machine.assets.pdf_reader import (
     CMap,
@@ -16,7 +15,6 @@ from money_machine.assets.pdf_reader import (
     PdfName,
     PdfObject,
     PdfReader,
-    PdfRef,
     PdfStream,
     PdfText,
     token_boundary,
@@ -38,7 +36,7 @@ def _pages(doc: PdfDocument, node: PdfObject | None) -> tuple[dict[str, PdfObjec
     page = _dict(found)
     if _name_is(page.get("Type"), "Page"):
         return (page,)
-    kids = page.get("Kids")
+    kids = doc.deref(page.get("Kids"))
     if not isinstance(kids, tuple):
         return ()
     return tuple(item for kid in kids for item in _pages(doc, kid))
@@ -57,7 +55,7 @@ def link_annotations(pdf: bytes) -> tuple[int, tuple[str, ...]]:
     count = 0
     uris: list[str] = []
     for page in _pages(doc, root.get("Pages")):
-        annots = page.get("Annots")
+        annots = doc.deref(page.get("Annots"))
         if not isinstance(annots, tuple):
             continue
         for item in annots:
@@ -205,62 +203,3 @@ def page_texts(pdf: bytes) -> tuple[str, ...]:
     root = _dict(doc.deref(doc.trailer.get("Root")))
     pages = _pages(doc, root.get("Pages"))
     return tuple(_operators(_page_bytes(doc, page), _fonts(doc, page)) for page in pages)
-
-
-def _pdf_literal(value: str) -> bytes:
-    escaped = value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
-    return f"({escaped})".encode("ascii")
-
-
-def embed_info_title(pdf: bytes, title: str) -> bytes:
-    """Point ``/Info`` at a title that exists only inside a compressed object stream."""
-    doc = PdfDocument(pdf)
-    root = doc.trailer.get("Root")
-    if not isinstance(root, PdfRef):
-        raise ValueError("pdf root")
-    info_num = max(doc.entries, default=0) + 1
-    stream_num = info_num + 1
-    xref_num = info_num + 2
-    header = f"{info_num} 0\n".encode("ascii")
-    body = b"<< /Title " + _pdf_literal(title) + b" >>"
-    compressed = zlib.compress(header + body)
-    base = pdf if pdf.endswith(b"\n") else pdf + b"\n"
-    stream_at = len(base)
-    stream = (
-        (
-            f"{stream_num} 0 obj\n<< /Type /ObjStm /N 1 /First {len(header)} "
-            f"/Filter /FlateDecode /Length {len(compressed)} >>\nstream\n"
-        ).encode("ascii")
-        + compressed
-        + b"\nendstream\nendobj\n"
-    )
-    base += stream
-    xref_at = len(base)
-    blob = bytearray()
-
-    def _add(kind: int, left: int, right: int) -> None:
-        blob.append(kind)
-        blob.extend(left.to_bytes(4, "big"))
-        blob.extend(right.to_bytes(2, "big"))
-
-    _add(0, 0, 65535)
-    for number in range(1, info_num):
-        entry = doc.entries.get(number)
-        if entry is None:
-            _add(0, 0, 65535)
-        elif entry.kind == "plain":
-            _add(1, entry.a, entry.b)
-        else:
-            _add(2, entry.a, entry.b)
-    _add(2, stream_num, 0)
-    _add(1, stream_at, 0)
-    _add(1, xref_at, 0)
-    size = xref_num + 1
-    header_text = (
-        f"{xref_num} 0 obj\n<< /Type /XRef /Size {size} /W [1 4 2] "
-        f"/Root {root.number} {root.generation} R /Info {info_num} 0 R "
-        f"/Length {len(blob)} >>\nstream\n"
-    )
-    base += header_text.encode("ascii") + bytes(blob) + b"\nendstream\nendobj\n"
-    base += f"startxref\n{xref_at}\n%%EOF\n".encode("ascii")
-    return base

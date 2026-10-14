@@ -1,5 +1,3 @@
-"""README and free-gift PDFs: page counts, claim text, paid links, stable bytes."""
-
 from __future__ import annotations
 
 import ast
@@ -362,8 +360,10 @@ def test_invalid_copydrop_refusal_accepts(scene: _Scene) -> None:
     assert getattr(accepted, "pdf", b"").startswith(b"%PDF")
 
 
-def _checkout_pair(scene: _Scene) -> tuple[MerchandisingInput, ListingCopy]:
-    value = "offered|Starter checklist|https://pay.example/checkout"
+def _checkout_pair(
+    scene: _Scene, community: str = "https://pay.example/checkout"
+) -> tuple[MerchandisingInput, ListingCopy]:
+    value = f"offered|Starter checklist|{community}"
     request = replace_fact(scene.request, "free_gift", value)
     claims = []
     support = None
@@ -401,7 +401,7 @@ def test_paid_checkout_is_refused(scene: _Scene) -> None:
 
 
 def test_paid_checkoutdrop_refusal_accepts(scene: _Scene) -> None:
-    request, copy = _checkout_pair(scene)
+    request, copy = _checkout_pair(scene, "pay.com")
     accepted = _accepted(
         drop_refusal("refuse_paid_checkout", "render_gift_pdf"),
         scene,

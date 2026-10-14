@@ -1,7 +1,8 @@
 """README and free-gift PDFs. A11 stays DESIGNED and unregistered.
 
-Buyer-facing sentences are listing templates. The gift refuses URL-like copy on
-a folded check-only string, then refuses link annotations and document info.
+Buyer-facing sentences are listing templates. The gift refuses raw characters
+outside the allowlist, then URL-like copy on a folded check-only string, then
+link annotations and document info.
 Painted text and lineage stay on the original bytes. Dates are pinned.
 Lineage is appended after ``%%EOF``.
 """
@@ -26,6 +27,7 @@ from money_machine.agents.contracts.merchandising import (
 )
 from money_machine.assets.design_tokens import DesignTokens, emit_css, load_tokens
 from money_machine.assets.gift_links import (
+    refuse_gift_charset,
     refuse_gift_document_info,
     refuse_gift_link_annotations,
     refuse_paid_checkout,
@@ -35,7 +37,6 @@ from money_machine.assets.listing_images import (
     merchandising_version,
     network_allowed,
 )
-from money_machine.assets.pdf_objects import embed_info_title
 from money_machine.domain.services.claim_validation import validate_claims
 from money_machine.domain.services.listing_text import TextSlot, render
 
@@ -128,8 +129,6 @@ def render_gift_pdf(
     *,
     build_version: int,
     injected_text: str = "",
-    link_uri: str = "",
-    info_title: str = "",
 ) -> RenderedDeliveryPdf:
     """Paint the one-page free gift. URL- or domain-like text is refused."""
     gift = _only(copy.draft, "free_gift")
@@ -148,8 +147,6 @@ def render_gift_pdf(
         role="free_gift",
         injected_text=injected_text,
         check_paid=True,
-        link_uri=link_uri,
-        info_title=info_title,
     )
 
 
@@ -204,6 +201,12 @@ def pdf_page_count(pdf: bytes) -> int:
 def refuse_gift_not_offered(encoded: str) -> str | None:
     if encoded == "not_offered":
         return "gift_not_offered"
+    return None
+
+
+def _refuse_charset(text: str) -> None:
+    if refuse_gift_charset(text) is not None:
+        raise DeliveryPdfRefusal("paid_checkout")
     return None
 
 
@@ -272,21 +275,19 @@ def _render(
     role: Literal["readme", "free_gift"],
     injected_text: str,
     check_paid: bool,
-    link_uri: str = "",
-    info_title: str = "",
 ) -> RenderedDeliveryPdf:
     load_tokens(tokens.model_dump())
     if check_paid:
-        _refuse_paid(_gift_copy(blocks, injected_text))
+        gift_text = _gift_copy(blocks, injected_text)
+        _refuse_charset(gift_text)
+        _refuse_paid(gift_text)
     probed = copy.draft.model_copy(update={"pdf_blocks": blocks})
     if refuse_unvalidated_copy(probed, request) is not None:
         raise DeliveryPdfRefusal("unsupported_claim")
-    html = _inject_anchor(_inject(compose_delivery_html(tokens, pages), injected_text), link_uri)
+    html = _inject(compose_delivery_html(tokens, pages), injected_text)
     if refuse_unclaimed_pdf_text(html, blocks, probed, request) is not None:
         raise DeliveryPdfRefusal("unsupported_claim")
     pdf = _pin_metadata(_paint(html, tokens))
-    if info_title:
-        pdf = embed_info_title(pdf, info_title)
     if check_paid:
         _refuse_annotations(pdf)
         _refuse_document_info(pdf)
@@ -360,13 +361,6 @@ def _inject(html: str, text: str) -> str:
         return html
     extra = f'<p class="mm-claim">{escape(text)}</p>'
     return html.replace("</article>", extra + "</article>", 1)
-
-
-def _inject_anchor(html: str, uri: str) -> str:
-    if uri == "":
-        return html
-    anchor = f'<a href="{escape(uri, quote=True)}">&nbsp;</a>'
-    return html.replace("</article>", anchor + "</article>", 1)
 
 
 def _article(paragraphs: tuple[str, ...]) -> str:

@@ -1,3 +1,33 @@
+## 2026-10-14 — Session 08 W3 r3: raw allowlist, IPv4, indirect annotations
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.
+
+This answers Reviewer review 5523259121 and the Verifier r3 addenda on #71. The prompt file is unchanged. The addendum remains `docs/control/reviews/2026-10-14-session-08-w3-prompt-integrity.md`. It does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, `AGENTS.md`, `CLAUDE.md`, `claim_validation.py`, `pdf.py`, or `IMPLEMENTATION_STATE.json`.
+
+The r2 claim that deleting only `_PAID` is equivalent is retracted. `Checklist checkout` passes the folded scheme, `www.`, host, percent, and IPv4 checks. With `_PAID` removed, that row is accepted. `Checklist /buy` and `Checklist /order` stay refused by the raw allowlist.
+
+The gift allowlist runs on the raw name, community, and injected text before any fold. It allows ASCII letters, digits, space, and `.,'-!?()[]&`. It excludes `:`, `/`, `@`, `%`, and `\`. `Free gift: ` and `Free community: `, plus one trailing sentence period, are not part of the field. The allowlist does not scan annotation URIs, document info, or XMP. Folded checks stay scheme, `www.`, host (case-insensitive), IPv4, percent, and `_PAID`. IPv4 matches a 3- or 4-part plain decimal, and any dotted group that has a `0x` octet or a 0-led octet such as `0177`. A match cannot start after a letter, digit, `:`, `/`, or `.`, so `ftp://1.2.3.4/x` is refused only by the scheme. `4.9` and bare `127.1` render. `127.1/x` is refused. Indirect `/Annots` and `/Kids` are followed with `PdfDocument.deref`. `link_uri`, `info_title`, and `embed_info_title` are test helpers. Production render still checks the PDF it paints.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=no -k "not mutant and not accepts and not dropping"` on `tests/unit/assets/test_delivery_pdfs.py`, `tests/unit/assets/test_gift_pdf_links.py`, and `tests/unit/assets/test_gift_link_policy.py`. The source was restored after each run.
+
+- Deleting the Cf strip: 1 failed, 84 passed, 10 deselected (`x\u200b.com`).
+- Deleting the scheme check: 1 failed, 84 passed, 10 deselected (`ftp://1.2.3.4/x`).
+- Deleting the `www.` check: 1 failed, 84 passed, 10 deselected (`www.x`).
+- Deleting the host check: 2 failed, 83 passed, 10 deselected (`ETSY.COM`, and `x\u200b.com` because the stripped value is `x.com`).
+- Deleting the IPv4 check: 8 failed, 77 passed, 10 deselected. The rows are `127.0.0.1`, `0x7f.0.0.1`, `0x7f.1`, `0177.1`, `1.2.3`, `1.2.3.4`, `192.168.0.1`, and `1.2.3.4/l/x`. `4.9` and `127.1` stayed open.
+- Deleting only `_PAID`: 2 failed, 83 passed, 10 deselected (`Checklist checkout`, direct and spliced). Not equivalent.
+- Deleting `if count:`: 1 failed, 84 passed, 10 deselected (a `/Link` whose URI is `mailto:a`).
+- Deleting the catalog XMP read: 1 failed, 84 passed, 10 deselected.
+- Deleting the injected-text append in `_gift_copy`: 1 failed, 84 passed, 10 deselected.
+- Deleting the allowlist call: 20 failed, 65 passed, 10 deselected (dot look-alikes, `x.cóm`, `127.1/x`, José and Zoë in both slots, and both IDN splices).
+- Moving the README split from 4/rest to 5/rest: 1 failed, 84 passed, 10 deselected (`test_readme_pages_place_setup_before_access`).
+
+Parked to next wave: whole-document `/OpenAction`, `/AA`, and outline scanning; non-Link URI annotations such as `/Widget` with `/A /URI`; defanged hosts `x . com`, `x[.]com`, `x dot com`, and `x.c0m`, which render; the scan reading only the newest xref, with no `/Prev`; non-ASCII names, with José and Zoë refused in the name and community slots; bare `127.1`, which renders, while `4.9` renders and `127.1/x` is refused. Carried: swatch colours in the rendered PNG; a 1-page README and a 0-page gift; the equivalent sRGB cutoff move to `0.03928`; deleting only `compose_listing_documents`'s `load_tokens` call; Chromium m153 writes no XMP and no `/ID`; #69 publishers and over-refusals; W2 survivors; leading or trailing space in `font_family`; video, live screenshots, opening links, S3, workflow, and commissioning. README access links may still allow any path on an allowed Notion host.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/assets/test_delivery_pdfs.py tests/unit/assets/test_gift_pdf_links.py tests/unit/assets/test_gift_link_policy.py` — 95 passed in 15.00s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --tb=line --basetemp /tmp/s08-w3-r3`: 12 failed, 4256 passed, 193 skipped, 1 warning in 404.00s (0:06:43). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (356 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Pyright also printed its upgrade notice, v1.1.411 to v1.1.414. Those commands and the pytest run are the tree before this paragraph was appended. This paragraph was written after that run.
+
 ## 2026-10-14 — Session 08 W3 r2: folded gift links, annotations, and PDF info
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.
