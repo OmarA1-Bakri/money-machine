@@ -9,8 +9,11 @@ from money_machine.assets.video_font import blit, wrap_caption
 
 _PASTE_X = 8
 _PASTE_Y = 2
-_CAPTION_Y = 40
-_LINE = 8
+CAPTION_Y = 40
+LINE_HEIGHT = 8
+INJECTED_Y = 72
+# Rows that sit strictly above the injected line. The next row would share y=72.
+CAPTION_ROWS = (INJECTED_Y - CAPTION_Y) // LINE_HEIGHT
 _BLANK = 32
 
 
@@ -88,7 +91,7 @@ def compose_frames(
             _paste(frame, shot, width)
             _caption(frame, caption, text, width)
             if injected:
-                blit(frame, injected[:26], 2, 72, text, width)
+                blit(frame, injected, 2, INJECTED_Y, text, width)
             _bar(frame, accent, width, height)
             red, green, blue, hub = scene_marker(index, local, count, len(shots))
             _paint(frame, 0, 0, (red, green, blue), width)
@@ -177,7 +180,7 @@ def _paste(frame: bytearray, shot: tuple[bytes, int, int], width: int) -> None:
 
 def _caption(frame: bytearray, caption: str, colour: tuple[int, int, int], width: int) -> None:
     for index, line in enumerate(wrap_caption(caption)):
-        blit(frame, line, 2, _CAPTION_Y + index * _LINE, colour, width)
+        blit(frame, line, 2, CAPTION_Y + index * LINE_HEIGHT, colour, width)
 
 
 def _bar(frame: bytearray, colour: tuple[int, int, int], width: int, height: int) -> None:

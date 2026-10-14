@@ -2,21 +2,18 @@
 
 Frames are drawn from the committed listing screenshots and the W2 tokens.
 There is no audio and no browser. The encoder is the locked ``imageio-ffmpeg``
-wheel: FFV1 in Matroska, one thread, bitexact. The hash is stable for that
-wheel. It is not a claim about any other ffmpeg build.
+wheel: FFV1 in Matroska, one thread, bitexact. The hash pin is the linux
+x86_64 wheel with the pinned fixture ids.
 
 On-screen text is a caption template of the cited claims, then the gift
-allowlist and the gift URL refusal. The access URL is not painted.
+allowlist and the gift URL refusal. The string that passes those checks is
+the string that is painted: nothing is sliced to fit. The access URL is not
+painted. Raw frames are rgb24. The wheel's stored sample format is not renamed.
 """
 
 from __future__ import annotations
 
 import hashlib
-import importlib
-import os
-import re
-import subprocess
-import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,7 +32,15 @@ from money_machine.agents.contracts.merchandising import (
 from money_machine.assets.design_tokens import DesignTokens, load_tokens
 from money_machine.assets.gift_links import refuse_gift_charset, refuse_paid_checkout
 from money_machine.assets.listing_images import merchandising_version
-from money_machine.assets.video_paint import blank_rgb, compose_frames, decode_png_rgb, scene_marker
+from money_machine.assets.video_encode import VideoRefusal, encode_frames, probe_container
+from money_machine.assets.video_font import CAPTION_COLUMNS, has_glyph, wrap_caption
+from money_machine.assets.video_paint import (
+    CAPTION_ROWS,
+    blank_rgb,
+    compose_frames,
+    decode_png_rgb,
+    scene_marker,
+)
 from money_machine.domain.services.claim_validation import validate_claims
 from money_machine.domain.services.listing_text import TextSlot, render
 
@@ -48,12 +53,6 @@ _MIN_SECONDS = 28.0
 _MAX_SECONDS = 32.0
 _EPOCH = "1767225600"
 _MISSING = b"missing-screenshot"
-_DURATION = re.compile(r"Duration:\s*(\d+):(\d\d):(\d\d(?:\.\d+)?)")
-_FRAME = re.compile(r"(\d+)x(\d+),\s*(\d+(?:\.\d+)?)\s*fps")
-
-
-class VideoRefusal(ValueError):
-    """The walkthrough was refused before a container was returned."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,7 +95,8 @@ def render_walkthrough(
     """Render the five beats. ``injected_caption`` is buyer-facing and must pass.
 
     Production callers leave ``injected_caption`` empty. A non-empty value is
-    painted only when the gift charset and the gift URL refusal both allow it.
+    painted only when it fits on one line, every character has a glyph, and
+    the gift charset and the gift URL refusal both allow that exact string.
     """
     load_tokens(tokens.model_dump())
     if refuse_missing_screenshot(screenshots) is not None:
@@ -110,6 +110,14 @@ def render_walkthrough(
         raise VideoRefusal("unsupported_claim")
     painted = tuple(block.text for block in blocks)
     visible = painted + ((injected_caption,) if injected_caption else ())
+    if refuse_injected_length(injected_caption) is not None:
+        raise VideoRefusal("caption_fit")
+    if refuse_caption_width(painted) is not None:
+        raise VideoRefusal("caption_fit")
+    if refuse_caption_rows(painted) is not None:
+        raise VideoRefusal("caption_fit")
+    if refuse_caption_glyphs(visible) is not None:
+        raise VideoRefusal("caption_glyph")
     if refuse_caption_charset(visible) is not None:
         raise VideoRefusal("paid_checkout")
     if refuse_caption_url(visible) is not None:
@@ -167,6 +175,44 @@ def refuse_unvalidated_copy(
     probed = _with_blocks(draft, blocks)
     if not validate_claims(probed, request).passed:
         return "unsupported_claim"
+    return None
+
+
+def refuse_injected_length(injected: str) -> str | None:
+    """Return ``caption_fit`` when the injected line is longer than 26 characters."""
+    if len(injected) > CAPTION_COLUMNS:
+        return "caption_fit"
+    return None
+
+
+def refuse_caption_width(texts: tuple[str, ...]) -> str | None:
+    """Return ``caption_fit`` when a wrapped line is longer than 26 characters."""
+    for text in texts:
+        if any(len(line) > CAPTION_COLUMNS for line in wrap_caption(text)):
+            return "caption_fit"
+    return None
+
+
+def refuse_caption_rows(texts: tuple[str, ...]) -> str | None:
+    """Return ``caption_fit`` when wrapped lines would overlap the injected row."""
+    for text in texts:
+        if len(wrap_caption(text)) > CAPTION_ROWS:
+            return "caption_fit"
+    return None
+
+
+def refuse_caption_glyphs(texts: tuple[str, ...]) -> str | None:
+    """Return ``caption_glyph`` when an allowlisted character has no 5x7 glyph.
+
+    Characters outside the gift allowlist stay on ``refuse_caption_charset``.
+    A hyphen or parenthesis would otherwise paint as a blank cell.
+    """
+    for text in texts:
+        for char in text:
+            if refuse_gift_charset(char) is not None:
+                continue
+            if not has_glyph(char):
+                return "caption_glyph"
     return None
 
 
@@ -325,107 +371,18 @@ def _rgb(value: str) -> tuple[int, int, int]:
 
 
 def _encode(frames: bytes) -> bytes:
-    expected = VIDEO_WIDTH * VIDEO_HEIGHT * 3 * sum(SCENE_FRAMES)
-    if len(frames) != expected:
-        raise VideoRefusal("encode")
-    with tempfile.TemporaryDirectory() as directory:
-        path = Path(directory) / "walkthrough.mkv"
-        command = [
-            _ffmpeg_exe(),
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-y",
-            "-f",
-            "rawvideo",
-            "-pix_fmt",
-            "rgb24",
-            "-s",
-            f"{VIDEO_WIDTH}x{VIDEO_HEIGHT}",
-            "-r",
-            str(VIDEO_FPS),
-            "-i",
-            "pipe:0",
-            "-an",
-            "-c:v",
-            "ffv1",
-            "-level",
-            "3",
-            "-coder",
-            "1",
-            "-context",
-            "1",
-            "-g",
-            "1",
-            "-slices",
-            "1",
-            "-slicecrc",
-            "1",
-            "-pix_fmt",
-            "rgb24",
-            "-fflags",
-            "+bitexact",
-            "-flags",
-            "+bitexact",
-            "-map_metadata",
-            "-1",
-            "-threads",
-            "1",
-            str(path),
-        ]
-        completed = subprocess.run(
-            command,
-            input=frames,
-            capture_output=True,
-            check=False,
-            env=_encode_env(),
-        )
-        if completed.returncode != 0 or not path.is_file():
-            raise VideoRefusal("encode")
-        return path.read_bytes()
+    return encode_frames(
+        frames,
+        width=VIDEO_WIDTH,
+        height=VIDEO_HEIGHT,
+        fps=VIDEO_FPS,
+        frame_count=sum(SCENE_FRAMES),
+        epoch=_EPOCH,
+    )
 
 
 def _probe(video: bytes) -> tuple[float, int, int, float]:
-    if not video.startswith(b"\x1a\x45\xdf\xa3"):
-        raise VideoRefusal("container")
-    with tempfile.TemporaryDirectory() as directory:
-        path = Path(directory) / "walkthrough.mkv"
-        path.write_bytes(video)
-        completed = subprocess.run(
-            [_ffmpeg_exe(), "-hide_banner", "-i", str(path)],
-            capture_output=True,
-            check=False,
-            env=_encode_env(),
-        )
-    text = completed.stderr.decode("utf-8", errors="replace")
-    duration = _DURATION.search(text)
-    frame = _FRAME.search(text)
-    if duration is None or frame is None:
-        raise VideoRefusal("container")
-    seconds = int(duration.group(1)) * 3600 + int(duration.group(2)) * 60
-    seconds += float(duration.group(3))
-    return seconds, int(frame.group(1)), int(frame.group(2)), float(frame.group(3))
-
-
-def _ffmpeg_exe() -> str:
-    try:
-        module = importlib.import_module("imageio_ffmpeg")
-        get_exe = module.get_ffmpeg_exe
-    except (AttributeError, ModuleNotFoundError) as exc:
-        raise VideoRefusal("encode") from exc
-    if not callable(get_exe):
-        raise VideoRefusal("encode")
-    exe = get_exe()
-    if not isinstance(exe, str) or exe == "":
-        raise VideoRefusal("encode")
-    return exe
-
-
-def _encode_env() -> dict[str, str]:
-    env = dict(os.environ)
-    env["SOURCE_DATE_EPOCH"] = _EPOCH
-    env["TZ"] = "UTC"
-    return env
+    return probe_container(video)
 
 
 def _bind(

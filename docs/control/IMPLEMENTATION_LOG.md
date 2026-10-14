@@ -1,3 +1,54 @@
+## 2026-10-14 — Session 08 W4 r2: refuse unpainted caption text
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.
+
+Reviewer 5525787560 and Verifier 6180030355 failed the walkthrough at `a0b41e87`. The painted string is now the string that passed the gift charset check and the gift URL check. Nothing is sliced to fit. An injected caption longer than 26 characters, a wrapped line longer than 26 characters, or more wrapped lines than fit above the injected row raises `VideoRefusal` `caption_fit`. `Notes and more at etsy.com9` and dashboard word `aaaaaaaaaaaaaaaaaaetsy.com9` are refused. `Notes stay on the frame no` (26) renders. `Notes stay on the frame now` (27) is refused. Twenty-five dashboard outputs wrap past the four caption rows and are refused. Allowlisted characters with no 5x7 glyph raise `caption_glyph` (`x-.com`). Characters outside the allowlist stay on the charset check.
+
+Claim-derived captions go through the dashboard merchandise path. `x.com.` is the URL-loop refusal. `x/y` and `x@y` are the charset-loop refusals. `(x.com)` and `at ko-fi.com/s/x` are `caption_glyph` because parenthesis and hyphen have no glyph. `validate_claims` runs on the draft and again on the caption blocks. An unpainted pdf block kills the first call. A caption rewritten after the draft passes kills the second. An empty access slot on `video_duplication_caption` raises `ValueError`.
+
+A 33-second container, a 12 fps container, and a 160x80 container are refused. `build_version` is 4 on the lineage record and in the trailer text. The trailer, including the `screenshots=` line, equals an independent literal. A hub byte of 0 on a correct scene index is refused.
+
+The linux x86_64 wheel, with product `00000000-0000-4000-8000-0000000000a1`, spec `00000000-0000-4000-8000-0000000000a2`, and workflow `00000000-0000-4000-8000-0000000000a3`, hashes to `6318854297cd5d316fdf4c579a73f188ec5f1e2089745534aa9d4ca6245fe248`, including from a second process. Deleting `+bitexact` changes that hash. Deleting `-map_metadata -1` left the bytes unchanged on this wheel. Raw frames are rgb24. `ffmpeg -i` reports the stored FFV1 sample format as bgr0.
+
+The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The addendum is unchanged. This round does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, `AGENTS.md`, `CLAUDE.md`, `claim_validation.py`, `IMPLEMENTATION_STATE.json`, `gift_links.py`, or `design_tokens.py`.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=no -k "not mutant and not accepts and not dropping"` on `tests/unit/assets/test_walkthrough_video.py` and `tests/unit/assets/test_walkthrough_video_mutants.py`. The source was restored after each run. The clean tree is 41 passed, 9 deselected in 5.61s.
+
+- Deleting the injected-length check: 2 failed, 39 passed, 9 deselected.
+- Deleting the caption-width check: 1 failed, 40 passed, 9 deselected.
+- Deleting the caption-rows check: 1 failed, 40 passed, 9 deselected.
+- Deleting the caption-glyph check: 1 failed, 40 passed, 9 deselected.
+- Deleting the caption-charset check: 3 failed, 38 passed, 9 deselected.
+- Deleting the caption-URL check: 3 failed, 38 passed, 9 deselected.
+- Restricting the charset loop to `texts[-1:]`: 2 failed, 39 passed, 9 deselected (`x/y`, `x@y`).
+- Restricting the URL loop to `texts[-1:]`: 1 failed, 40 passed, 9 deselected (`x.com.`).
+- Deleting the first `validate_claims` call: 1 failed, 40 passed, 9 deselected.
+- Deleting the second `validate_claims` call: 1 failed, 40 passed, 9 deselected.
+- Deleting the duration upper bound: 1 failed, 40 passed, 9 deselected.
+- Deleting the fps comparison: 1 failed, 40 passed, 9 deselected.
+- Deleting the height comparison: 1 failed, 40 passed, 9 deselected.
+- Setting the lineage `build_version` field to 0: 1 failed, 40 passed, 9 deselected.
+- Setting the trailer `build_version` text to 0: 3 failed, 38 passed, 9 deselected.
+- Deleting the `screenshots=` line: 3 failed, 38 passed, 9 deselected.
+- Deleting the hub sub-index check: 1 failed, 40 passed, 9 deselected.
+- Deleting the missing-screenshot check: 1 failed, 40 passed, 9 deselected.
+- Deleting the unknown-screenshot check: 1 failed, 40 passed, 9 deselected.
+- Deleting the scene-order check: 1 failed, 40 passed, 9 deselected.
+- Deleting the unvalidated-copy check: 3 failed, 38 passed, 9 deselected.
+- Deleting the scene-marker check: 2 failed, 39 passed, 9 deselected.
+- Deleting the frame-size check: 3 failed, 38 passed, 9 deselected.
+- Deleting the duration check: 2 failed, 39 passed, 9 deselected.
+- Restoring `injected[:26]`: 1 failed, 40 passed, 9 deselected.
+- Deleting `+bitexact`: 3 failed, 38 passed, 9 deselected.
+- Deleting `-map_metadata -1`: 41 passed, 9 deselected, exit 0. That flag is parked.
+- Deleting the empty-access guard: 1 failed, 40 passed, 9 deselected.
+
+Carried guards on `gift_links.py` and `design_tokens.py` were not re-run. Those files are unchanged from `a0b41e87`.
+
+Parked to next wave: the cross-platform hash; the trailer after the Matroska bytes can be tampered with; the screenshot is read three times (TOCTOU); an undecodable PNG pastes a blank frame; Verifier #71 SF1 (probed-copy validation); Verifier #71 SF3 (page count `!=` to `>`); #70 NIT1 (contrast nearest-pair wording, historical); `-map_metadata -1`, the metadata strip, `SOURCE_DATE_EPOCH`, and `-threads 1` (no byte difference on this wheel); live screenshot acquisition; opening or repairing variant links; storage URI and S3; workflow linkage and commissioning; the session exit code; Exit 78; whole-document `/OpenAction`, `/AA`, and outline scanning; non-Link URI annotations; defanged hosts; José and Zoë; bare `127.1`, `0x7f000001`, and `2130706433`; deleting the URI loop while `if count:` stays; the newest xref only, with no `/Prev`; #69 publishers and over-refusals; W2 survivors other than the font edge space; Chromium m153 writes no XMP and no `/ID`.
+
+`uv run ruff check .` exit 0. ruff 0.16.2. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Full local pytest was not re-run. The 12 `test_compose_preserves_the_postgres_password` failures recorded in W3 stay pre-existing and local (`docker` missing). CI is the gate. The walkthrough suite above ran before the two docstring sentences that record the `-map_metadata` measurement. Those sentences do not change behaviour. ruff and pyright were run again after them. This paragraph was written after that run.
+
 ## 2026-10-14 — Session 08 W4: silent fixture walkthrough
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.

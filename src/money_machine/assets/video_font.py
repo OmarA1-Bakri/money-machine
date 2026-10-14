@@ -44,10 +44,20 @@ _GLYPHS: dict[str, tuple[int, ...]] = {
     ".": (0, 0, 0, 0, 0, 12, 12),
 }
 
-_WRAP = 26
+# 6px cells starting at x=2. 26 cells end at x=158 on a 160px frame.
+# A 27th cell is clipped, so the walker refuses it instead of painting a prefix.
+CAPTION_COLUMNS = 26
 
 
-def wrap_caption(text: str, width: int = _WRAP) -> tuple[str, ...]:
+def has_glyph(char: str) -> bool:
+    """True when the 5x7 font draws this character, including a letter's case."""
+    if char in _GLYPHS:
+        return True
+    upper = char.upper()
+    return upper in _GLYPHS and char.isalpha()
+
+
+def wrap_caption(text: str, width: int = CAPTION_COLUMNS) -> tuple[str, ...]:
     """Greedy wrap on spaces. A single long word stays one line."""
     words = text.split(" ")
     lines: list[str] = []
