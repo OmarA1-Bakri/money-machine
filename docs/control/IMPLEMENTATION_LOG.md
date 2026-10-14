@@ -1,3 +1,33 @@
+## 2026-10-14 — Session 08 W3: README and free-gift PDFs
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.
+
+This wave is the README/access PDF and the optional free-gift PDF from action 4. Video, live screenshot acquisition, opening links, S3, workflow linkage, and commissioning stay deferred. The prompt file is unchanged. The addendum is `docs/control/reviews/2026-10-14-session-08-w3-prompt-integrity.md`. It does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, `AGENTS.md`, `CLAUDE.md`, or `IMPLEMENTATION_STATE.json`.
+
+The README PDF is exactly 2 pages. Page 1 is three setup steps plus the configured widgets and resources. Page 2 is one access link per built variant, the duplication reminder, the support channel, and a review request. The gift PDF is exactly 1 page: the configured free gift and, when the fact names one, the free community. A paid or checkout URL on the gift PDF is refused. Every painted sentence is a `render` template attached as `pdf_blocks` and accepted by `validate_claims` before Chromium runs. Dates and the document id are replaced at the same length, and lineage is appended after `%%EOF`. Template version is `s08-w3-pdf-1`.
+
+Carried parks from #70: `#0A0A0A` on `#FFFFFF` is 19.79814571052481, so divisor `12.92` changed to `12` fails. `#0B0B0B` on `#FFFFFF` is 19.682627652657427, so cutoff `0.04045` raised to `0.0432` fails. `load_tokens` wraps a pydantic `ValidationError` as `TokenValidationError("invalid_token")`. `emit_css` calls `load_tokens` again. Swatches use `request.variants` and the variant colour (`#8A9A7B`, `#1B3A4B`, `#B76E79` for the fixture). Hub lineage hashes the bytes embedded in that frame.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=no` with `-k "not mutant and not accepts and not dropping"`. The source was restored after each run.
+
+- Divisor `12.92` to `12`: 1 failed, 16 passed, 4 deselected (`tests/unit/assets/test_design_tokens.py`).
+- Cutoff `0.04045` to `0.0432`: 1 failed, 16 passed, 4 deselected.
+- Cutoff `0.04045` to `0.03928`: 17 passed, 4 deselected, no `FAILED`. No 8-bit channel sits strictly between `10/255` and `11/255`, so that move is equivalent.
+- Raising the bare `ValidationError`: 7 failed, 10 passed, 4 deselected.
+- Deleting `load_tokens` in `emit_css`: 1 failed, 16 passed, 4 deselected.
+- Deleting only `load_tokens` in `compose_listing_documents`: 19 passed, 5 deselected, no `FAILED`. `emit_css` still validates, so that deletion is equivalent.
+- `refuse_paid_checkout` returning `None`: 1 failed, 11 passed, 6 deselected (`tests/unit/assets/test_delivery_pdfs.py`).
+- `refuse_page_count` returning `None`: 2 failed, 10 passed, 6 deselected.
+- `refuse_gift_not_offered` returning `None`: 1 failed, 11 passed, 6 deselected.
+- `refuse_unvalidated_copy` returning `None`: 1 failed, 11 passed, 6 deselected.
+- `refuse_unclaimed_pdf_text` returning `None`: 1 failed, 11 passed, 6 deselected.
+
+Parked to next wave: the equivalent cutoff move to `0.03928`; deleting only the compose `load_tokens` call while `emit_css` still validates; #69 claim publishers and fail-closed over-refusals; W2 survivors not named in this wave (quote-strip in `emit_css`, `route.abort` to `continue`, role order, dropping "line must be present", dropping `_probe_holds`, removing `escape()`, removing `--force-device-scale-factor=1`); leading or trailing space in `font_family`; video, live screenshots, opening links, S3, workflow linkage, and commissioning.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/assets --basetemp /tmp/s08-w3-assets` — 63 passed in 22.97s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w3-pytest2`: 12 failed, 4179 passed, 193 skipped, 1 warning in 400.74s (0:06:40). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (350 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Pyright also printed its upgrade notice, v1.1.411 to v1.1.414. Those commands and the pytest run are the tree before this paragraph was appended. This paragraph was written after that run.
+
 ## 2026-10-14 — Session 08 W2: contrast pairs, screenshot slots, lineage fields
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `IMPLEMENTATION_STATE.json` is unchanged. A10 and A11 stay DESIGNED. Exit 78 stays HELD. This answers Verifier r3 on #70. Tests only. `design_tokens.py` and `listing_images.py` are unchanged. Claim-validation rules are unchanged. Swatch colours and the hub lineage hash stay parked.

@@ -1,7 +1,7 @@
 """Reusable listing and PDF tokens, their checks, and one CSS emitter.
 
-Wave 2 does not render PDFs. The PDF page tokens are part of the system so a
-later wave can reuse the same palette, type, and page measures. A11 stays
+``load_tokens`` refuses a missing section, a font family outside the pattern,
+or a text pair under contrast 4.5. ``emit_css`` runs that gate again. A11 stays
 DESIGNED and is not registered here.
 """
 
@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import Field, StringConstraints
+from pydantic import Field, StringConstraints, ValidationError
 
 from money_machine.domain.models._base import ContractModel, NonEmptyStr
 
@@ -142,7 +142,7 @@ class DeviceCompatibility(ContractModel):
 
 
 class PdfPages(ContractModel):
-    """Page box for a later PDF wave. This wave only emits the class."""
+    """Page box shared by listing CSS and the delivery PDFs."""
 
     width_px: PositivePx
     height_px: PositivePx
@@ -215,7 +215,10 @@ def load_tokens(payload: Mapping[str, object]) -> DesignTokens:
     """
     if refuse_missing_token_keys(payload) is not None:
         raise TokenValidationError("missing_token")
-    tokens = DesignTokens.model_validate(dict(payload))
+    try:
+        tokens = DesignTokens.model_validate(dict(payload))
+    except ValidationError as exc:
+        raise TokenValidationError("invalid_token") from exc
     if refuse_low_contrast(tokens) is not None:
         raise TokenValidationError("low_contrast")
     return tokens
@@ -265,7 +268,8 @@ def contrast_ratio(foreground: str, background: str) -> float:
 
 
 def emit_css(tokens: DesignTokens) -> str:
-    """Emit one stylesheet. Caller has already run ``load_tokens``."""
+    """Emit one stylesheet. The token set is validated again on this path."""
+    load_tokens(tokens.model_dump())
     palette = tokens.palette
     typography = tokens.typography
     spacing = tokens.spacing
@@ -433,9 +437,6 @@ def emit_css(tokens: DesignTokens) -> str:
         "  background: var(--mm-accent);",
         "  display: block;",
         "}",
-        ".mm-swatch:nth-child(2) { background: var(--mm-text); }",
-        ".mm-swatch:nth-child(3) { background: var(--mm-muted); }",
-        ".mm-swatch:nth-child(4) { background: var(--mm-border); }",
         ".mm-colour-options img { width: 100%; height: 360px; object-fit: cover; }",
         ".mm-how-it-works {",
         "  display: flex;",
@@ -487,6 +488,7 @@ def _rgb(color: str) -> tuple[int, int, int]:
 
 
 def _linear(channel: int) -> float:
+    """sRGB channel to linear light. Cutoff 0.04045, linear divisor 12.92."""
     value = channel / 255
     if value <= 0.04045:
         return value / 12.92

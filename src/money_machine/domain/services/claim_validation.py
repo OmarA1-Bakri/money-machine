@@ -818,6 +818,9 @@ def _bound_surfaces(
         for item in copy.video_sequence
     )
     rows.extend((item.text, item.claim_ids, item.template_id, "tag") for item in copy.tags)
+    rows.extend(
+        (item.text, item.claim_ids, item.template_id, item.template_id) for item in copy.pdf_blocks
+    )
     return tuple(rows)
 
 

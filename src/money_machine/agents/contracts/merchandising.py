@@ -9,10 +9,10 @@ the listing structure named by the workbook listing package and Session 08.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Final, Literal, Self
+from typing import Annotated, Final, Literal, Self
 from uuid import UUID
 
-from pydantic import Field, model_validator
+from pydantic import Field, StringConstraints, model_validator
 
 from money_machine.domain.models._base import (
     ContractModel,
@@ -277,10 +277,14 @@ class NotificationDashboardBehaviour(ContractModel):
         return self
 
 
+VariantColour = Annotated[str, StringConstraints(strict=True, pattern=r"^#[0-9A-F]{6}$")]
+
+
 class BuiltVariant(ContractModel):
-    """One colour variant that was actually built."""
+    """One colour variant that was actually built, with its swatch colour."""
 
     name: NonEmptyStr
+    colour: VariantColour
 
 
 class PriceSaleData(ContractModel):
@@ -348,6 +352,7 @@ class ListingDraft(ContractModel):
     video_sequence: tuple[VideoBeat, ...]
     price_sale: PriceSaleData
     claims: tuple[ListingClaim, ...] = Field(min_length=1)
+    pdf_blocks: tuple[CitedText, ...] = ()
 
     @model_validator(mode="after")
     def media_and_claim_refs(self) -> Self:
@@ -367,6 +372,7 @@ class ListingDraft(ContractModel):
         )
         cited.extend(claim_id for line in self.image_strip for claim_id in line.claim_ids)
         cited.extend(claim_id for beat in self.video_sequence for claim_id in beat.claim_ids)
+        cited.extend(claim_id for block in self.pdf_blocks for claim_id in block.claim_ids)
         if any(claim_id not in known for claim_id in cited):
             raise ValueError("copy cites a claim that is not on the draft")
         return self

@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import cast
 
 import pytest
-from pydantic import ValidationError
 
 from money_machine.assets.design_tokens import (
     MIN_CONTRAST,
@@ -138,7 +137,7 @@ def test_lowercase_hex_is_rejected() -> None:
     replaced = dict(palette)
     replaced["text"] = "#1c1917"
     payload["palette"] = replaced
-    with pytest.raises(ValidationError):
+    with pytest.raises(TokenValidationError, match="invalid_token"):
         load_tokens(payload)
 
 
@@ -262,11 +261,65 @@ def test_known_wcag_contrast_ratios() -> None:
     assert contrast_ratio("#777777", "#FFFFFF") == 4.478089453577214
     assert contrast_ratio("#767676", "#FFFFFF") == 4.542224959605253
     assert contrast_ratio("#FF0000", "#FFFFFF") == 3.9984767707539985
+    # 0x0A is the last 8-bit channel on the linear side of 0.04045.
+    # Dividing by 12 instead of 12.92 changes this ratio.
+    assert contrast_ratio("#0A0A0A", "#FFFFFF") == 19.79814571052481
+    # 0x0B is the first 8-bit channel in 0x0B-0x67, on the gamma side.
+    assert contrast_ratio("#0B0B0B", "#FFFFFF") == 19.682627652657427
 
 
 def test_css_requires_every_section() -> None:
     with pytest.raises(TokenValidationError, match="missing_token"):
         emit_css(DesignTokens())
+
+
+class _DropCall(ast.NodeTransformer):
+    """Delete a bare ``load_tokens(...)`` statement."""
+
+    def __init__(self, callee: str) -> None:
+        self.callee = callee
+        self.dropped = 0
+
+    def visit_Expr(self, node: ast.Expr) -> ast.AST | None:
+        call = node.value
+        if (
+            isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Name)
+            and call.func.id == self.callee
+        ):
+            self.dropped += 1
+            return None
+        return self.generic_visit(node)
+
+
+def _mutant_emit_css() -> Callable[[DesignTokens], str]:
+    drop = _DropCall("load_tokens")
+    tree = drop.visit(ast.parse(_TOKENS.read_text(encoding="utf-8")))
+    if drop.dropped != 1 or not isinstance(tree, ast.Module):
+        raise AssertionError(f"emit_css load_tokens dropped {drop.dropped}")
+    ast.fix_missing_locations(tree)
+    name = "token_mutant_emit_css"
+    module = types.ModuleType(name)
+    module.__file__ = str(_TOKENS)
+    sys.modules[name] = module
+    exec(compile(tree, str(_TOKENS), "exec"), module.__dict__)
+    emit = module.__dict__["emit_css"]
+    if not callable(emit):
+        raise AssertionError("emit_css")
+    return cast(Callable[[DesignTokens], str], emit)
+
+
+def test_emit_css_revalidates_direct_calls() -> None:
+    tokens = DesignTokens.model_validate(_white_on_white())
+    with pytest.raises(TokenValidationError, match="low_contrast"):
+        emit_css(tokens)
+
+
+def test_emit_css_mutant_emits_white_on_white() -> None:
+    tokens = DesignTokens.model_validate(_white_on_white())
+    css = _mutant_emit_css()(tokens)
+    assert "--mm-text: #FFFFFF;" in css
+    assert "--mm-background: #FFFFFF;" in css
 
 
 _FONT_MARKS = (";", "}", "<", "\\", "\n")
@@ -328,12 +381,12 @@ def _mutant_without_font_pattern() -> Callable[[Mapping[str, object]], DesignTok
 
 @pytest.mark.parametrize("mark", _FONT_MARKS)
 def test_font_family_marks_are_rejected(mark: str) -> None:
-    with pytest.raises(ValidationError):
+    with pytest.raises(TokenValidationError, match="invalid_token"):
         load_tokens(_with_font_family(f"MM{mark}Listing"))
 
 
 def test_css_injection_font_family_is_rejected() -> None:
-    with pytest.raises(ValidationError):
+    with pytest.raises(TokenValidationError, match="invalid_token"):
         load_tokens(_with_font_family(_CSS_INJECTION))
 
 
@@ -341,12 +394,12 @@ def test_dropping_the_font_family_pattern_accepts_the_marks() -> None:
     mutant = _mutant_without_font_pattern()
     for mark in _FONT_MARKS:
         family = f"MM{mark}Listing"
-        with pytest.raises(ValidationError):
+        with pytest.raises(TokenValidationError, match="invalid_token"):
             load_tokens(_with_font_family(family))
         opened = mutant(_with_font_family(family))
         assert opened.typography is not None
         assert opened.typography.font_family == family
-    with pytest.raises(ValidationError):
+    with pytest.raises(TokenValidationError, match="invalid_token"):
         load_tokens(_with_font_family(_CSS_INJECTION))
     injected = mutant(_with_font_family(_CSS_INJECTION))
     assert injected.typography is not None
