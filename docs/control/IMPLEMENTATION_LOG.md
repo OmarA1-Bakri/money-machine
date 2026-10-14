@@ -1,3 +1,45 @@
+## 2026-10-14 — Session 08 W2: contrast pairs, screenshot slots, lineage fields
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `IMPLEMENTATION_STATE.json` is unchanged. A10 and A11 stay DESIGNED. Exit 78 stays HELD. This answers Verifier r3 on #70. Tests only. `design_tokens.py` and `listing_images.py` are unchanged. Claim-validation rules are unchanged. Swatch colours and the hub lineage hash stay parked.
+
+`#767676` on `#FFFFFF` is 4.542224959605253 and loads. `#777777` on `#FFFFFF` is 4.478089453577214 and is refused. Each of the five pairs has its own failing palette: `text`/`background`, `text`/`surface`, `muted`/`background`, `muted`/`surface`, `accent_text`/`accent`. Known ratios are pinned: `#000000`/`#FFFFFF` is 21.0, the two greys above, and `#FF0000`/`#FFFFFF` is 3.9984767707539985. A missing screenshot is refused for every role in `IMAGE_ROLES`. Lineage `merchandising_version` is the SHA-256 of the JSON-encoded draft, computed in the test. The PNG `tEXt` chunk and the record both match product id, spec version, build version 4, that digest, template version `s08-w2-listing-1`, the fixture file hash, role, 800×800, and QA `passed`.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=no` with `-k "not mutant and not accepts and not dropping"`. The source was restored after each run.
+
+- `<` changed to `<=` at `MIN_CONTRAST`: 16 passed, 3 deselected, no `FAILED`. No 8-bit `#RRGGBB` pair has contrast exactly 4.5 (nearest 4.499999932321686 and 4.500000635232021), so the two operators agree on every palette `load_tokens` can see.
+- `MIN_CONTRAST = 3.0`: 2 failed, 14 passed, 3 deselected. `MIN_CONTRAST = 1.5`: 2 failed, 14 passed, 3 deselected. Both fail `test_contrast_at_four_point_five_passes_and_just_below_is_refused` and `test_each_contrast_pair_is_refused[text_background]`.
+- Dropping `(palette.text, palette.background)`: 2 failed, 14 passed, 3 deselected. Dropping each of the other four pairs: 1 failed, 15 passed, 3 deselected. The failure is that pair's `test_each_contrast_pair_is_refused` case.
+- `0.2126` changed to `0.2`: 2 failed, 14 passed, 3 deselected. Weights moved to `0.3000` / `0.6278` / `0.0722`: 2 failed, 14 passed, 3 deselected. Gamma `2.4` changed to `2.2`: 2 failed, 14 passed, 3 deselected. Each fails `test_known_wcag_contrast_ratios` and the 4.542 floor test.
+- `refuse_missing_screenshot` checks only `hero`: 9 failed, 6 passed, 5 deselected. The nine failures are the other roles.
+- Merchandising JSON separators changed to `", "` / `": "`: 2 failed, 13 passed, 5 deselected.
+- Lineage chunk `build_version` hardcoded to 0: 2 failed, 13 passed, 5 deselected. The record field hardcoded to 0: 2 failed, 13 passed, 5 deselected.
+
+`uv run ruff format` left both test files unchanged. `uv run ruff check` on them: exit 0. `uv run pyright` on them: 0 errors, 0 warnings, 0 informations (1.1.411). `uv run pytest -q -p no:cacheprovider tests/unit/assets/test_design_tokens.py tests/unit/assets/test_listing_images.py --basetemp /tmp/s08-w2-r3`: 39 passed in 14.08s.
+
+## 2026-10-14 — Session 08 W2: font family cannot inject CSS
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `IMPLEMENTATION_STATE.json` is unchanged. A10 and A11 stay DESIGNED. Exit 78 stays HELD. This answers Reviewer r1 on #70 (`5520251077`) at `2e701862`. Claim-validation rules are unchanged. The CodeRabbit swatch note, the 12 surviving mutants, the page-count wording, and the dev-only Playwright import stay parked.
+
+`font_family` must match `^[A-Za-z0-9 ]{1,64}$`. `load_tokens` applies that pattern through `model_validate`. `;`, `}`, `<`, `\`, a newline, and the reviewer's `content:counter(n)` family are refused. Removing the pattern keyword makes those six behavioural tests accept the family (6 failed, 6 deselected). The deselected tests include the AST mutant helper. With the pattern restored, `tests/unit/assets` is 22 passed.
+
+`uv run ruff format` on the two edited files, then `uv run ruff check` on them: exit 0. `uv run pyright` on them: 0 errors, 0 warnings, 0 informations (1.1.411). `uv run pytest -q -p no:cacheprovider tests/unit/assets/test_design_tokens.py --basetemp /tmp/s08-w2-font`: 12 passed in 0.28s. `uv run pytest -q -p no:cacheprovider tests/unit/assets --basetemp /tmp/s08-w2-assets`: 22 passed in 26.78s.
+
+## 2026-10-10 — Session 08 W2: design tokens and fixture listing images
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.
+
+This wave is action 3 and the ten listing images in action 4. Video, delivery PDFs, live screenshot acquisition, link injection, S3, workflow linkage, and commissioning stay deferred. The prompt file is unchanged. The addendum is `docs/control/reviews/2026-10-10-session-08-w2-prompt-integrity.md`. It does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, `claim_validation.py`, or `IMPLEMENTATION_STATE.json`.
+
+`load_tokens` refuses a missing section, a missing font file, or a text pair under contrast 4.5. `emit_css` covers palette, typography, spacing, cards, device frames, icons, hero, overview, hub slide, colour options, how-it-works, device compatibility, and PDF page measures. The ten frames render in `IMAGE_ROLES` order from the A10 image strip, cited facts, page count, and caller-supplied fixture screenshots. Visible text that is not accepted by `validate_claims` refuses the render. Playwright aborts `http` and `https`. The vendored DejaVu Sans file is the only font. Spec version is a PNG `tEXt` chunk, not painted text. Each image returns lineage: product id, spec version, build version, source screenshot hash, merchandising version, template version `s08-w2-listing-1`, output hash, 800×800, QA `passed`.
+
+Killing tests delete one refusal call each. `refuse_missing_token_keys` then accepts a payload with no palette. `refuse_low_contrast` then accepts white on white. Deleting the `load_tokens` call in `render_listing_images` paints 10 PNGs from that white set. `refuse_missing_screenshot`, `refuse_unknown_screenshot`, `refuse_unvalidated_copy` (tag `500 sold`), and `refuse_unclaimed_rendered_text` (`Bestseller 500 sold`) each paint 10 PNGs once that call is deleted. The real functions refuse those inputs.
+
+Parked from #69, not fixed here: base-also publishers `;`, `,`, `:`, `=`, `()`, `Reviews: +500`, `500sold`, `2.5 thousand sold`, `2.5ksold`, the Five_Star family, `Reviews.:.500`, `Sold: 500`, `Orders: 12`; fail-closed over-refusals `Year in Review 2026`, `2026 Review`, `Rating 1-10 Mood`, `Rating 0-100 Score`, `Rating 1-5`, `Sold 4 Ways`, `Orders 2026 Log`, and the rest of that word-first list; `A5-Rating Card`; `k-download` wording; the 62-vs-59 deselected nit.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/assets/test_design_tokens.py --basetemp /tmp/s08-w2-tokens` — 5 passed in 0.24s. `uv run pytest -q -p no:cacheprovider tests/unit/assets/test_listing_images.py --basetemp /tmp/s08-w2-listing` — 10 passed in 15.73s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --basetemp /tmp/s08-w2-pytest`: 12 failed, 4131 passed, 193 skipped, 1 warning in 399.86s (0:06:39). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (348 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Pyright also printed its upgrade notice, v1.1.411 to v1.1.414. Those commands and the pytest run are the tree at `1a37ccc`. This paragraph was written after that run.
+
 ## 2026-10-10 — Session 08 W1 follow-up: collapse-edge tests
 
 Session 08 is not activated. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, and A10 stay DESIGNED. A10 is not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy.
