@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from uuid import UUID, uuid5
 
 from money_machine.agents.contracts.merchandising import (
@@ -26,6 +27,19 @@ SHOP_NAME = "Fieldnote Shop"
 PAGE_COUNT = 42
 DEVICES = ("Tablet", "Phone")
 SECRET_LINK = "https://fixture.notion.site"
+_VARIANT_COLOURS = {
+    "Sage Green": "#8A9A7B",
+    "Navy Blue": "#1B3A4B",
+    "Rose Gold": "#B76E79",
+}
+
+
+def variant_colour(name: str) -> str:
+    """Pinned swatch for the fixture colours, otherwise a stable hex from the name."""
+    pinned = _VARIANT_COLOURS.get(name)
+    if pinned is not None:
+        return pinned
+    return "#" + hashlib.sha256(name.encode()).hexdigest()[:6].upper()
 
 
 def consistent_request(
@@ -76,7 +90,9 @@ def consistent_request(
         facts=facts,
         hubs=product.hubs,
         page_count=PAGE_COUNT,
-        variants=tuple(BuiltVariant(name=name) for name in product.colour_variants),
+        variants=tuple(
+            BuiltVariant(name=name, colour=variant_colour(name)) for name in product.colour_variants
+        ),
         notification_dashboard=dashboard,
         shop_name=SHOP_NAME,
         price=product.real_price,

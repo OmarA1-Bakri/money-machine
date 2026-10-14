@@ -26,6 +26,7 @@ from playwright.sync_api import Route, sync_playwright
 
 from money_machine.agents.contracts.merchandising import (
     IMAGE_ROLES,
+    BuiltVariant,
     ImageRole,
     ListingCopy,
     ListingDraft,
@@ -130,15 +131,16 @@ def render_listing_images(
         copy,
         screenshots,
         tokens,
+        request.variants,
         injected_text=injected_text,
     )
     if refuse_unclaimed_rendered_text(documents, copy.draft, request) is not None:
         raise ListingImageRefusal("unsupported_claim")
-    pngs = _paint(tuple(html for _role, html in documents))
+    pngs = _paint(tuple(html for _role, html, _embedded in documents))
     version = merchandising_version(copy.draft)
     rendered: list[RenderedListingImage] = []
-    for (role, _html), png in zip(documents, pngs, strict=True):
-        source_hash = hashlib.sha256(_screenshot_bytes(screenshots.get(role))).hexdigest()
+    for (role, _html, embedded), png in zip(documents, pngs, strict=True):
+        source_hash = hashlib.sha256(embedded).hexdigest()
         bound = _bind_lineage_png(
             png,
             _lineage_text(
@@ -207,7 +209,7 @@ def refuse_unvalidated_copy(copy: ListingDraft, request: MerchandisingInput) -> 
 
 
 def refuse_unclaimed_rendered_text(
-    documents: tuple[tuple[ImageRole, str], ...],
+    documents: tuple[tuple[ImageRole, str, bytes], ...],
     copy: ListingDraft,
     request: MerchandisingInput,
 ) -> str | None:
@@ -215,12 +217,12 @@ def refuse_unclaimed_rendered_text(
 
     A string that matches the line was already accepted with the copy. Any other
     string is substituted onto that frame and kept only when ``validate_claims``
-    accepts the substitution.
+    accepts the substitution. The third item is the embedded screenshot.
     """
     lines = {line.role: line.text for line in copy.image_strip}
-    if tuple(role for role, _html in documents) != IMAGE_ROLES:
+    if tuple(role for role, _html, _embedded in documents) != IMAGE_ROLES:
         return "unsupported_claim"
-    for role, html in documents:
+    for role, html, _embedded in documents:
         texts = extract_visible_text(html)
         for text in texts:
             if text == lines[role]:
@@ -237,18 +239,27 @@ def compose_listing_documents(
     copy: ListingCopy,
     screenshots: Mapping[str, Path],
     tokens: DesignTokens,
+    variants: tuple[BuiltVariant, ...],
     *,
     injected_text: str = "",
-) -> tuple[tuple[ImageRole, str], ...]:
-    """Build the ten HTML documents. Text nodes are the image-strip lines."""
+) -> tuple[tuple[ImageRole, str, bytes], ...]:
+    """Build the ten HTML documents. Text nodes are the image-strip lines.
+
+    Each document carries the screenshot bytes embedded in that frame. Lineage
+    hashes those bytes, so a hub frame cannot show a different file than the
+    hash it records.
+    """
+    load_tokens(tokens.model_dump())
     css = emit_css(tokens) + _frame_css()
     lines = {line.role: line for line in copy.draft.image_strip}
-    documents: list[tuple[ImageRole, str]] = []
+    colours = tuple(variant.colour for variant in variants)
+    documents: list[tuple[ImageRole, str, bytes]] = []
     for role in IMAGE_ROLES:
         line = lines[role]
-        image = base64.b64encode(_screenshot_bytes(screenshots.get(role))).decode("ascii")
-        body = _body(role, line.text, image, len(line.claim_ids), injected_text)
-        documents.append((role, _document(css, body)))
+        embedded = _screenshot_bytes(screenshots.get(role))
+        image = base64.b64encode(embedded).decode("ascii")
+        body = _body(role, line.text, image, colours, injected_text)
+        documents.append((role, _document(css, body), embedded))
     return tuple(documents)
 
 
@@ -277,7 +288,7 @@ def _screenshot_bytes(path: Path | None) -> bytes:
     return Path(path).read_bytes()
 
 
-def _body(role: ImageRole, text: str, image: str, swatches: int, injected: str) -> str:
+def _body(role: ImageRole, text: str, image: str, colours: tuple[str, ...], injected: str) -> str:
     claim = f'<p class="mm-claim">{escape(text)}</p>'
     extra = f'<p class="mm-claim">{escape(injected)}</p>' if injected else ""
     shot = f'<img alt="" src="data:image/png;base64,{image}">'
@@ -299,7 +310,10 @@ def _body(role: ImageRole, text: str, image: str, swatches: int, injected: str) 
     elif role in ("hub_1", "hub_2", "hub_3", "hub_4", "hub_5"):
         layout, inner = "mm-hub-slide", f"{shot}{claim}{extra}"
     elif role == "colour_options":
-        row = "".join('<span class="mm-swatch"></span>' for _index in range(swatches))
+        row = "".join(
+            f'<span class="mm-swatch" style="background:{escape(colour)}"></span>'
+            for colour in colours
+        )
         layout, inner = (
             "mm-colour-options",
             f'<div class="mm-swatches">{row}</div>{shot}{claim}{extra}',

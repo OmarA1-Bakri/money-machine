@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import base64
 import hashlib
 import json
 import struct
@@ -18,6 +19,7 @@ from playwright.sync_api import sync_playwright
 
 from money_machine.agents.contracts.merchandising import (
     IMAGE_ROLES,
+    BuiltVariant,
     ListingCopy,
     ListingDraft,
     MerchandisingInput,
@@ -40,10 +42,13 @@ from money_machine.assets.listing_images import (
 )
 from money_machine.domain.services.claim_validation import validate_claims
 from tests.fixtures.listing_screenshots import fixture_screenshot_hashes, fixture_screenshot_paths
-from tests.fixtures.merchandising import PAGE_COUNT, consistent_request
+from tests.fixtures.merchandising import PAGE_COUNT, consistent_request, variant_colour
 
 _LISTING = (
     Path(__file__).resolve().parents[3] / "src" / "money_machine" / "assets" / "listing_images.py"
+)
+_TOKENS = (
+    Path(__file__).resolve().parents[3] / "src" / "money_machine" / "assets" / "design_tokens.py"
 )
 _BUILD = 4
 _HUB_ROLES = ("hub_1", "hub_2", "hub_3", "hub_4", "hub_5")
@@ -234,22 +239,59 @@ def test_network_stays_on_local_urls() -> None:
 
 
 def test_documents_show_only_the_validated_image_line(scene: _Scene) -> None:
-    documents = compose_listing_documents(scene.copy, scene.paths, scene.tokens)
-    assert tuple(role for role, _html in documents) == IMAGE_ROLES
+    documents = compose_listing_documents(
+        scene.copy, scene.paths, scene.tokens, scene.request.variants
+    )
+    assert tuple(role for role, _html, _embedded in documents) == IMAGE_ROLES
     lines = {line.role: line.text for line in scene.copy.draft.image_strip}
     request = scene.request
     assert lines["overview"] == f"{PAGE_COUNT} pages in {request.spec.identity}."
     for role, hub in zip(_HUB_ROLES, request.hubs[:5], strict=True):
         assert lines[role] == f"Hub: {hub}."
-    for role, html in documents:
+    by_role = {role: html for role, html, _embedded in documents}
+    for role, html, _embedded in documents:
         assert extract_visible_text(html) == (lines[role],)
         assert f'class="mm-frame {_frame_class(role)}"' in html
         assert "https://" not in html.split("<article", maxsplit=1)[0]
-    colour = dict(documents)["colour_options"]
-    assert colour.count('class="mm-swatch"') == 3
-    assert "mm-phone" in dict(documents)["devices"]
-    assert "mm-tablet" in dict(documents)["devices"]
-    assert "<circle" in dict(documents)["how_it_works"]
+    colour = by_role["colour_options"]
+    assert colour.count('class="mm-swatch"') == len(request.variants)
+    for variant in request.variants:
+        assert f'style="background:{variant.colour}"' in colour
+        assert variant.colour == variant_colour(variant.name)
+    assert "mm-phone" in by_role["devices"]
+    assert "mm-tablet" in by_role["devices"]
+    assert "<circle" in by_role["how_it_works"]
+
+
+def test_swatches_follow_request_variants_not_claim_ids(scene: _Scene) -> None:
+    extra = BuiltVariant(name="Midnight", colour="#101820")
+    variants = (*scene.request.variants, extra)
+    documents = compose_listing_documents(scene.copy, scene.paths, scene.tokens, variants)
+    colour = next(html for role, html, _embedded in documents if role == "colour_options")
+    claims = next(line for line in scene.copy.draft.image_strip if line.role == "colour_options")
+    assert colour.count('class="mm-swatch"') == len(variants) == len(claims.claim_ids) + 1
+    assert 'style="background:#101820"' in colour
+
+
+def test_hub_lineage_hashes_the_embedded_bytes(
+    scene: _Scene, rendered: tuple[RenderedListingImage, ...]
+) -> None:
+    documents = compose_listing_documents(
+        scene.copy, scene.paths, scene.tokens, scene.request.variants
+    )
+    hero = scene.paths["hero"].read_bytes()
+    hero_b64 = base64.b64encode(hero).decode("ascii")
+    by_role = {image.lineage.role: image for image in rendered}
+    for role, html, embedded in documents:
+        if not role.startswith("hub_"):
+            continue
+        hub = scene.paths[role].read_bytes()
+        assert embedded == hub
+        assert base64.b64encode(hub).decode("ascii") in html
+        assert hero_b64 not in html
+        digest = hashlib.sha256(embedded).hexdigest()
+        assert by_role[role].lineage.source_screenshot_sha256 == (digest,)
+        assert digest != hashlib.sha256(hero).hexdigest()
 
 
 def _frame_class(role: str) -> str:
@@ -420,11 +462,39 @@ def test_an_unknown_screenshot_is_refused_and_the_mutant_accepts(
     assert len(accepted) == 10
 
 
-def test_render_refuses_low_contrast_and_the_mutant_paints(scene: _Scene) -> None:
-    tokens = _white_tokens()
+def _load_mutant(path: Path, name: str, dropped: int) -> types.ModuleType:
+    transform = _DropCall("load_tokens")
+    tree = transform.visit(ast.parse(path.read_text(encoding="utf-8")))
+    if transform.dropped != dropped or not isinstance(tree, ast.Module):
+        raise AssertionError(f"{name} dropped {transform.dropped}")
+    ast.fix_missing_locations(tree)
+    module = types.ModuleType(name)
+    module.__file__ = str(path)
+    sys.modules[name] = module
+    exec(compile(tree, str(path), "exec"), module.__dict__)
+    return module
+
+
+def _ungated_contrast_render() -> Callable[..., object]:
+    tokens = _load_mutant(_TOKENS, "listing_token_mutant_emit_css", 1)
+    listing = _load_mutant(_LISTING, "listing_mutant_ungated_contrast", 2)
+    listing.__dict__["emit_css"] = tokens.__dict__["emit_css"]
+    render = listing.__dict__["render_listing_images"]
+    if not callable(render):
+        raise AssertionError("ungated contrast")
+    return render
+
+
+def test_compose_revalidates_tokens(scene: _Scene) -> None:
     with pytest.raises(TokenValidationError, match="low_contrast"):
-        _render(scene, tokens=tokens)
-    accepted = _accepted(
-        _exec_mutant(_DropCall("load_tokens"), "load_tokens"), scene, tokens=tokens
-    )
+        compose_listing_documents(scene.copy, scene.paths, _white_tokens(), scene.request.variants)
+
+
+def test_render_refuses_low_contrast(scene: _Scene) -> None:
+    with pytest.raises(TokenValidationError, match="low_contrast"):
+        _render(scene, tokens=_white_tokens())
+
+
+def test_low_contrast_mutant_paints(scene: _Scene) -> None:
+    accepted = _accepted(_ungated_contrast_render(), scene, tokens=_white_tokens())
     assert len(accepted) == 10

@@ -203,6 +203,38 @@ def render(template_id: str, slots: tuple[TextSlot, ...], *, quantity: int) -> s
     if template_id == "video_hubs":
         names = _all(slots, "hub")
         return f"Hubs: {', '.join(names)}."
+    if template_id == "pdf_setup_open":
+        (access,) = _named(slots, ("access",))
+        return f"Step 1. Open your template at {access}."
+    if template_id == "pdf_setup_duplicate":
+        (access,) = _named(slots, ("access",))
+        return f"Step 2. Duplicate the template at {access}."
+    if template_id == "pdf_setup_resources":
+        features = _all(slots, "feature")
+        return f"Step 3. Use the included resources: {'; '.join(features)}."
+    if template_id == "pdf_widgets":
+        (encoded,) = _named(slots, ("dashboard",))
+        return _widget_sentence(encoded)
+    if template_id == "pdf_variant_link":
+        name, access = _named(slots, ("variant", "access"))
+        return f"Variant {name}. Access link: {access}."
+    if template_id == "pdf_duplication":
+        (access,) = _named(slots, ("access",))
+        return f"Duplicate the template. Access link: {access}."
+    if template_id == "pdf_support":
+        (encoded,) = _named(slots, ("support",))
+        return _support_clause(encoded)
+    if template_id == "pdf_review_request":
+        (shop,) = _named(slots, ("shop",))
+        return f"Please leave a review for {shop}."
+    if template_id == "pdf_gift":
+        (encoded,) = _named(slots, ("free_gift",))
+        if encoded == "not_offered":
+            return "No free gift is configured."
+        return f"Free gift: {_gift_name(encoded)}."
+    if template_id == "pdf_community":
+        (encoded,) = _named(slots, ("free_gift",))
+        return f"Free community: {_gift_community(encoded)}."
     if template_id == "tag":
         if len(slots) != 1:
             raise ValueError("tag template cites one claim")
@@ -259,12 +291,38 @@ def _support_clause(encoded: str) -> str:
 def _gift_clause(encoded: str) -> str:
     if encoded == "not_offered":
         return "No free gift is configured."
-    rest = _offered(encoded, "free gift")
-    parts = rest.split("|")
+    parts = _gift_parts(encoded)
+    sentence = f"Free gift: {parts[0]}."
     if len(parts) == 1:
-        return f"Free gift: {parts[0]}."
-    if len(parts) == 2:
-        return f"Free gift: {parts[0]}. Free community: {parts[1]}."
+        return sentence
+    return f"{sentence} Free community: {parts[1]}."
+
+
+def _widget_sentence(encoded: str) -> str:
+    if encoded == "absent":
+        return "Widgets are not in this build."
+    if encoded == "" or encoded.startswith("|") or encoded.endswith("|") or "||" in encoded:
+        raise ValueError("dashboard fact is not a list of outputs")
+    return f"Widgets: {', '.join(encoded.split('|'))}."
+
+
+def _gift_name(encoded: str) -> str:
+    parts = _gift_parts(encoded)
+    return parts[0]
+
+
+def _gift_community(encoded: str) -> str:
+    parts = _gift_parts(encoded)
+    if len(parts) != 2:
+        raise ValueError("free gift fact has no community")
+    return parts[1]
+
+
+def _gift_parts(encoded: str) -> tuple[str, ...]:
+    rest = _offered(encoded, "free gift")
+    parts = tuple(rest.split("|"))
+    if len(parts) == 1 or len(parts) == 2:
+        return parts
     raise ValueError("free gift fact is a name and an optional community")
 
 
