@@ -176,6 +176,94 @@ def test_low_contrast_is_refused_and_the_mutant_accepts() -> None:
     assert opened.palette.background == "#FFFFFF"
 
 
+def _with_palette(colors: Mapping[str, str]) -> dict[str, object]:
+    payload = listing_token_payload()
+    palette = payload["palette"]
+    if not isinstance(palette, dict):
+        raise AssertionError("palette")
+    replaced = dict(palette)
+    replaced.update(colors)
+    payload["palette"] = replaced
+    return payload
+
+
+# Each set fails exactly one of the five pairs in refuse_low_contrast.
+# text/background uses #777777 on #FFFFFF (4.478), which sits between 3.0 and 4.5.
+_CONTRAST_PAIR_FAILURES: dict[str, dict[str, str]] = {
+    "text_background": {
+        "background": "#FFFFFF",
+        "surface": "#000000",
+        "text": "#777777",
+        "muted": "#767676",
+        "accent": "#000000",
+        "accent_text": "#FFFFFF",
+    },
+    "text_surface": {
+        "background": "#000000",
+        "surface": "#FFFFFF",
+        "text": "#F2F2F2",
+        "muted": "#767676",
+        "accent": "#000000",
+        "accent_text": "#FFFFFF",
+    },
+    "muted_background": {
+        "background": "#FFFFFF",
+        "surface": "#000000",
+        "text": "#767676",
+        "muted": "#F2F2F2",
+        "accent": "#000000",
+        "accent_text": "#FFFFFF",
+    },
+    "muted_surface": {
+        "background": "#000000",
+        "surface": "#FFFFFF",
+        "text": "#767676",
+        "muted": "#F2F2F2",
+        "accent": "#000000",
+        "accent_text": "#FFFFFF",
+    },
+    "accent_text_accent": {
+        "accent": "#FFFFFF",
+        "accent_text": "#FFFFFF",
+    },
+}
+
+# #767676 on #FFFFFF is 4.542. The same grey on #000000 is 4.623.
+_PASSING_AT_FLOOR: dict[str, str] = {
+    "background": "#FFFFFF",
+    "surface": "#000000",
+    "text": "#767676",
+    "muted": "#767676",
+    "accent": "#000000",
+    "accent_text": "#FFFFFF",
+}
+
+
+def test_contrast_at_four_point_five_passes_and_just_below_is_refused() -> None:
+    tokens = load_tokens(_with_palette(_PASSING_AT_FLOOR))
+    assert tokens.palette is not None
+    assert contrast_ratio(tokens.palette.text, tokens.palette.background) == 4.542224959605253
+    assert contrast_ratio("#767676", "#FFFFFF") >= 4.5
+    with pytest.raises(TokenValidationError, match="low_contrast"):
+        load_tokens(_with_palette(_CONTRAST_PAIR_FAILURES["text_background"]))
+    assert contrast_ratio("#777777", "#FFFFFF") == 4.478089453577214
+    assert contrast_ratio("#777777", "#FFFFFF") < 4.5
+
+
+@pytest.mark.parametrize("pair", tuple(_CONTRAST_PAIR_FAILURES))
+def test_each_contrast_pair_is_refused(pair: str) -> None:
+    with pytest.raises(TokenValidationError, match="low_contrast"):
+        load_tokens(_with_palette(_CONTRAST_PAIR_FAILURES[pair]))
+
+
+def test_known_wcag_contrast_ratios() -> None:
+    assert contrast_ratio("#000000", "#FFFFFF") == 21.0
+    assert contrast_ratio("#FFFFFF", "#000000") == 21.0
+    assert contrast_ratio("#777777", "#FFFFFF") == 4.478089453577214
+    assert contrast_ratio("#767676", "#FFFFFF") == 4.542224959605253
+    assert contrast_ratio("#FF0000", "#FFFFFF") == 3.9984767707539985
+
+
 def test_css_requires_every_section() -> None:
     with pytest.raises(TokenValidationError, match="missing_token"):
         emit_css(DesignTokens())

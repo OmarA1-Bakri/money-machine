@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import json
 import struct
 import subprocess
 import sys
@@ -18,6 +19,7 @@ from playwright.sync_api import sync_playwright
 from money_machine.agents.contracts.merchandising import (
     IMAGE_ROLES,
     ListingCopy,
+    ListingDraft,
     MerchandisingInput,
 )
 from money_machine.agents.implementations.merchandising import merchandise
@@ -28,15 +30,11 @@ from money_machine.assets.design_tokens import (
     load_tokens,
 )
 from money_machine.assets.listing_images import (
-    LISTING_IMAGE_HEIGHT,
-    LISTING_IMAGE_WIDTH,
-    LISTING_TEMPLATE_VERSION,
     ListingImageLineage,
     ListingImageRefusal,
     RenderedListingImage,
     compose_listing_documents,
     extract_visible_text,
-    merchandising_version,
     network_allowed,
     render_listing_images,
 )
@@ -265,31 +263,66 @@ def _frame_class(role: str) -> str:
     return classes.get(role, f"mm-{role}")
 
 
+def _independent_merchandising_version(draft: ListingDraft) -> str:
+    payload = draft.model_dump(mode="json")
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode()).hexdigest()
+
+
+def _lineage_chunk(
+    *,
+    product_id: object,
+    spec_version: int,
+    source: str,
+    merchandising: str,
+    role: str,
+) -> bytes:
+    text = (
+        f"product_id={product_id}\n"
+        f"spec_version={spec_version}\n"
+        "build_version=4\n"
+        f"screenshots={source}\n"
+        f"merchandising_version={merchandising}\n"
+        "template_version=s08-w2-listing-1\n"
+        f"role={role}\n"
+    )
+    return text.encode("ascii")
+
+
 def test_all_ten_images_render_with_lineage(
     scene: _Scene, rendered: tuple[RenderedListingImage, ...]
 ) -> None:
     request = scene.request
+    assert _BUILD == 4
     assert tuple(image.lineage.role for image in rendered) == IMAGE_ROLES
-    version = merchandising_version(scene.copy.draft)
+    version = _independent_merchandising_version(scene.copy.draft)
     hashes = [image.lineage.output_sha256 for image in rendered]
     assert len(set(hashes)) == 10
     for image in rendered:
         record = image.lineage
         assert isinstance(record, ListingImageLineage)
+        source = hashlib.sha256(scene.paths[record.role].read_bytes()).hexdigest()
         assert record.product_id == request.spec.product_id
         assert record.spec_version == request.spec.version
-        assert record.build_version == _BUILD
-        assert record.merchandising_version == version
-        assert record.template_version == LISTING_TEMPLATE_VERSION
-        assert record.qa_status == "passed"
-        assert record.width_px == LISTING_IMAGE_WIDTH
-        assert record.height_px == LISTING_IMAGE_HEIGHT
-        assert _png_size(image.png) == (LISTING_IMAGE_WIDTH, LISTING_IMAGE_HEIGHT)
-        assert hashlib.sha256(image.png).hexdigest() == record.output_sha256
-        source = hashlib.sha256(scene.paths[record.role].read_bytes()).hexdigest()
+        assert record.build_version == 4
         assert record.source_screenshot_sha256 == (source,)
-        assert f"spec_version={record.spec_version}\n".encode() in image.png
-        assert b"mm-lineage" in image.png
+        assert record.merchandising_version == version
+        assert record.template_version == "s08-w2-listing-1"
+        assert record.output_sha256 == hashlib.sha256(image.png).hexdigest()
+        assert record.width_px == 800
+        assert record.height_px == 800
+        assert record.qa_status == "passed"
+        assert _png_size(image.png) == (800, 800)
+        assert (
+            _lineage_chunk(
+                product_id=request.spec.product_id,
+                spec_version=request.spec.version,
+                source=source,
+                merchandising=version,
+                role=record.role,
+            )
+            in image.png
+        )
 
 
 def test_the_same_inputs_render_the_same_png(
@@ -311,12 +344,29 @@ def test_a_changed_spec_version_changes_lineage_and_hash(
         update={"spec": request.spec.model_copy(update={"version": request.spec.version + 1})}
     )
     again = _render(scene, request=bumped)
-    assert merchandising_version(scene.copy.draft) == rendered[0].lineage.merchandising_version
+    version = _independent_merchandising_version(scene.copy.draft)
+    assert rendered[0].lineage.merchandising_version == version
     for original, updated in zip(rendered, again, strict=True):
-        assert updated.lineage.spec_version == original.lineage.spec_version + 1
-        assert updated.lineage.merchandising_version == original.lineage.merchandising_version
-        assert updated.lineage.source_screenshot_sha256 == original.lineage.source_screenshot_sha256
-        assert updated.lineage.product_id == original.lineage.product_id
+        source = hashlib.sha256(scene.paths[updated.lineage.role].read_bytes()).hexdigest()
+        assert updated.lineage.spec_version == request.spec.version + 1
+        assert updated.lineage.merchandising_version == version
+        assert updated.lineage.build_version == 4
+        assert updated.lineage.product_id == request.spec.product_id
+        assert updated.lineage.template_version == "s08-w2-listing-1"
+        assert updated.lineage.qa_status == "passed"
+        assert updated.lineage.width_px == 800
+        assert updated.lineage.height_px == 800
+        assert updated.lineage.source_screenshot_sha256 == (source,)
+        assert (
+            _lineage_chunk(
+                product_id=request.spec.product_id,
+                spec_version=request.spec.version + 1,
+                source=source,
+                merchandising=version,
+                role=updated.lineage.role,
+            )
+            in updated.png
+        )
         assert updated.lineage.output_sha256 != original.lineage.output_sha256
         assert updated.png != original.png
 
@@ -342,13 +392,17 @@ def test_unclaimed_text_is_refused_and_the_mutant_accepts(scene: _Scene) -> None
     assert len(accepted) == 10
 
 
-def test_a_missing_screenshot_is_refused_and_the_mutant_accepts(
-    scene: _Scene, tmp_path: Path
-) -> None:
+@pytest.mark.parametrize("role", IMAGE_ROLES)
+def test_a_missing_screenshot_is_refused(scene: _Scene, tmp_path: Path, role: str) -> None:
     paths = dict(scene.paths)
-    paths["hero"] = tmp_path / "missing.png"
+    paths[role] = tmp_path / "missing.png"
     with pytest.raises(ListingImageRefusal, match="missing_screenshot"):
         _render(scene, paths=paths)
+
+
+def test_dropping_the_missing_screenshot_check_accepts(scene: _Scene, tmp_path: Path) -> None:
+    paths = dict(scene.paths)
+    paths["overview"] = tmp_path / "missing.png"
     accepted = _accepted(_mutant_render("refuse_missing_screenshot"), scene, paths=paths)
     assert len(accepted) == 10
 

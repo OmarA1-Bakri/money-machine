@@ -1,3 +1,21 @@
+## 2026-10-14 — Session 08 W2: contrast pairs, screenshot slots, lineage fields
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `IMPLEMENTATION_STATE.json` is unchanged. A10 and A11 stay DESIGNED. Exit 78 stays HELD. This answers Verifier r3 on #70. Tests only. `design_tokens.py` and `listing_images.py` are unchanged. Claim-validation rules are unchanged. Swatch colours and the hub lineage hash stay parked.
+
+`#767676` on `#FFFFFF` is 4.542224959605253 and loads. `#777777` on `#FFFFFF` is 4.478089453577214 and is refused. Each of the five pairs has its own failing palette: `text`/`background`, `text`/`surface`, `muted`/`background`, `muted`/`surface`, `accent_text`/`accent`. Known ratios are pinned: `#000000`/`#FFFFFF` is 21.0, the two greys above, and `#FF0000`/`#FFFFFF` is 3.9984767707539985. A missing screenshot is refused for every role in `IMAGE_ROLES`. Lineage `merchandising_version` is the SHA-256 of the JSON-encoded draft, computed in the test. The PNG `tEXt` chunk and the record both match product id, spec version, build version 4, that digest, template version `s08-w2-listing-1`, the fixture file hash, role, 800×800, and QA `passed`.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=no` with `-k "not mutant and not accepts and not dropping"`. The source was restored after each run.
+
+- `<` changed to `<=` at `MIN_CONTRAST`: 16 passed, 3 deselected, no `FAILED`. No 8-bit `#RRGGBB` pair has contrast exactly 4.5 (nearest 4.499999932321686 and 4.500000635232021), so the two operators agree on every palette `load_tokens` can see.
+- `MIN_CONTRAST = 3.0`: 2 failed, 14 passed, 3 deselected. `MIN_CONTRAST = 1.5`: 2 failed, 14 passed, 3 deselected. Both fail `test_contrast_at_four_point_five_passes_and_just_below_is_refused` and `test_each_contrast_pair_is_refused[text_background]`.
+- Dropping `(palette.text, palette.background)`: 2 failed, 14 passed, 3 deselected. Dropping each of the other four pairs: 1 failed, 15 passed, 3 deselected. The failure is that pair's `test_each_contrast_pair_is_refused` case.
+- `0.2126` changed to `0.2`: 2 failed, 14 passed, 3 deselected. Weights moved to `0.3000` / `0.6278` / `0.0722`: 2 failed, 14 passed, 3 deselected. Gamma `2.4` changed to `2.2`: 2 failed, 14 passed, 3 deselected. Each fails `test_known_wcag_contrast_ratios` and the 4.542 floor test.
+- `refuse_missing_screenshot` checks only `hero`: 9 failed, 6 passed, 5 deselected. The nine failures are the other roles.
+- Merchandising JSON separators changed to `", "` / `": "`: 2 failed, 13 passed, 5 deselected.
+- Lineage chunk `build_version` hardcoded to 0: 2 failed, 13 passed, 5 deselected. The record field hardcoded to 0: 2 failed, 13 passed, 5 deselected.
+
+`uv run ruff format` left both test files unchanged. `uv run ruff check` on them: exit 0. `uv run pyright` on them: 0 errors, 0 warnings, 0 informations (1.1.411). `uv run pytest -q -p no:cacheprovider tests/unit/assets/test_design_tokens.py tests/unit/assets/test_listing_images.py --basetemp /tmp/s08-w2-r3`: 39 passed in 14.08s.
+
 ## 2026-10-14 — Session 08 W2: font family cannot inject CSS
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `IMPLEMENTATION_STATE.json` is unchanged. A10 and A11 stay DESIGNED. Exit 78 stays HELD. This answers Reviewer r1 on #70 (`5520251077`) at `2e701862`. Claim-validation rules are unchanged. The CodeRabbit swatch note, the 12 surviving mutants, the page-count wording, and the dev-only Playwright import stay parked.
