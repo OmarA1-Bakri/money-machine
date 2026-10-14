@@ -29,7 +29,12 @@ from money_machine.assets.delivery_pdfs import (
 from money_machine.assets.design_tokens import DesignTokens, listing_token_payload, load_tokens
 from money_machine.assets.pdf_objects import page_texts
 from tests.fixtures.merchandising import consistent_request
-from tests.unit.assets.gift_pdf_craft import embed_info_title
+from tests.unit.assets.gift_pdf_craft import (
+    embed_info_title,
+    indirect_link,
+    percent_packet,
+    titled_page,
+)
 from tests.unit.assets.test_delivery_pdfs import DELIVERY_PDF_PATH, replace_fact
 
 _BUILD = 4
@@ -73,6 +78,22 @@ _CHARSET_ROWS = (
     "Checklist /buy",
     "Checklist /order",
     "Notes 127.1/x",
+)
+_DOTTED_ROWS = (
+    ".1.2.3.4",
+    "Checklist .1.2.3.4",
+    "Checklist at a.1.2.3.4",
+)
+_EXCLUDED_ROWS = (
+    "Checklist a:b",
+    "a@b",
+    "50%",
+    "a\\b",
+    "a/b",
+)
+_FOLD_ROWS = (
+    "Checklist \uff46\uff4f\uff4f",
+    "4\uff0e9",
 )
 _CONCEALED_ROWS = (
     "Checklist at www.etsy.com/listing/123456/planner",
@@ -135,7 +156,10 @@ def _concealed_name(
     return _spliced_claim(scene, encode_free_gift(gift))
 
 
-@pytest.mark.parametrize("name", (*_LINK_ROWS, *_CHARSET_ROWS))
+@pytest.mark.parametrize(
+    "name",
+    (*_LINK_ROWS, *_CHARSET_ROWS, *_DOTTED_ROWS, *_EXCLUDED_ROWS, *_FOLD_ROWS),
+)
 def test_gift_domain_text_is_refused(scene: _Scene, name: str) -> None:
     request, copy = _named(scene, name)
     with pytest.raises(DeliveryPdfRefusal, match="paid_checkout"):
@@ -159,6 +183,8 @@ def test_concealed_gift_domain_text_is_refused(scene: _Scene, name: str) -> None
         ("x[.]com", "x[.]com"),
         ("x dot com", "x dot com"),
         ("x.c0m", "x.c0m"),
+        ("0x7f000001", "0x7f000001"),
+        ("2130706433", "2130706433"),
     ),
 )
 def test_quantities_and_examples_render(scene: _Scene, name: str, kept: str) -> None:
@@ -198,6 +224,34 @@ def test_spliced_gift_text_is_refused(scene: _Scene, encoded: str) -> None:
     request, copy = _spliced_claim(scene, encoded)
     with pytest.raises(DeliveryPdfRefusal, match="paid_checkout"):
         render_gift_pdf(copy, request, scene.tokens, build_version=_BUILD)
+
+
+def _painted(pdf: bytes) -> Callable[..., bytes]:
+    def paint(*_args: object) -> bytes:
+        return pdf
+
+    return paint
+
+
+def test_painted_percent_text_is_refused(scene: _Scene, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("money_machine.assets.delivery_pdfs._paint", _painted(percent_packet()))
+    with pytest.raises(DeliveryPdfRefusal, match="paid_checkout"):
+        render_gift_pdf(scene.copy, scene.request, scene.tokens, build_version=_BUILD)
+
+
+def test_painted_link_is_refused(scene: _Scene, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("money_machine.assets.delivery_pdfs._paint", _painted(indirect_link()))
+    with pytest.raises(DeliveryPdfRefusal, match="paid_checkout"):
+        render_gift_pdf(scene.copy, scene.request, scene.tokens, build_version=_BUILD)
+
+
+def test_painted_title_is_refused(scene: _Scene, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "money_machine.assets.delivery_pdfs._paint",
+        _painted(titled_page("https://x.com")),
+    )
+    with pytest.raises(DeliveryPdfRefusal, match="paid_checkout"):
+        render_gift_pdf(scene.copy, scene.request, scene.tokens, build_version=_BUILD)
 
 
 def test_injected_gift_line_is_refused(scene: _Scene) -> None:

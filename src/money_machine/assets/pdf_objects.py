@@ -15,6 +15,7 @@ from money_machine.assets.pdf_reader import (
     PdfName,
     PdfObject,
     PdfReader,
+    PdfRef,
     PdfStream,
     PdfText,
     token_boundary,
@@ -31,15 +32,23 @@ def _dict(value: PdfObject | None) -> dict[str, PdfObject]:
     return {}
 
 
-def _pages(doc: PdfDocument, node: PdfObject | None) -> tuple[dict[str, PdfObject], ...]:
+def _pages(
+    doc: PdfDocument,
+    node: PdfObject | None,
+    seen: frozenset[int] = frozenset(),
+) -> tuple[dict[str, PdfObject], ...]:
+    if isinstance(node, PdfRef):
+        if node.number in seen:
+            raise ValueError("pdf page")
+        seen = seen | {node.number}
     found = doc.deref(node)
     page = _dict(found)
     if _name_is(page.get("Type"), "Page"):
         return (page,)
     kids = doc.deref(page.get("Kids"))
     if not isinstance(kids, tuple):
-        return ()
-    return tuple(item for kid in kids for item in _pages(doc, kid))
+        raise ValueError("pdf page")
+    return tuple(item for kid in kids for item in _pages(doc, kid, seen))
 
 
 def _text_of(value: PdfObject | None) -> str | None:

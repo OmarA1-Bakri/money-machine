@@ -43,6 +43,66 @@ def _stream_object(number: int, payload: bytes) -> bytes:
     return header.encode("ascii") + b"stream\n" + payload + b"\nendstream\nendobj\n"
 
 
+def titled_page(title: str) -> bytes:
+    """One page whose info title is ``title`` and which has no annotations."""
+    literal = _pdf_literal(title).decode("ascii")
+    return classic_pdf(
+        {
+            1: _dict_object(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+            2: _dict_object(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            3: _dict_object(3, "<< /Type /Page /Parent 2 0 R >>"),
+            4: _dict_object(4, f"<< /Title {literal} >>"),
+        },
+        info=4,
+    )
+
+
+def percent_packet() -> bytes:
+    """Info title and XMP both carry ``x%2Ecom``. The page has no annotations."""
+    packet = b"<?xpacket begin='x'?><dc:title>x%2Ecom</dc:title>"
+    return classic_pdf(
+        {
+            1: _dict_object(1, "<< /Type /Catalog /Pages 2 0 R /Metadata 5 0 R >>"),
+            2: _dict_object(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            3: _dict_object(3, "<< /Type /Page /Parent 2 0 R >>"),
+            4: _dict_object(4, "<< /Title (x%2Ecom) >>"),
+            5: _stream_object(5, packet),
+        },
+        info=4,
+    )
+
+
+def untyped_page() -> bytes:
+    """A page dictionary with no ``/Type /Page``."""
+    return classic_pdf(
+        {
+            1: _dict_object(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+            2: _dict_object(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            3: _dict_object(3, "<< /Parent 2 0 R >>"),
+        }
+    )
+
+
+def looping_kids() -> bytes:
+    """A page tree whose ``/Kids`` array contains its own page node."""
+    return classic_pdf(
+        {
+            1: _dict_object(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+            2: _dict_object(2, "<< /Type /Pages /Kids [2 0 R] /Count 1 >>"),
+        }
+    )
+
+
+def reference_chain(length: int) -> bytes:
+    """Object 1 is the first of ``length`` references. The next object is a dictionary."""
+    objects = {
+        number: f"{number} 0 obj\n{number + 1} 0 R\nendobj\n".encode("ascii")
+        for number in range(1, length + 1)
+    }
+    objects[length + 1] = _dict_object(length + 1, "<< /Done true >>")
+    return classic_pdf(objects)
+
+
 def mail_link() -> bytes:
     """A ``/Link`` whose URI is ``mailto:a`` and whose array is direct."""
     return classic_pdf(

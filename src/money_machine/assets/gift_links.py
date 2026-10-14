@@ -1,8 +1,9 @@
 """Gift-link refusal. Painted strings are not rewritten.
 
 The raw allowlist runs on gift fields before any fold. Folded checks stay
-scheme, ``www.``, host, IPv4, percent, and ``_PAID``. ``/OpenAction``, ``/AA``,
-and outline scanning are intentionally absent.
+scheme, ``www.``, host, IPv4, percent, and ``_PAID``. A dotted address may
+follow a dot. ``/OpenAction``, ``/AA``, and outline scanning are intentionally
+absent.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ _HOST = re.compile(
 )
 _MARKED_OCTET = r"(?:0[xX][0-9A-Fa-f]+|0\d+)"
 _IPV4 = re.compile(
-    rf"(?<![A-Za-z0-9:/.])(?:"
+    rf"(?<![A-Za-z0-9:/])(?<!\d\.)(?:"
     rf"\d{{1,3}}(?:\.\d{{1,3}}){{2,3}}"
     rf"|{_MARKED_OCTET}(?:\.(?:0[xX][0-9A-Fa-f]+|\d+)){{1,3}}"
     rf"|(?:\d+\.){{1,3}}{_MARKED_OCTET}"
@@ -88,7 +89,10 @@ def refuse_paid_checkout(text: str) -> str | None:
 
 def refuse_gift_link_annotations(pdf: bytes) -> str | None:
     """Return ``paid_checkout`` when the gift PDF has any link annotation."""
-    count, uris = link_annotations(pdf)
+    try:
+        count, uris = link_annotations(pdf)
+    except ValueError:
+        return "paid_checkout"
     for uri in uris:
         if refuse_paid_checkout(uri) is not None:
             return "paid_checkout"

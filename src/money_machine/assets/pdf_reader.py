@@ -469,6 +469,8 @@ class PdfDocument:
         while isinstance(value, PdfRef) and seen < 8:
             value = self.get(value.number)
             seen += 1
+        if isinstance(value, PdfRef):
+            raise ValueError("pdf reference")
         return value
 
     def _object_stream(self, number: int) -> dict[int, PdfObject]:

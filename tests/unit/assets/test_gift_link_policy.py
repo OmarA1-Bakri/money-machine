@@ -15,12 +15,16 @@ from money_machine.assets.gift_links import (
     refuse_paid_checkout,
 )
 from money_machine.assets.pdf_objects import document_strings
+from money_machine.assets.pdf_reader import PdfDocument, PdfRef
 from tests.unit.assets.gift_pdf_craft import (
     embed_info_title,
     indirect_link,
+    looping_kids,
     mail_link,
     metadata_packet,
     nested_kids_link,
+    reference_chain,
+    untyped_page,
 )
 
 _LINKS = Path(__file__).resolve().parents[3] / "src" / "money_machine" / "assets" / "gift_links.py"
@@ -40,9 +44,33 @@ def test_other_numeric_forms_are_refused(text: str) -> None:
     assert refuse_paid_checkout(text) == "paid_checkout"
 
 
+@pytest.mark.parametrize(
+    "text",
+    (".1.2.3.4", "Checklist .1.2.3.4", "Checklist at a.1.2.3.4"),
+)
+def test_unanchored_dotted_address_is_refused(text: str) -> None:
+    assert refuse_paid_checkout(text) == "paid_checkout"
+
+
 def test_two_part_decimals_stay() -> None:
     assert refuse_paid_checkout("4.9") is None
     assert refuse_paid_checkout("127.1") is None
+    assert refuse_paid_checkout("0x7f000001") is None
+    assert refuse_paid_checkout("2130706433") is None
+
+
+def test_percent_encoding_is_refused() -> None:
+    assert refuse_paid_checkout("x%2Ecom") == "paid_checkout"
+
+
+@pytest.mark.parametrize("text", ("Checklist a:b", "a@b", "50%", "a\\b", "a/b"))
+def test_excluded_character_is_not_a_folded_link(text: str) -> None:
+    assert refuse_paid_checkout(text) is None
+
+
+def test_fullwidth_fold_is_not_a_folded_link() -> None:
+    assert refuse_paid_checkout("Checklist \uff46\uff4f\uff4f") is None
+    assert refuse_paid_checkout("4\uff0e9") is None
 
 
 def test_format_host_is_refused() -> None:
@@ -75,6 +103,23 @@ def test_indirect_annotation_is_refused() -> None:
 
 def test_nested_kids_annotation_is_refused() -> None:
     assert refuse_gift_link_annotations(nested_kids_link()) == "paid_checkout"
+
+
+def test_untyped_page_is_refused() -> None:
+    assert refuse_gift_link_annotations(untyped_page()) == "paid_checkout"
+
+
+def test_looping_page_kids_is_refused() -> None:
+    assert refuse_gift_link_annotations(looping_kids()) == "paid_checkout"
+
+
+def test_reference_chain_over_eight_is_refused() -> None:
+    short = PdfDocument(reference_chain(7))
+    found = short.deref(PdfRef(1, 0))
+    assert isinstance(found, dict)
+    long = PdfDocument(reference_chain(8))
+    with pytest.raises(ValueError, match="pdf reference"):
+        long.deref(PdfRef(1, 0))
 
 
 def test_metadata_packet_is_refused() -> None:

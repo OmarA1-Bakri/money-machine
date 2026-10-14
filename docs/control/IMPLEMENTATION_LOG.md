@@ -1,3 +1,40 @@
+## 2026-10-14 — Session 08 W3 r4: unanchored IPv4, percent, allowlist order
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.
+
+This answers Reviewer review 5524200950 and the Verifier r4 addendum on #71. The prompt file is unchanged. The addendum remains `docs/control/reviews/2026-10-14-session-08-w3-prompt-integrity.md`. It does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, `AGENTS.md`, `CLAUDE.md`, `claim_validation.py`, `pdf.py`, or `IMPLEMENTATION_STATE.json`.
+
+The raw allowlist still runs before the fold. `4.9` and `e.g.` render. `1.2.3`, `.1.2.3.4`, and `a.1.2.3.4` are refused. Bare `127.1` renders and stays parked. A dotted address may start after a dot. It still cannot start after a letter, digit, `:`, `/`, or a digit-dot, so `ftp://1.2.3.4/x` stays a scheme-only refusal. `0x7f000001` and `2130706433` render. The percent check is defence in depth for painted text: the allowlist already refuses `%` on a raw gift field, and `%xx` is what refuses `x%2Ecom` in an info title or XMP. Each excluded character has a plain row with no other trigger: `Checklist a:b`, `a@b`, `50%`, `a\b`, and `a/b`. Fullwidth `Checklist foo` and `4` plus U+FF0E plus `9` are refused on the raw field. After the fold they are `Checklist foo` and `4.9`, which render. A reference that is still unresolved after 8 follows raises `ValueError`. A page node without `/Type /Page`, and a `/Kids` cycle, are `paid_checkout` rather than a skip or `RecursionError`.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=no -k "not mutant and not accepts and not dropping"` on `tests/unit/assets/test_delivery_pdfs.py`, `tests/unit/assets/test_gift_pdf_links.py`, and `tests/unit/assets/test_gift_link_policy.py`. The source was restored after each run.
+
+- Deleting the Cf strip: 1 failed, 112 passed, 10 deselected (`x\u200b.com`).
+- Deleting the scheme check: 1 failed, 112 passed, 10 deselected (`ftp://1.2.3.4/x`).
+- Deleting the `www.` check: 1 failed, 112 passed, 10 deselected (`www.x`).
+- Deleting the host check: 2 failed, 111 passed, 10 deselected (`ETSY.COM`, and `x\u200b.com` because the stripped value is `x.com`).
+- Deleting the IPv4 check: 14 failed, 99 passed, 10 deselected. The rows are `127.0.0.1`, `0x7f.0.0.1`, `0x7f.1`, `0177.1`, `1.2.3`, `1.2.3.4`, `192.168.0.1`, `1.2.3.4/l/x`, `.1.2.3.4`, `Checklist .1.2.3.4`, and `Checklist at a.1.2.3.4`, the last three on both the direct check and the gift render. `4.9`, `127.1`, `0x7f000001`, and `2130706433` stayed open.
+- Deleting the percent check: 2 failed, 111 passed, 10 deselected (`x%2Ecom` directly, and the same text painted into the info title and XMP).
+- Deleting only `_PAID`: 2 failed, 111 passed, 10 deselected (`Checklist checkout`, direct and spliced). Not equivalent.
+- Deleting `if count:`: 1 failed, 112 passed, 10 deselected (a `/Link` whose URI is `mailto:a`). The painted `https://x.com` link stays refused by the URI loop.
+- Deleting the catalog XMP read: 1 failed, 112 passed, 10 deselected.
+- Deleting the injected-text append in `_gift_copy`: 1 failed, 112 passed, 10 deselected.
+- Deleting the allowlist call: 27 failed, 86 passed, 10 deselected (the r3 rows, plus `Checklist a:b`, `a@b`, `50%`, `a\b`, `a/b`, fullwidth `Checklist foo`, and `4` plus U+FF0E plus `9`).
+- Deleting the annotation call in `render_gift_pdf`: 1 failed, 112 passed, 10 deselected (a painted `/Link`).
+- Deleting the document-info call in `render_gift_pdf`: 2 failed, 111 passed, 10 deselected (a painted info title `https://x.com`, and the painted `x%2Ecom` packet). The direct `x%2Ecom` row stays refused by the percent check.
+- Moving the allowlist to the folded string: 2 failed, 111 passed, 10 deselected (fullwidth `Checklist foo` and `4` plus U+FF0E plus `9`). The excluded-character rows stay refused.
+- Admitting `:`: 1 failed, 112 passed, 10 deselected (`Checklist a:b`).
+- Admitting `@`: 1 failed, 112 passed, 10 deselected (`a@b`).
+- Admitting `%`: 1 failed, 112 passed, 10 deselected (`50%`).
+- Admitting `\`: 1 failed, 112 passed, 10 deselected (`a\b`).
+- Admitting `/`: 2 failed, 111 passed, 10 deselected (`a/b` and `Notes 127.1/x`). `Checklist /buy` and `Checklist /order` stay refused by `_PAID`.
+- Moving the README split from 4/rest to 5/rest: 1 failed, 112 passed, 10 deselected (`test_readme_pages_place_setup_before_access`).
+
+Parked to next wave: whole-document `/OpenAction`, `/AA`, and outline scanning; non-Link URI annotations such as `/Widget` with `/A /URI`; defanged hosts `x . com`, `x[.]com`, `x dot com`, and `x.c0m`, which render; the scan reading only the newest xref, with no `/Prev`; non-ASCII names, with José and Zoë refused in the name and community slots; bare `127.1`, `0x7f000001`, and `2130706433`, which render, while `4.9` renders and `1.2.3` is refused; deleting the URI loop while `if count:` stays. Carried: swatch colours in the rendered PNG; a 1-page README and a 0-page gift; the equivalent sRGB cutoff move to `0.03928`; deleting only `compose_listing_documents`'s `load_tokens` call; Chromium m153 writes no XMP and no `/ID`; #69 publishers and over-refusals; W2 survivors; leading or trailing space in `font_family`; video, live screenshots, opening links, S3, workflow, and commissioning. README access links may still allow any path on an allowed Notion host.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/assets/test_delivery_pdfs.py tests/unit/assets/test_gift_pdf_links.py tests/unit/assets/test_gift_link_policy.py` — 123 passed in 16.21s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --tb=line --basetemp /tmp/s08-w3-r4`: 12 failed, 4284 passed, 193 skipped, 1 warning in 406.84s (0:06:46). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (356 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Pyright also printed its upgrade notice, v1.1.411 to v1.1.414. Those commands and the pytest run are the tree before this paragraph was appended. This paragraph was written after that run.
+
 ## 2026-10-14 — Session 08 W3 r3: raw allowlist, IPv4, indirect annotations
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.
