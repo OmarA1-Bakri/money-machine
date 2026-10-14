@@ -203,6 +203,23 @@ def render(template_id: str, slots: tuple[TextSlot, ...], *, quantity: int) -> s
     if template_id == "video_hubs":
         names = _all(slots, "hub")
         return f"Hubs: {', '.join(names)}."
+    if template_id == "video_dashboard_caption":
+        (encoded,) = _named(slots, ("dashboard",))
+        return f"Dashboard {_caption_outputs(encoded)}."
+    if template_id == "video_notification_caption":
+        (encoded,) = _named(slots, ("dashboard",))
+        return f"Notification panel {_caption_outputs(encoded)}."
+    if template_id == "video_hubs_caption":
+        names = _all(slots, "hub")
+        return f"Hubs {', '.join(names)}."
+    if template_id == "video_variants_caption":
+        names = _all(slots, "variant")
+        return f"Variants {', '.join(names)}."
+    if template_id == "video_duplication_caption":
+        (access,) = _named(slots, ("access",))
+        if access == "":
+            raise ValueError("access")
+        return "Duplicate the template."
     if template_id == "pdf_setup_open":
         (access,) = _named(slots, ("access",))
         return f"Step 1. Open your template at {access}."
@@ -268,6 +285,15 @@ def _support(slots: tuple[TextSlot, ...]) -> str:
     return (
         f"{_support_clause(support)} {_gift_clause(gift)} Fact support {support}. Fact gift {gift}."
     )
+
+
+def _caption_outputs(encoded: str) -> str:
+    """Comma-separated dashboard outputs, with no colon and no pipe."""
+    if encoded == "absent":
+        return "not in this build"
+    if encoded == "" or encoded.startswith("|") or encoded.endswith("|") or "||" in encoded:
+        raise ValueError("dashboard fact is not a list of outputs")
+    return ", ".join(encoded.split("|"))
 
 
 def _dashboard_sentence(encoded: str) -> str:

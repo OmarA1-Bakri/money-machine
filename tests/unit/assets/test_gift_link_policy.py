@@ -9,14 +9,19 @@ from pathlib import Path
 
 import pytest
 
+from money_machine.agents.implementations.merchandising import merchandise
+from money_machine.assets.delivery_pdfs import DeliveryPdfRefusal, render_gift_pdf
+from money_machine.assets.design_tokens import listing_token_payload, load_tokens
 from money_machine.assets.gift_links import (
     refuse_gift_document_info,
     refuse_gift_link_annotations,
     refuse_paid_checkout,
 )
-from money_machine.assets.pdf_objects import document_strings
+from money_machine.assets.pdf_objects import document_strings, link_annotations
 from money_machine.assets.pdf_reader import PdfDocument, PdfRef
+from tests.fixtures.merchandising import consistent_request
 from tests.unit.assets.gift_pdf_craft import (
+    deep_info_chain,
     embed_info_title,
     indirect_link,
     looping_kids,
@@ -103,6 +108,44 @@ def test_indirect_annotation_is_refused() -> None:
 
 def test_nested_kids_annotation_is_refused() -> None:
     assert refuse_gift_link_annotations(nested_kids_link()) == "paid_checkout"
+
+
+def test_indirect_kids_link_is_found() -> None:
+    count, uris = link_annotations(nested_kids_link())
+    assert count == 1
+    assert uris == ("https://x.com",)
+
+
+def test_letter_prefixed_dotted_address_stays() -> None:
+    assert refuse_paid_checkout("v1.2.3.4") is None
+
+
+def test_marked_last_octet_is_refused() -> None:
+    assert refuse_paid_checkout("1.2.0x7f") == "paid_checkout"
+    assert refuse_paid_checkout("1.0x10") == "paid_checkout"
+
+
+def test_deep_info_chain_is_paid_checkout() -> None:
+    pdf = deep_info_chain()
+    with pytest.raises(ValueError, match="pdf reference"):
+        document_strings(pdf)
+    assert refuse_gift_document_info(pdf) == "paid_checkout"
+
+
+def _deep_paint(_html: str, _tokens: object) -> bytes:
+    return deep_info_chain()
+
+
+def test_deep_info_chain_is_delivery_refusal(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("money_machine.assets.delivery_pdfs._paint", _deep_paint)
+    request = consistent_request()
+    with pytest.raises(DeliveryPdfRefusal, match="paid_checkout"):
+        render_gift_pdf(
+            merchandise(request),
+            request,
+            load_tokens(listing_token_payload()),
+            build_version=4,
+        )
 
 
 def test_untyped_page_is_refused() -> None:

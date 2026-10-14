@@ -102,8 +102,16 @@ def refuse_gift_link_annotations(pdf: bytes) -> str | None:
 
 
 def refuse_gift_document_info(pdf: bytes) -> str | None:
-    """Return ``paid_checkout`` when info strings or XMP contain a link."""
-    for value in document_strings(pdf):
+    """Return ``paid_checkout`` when info strings or XMP contain a link.
+
+    A ``ValueError`` from a deep or broken ``/Info`` chain is the same refusal.
+    Callers then raise ``DeliveryPdfRefusal`` instead of the raw parser error.
+    """
+    try:
+        values = document_strings(pdf)
+    except ValueError:
+        return "paid_checkout"
+    for value in values:
         if refuse_paid_checkout(value) is not None:
             return "paid_checkout"
     return None

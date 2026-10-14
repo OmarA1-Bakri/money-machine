@@ -18,7 +18,7 @@ from money_machine.domain.models._base import ContractModel, NonEmptyStr
 
 MIN_CONTRAST = 4.5
 FONT_FAMILY = "MM Listing"
-FONT_FAMILY_PATTERN = r"^[A-Za-z0-9 ]{1,64}$"
+FONT_FAMILY_PATTERN = r"^[A-Za-z0-9](?:[A-Za-z0-9 ]{0,62}[A-Za-z0-9])?$"
 REQUIRED_TOKEN_KEYS = (
     "palette",
     "typography",
@@ -60,8 +60,9 @@ class Palette(ContractModel):
 class Typography(ContractModel):
     """Local font file and the type scale. The family name is the CSS name.
 
-    ``font_family`` is letters, digits, and spaces only. ``load_tokens`` applies
-    that pattern, so a family cannot close the stylesheet or set ``content``.
+    ``font_family`` is letters, digits, and internal spaces only. A leading or
+    trailing space is refused. ``load_tokens`` applies that pattern, so a family
+    cannot close the stylesheet or set ``content``.
     """
 
     font_family: FontFamily
