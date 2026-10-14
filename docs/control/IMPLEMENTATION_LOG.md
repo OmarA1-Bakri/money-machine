@@ -1,3 +1,27 @@
+## 2026-10-14 — Session 08 W3 r2: folded gift links, annotations, and PDF info
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.
+
+This answers Reviewer review 5522104381 and the Verifier r2 addenda on #71. The prompt file is unchanged. The addendum remains `docs/control/reviews/2026-10-14-session-08-w3-prompt-integrity.md`. It does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, `AGENTS.md`, `CLAUDE.md`, `claim_validation.py`, `pdf.py`, or `IMPLEMENTATION_STATE.json`.
+
+The gift refuses URL- or domain-like text on a folded check-only copy. The fold is NFKC, then U+3002, U+FF61, and U+FF0E become `.`, then every Unicode Cf character is stripped. Painted text and lineage stay on the original bytes. After the fold the gift refuses `://`, `:/`, `www.`, a host with a letters-only TLD of 2 or more characters, and `%xx`. `_PAID` is a second layer and also matches a dotted boundary, `/buy`, `/order`, `/purchase`, and `paypal.me`. The same fold runs on every `/Annot /Link` `/URI` and on document info strings plus catalog XMP. Those strings are read by walking objects, including a compressed `/ObjStm`. A gift with any link annotation is refused. `4.9` and `e.g.` still render. README page 1 text is the setup steps and widgets; page 2 text is the access links, duplication reminder, support, and review request. Lineage expectations are fixed literals and a SHA-256 computed from the draft, not from the lineage record.
+
+`www.etsy.com/...` and a zero-width space inside `www` never reach `merchandise()`: `require_consistent` already rejects a fact URL and a Cf character. Those two rows build a `FreeGiftConfig` the contract allows, splice the encoded claim, and the PDF gate still refuses them.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=no -k "not mutant and not accepts and not dropping"` on `tests/unit/assets/test_delivery_pdfs.py` and `tests/unit/assets/test_gift_pdf_links.py`. The source was restored after each run.
+
+- Deleting the `_refuse_paid` call: 22 failed, 17 passed, 9 deselected.
+- Deleting the link-annotation call: 1 failed, 38 passed, 9 deselected.
+- Deleting the document-info call: 1 failed, 38 passed, 9 deselected.
+- Swapping the README page tuples, and reordering the cited blocks so a PDF is painted: 1 failed, 38 passed, 9 deselected. The failure is `test_readme_pages_place_setup_before_access`.
+- Deleting only the `_PAID` second layer: 39 passed, 9 deselected, no `FAILED`. The folded scheme, `www.`, host, and percent checks already refuse the listed rows, so that deletion is equivalent.
+
+Parked to next wave: whole-document `/OpenAction`, `/AA`, and outline scanning; swatch colours checked in the rendered PNG (`tests/unit/assets/test_listing_images.py` is 500 lines); a 1-page README and a 0-page gift, which the renderer does not emit; the equivalent `_PAID`-only deletion; the equivalent sRGB cutoff move to `0.03928`; deleting only `compose_listing_documents`'s `load_tokens` call; #69 claim publishers and fail-closed over-refusals; the W2 survivors not named in this wave; leading or trailing space in `font_family`; video, live screenshots, opening links, S3, workflow linkage, and commissioning. Chromium m153 writes no XMP and no `/ID`, so the same-length `/ID` substitution and an XMP date pin do not change these bytes.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/assets/test_delivery_pdfs.py tests/unit/assets/test_gift_pdf_links.py` — 48 passed in 13.70s.
+
+Full local pytest: `uv run pytest -q -p no:cacheprovider --tb=line --basetemp /tmp/s08-w3-r2`: 12 failed, 4209 passed, 193 skipped, 1 warning in 404.37s (0:06:44). Exit 1. All 12 failures are `test_compose_preserves_the_postgres_password` with `FileNotFoundError: [Errno 2] No such file or directory: 'docker'`. Local-only. CI is the gate. `uv run ruff format --check .` exit 0 (354 files already formatted). `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Pyright also printed its upgrade notice, v1.1.411 to v1.1.414. Those commands and the pytest run are the tree before this paragraph was appended. This paragraph was written after that run.
+
 ## 2026-10-14 — Session 08 W3: README and free-gift PDFs
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.

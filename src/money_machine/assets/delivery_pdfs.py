@@ -1,9 +1,9 @@
 """README and free-gift PDFs. A11 stays DESIGNED and unregistered.
 
-Buyer-facing sentences are listing templates. ``validate_claims`` accepts them
-before Chromium paints. A paid or checkout URL is refused on the gift PDF.
-Creation dates and document ids are pinned so the same inputs yield the same
-bytes. Lineage is appended after ``%%EOF``.
+Buyer-facing sentences are listing templates. The gift refuses URL-like copy on
+a folded check-only string, then refuses link annotations and document info.
+Painted text and lineage stay on the original bytes. Dates are pinned.
+Lineage is appended after ``%%EOF``.
 """
 
 from __future__ import annotations
@@ -25,11 +25,17 @@ from money_machine.agents.contracts.merchandising import (
     MerchandisingInput,
 )
 from money_machine.assets.design_tokens import DesignTokens, emit_css, load_tokens
+from money_machine.assets.gift_links import (
+    refuse_gift_document_info,
+    refuse_gift_link_annotations,
+    refuse_paid_checkout,
+)
 from money_machine.assets.listing_images import (
     extract_visible_text,
     merchandising_version,
     network_allowed,
 )
+from money_machine.assets.pdf_objects import embed_info_title
 from money_machine.domain.services.claim_validation import validate_claims
 from money_machine.domain.services.listing_text import TextSlot, render
 
@@ -61,21 +67,15 @@ _PDF_DATE = re.compile(rb"D:\d{14}")
 _ISO_DATE = re.compile(rb"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
 _PDF_ID = re.compile(rb"/ID\s*\[\s*<[0-9A-Fa-f]+>\s*<[0-9A-Fa-f]+>\s*\]")
 _PDF_PAGE = re.compile(rb"/Type\s*/Page(?!s)\b")
-_PAID = re.compile(
-    r"checkout|stripe\.com|paypal\.com|gumroad\.com|(?:^|[/?&#])(?:cart|pay)(?:[/?&#]|$)",
-    re.IGNORECASE,
-)
 _ACCESS_MARK = "Access link: "
 
 
 class DeliveryPdfRefusal(ValueError):
-    """The PDF was refused before bytes were returned."""
+    pass
 
 
 @dataclass(frozen=True, slots=True)
 class DeliveryPdfLineage:
-    """Per-artifact record. QA status is ``passed`` only when bytes are returned."""
-
     product_id: UUID
     spec_version: int
     build_version: int
@@ -89,8 +89,6 @@ class DeliveryPdfLineage:
 
 @dataclass(frozen=True, slots=True)
 class RenderedDeliveryPdf:
-    """One PDF and the lineage recorded after its end-of-file marker."""
-
     pdf: bytes
     lineage: DeliveryPdfLineage
 
@@ -130,8 +128,10 @@ def render_gift_pdf(
     *,
     build_version: int,
     injected_text: str = "",
+    link_uri: str = "",
+    info_title: str = "",
 ) -> RenderedDeliveryPdf:
-    """Paint the one-page free gift. A paid or checkout URL is refused."""
+    """Paint the one-page free gift. URL- or domain-like text is refused."""
     gift = _only(copy.draft, "free_gift")
     if refuse_gift_not_offered(gift.stated_value) is not None:
         raise DeliveryPdfRefusal("gift_not_offered")
@@ -148,11 +148,12 @@ def render_gift_pdf(
         role="free_gift",
         injected_text=injected_text,
         check_paid=True,
+        link_uri=link_uri,
+        info_title=info_title,
     )
 
 
 def readme_blocks(draft: ListingDraft, quantity: int) -> tuple[CitedText, ...]:
-    """Setup, widgets, variant links, duplication, support, and the review request."""
     access = _only(draft, "access")
     features = _many(draft, "feature")
     dashboard = _only(draft, "dashboard")
@@ -176,7 +177,6 @@ def readme_blocks(draft: ListingDraft, quantity: int) -> tuple[CitedText, ...]:
 
 
 def gift_blocks(draft: ListingDraft, quantity: int) -> tuple[CitedText, ...]:
-    """The configured gift, plus the community when the fact names one."""
     gift = _only(draft, "free_gift")
     blocks = [_cite("pdf_gift", (gift,), quantity)]
     if _community_offered(gift.stated_value):
@@ -188,7 +188,6 @@ def compose_delivery_html(
     tokens: DesignTokens,
     pages: tuple[tuple[str, ...], ...],
 ) -> str:
-    """HTML for the PDF. A line past ``_LINE_FIT`` adds a page."""
     load_tokens(tokens.model_dump())
     css = emit_css(tokens) + _pdf_css(tokens)
     body = "".join(_article(paragraphs) for paragraphs in _with_overflow_page(pages))
@@ -199,26 +198,29 @@ def compose_delivery_html(
 
 
 def pdf_page_count(pdf: bytes) -> int:
-    """Count PDF page objects. The pages-tree node is not a page."""
     return len(_PDF_PAGE.findall(pdf))
 
 
 def refuse_gift_not_offered(encoded: str) -> str | None:
-    """Return ``gift_not_offered`` when no free gift is configured."""
     if encoded == "not_offered":
         return "gift_not_offered"
     return None
 
 
-def refuse_paid_checkout(html: str) -> str | None:
-    """Return ``paid_checkout`` when the gift document contains a paid URL."""
-    if _PAID.search(html) is not None:
-        return "paid_checkout"
+def _refuse_paid(text: str) -> None:
+    if refuse_paid_checkout(text) is not None:
+        raise DeliveryPdfRefusal("paid_checkout")
     return None
 
 
-def _refuse_paid(html: str) -> None:
-    if refuse_paid_checkout(html) is not None:
+def _refuse_annotations(pdf: bytes) -> None:
+    if refuse_gift_link_annotations(pdf) is not None:
+        raise DeliveryPdfRefusal("paid_checkout")
+    return None
+
+
+def _refuse_document_info(pdf: bytes) -> None:
+    if refuse_gift_document_info(pdf) is not None:
         raise DeliveryPdfRefusal("paid_checkout")
     return None
 
@@ -226,21 +228,18 @@ def _refuse_paid(html: str) -> None:
 def _with_overflow_page(
     pages: tuple[tuple[str, ...], ...],
 ) -> tuple[tuple[str, ...], ...]:
-    """A line that cannot fit adds an empty page so the count check can see it."""
     if any(len(text) > _LINE_FIT for paragraphs in pages for text in paragraphs):
         return (*pages, ())
     return pages
 
 
 def refuse_page_count(pdf: bytes, expected: int) -> str | None:
-    """Return ``page_count`` when the painted PDF is not the required length."""
     if pdf_page_count(pdf) != expected:
         return "page_count"
     return None
 
 
 def refuse_unvalidated_copy(copy: ListingDraft, request: MerchandisingInput) -> str | None:
-    """Return ``unsupported_claim`` when claim validation rejects the copy."""
     if validate_claims(copy, request).passed:
         return None
     return "unsupported_claim"
@@ -252,7 +251,6 @@ def refuse_unclaimed_pdf_text(
     draft: ListingDraft,
     request: MerchandisingInput,
 ) -> str | None:
-    """Refuse visible text that claim validation does not accept as these blocks."""
     texts = extract_visible_text(html)
     if texts == tuple(block.text for block in blocks):
         return None
@@ -274,22 +272,28 @@ def _render(
     role: Literal["readme", "free_gift"],
     injected_text: str,
     check_paid: bool,
+    link_uri: str = "",
+    info_title: str = "",
 ) -> RenderedDeliveryPdf:
     load_tokens(tokens.model_dump())
+    if check_paid:
+        _refuse_paid(_gift_copy(blocks, injected_text))
     probed = copy.draft.model_copy(update={"pdf_blocks": blocks})
     if refuse_unvalidated_copy(probed, request) is not None:
         raise DeliveryPdfRefusal("unsupported_claim")
-    html = _inject(compose_delivery_html(tokens, pages), injected_text)
+    html = _inject_anchor(_inject(compose_delivery_html(tokens, pages), injected_text), link_uri)
     if refuse_unclaimed_pdf_text(html, blocks, probed, request) is not None:
         raise DeliveryPdfRefusal("unsupported_claim")
+    pdf = _pin_metadata(_paint(html, tokens))
+    if info_title:
+        pdf = embed_info_title(pdf, info_title)
     if check_paid:
-        _refuse_paid(html)
-    pdf = _paint(html, tokens)
+        _refuse_annotations(pdf)
+        _refuse_document_info(pdf)
     if refuse_page_count(pdf, expected_pages) is not None:
         raise DeliveryPdfRefusal("page_count")
-    pinned = _pin_metadata(pdf)
     return _bind(
-        pinned,
+        pdf,
         copy,
         request,
         build_version=build_version,
@@ -344,11 +348,25 @@ def _blocks_for_visible(
     return tuple(updated)
 
 
+def _gift_copy(blocks: tuple[CitedText, ...], injected_text: str) -> str:
+    parts = [block.text for block in blocks]
+    if injected_text:
+        parts.append(injected_text)
+    return "\n".join(parts)
+
+
 def _inject(html: str, text: str) -> str:
     if text == "":
         return html
     extra = f'<p class="mm-claim">{escape(text)}</p>'
     return html.replace("</article>", extra + "</article>", 1)
+
+
+def _inject_anchor(html: str, uri: str) -> str:
+    if uri == "":
+        return html
+    anchor = f'<a href="{escape(uri, quote=True)}">&nbsp;</a>'
+    return html.replace("</article>", anchor + "</article>", 1)
 
 
 def _article(paragraphs: tuple[str, ...]) -> str:
@@ -434,7 +452,6 @@ def _guard(route: Route) -> None:
 
 
 def _pin_metadata(pdf: bytes) -> bytes:
-    """Replace dates and the document id without changing byte lengths."""
     pinned = _PDF_DATE.sub(_PINNED_PDF_DATE, pdf)
     pinned = _ISO_DATE.sub(_PINNED_ISO_DATE, pinned)
 

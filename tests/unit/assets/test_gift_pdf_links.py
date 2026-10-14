@@ -1,0 +1,257 @@
+"""Gift PDFs refuse URL-like copy, link annotations, and document titles."""
+
+from __future__ import annotations
+
+import ast
+import subprocess
+import sys
+import types
+from collections.abc import Callable
+from dataclasses import dataclass
+
+import pytest
+from playwright.sync_api import sync_playwright
+
+from money_machine.agents.contracts.merchandising import (
+    FreeGiftConfig,
+    ListingCopy,
+    MerchandisingInput,
+    encode_free_gift,
+)
+from money_machine.agents.implementations.merchandising import merchandise
+from money_machine.assets.delivery_pdfs import (
+    DeliveryPdfRefusal,
+    gift_blocks,
+    pdf_page_count,
+    refuse_gift_document_info,
+    render_gift_pdf,
+    render_readme_pdf,
+)
+from money_machine.assets.design_tokens import DesignTokens, listing_token_payload, load_tokens
+from money_machine.assets.pdf_objects import embed_info_title, link_annotations, page_texts
+from tests.fixtures.merchandising import consistent_request
+from tests.unit.assets.test_delivery_pdfs import DELIVERY_PDF_PATH, drop_refusal, replace_fact
+
+_BUILD = 4
+_TITLE = "https://www.etsy.com/listing/123/planner"
+_LINK_ROWS = (
+    "Checklist at x.com/pay.",
+    "Checklist at https:/x.com/cart.",
+    "Checklist at gumroad.co/l/x",
+    "Checklist at lemonsqueezy.com/buy/x",
+    "Checklist at ko-fi.com/s/x",
+    "Checklist at x.com/ch%65ckout",
+    "Checklist at %63heckout",
+    "Checklist at etsy.com/listing/123456/planner",
+    "Checklist at etsy.me/x",
+    "Checklist at bit.ly/x",
+    "Checklist at paypal.me/x",
+    "Checklist at x.com/buy",
+    "Checklist at x.com/order",
+    "Checklist at x.com/purchase",
+    "Checklist at \uff50\uff41\uff59\uff0e\uff43\uff4f\uff4d",
+    "Checklist at pay\u3002com",
+    "Checklist at pay\uff61com",
+    "Checklist at pay\uff0ecom",
+    "Checklist at ch\uff0565ckout",
+)
+_CONCEALED_ROWS = (
+    "Checklist at www.etsy.com/listing/123456/planner",
+    "Checklist at w\u200bww.example",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _Scene:
+    request: MerchandisingInput
+    copy: ListingCopy
+    tokens: DesignTokens
+
+
+def _launch_chromium() -> None:
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True, args=["--no-sandbox"])
+        browser.close()
+
+
+@pytest.fixture(scope="module", autouse=True)
+def chromium_installed() -> None:
+    try:
+        _launch_chromium()
+    except Exception:
+        subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+        _launch_chromium()
+
+
+@pytest.fixture(scope="module")
+def scene(chromium_installed: None) -> _Scene:
+    del chromium_installed
+    request = consistent_request()
+    copy = merchandise(request)
+    return _Scene(request=request, copy=copy, tokens=load_tokens(listing_token_payload()))
+
+
+def _named(scene: _Scene, name: str) -> tuple[MerchandisingInput, ListingCopy]:
+    gift = FreeGiftConfig(offered=True, name=name)
+    request = replace_fact(scene.request, "free_gift", encode_free_gift(gift))
+    request = request.model_copy(update={"free_gift": gift})
+    return request, merchandise(request)
+
+
+def _concealed_name(scene: _Scene, name: str) -> tuple[MerchandisingInput, ListingCopy]:
+    """Reach the PDF gate when ``require_consistent`` rejects the fact first."""
+    gift = FreeGiftConfig(offered=True, name=name, community="Planning circle")
+    encoded = encode_free_gift(gift)
+    claims = tuple(
+        claim.model_copy(update={"stated_value": encoded}) if claim.kind == "free_gift" else claim
+        for claim in scene.copy.draft.claims
+    )
+    draft = scene.copy.draft.model_copy(update={"claims": claims})
+    return scene.request, scene.copy.model_copy(update={"draft": draft})
+
+
+@pytest.mark.parametrize("name", _LINK_ROWS)
+def test_gift_domain_text_is_refused(scene: _Scene, name: str) -> None:
+    request, copy = _named(scene, name)
+    with pytest.raises(DeliveryPdfRefusal, match="paid_checkout"):
+        render_gift_pdf(copy, request, scene.tokens, build_version=_BUILD)
+
+
+@pytest.mark.parametrize("name", _CONCEALED_ROWS)
+def test_concealed_gift_domain_text_is_refused(scene: _Scene, name: str) -> None:
+    request, copy = _concealed_name(scene, name)
+    with pytest.raises(DeliveryPdfRefusal, match="paid_checkout"):
+        render_gift_pdf(copy, request, scene.tokens, build_version=_BUILD)
+
+
+@pytest.mark.parametrize(
+    ("name", "kept"),
+    (("Starter 4.9 kit", "4.9"), ("Notes e.g. habits", "e.g.")),
+)
+def test_quantities_and_examples_render(scene: _Scene, name: str, kept: str) -> None:
+    request, copy = _named(scene, name)
+    rendered = render_gift_pdf(copy, request, scene.tokens, build_version=_BUILD)
+    assert pdf_page_count(rendered.pdf) == 1
+    assert kept in page_texts(rendered.pdf)[0]
+
+
+def test_gift_link_annotation_is_refused(scene: _Scene) -> None:
+    blocks = gift_blocks(scene.copy.draft, scene.request.rules.quantity)
+    assert all("http" not in block.text for block in blocks)
+    with pytest.raises(DeliveryPdfRefusal, match="paid_checkout"):
+        render_gift_pdf(
+            scene.copy,
+            scene.request,
+            scene.tokens,
+            build_version=_BUILD,
+            link_uri="https://www.etsy.com/listing/999/hidden",
+        )
+
+
+def test_gift_link_annotation_mutant_accepts(scene: _Scene) -> None:
+    render = drop_refusal("refuse_gift_link_annotations", "render_gift_pdf")
+    result = render(
+        scene.copy,
+        scene.request,
+        scene.tokens,
+        build_version=_BUILD,
+        link_uri="https://www.etsy.com/listing/999/hidden",
+    )
+    pdf = getattr(result, "pdf", b"")
+    assert isinstance(pdf, bytes) and pdf.startswith(b"%PDF")
+    assert link_annotations(pdf)[0] == 1
+
+
+def test_gift_document_title_is_refused(scene: _Scene) -> None:
+    with pytest.raises(DeliveryPdfRefusal, match="paid_checkout"):
+        render_gift_pdf(
+            scene.copy, scene.request, scene.tokens, build_version=_BUILD, info_title=_TITLE
+        )
+
+
+def test_gift_document_title_mutant_accepts(scene: _Scene) -> None:
+    render = drop_refusal("refuse_gift_document_info", "render_gift_pdf")
+    result = render(
+        scene.copy, scene.request, scene.tokens, build_version=_BUILD, info_title=_TITLE
+    )
+    pdf = getattr(result, "pdf", b"")
+    assert isinstance(pdf, bytes) and pdf.startswith(b"%PDF")
+    assert _TITLE.encode("ascii") not in pdf
+    assert refuse_gift_document_info(pdf) == "paid_checkout"
+
+
+def _tuple_call(node: ast.AST) -> bool:
+    if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+        return False
+    return node.func.id == "tuple"
+
+
+class _SwapPages(ast.NodeTransformer):
+    def __init__(self) -> None:
+        self.swapped = 0
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST:
+        if node.name != "render_readme_pdf":
+            return node
+        for index, stmt in enumerate(node.body):
+            value = stmt.value if isinstance(stmt, ast.Assign) else None
+            if not (
+                isinstance(value, ast.Tuple)
+                and len(value.elts) == 2
+                and all(_tuple_call(item) for item in value.elts)
+            ):
+                continue
+            value.elts.reverse()
+            reorder = ast.parse("blocks = blocks[4:] + blocks[:4]").body[0]
+            node.body.insert(index + 1, reorder)
+            self.swapped += 1
+            break
+        return node
+
+
+def _swapped_readme() -> Callable[..., object]:
+    module = types.ModuleType("swapped_readme_pdfs")
+    module.__file__ = str(DELIVERY_PDF_PATH)
+    swap = _SwapPages()
+    tree = swap.visit(ast.parse(DELIVERY_PDF_PATH.read_text(encoding="utf-8")))
+    if swap.swapped != 1 or not isinstance(tree, ast.Module):
+        raise AssertionError(f"page tuples swapped {swap.swapped}")
+    ast.fix_missing_locations(tree)
+    sys.modules[module.__name__] = module
+    exec(compile(tree, str(DELIVERY_PDF_PATH), "exec"), module.__dict__)
+    render = module.__dict__["render_readme_pdf"]
+    if not callable(render):
+        raise AssertionError("render_readme_pdf")
+    return render
+
+
+def test_readme_pages_place_setup_before_access(scene: _Scene) -> None:
+    rendered = render_readme_pdf(scene.copy, scene.request, scene.tokens, build_version=_BUILD)
+    pages = page_texts(rendered.pdf)
+    assert len(pages) == 2
+    assert "Step 1. Open your template" in pages[0]
+    assert "Step 3. Use the included resources" in pages[0]
+    assert "Widgets: Today panel, Reminder list." in pages[0]
+    assert "Please leave a review" not in pages[0]
+    assert "Access link:" in pages[1]
+    assert "Duplicate the template. Access link" in pages[1]
+    assert "Support channel: Email inbox." in pages[1]
+    assert "Please leave a review for Fieldnote Shop." in pages[1]
+    assert "Step 1." not in pages[1]
+
+
+def test_readme_page_swap_mutant_accepts(scene: _Scene) -> None:
+    render = _swapped_readme()
+    result = render(scene.copy, scene.request, scene.tokens, build_version=_BUILD)
+    pdf = getattr(result, "pdf", b"")
+    assert isinstance(pdf, bytes)
+    pages = page_texts(pdf)
+    assert "Please leave a review for Fieldnote Shop." in pages[0]
+    assert "Step 1. Open your template" in pages[1]
+
+
+def test_object_stream_title_is_not_a_byte_search(scene: _Scene) -> None:
+    rendered = render_gift_pdf(scene.copy, scene.request, scene.tokens, build_version=_BUILD)
+    embedded = embed_info_title(rendered.pdf, _TITLE)
+    assert _TITLE.encode("ascii") not in embedded
+    assert refuse_gift_document_info(embedded) == "paid_checkout"

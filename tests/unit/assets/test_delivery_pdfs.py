@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import json
 import subprocess
 import sys
 import types
@@ -25,23 +26,24 @@ from money_machine.agents.contracts.merchandising import (
 from money_machine.agents.implementations.merchandising import merchandise
 from money_machine.assets.delivery_pdfs import (
     PDF_TEMPLATE_VERSION,
-    DeliveryPdfLineage,
     DeliveryPdfRefusal,
     RenderedDeliveryPdf,
     compose_delivery_html,
     gift_blocks,
     pdf_page_count,
     readme_blocks,
+    refuse_unvalidated_copy,
     render_gift_pdf,
     render_readme_pdf,
 )
 from money_machine.assets.design_tokens import DesignTokens, listing_token_payload, load_tokens
 from money_machine.assets.listing_images import network_allowed
+from money_machine.assets.pdf_objects import link_annotations, page_texts
 from money_machine.domain.services.claim_validation import validate_claims
 from money_machine.domain.services.listing_text import TextSlot, render
 from tests.fixtures.merchandising import SECRET_LINK, consistent_request
 
-_PDFS = (
+DELIVERY_PDF_PATH = (
     Path(__file__).resolve().parents[3] / "src" / "money_machine" / "assets" / "delivery_pdfs.py"
 )
 _BUILD = 4
@@ -55,8 +57,6 @@ class _Scene:
 
 
 class _DropRefusal(ast.NodeTransformer):
-    """Delete ``if refuse_*(...) is not None``."""
-
     def __init__(self, callee: str) -> None:
         self.callee = callee
         self.dropped = 0
@@ -76,17 +76,17 @@ class _DropRefusal(ast.NodeTransformer):
         return self.generic_visit(node)
 
 
-def _mutant(callee: str, function: str) -> Callable[..., object]:
+def drop_refusal(callee: str, function: str) -> Callable[..., object]:
     drop = _DropRefusal(callee)
-    tree = drop.visit(ast.parse(_PDFS.read_text(encoding="utf-8")))
+    tree = drop.visit(ast.parse(DELIVERY_PDF_PATH.read_text(encoding="utf-8")))
     if drop.dropped != 1 or not isinstance(tree, ast.Module):
         raise AssertionError(f"{callee} dropped {drop.dropped}")
     ast.fix_missing_locations(tree)
     name = f"pdf_mutant_{callee}"
     module = types.ModuleType(name)
-    module.__file__ = str(_PDFS)
+    module.__file__ = str(DELIVERY_PDF_PATH)
     sys.modules[name] = module
-    exec(compile(tree, str(_PDFS), "exec"), module.__dict__)
+    exec(compile(tree, str(DELIVERY_PDF_PATH), "exec"), module.__dict__)
     render = module.__dict__[function]
     if not callable(render):
         raise AssertionError(callee)
@@ -164,7 +164,7 @@ def _accepted(render: Callable[..., object], scene: _Scene, **kwargs: object) ->
     return result
 
 
-def _replace_fact(request: MerchandisingInput, key: str, value: str) -> MerchandisingInput:
+def replace_fact(request: MerchandisingInput, key: str, value: str) -> MerchandisingInput:
     facts = tuple(
         fact.model_copy(update={"fact_value": value}) if fact.fact_key == key else fact
         for fact in request.facts
@@ -172,16 +172,29 @@ def _replace_fact(request: MerchandisingInput, key: str, value: str) -> Merchand
     return request.model_copy(update={"facts": facts})
 
 
-def _lineage_text(record: DeliveryPdfLineage) -> bytes:
+def _draft_hash(copy: ListingCopy) -> str:
+    payload = copy.draft.model_dump(mode="json")
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode()).hexdigest()
+
+
+def _expected_lineage(
+    *,
+    product_id: object,
+    spec_version: int,
+    merchandising: str,
+    page_count: int,
+    role: str,
+) -> bytes:
     text = (
-        f"product_id={record.product_id}\n"
-        f"spec_version={record.spec_version}\n"
-        f"build_version={record.build_version}\n"
-        f"merchandising_version={record.merchandising_version}\n"
-        f"template_version={record.template_version}\n"
-        f"page_count={record.page_count}\n"
-        f"qa_status={record.qa_status}\n"
-        f"role={record.role}\n"
+        f"product_id={product_id}\n"
+        f"spec_version={spec_version}\n"
+        "build_version=4\n"
+        f"merchandising_version={merchandising}\n"
+        "template_version=s08-w3-pdf-1\n"
+        f"page_count={page_count}\n"
+        "qa_status=passed\n"
+        f"role={role}\n"
     )
     return text.encode("ascii")
 
@@ -210,14 +223,25 @@ def test_readme_is_two_pages_with_setup_and_access(scene: _Scene) -> None:
     assert html.count('class="mm-pdf-page"') == 2
     assert f'href="{SECRET_LINK}"' in html
     rendered = _readme(scene)
+    version = _draft_hash(scene.copy)
+    expected = _expected_lineage(
+        product_id=scene.request.spec.product_id,
+        spec_version=scene.request.spec.version,
+        merchandising=version,
+        page_count=2,
+        role="readme",
+    )
     assert pdf_page_count(rendered.pdf) == 2
     assert rendered.lineage.page_count == 2
     assert rendered.lineage.role == "readme"
-    assert rendered.lineage.template_version == PDF_TEMPLATE_VERSION
+    assert rendered.lineage.template_version == PDF_TEMPLATE_VERSION == "s08-w3-pdf-1"
     assert rendered.lineage.qa_status == "passed"
-    assert rendered.lineage.build_version == _BUILD
+    assert rendered.lineage.build_version == 4
+    assert rendered.lineage.merchandising_version == version
+    assert rendered.lineage.product_id == scene.request.spec.product_id
+    assert rendered.lineage.spec_version == scene.request.spec.version
     assert rendered.lineage.output_sha256 == hashlib.sha256(rendered.pdf).hexdigest()
-    assert _lineage_text(rendered.lineage) in rendered.pdf
+    assert expected in rendered.pdf
     assert b"D:20260101000000" in rendered.pdf
 
 
@@ -231,16 +255,29 @@ def test_gift_is_one_page_without_a_paid_link(scene: _Scene) -> None:
     assert "checkout" not in html.casefold()
     assert html.count('class="mm-pdf-page"') == 1
     rendered = _gift(scene)
+    version = _draft_hash(scene.copy)
+    expected = _expected_lineage(
+        product_id=scene.request.spec.product_id,
+        spec_version=scene.request.spec.version,
+        merchandising=version,
+        page_count=1,
+        role="free_gift",
+    )
     assert pdf_page_count(rendered.pdf) == 1
+    assert link_annotations(rendered.pdf) == (0, ())
     assert rendered.lineage.page_count == 1
     assert rendered.lineage.role == "free_gift"
+    assert rendered.lineage.merchandising_version == version
     assert rendered.lineage.output_sha256 == hashlib.sha256(rendered.pdf).hexdigest()
-    assert _lineage_text(rendered.lineage) in rendered.pdf
+    assert expected in rendered.pdf
+    assert page_texts(rendered.pdf) == (
+        "Free gift: Starter checklist.Free community: Planning circle.",
+    )
 
 
 def test_gift_community_is_optional(scene: _Scene) -> None:
     gift = FreeGiftConfig(offered=True, name="Starter checklist")
-    request = _replace_fact(scene.request, "free_gift", encode_free_gift(gift))
+    request = replace_fact(scene.request, "free_gift", encode_free_gift(gift))
     request = request.model_copy(update={"free_gift": gift})
     copy = merchandise(request)
     blocks = gift_blocks(copy.draft, request.rules.quantity)
@@ -269,10 +306,20 @@ def test_a_changed_spec_version_changes_the_pdf_hash(scene: _Scene) -> None:
     )
     second = _readme(scene, request=bumped)
     assert second.lineage.spec_version == scene.request.spec.version + 1
+    assert second.lineage.merchandising_version == _draft_hash(scene.copy)
     assert second.lineage.merchandising_version == first.lineage.merchandising_version
     assert second.pdf != first.pdf
     assert second.lineage.output_sha256 != first.lineage.output_sha256
-    assert _lineage_text(second.lineage) in second.pdf
+    assert (
+        _expected_lineage(
+            product_id=bumped.spec.product_id,
+            spec_version=bumped.spec.version,
+            merchandising=_draft_hash(scene.copy),
+            page_count=2,
+            role="readme",
+        )
+        in second.pdf
+    )
 
 
 def test_unclaimed_text_is_refused(scene: _Scene) -> None:
@@ -280,9 +327,9 @@ def test_unclaimed_text_is_refused(scene: _Scene) -> None:
         _readme(scene, injected_text="Bestseller 500 sold")
 
 
-def test_unclaimed_text_mutant_accepts(scene: _Scene) -> None:
+def test_unclaimed_textdrop_refusal_accepts(scene: _Scene) -> None:
     accepted = _accepted(
-        _mutant("refuse_unclaimed_pdf_text", "render_readme_pdf"),
+        drop_refusal("refuse_unclaimed_pdf_text", "render_readme_pdf"),
         scene,
         injected_text="Bestseller 500 sold",
     )
@@ -299,13 +346,16 @@ def _bad_tag_copy(scene: _Scene) -> ListingCopy:
 
 
 def test_invalid_copy_is_refused(scene: _Scene) -> None:
+    copy = _bad_tag_copy(scene)
+    assert copy.draft.pdf_blocks == ()
+    assert refuse_unvalidated_copy(copy.draft, scene.request) == "unsupported_claim"
     with pytest.raises(DeliveryPdfRefusal, match="unsupported_claim"):
-        _readme(scene, copy=_bad_tag_copy(scene))
+        _readme(scene, copy=copy)
 
 
-def test_invalid_copy_mutant_accepts(scene: _Scene) -> None:
+def test_invalid_copydrop_refusal_accepts(scene: _Scene) -> None:
     accepted = _accepted(
-        _mutant("refuse_unvalidated_copy", "render_readme_pdf"),
+        drop_refusal("refuse_unvalidated_copy", "render_readme_pdf"),
         scene,
         copy=_bad_tag_copy(scene),
     )
@@ -314,7 +364,7 @@ def test_invalid_copy_mutant_accepts(scene: _Scene) -> None:
 
 def _checkout_pair(scene: _Scene) -> tuple[MerchandisingInput, ListingCopy]:
     value = "offered|Starter checklist|https://pay.example/checkout"
-    request = _replace_fact(scene.request, "free_gift", value)
+    request = replace_fact(scene.request, "free_gift", value)
     claims = []
     support = None
     for claim in scene.copy.draft.claims:
@@ -350,10 +400,10 @@ def test_paid_checkout_is_refused(scene: _Scene) -> None:
         render_gift_pdf(copy, request, scene.tokens, build_version=_BUILD)
 
 
-def test_paid_checkout_mutant_accepts(scene: _Scene) -> None:
+def test_paid_checkoutdrop_refusal_accepts(scene: _Scene) -> None:
     request, copy = _checkout_pair(scene)
     accepted = _accepted(
-        _mutant("refuse_paid_checkout", "render_gift_pdf"),
+        drop_refusal("refuse_paid_checkout", "render_gift_pdf"),
         scene,
         copy=copy,
         request=request,
@@ -364,7 +414,7 @@ def test_paid_checkout_mutant_accepts(scene: _Scene) -> None:
 def _long_readme(scene: _Scene) -> tuple[MerchandisingInput, ListingCopy]:
     output = "Panel" + (" x" * 260)
     dashboard = NotificationDashboardBehaviour(present=True, outputs=(output,))
-    request = _replace_fact(scene.request, "dashboard_outputs", encode_dashboard(dashboard))
+    request = replace_fact(scene.request, "dashboard_outputs", encode_dashboard(dashboard))
     request = request.model_copy(update={"notification_dashboard": dashboard})
     copy = merchandise(request)
     assert validate_claims(copy.draft, request).passed is True
@@ -376,7 +426,7 @@ def _long_readme(scene: _Scene) -> tuple[MerchandisingInput, ListingCopy]:
 def _long_gift(scene: _Scene) -> tuple[MerchandisingInput, ListingCopy]:
     community = "Circle" + (" x" * 260)
     gift = FreeGiftConfig(offered=True, name="Starter checklist", community=community)
-    request = _replace_fact(scene.request, "free_gift", encode_free_gift(gift))
+    request = replace_fact(scene.request, "free_gift", encode_free_gift(gift))
     request = request.model_copy(update={"free_gift": gift})
     copy = merchandise(request)
     assert len(gift_blocks(copy.draft, request.rules.quantity)[1].text) > 500
@@ -389,10 +439,10 @@ def test_readme_page_count_is_refused(scene: _Scene) -> None:
         render_readme_pdf(copy, request, scene.tokens, build_version=_BUILD)
 
 
-def test_readme_page_count_mutant_accepts(scene: _Scene) -> None:
+def test_readme_page_countdrop_refusal_accepts(scene: _Scene) -> None:
     request, copy = _long_readme(scene)
     accepted = _accepted(
-        _mutant("refuse_page_count", "render_readme_pdf"),
+        drop_refusal("refuse_page_count", "render_readme_pdf"),
         scene,
         copy=copy,
         request=request,
@@ -408,10 +458,10 @@ def test_gift_page_count_is_refused(scene: _Scene) -> None:
         render_gift_pdf(copy, request, scene.tokens, build_version=_BUILD)
 
 
-def test_gift_page_count_mutant_accepts(scene: _Scene) -> None:
+def test_gift_page_countdrop_refusal_accepts(scene: _Scene) -> None:
     request, copy = _long_gift(scene)
     accepted = _accepted(
-        _mutant("refuse_page_count", "render_gift_pdf"),
+        drop_refusal("refuse_page_count", "render_gift_pdf"),
         scene,
         copy=copy,
         request=request,
@@ -423,20 +473,20 @@ def test_gift_page_count_mutant_accepts(scene: _Scene) -> None:
 
 def test_gift_not_offered_is_refused(scene: _Scene) -> None:
     gift = FreeGiftConfig(offered=False)
-    request = _replace_fact(scene.request, "free_gift", encode_free_gift(gift))
+    request = replace_fact(scene.request, "free_gift", encode_free_gift(gift))
     request = request.model_copy(update={"free_gift": gift})
     copy = merchandise(request)
     with pytest.raises(DeliveryPdfRefusal, match="gift_not_offered"):
         render_gift_pdf(copy, request, scene.tokens, build_version=_BUILD)
 
 
-def test_gift_not_offered_mutant_accepts(scene: _Scene) -> None:
+def test_gift_not_offereddrop_refusal_accepts(scene: _Scene) -> None:
     gift = FreeGiftConfig(offered=False)
-    request = _replace_fact(scene.request, "free_gift", encode_free_gift(gift))
+    request = replace_fact(scene.request, "free_gift", encode_free_gift(gift))
     request = request.model_copy(update={"free_gift": gift})
     copy = merchandise(request)
     accepted = _accepted(
-        _mutant("refuse_gift_not_offered", "render_gift_pdf"),
+        drop_refusal("refuse_gift_not_offered", "render_gift_pdf"),
         scene,
         copy=copy,
         request=request,
