@@ -1,3 +1,33 @@
+## 2026-10-15 — Session 08 W7 r3: page-tree roles and screenshot sources
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+A page is an object `_pages` reaches from trailer `/Root` through `/Pages` and `/Kids`. Only that object's `/Annots` links defer URI checks. A `/Type /Page` inline under Font, inline in `/Info`, unreferenced, on trailer `/Foo`, or referenced from Font (`/F1 5 0 R`) keeps its URI in the graph check. Any other place raises `pdf page place`. The page walk no longer calls `_refuse_annot_role`; the graph `/Annots` visit is that check.
+
+A source must be a screenshot of the same spec. A listing that names its own hash, a listing named from a delivery PDF, two listings that name each other, a walkthrough named from a listing, a listing named from another listing, and a listing named from a walkthrough are stale. Existence for the unknown-source check still uses every owned asset. Painted text lives in `pdf_text.py`.
+
+`/Resources` stays `{ExtGState, Font, ProcSet}`. It grows only with a measured row when a template emits `XObject`, `Pattern`, or `Shading`.
+
+Clean focused suite, Chromium deselected: 252 passed, 2 deselected. Command: `uv run pytest -q -p no:cacheprovider --tb=line -k "not readme_uris and not gift_pdf_has_no_links" tests/unit/assets/test_link_validation.py tests/unit/assets/test_gift_link_policy.py tests/unit/assets/test_gift_pdf_links.py tests/unit/assets/test_asset_lineage.py`. The README round-trip, the gift with no links, and `test_readme_pages_place_setup_before_access` passed. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the inline-Font page return | `test_a_fake_page_inline_under_font_is_refused` | 1/251 |
+| Delete the `/Info` page return | `test_a_fake_page_inline_in_info_is_refused` | 1/251 |
+| Delete the unreferenced-page return | `test_an_unreferenced_fake_page_is_refused` | 1/251 |
+| Delete the trailer `/Foo` page return | `test_a_fake_page_on_trailer_foo_is_refused` | 1/251 |
+| Delete the Font-reference page return | `test_a_fake_page_referenced_from_font_is_refused` | 1/251 |
+| Replace `pdf page place` with `return False` | `test_a_fake_page_under_extgstate_is_malformed` | 1/251 |
+| Delete the self-source return | `test_a_self_sourced_listing_is_stale` | 1/251 |
+| Delete the mutual-source return | `test_mutually_sourced_listings_are_stale` | 1/251 |
+| Delete the delivery-PDF source return | `test_a_listing_sourced_from_a_delivery_pdf_is_stale` | 1/251 |
+| Delete the walkthrough-from-listing return | `test_a_walkthrough_sourced_from_a_listing_is_stale` | 1/251 |
+| Delete the one-way listing return | `test_a_listing_sourced_from_another_listing_is_stale` | 1/251 |
+| Allow a walkthrough hash as a source | `test_a_listing_sourced_from_a_walkthrough_is_stale` | 1/251 |
+| Source walk returns false | `test_a_stale_source_marks_the_dependent`, `test_a_dependent_listed_before_its_source_is_stale`, and `test_an_unknown_source_is_stale` | 3/249 |
+
+The source-walk mutant leaves the six new source rows stale. Each of those rows fails only when its own return is removed.
+
 ## 2026-10-15 — Session 08 W7 r2: resolved roles, measured keys
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.

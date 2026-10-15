@@ -27,7 +27,7 @@ from money_machine.assets.delivery_pdfs import (
     render_readme_pdf,
 )
 from money_machine.assets.design_tokens import DesignTokens, listing_token_payload, load_tokens
-from money_machine.assets.pdf_objects import page_texts
+from money_machine.assets.pdf_text import page_texts
 from tests.fixtures.merchandising import consistent_request
 from tests.unit.assets.gift_pdf_craft import (
     embed_info_title,

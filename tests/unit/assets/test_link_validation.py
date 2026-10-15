@@ -1026,6 +1026,79 @@ def test_a_resource_link_uri_is_not_an_accepted_action() -> None:
     assert refusal.repairs == (AssetRepair(_ASSET, "https://evil.example/", "host"),)
 
 
+_EVIL_PAGE = "https://evil.example/x"
+
+
+def _evil_page() -> str:
+    """A Chromium-keyed page whose only link is off the accepted host."""
+    return _page(2, f"[{_annot_dict(_action_dict(_EVIL_PAGE))}]")
+
+
+def _assert_evil_page(pdf: bytes) -> None:
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "host"
+    assert refusal.repairs == (AssetRepair(_ASSET, _EVIL_PAGE, "host"),)
+
+
+def test_a_fake_page_inline_under_font_is_refused() -> None:
+    """An inline ``/Type /Page`` under Font is not a page-tree page."""
+    pdf = _annot(_good_annot(), resources=_resources(f"/Hold {_evil_page()}"))
+    _assert_evil_page(pdf)
+
+
+def test_a_fake_page_referenced_from_font_is_refused() -> None:
+    """``/F1 5 0 R`` is a page only when ``/Kids`` reached object 5."""
+    pdf = _annot(
+        _good_annot(),
+        resources=_resources("/F1 5 0 R"),
+        objects={5: _obj(5, _evil_page())},
+    )
+    _assert_evil_page(pdf)
+
+
+def test_an_unreferenced_fake_page_is_refused() -> None:
+    """An orphan ``/Type /Page`` is outside the page tree."""
+    pdf = _annot(_good_annot(), objects={5: _obj(5, _evil_page())})
+    _assert_evil_page(pdf)
+
+
+def test_a_fake_page_on_trailer_foo_is_refused() -> None:
+    """Trailer ``/Foo`` does not make its target a page."""
+    objects = {
+        1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+        2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+        3: _obj(3, _page(2, "[4 0 R]")),
+        4: _obj(4, _good_annot()),
+        5: _obj(5, _evil_page()),
+    }
+    trailer = "<< /Size 6 /Foo 5 0 R /Root 1 0 R >>"
+    _assert_evil_page(classic_pdf(objects, trailer_body=trailer))
+
+
+def test_a_fake_page_inline_in_info_is_refused() -> None:
+    """A page dictionary written inside ``/Info`` is not a page-tree page."""
+    objects = {
+        1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+        2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+        3: _obj(3, _page(2, "[4 0 R]")),
+        4: _obj(4, _good_annot()),
+    }
+    trailer = f"<< /Size 5 /Info << /Hold {_evil_page()} >> /Root 1 0 R >>"
+    _assert_evil_page(classic_pdf(objects, trailer_body=trailer))
+
+
+def test_a_fake_page_under_extgstate_is_malformed() -> None:
+    """A page reached from ExtGState is not one of the named places."""
+    resources = (
+        "<< /ExtGState << /G0 5 0 R >> /Font << >> /ProcSet [/PDF /Text /ImageB /ImageC /ImageI] >>"
+    )
+    pdf = _annot(_good_annot(), resources=resources, objects={5: _obj(5, _evil_page())})
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+    assert isinstance(refusal.__cause__, ValueError)
+    assert refusal.__cause__.args == ("pdf page place",)
+
+
 def test_a_short_link_in_annots_is_malformed() -> None:
     """A Link that is missing keys is refused on its ``/Annots`` visit."""
     short = "<< /Type /Annot /Subtype /Link /Rect [0 0 1 1] >>"

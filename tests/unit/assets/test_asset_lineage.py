@@ -205,3 +205,101 @@ def test_an_unknown_source_is_stale() -> None:
     current, stale = split_current((image,), product_id=_PRODUCT, spec_version=2)
     assert current == ()
     assert tuple(asset.output_sha256 for asset in stale) == ("bb",)
+
+
+def _pdf(digest: str) -> BoundAsset:
+    return bind_asset(
+        DeliveryPdfLineage(
+            product_id=_PRODUCT,
+            spec_version=2,
+            build_version=4,
+            merchandising_version="m1",
+            template_version="t1",
+            output_sha256=digest,
+            page_count=1,
+            qa_status="passed",
+            role="readme",
+        )
+    )
+
+
+def _walkthrough(digest: str, sources: tuple[str, ...]) -> BoundAsset:
+    return bind_asset(
+        WalkthroughLineage(
+            product_id=_PRODUCT,
+            spec_version=2,
+            build_version=4,
+            source_screenshot_sha256=sources,
+            merchandising_version="m1",
+            template_version="t1",
+            output_sha256=digest,
+            width_px=20,
+            height_px=10,
+            fps=12,
+            scene_order=("dashboard",),
+            scene_frames=(1,),
+            qa_status="passed",
+        )
+    )
+
+
+def test_a_self_sourced_listing_is_stale() -> None:
+    image = _listing("bb", ("bb",))
+    current, stale = split_current((image,), product_id=_PRODUCT, spec_version=2)
+    assert current == ()
+    assert tuple(asset.output_sha256 for asset in stale) == ("bb",)
+
+
+def test_a_listing_sourced_from_a_delivery_pdf_is_stale() -> None:
+    pdf = _pdf("dd")
+    image = _listing("bb", ("dd",))
+    current, stale = split_current((pdf, image), product_id=_PRODUCT, spec_version=2)
+    assert tuple(asset.output_sha256 for asset in current) == ("dd",)
+    assert tuple(asset.output_sha256 for asset in stale) == ("bb",)
+
+
+def test_mutually_sourced_listings_are_stale() -> None:
+    first = _listing("bb", ("cc",))
+    second = _listing("cc", ("bb",))
+    current, stale = split_current((first, second), product_id=_PRODUCT, spec_version=2)
+    assert current == ()
+    assert tuple(asset.output_sha256 for asset in stale) == ("bb", "cc")
+
+
+def test_a_walkthrough_sourced_from_a_listing_is_stale() -> None:
+    shot = _shot("aa")
+    image = _listing("bb", ("aa",))
+    video = _walkthrough("ww", ("bb",))
+    current, stale = split_current(
+        (shot, image, video),
+        product_id=_PRODUCT,
+        spec_version=2,
+    )
+    assert tuple(asset.output_sha256 for asset in current) == ("aa", "bb")
+    assert tuple(asset.output_sha256 for asset in stale) == ("ww",)
+
+
+def test_a_listing_sourced_from_another_listing_is_stale() -> None:
+    shot = _shot("aa")
+    image = _listing("bb", ("aa",))
+    other = _listing("cc", ("bb",))
+    current, stale = split_current(
+        (shot, image, other),
+        product_id=_PRODUCT,
+        spec_version=2,
+    )
+    assert tuple(asset.output_sha256 for asset in current) == ("aa", "bb")
+    assert tuple(asset.output_sha256 for asset in stale) == ("cc",)
+
+
+def test_a_listing_sourced_from_a_walkthrough_is_stale() -> None:
+    shot = _shot("aa")
+    video = _walkthrough("ww", ("aa",))
+    image = _listing("bb", ("ww",))
+    current, stale = split_current(
+        (shot, video, image),
+        product_id=_PRODUCT,
+        spec_version=2,
+    )
+    assert tuple(asset.output_sha256 for asset in current) == ("aa", "ww")
+    assert tuple(asset.output_sha256 for asset in stale) == ("bb",)

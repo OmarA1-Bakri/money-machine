@@ -4,6 +4,9 @@ The storage URI is a fixture name. Object storage is a later wave. A product
 change is a new ``spec_version`` for one ``product_id``. Stale identity is
 ``(spec_version, output_sha256)``, so two specs can share one output hash.
 A source hash is resolved against that same spec. An unknown source is stale.
+Only a screenshot may be a source. A listing, walkthrough, or delivery PDF
+hash is stale, including a listing that names itself and two listings that
+name each other.
 """
 
 from __future__ import annotations
@@ -119,7 +122,7 @@ def split_current(
     """Return current assets, then stale ones, for this product and spec.
 
     Other products are omitted. The walk repeats so a dependent listed before
-    its source still becomes stale.
+    its source still becomes stale. A source must be a screenshot.
     """
     owned = tuple(asset for asset in assets if asset.product_id == product_id)
     known = {(asset.spec_version, asset.output_sha256) for asset in owned}
@@ -135,6 +138,7 @@ def split_current(
                 spec_version=spec_version,
                 stale_ids=stale_ids,
                 known=known,
+                owned=owned,
             ):
                 stale_ids.add((asset.spec_version, asset.output_sha256))
                 progressed = True
@@ -158,14 +162,74 @@ def _is_stale(
     spec_version: int,
     stale_ids: set[tuple[int, str]],
     known: set[tuple[int, str]],
+    owned: tuple[BoundAsset, ...],
 ) -> bool:
     if asset.spec_version != spec_version:
         return True
     if asset.qa_status != "passed":
         return True
+    if any(_source_blocked(asset, src, owned) for src in asset.source_screenshot_sha256):
+        return True
     return any(
         _source_stale(src, spec_version=asset.spec_version, stale_ids=stale_ids, known=known)
         for src in asset.source_screenshot_sha256
+    )
+
+
+def _source_blocked(asset: BoundAsset, src: str, owned: tuple[BoundAsset, ...]) -> bool:
+    """True when this source exists and is not an allowed screenshot.
+
+    Each non-screenshot shape returns on its own line. Deleting that line
+    leaves the shape allowed. A screenshot falls through.
+    """
+    resolved = _resolve_source(owned, asset.spec_version, src)
+    if resolved is None:
+        return False
+    if _self_sourced(asset, resolved):
+        return True
+    if _mutually_sourced(asset, resolved):
+        return True
+    if resolved.kind == "delivery_pdf":
+        return True
+    if asset.kind == "walkthrough" and resolved.kind == "listing_image":
+        return True
+    if _one_way_listing(asset, resolved):
+        return True
+    return resolved.kind == "walkthrough"
+
+
+def _resolve_source(
+    owned: tuple[BoundAsset, ...], spec_version: int, src: str
+) -> BoundAsset | None:
+    found: BoundAsset | None = None
+    for candidate in owned:
+        if candidate.spec_version != spec_version or candidate.output_sha256 != src:
+            continue
+        if candidate.kind == "screenshot":
+            return candidate
+        if found is None:
+            found = candidate
+    return found
+
+
+def _self_sourced(asset: BoundAsset, resolved: BoundAsset) -> bool:
+    return resolved.kind != "screenshot" and resolved.output_sha256 == asset.output_sha256
+
+
+def _mutually_sourced(asset: BoundAsset, resolved: BoundAsset) -> bool:
+    return (
+        resolved.kind != "screenshot"
+        and resolved.output_sha256 != asset.output_sha256
+        and asset.output_sha256 in resolved.source_screenshot_sha256
+    )
+
+
+def _one_way_listing(asset: BoundAsset, resolved: BoundAsset) -> bool:
+    return (
+        resolved.kind == "listing_image"
+        and asset.kind == "listing_image"
+        and resolved.output_sha256 != asset.output_sha256
+        and asset.output_sha256 not in resolved.source_screenshot_sha256
     )
 
 

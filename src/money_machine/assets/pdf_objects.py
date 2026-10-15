@@ -8,24 +8,19 @@ accepted link. The catalog is trailer ``/Root`` and equals ``Type`` and
 ``Pages``. A page equals the Chromium keys, plus ``Annots`` when present.
 ``/Resources`` equals the measured set ``ExtGState``, ``Font``, and
 ``ProcSet``. Role checks see the resolved value. A ``/URI`` is deferred only
-for a page ``/Annots`` link. A ``/Kids`` chain past depth 64 raises
-``pdf kids depth``.
+for a ``/Annots`` link on a page the ``/Kids`` walk reached. A ``/Kids``
+chain past depth 64 raises ``pdf kids depth``.
 """
 
 from __future__ import annotations
 
-import re
-
 from money_machine.assets.pdf_reader import (
-    CMap,
     PdfDocument,
     PdfName,
     PdfObject,
-    PdfReader,
     PdfRef,
     PdfStream,
     PdfText,
-    token_boundary,
 )
 
 
@@ -51,21 +46,26 @@ def _pages(
     node: PdfObject | None,
     seen: frozenset[int] = frozenset(),
     depth: int = 0,
+    numbers: set[int] | None = None,
 ) -> tuple[dict[str, PdfObject], ...]:
     if depth > _MAX_DEPTH:
         raise ValueError("pdf kids depth")
+    number: int | None = None
     if isinstance(node, PdfRef):
         if node.number in seen:
             raise ValueError("pdf page")
         seen = seen | {node.number}
+        number = node.number
     found = doc.deref(node)
     page = _dict(found)
     if _name_is(page.get("Type"), "Page"):
+        if numbers is not None and number is not None:
+            numbers.add(number)
         return (page,)
     kids = doc.deref(page.get("Kids"))
     if not isinstance(kids, tuple):
         raise ValueError("pdf page")
-    return tuple(item for kid in kids for item in _pages(doc, kid, seen, depth + 1))
+    return tuple(item for kid in kids for item in _pages(doc, kid, seen, depth + 1, numbers))
 
 
 def _text_of(value: PdfObject | None) -> str | None:
@@ -133,8 +133,7 @@ def delivery_link_uris(pdf: bytes, *, accepted: frozenset[str] = frozenset()) ->
     ``/URI``. An indirect action or URI resolves one hop. A URI stream is
     refused. The catalog is checked from the trailer ``/Root`` before the
     walk. A page must equal the generator's keys. ``/Resources`` must equal
-    the measured Chromium set. An annotation whose subtype is not ``Link``
-    is refused by the same role check the graph walk uses.
+    the measured Chromium set. Annotation roles are the graph walk's check.
     """
     doc = PdfDocument(pdf)
     _refuse_graph(doc, accepted)
@@ -145,9 +144,7 @@ def delivery_link_uris(pdf: bytes, *, accepted: frozenset[str] = frozenset()) ->
         if not isinstance(annots, tuple):
             continue
         for item in annots:
-            annot = _dict(doc.deref(item))
-            _refuse_annot_role(annot)
-            uris.append(_uri_action(doc, annot))
+            uris.append(_uri_action(doc, _dict(doc.deref(item))))
     return tuple(uris)
 
 
@@ -157,10 +154,15 @@ def _refuse_graph(doc: PdfDocument, accepted: frozenset[str]) -> None:
     The catalog is ``trailer["Root"]``, checked before the walk so an earlier
     ``/Info`` or ``/Foo`` cannot hide it. The walk's seen set is
     ``(object, role)``. Role checks run after a reference is resolved, so an
-    inline dictionary hits the same check. Objects that nothing references
-    are walked afterwards. Nesting deeper than ``_MAX_DEPTH`` is refused.
+    inline dictionary hits the same check. A page is an object ``_pages``
+    reached from ``/Root`` through ``/Pages`` and ``/Kids``. Objects that
+    nothing references are walked afterwards. Nesting deeper than
+    ``_MAX_DEPTH`` is refused.
     """
     _refuse_trailer_root(doc)
+    real_pages: set[int] = set()
+    root = _dict(doc.deref(doc.trailer.get("Root")))
+    _pages(doc, root.get("Pages"), numbers=real_pages)
     seen: set[tuple[int, str | None]] = set()
 
     def scan(
@@ -171,11 +173,16 @@ def _refuse_graph(doc: PdfDocument, accepted: frozenset[str]) -> None:
         in_link_action: bool = False,
         under_page_annots: bool = False,
         action_of_annot: bool = False,
+        in_font: bool = False,
+        in_info: bool = False,
+        unreferenced: bool = False,
     ) -> None:
         if depth > _MAX_DEPTH:
             raise ValueError("pdf depth")
         role = parent_key
+        number: int | None = None
         if isinstance(value, PdfRef):
+            number = value.number
             if (value.number, role) in seen:
                 return
             seen.add((value.number, role))
@@ -190,15 +197,25 @@ def _refuse_graph(doc: PdfDocument, accepted: frozenset[str]) -> None:
             _refuse_dict(doc, value, accepted, in_link_action=in_link_action)
             annot = _name_is(value.get("Type"), "Annot")
             link = annot and _name_is(value.get("Subtype"), "Link")
-            page = _name_is(value.get("Type"), "Page")
+            defer = _defer_page_annots(
+                value,
+                number=number,
+                parent_key=role,
+                in_font=in_font,
+                in_info=in_info,
+                unreferenced=unreferenced,
+                real_pages=real_pages,
+            )
             for key, child in value.items():
                 scan(
                     child,
                     key,
                     depth + 1,
                     in_link_action=under_page_annots and link and key == "A",
-                    under_page_annots=page and key == "Annots",
+                    under_page_annots=defer and key == "Annots",
                     action_of_annot=annot and key == "A",
+                    in_font=in_font or key == "Font",
+                    in_info=in_info or key == "Info",
                 )
             return
         if isinstance(value, tuple):
@@ -210,6 +227,9 @@ def _refuse_graph(doc: PdfDocument, accepted: frozenset[str]) -> None:
                     in_link_action=in_link_action,
                     under_page_annots=under_page_annots,
                     action_of_annot=action_of_annot,
+                    in_font=in_font,
+                    in_info=in_info,
+                    unreferenced=unreferenced,
                 )
             return
         if isinstance(value, PdfStream):
@@ -220,13 +240,16 @@ def _refuse_graph(doc: PdfDocument, accepted: frozenset[str]) -> None:
                 in_link_action=in_link_action,
                 under_page_annots=under_page_annots,
                 action_of_annot=action_of_annot,
+                in_font=in_font,
+                in_info=in_info,
+                unreferenced=unreferenced,
             )
 
     scan(doc.trailer, None, 0)
     reached = {number for number, _role in seen}
     for number in list(doc.entries):
         if number not in reached:
-            scan(PdfRef(number, 0), None, 0)
+            scan(PdfRef(number, 0), None, 0, unreferenced=True)
             reached.add(number)
 
 
@@ -274,12 +297,41 @@ def _refuse_resolved_role(
         raise ValueError("pdf link lookalike")
 
 
-def _refuse_annot_role(fields: dict[str, PdfObject]) -> None:
-    """Check an annotation reached under ``Annots``.
+def _defer_page_annots(
+    fields: dict[str, PdfObject],
+    *,
+    number: int | None,
+    parent_key: str | None,
+    in_font: bool,
+    in_info: bool,
+    unreferenced: bool,
+    real_pages: set[int],
+) -> bool:
+    """Defer link URIs only for a page object the page tree reached.
 
-    Every visit requires the link keys and ``/Subtype /Link``. The page walk
-    calls this same check.
+    Each other place returns on its own line. Deleting that line raises
+    ``pdf page place`` for that place only.
     """
+    if not _name_is(fields.get("Type"), "Page"):
+        return False
+    if number is not None and number in real_pages:
+        return True
+    inline = number is None
+    if inline and in_font:
+        return False
+    if inline and in_info:
+        return False
+    if unreferenced:
+        return False
+    if parent_key == "Foo":
+        return False
+    if in_font and not inline:
+        return False
+    raise ValueError("pdf page place")
+
+
+def _refuse_annot_role(fields: dict[str, PdfObject]) -> None:
+    """Check an annotation reached under ``Annots``."""
     if frozenset(fields) - _ANNOT_ALLOW_EXTRA != _LINK_KEYS:
         raise ValueError("pdf link keys")
     if not _name_is(fields.get("Subtype"), "Link"):
@@ -381,118 +433,14 @@ def document_strings(pdf: bytes) -> tuple[str, ...]:
     return tuple(found)
 
 
-def _cmap(data: bytes) -> CMap:
-    text = data.decode("latin-1")
-    width = 2
-    space = re.search(r"begincodespacerange(.*?)endcodespacerange", text, re.S)
-    if space is not None:
-        codes = re.findall(r"<([0-9A-Fa-f]+)>", space.group(1))
-        if codes:
-            width = max(1, len(codes[0]) // 2)
-    mapping: dict[int, str] = {}
-    for block in re.findall(r"beginbfchar(.*?)endbfchar", text, re.S):
-        for src, dst in re.findall(r"<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>", block):
-            mapping[int(src, 16)] = bytes.fromhex(dst).decode("utf-16-be", errors="replace")
-    for block in re.findall(r"beginbfrange(.*?)endbfrange", text, re.S):
-        pairs = re.findall(
-            r"<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*(?:<([0-9A-Fa-f]+)>|\[(.*?)\])",
-            block,
-            re.S,
-        )
-        for src, end, single, array in pairs:
-            if single:
-                target = bytes.fromhex(single)
-                for code in range(int(src, 16), int(end, 16) + 1):
-                    mapping[code] = target.decode("utf-16-be", errors="replace")
-                    last = int.from_bytes(target[-2:], "big") + 1
-                    target = target[:-2] + last.to_bytes(2, "big")
-                continue
-            code = int(src, 16)
-            for dst in re.findall(r"<([0-9A-Fa-f]+)>", array):
-                mapping[code] = bytes.fromhex(dst).decode("utf-16-be", errors="replace")
-                code += 1
-    return CMap(width, mapping)
+def read_dict(value: PdfObject | None) -> dict[str, PdfObject]:
+    """Return a dictionary object, or an empty dictionary."""
+    return _dict(value)
 
 
-def _fonts(doc: PdfDocument, page: dict[str, PdfObject]) -> dict[str, CMap]:
-    node: PdfObject | None = page
-    resources: dict[str, PdfObject] = {}
-    for _ in range(6):
-        current = _dict(doc.deref(node))
-        if "Resources" in current:
-            resources = _dict(doc.deref(current.get("Resources")))
-            break
-        node = current.get("Parent")
-    fonts = _dict(doc.deref(resources.get("Font")))
-    decoded: dict[str, CMap] = {}
-    for name, ref in fonts.items():
-        font = _dict(doc.deref(ref))
-        tounicode = doc.deref(font.get("ToUnicode"))
-        if isinstance(tounicode, PdfStream):
-            decoded[name] = _cmap(tounicode.data)
-    return decoded
-
-
-def _page_bytes(doc: PdfDocument, page: dict[str, PdfObject]) -> bytes:
-    contents = doc.deref(page.get("Contents"))
-    if isinstance(contents, PdfStream):
-        return contents.data
-    if not isinstance(contents, tuple):
-        return b""
-    parts = [
-        item.data for item in (doc.deref(part) for part in contents) if isinstance(item, PdfStream)
-    ]
-    return b"\n".join(parts)
-
-
-def _show(value: PdfObject, cmap: CMap | None) -> str:
-    if not isinstance(value, PdfText):
-        return ""
-    if value.hex_digits is None or cmap is None:
-        return value.text
-    step = cmap.width * 2
-    chars: list[str] = []
-    digits = value.hex_digits
-    for index in range(0, len(digits), step):
-        chars.append(cmap.codes.get(int(digits[index : index + step], 16), ""))
-    return "".join(chars)
-
-
-def _operators(content: bytes, fonts: dict[str, CMap]) -> str:
-    reader = PdfReader(content)
-    stack: list[PdfObject] = []
-    pieces: list[str] = []
-    current: CMap | None = None
-    while reader.i < reader.n:
-        reader.skip()
-        if reader.i >= reader.n:
-            break
-        byte = reader.data[reader.i]
-        if token_boundary(byte) or chr(byte).isdigit() or byte in b"+-.":
-            stack.append(reader.value())
-            continue
-        word = reader.word().decode("latin-1")
-        if word == "Tj" and stack:
-            pieces.append(_show(stack.pop(), current))
-        elif word == "TJ" and stack:
-            array = stack.pop()
-            if isinstance(array, tuple):
-                pieces.extend(_show(item, current) for item in array)
-        elif word == "'" and stack:
-            pieces.append(_show(stack.pop(), current))
-        elif word == "Tf" and len(stack) >= 2:
-            stack.pop()
-            name = stack.pop()
-            if isinstance(name, PdfName):
-                current = fonts.get(name.value)
-        else:
-            stack.clear()
-    return "".join(pieces)
-
-
-def page_texts(pdf: bytes) -> tuple[str, ...]:
-    """Painted text of each page, in page-tree order."""
-    doc = PdfDocument(pdf)
-    root = _dict(doc.deref(doc.trailer.get("Root")))
-    pages = _pages(doc, root.get("Pages"))
-    return tuple(_operators(_page_bytes(doc, page), _fonts(doc, page)) for page in pages)
+def read_pages(
+    doc: PdfDocument,
+    node: PdfObject | None,
+) -> tuple[dict[str, PdfObject], ...]:
+    """Return the page dictionaries reached from ``/Pages``."""
+    return _pages(doc, node)
