@@ -387,9 +387,7 @@ def _service_worker_hits(*, allow: bool) -> list[str]:
                         service_workers="allow",
                     )
                 else:
-                    context = open_screenshot_context(
-                        browser, javascript=True, allowed_http=(doc,)
-                    )
+                    context = open_screenshot_context(browser, javascript=True, allowed_http=(doc,))
                 try:
                     page = context.new_page()
                     page.goto(doc, wait_until="domcontentloaded", timeout=4000)

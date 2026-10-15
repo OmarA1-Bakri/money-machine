@@ -548,9 +548,7 @@ def test_a_create_response_listing_id_must_be_a_positive_int(
         ("A fixture description.\n", "keep-newline"),
     ],
 )
-def test_the_marker_is_its_own_line(
-    tmp_path: Path, description: str, expected: str | None
-) -> None:
+def test_the_marker_is_its_own_line(tmp_path: Path, description: str, expected: str | None) -> None:
     spec = replace(_spec(), description=description)
     client, store, _ledger = _client(tmp_path)
     client.create_draft(spec)
@@ -755,23 +753,17 @@ def _create_open_flags(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[
     return seen
 
 
-def test_the_pending_create_uses_nofollow(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_the_pending_create_uses_nofollow(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     flags = _create_open_flags(tmp_path, monkeypatch)
     assert any(item & os.O_NOFOLLOW for item in flags)
 
 
-def test_the_pending_create_uses_exclusive(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_the_pending_create_uses_exclusive(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     flags = _create_open_flags(tmp_path, monkeypatch)
     assert any(item & os.O_EXCL for item in flags)
 
 
-def test_the_pending_create_uses_create(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_the_pending_create_uses_create(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     flags = _create_open_flags(tmp_path, monkeypatch)
     assert any(item & os.O_CREAT for item in flags)
 
@@ -798,9 +790,7 @@ def test_put_pending_fsyncs_the_file(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert kinds[0] == "file"
 
 
-def test_put_pending_fsyncs_the_directory(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_put_pending_fsyncs_the_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     kinds = _fsync_kinds(monkeypatch)
     DraftLedger(tmp_path).put_pending(2, "cd" * 32)
     assert "dir" in kinds
