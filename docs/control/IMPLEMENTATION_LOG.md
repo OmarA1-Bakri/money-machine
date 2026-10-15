@@ -1,3 +1,30 @@
+## 2026-10-15 — Session 08 W6 r2: link actions, ports, and repair identity
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged because open PR #68 owns it. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+Review round 1 on `0a3f3d17` failed four action bypasses. `delivery_link_uris` uses the same page walk as `link_annotations`. A link is kept only when `/A /S` is `/URI` and the URI is that action's `/URI`. An annotation `/URI`, an action `/Next`, a link `/AA`, and a catalog `/OpenAction`, `/AA`, or `/Names /JavaScript` raise `ValueError`, which the validator maps to `malformed`. `link_annotations` is unchanged, so the gift count still does not scan catalog actions. Outlines and non-Link annotations stay parked.
+
+An explicit port is `malformed`, including when the accepted string is that URI. `PdfDocument` failing to open the file is `malformed`, before the info check, so a truncated file is not `paid_checkout`. A deep `/Info` chain is still `paid_checkout`. `AssetRepair.index` is the annotation index, or `-1` when the failure is not an annotation. The refusal code is `repairs[0].reason`. `clock()` runs once, after every link has passed. Refusal records keep `checked_at` empty, so the default clock cannot replace a targeted repair.
+
+The Chromium fixture still installs the browser when the executable is missing, because CI does not provision it and `ci.yml` is not edited here. Any other launch error fails the test.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=no -k "not mutant and not accepts and not dropping" tests/unit/assets/test_link_validation.py`. The source was restored after each run. The clean file is 51 passed.
+
+- Changing the open-file `except ValueError` to `except KeyError`: 1 failed, 50 passed (`test_a_truncated_pdf_is_malformed`).
+- Changing the `delivery_link_uris` `except ValueError` to `except KeyError`: 13 failed, 38 passed (`test_a_non_uri_action_is_malformed`, `test_a_link_without_a_uri_is_malformed`).
+- Using `repairs[-1].reason` as the refusal code: 1 failed, 50 passed (`test_the_first_repair_names_the_refusal`).
+- Storing every repair index as `-1`: 13 failed, 38 passed (`test_a_repair_names_one_of_four_identical_uris`).
+- Calling `clock()` while building a refusal record: 1 failed, 50 passed (`test_a_refusal_does_not_ask_the_clock`).
+- Allowing an explicit port: 1 failed, 50 passed (`test_an_explicit_port_is_malformed`).
+- Accepting an action whose `/S` is not `/URI`: 5 failed, 46 passed (`test_a_non_uri_action_is_malformed` for `/Launch`, `/JavaScript`, `/SubmitForm`, `/ImportData`, and `/GoToR`).
+- Allowing an annotation-level `/URI`: 1 failed, 50 passed (`test_an_annotation_uri_cannot_hide_the_action`).
+- Allowing `/Next`: 1 failed, 50 passed (`test_an_action_next_is_malformed`).
+- Allowing a link `/AA`: 1 failed, 50 passed (`test_a_link_additional_action_is_malformed`).
+- Allowing catalog `/OpenAction` and `/AA`: 3 failed, 48 passed (`test_a_catalog_action_is_malformed`).
+- Allowing `/Names /JavaScript`: 1 failed, 50 passed (`test_a_catalog_action_is_malformed`).
+
+No row above survived. The gift policy file on this tree is included in the 87-pass run with the link file. `ci.yml` stays out of this diff.
+
 ## 2026-10-15 — Session 08 W6: link injection and validation
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.

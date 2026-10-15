@@ -124,8 +124,8 @@ This addendum governs Wave 6. The prompt remains the unamended source of record.
 | Workflow linkage and commissioning | Later Session 08 wave | F-01 |
 | Session exit code | Later, at a real session exit | F-01 |
 | Exit 78 | Held | Operator instruction |
-| Whole-document `/OpenAction`, `/AA`, and outlines | Later wave | W3 park |
-| Non-Link URI annotations | Later wave | W3 park |
+| Whole-document outlines | Later wave | W3 park. Catalog `/OpenAction`, `/AA`, and `/Names /JavaScript` are refused by the link validator after review round 1. The gift walker still does not scan them |
+| Non-Link URI annotations | Later wave | W3 park. A `/Link` whose `/S` is not `/URI` is refused |
 | Defanged hosts | Later wave | W3 park |
 | José and Zoë in the gift name or community | Later wave | The Latin-1 row is the screenshot gate, not the gift field |
 | Bare `127.1`, `0x7f000001`, and `2130706433` | Later wave | W3 park |

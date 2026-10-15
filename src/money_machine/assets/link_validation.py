@@ -1,7 +1,8 @@
 """Validate links injected into an exported delivery PDF.
 
-Extraction is ``link_annotations`` (indirect ``/Annots`` and ``/Kids``,
-including compressed object streams). Info and XMP go through
+Extraction is ``delivery_link_uris`` (the ``link_annotations`` page walk:
+indirect ``/Annots`` and ``/Kids``, including compressed object streams).
+The action must be ``/URI``. Info and XMP go through
 ``refuse_gift_document_info``. The raw allowlist runs before any fold.
 ``refuse_paid_checkout`` is the percent guard. On a full URI it returns at
 ``://`` before it sees ``%xx``, so the percent guard for a URI is applied to
@@ -12,7 +13,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from urllib.parse import ParseResult, urlparse
 
 from money_machine.assets.gift_links import (
@@ -20,7 +21,8 @@ from money_machine.assets.gift_links import (
     refuse_paid_checkout,
     refuse_raw_charset,
 )
-from money_machine.assets.pdf_objects import document_strings, link_annotations
+from money_machine.assets.pdf_objects import delivery_link_uris, document_strings
+from money_machine.assets.pdf_reader import PdfDocument
 from money_machine.integrations.notion.publishing import (
     _allowed_secret_host,  # pyright: ignore[reportPrivateUsage]
 )
@@ -46,11 +48,12 @@ class LinkValidationRefusal(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class AssetRepair:
-    """One targeted repair. It names the asset and the link that failed."""
+    """One targeted repair. ``index`` is the annotation, or ``-1`` when none."""
 
     asset: str
     link: str
     reason: str
+    index: int = -1
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,17 +109,19 @@ def validate_pdf_links(
     clock: Callable[[], str] = default_clock,
 ) -> LinkReport:
     """Check every embedded link. A failure raises and names that link only."""
+    try:
+        PdfDocument(pdf)
+    except ValueError as exc:
+        raise _repair(asset, "", "malformed") from exc
     info = _info_refusal(pdf, asset)
     if info is not None:
         raise info
     try:
-        count, uris = link_annotations(pdf)
+        uris = delivery_link_uris(pdf)
     except ValueError as exc:
         raise _repair(asset, "", "malformed") from exc
-    if count == 0:
+    if len(uris) == 0:
         raise _repair(asset, "", "missing_links")
-    if len(uris) != count:
-        raise _repair(asset, "", "malformed")
     pdf_sha256 = hashlib.sha256(pdf).hexdigest()
     expected = tuple(uri for _variant, uri in accepted)
     records: list[LinkRecord] = []
@@ -130,16 +135,18 @@ def validate_pdf_links(
         if reason is None:
             observation = checker(uri, variant)
             reason = _refuse_observation(uri, variant, observation)
-        records.append(_record(uri, variant, observation, clock(), pdf_sha256))
+        records.append(_record(uri, variant, observation, "", pdf_sha256))
         if reason is not None:
-            repairs.append(AssetRepair(asset, uri, reason))
+            repairs.append(AssetRepair(asset, uri, reason, index))
     if len(accepted) > len(uris):
-        for _variant, uri in accepted[len(uris) :]:
-            repairs.append(AssetRepair(asset, uri, "link_mismatch"))
+        for offset, (_variant, uri) in enumerate(accepted[len(uris) :]):
+            repairs.append(AssetRepair(asset, uri, "link_mismatch", len(uris) + offset))
     found = tuple(records)
     if repairs:
         raise LinkValidationRefusal(repairs[0].reason, records=found, repairs=tuple(repairs))
-    return LinkReport(records=found, repairs=())
+    checked_at = clock()
+    stamped = tuple(replace(record, checked_at=checked_at) for record in found)
+    return LinkReport(records=stamped, repairs=())
 
 
 def _info_refusal(pdf: bytes, asset: str) -> LinkValidationRefusal | None:
@@ -187,6 +194,12 @@ def _refuse_link(uri: str, variant: str, known_variants: frozenset[str]) -> str 
         return "malformed"
     if parsed.scheme != "https":
         return "not_https"
+    try:
+        port = parsed.port
+    except ValueError:
+        return "malformed"
+    if port is not None:
+        return "malformed"
     if not _allowed_secret_host(host):  # pyright: ignore[reportPrivateUsage]
         return "host"
     if variant != "" and variant not in known_variants:

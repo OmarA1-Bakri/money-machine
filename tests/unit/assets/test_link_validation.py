@@ -135,6 +135,7 @@ def test_swapping_one_link_is_refused(index: int) -> None:
     refusal = _raise(_link_pdf(tuple(uris)))
     assert refusal.code == "link_mismatch"
     assert [job.link for job in refusal.repairs] == [uris[index]]
+    assert [job.index for job in refusal.repairs] == [index]
     kept = {uri for _variant, uri in _LINKS}
     assert kept.isdisjoint({job.link for job in refusal.repairs})
 
@@ -151,6 +152,134 @@ def test_a_pdf_with_no_links_is_refused() -> None:
     refusal = _raise(titled_page("Notes"), accepted=(), clock=None)
     assert refusal.code == "missing_links"
     assert refusal.repairs == (AssetRepair(_ASSET, "", "missing_links"),)
+
+
+_GOOD = "https://fixture.notion.site/Sage-Green"
+
+
+def _annot(body: str, *, catalog: str = "") -> bytes:
+    extra = f" {catalog}" if catalog else ""
+    return classic_pdf(
+        {
+            1: f"1 0 obj\n<< /Type /Catalog /Pages 2 0 R{extra} >>\nendobj\n".encode(),
+            2: b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+            3: b"3 0 obj\n<< /Type /Page /Parent 2 0 R /Annots [4 0 R] >>\nendobj\n",
+            4: f"4 0 obj\n{body}\nendobj\n".encode("latin-1"),
+        }
+    )
+
+
+@pytest.mark.parametrize("action", ("Launch", "JavaScript", "SubmitForm", "ImportData", "GoToR"))
+def test_a_non_uri_action_is_malformed(action: str) -> None:
+    pdf = _annot(
+        "<< /Subtype /Link /A << /S /" + action + " /F (calc.exe) /URI (" + _GOOD + ") >> >>"
+    )
+    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
+    assert refusal.code == "malformed"
+    assert refusal.repairs == (AssetRepair(_ASSET, "", "malformed"),)
+
+
+def test_an_annotation_uri_cannot_hide_the_action() -> None:
+    pdf = _annot(
+        "<< /Subtype /Link /URI (" + _GOOD + ") /A << /S /URI /URI (https://evil.example/x) >> >>"
+    )
+    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
+    assert refusal.code == "malformed"
+
+
+def test_an_action_next_is_malformed() -> None:
+    pdf = _annot(
+        "<< /Subtype /Link /A << /S /URI /URI ("
+        + _GOOD
+        + ") /Next << /S /URI /URI (https://evil.example/) >> >> >>"
+    )
+    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
+    assert refusal.code == "malformed"
+
+
+def test_a_link_additional_action_is_malformed() -> None:
+    pdf = _annot(
+        "<< /Subtype /Link /AA << /E << /S /JavaScript /JS (1) >> >> "
+        "/A << /S /URI /URI (" + _GOOD + ") >> >>"
+    )
+    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
+    assert refusal.code == "malformed"
+
+
+@pytest.mark.parametrize(
+    "catalog",
+    (
+        "/OpenAction << /S /URI /URI (https://evil.example/) >>",
+        "/OpenAction << /S /JavaScript >>",
+        "/AA << /WC << /S /Launch >> >>",
+        "/Names << /JavaScript << /Names [] >> >>",
+    ),
+)
+def test_a_catalog_action_is_malformed(catalog: str) -> None:
+    pdf = _annot("<< /Subtype /Link /A << /S /URI /URI (" + _GOOD + ") >> >>", catalog=catalog)
+    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
+    assert refusal.code == "malformed"
+
+
+def test_a_truncated_pdf_is_malformed() -> None:
+    refusal = _raise(b"%PDF-1.4\n", accepted=(), clock=None)
+    assert refusal.code == "malformed"
+    assert refusal.repairs == (AssetRepair(_ASSET, "", "malformed"),)
+
+
+def test_the_first_repair_names_the_refusal() -> None:
+    first = "http://fixture.notion.site/Sage-Green"
+    second = "https://x.com"
+    pdf = _link_pdf((first, second))
+    refusal = _raise(pdf, accepted=(("Sage Green", first), ("Navy Blue", second)))
+    assert refusal.code == "not_https"
+    assert [job.reason for job in refusal.repairs] == ["not_https", "host"]
+    assert [job.index for job in refusal.repairs] == [0, 1]
+
+
+def test_an_explicit_port_is_malformed() -> None:
+    pdf, accepted = _one("https://fixture.notion.site:8443/a")
+    refusal = _raise(pdf, accepted=accepted)
+    assert refusal.code == "malformed"
+    assert refusal.repairs[0].index == 0
+
+
+def test_an_unparseable_port_is_malformed() -> None:
+    pdf, accepted = _one("https://fixture.notion.site:99999/a")
+    refusal = _raise(pdf, accepted=accepted)
+    assert refusal.code == "malformed"
+
+
+def test_a_repair_names_one_of_four_identical_uris() -> None:
+    uri = _GOOD
+    calls = {"n": 0}
+
+    def _third(opened: str, variant: str) -> LinkObservation:
+        calls["n"] += 1
+        seen = _checker(opened, variant)
+        if calls["n"] == 3:
+            return LinkObservation(seen.variant, False, True, seen.chain)
+        return seen
+
+    pdf = _link_pdf((uri, uri, uri, uri))
+    accepted = tuple(("Sage Green", uri) for _ in range(4))
+    refusal = _raise(pdf, accepted=accepted, checker=_third)
+    assert refusal.repairs == (AssetRepair(_ASSET, uri, "auth_wall", 2),)
+    assert calls["n"] == 4
+
+
+def test_a_refusal_does_not_ask_the_clock() -> None:
+    pdf, accepted = _one("https://x.com")
+    with pytest.raises(LinkValidationRefusal, match="host") as caught:
+        validate_pdf_links(
+            pdf,
+            asset=_ASSET,
+            accepted=accepted,
+            known_variants=_KNOWN,
+            checker=_checker,
+        )
+    assert caught.value.records[0].checked_at == ""
+    assert caught.value.repairs == (AssetRepair(_ASSET, "https://x.com", "host", 0),)
 
 
 def test_a_link_without_a_uri_is_malformed() -> None:
@@ -170,7 +299,7 @@ def test_an_indirect_annotation_off_host_is_refused() -> None:
     accepted = (("Sage Green", "https://x.com"),)
     refusal = _raise(indirect_link(), accepted=accepted, clock=_clock)
     assert refusal.code == "host"
-    assert refusal.repairs == (AssetRepair(_ASSET, "https://x.com", "host"),)
+    assert refusal.repairs == (AssetRepair(_ASSET, "https://x.com", "host", 0),)
 
 
 def test_nested_kids_are_walked() -> None:
@@ -183,7 +312,7 @@ def test_nested_kids_are_walked() -> None:
 def test_mailto_is_malformed() -> None:
     refusal = _raise(mail_link(), accepted=(("Sage Green", "mailto:a"),))
     assert refusal.code == "malformed"
-    assert refusal.repairs == (AssetRepair(_ASSET, "mailto:a", "malformed"),)
+    assert refusal.repairs == (AssetRepair(_ASSET, "mailto:a", "malformed", 0),)
 
 
 def test_http_is_refused() -> None:
@@ -215,7 +344,7 @@ def test_a_latin1_variant_is_refused_before_fold() -> None:
     refusal = _raise(pdf, accepted=accepted, known=_KNOWN | {"Zo\u00eb"})
     assert refusal.code == "paid_checkout"
     assert refusal.repairs == (
-        AssetRepair(_ASSET, "https://fixture.notion.site/Sage-Green", "paid_checkout"),
+        AssetRepair(_ASSET, "https://fixture.notion.site/Sage-Green", "paid_checkout", 0),
     )
 
 
@@ -265,7 +394,7 @@ def test_an_unknown_variant_is_refused_without_opening() -> None:
     assert refusal.code == "unknown_variant"
     assert seen == []
     assert refusal.repairs == (
-        AssetRepair(_ASSET, "https://fixture.notion.site/Lime", "unknown_variant"),
+        AssetRepair(_ASSET, "https://fixture.notion.site/Lime", "unknown_variant", 0),
     )
 
 
@@ -341,7 +470,7 @@ def test_an_auth_wall_is_refused() -> None:
     refusal = _raise(pdf, accepted=accepted, checker=_closed)
     assert refusal.code == "auth_wall"
     assert refusal.records[0].public is False
-    assert refusal.repairs == (AssetRepair(_ASSET, uri, "auth_wall"),)
+    assert refusal.repairs == (AssetRepair(_ASSET, uri, "auth_wall", 0),)
 
 
 def test_a_missing_duplicate_button_is_refused() -> None:
@@ -417,7 +546,9 @@ def _launch_chromium() -> None:
 def chromium_installed() -> None:
     try:
         _launch_chromium()
-    except Exception:
+    except Exception as exc:
+        if "Executable doesn't exist" not in str(exc):
+            pytest.fail(f"Chromium failed to launch: {exc}")
         subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
         _launch_chromium()
 
@@ -457,6 +588,7 @@ def test_the_readme_uris_round_trip_exactly(chromium_installed: None) -> None:
     refusal = _raise(swapped, accepted=accepted, asset="readme")
     assert refusal.code == "link_mismatch"
     assert [job.link for job in refusal.repairs] == [swapped_uri]
+    assert [job.index for job in refusal.repairs] == [0]
 
 
 def test_the_gift_pdf_has_no_links(chromium_installed: None) -> None:

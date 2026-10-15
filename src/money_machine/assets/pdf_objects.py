@@ -1,8 +1,9 @@
 """Gift-PDF surfaces read by walking objects, not by searching bytes.
 
-Link annotations are ``/Annot`` ``/Link`` ``/URI`` values. Document info strings
-and catalog XMP are the metadata surface. ``/OpenAction``, ``/AA``, and outlines
-are not walked.
+``link_annotations`` counts ``/Link`` annotations and returns ``/URI`` strings.
+``delivery_link_uris`` is the same page walk for link validation: the action
+``/S`` must be ``/URI``, and a catalog ``/OpenAction``, ``/AA``, or
+``/Names /JavaScript`` is refused. Outlines are not walked.
 """
 
 from __future__ import annotations
@@ -58,7 +59,10 @@ def _text_of(value: PdfObject | None) -> str | None:
 
 
 def link_annotations(pdf: bytes) -> tuple[int, tuple[str, ...]]:
-    """Count ``/Link`` annotations and return each ``/URI`` string."""
+    """Count ``/Link`` annotations and return each ``/URI`` string.
+
+    The gift check uses this count. It does not refuse catalog actions.
+    """
     doc = PdfDocument(pdf)
     root = _dict(doc.deref(doc.trailer.get("Root")))
     count = 0
@@ -79,6 +83,45 @@ def link_annotations(pdf: bytes) -> tuple[int, tuple[str, ...]]:
             if uri is not None:
                 uris.append(uri)
     return count, tuple(uris)
+
+
+def delivery_link_uris(pdf: bytes) -> tuple[str, ...]:
+    """Return each link URI from the page walk, or raise ``ValueError``.
+
+    ``/S`` must be ``/URI``. An annotation ``/URI``, an action ``/Next``, a
+    link ``/AA``, or a catalog ``/OpenAction``, ``/AA``, or
+    ``/Names /JavaScript`` is refused. The URI string is the ``/A /URI`` value.
+    """
+    doc = PdfDocument(pdf)
+    root = _dict(doc.deref(doc.trailer.get("Root")))
+    if "OpenAction" in root or "AA" in root:
+        raise ValueError("pdf catalog")
+    names = _dict(doc.deref(root.get("Names")))
+    if "JavaScript" in names:
+        raise ValueError("pdf catalog")
+    uris: list[str] = []
+    for page in _pages(doc, root.get("Pages")):
+        annots = doc.deref(page.get("Annots"))
+        if not isinstance(annots, tuple):
+            continue
+        for item in annots:
+            annot = _dict(doc.deref(item))
+            if not _name_is(annot.get("Subtype"), "Link"):
+                continue
+            uris.append(_uri_action(doc, annot))
+    return tuple(uris)
+
+
+def _uri_action(doc: PdfDocument, annot: dict[str, PdfObject]) -> str:
+    if "URI" in annot or "AA" in annot:
+        raise ValueError("pdf link")
+    action = _dict(doc.deref(annot.get("A")))
+    if "Next" in action or not _name_is(action.get("S"), "URI"):
+        raise ValueError("pdf link")
+    uri = _text_of(doc.deref(action.get("URI")))
+    if uri is None:
+        raise ValueError("pdf link")
+    return uri
 
 
 def document_strings(pdf: bytes) -> tuple[str, ...]:
