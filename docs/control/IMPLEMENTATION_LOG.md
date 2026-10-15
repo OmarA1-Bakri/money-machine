@@ -1,3 +1,25 @@
+## 2026-10-15 — Session 08 shared defang normalizer (#80)
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-punycode-host-r3-prompt-integrity.md`.
+
+`normalize_defanged` is the only defang pipeline. It folds, finds candidates, then undoes defanging inside those spans. Gift checkout, screenshot text, and the secret-host check call it. A bare `dot`, a bare `at`, or a spaced `.` undoes only for `{com, c0m, net, io, shop, org, co}` plus a zero lookalike. Bracket forms also accept the IANA snapshot. `fíxture.notion.site` and a fullwidth label are refused from `_capture_secret_link` and from `_allowed_secret_host`. A PDF with that host raises `host` before the raw allowlist. `urlparse` does not IDNA-encode. The docstring does not say parsing produces `xn--`.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_defanged_host.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. 50 passed. Gift PDF rows for the defanged names and `Notes . md`: 38 passed, 42 deselected. Source restored after each mutant. Counts are that 50-test set unless noted.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Detect candidates before the fold | `test_step_order_is_fold_then_candidates_then_undo` | 3/47 |
+| Email TLD `{2,}` to `{3,}` | `test_a_bare_dot_email_uses_the_curated_list` | 4/46 |
+| Host detector skips the normalizer | `test_each_detector_calls_the_normalizer` | 17/33 |
+| Email detector skips the normalizer | `test_each_detector_calls_the_normalizer` | 13/37 |
+| URL detector skips the normalizer | `test_each_detector_calls_the_normalizer` | 2/48 |
+| Drop the capture-site normalizer call | `test_secret_host_capture_calls_the_normalizer` | 1/49 |
+| Drop the allowlist normalizer call | `test_allowed_secret_host_calls_the_normalizer` | 1/49 |
+| Drop the spaced-dot word boundary | `test_quantities_and_plain_names_stay` | 1/49 |
+| ` _secret_host_is_ascii` returns true | `test_a_unicode_homoglyph_host_is_refused` | 3/11 on the punycode plus normalizer files |
+
+Parked: live S3, `CREATE_ETSY_DRAFT`, commissioning, and the session exit.
+
 ## 2026-10-15 — Session 08 punycode host r2
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-punycode-host-r2-prompt-integrity.md`.

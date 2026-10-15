@@ -15,7 +15,13 @@ import html
 import re
 import unicodedata
 
-_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+from money_machine.assets.defang_normalizer import (
+    bracket_host_matches,
+    email_matches,
+    lookalike_host_matches,
+    url_matches,
+)
+
 _NOTION_HOST = re.compile(r"notion\.(?:so|site)", re.IGNORECASE)
 _TOKEN = re.compile(
     r"(?:secret|token|api[_-]?key|bearer|ntn|sk)[_-][A-Za-z0-9]{6,}",
@@ -42,7 +48,7 @@ class ScreenshotRefusal(ValueError):
 
 def email_rule_matches(text: str) -> bool:
     """Return whether the email rule matches. Host and token rules are separate."""
-    return _EMAIL.search(text) is not None
+    return email_matches(text)
 
 
 def notion_host_rule_matches(text: str) -> bool:
@@ -69,7 +75,12 @@ def fill_template(template: str, label: str) -> str:
 
 def refuse_sensitive_text(text: str) -> str | None:
     """Return ``sensitive_data`` when text is not fixture or sample data."""
-    if _EMAIL.search(text) is not None:
+    if (
+        email_matches(text)
+        or url_matches(text)
+        or bracket_host_matches(text)
+        or lookalike_host_matches(text)
+    ):
         return "sensitive_data"
     if _NOTION_HOST.search(text) is not None:
         return "sensitive_data"

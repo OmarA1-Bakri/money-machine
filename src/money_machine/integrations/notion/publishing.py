@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from typing import cast
 from urllib.parse import ParseResult, urlparse
 
+from money_machine.assets.defang_normalizer import normalize_defanged
+
 from .errors import SchemaBuilderError
 
 _TOP_LEVEL_PARENT = "workspace"
@@ -140,7 +142,11 @@ def _capture_secret_link(value: object) -> str:
     if parsed.netloc.endswith(":") or _secret_port(parsed) not in (None, 443):
         raise SchemaBuilderError("secret link port is not allowed")
     host = parsed.hostname
-    if not isinstance(host, str) or not _allowed_secret_host(host):
+    if (
+        not isinstance(host, str)
+        or not _secret_host_is_ascii(host)
+        or not _allowed_secret_host(host)
+    ):
         raise SchemaBuilderError("secret link host is not allowed")
     if parsed.path.strip("/") == "":
         raise SchemaBuilderError("secret link must name a page")
@@ -162,15 +168,27 @@ def _secret_port(parsed: ParseResult) -> int | None:
         raise SchemaBuilderError("secret link port is not allowed") from exc
 
 
+def _secret_host_is_ascii(host: str) -> bool:
+    """Refuse a parsed host that is not ASCII, before and after normalization.
+
+    ``urlparse`` does not IDNA-encode. A fullwidth letter and ``fíxture``
+    therefore never appear as ``xn--``. NFKC would fold the fullwidth letter
+    into the real label, so the raw host is refused as well as a host that
+    is still non-ASCII after the shared normalizer.
+    """
+    normalized = normalize_defanged(host)
+    return host.isascii() and normalized.isascii()
+
+
 def _allowed_secret_host(host: str) -> bool:
     """Plain Notion hosts only.
 
-    ``urlparse`` does not IDNA-encode, so a Unicode label never contains
-    ``xn--``. Non-ASCII hosts are refused first.
+    ``urlparse`` does not IDNA-encode, so a Unicode label is not ``xn--``
+    after parsing. Non-ASCII hosts are refused first.
     """
-    if not host.isascii():
+    if not _secret_host_is_ascii(host):
         return False
-    if "xn--" in host:
+    if "xn--" in host.casefold():
         return False
     if host in _EXACT_SECRET_HOSTS:
         return True

@@ -83,6 +83,20 @@ def test_a_fullwidth_host_is_refused() -> None:
         _publish_secret("https://\uff46ixture.notion.site/Home")
 
 
+def test_a_unicode_host_in_a_pdf_is_refused() -> None:
+    uri = "https://f\u00edxture.notion.site/Sage-Green"
+    with pytest.raises(LinkValidationRefusal) as caught:
+        validate_pdf_links(
+            _pdf(uri),
+            asset="readme",
+            accepted=(("Sage Green", uri),),
+            known_variants=_KNOWN,
+            checker=_checker_must_not_run,
+            clock=lambda: _STAMP,
+        )
+    assert caught.value.code == "host"
+
+
 def test_a_plain_notion_host_is_allowed() -> None:
     report = validate_pdf_links(
         _pdf(_PLAIN),
