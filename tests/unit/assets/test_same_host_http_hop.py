@@ -57,6 +57,38 @@ def test_a_same_host_http_hop_is_refused() -> None:
     assert [job.link for job in caught.value.repairs] == [_URI]
 
 
+def test_a_same_host_ws_or_ftp_hop_is_refused() -> None:
+    for scheme in ("ws", "ftp"):
+        hop = f"{scheme}://fixture.notion.site/Sage-Green"
+        with pytest.raises(LinkValidationRefusal) as caught:
+            validate_pdf_links(
+                _pdf(_URI),
+                asset="readme",
+                accepted=(("Sage Green", _URI),),
+                known_variants=_KNOWN,
+                checker=lambda _uri, _variant, hop=hop: _check((_URI, hop)),
+                clock=lambda: _STAMP,
+            )
+        assert caught.value.code == "redirect_host"
+        assert [job.link for job in caught.value.repairs] == [_URI]
+
+
+def test_a_mid_chain_http_hop_is_refused() -> None:
+    mid = "http://fixture.notion.site/mid"
+    final = "https://fixture.notion.site/Sage-Green"
+    with pytest.raises(LinkValidationRefusal) as caught:
+        validate_pdf_links(
+            _pdf(_URI),
+            asset="readme",
+            accepted=(("Sage Green", _URI),),
+            known_variants=_KNOWN,
+            checker=lambda _uri, _variant: _check((_URI, mid, final)),
+            clock=lambda: _STAMP,
+        )
+    assert caught.value.code == "redirect_host"
+    assert [job.link for job in caught.value.repairs] == [_URI]
+
+
 def test_a_same_host_https_hop_is_allowed() -> None:
     report = validate_pdf_links(
         _pdf(_URI),
