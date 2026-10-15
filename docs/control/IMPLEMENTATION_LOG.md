@@ -1,3 +1,19 @@
+## 2026-10-15 — Session 08 same-host http hop
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+A redirect hop whose scheme is not `https` raises `redirect_host` and the repair names the opened URI. An `https` hop on the same host stays a passing record. Action 8 stays on #78. Action 9 stays on #77. `/Resources` stays `{ExtGState, Font, ProcSet}`.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_same_host_http_hop.py tests/unit/assets/test_link_validation.py -k "same_host or redirect_to_another or chain_that_skips"`. 5 passed, 118 deselected. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the hop-scheme check | `test_a_same_host_http_hop_is_refused` | 1/4 |
+
+The other-host redirect, the skipped-chain redirect, and the same-host `https` hop stay green when that line is removed.
+
+Parked: punycode and uppercase on-host URIs, `file:` allow, sendBeacon, spelled-out emails, raster text, `_prepare` non-ASCII, live S3, `CREATE_ETSY_DRAFT`, commissioning, and the session exit.
+
 ## 2026-10-15 — Session 08 W7 r3: page-tree roles and screenshot sources
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
