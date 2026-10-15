@@ -181,6 +181,10 @@ def test_screenshot_text_refuses_a_bare_spaced_host() -> None:
     assert refuse_sensitive_text("x dot com") is None
 
 
+def test_screenshot_text_refuses_a_lowercase_cyrillic_em_dot() -> None:
+    assert refuse_sensitive_text("x dot co\u043c") == "sensitive_data"
+
+
 def test_a_zero_width_char_inside_the_scheme_is_a_url() -> None:
     text = "h\u200bttp://evil"
     assert url_matches(text) is True
