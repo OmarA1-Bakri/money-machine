@@ -26,6 +26,23 @@ _HOST = re.compile(
     r"\.[A-Za-z]{2,}(?![A-Za-z0-9])",
     re.IGNORECASE,
 )
+_LABEL = r"(?:[A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9-]*[A-Za-z0-9])"
+_SPACED_HOST = re.compile(
+    rf"(?<![A-Za-z0-9]){_LABEL}\s+\.\s+[A-Za-z]{{2,}}(?![A-Za-z0-9])",
+    re.IGNORECASE,
+)
+_BRACKET_HOST = re.compile(
+    rf"(?<![A-Za-z0-9]){_LABEL}\[\.\][A-Za-z]{{2,}}(?![A-Za-z0-9])",
+    re.IGNORECASE,
+)
+_SPELLED_HOST = re.compile(
+    rf"(?<![A-Za-z0-9]){_LABEL}\s+dot\s+com(?![A-Za-z0-9])",
+    re.IGNORECASE,
+)
+_LEET_HOST = re.compile(
+    rf"(?<![A-Za-z0-9]){_LABEL}\.c0m(?![A-Za-z0-9])",
+    re.IGNORECASE,
+)
 _MARKED_OCTET = r"(?:0[xX][0-9A-Fa-f]+|0\d+)"
 _IPV4 = re.compile(
     rf"(?<![A-Za-z0-9:/])(?<!\d\.)(?:"
@@ -89,6 +106,14 @@ def refuse_paid_checkout(text: str) -> str | None:
     if _WWW.search(folded) is not None:
         return "paid_checkout"
     if _HOST.search(folded) is not None:
+        return "paid_checkout"
+    if _SPACED_HOST.search(folded) is not None:
+        return "paid_checkout"
+    if _BRACKET_HOST.search(folded) is not None:
+        return "paid_checkout"
+    if _SPELLED_HOST.search(folded) is not None:
+        return "paid_checkout"
+    if _LEET_HOST.search(folded) is not None:
         return "paid_checkout"
     if _IPV4.search(folded) is not None:
         return "paid_checkout"

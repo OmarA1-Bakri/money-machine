@@ -1,3 +1,20 @@
+## 2026-10-15 — Session 08 defanged host
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defanged-host-prompt-integrity.md`.
+
+`x . com`, `x[.]com`, `x dot com`, and `x.c0m` are `paid_checkout`. `4.9`, `e.g.`, `127.1`, `0x7f000001`, `2130706433`, `v1.2.3.4`, and `polka dot journal` stay allowed. The gift render rows no longer claim those four names paint. Action 8 stays on #78. Action 9 stays on #77. `/Resources` stays `{ExtGState, Font, ProcSet}`.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defanged_host.py tests/unit/assets/test_gift_link_policy.py -k "not render and not paint and not chromium"`. 49 passed. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the spaced-dot check | `test_a_spaced_dot_host_is_refused` | 1/48 |
+| Delete the bracket-dot check | `test_a_bracket_dot_host_is_refused` | 1/48 |
+| Delete the spelled-dot check | `test_a_spelled_dot_host_is_refused` | 1/48 |
+| Delete the `c0m` check | `test_a_leet_com_host_is_refused` | 1/48 |
+
+Parked: uppercase on-host URIs, `file:` allow, sendBeacon, raster text, `_prepare` non-ASCII, spelled dots other than `com`, leet digits other than `c0m`, bare `127.1`, live S3, `CREATE_ETSY_DRAFT`, commissioning, and the session exit.
+
 ## 2026-10-15 — Session 08 W7 r3: page-tree roles and screenshot sources
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
