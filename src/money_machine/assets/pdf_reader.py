@@ -8,6 +8,7 @@ from typing import Literal
 
 _WS = b"\x00\t\n\x0c\r "
 _DELIM = _WS + b"()<>[]{}/%"
+_MAX_DEPTH = 64
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,15 +131,11 @@ class _Reader:
 
     def _name(self) -> PdfName:
         self.i += 1
-        chars: list[str] = []
+        start = self.i
         while self.i < self.n and self.data[self.i] not in _DELIM:
-            if self.data[self.i] == ord("#"):
-                chars.append(chr(int(self.data[self.i + 1 : self.i + 3], 16)))
-                self.i += 3
-                continue
-            chars.append(chr(self.data[self.i]))
             self.i += 1
-        return PdfName("".join(chars))
+        raw = self.data[start : self.i].decode("latin-1")
+        return PdfName(decode_pdf_name(raw))
 
     def _literal(self) -> PdfText:
         self.i += 1
@@ -197,7 +194,7 @@ class _Reader:
             hex_digits += "0"
         return PdfText(_decode_text(bytes.fromhex(hex_digits)), hex_digits)
 
-    def _array(self) -> tuple[PdfObject, ...]:
+    def _array(self, depth: int) -> tuple[PdfObject, ...]:
         self.i += 1
         items: list[PdfObject] = []
         while True:
@@ -205,9 +202,9 @@ class _Reader:
             if self._at(b"]"):
                 self.i += 1
                 return tuple(items)
-            items.append(self.value())
+            items.append(self.value(depth + 1))
 
-    def _dict(self) -> dict[str, PdfObject] | PdfStream:
+    def _dict(self, depth: int) -> dict[str, PdfObject] | PdfStream:
         self.i += 2
         fields: dict[str, PdfObject] = {}
         while True:
@@ -216,7 +213,9 @@ class _Reader:
                 self.i += 2
                 break
             key = self._name().value
-            fields[key] = self.value()
+            if key in fields:
+                raise ValueError("pdf duplicate name")
+            fields[key] = self.value(depth + 1)
         self._skip()
         if not self._at(b"stream"):
             return fields
@@ -232,14 +231,16 @@ class _Reader:
         self.i += length
         return PdfStream(fields, _inflate(fields, payload))
 
-    def value(self) -> PdfObject:
+    def value(self, depth: int = 0) -> PdfObject:
+        if depth > _MAX_DEPTH:
+            raise ValueError("pdf depth")
         self._skip()
         if self.i >= self.n:
             raise ValueError("pdf value")
         if self._at(b"<<"):
-            return self._dict()
+            return self._dict(depth)
         if self._at(b"["):
-            return self._array()
+            return self._array(depth)
         if self._at(b"("):
             return self._literal()
         if self._at(b"<"):
@@ -281,6 +282,30 @@ def _decode_text(raw: bytes) -> str:
     if raw.startswith(b"\xff\xfe"):
         return raw[2:].decode("utf-16-le", errors="replace")
     return raw.decode("latin-1")
+
+
+def decode_pdf_name(raw: str) -> str:
+    """Decode one PDF name's ``#xx`` escapes.
+
+    The reader calls this while storing the name. Key lookups use that stored
+    value and do not decode a second time.
+    """
+    chars: list[str] = []
+    index = 0
+    while index < len(raw):
+        if raw[index] == "#" and index + 2 < len(raw):
+            hex_digits = raw[index + 1 : index + 3]
+            try:
+                chars.append(chr(int(hex_digits, 16)))
+            except ValueError:
+                chars.append(raw[index])
+                index += 1
+                continue
+            index += 3
+            continue
+        chars.append(raw[index])
+        index += 1
+    return "".join(chars)
 
 
 def _filter_names(fields: dict[str, PdfObject]) -> tuple[str, ...]:

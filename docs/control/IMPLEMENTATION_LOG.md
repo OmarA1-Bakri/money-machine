@@ -1,3 +1,229 @@
+## 2026-10-15 — Session 08 W6 r7: catalog before the walk, page keys, every URI
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+This round answers owner review 5530246698 on `81aca76`. The catalog is `trailer["Root"]`, checked before the walk, so `/Info` or `/Foo` written first cannot hide it. The walk's seen set is `(object number, role)`. A page must equal the generator keys `{Type, Resources, MediaBox, Contents, Tabs, Parent}`, or that set plus `Annots`. Every `/S /URI` outside a link annotation's own `/A` goes through `refuse_graph_uri`. A deep catalog, parsed while resolving `Root` before the info check, is `malformed`. A deep `/Info` chain stays `paid_checkout`. The page-walk depth cap in `_pages` is the gift kids chain. CodeRabbit 4280244489 is the docs claim about a non-Link `/A`: the global `/S` check has no `/A` exemption. This round also validates every other graph `/URI` and refuses a page `/AA` as an extra page key. Duplicate decoded names remain the reader check `pdf duplicate name`.
+
+Clean focused suite, Chromium deselected: 217 passed, 2 deselected. The two Chromium must-pass rows passed on the restored tree. Command: `uv run pytest -q -p no:cacheprovider --tb=line -k "not readme_uris and not gift_pdf_has_no_links" tests/unit/assets/test_link_validation.py tests/unit/assets/test_gift_link_policy.py tests/unit/assets/test_gift_pdf_links.py`. Source restored after each run.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the direct `trailer["Root"]` check | the fourteen catalog rows, including `test_info_before_root_cannot_hide_the_catalog` and `test_foo_before_root_cannot_hide_the_catalog` | 14/203 |
+| Seen set keyed by object number only | `test_a_second_role_widget_is_malformed` | 1/216 |
+| Second-role subtype also allows Widget | the same test | 1/216 |
+| Delete the graph `/URI` check | `test_a_widget_uri_through_an_outline_is_refused` | 1/216 |
+| Delete the page key check | `test_a_page_uri_additional_action_is_malformed` (the code becomes `host`), `test_a_page_additional_action_without_a_uri_is_malformed`, `test_a_page_missing_tabs_is_malformed` | 3/214 |
+| Page equality weakened to a subset of the annotating page | `test_a_page_missing_tabs_is_malformed` | 1/216 |
+| Add `AA` to the annotation extras | `test_a_link_uri_additional_action_is_malformed`, `test_a_link_additional_action_without_an_s_is_malformed` | 2/215 |
+| Delete the `_pages` depth cap | `test_a_deep_kids_chain_is_paid_checkout` | 1/216 |
+| Change the page-walk subtype `raise` to `continue` | `test_a_non_link_annotation_is_malformed` for Widget, Screen, and RichMedia | 3/214 |
+| Delete the URI-stream `raise` | none | 217 passed |
+
+`test_a_second_role_widget_is_malformed` dies for either the object-number seen set or a second-role check that allows Widget. It is the single failure of each of those mutants, and it is not an independent kill of both. The page-level Widget row stays refused when only the second-role check allows Widget, because `delivery_link_uris` compares the subtype to `Link`. `test_a_widget_after_an_outline_is_still_refused` accepts either `host` or `malformed`. It is not a unique kill. The JavaScript `/AA` row stays refused through `/S`, so it does not kill the annotation-extra mutant.
+
+Deleting the URI-stream `raise` still passes. That survivor stays parked, with punycode and uppercase on-host URIs, and the same-host `http` hop.
+
+## 2026-10-15 — Session 08 W6 r6: decoded names, duplicate keys, and non-URI actions
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+This round answers owner review 5529339737 on `ba63c18`. The reader decodes `#xx` once, inside `_Reader._name`, and later lookups use that stored name. A dictionary with two keys that decode to one name, or with the same raw key twice, raises `ValueError`. The root `/Names` object is read with `PdfDocument.get` even when another catalog key already visited it, and `/JavaScript` or `/EmbeddedFiles` there is refused. The reader, the page walk, and the graph walk stop past depth 64. An annotation in `/Annots` must have subtype `Link`. Any `/S` other than `/URI` is refused, including an outline action. An indirect `/A` or `/URI` is still one hop through `PdfDocument.get`. The `/sw.js` continuation is unchanged.
+
+Clean link file: 90 passed. Link file plus gift policy: 132 passed, 2 deselected. The same two files with every `classic_pdf` name `#xx`-escaped: 132 passed, 2 deselected. Gift PDF and screenshot files under that escape: 138 passed, 2 deselected. Each mutant below was run again on the escaped fixtures and failed the same tests.
+
+Command: `uv run pytest -q -p no:cacheprovider --tb=line -k "not mutant and not accepts and not dropping"`. Source restored after each run.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| `decode_pdf_name` returns the raw token | six link rows (`test_a_hash_escaped_s_is_uri`, `test_an_escaped_annots_key_is_not_hidden`, `test_an_escaped_subtype_is_a_link`, `test_an_escaped_kids_key_is_walked`, `test_an_escaped_metadata_key_is_paid_checkout`, `test_a_decoded_kids_twin_is_malformed`) and four gift rows (`test_an_escaped_annots_key_is_paid_checkout`, `test_an_escaped_subtype_link_is_paid_checkout`, `test_an_escaped_kids_key_is_walked`, `test_an_escaped_metadata_key_is_paid_checkout`) | 10/122 on both files |
+| Delete the duplicate-name check | `test_a_decoded_action_twin_is_malformed`, `test_a_decoded_s_twin_is_malformed`, `test_a_decoded_kids_twin_is_malformed`, `test_a_repeated_raw_action_key_is_malformed` | 4/86 |
+| Delete the direct `/Names` read | `test_a_shared_names_reference_is_malformed` for JavaScript and EmbeddedFiles | 2/88 |
+| Add `Names` to the catalog extras | `test_a_names_tree_without_scripts_is_malformed` | 1/89 |
+| Delete the reader depth cap | `test_a_deep_page_nest_is_malformed` (500 nested arrays; the uncapped parse raises `RecursionError`) | 1/89 |
+| Delete the graph depth cap | `test_a_deep_reference_chain_is_malformed` (1500-object `/Next` chain; uncapped walk raises `RecursionError`) | 1/89 |
+| Delete the page-walk depth cap | `test_a_deep_kids_chain_is_paid_checkout` | 1/131 on both files |
+| Delete the subtype allowlist | `test_a_non_link_annotation_is_malformed` for Widget, Screen, and RichMedia | 3/87 |
+| Add `Widget` to the subtype allow-set | `test_a_non_link_annotation_is_malformed[Widget]` | 1/89 |
+| Delete the graph `/S` check | launch, JavaScript, SubmitForm, ImportData, GoToR, the page launch, the unreferenced launch, and `test_an_outline_launch_is_malformed` | 8/82 |
+| Add `Launch` to the `/S` allow-set | the link, page, unreferenced, and outline launch rows | 4/86 |
+| Delete the unreferenced-object scan | `test_an_unreferenced_launch_action_is_malformed` | 1/89 |
+| Annotation equality weakened to a subset check | `test_a_link_missing_border_is_malformed` | 1/89 |
+| Catalog equality weakened to a subset check | `test_a_catalog_missing_type_is_malformed` | 1/89 |
+| Delete the `/Type /Annot` check | `test_a_link_type_must_be_annot` | 1/89 |
+| Delete the `/Type /Action` check | `test_an_action_type_must_be_action` | 1/89 |
+| Add `Outlines`, `OpenAction`, `AA`, `AcroForm`, `JavaScript`, or `Launch` to the catalog extras | that key's own row | 1/89 each |
+| `expected[index] in uris` | `test_links_must_keep_accepted_order`, `test_the_readme_uris_round_trip_exactly` | 2/88 |
+
+On the 64-test file at `ba63c18`, that membership mutant is 2 failed, 62 passed. An indirect `/URI` is one hop. The body does not call it a direct string.
+
+`test_a_widget_launch_is_malformed` and `test_a_widget_javascript_is_malformed` stay refused if only one of the subtype check and the `/S` check is removed. They are not unique kills. The `/S /URI` subtype rows and the outline `/Launch` row are the unique ones.
+
+Deleting the URI-stream `raise` still passes (90 passed). Returning the stream bytes remains the kill. Adding `Names` to the extras no longer fails the JavaScript or EmbeddedFiles rows, because the direct `/Names` read still refuses them.
+
+## 2026-10-15 — Session 08 W6 r5: catalog keys, depth cap, and SF kill rows
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+The catalog is the trailer `/Root`. Its keys must equal `{Type, Pages}`, which is what the README generator emits. The README must-pass asserts that set and `/Type /Catalog`. `/Outlines`, `/OpenAction`, `/AA`, `/Names`, `/AcroForm`, `/Launch`, and `/JavaScript` are outside the set. A dictionary other than a link `/A` whose `/S` is `/Launch` is refused, including an xref object nothing references. The reader and the graph walk refuse nesting deeper than 64. `validate_pdf_links` maps that `ValueError` to `malformed`.
+
+The round-4 membership row was 1 failed, 63 passed. `expected[index] in uris` on that 64-test file is 2 failed, 62 passed.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=line -k "not mutant and not accepts and not dropping" tests/unit/assets/test_link_validation.py`. The source was restored after each run. The clean link file is 73 passed.
+
+- Weakening annotation equality to a subset check: 1 failed, 72 passed (`test_a_link_missing_border_is_malformed`).
+- Weakening catalog equality to a subset check: 1 failed, 72 passed (`test_a_catalog_missing_type_is_malformed`).
+- Deleting the `/Type /Annot` check: 1 failed, 72 passed (`test_a_link_type_must_be_annot`).
+- Deleting the `/Type /Action` check: 1 failed, 72 passed (`test_an_action_type_must_be_action`).
+- Deleting the unreferenced-object scan: 1 failed, 72 passed (`test_an_unreferenced_launch_action_is_malformed`).
+- Adding `Outlines` to the catalog extras: 1 failed, 72 passed (`test_an_extra_catalog_key_is_malformed`).
+- Adding `OpenAction` to the catalog extras: 1 failed, 72 passed (`test_a_catalog_open_action_is_malformed`).
+- Adding `AA` to the catalog extras: 1 failed, 72 passed (`test_a_catalog_additional_action_is_malformed`).
+- Adding `Names` to the catalog extras: 2 failed, 71 passed (`test_a_names_javascript_is_malformed`, `test_a_catalog_embedded_file_is_malformed`).
+- Adding `AcroForm` to the catalog extras: 1 failed, 72 passed (`test_a_catalog_acroform_is_malformed`).
+- Adding `JavaScript` to the catalog extras: 1 failed, 72 passed (`test_a_catalog_javascript_key_is_malformed`).
+- Adding `Launch` to the catalog extras: 1 failed, 72 passed (`test_a_catalog_launch_key_is_malformed`).
+- Deleting the reader depth cap: 1 failed, 72 passed (`test_a_deep_page_nest_is_malformed`).
+- Deleting the graph depth cap: 1 failed, 72 passed (`test_a_deep_reference_chain_is_malformed`).
+- Deleting the graph `/S /Launch` check: 2 failed, 71 passed (`test_a_page_launch_action_is_malformed`, `test_an_unreferenced_launch_action_is_malformed`).
+- Adding `Launch` to the `/S` allow-set: 1 failed, 72 passed (`test_a_launch_action_is_malformed`).
+- Comparing an equal-length URI with `expected[index] in uris`: 2 failed, 71 passed (`test_links_must_keep_accepted_order`, `test_the_readme_uris_round_trip_exactly`).
+
+No measured row above survived. Escaped keys, duplicate decoded names, and non-Link actions stay open.
+
+## 2026-10-15 — Session 08 W6 r4: exact link shape and object-graph refusals
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+A link annotation must equal `{Type, Subtype, Rect, Border, F, A}` with `/Type /Annot` and `/Subtype /Link`. The action equals `{S, URI}`, or `{Type, S, URI}` when `/Type /Action` is present. `/S` is compared after `#xx` decoding, so `/U#52I` is `/URI`. An indirect `/A` or `/URI` resolves one hop through `PdfDocument.get`. A second hop stays a reference. A URI stream is refused. `link_annotations` no longer reads an annotation-level `/URI`. The object graph, catalog first, refuses `/OpenAction`, `/AA` except on a `/Link`, `/Launch`, a catalog `/JavaScript`, `/AcroForm`, and `/Names` to `/JavaScript` or `/EmbeddedFiles`. The `/sw.js` continuation stays. This Chromium fetches the worker script as `script`. Production capture passes an empty allow-list, so `/sw.js` is aborted there.
+
+The real README generator, fed by the W2 token payload, is the must-pass. Its page-1 annotations have those exact keys, and validation against `SECRET_LINK + "/"` passes. A bare action without `/Type` also passes.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=line` on `tests/unit/assets/test_link_validation.py` with `-k "not mutant and not accepts and not dropping"`, except the worker row, which is the full screenshot file. The source was restored after each run. The clean link file is 64 passed. Deleting the stream `raise` survives (64 passed), because `_text_of` still returns none. Returning the stream bytes is the kill.
+
+- Adding `Launch` to the `/S` allow-set: 1 failed, 63 passed (`test_a_launch_action_is_malformed`).
+- Adding `JavaScript` to the `/S` allow-set: 1 failed, 63 passed (`test_a_javascript_action_is_malformed`).
+- Adding `Next` to the action extras: 1 failed, 63 passed (`test_an_action_next_is_malformed`).
+- Adding `AA` to the annotation extras: 1 failed, 63 passed (`test_a_link_additional_action_is_malformed`).
+- Adding `URI` to the annotation extras: 1 failed, 63 passed (`test_an_annotation_uri_cannot_hide_the_action`).
+- Adding `PA` to the annotation extras: 1 failed, 63 passed (`test_an_extra_annotation_key_is_malformed`).
+- Adding `NewWindow` to the action extras: 1 failed, 63 passed (`test_an_extra_action_key_is_malformed`).
+- Returning a URI stream's bytes: 1 failed, 63 passed (`test_an_indirect_stream_uri_is_malformed`).
+- Following every reference instead of one hop: 1 failed, 63 passed (`test_a_double_indirect_uri_is_malformed`).
+- Dropping the `/OpenAction` check: 1 failed, 63 passed (`test_a_catalog_open_action_is_malformed`).
+- Dropping the catalog `/AA` check: 1 failed, 63 passed (`test_a_catalog_additional_action_is_malformed`).
+- Dropping the catalog `/JavaScript` check: 1 failed, 63 passed (`test_a_catalog_javascript_key_is_malformed`).
+- Dropping the `/Launch` key check: 1 failed, 63 passed (`test_a_catalog_launch_key_is_malformed`).
+- Dropping the `/Names /JavaScript` check: 1 failed, 63 passed (`test_a_names_javascript_is_malformed`).
+- Dropping the `/Names /EmbeddedFiles` check: 1 failed, 63 passed (`test_a_catalog_embedded_file_is_malformed`).
+- Dropping the `/AcroForm` check: 1 failed, 63 passed (`test_a_catalog_acroform_is_malformed`).
+- Returning a PDF name without `#xx` decoding: 1 failed, 63 passed (`test_a_hash_escaped_s_is_uri`).
+- Setting `service_workers` to `allow`: 1 failed, 65 passed (`test_the_fixture_context_makes_no_network_requests`).
+- Changing the open-file `except ValueError` to `except KeyError`: 1 failed, 63 passed (`test_a_truncated_pdf_is_malformed`).
+- Using `repairs[-1].reason` as the refusal code: 1 failed, 63 passed (`test_the_first_repair_names_the_refusal`).
+- Comparing an equal-length URI by membership instead of position: 1 failed, 63 passed (`test_links_must_keep_accepted_order`).
+- Allowing an explicit port: 1 failed, 63 passed (`test_an_explicit_port_is_malformed`).
+
+No measured row above survived except deleting the stream `raise`. Outlines, non-Link annotations, and redirect-hop scheme or port checks stay parked.
+
+## 2026-10-15 — Session 08 W6 r3: worker continuation, link order, exact keys
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+Verifier r1 on `0a3f3d17` showed that deleting the `/sw.js` continuation lets `service_workers="allow"` survive. The continuation is restored. This Chromium fetches the worker script as `script`. The script is continued only for an allowed document. Production capture passes an empty allow-list, so `/sw.js` is aborted there.
+
+Equal-length URIs stay positional, so a permutation is `link_mismatch`. A shorter PDF is aligned as a subsequence. Dropping the middle link names that accepted URI once. Annotation keys are limited to `Type`, `Subtype`, `Rect`, `Border`, `F`, and `A`. Action keys are limited to `Type`, `S`, and `URI`. `/S` must be `/URI`. The URI must be a direct string. A catalog `/AcroForm` or `/Names /EmbeddedFiles` is `malformed`, in addition to `/OpenAction`, `/AA`, and `/Names /JavaScript`. `link_annotations` is unchanged.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=no` on the named file. The source was restored after each run. The clean link file is 58 passed. The clean screenshot file, with the link file and the gift policy file, is in the 160-pass run (2 deselected).
+
+- Setting `service_workers` to `allow`: 1 failed, 65 passed (`test_the_fixture_context_makes_no_network_requests`).
+- Comparing an equal-length URI by membership instead of position: 1 failed, 57 passed (`test_links_must_keep_accepted_order`).
+- Repairing only the tail of a shorter PDF: 1 failed, 57 passed (`test_a_dropped_middle_link_is_named`).
+- Dropping the annotation key allowlist: 3 failed, 55 passed (`test_an_extra_annotation_key_is_malformed`, `test_an_annotation_uri_cannot_hide_the_action`, `test_a_link_additional_action_is_malformed`).
+- Dropping the action key allowlist: 2 failed, 56 passed (`test_an_extra_action_key_is_malformed`, `test_an_action_next_is_malformed`).
+- Dropping the `/S` `/URI` check: 5 failed, 53 passed (`test_a_non_uri_action_is_malformed` for `/Launch`, `/JavaScript`, `/SubmitForm`, `/ImportData`, and `/GoToR`).
+- Dereferencing the URI string: 1 failed, 57 passed (`test_an_indirect_uri_string_is_malformed`).
+- Dropping the `/AcroForm` check: 1 failed, 57 passed (`test_a_catalog_acroform_is_malformed`).
+- Dropping the `/Names /EmbeddedFiles` check: 1 failed, 57 passed (`test_a_catalog_embedded_file_is_malformed`).
+
+No row above survived. The `/S` rows use an action whose only keys are `/S` and `/URI`, so an extra `/F` is not what kills them. Outlines and non-Link annotations stay parked.
+
+## 2026-10-15 — Session 08 W6 r2: link actions, ports, and repair identity
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged because open PR #68 owns it. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+Review round 1 on `0a3f3d17` failed four action bypasses. `delivery_link_uris` uses the same page walk as `link_annotations`. A link is kept only when `/A /S` is `/URI` and the URI is that action's `/URI`. An annotation `/URI`, an action `/Next`, a link `/AA`, and a catalog `/OpenAction`, `/AA`, or `/Names /JavaScript` raise `ValueError`, which the validator maps to `malformed`. `link_annotations` is unchanged, so the gift count still does not scan catalog actions. Outlines and non-Link annotations stay parked.
+
+An explicit port is `malformed`, including when the accepted string is that URI. `PdfDocument` failing to open the file is `malformed`, before the info check, so a truncated file is not `paid_checkout`. A deep `/Info` chain is still `paid_checkout`. `AssetRepair.index` is the annotation index, or `-1` when the failure is not an annotation. The refusal code is `repairs[0].reason`. `clock()` runs once, after every link has passed. Refusal records keep `checked_at` empty, so the default clock cannot replace a targeted repair.
+
+The Chromium fixture still installs the browser when the executable is missing, because CI does not provision it and `ci.yml` is not edited here. Any other launch error fails the test.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=no -k "not mutant and not accepts and not dropping" tests/unit/assets/test_link_validation.py`. The source was restored after each run. The clean file is 51 passed.
+
+- Changing the open-file `except ValueError` to `except KeyError`: 1 failed, 50 passed (`test_a_truncated_pdf_is_malformed`).
+- Changing the `delivery_link_uris` `except ValueError` to `except KeyError`: 13 failed, 38 passed (`test_a_non_uri_action_is_malformed`, `test_a_link_without_a_uri_is_malformed`).
+- Using `repairs[-1].reason` as the refusal code: 1 failed, 50 passed (`test_the_first_repair_names_the_refusal`).
+- Storing every repair index as `-1`: 13 failed, 38 passed (`test_a_repair_names_one_of_four_identical_uris`).
+- Calling `clock()` while building a refusal record: 1 failed, 50 passed (`test_a_refusal_does_not_ask_the_clock`).
+- Allowing an explicit port: 1 failed, 50 passed (`test_an_explicit_port_is_malformed`).
+- Accepting an action whose `/S` is not `/URI`: 5 failed, 46 passed (`test_a_non_uri_action_is_malformed` for `/Launch`, `/JavaScript`, `/SubmitForm`, `/ImportData`, and `/GoToR`).
+- Allowing an annotation-level `/URI`: 1 failed, 50 passed (`test_an_annotation_uri_cannot_hide_the_action`).
+- Allowing `/Next`: 1 failed, 50 passed (`test_an_action_next_is_malformed`).
+- Allowing a link `/AA`: 1 failed, 50 passed (`test_a_link_additional_action_is_malformed`).
+- Allowing catalog `/OpenAction` and `/AA`: 3 failed, 48 passed (`test_a_catalog_action_is_malformed`).
+- Allowing `/Names /JavaScript`: 1 failed, 50 passed (`test_a_catalog_action_is_malformed`).
+
+No row above survived. The gift policy file on this tree is included in the 87-pass run with the link file. `ci.yml` stays out of this diff.
+
+## 2026-10-15 — Session 08 W6: link injection and validation
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.
+
+The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The addendum is `docs/control/reviews/2026-10-15-session-08-w6-prompt-integrity.md`. This wave does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, `AGENTS.md`, `CLAUDE.md`, `gift_links.py`, `pdf_objects.py`, or `IMPLEMENTATION_STATE.json`.
+
+`validate_pdf_links` reads annotations with `link_annotations` and Info/XMP with `refuse_gift_document_info`. The raw allowlist is `refuse_raw_charset` on the variant and on a probe of the URI. The probe blanks `:/?#[]@` and a `%xx` triplet that `refuse_paid_checkout` already matches, and it does not fold. A bare `%` stays in the probe. Percent on a URI is `refuse_paid_checkout` on the path, query, and fragment, because that function returns at `://` before it sees `%xx`. Host admission is `_allowed_secret_host`. The default checker raises `live_link_check`. The default clock raises `live_clock`. A failure raises `LinkValidationRefusal` and the repair names that asset and that link.
+
+Chromium m153 stores each README origin href as `SECRET_LINK` plus `/`. Validation against the painted string is `link_mismatch`. Validation against the annotation string passes. Replacing one annotation fails. The gift PDF has zero links and is `missing_links`.
+
+`refuse_fixture_value` still refuses raw code points above 127. `Zoë` (U+00EB) is `fixture_charset`. The `/sw.js` continuation is deleted. `O_NOFOLLOW` is not combined with `O_EXCL`: on Linux, `O_EXCL` already returns `EEXIST` for a symlink and does not follow it. `O_EXCL` stays.
+
+The linux x86_64 video hash stays `6318854297cd5d316fdf4c579a73f188ec5f1e2089745534aa9d4ca6245fe248`. The Sage Green PNG pin stays `2efb97e6c323fe81f763181f2d773d167a49b6f5ca29452e8778a5e9a60d836b`. The template pin stays `f38abcd419f3ff5dfb23264e2f63ad2c597e255cc1728b1cb4fe48237b505866`. Screenshot `build_version` stays 5. `video.py` was not edited.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=no -k "not mutant and not accepts and not dropping"` on the named file. The source was restored after each run. The clean link file is 33 passed. The clean screenshot file is 66 passed. This pair has no deselected tests.
+
+- Dropping the exact URI inequality: 5 failed, 27 passed (`test_swapping_one_link_is_refused`, `test_swapping_one_link_only_in_case_is_refused`, `test_the_readme_uris_round_trip_exactly`).
+- Comparing URIs with `casefold`: 1 failed, 31 passed (`test_swapping_one_link_only_in_case_is_refused`).
+- Dropping the variant allowlist: 1 failed, 31 passed (`test_a_latin1_variant_is_refused_before_fold`).
+- Dropping the URI allowlist: 2 failed, 30 passed (`test_a_latin1_uri_is_refused_before_fold`, `test_a_bare_percent_is_refused`).
+- Blanking every `%`, including a bare one: 1 failed, 31 passed (`test_a_bare_percent_is_refused`).
+- Dropping `refuse_paid_checkout` on the path, query, and fragment: 1 failed, 31 passed (`test_a_percent_triplet_in_the_path_is_refused`).
+- Skipping `refuse_gift_document_info`: 3 failed, 29 passed (`test_object_stream_info_percent_is_refused`, `test_xmp_percent_surface_is_refused`, `test_a_deep_info_chain_is_refused`).
+- Allowing zero links: 2 failed, 30 passed (`test_a_pdf_with_no_links_is_refused`, `test_the_gift_pdf_has_no_links`).
+- Allowing a link with no URI: 1 failed, 31 passed (`test_a_link_without_a_uri_is_malformed`).
+- Allowing a scheme other than `https`: 1 failed, 31 passed (`test_http_is_refused`).
+- Dropping the empty-host check: 1 failed, 31 passed (`test_mailto_is_malformed`, code becomes `not_https`).
+- Dropping `_allowed_secret_host`: 2 failed, 30 passed (`test_an_indirect_annotation_off_host_is_refused`, `test_nested_kids_are_walked`).
+- Allowing userinfo: 1 failed, 31 passed (`test_userinfo_is_malformed`).
+- Allowing whitespace: 1 failed, 31 passed (`test_a_space_in_the_uri_is_malformed`).
+- Allowing an unknown variant: 1 failed, 31 passed (`test_an_unknown_variant_is_refused_without_opening`).
+- Allowing a cross-host hop: 1 failed, 31 passed (`test_a_redirect_to_another_host_is_refused`).
+- Refusing every chain longer than one hop: 1 failed, 32 passed (`test_a_same_host_hop_is_allowed`).
+- Dropping the check that the chain starts with the opened URI: 1 failed, 32 passed (`test_a_chain_that_skips_the_opened_uri_is_refused`).
+- Ignoring the observed variant: 1 failed, 31 passed (`test_the_wrong_variant_is_refused`).
+- Allowing an auth wall: 2 failed, 30 passed (`test_an_auth_wall_is_refused`, `test_one_failed_link_does_not_repair_the_others`).
+- Allowing a missing duplicate button: 1 failed, 31 passed (`test_a_missing_duplicate_button_is_refused`).
+- Repairing every URI when one fails: 6 failed, 26 passed (`test_one_failed_link_does_not_repair_the_others` and the one-link swap rows).
+- Ignoring accepted URIs past the PDF: 1 failed, 31 passed (`test_a_missing_accepted_link_is_named`).
+- Making the default checker return a pass: 1 failed, 31 passed (`test_the_checker_defaults_to_refusal`).
+- Making the default clock return a stamp: 1 failed, 31 passed (`test_the_clock_defaults_to_refusal`).
+- Switching the fixture allowlist from `> 127` to `> 255`: 1 failed, 65 passed (`test_a_latin1_zoe_is_refused`).
+- Dropping `O_EXCL`: 2 failed, 64 passed (`test_an_existing_file_is_not_truncated`, `test_a_symlink_file_is_not_followed`).
+
+The chain-start row and the same-host row were measured after `test_a_chain_that_skips_the_opened_uri_is_refused` landed, so their passed count is 32. The earlier link rows were measured on the 32-test file and their passed counts are one lower. No link guard above survived.
+
+Parked to next wave: the `file:` allow; `sendBeacon` from `set_content` while JavaScript is on; spelled-out `at ... dot com` addresses; refusing non-ASCII labels inside `_prepare`; `-flags +bitexact` on its own; the cross-platform hash; trailer tampering after the Matroska bytes; text inside raster images; José and Zoë in the gift name or community; whole-document `/OpenAction`, `/AA`, and outline scanning; non-Link URI annotations; defanged hosts; bare `127.1`, `0x7f000001`, and `2130706433`; storage URI and S3; workflow linkage and commissioning; the session exit code; Exit 78.
+
+`uv run ruff check .` exit 0. `uv run ruff format --check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Full local pytest was not re-run. The 12 `test_compose_preserves_the_postgres_password` failures recorded in W3 stay pre-existing and local (`docker` missing). CI is the gate. `.github/workflows/ci.yml` is unchanged.
+
 ## 2026-10-15 — Session 08 W5 r3: raw ASCII allowlist and split structure kills
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.

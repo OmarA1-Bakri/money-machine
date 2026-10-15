@@ -21,6 +21,7 @@ from money_machine.assets.pdf_objects import document_strings, link_annotations
 from money_machine.assets.pdf_reader import PdfDocument, PdfRef
 from tests.fixtures.merchandising import consistent_request
 from tests.unit.assets.gift_pdf_craft import (
+    classic_pdf,
     deep_info_chain,
     embed_info_title,
     indirect_link,
@@ -171,6 +172,88 @@ def test_metadata_packet_is_refused() -> None:
     assert "Chromium" in found
     assert any("https://x.com" in value for value in found)
     assert refuse_gift_document_info(pdf) == "paid_checkout"
+
+
+def _gift_obj(number: int, body: str) -> bytes:
+    return f"{number} 0 obj\n{body}\nendobj\n".encode("latin-1")
+
+
+def test_an_escaped_annots_key_is_paid_checkout() -> None:
+    pdf = classic_pdf(
+        {
+            1: _gift_obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+            2: _gift_obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            3: _gift_obj(3, "<< /Type /Page /Parent 2 0 R /Ann#6fts [4 0 R] >>"),
+            4: _gift_obj(4, "<< /Subtype /Link /A << /S /URI /URI (https://x.com) >> >>"),
+        }
+    )
+    assert refuse_gift_link_annotations(pdf) == "paid_checkout"
+
+
+def test_an_escaped_subtype_link_is_paid_checkout() -> None:
+    pdf = classic_pdf(
+        {
+            1: _gift_obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+            2: _gift_obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            3: _gift_obj(3, "<< /Type /Page /Parent 2 0 R /Annots [4 0 R] >>"),
+            4: _gift_obj(4, "<< /Sub#74ype /Link /A << /S /URI /URI (https://x.com) >> >>"),
+        }
+    )
+    assert refuse_gift_link_annotations(pdf) == "paid_checkout"
+
+
+def test_an_escaped_kids_key_is_walked() -> None:
+    pdf = classic_pdf(
+        {
+            1: _gift_obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+            2: _gift_obj(2, "<< /Type /Pages /K#69ds [3 0 R] /Count 1 >>"),
+            3: _gift_obj(3, "<< /Type /Page /Parent 2 0 R /Annots [4 0 R] >>"),
+            4: _gift_obj(4, "<< /Subtype /Link /A << /S /URI /URI (https://x.com) >> >>"),
+        }
+    )
+    count, uris = link_annotations(pdf)
+    assert count == 1
+    assert uris == ("https://x.com",)
+    assert refuse_gift_link_annotations(pdf) == "paid_checkout"
+
+
+def test_an_escaped_metadata_key_is_paid_checkout() -> None:
+    payload = b"<?xpacket begin='x'?><dc:title>x%2Ecom</dc:title>"
+    header = f"5 0 obj\n<< /Type /Metadata /Subtype /XML /Length {len(payload)} >>\n"
+    stream = header.encode() + b"stream\n" + payload + b"\nendstream\nendobj\n"
+    pdf = classic_pdf(
+        {
+            1: _gift_obj(1, "<< /Type /Catalog /Pages 2 0 R /Metad#61ta 5 0 R >>"),
+            2: _gift_obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            3: _gift_obj(3, "<< /Type /Page /Parent 2 0 R >>"),
+            5: stream,
+        }
+    )
+    assert refuse_gift_document_info(pdf) == "paid_checkout"
+
+
+def test_a_deep_kids_chain_is_paid_checkout() -> None:
+    objects = {1: _gift_obj(1, "<< /Type /Catalog /Pages 10 0 R >>")}
+    for hop in range(500):
+        number = 10 + hop
+        if hop == 499:
+            body = "<< /Type /Page /Parent 10 0 R >>"
+        else:
+            body = f"<< /Kids [{number + 1} 0 R] >>"
+        objects[number] = _gift_obj(number, body)
+    assert refuse_gift_link_annotations(classic_pdf(objects)) == "paid_checkout"
+
+
+def test_a_deep_nest_is_paid_checkout() -> None:
+    nested = "[" * 500 + "0" + "]" * 500
+    pdf = classic_pdf(
+        {
+            1: _gift_obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+            2: _gift_obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            3: _gift_obj(3, f"<< /Type /Page /Parent 2 0 R /Resources {nested} >>"),
+        }
+    )
+    assert refuse_gift_link_annotations(pdf) == "paid_checkout"
 
 
 class _DropCount(ast.NodeTransformer):

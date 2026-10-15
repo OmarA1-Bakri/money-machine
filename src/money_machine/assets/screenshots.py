@@ -390,7 +390,13 @@ def _clip(page: Page) -> bytes:
 
 
 def _write_exclusive(path: Path, payload: bytes) -> None:
-    flags = os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_WRONLY
+    """Create a new file.
+
+    ``O_EXCL`` refuses an existing path. On Linux that includes a symlink,
+    and the open does not follow it. ``O_NOFOLLOW`` does not change that
+    outcome while ``O_EXCL`` is set, so it is not combined here.
+    """
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
     descriptor = os.open(path, flags, 0o644)
     try:
         os.write(descriptor, payload)
