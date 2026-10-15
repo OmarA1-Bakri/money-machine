@@ -1,3 +1,15 @@
+## 2026-10-15 — Session 08 spaced at-sign email
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.
+
+The spelled-email and defanged-host test files on the closed branches already match trunk. The screenshot row they never pinned is `ceo @ acme dot com`. A spaced `@` is an email separator, and the spaces around it collapse inside the candidate. `ceo@acme dot com` and `ceo at acme dot com` stay refused.
+
+Clean suite: 78 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_spelled_email.py tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_defanged_host.py tests/unit/assets/test_punycode_host.py`. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Match `@` with no surrounding space | `test_a_spaced_at_sign_email_is_refused` | 1/77 |
+
 ## 2026-10-15 — Session 08 storage shape and vanished link (#78 carry)
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-sf-carry-prompt-integrity.md`.

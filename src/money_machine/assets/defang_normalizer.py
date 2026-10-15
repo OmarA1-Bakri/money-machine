@@ -80,7 +80,7 @@ _AT = (
     r"|[ \t]*\([ \t]*at[ \t]*\)[ \t]*"
     r"|[ \t]*\{[ \t]*at[ \t]*\}[ \t]*"
     r"|[ \t]+at[ \t]+"
-    r"|@"
+    r"|[ \t]*@[ \t]*"
     r")"
 )
 _URL_CANDIDATE = re.compile(r"(?<![A-Za-z0-9])hxxps?://\S+", re.IGNORECASE)
@@ -100,6 +100,7 @@ _BRACKET_AT_RE = re.compile(
     re.IGNORECASE,
 )
 _BARE_AT_RE = re.compile(r"[ \t]+at[ \t]+", re.IGNORECASE)
+_SPACED_AT_SIGN = re.compile(r"[ \t]+@[ \t]*|[ \t]*@[ \t]+")
 _HOST_TAIL = re.compile(
     r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*(?:\.[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)+",
     re.IGNORECASE,
@@ -190,7 +191,8 @@ def _undo_span(text: str, start: int, end: int) -> str:
     restored = _replace_dots(restored, _BARE_DOT_RE, _curated_tld, boundary=False, tail=tail)
     restored = _replace_dots(restored, _SPACED_DOT_RE, _spaced_dot_tld, boundary=True, tail=tail)
     restored = _replace_ats(restored, _BRACKET_AT_RE, bracket=True)
-    return _replace_ats(restored, _BARE_AT_RE, bracket=False)
+    restored = _replace_ats(restored, _BARE_AT_RE, bracket=False)
+    return _SPACED_AT_SIGN.sub("@", restored)
 
 
 def _replace_dots(
