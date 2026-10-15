@@ -1,3 +1,64 @@
+## 2026-10-15 — Session 08 W8 r2: durable ledger and paged lookup
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. Action 8 stays parked. This wave does not emit `DRAFT_CREATED` and does not edit `workflows.yaml`.
+
+The allowlist is unchanged: `GET` and `POST` `/v3/application/shops/{shop_id}/listings`. `getListingsByShop` still defaults `state` to `active` and `limit` to 25. The client sends `state=draft`, `limit=100`, and `offset`, and stops on a short page. `count` must stay stable and must equal the number of rows seen. Ten full pages raise `page_cap`. A transport error raises `transport`. A pending key is written to the injected ledger directory with `O_CREAT|O_EXCL|O_NOFOLLOW`, then the file and the directory are fsynced, and only then does `POST` run. A pending key whose lookup does not adopt a draft is not posted again. An unreadable or corrupt pending file refuses before `POST`. Query and body keys are case-folded and trimmed before the allowlist check; a key that changes, or collides, is refused. The `/sw.js` continuation is restored, and `service_workers` stays `"block"` unless a test passes `"allow"`.
+
+Draft suite: 114 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_etsy_draft_client.py tests/unit/assets/test_etsy_draft_ready.py`. The two service-worker rows passed. Source was restored after each mutant. Counts below are failures on that 114-test suite unless noted. The r1 table under the next heading is unchanged.
+
+| Mutant | Killing test | F |
+|---|---|---|
+| Stop after the first page | `test_an_empty_ledger_adopts_the_page_two_orphan_without_a_post` (also the pending page-2 restart and the insert/delete row) | 3 |
+| Delete the page cap | `test_a_full_page_cap_refuses_to_post` | 1 |
+| Delete the stable-count check | `test_a_count_that_changes_between_pages_refuses_to_post` | 1 |
+| Delete the short-page count check | `test_a_short_page_whose_count_does_not_match_refuses_to_post` | 1 |
+| Delete the repeated-id check | `test_a_repeated_listing_id_refuses_to_post` | 1 |
+| Delete the oversize-page check | `test_a_page_longer_than_the_limit_is_malformed` | 1 |
+| Delete the transport wrapper | `test_a_lookup_transport_error_refuses_to_post` | 1 |
+| Relabel a lookup refusal as transport | `test_a_lookup_refusal_is_not_relabelled_as_transport` and `test_a_missing_or_real_token_never_opens_a_socket` | 2 |
+| Refuse pending before lookup | `test_a_pending_restart_adopts_when_lookup_finds_the_draft` | 3 |
+| Delete the pending re-POST refusal | `test_a_pending_key_with_no_draft_does_not_post` | 2 |
+| POST before the pending write | `test_pending_is_written_before_the_call` | 2 |
+| Delete `put_pending` | `test_pending_is_written_before_the_call` | 2 |
+| Delete the file fsync | `test_put_pending_fsyncs_the_file` | 2 |
+| Delete the directory fsync | `test_put_pending_fsyncs_the_directory` | 2 |
+| Drop `O_NOFOLLOW` on create | `test_the_pending_create_uses_nofollow` | 1 |
+| Drop `O_EXCL` on create | `test_the_pending_create_uses_exclusive` | 3 |
+| Drop `O_CREAT` on create | `test_the_pending_create_uses_create` | 33 |
+| Drop `O_NOFOLLOW` on read | `test_an_unreadable_pending_file_refuses_to_post` | 1 |
+| Treat a corrupt file as missing | `test_a_corrupt_pending_file_refuses_to_post` | 1 |
+| Follow a broken symlink | `test_a_broken_pending_symlink_refuses_to_post` | 1 |
+| Delete the query case check | `test_a_query_key_that_changes_case_is_refused` | 2 |
+| Delete the query space check | `test_a_query_key_with_whitespace_is_refused` | 2 |
+| Delete the query duplicate check | `test_a_duplicated_query_key_is_refused` | 1 |
+| Skip query normalization on POST | both POST query-shape rows; the GET rows still pass | 2 |
+| Delete the non-empty POST query check | `test_a_post_query_is_refused_before_the_transport` | 1 |
+| Delete the body case check | `test_a_body_key_that_changes_case_is_refused` | 1 |
+| Delete the body space check | `test_a_body_key_with_whitespace_is_refused` | 1 |
+| Delete the body duplicate check | `test_a_duplicated_body_key_is_refused` | 1 |
+| Delete the missing-body check | `test_a_missing_body_is_refused` | 1 |
+| Delete the extra-body-key check | `test_a_state_field_on_create_is_refused_before_the_transport` | 1 |
+| Delete the missing-body-key check | `test_a_missing_body_key_is_refused` | 1 |
+| Delete the GET-body check | `test_a_get_with_a_body_is_refused_before_the_transport` | 1 |
+| Delete the unknown query-key check | `test_an_unknown_query_key_is_refused_before_the_transport` | 1 |
+| Delete the lookup-state check | `test_lookup_state_must_be_draft` | 1 |
+| Delete the limit check | all four `test_a_bad_limit_is_refused` rows | 4 |
+| Delete the offset check | both `test_a_bad_offset_is_refused` rows | 2 |
+| Delete the digit check | `test_a_bad_limit_is_refused[x]` | 1 |
+| Delete the leading-zero check | `test_a_bad_limit_is_refused[01]` and `test_a_bad_offset_is_refused[01]` | 2 |
+| Delete the low bound | `test_a_bad_limit_is_refused[0]` | 1 |
+| Drop the high bound | `test_a_bad_limit_is_refused[101]` | 1 |
+| Delete CRLF normalization | `test_a_crlf_marker_line_is_adopted` | 1 |
+| Delete trailing-whitespace normalization | `test_a_trailing_space_on_the_marker_line_is_adopted` | 1 |
+| Delete the marker-injection check | `test_an_injected_marker_line_is_refused_before_the_transport` | 1 |
+| Omit one fixture-hash field | that field's `test_a_changed_field_changes_the_fixture_hash` row; description and title also fail their adoption rows | 1 or 2 |
+| Omit the hash from the marker | `test_the_marker_embeds_the_fixture_hash` | 3 |
+| Drop `state=draft` from the lookup query | `test_a_crash_after_create_adopts_the_existing_draft` | 5 |
+| Default `service_workers` to `allow` | `test_the_fixture_context_makes_no_network_requests` | 1 of 2 |
+| Delete the `/sw.js` continuation | `test_allowing_service_workers_fetches_the_worker_script` | 1 of 2 |
+
+Parked to next wave: human publish before retry, and live Etsy. Action 8 S3, upload operations, `updateListing` and publish, commissioning, the session exit, and the W7 leftovers stay parked.
+
 ## 2026-10-15 — Session 08 W8: fixture Etsy draft
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. Action 8 stays parked. A10, A11, and A13 stay `DESIGNED`. This wave does not emit `DRAFT_CREATED` and does not edit `workflows.yaml`.

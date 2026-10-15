@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import socket
 from dataclasses import replace
+from pathlib import Path
 from uuid import UUID
 
 import pytest
@@ -154,9 +155,9 @@ def _evidence(**changes: object) -> DraftEvidence:
     return replace(evidence, **changes)
 
 
-def test_a_passed_chain_is_a_ready_draft() -> None:
+def test_a_passed_chain_is_a_ready_draft(tmp_path: Path) -> None:
     store = Store()
-    client = EtsyDraftClient(store, DraftLedger())
+    client = EtsyDraftClient(store, DraftLedger(tmp_path))
     receipt = prepare_etsy_draft(_evidence(), client)
     assert receipt.ready is True
     assert receipt.state == "draft"
@@ -180,9 +181,11 @@ def test_a_passed_chain_is_a_ready_draft() -> None:
         ({"assets": _assets(stale_image=True)}, "asset_qa"),
     ],
 )
-def test_each_gate_refuses_on_its_own(changes: dict[str, object], gate: str) -> None:
+def test_each_gate_refuses_on_its_own(
+    tmp_path: Path, changes: dict[str, object], gate: str
+) -> None:
     store = Store()
-    client = EtsyDraftClient(store, DraftLedger())
+    client = EtsyDraftClient(store, DraftLedger(tmp_path))
     with pytest.raises(DraftGateError) as caught:
         prepare_etsy_draft(_evidence(**changes), client)
     assert caught.value.gate == gate

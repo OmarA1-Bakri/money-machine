@@ -278,6 +278,7 @@ def open_screenshot_context(
     *,
     javascript: bool,
     allowed_http: tuple[str, ...] = (),
+    service_workers: Literal["allow", "block"] = "block",
 ) -> BrowserContext:
     context = browser.new_context(
         viewport={"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT},
@@ -286,7 +287,7 @@ def open_screenshot_context(
         reduced_motion="reduce",
         color_scheme="light",
         java_script_enabled=javascript,
-        service_workers="block",
+        service_workers=service_workers,
         bypass_csp=True,
         locale="en-US",
         timezone_id="UTC",
@@ -333,7 +334,17 @@ def _file_allowed(url: str) -> bool:
 
 
 def _http_allowed(url: str, _resource_type: str, allowed_http: frozenset[str]) -> bool:
-    return url in allowed_http
+    if url in allowed_http:
+        return True
+    # This Chromium reports the worker script as "script", not "serviceworker".
+    # Continue that script only for an allowed document. Production capture
+    # passes an empty allow-list, so the script is aborted there. The
+    # continuation is what makes service_workers="allow" visible to the test.
+    for document in allowed_http:
+        prefix = document[:-1] if document.endswith("/") else document
+        if url == f"{prefix}/sw.js":
+            return True
+    return False
 
 
 def _paint_page(context: BrowserContext, document: str) -> bytes:

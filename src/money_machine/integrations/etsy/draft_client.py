@@ -7,24 +7,29 @@ Measured from the Etsy Open API v3 Shop Listing document
 - ``createDraftListing`` — ``POST /v3/application/shops/{shop_id}/listings``
 - ``getListingsByShop`` — ``GET /v3/application/shops/{shop_id}/listings``
 
-``getListingsByShop`` defaults ``state`` to ``active``. This client sends
-``state=draft``. ``updateListing`` is ``PATCH`` on
-``/v3/application/shops/{shop_id}/listings/{listing_id}`` and can set
-``state=active``, which publishes the draft. That pair is not in the
+``getListingsByShop`` defaults ``state`` to ``active`` and ``limit`` to 25.
+This client sends ``state=draft`` and ``limit=100``, and follows ``offset``
+until a short page. ``count`` is the filtered total. ``updateListing`` is
+``PATCH`` on ``/v3/application/shops/{shop_id}/listings/{listing_id}`` and can
+set ``state=active``, which publishes the draft. That pair is not in the
 allowlist, and this class has no publish or activate method.
 
 Etsy does not take a client idempotency key. The ledger key is the spec
-version plus a hash of the fixture fields. The description carries one exact
-line, ``mm-draft:{spec_version}:{fixture_hash}``. A retry adopts that line
-and never a title.
+version plus a hash of the fixture fields. The pending file is created with
+``O_CREAT|O_EXCL|O_NOFOLLOW`` and fsynced, with the directory, before
+``POST``. A pending key with no adopted draft is not posted again. The
+description carries one exact line, ``mm-draft:{spec_version}:{fixture_hash}``.
+A retry adopts that line and never a title.
 """
 
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal, Protocol
 from uuid import UUID
 
@@ -36,6 +41,21 @@ MEASURED_ALLOWLIST: frozenset[tuple[str, str]] = frozenset(
     }
 )
 _LISTINGS_RE = re.compile(r"^/v3/application/shops/([1-9][0-9]*)/listings$")
+PAGE_LIMIT = 100
+PAGE_CAP = 10
+_GET_KEYS = frozenset({"state", "limit", "offset"})
+_BODY_KEYS = frozenset(
+    {
+        "quantity",
+        "title",
+        "description",
+        "price",
+        "who_made",
+        "when_made",
+        "taxonomy_id",
+        "type",
+    }
+)
 
 
 class EtsyDraftRefused(Exception):
@@ -94,7 +114,7 @@ class FixtureTransport(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class LedgerEntry:
-    """One spec-and-hash row. ``pending`` is written before the transport call."""
+    """One spec-and-hash row. ``pending`` is written before ``POST``."""
 
     spec_version: int
     fixture_hash: str
@@ -102,34 +122,88 @@ class LedgerEntry:
     listing_id: int | None
 
 
-class DraftLedger:
-    """In-memory idempotency ledger. The key is not an Etsy field."""
+def _fsync_file(fd: int) -> None:
+    """Flush one file descriptor. Called before ``POST``."""
+    os.fsync(fd)
 
-    def __init__(self) -> None:
-        self._rows: dict[tuple[int, str], LedgerEntry] = {}
+
+def _fsync_dir(directory: Path) -> None:
+    """Flush the directory so the new name survives a crash."""
+    fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+class DraftLedger:
+    """Durable idempotency ledger. The directory is injected. There is no default."""
+
+    def __init__(self, directory: Path) -> None:
+        self._directory = directory
 
     def get(self, spec_version: int, fixture_hash: str) -> LedgerEntry | None:
-        return self._rows.get((spec_version, fixture_hash))
+        """Return the row, or refuse an unreadable or corrupt file."""
+        path = self._path(spec_version, fixture_hash)
+        if not path.is_symlink() and not path.exists():
+            return None
+        try:
+            descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        except OSError as exc:
+            raise EtsyDraftRefused("ledger") from exc
+        try:
+            payload = os.read(descriptor, 4096)
+        except OSError as exc:
+            raise EtsyDraftRefused("ledger") from exc
+        finally:
+            os.close(descriptor)
+        text = payload.decode("utf-8", errors="replace")
+        if text == "pending\n":
+            return LedgerEntry(
+                spec_version=spec_version,
+                fixture_hash=fixture_hash,
+                status="pending",
+                listing_id=None,
+            )
+        if text.startswith("recorded\n"):
+            lines = text.split("\n")
+            if len(lines) >= 2 and lines[1].isdigit() and int(lines[1]) >= 1:
+                return LedgerEntry(
+                    spec_version=spec_version,
+                    fixture_hash=fixture_hash,
+                    status="recorded",
+                    listing_id=int(lines[1]),
+                )
+        raise EtsyDraftRefused("ledger_corrupt")
 
     def put_pending(self, spec_version: int, fixture_hash: str) -> None:
-        key = (spec_version, fixture_hash)
-        current = self._rows.get(key)
-        if current is not None and current.status == "recorded":
+        """Create the pending file if it is missing. A recorded row stays recorded."""
+        current = self.get(spec_version, fixture_hash)
+        if current is not None:
             return
-        self._rows[key] = LedgerEntry(
-            spec_version=spec_version,
-            fixture_hash=fixture_hash,
-            status="pending",
-            listing_id=None,
-        )
+        self._create_exclusive(self._path(spec_version, fixture_hash), b"pending\n")
 
     def record(self, spec_version: int, fixture_hash: str, listing_id: int) -> None:
-        self._rows[(spec_version, fixture_hash)] = LedgerEntry(
-            spec_version=spec_version,
-            fixture_hash=fixture_hash,
-            status="recorded",
-            listing_id=listing_id,
-        )
+        """Replace the row with the adopted or created listing."""
+        payload = f"recorded\n{listing_id}\n".encode()
+        path = self._path(spec_version, fixture_hash)
+        temporary = path.with_name(path.name + ".next")
+        self._create_exclusive(temporary, payload)
+        os.replace(temporary, path)
+        _fsync_dir(self._directory)
+
+    def _path(self, spec_version: int, fixture_hash: str) -> Path:
+        return self._directory / f"{spec_version}-{fixture_hash}"
+
+    def _create_exclusive(self, path: Path, payload: bytes) -> None:
+        flags = os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_WRONLY
+        descriptor = os.open(path, flags, 0o644)
+        try:
+            os.write(descriptor, payload)
+            _fsync_file(descriptor)
+        finally:
+            os.close(descriptor)
+        _fsync_dir(self._directory)
 
 
 class EtsyDraftClient:
@@ -140,20 +214,22 @@ class EtsyDraftClient:
         self._ledger = ledger
 
     def create_draft(self, spec: DraftSpec) -> DraftReceipt:
-        """Return the ready draft. A missing transport never opens a socket."""
+        """Return the ready draft. A pending key with no adopted draft is not posted."""
         _require_spec(spec)
         digest = fixture_hash(spec)
         marker = draft_marker(spec.spec_version, digest)
-        recorded = self._ledger.get(spec.spec_version, digest)
-        if recorded is not None and recorded.status == "recorded":
-            listing_id = recorded.listing_id
+        existing = self._ledger.get(spec.spec_version, digest)
+        if existing is not None and existing.status == "recorded":
+            listing_id = existing.listing_id
             assert listing_id is not None
             return _receipt(spec, digest, marker, listing_id)
-        self._ledger.put_pending(spec.spec_version, digest)
         adopted = self._adopt(spec, marker)
         if adopted is not None:
             self._ledger.record(spec.spec_version, digest, adopted)
             return _receipt(spec, digest, marker, adopted)
+        if existing is not None and existing.status == "pending":
+            raise EtsyDraftRefused("pending")
+        self._ledger.put_pending(spec.spec_version, digest)
         created = self._create(spec, marker)
         self._ledger.record(spec.spec_version, digest, created)
         return _receipt(spec, digest, marker, created)
@@ -165,39 +241,67 @@ class EtsyDraftClient:
         query: tuple[tuple[str, str], ...],
         body: tuple[tuple[str, str], ...] | None,
     ) -> Mapping[str, object]:
-        """Send one call. Off-list pairs are refused before the transport."""
+        """Send one call. Off-list pairs and bad keys are refused before the transport."""
         if self._transport is None:
             raise EtsyDraftRefused("fixture_transport")
         pair = _measured_pair(method, path)
         if pair not in MEASURED_ALLOWLIST:
             raise EtsyDraftRefused("off_list")
-        if method == "GET" and query != (("state", "draft"),):
-            raise EtsyDraftRefused("lookup_state")
-        if body is not None and any(name == "state" for name, _value in body):
-            raise EtsyDraftRefused("state_field")
+        if method == "GET":
+            _refuse_get(query, body)
+        elif method == "POST":
+            _refuse_post(query, body)
         return self._transport.exchange(FixtureCall(method, path, query, body))
 
     def _adopt(self, spec: DraftSpec, marker: str) -> int | None:
-        payload = self.exchange(
-            "GET",
-            _listings_path(spec.shop_id),
-            (("state", "draft"),),
-            None,
-        )
-        results = payload.get("results")
-        if not isinstance(results, list):
-            raise EtsyDraftRefused("malformed")
         found: int | None = None
-        for row in results:
-            if not isinstance(row, dict):
+        seen = 0
+        seen_ids: set[int] = set()
+        expected: int | None = None
+        offset = 0
+        for _page in range(PAGE_CAP):
+            try:
+                payload = self.exchange(
+                    "GET",
+                    _listings_path(spec.shop_id),
+                    _draft_query(offset),
+                    None,
+                )
+            except EtsyDraftRefused:
+                raise
+            except Exception as exc:
+                raise EtsyDraftRefused("transport") from exc
+            results = payload.get("results")
+            count = payload.get("count")
+            if not isinstance(results, list) or type(count) is not int or count < 0:
                 raise EtsyDraftRefused("malformed")
-            if not _line_marker(row.get("description"), marker):
-                continue
-            listing_id = _draft_listing_id(row)
-            if found is not None:
-                raise EtsyDraftRefused("duplicate_marker")
-            found = listing_id
-        return found
+            if expected is None:
+                expected = count
+            elif count != expected:
+                raise EtsyDraftRefused("count")
+            if len(results) > PAGE_LIMIT:
+                raise EtsyDraftRefused("malformed")
+            for row in results:
+                if not isinstance(row, dict):
+                    raise EtsyDraftRefused("malformed")
+                listing_raw = row.get("listing_id")
+                if type(listing_raw) is int:
+                    if listing_raw in seen_ids:
+                        raise EtsyDraftRefused("count")
+                    seen_ids.add(listing_raw)
+                if not _line_marker(row.get("description"), marker):
+                    continue
+                listing_id = _draft_listing_id(row)
+                if found is not None:
+                    raise EtsyDraftRefused("duplicate_marker")
+                found = listing_id
+            seen += len(results)
+            if len(results) < PAGE_LIMIT:
+                if seen != expected:
+                    raise EtsyDraftRefused("count")
+                return found
+            offset += PAGE_LIMIT
+        raise EtsyDraftRefused("page_cap")
 
     def _create(self, spec: DraftSpec, marker: str) -> int:
         description = _with_marker(spec.description, marker)
@@ -250,10 +354,20 @@ def _require_spec(spec: DraftSpec) -> None:
         raise EtsyDraftRefused("title")
     if spec.price == "":
         raise EtsyDraftRefused("price")
+    if any(line.startswith("mm-draft:") for line in _description_lines(spec.description)):
+        raise EtsyDraftRefused("marker_injection")
 
 
 def _listings_path(shop_id: int) -> str:
     return f"/v3/application/shops/{shop_id}/listings"
+
+
+def _draft_query(offset: int) -> tuple[tuple[str, str], ...]:
+    return (
+        ("state", "draft"),
+        ("limit", str(PAGE_LIMIT)),
+        ("offset", str(offset)),
+    )
 
 
 def _measured_pair(method: str, path: str) -> tuple[str, str]:
@@ -263,11 +377,92 @@ def _measured_pair(method: str, path: str) -> tuple[str, str]:
     return (method, _LISTINGS_PATH)
 
 
+def _query_keys(pairs: tuple[tuple[str, str], ...]) -> dict[str, str]:
+    """Case-fold and trim lookup keys. A key that changes, or collides, is refused."""
+    normalized: dict[str, str] = {}
+    for raw, value in pairs:
+        if raw != raw.casefold():
+            raise EtsyDraftRefused("query_case")
+        folded = raw.casefold()
+        if folded != folded.strip():
+            raise EtsyDraftRefused("query_space")
+        key = folded.strip()
+        if key in normalized:
+            raise EtsyDraftRefused("query_duplicate")
+        normalized[key] = value
+    return normalized
+
+
+def _body_keys(pairs: tuple[tuple[str, str], ...]) -> dict[str, str]:
+    """Case-fold and trim create-body keys. A key that changes, or collides, is refused."""
+    normalized: dict[str, str] = {}
+    for raw, value in pairs:
+        if raw != raw.casefold():
+            raise EtsyDraftRefused("body_case")
+        folded = raw.casefold()
+        if folded != folded.strip():
+            raise EtsyDraftRefused("body_space")
+        key = folded.strip()
+        if key in normalized:
+            raise EtsyDraftRefused("body_duplicate")
+        normalized[key] = value
+    return normalized
+
+
+def _canonical_int(value: str, *, low: int, high: int | None) -> bool:
+    if not value.isdigit():
+        return False
+    if value != "0" and value.startswith("0"):
+        return False
+    number = int(value)
+    if number < low:
+        return False
+    return high is None or number <= high
+
+
+def _refuse_get(
+    query: tuple[tuple[str, str], ...],
+    body: tuple[tuple[str, str], ...] | None,
+) -> None:
+    if body is not None:
+        raise EtsyDraftRefused("query_key")
+    fields = _query_keys(query)
+    if set(fields) - _GET_KEYS:
+        raise EtsyDraftRefused("query_key")
+    if "state" in fields and fields["state"] != "draft":
+        raise EtsyDraftRefused("lookup_state")
+    if "limit" in fields and not _canonical_int(fields["limit"], low=1, high=PAGE_LIMIT):
+        raise EtsyDraftRefused("query_limit")
+    if "offset" in fields and not _canonical_int(fields["offset"], low=0, high=None):
+        raise EtsyDraftRefused("query_offset")
+
+
+def _refuse_post(
+    query: tuple[tuple[str, str], ...],
+    body: tuple[tuple[str, str], ...] | None,
+) -> None:
+    _query_keys(query)
+    if query:
+        raise EtsyDraftRefused("post_query")
+    if body is None:
+        raise EtsyDraftRefused("body_missing")
+    fields = _body_keys(body)
+    if set(fields) - _BODY_KEYS:
+        raise EtsyDraftRefused("body_extra")
+    if _BODY_KEYS - set(fields):
+        raise EtsyDraftRefused("body_missing")
+
+
+def _description_lines(description: str) -> tuple[str, ...]:
+    text = description.replace("\r\n", "\n")
+    return tuple(line.rstrip(" \t") for line in text.split("\n"))
+
+
 def _line_marker(description: object, marker: str) -> bool:
-    """True only when a whole line equals the marker."""
+    """True only when a whole normalized line equals the marker."""
     if not isinstance(description, str):
         return False
-    return any(line == marker for line in description.split("\n"))
+    return any(line == marker for line in _description_lines(description))
 
 
 def _with_marker(description: str, marker: str) -> str:
