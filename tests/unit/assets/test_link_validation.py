@@ -862,6 +862,8 @@ def test_a_page_additional_action_without_a_uri_is_malformed() -> None:
         accepted=_accepted_good(),
     )
     assert refusal.code == "malformed"
+    assert isinstance(refusal.__cause__, ValueError)
+    assert refusal.__cause__.args == ("pdf page additional action",)
 
 
 def test_a_page_missing_tabs_is_malformed() -> None:

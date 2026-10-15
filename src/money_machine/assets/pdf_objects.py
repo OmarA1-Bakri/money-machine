@@ -10,11 +10,11 @@ annotation must be exactly ``Type``, ``Subtype``, ``Rect``, ``Border``,
 in the graph. A ``/URI`` that is not the link's own action is checked with
 the same rules as a delivery link, and it must be one of the accepted links.
 An indirect action or URI is resolved one hop. A URI stream on a link is
-refused. The catalog is the trailer ``/Root``,
-read before the walk, and must equal ``Type`` and ``Pages``. A page must
-equal the keys Chromium emits, with ``Annots`` only when the page has
-annotations. The walk remembers ``(object, role)``. Every ``/Annots`` visit
-checks the subtype, and a later visit also checks the link keys. The page walk
+refused. The catalog is the trailer ``/Root``, read before the walk, and must
+equal ``Type`` and ``Pages``. A page must equal the keys Chromium emits, with
+``Annots`` only when the page has annotations. A page ``/AA`` is named on its
+own. The walk remembers ``(object, role)``. Every ``/Annots`` visit checks
+the subtype, and a later visit also checks the link keys. The page walk
 stops a ``/Kids`` chain past depth 64 with ``pdf kids depth``. Names are
 decoded once in the reader, and a dictionary with two keys for one name is
 refused there.
@@ -258,6 +258,8 @@ def _refuse_dict(
 def _refuse_page(fields: dict[str, PdfObject]) -> None:
     if not _name_is(fields.get("Type"), "Page"):
         return
+    if "AA" in fields:
+        raise ValueError("pdf page additional action")
     keys = frozenset(fields) - _PAGE_ALLOW_EXTRA
     if keys != _PAGE_KEYS and keys != _PAGE_WITH_ANNOTS:
         raise ValueError("pdf page keys")
