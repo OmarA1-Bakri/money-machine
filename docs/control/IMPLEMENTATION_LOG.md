@@ -1,3 +1,53 @@
+## 2026-10-15 — Session 08 W7: artifact lineage
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+Prompt integrity: `docs/control/reviews/2026-10-15-session-08-w7-prompt-integrity.md`. The addendum is action 7 plus four #74 carries. The storage URI is `fixture://`. S3 stays action 8. Bound PNG, PDF, and video bytes stay as they are. Invalidation rewrites QA status on the record. It does not delete a file or call a provider.
+
+The seen set stays `(object number, role)`. Re-entering an action object raises `pdf seen key`. An `/Annots` array is subtype-checked at the parent, before the child is entered, so a seen set keyed only by object number still refuses a Widget. `_pages` raises `pdf kids depth`. The gift path maps that message to `malformed` and leaves every other `ValueError` as `paid_checkout`. A graph `/URI` that passes the host rules must also be one of the accepted link strings. A page `/AA` that contains a `/URI` raises `pdf page /AA`, which the validator maps to `page_aa`.
+
+`ArtifactLineage` stores the action 7 fields beside the renderers. Pixel kinds store dimensions and no page count. A delivery PDF stores a page count and no dimensions. A screenshot's source tuple is its own hash. A listing image or walkthrough names at least one screenshot hash. The URI is `fixture://{product}/spec/{spec}/build/{build}/{kind}/{sha256}`. `s3://`, `http://`, `https://`, and `file://` are `live_storage`. An older spec of this product becomes `stale`, then every asset whose dependency URI is already stale. A current spec with no stale dependency stays `passed`. Another product stays as it was.
+
+Clean lineage file: 28 passed. Command: `PYTHONDONTWRITEBYTECODE=1 uv run pytest -q -p no:cacheprovider --tb=no tests/unit/assets/test_artifact_lineage.py`. Clean link, gift-policy, and gift-pdf files, Chromium rows deselected: 221 passed, 2 deselected. Command: `uv run pytest -q -p no:cacheprovider --tb=no -k "not readme_uris and not gift_pdf_has_no_links" tests/unit/assets/test_link_validation.py tests/unit/assets/test_gift_link_policy.py tests/unit/assets/test_gift_pdf_links.py`. Source restored after each run. `PYTHONDONTWRITEBYTECODE=1` kept a same-second rewrite from reusing the previous mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Seen set returns when the object number was already walked | `test_a_reentered_action_is_refused` | 1/220 |
+| Second-role subtype also allows Widget | `test_a_second_role_widget_is_malformed` | 1/220 |
+| Gift path maps every `ValueError` to `paid_checkout` | `tests/unit/assets/test_gift_link_policy.py::test_a_deep_kids_chain_is_malformed` | 1/220 |
+| `_pages` raises `pdf depth` | the same gift test | 1/220 |
+| Delete the accepted-set membership check | `test_an_on_host_graph_uri_must_be_an_accepted_link` | 1/220 |
+| Delete the page `/AA` branch | `test_a_page_uri_additional_action_is_page_aa` | 1/220 |
+| Delete the `qa_status` allow-set | `test_a_qa_status_must_be_passed_or_stale` | 1/27 |
+| Delete the spec-version floor | `test_a_spec_version_below_one_is_refused` | 1/27 |
+| Delete the build-version floor | `test_a_build_version_below_one_is_refused` | 1/27 |
+| Delete the blank merchandising check | `test_a_blank_merchandising_version_is_refused` | 1/27 |
+| Delete the blank template check | `test_a_blank_template_version_is_refused` | 1/27 |
+| Delete the content-hash check | `test_a_short_hash_is_refused` | 1/27 |
+| Delete the source-hash check | `test_a_source_hash_must_be_lowercase_hex` | 1/27 |
+| Delete the pixel `dimensions is None` check | `test_a_screenshot_without_dimensions_is_refused` | 1/27 |
+| Delete the pixel page-count check | `test_a_screenshot_with_a_page_count_is_refused` | 1/27 |
+| Delete the pixel size check | `test_a_screenshot_with_a_zero_dimension_is_refused` | 1/27 |
+| Delete the PDF dimensions check | `test_a_pdf_with_dimensions_is_refused` | 1/27 |
+| Delete the PDF missing-page check | `test_a_pdf_without_a_page_count_is_refused` | 1/27 |
+| Delete the PDF `page_count < 1` check | `test_a_pdf_with_zero_pages_is_refused` | 1/27 |
+| Delete the screenshot source equality | `test_a_screenshot_must_name_its_own_hash` | 1/27 |
+| Delete the listing-image source check | `test_a_listing_image_without_a_screenshot_is_refused` | 1/27 |
+| Delete the walkthrough source check | `test_a_walkthrough_without_a_screenshot_is_refused` | 1/27 |
+| Delete the `s3://` check | `test_live_storage_is_refused[s3://bucket/x]` | 1/27 |
+| Delete the `http://` check | `test_live_storage_is_refused[http://fixture.example/x]` | 1/27 |
+| Delete the `https://` check | `test_live_storage_is_refused[https://fixture.example/x]` | 1/27 |
+| Delete the `file://` check | `test_live_storage_is_refused[file:///tmp/x]` | 1/27 |
+| Delete the storage-URI equality | `test_a_storage_uri_must_name_the_hash` | 1/27 |
+| Mark every row of this product stale | `test_the_current_spec_stays_passed` | 1/27 |
+| Ignore `product_id` | `test_another_product_stays_passed` | 1/27 |
+| Drop the already-stale seed | `test_an_already_stale_asset_marks_its_dependent` | 1/27 |
+| Collapse the dependency fixpoint to one pass | `test_a_transitive_dependent_is_stale` | 1/27 |
+
+The two Kids mutants share the gift test. The validator's deep `/Kids` row stays `malformed` for both, so it is not a separate kill. Mapping every gift `ValueError` to `malformed` fails `test_untyped_page_is_refused`, `test_looping_page_kids_is_refused`, and `test_a_deep_nest_is_paid_checkout` (3/218). Returning `link_mismatch` for every graph URI that passed the host rules fails six rows, including `test_an_accepted_graph_uri_outside_the_link_passes`. Deleting the dependency walk fails both propagation tests (2/26). The one-pass mutant is the closure row.
+
+Parked, with the earlier survivors: same-host `http` hop, punycode and uppercase on-host URIs, the URI-stream `raise` survivor, `file:` allow, `sendBeacon`, spelled-out emails, `_prepare` non-ASCII, and raster text.
+
 ## 2026-10-15 — Session 08 W6 r7: catalog before the walk, page keys, every URI
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
