@@ -103,11 +103,10 @@ class SimS3AssetStore:
         require_digest(data, sha256)
         uri = object_uri(scheme, product_id, spec_version, sha256)
         existing = self._objects.get(uri)
-        if existing is None:
-            self._objects[uri] = data
-            self._roles[uri] = role
-            return StoredObject(uri, sha256, len(data), role)
-        if existing == data:
-            return StoredObject(uri, sha256, len(data), role)
-        refuse_collision(existing, data)
-        raise ValueError("storage place")
+        if existing is not None:
+            if existing == data:
+                return StoredObject(uri, sha256, len(data), role)
+            refuse_collision(existing, data)
+        self._objects[uri] = data
+        self._roles[uri] = role
+        return StoredObject(uri, sha256, len(data), role)

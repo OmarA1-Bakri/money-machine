@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import errno
 import hashlib
+import os
 from pathlib import Path
 from uuid import UUID
 
@@ -357,6 +359,215 @@ def test_s3_cleanup_keeps_the_current_temp() -> None:
     ).storage_uri
     store.cleanup_temporary(product_id=_PRODUCT, spec_version=2, keep_sha256=_digest(_PNG))
     assert store.read(kept) == _PNG
+
+
+def test_publish_does_not_follow_a_symlinked_parent(tmp_path: Path) -> None:
+    store = _local(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    role = store.root / "published"
+    role.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ValueError, match="storage symlink"):
+        _publish(store, _PNG)
+    assert list(outside.iterdir()) == []
+
+
+def test_discard_does_not_follow_a_symlinked_product(tmp_path: Path) -> None:
+    store = _local(tmp_path)
+    outside = tmp_path / "outside"
+    spec = outside / "2"
+    spec.mkdir(parents=True)
+    digest = _digest(_PNG)
+    victim = spec / digest
+    victim.write_bytes(_PNG)
+    product = store.root / "temporary" / str(_PRODUCT)
+    product.parent.mkdir(parents=True)
+    product.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ValueError, match="storage symlink"):
+        store.discard(f"temp://{_PRODUCT}/2/{digest}")
+    assert victim.read_bytes() == _PNG
+
+
+def test_cleanup_does_not_follow_a_symlinked_role(tmp_path: Path) -> None:
+    store = _local(tmp_path)
+    outside = tmp_path / "outside" / str(_PRODUCT) / "2"
+    outside.mkdir(parents=True)
+    digest = _digest(_OLD)
+    victim = outside / digest
+    victim.write_bytes(_OLD)
+    role = store.root / "temporary"
+    role.symlink_to(tmp_path / "outside", target_is_directory=True)
+    with pytest.raises(ValueError, match="storage symlink"):
+        store.cleanup_temporary(product_id=_PRODUCT, spec_version=2, keep_sha256=_digest(_PNG))
+    assert victim.read_bytes() == _OLD
+
+
+def test_a_symlink_swapped_during_the_walk(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    store = _local(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    digest = _digest(_PNG)
+    (outside / digest).write_bytes(_OLD)
+    spec = store.root / "published" / str(_PRODUCT) / "2"
+    spec.mkdir(parents=True)
+    real_open = os.open
+
+    def swapping_open(
+        path: str | Path, flags: int, mode: int = 0o777, *, dir_fd: int | None = None
+    ) -> int:
+        if path == "2" and dir_fd is not None and spec.is_dir() and not spec.is_symlink():
+            spec.rmdir()
+            spec.symlink_to(outside, target_is_directory=True)
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(os, "open", swapping_open)
+    with pytest.raises(ValueError, match="storage symlink"):
+        store.read(f"fixture://{_PRODUCT}/2/{digest}")
+    assert (outside / digest).read_bytes() == _OLD
+
+
+def test_a_dotdot_key_is_refused(tmp_path: Path) -> None:
+    store = _local(tmp_path)
+    secret = tmp_path / "secret"
+    secret.write_bytes(_OLD)
+    with pytest.raises(ValueError, match="storage path"):
+        store.read(f"fixture://{_PRODUCT}/../{_digest(_PNG)}")
+    assert secret.read_bytes() == _OLD
+
+
+def test_a_symlinked_parent_read_stays_inside(tmp_path: Path) -> None:
+    store = _local(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    digest = _digest(_PNG)
+    (outside / digest).write_bytes(_OLD)
+    spec = store.root / "published" / str(_PRODUCT) / "2"
+    spec.parent.mkdir(parents=True)
+    spec.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ValueError, match="storage symlink"):
+        store.read(f"fixture://{_PRODUCT}/2/{digest}")
+    assert (outside / digest).read_bytes() == _OLD
+
+
+def test_internal_retrieval_refuses_a_missing_object(tmp_path: Path) -> None:
+    store = _local(tmp_path)
+    _publish(store, _GIF)
+    with pytest.raises(ValueError, match="storage missing"):
+        store.internal_retrieval(f"fixture://{_PRODUCT}/2/{_digest(_PNG)}")
+
+
+def test_internal_retrieval_refuses_tampered_bytes(tmp_path: Path) -> None:
+    store = _local(tmp_path)
+    uri = _publish(store, _PNG)
+    _uri_path(store, uri).write_bytes(_GIF)
+    with pytest.raises(ValueError, match="storage bytes"):
+        store.internal_retrieval(uri)
+
+
+def test_a_crash_mid_write_can_retry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    store = _local(tmp_path)
+    real_write = os.write
+
+    def boom(_descriptor: int, _data: bytes | bytearray | memoryview) -> int:
+        raise OSError(errno.EIO, "disk")
+
+    monkeypatch.setattr(os, "write", boom)
+    with pytest.raises(OSError, match="disk"):
+        _publish(store, _PNG)
+    monkeypatch.setattr(os, "write", real_write)
+    final = store.root / "published" / str(_PRODUCT) / "2" / _digest(_PNG)
+    assert not final.exists()
+    uri = _publish(store, _PNG)
+    assert store.read(uri) == _PNG
+
+
+def test_publish_fsyncs_the_file_before_linking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    order: list[str] = []
+    real_open = os.open
+    real_fsync = os.fsync
+    real_link = os.link
+    created: set[int] = set()
+
+    def open_hook(
+        path: str | Path, flags: int, mode: int = 0o777, *, dir_fd: int | None = None
+    ) -> int:
+        descriptor = real_open(path, flags, mode, dir_fd=dir_fd)
+        if flags & os.O_CREAT:
+            created.add(descriptor)
+        return descriptor
+
+    def fsync(descriptor: int) -> None:
+        order.append("file" if descriptor in created else "dir")
+        real_fsync(descriptor)
+
+    def link(src: str, dst: str, **kwargs: int | bool | None) -> None:
+        order.append("link")
+        real_link(src, dst, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(os, "open", open_hook)
+    monkeypatch.setattr(os, "fsync", fsync)
+    monkeypatch.setattr(os, "link", link)
+    _publish(_local(tmp_path), _PNG)
+    assert order == ["file", "link", "dir"]
+
+
+def test_the_temp_file_is_created_exclusive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[int] = []
+    real_open = os.open
+
+    def open_hook(
+        path: str | Path, flags: int, mode: int = 0o777, *, dir_fd: int | None = None
+    ) -> int:
+        if isinstance(path, str) and path.startswith("."):
+            seen.append(flags)
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(os, "open", open_hook)
+    _publish(_local(tmp_path), _PNG)
+    assert seen
+    assert seen[0] & os.O_EXCL
+
+
+def test_the_temp_file_is_created_without_following(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[int] = []
+    real_open = os.open
+
+    def open_hook(
+        path: str | Path, flags: int, mode: int = 0o777, *, dir_fd: int | None = None
+    ) -> int:
+        if isinstance(path, str) and path.startswith("."):
+            seen.append(flags)
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(os, "open", open_hook)
+    _publish(_local(tmp_path), _PNG)
+    assert seen
+    assert seen[0] & os.O_NOFOLLOW
+
+
+def test_s3_mismatched_digest_is_refused() -> None:
+    store = SimS3AssetStore()
+    with pytest.raises(ValueError, match="storage digest"):
+        store.publish(product_id=_PRODUCT, spec_version=2, sha256=_digest(_GIF), data=_PNG)
+    with pytest.raises(ValueError, match="storage missing"):
+        store.read(f"s3://simulation/{_PRODUCT}/2/{_digest(_GIF)}")
+
+
+def test_s3_tampered_bytes_collide() -> None:
+    store = SimS3AssetStore()
+    uri = store.publish(
+        product_id=_PRODUCT, spec_version=2, sha256=_digest(_PNG), data=_PNG
+    ).storage_uri
+    store._objects[uri] = _GIF  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ValueError, match="storage collision"):
+        store.publish(product_id=_PRODUCT, spec_version=2, sha256=_digest(_PNG), data=_PNG)
+    assert store._objects[uri] == _GIF  # pyright: ignore[reportPrivateUsage]
 
 
 def test_s3_same_bytes_are_idempotent() -> None:
