@@ -9,8 +9,9 @@ The order is fixed:
    :data:`CURATED_TLDS`. A spaced ``.`` is undone only when that token is
    all lowercase or all uppercase and is ``com``, ``c0m``, ``net``, or
    ``org``. Case is read after NFKC. The lookalike fold keeps case. An
-   all-uppercase token is casefolded after that check. A mixed-case token
-   stays prose. ``c0m`` is the zero spelling of ``com``, and a zero in
+   all-uppercase token is casefolded after that check. A lowercase token
+   is compared as itself. A mixed-case token stays prose. ``c0m`` is the
+   zero spelling of ``com``, and a zero in
    ``org`` counts. A later word still leaves the spaced form alone.
    Bracket and parenthesis forms also accept the IANA snapshot.
 """
@@ -284,18 +285,18 @@ def _spaced_dot_tld(token: str) -> bool:
     """Accept an all-lowercase or all-uppercase com, c0m, net, or org.
 
     The token is already NFKC and lookalike-folded. Case is read here.
-    An all-uppercase token is casefolded after that check. A mixed-case
-    token stays prose. A lowercase zero inside org counts.
+    An all-uppercase token is casefolded after that check. A lowercase
+    token is compared as itself. A mixed-case token stays prose. A
+    lowercase zero inside org counts.
     """
     if token.isupper():
         token = token.casefold()
     if not token.islower():
         return False
-    folded = token.casefold()
-    if folded in _SPACED_DOT_TLDS:
+    if token in _SPACED_DOT_TLDS:
         return True
-    mapped = folded.translate(_ZERO_TO_O)
-    return mapped != folded and mapped in _SPACED_ZERO_TARGETS
+    mapped = token.translate(_ZERO_TO_O)
+    return mapped != token and mapped in _SPACED_ZERO_TARGETS
 
 
 def _curated_tld(token: str) -> bool:

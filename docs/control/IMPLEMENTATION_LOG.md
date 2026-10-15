@@ -1,3 +1,17 @@
+## 2026-10-15 — Session 08 drop the dead spaced-dot casefold
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.
+
+The casefold after the `islower` gate is gone. A lowercase token is compared as itself. An all-uppercase token is still casefolded after the case check. Casefolding the token before that gate refuses title case.
+
+Clean suite: 79 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defanged_host.py tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Casefold before the `islower` gate | `test_a_capitalised_spaced_dot_at_the_end_stays[Go . Com]` | 6/73 |
+
+The other five failures are the remaining title-case stays and the capital Cyrillic `O` stay. `test_an_all_caps_spaced_dot_is_refused` stays green.
+
 ## 2026-10-15 — Session 08 all-caps spaced dot
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.
