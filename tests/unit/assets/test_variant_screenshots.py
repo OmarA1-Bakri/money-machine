@@ -462,9 +462,7 @@ def _refuse_name(name: str, code: str) -> None:
 
 
 def _refuse_rendered(body: str, code: str) -> None:
-    html_doc = (
-        "<!DOCTYPE html><html data-mm-ready='loaded'><body><p>" + body + "</p></body></html>"
-    )
+    html_doc = "<!DOCTYPE html><html data-mm-ready='loaded'><body><p>" + body + "</p></body></html>"
     with pytest.raises(ScreenshotRefusal, match=code):
         _paint_documents((html_doc,))
 
