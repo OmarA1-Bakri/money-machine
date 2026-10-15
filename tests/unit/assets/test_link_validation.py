@@ -929,6 +929,26 @@ def test_a_reentered_action_is_refused() -> None:
     assert str(refusal.__cause__) == "pdf seen key"
 
 
+def test_an_accepted_graph_uri_outside_the_link_passes() -> None:
+    pdf = _annot(
+        _good_annot(),
+        objects={5: _obj(5, f"<< /S /URI /URI {_literal(_GOOD)} >>")},
+    )
+    report = _validate(pdf, accepted=_accepted_good())
+    assert report.repairs == ()
+
+
+def test_an_on_host_graph_uri_must_be_an_accepted_link() -> None:
+    extra = "https://fixture.notion.site/not-listed"
+    pdf = _annot(
+        _good_annot(),
+        objects={5: _obj(5, f"<< /S /URI /URI {_literal(extra)} >>")},
+    )
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "link_mismatch"
+    assert refusal.repairs == (AssetRepair(_ASSET, extra, "link_mismatch"),)
+
+
 def test_a_deep_kids_chain_is_malformed() -> None:
     objects: dict[int, bytes] = {1: _obj(1, "<< /Type /Catalog /Pages 10 0 R >>")}
     for hop in range(500):

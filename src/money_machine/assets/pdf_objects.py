@@ -130,7 +130,7 @@ class EmbeddedUriRefusal(ValueError):
         self.uri = uri
 
 
-def delivery_link_uris(pdf: bytes) -> tuple[str, ...]:
+def delivery_link_uris(pdf: bytes, *, accepted: frozenset[str] = frozenset()) -> tuple[str, ...]:
     """Return each link URI from the page walk, or raise ``ValueError``.
 
     Annotation keys must equal the Chromium set. The action is ``S`` and
@@ -141,7 +141,7 @@ def delivery_link_uris(pdf: bytes) -> tuple[str, ...]:
     subtype is not ``Link`` is refused here, not by the walk's parent key.
     """
     doc = PdfDocument(pdf)
-    _refuse_graph(doc)
+    _refuse_graph(doc, accepted)
     root = _dict(doc.deref(doc.trailer.get("Root")))
     uris: list[str] = []
     for page in _pages(doc, root.get("Pages")):
@@ -156,7 +156,7 @@ def delivery_link_uris(pdf: bytes) -> tuple[str, ...]:
     return tuple(uris)
 
 
-def _refuse_graph(doc: PdfDocument) -> None:
+def _refuse_graph(doc: PdfDocument, accepted: frozenset[str]) -> None:
     """Refuse a bad catalog, a bad page, a non-URI ``/S``, and an unvalidated ``/URI``.
 
     The catalog is ``trailer["Root"]``, checked before the walk so an earlier
@@ -188,7 +188,7 @@ def _refuse_graph(doc: PdfDocument) -> None:
             if seen_before and isinstance(value, dict) and "S" in value and "Subtype" not in value:
                 raise ValueError("pdf seen key")
         if isinstance(value, dict):
-            _refuse_dict(doc, value, in_link_action=in_link_action)
+            _refuse_dict(doc, value, in_link_action=in_link_action, accepted=accepted)
             owned = _name_is(value.get("Subtype"), "Link") and _name_is(value.get("Type"), "Annot")
             for key, child in value.items():
                 if key == "Annots":
@@ -257,13 +257,14 @@ def _refuse_dict(
     fields: dict[str, PdfObject],
     *,
     in_link_action: bool,
+    accepted: frozenset[str],
 ) -> None:
     _refuse_page(fields)
     action = fields.get("S")
     if isinstance(action, PdfName) and action.value not in _ALLOWED_S:
         raise ValueError("pdf action s")
     if isinstance(action, PdfName):
-        _refuse_action_uri(doc, fields, in_link_action=in_link_action)
+        _refuse_action_uri(doc, fields, in_link_action=in_link_action, accepted=accepted)
 
 
 def _refuse_page(fields: dict[str, PdfObject]) -> None:
@@ -279,6 +280,7 @@ def _refuse_action_uri(
     fields: dict[str, PdfObject],
     *,
     in_link_action: bool,
+    accepted: frozenset[str],
 ) -> None:
     """Validate a ``/URI`` the link extractor will not return.
 
@@ -294,16 +296,16 @@ def _refuse_action_uri(
     uri = _text_of(resolved)
     if uri is None:
         return
-    reason = _graph_uri_reason(uri)
+    reason = _graph_uri_reason(uri, accepted)
     if reason is not None:
         raise EmbeddedUriRefusal(reason, uri)
 
 
-def _graph_uri_reason(uri: str) -> str | None:
+def _graph_uri_reason(uri: str, accepted: frozenset[str]) -> str | None:
     # link_validation imports this module, so a top-level import cycles.
     from money_machine.assets.link_validation import refuse_graph_uri
 
-    return refuse_graph_uri(uri)
+    return refuse_graph_uri(uri, accepted)
 
 
 def _uri_action(doc: PdfDocument, annot: dict[str, PdfObject]) -> str:
