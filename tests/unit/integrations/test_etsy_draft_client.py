@@ -1289,6 +1289,36 @@ def test_a_marker_swap_between_existing_ids_refuses_to_post(tmp_path: Path) -> N
     assert ledger.get(spec.spec_version, fixture_hash(spec)) is None
 
 
+def test_a_reordered_description_still_posts(tmp_path: Path) -> None:
+    spec = _spec()
+    marker = draft_marker(spec.spec_version, fixture_hash(spec))
+    first = [_draft_row(1, "alpha"), _draft_row(2, "beta")]
+    second = [_draft_row(2, "beta"), _draft_row(1, "alpha")]
+
+    class _Reorder:
+        def __init__(self) -> None:
+            self.gets = 0
+            self.posts = 0
+
+        def exchange(self, call: FixtureCall) -> Mapping[str, object]:
+            if call.method == "POST":
+                self.posts += 1
+                return {
+                    "listing_id": 5,
+                    "state": "draft",
+                    "description": f"{spec.description}\n{marker}",
+                }
+            rows = first if self.gets == 0 else second
+            self.gets += 1
+            return {"count": len(rows), "results": rows}
+
+    race = _Reorder()
+    client = EtsyDraftClient(race, DraftLedger(tmp_path))
+    receipt = client.create_draft(spec)
+    assert receipt.ready is True
+    assert race.posts == 1
+
+
 def test_an_existing_description_change_refuses_to_post(tmp_path: Path) -> None:
     spec = _spec()
     marker = draft_marker(spec.spec_version, fixture_hash(spec))

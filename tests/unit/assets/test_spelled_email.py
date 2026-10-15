@@ -49,6 +49,19 @@ def test_a_bare_dot_md_email_stays() -> None:
     assert refuse_rendered_text("Stay at home dot spa") is None
 
 
+def test_a_plain_hxxp_url_needs_the_url_rule() -> None:
+    assert refuse_sensitive_text("hxxp://acme.com/a") == "sensitive_data"
+
+
+def test_a_spaced_at_sign_email_is_refused() -> None:
+    spelled = "ceo @ acme dot com"
+    assert email_rule_matches(spelled) is True
+    assert refuse_sensitive_text(spelled) == "sensitive_data"
+    assert refuse_rendered_text(spelled) == "sensitive_data"
+    assert email_rule_matches("ceo@acme dot com") is True
+    assert email_rule_matches("ceo at acme dot com") is True
+
+
 def test_a_spaced_email_uses_the_curated_list() -> None:
     assert email_rule_matches("ceo at acme . com") is True
     assert refuse_rendered_text("ceo at acme . com") == "sensitive_data"

@@ -7,11 +7,12 @@ The order is fixed:
 3. Undo defanging only inside those candidates. A bare ``dot`` or a bare
    ``at`` is undone only when the next token, with spaces removed, is on
    :data:`CURATED_TLDS`. A spaced ``.`` is undone only when that token is
-   all lowercase and is ``com``, ``c0m``, ``net``, or ``org``. Case is
-   read after NFKC. The lookalike fold keeps case, and nothing lowercases
-   the token before that check. ``c0m`` is the zero spelling of ``com``,
-   and a zero in ``org`` counts. A later word still leaves the spaced
-   form alone.
+   all lowercase or all uppercase and is ``com``, ``c0m``, ``net``, or
+   ``org``. Case is read after NFKC. The lookalike fold keeps case. An
+   all-uppercase token is casefolded after that check. A lowercase token
+   is compared as itself. A mixed-case token stays prose. ``c0m`` is the
+   zero spelling of ``com``, and a zero in
+   ``org`` counts. A later word still leaves the spaced form alone.
    Bracket and parenthesis forms also accept the IANA snapshot.
 """
 
@@ -80,7 +81,7 @@ _AT = (
     r"|[ \t]*\([ \t]*at[ \t]*\)[ \t]*"
     r"|[ \t]*\{[ \t]*at[ \t]*\}[ \t]*"
     r"|[ \t]+at[ \t]+"
-    r"|@"
+    r"|[ \t]*@[ \t]*"
     r")"
 )
 _URL_CANDIDATE = re.compile(r"(?<![A-Za-z0-9])hxxps?://\S+", re.IGNORECASE)
@@ -100,6 +101,7 @@ _BRACKET_AT_RE = re.compile(
     re.IGNORECASE,
 )
 _BARE_AT_RE = re.compile(r"[ \t]+at[ \t]+", re.IGNORECASE)
+_SPACED_AT_SIGN = re.compile(r"[ \t]+@[ \t]*|[ \t]*@[ \t]+")
 _HOST_TAIL = re.compile(
     r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*(?:\.[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)+",
     re.IGNORECASE,
@@ -190,7 +192,8 @@ def _undo_span(text: str, start: int, end: int) -> str:
     restored = _replace_dots(restored, _BARE_DOT_RE, _curated_tld, boundary=False, tail=tail)
     restored = _replace_dots(restored, _SPACED_DOT_RE, _spaced_dot_tld, boundary=True, tail=tail)
     restored = _replace_ats(restored, _BRACKET_AT_RE, bracket=True)
-    return _replace_ats(restored, _BARE_AT_RE, bracket=False)
+    restored = _replace_ats(restored, _BARE_AT_RE, bracket=False)
+    return _SPACED_AT_SIGN.sub("@", restored)
 
 
 def _replace_dots(
@@ -279,18 +282,21 @@ def _followed_by_word(text: str, index: int) -> bool:
 
 
 def _spaced_dot_tld(token: str) -> bool:
-    """Accept only an all-lowercase com, c0m, net, or org.
+    """Accept an all-lowercase or all-uppercase com, c0m, net, or org.
 
-    The token is already NFKC and lookalike-folded. Case is read here,
-    before any lowercasing. A lowercase zero inside org counts.
+    The token is already NFKC and lookalike-folded. Case is read here.
+    An all-uppercase token is casefolded after that check. A lowercase
+    token is compared as itself. A mixed-case token stays prose. A
+    lowercase zero inside org counts.
     """
+    if token.isupper():
+        token = token.casefold()
     if not token.islower():
         return False
-    folded = token.casefold()
-    if folded in _SPACED_DOT_TLDS:
+    if token in _SPACED_DOT_TLDS:
         return True
-    mapped = folded.translate(_ZERO_TO_O)
-    return mapped != folded and mapped in _SPACED_ZERO_TARGETS
+    mapped = token.translate(_ZERO_TO_O)
+    return mapped != token and mapped in _SPACED_ZERO_TARGETS
 
 
 def _curated_tld(token: str) -> bool:

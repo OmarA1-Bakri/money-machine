@@ -1,3 +1,104 @@
+## 2026-10-15 — Session 08 spec suffix and description order
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.
+
+`fixture://<uuid>/12x/<64-hex>` raises `storage path`. Changing `_SPEC.fullmatch` to `match` accepts the `12` prefix and the walk then raises `storage missing`. Two walks that list the same descriptions in opposite order still post. Removing `texts.sort()` refuses that reorder with `count` before the post. The marker-swap and description-edit rows stay refusals.
+
+Clean storage suite: 73 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_asset_storage.py`. Clean draft suite: 130 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_etsy_draft_client.py tests/unit/assets/test_etsy_draft_ready.py`. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| `_SPEC.fullmatch` → `match` | `test_a_suffixed_spec_is_refused` | 1/72 |
+| Delete `texts.sort()` | `test_a_reordered_description_still_posts` | 1/129 |
+
+## 2026-10-15 — Session 08 screenshot URL rule
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.
+
+`refuse_sensitive_text` refuses a plain `hxxp://` URL through `url_matches`. `hxxp://acme.com/a` is `sensitive_data`. The shared corpus URL is also a bracket host, so it stays refused when this term is removed.
+
+Clean suite: 83 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defanged_host.py tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete `or url_matches` | `test_a_plain_hxxp_url_needs_the_url_rule` | 1/82 |
+
+## 2026-10-15 — Session 08 spaced-dot boundary
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.
+
+A later word still skips the spaced-dot undo. `acme . com today` stays prose. `acme . com` still refuses. Bare `. org` stays prose, as on this base. Title-case rows stay even when the skip is deleted, so they do not kill it.
+
+Clean suite: 82 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defanged_host.py tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Drop the spaced-dot word boundary | `test_a_word_after_a_spaced_dot_keeps_the_boundary` | 1/81 |
+
+## 2026-10-15 — Session 08 capital Greek omicron
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.
+
+U+039F (Greek capital omicron) folds to Latin `O`. `See . Οrg` stays prose. Mapping that character to lowercase `o` would make `org` and refuse it. The capital Cyrillic `O` stay is a different character.
+
+Clean suite: 81 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defanged_host.py tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Map U+039F to lowercase `o` | `test_a_capital_greek_omicron_spaced_org_stays` | 1/80 |
+
+## 2026-10-15 — Session 08 capital Cyrillic Es
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.
+
+U+0421 (Cyrillic capital Es) folds to Latin `C`. `acme . СOM` is `paid_checkout`. The capital Cyrillic `O` stay is a different character.
+
+Clean suite: 80 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defanged_host.py tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the U+0421 to `C` map | `test_a_capital_cyrillic_es_spaced_com_is_refused` | 1/79 |
+
+## 2026-10-15 — Session 08 drop the dead spaced-dot casefold
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.
+
+The casefold after the `islower` gate is gone. A lowercase token is compared as itself. An all-uppercase token is still casefolded after the case check. Casefolding the token before that gate refuses title case.
+
+Clean suite: 79 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defanged_host.py tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Casefold before the `islower` gate | `test_a_capitalised_spaced_dot_at_the_end_stays[Go . Com]` | 6/73 |
+
+The other five failures are the remaining title-case stays and the capital Cyrillic `O` stay. `test_an_all_caps_spaced_dot_is_refused` stays green.
+
+## 2026-10-15 — Session 08 all-caps spaced dot
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.
+
+An all-uppercase spaced token in `{com, c0m, net, org}` refuses. `acme . NET`, `acme . COM`, `mail me at acme . COM`, and `X . COM` are `paid_checkout`. Title case stays prose, including `Done . Net` and `Go . Com`. The uppercase token is casefolded only after the case check.
+
+Clean suite: 79 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defanged_host.py tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Accept only an all-lowercase token | `test_an_all_caps_spaced_dot_is_refused` | 1/78 |
+
+Title-case rows stay green under that mutant.
+
+## 2026-10-15 — Session 08 spaced at-sign email
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.
+
+The spelled-email and defanged-host test files on the closed branches already match trunk. The screenshot row they never pinned is `ceo @ acme dot com`. A spaced `@` is an email separator, and the spaces around it collapse inside the candidate. `ceo@acme dot com` and `ceo at acme dot com` stay refused.
+
+Clean suite: 78 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_spelled_email.py tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_defanged_host.py tests/unit/assets/test_punycode_host.py`. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Match `@` with no surrounding space | `test_a_spaced_at_sign_email_is_refused` | 1/77 |
+
 ## 2026-10-15 — Session 08 storage shape and vanished link (#78 carry)
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-sf-carry-prompt-integrity.md`.
