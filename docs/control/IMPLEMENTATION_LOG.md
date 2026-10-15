@@ -1,3 +1,38 @@
+## 2026-10-15 — Session 08 W6 r4: exact link shape and object-graph refusals
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+A link annotation must equal `{Type, Subtype, Rect, Border, F, A}` with `/Type /Annot` and `/Subtype /Link`. The action equals `{S, URI}`, or `{Type, S, URI}` when `/Type /Action` is present. `/S` is compared after `#xx` decoding, so `/U#52I` is `/URI`. An indirect `/A` or `/URI` resolves one hop through `PdfDocument.get`. A second hop stays a reference. A URI stream is refused. `link_annotations` no longer reads an annotation-level `/URI`. The object graph, catalog first, refuses `/OpenAction`, `/AA` except on a `/Link`, `/Launch`, a catalog `/JavaScript`, `/AcroForm`, and `/Names` to `/JavaScript` or `/EmbeddedFiles`. The `/sw.js` continuation stays. This Chromium fetches the worker script as `script`. Production capture passes an empty allow-list, so `/sw.js` is aborted there.
+
+The real README generator, fed by the W2 token payload, is the must-pass. Its page-1 annotations have those exact keys, and validation against `SECRET_LINK + "/"` passes. A bare action without `/Type` also passes.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=line` on `tests/unit/assets/test_link_validation.py` with `-k "not mutant and not accepts and not dropping"`, except the worker row, which is the full screenshot file. The source was restored after each run. The clean link file is 64 passed. Deleting the stream `raise` survives (64 passed), because `_text_of` still returns none. Returning the stream bytes is the kill.
+
+- Adding `Launch` to the `/S` allow-set: 1 failed, 63 passed (`test_a_launch_action_is_malformed`).
+- Adding `JavaScript` to the `/S` allow-set: 1 failed, 63 passed (`test_a_javascript_action_is_malformed`).
+- Adding `Next` to the action extras: 1 failed, 63 passed (`test_an_action_next_is_malformed`).
+- Adding `AA` to the annotation extras: 1 failed, 63 passed (`test_a_link_additional_action_is_malformed`).
+- Adding `URI` to the annotation extras: 1 failed, 63 passed (`test_an_annotation_uri_cannot_hide_the_action`).
+- Adding `PA` to the annotation extras: 1 failed, 63 passed (`test_an_extra_annotation_key_is_malformed`).
+- Adding `NewWindow` to the action extras: 1 failed, 63 passed (`test_an_extra_action_key_is_malformed`).
+- Returning a URI stream's bytes: 1 failed, 63 passed (`test_an_indirect_stream_uri_is_malformed`).
+- Following every reference instead of one hop: 1 failed, 63 passed (`test_a_double_indirect_uri_is_malformed`).
+- Dropping the `/OpenAction` check: 1 failed, 63 passed (`test_a_catalog_open_action_is_malformed`).
+- Dropping the catalog `/AA` check: 1 failed, 63 passed (`test_a_catalog_additional_action_is_malformed`).
+- Dropping the catalog `/JavaScript` check: 1 failed, 63 passed (`test_a_catalog_javascript_key_is_malformed`).
+- Dropping the `/Launch` key check: 1 failed, 63 passed (`test_a_catalog_launch_key_is_malformed`).
+- Dropping the `/Names /JavaScript` check: 1 failed, 63 passed (`test_a_names_javascript_is_malformed`).
+- Dropping the `/Names /EmbeddedFiles` check: 1 failed, 63 passed (`test_a_catalog_embedded_file_is_malformed`).
+- Dropping the `/AcroForm` check: 1 failed, 63 passed (`test_a_catalog_acroform_is_malformed`).
+- Returning a PDF name without `#xx` decoding: 1 failed, 63 passed (`test_a_hash_escaped_s_is_uri`).
+- Setting `service_workers` to `allow`: 1 failed, 65 passed (`test_the_fixture_context_makes_no_network_requests`).
+- Changing the open-file `except ValueError` to `except KeyError`: 1 failed, 63 passed (`test_a_truncated_pdf_is_malformed`).
+- Using `repairs[-1].reason` as the refusal code: 1 failed, 63 passed (`test_the_first_repair_names_the_refusal`).
+- Comparing an equal-length URI by membership instead of position: 1 failed, 63 passed (`test_links_must_keep_accepted_order`).
+- Allowing an explicit port: 1 failed, 63 passed (`test_an_explicit_port_is_malformed`).
+
+No measured row above survived except deleting the stream `raise`. Outlines, non-Link annotations, and redirect-hop scheme or port checks stay parked.
+
 ## 2026-10-15 — Session 08 W6 r3: worker continuation, link order, exact keys
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.

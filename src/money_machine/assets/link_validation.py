@@ -2,7 +2,8 @@
 
 Extraction is ``delivery_link_uris`` (the ``link_annotations`` page walk:
 indirect ``/Annots`` and ``/Kids``, including compressed object streams).
-The action must be ``/URI``. Equal-length URIs are compared by index.
+A link annotation must carry exactly the Chromium keys, and the action
+must be ``/URI``. Equal-length URIs are compared by index.
 A shorter PDF is aligned as a subsequence, so a dropped middle names that
 accepted link. Info and XMP go through
 ``refuse_gift_document_info``. The raw allowlist runs before any fold.

@@ -130,15 +130,10 @@ class _Reader:
 
     def _name(self) -> PdfName:
         self.i += 1
-        chars: list[str] = []
+        start = self.i
         while self.i < self.n and self.data[self.i] not in _DELIM:
-            if self.data[self.i] == ord("#"):
-                chars.append(chr(int(self.data[self.i + 1 : self.i + 3], 16)))
-                self.i += 3
-                continue
-            chars.append(chr(self.data[self.i]))
             self.i += 1
-        return PdfName("".join(chars))
+        return PdfName(self.data[start : self.i].decode("latin-1"))
 
     def _literal(self) -> PdfText:
         self.i += 1
@@ -283,12 +278,32 @@ def _decode_text(raw: bytes) -> str:
     return raw.decode("latin-1")
 
 
+def decode_pdf_name(raw: str) -> str:
+    """Decode a PDF name's ``#xx`` escapes. The reader stores the raw token."""
+    chars: list[str] = []
+    index = 0
+    while index < len(raw):
+        if raw[index] == "#" and index + 2 < len(raw):
+            hex_digits = raw[index + 1 : index + 3]
+            try:
+                chars.append(chr(int(hex_digits, 16)))
+            except ValueError:
+                chars.append(raw[index])
+                index += 1
+                continue
+            index += 3
+            continue
+        chars.append(raw[index])
+        index += 1
+    return "".join(chars)
+
+
 def _filter_names(fields: dict[str, PdfObject]) -> tuple[str, ...]:
     found = fields.get("Filter")
     if isinstance(found, PdfName):
-        return (found.value,)
+        return (decode_pdf_name(found.value),)
     if isinstance(found, tuple):
-        return tuple(item.value for item in found if isinstance(item, PdfName))
+        return tuple(decode_pdf_name(item.value) for item in found if isinstance(item, PdfName))
     return ()
 
 

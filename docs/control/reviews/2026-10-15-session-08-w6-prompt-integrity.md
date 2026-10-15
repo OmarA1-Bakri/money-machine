@@ -98,13 +98,13 @@ The operator instruction for this wave is to extract every embedded link from th
 This addendum governs Wave 6. The prompt remains the unamended source of record.
 
 1. Prove the prompt hash, then implement fixture link validation, plus the carried #73 fixes named by the operator.
-2. After export, read links with `delivery_link_uris` (the `link_annotations` page walk) and Info/XMP with `refuse_gift_document_info`. Do not add a second walker or a new percent expression. A link annotation may only carry `Type`, `Subtype`, `Rect`, `Border`, `F`, and `A`. The action may only carry `Type`, `S`, and `URI`, `/S` must be `/URI`, and the URI must be a direct string. A catalog `/OpenAction`, `/AA`, `/AcroForm`, `/Names /JavaScript`, or `/Names /EmbeddedFiles` is `malformed`.
+2. After export, read links with `delivery_link_uris` (the `link_annotations` page walk) and Info/XMP with `refuse_gift_document_info`. Do not add a second walker or a new percent expression. Each link annotation is `/Subtype /Link` with exactly the keys `Type`, `Subtype`, `Rect`, `Border`, `F`, and `A`. `/A` is exactly `S` and `URI`. `Type`, when present, must be `/Action`. `/S` must be `/URI` after `#xx` decoding. An indirect `/A` or `/URI` resolves one hop through `PdfDocument.get`. A second hop stays unresolved. A URI stream is refused. An annotation-level `/URI` is not a link and is refused. The object graph refuses `/OpenAction`, `/AA` except on a `/Link`, `/Launch`, a catalog `/JavaScript`, `/AcroForm`, and `/Names` pointing at `/JavaScript` or `/EmbeddedFiles`. `link_annotations` reads the action URI only and does not scan the catalog.
 3. A PDF with zero link annotations is `missing_links`. A link annotation without a URI is `malformed`. `http` is `not_https`. A host outside `_allowed_secret_host` is `host`. Userinfo, whitespace, and `mailto` are `malformed`.
 4. `refuse_raw_charset` runs on the raw variant and on the raw URI probe before any fold. `Zoë` in either place is `paid_checkout`. `%xx` is `refuse_paid_checkout` on the path, query, and fragment, and on Info and XMP. A bare `%` stays on the allowlist.
 5. When the PDF has as many links as the accepted list, each extracted URI must equal the accepted string at that index. A permutation is `link_mismatch`. A shorter PDF is aligned as a subsequence, and a dropped middle names that accepted link once. The checker then reports the variant, public access, and the duplicate button. The record stores the link, the variant, those three results, the injected timestamp, the PDF sha256, and the link sha256.
 6. A failed link raises. The repair names that asset and that link. Other links in the same PDF are not repaired. The default checker raises `live_link_check`. The default clock raises `live_clock`.
 7. Unknown variants are refused before the checker is called. A redirect chain whose host differs is `redirect_host`. A same-host hop is allowed.
-8. The rendered README paints `SECRET_LINK` once per variant plus the duplication line. Chromium m153 stores each annotation as that string plus `/`. Validation against the painted string is `link_mismatch`. Validation against the annotation string passes, and replacing one annotation fails. The rendered gift PDF has zero links and is `missing_links`.
+8. The rendered README paints `SECRET_LINK` once per variant plus the duplication line. Chromium m153 stores each annotation as that string plus `/`, with exactly the keys in item 2 and an action whose keys are `Type`, `S`, and `URI`. Validation against the painted string is `link_mismatch`. Validation against the annotation string passes, and replacing one annotation fails. The rendered gift PDF has zero links and is `missing_links`. An explicit port, including `:8443`, is `malformed`.
 9. Add the Latin-1 `Zoë` screenshot row. Keep the `/sw.js` continuation so `service_workers="allow"` is killed by the network test. Keep `O_EXCL` and drop `O_NOFOLLOW`, with tests for an existing file and a symlink.
 10. Do not edit the files owned by open pulls #63 and #68, and do not edit `IMPLEMENTATION_STATE.json`. Exit 78 stays HELD. Session 08 stays inactive. Do not print the session exit code. Do not change the committed screenshot or video goldens.
 
@@ -124,8 +124,9 @@ This addendum governs Wave 6. The prompt remains the unamended source of record.
 | Workflow linkage and commissioning | Later Session 08 wave | F-01 |
 | Session exit code | Later, at a real session exit | F-01 |
 | Exit 78 | Held | Operator instruction |
-| Whole-document outlines | Later wave | W3 park. Catalog `/OpenAction`, `/AA`, `/AcroForm`, `/Names /JavaScript`, and `/Names /EmbeddedFiles` are refused by the link validator. The gift walker still does not scan them |
+| Whole-document outlines | Later wave | W3 park. The link validator walks the object graph for the catalog keys in item 2. The gift walker still does not scan them |
 | Non-Link URI annotations | Later wave | W3 park. A `/Link` whose `/S` is not `/URI` is refused |
+| Redirect-hop scheme and port | Later wave | Operator park. A same-host hop is allowed. An `http` hop on that host is not a new gate |
 | Defanged hosts | Later wave | W3 park |
 | José and Zoë in the gift name or community | Later wave | The Latin-1 row is the screenshot gate, not the gift field |
 | Bare `127.1`, `0x7f000001`, and `2130706433` | Later wave | W3 park |

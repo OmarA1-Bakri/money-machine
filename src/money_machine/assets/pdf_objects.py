@@ -1,12 +1,16 @@
 """Gift-PDF surfaces read by walking objects, not by searching bytes.
 
-``link_annotations`` counts ``/Link`` annotations and returns ``/URI`` strings.
+``link_annotations`` counts ``/Link`` annotations and returns each action
+``/URI`` string. It does not read an annotation-level ``/URI``.
 ``delivery_link_uris`` is the same page walk for link validation. A link
-annotation may only carry ``Type``, ``Subtype``, ``Rect``, ``Border``, ``F``,
-and ``A``. The action may only carry ``Type``, ``S``, and ``URI``, ``/S``
-must be ``/URI``, and the URI must be a direct string. A catalog
-``/OpenAction``, ``/AA``, ``/AcroForm``, ``/Names /JavaScript``, or
-``/Names /EmbeddedFiles`` is refused. Outlines are not walked.
+annotation must be exactly ``Type``, ``Subtype``, ``Rect``, ``Border``,
+``F``, and ``A``, with ``/Subtype /Link``. The action is exactly ``S`` and
+``URI``, plus ``Type /Action`` when ``Type`` is present. ``/S`` must be
+``/URI`` after ``#xx`` decoding. An indirect action or URI is resolved one
+hop. A URI stream is refused. The object graph refuses ``/OpenAction``,
+``/AA`` (except on a ``/Link``), ``/Launch``, a catalog ``/JavaScript``,
+``/AcroForm``, and ``/Names`` pointing at ``/JavaScript`` or
+``/EmbeddedFiles``. Outlines are not walked.
 """
 
 from __future__ import annotations
@@ -22,12 +26,24 @@ from money_machine.assets.pdf_reader import (
     PdfRef,
     PdfStream,
     PdfText,
+    decode_pdf_name,
     token_boundary,
 )
 
 
 def _name_is(value: PdfObject | None, expected: str) -> bool:
-    return isinstance(value, PdfName) and value.value == expected
+    return isinstance(value, PdfName) and decode_pdf_name(value.value) == expected
+
+
+def _decoded(fields: dict[str, PdfObject]) -> dict[str, PdfObject]:
+    return {decode_pdf_name(key): value for key, value in fields.items()}
+
+
+def _once(doc: PdfDocument, value: PdfObject | None) -> PdfObject | None:
+    """Resolve one indirect reference. A second hop stays a reference."""
+    if isinstance(value, PdfRef):
+        return doc.get(value.number)
+    return value
 
 
 def _dict(value: PdfObject | None) -> dict[str, PdfObject]:
@@ -80,61 +96,117 @@ def link_annotations(pdf: bytes) -> tuple[int, tuple[str, ...]]:
                 continue
             count += 1
             action = _dict(doc.deref(annot.get("A")))
-            uri = _text_of(annot.get("URI"))
-            if uri is None:
-                uri = _text_of(action.get("URI"))
+            uri = _text_of(action.get("URI"))
             if uri is not None:
                 uris.append(uri)
     return count, tuple(uris)
 
 
 _LINK_KEYS = frozenset({"Type", "Subtype", "Rect", "Border", "F", "A"})
-_ACTION_KEYS = frozenset({"Type", "S", "URI"})
+_ACTION_BARE = frozenset({"S", "URI"})
+_ACTION_WITH_TYPE = frozenset({"Type", "S", "URI"})
+_ANNOT_ALLOW_EXTRA: frozenset[str] = frozenset()
+_ACTION_ALLOW_EXTRA: frozenset[str] = frozenset()
+_ALLOWED_S: frozenset[str] = frozenset({"URI"})
 
 
 def delivery_link_uris(pdf: bytes) -> tuple[str, ...]:
     """Return each link URI from the page walk, or raise ``ValueError``.
 
-    Annotation and action keys must be the Chromium set. ``/S`` must be
-    ``/URI`` and the URI must be a direct string. A catalog ``/OpenAction``,
-    ``/AA``, ``/AcroForm``, ``/Names /JavaScript``, or
-    ``/Names /EmbeddedFiles`` is refused.
+    Annotation keys must equal the Chromium set. The action is ``S`` and
+    ``URI``, with ``Type /Action`` when ``Type`` is present. ``/S`` must
+    decode to ``/URI``. An indirect action or URI resolves one hop. A URI
+    stream is refused. The object graph refuses catalog actions.
     """
     doc = PdfDocument(pdf)
+    _refuse_graph(doc)
     root = _dict(doc.deref(doc.trailer.get("Root")))
-    if "OpenAction" in root or "AA" in root:
-        raise ValueError("pdf catalog")
-    if "AcroForm" in root:
-        raise ValueError("pdf catalog")
-    names = _dict(doc.deref(root.get("Names")))
-    if "JavaScript" in names:
-        raise ValueError("pdf catalog")
-    if "EmbeddedFiles" in names:
-        raise ValueError("pdf catalog")
     uris: list[str] = []
     for page in _pages(doc, root.get("Pages")):
         annots = doc.deref(page.get("Annots"))
         if not isinstance(annots, tuple):
             continue
         for item in annots:
-            annot = _dict(doc.deref(item))
+            annot = _decoded(_dict(doc.deref(item)))
             if not _name_is(annot.get("Subtype"), "Link"):
                 continue
             uris.append(_uri_action(doc, annot))
     return tuple(uris)
 
 
+def _refuse_graph(doc: PdfDocument) -> None:
+    """Refuse catalog actions anywhere in the object graph.
+
+    The catalog is walked first, so a ``/Names`` dictionary is seen with
+    that parent. Objects that nothing references are walked afterwards.
+    """
+    seen: set[int] = set()
+
+    def scan(value: PdfObject | None, parent_key: str | None) -> None:
+        if isinstance(value, PdfRef):
+            if value.number in seen:
+                return
+            seen.add(value.number)
+            value = doc.get(value.number)
+        if isinstance(value, dict):
+            fields = _decoded(value)
+            _refuse_dict(fields, parent_key)
+            for key, child in fields.items():
+                scan(child, key)
+            return
+        if isinstance(value, tuple):
+            for item in value:
+                scan(item, parent_key)
+            return
+        if isinstance(value, PdfStream):
+            scan(value.fields, parent_key)
+
+    scan(doc.trailer, None)
+    for number in doc.entries:
+        if number not in seen:
+            scan(PdfRef(number, 0), None)
+
+
+def _refuse_dict(fields: dict[str, PdfObject], parent_key: str | None) -> None:
+    if "OpenAction" in fields:
+        raise ValueError("pdf openaction")
+    if "AcroForm" in fields:
+        raise ValueError("pdf acroform")
+    if "Launch" in fields:
+        raise ValueError("pdf launch")
+    if parent_key == "Names" and "JavaScript" in fields:
+        raise ValueError("pdf names javascript")
+    if parent_key == "Names" and "EmbeddedFiles" in fields:
+        raise ValueError("pdf names embeddedfiles")
+    if _name_is(fields.get("Type"), "Catalog") and "JavaScript" in fields:
+        raise ValueError("pdf catalog javascript")
+    if "AA" in fields and not _name_is(fields.get("Subtype"), "Link"):
+        raise ValueError("pdf additional action")
+
+
 def _uri_action(doc: PdfDocument, annot: dict[str, PdfObject]) -> str:
-    if not set(annot).issubset(_LINK_KEYS):
-        raise ValueError("pdf link")
-    action = _dict(doc.deref(annot.get("A")))
-    if not set(action).issubset(_ACTION_KEYS):
-        raise ValueError("pdf link")
-    if not _name_is(action.get("S"), "URI"):
-        raise ValueError("pdf link")
-    uri = _text_of(action.get("URI"))
+    """Return the URI of one already-decoded link annotation."""
+    if frozenset(annot) - _ANNOT_ALLOW_EXTRA != _LINK_KEYS:
+        raise ValueError("pdf link keys")
+    if not _name_is(annot.get("Type"), "Annot"):
+        raise ValueError("pdf link type")
+    if not _name_is(annot.get("Subtype"), "Link"):
+        raise ValueError("pdf link subtype")
+    action = _decoded(_dict(_once(doc, annot.get("A"))))
+    keys = frozenset(action) - _ACTION_ALLOW_EXTRA
+    if keys == _ACTION_WITH_TYPE:
+        if not _name_is(action.get("Type"), "Action"):
+            raise ValueError("pdf action type")
+    elif keys != _ACTION_BARE:
+        raise ValueError("pdf action keys")
+    if not any(_name_is(action.get("S"), name) for name in _ALLOWED_S):
+        raise ValueError("pdf action s")
+    resolved = _once(doc, action.get("URI"))
+    if isinstance(resolved, PdfStream):
+        raise ValueError("pdf uri stream")
+    uri = _text_of(resolved)
     if uri is None:
-        raise ValueError("pdf link")
+        raise ValueError("pdf uri")
     return uri
 
 

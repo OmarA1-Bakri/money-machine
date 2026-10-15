@@ -24,13 +24,12 @@ from money_machine.assets.link_validation import (
     validate_pdf_links,
 )
 from money_machine.assets.pdf_objects import link_annotations
+from money_machine.assets.pdf_reader import PdfDocument, PdfName, PdfObject
 from tests.fixtures.merchandising import SECRET_LINK, consistent_request
 from tests.unit.assets.gift_pdf_craft import (
     classic_pdf,
     deep_info_chain,
     embed_info_title,
-    indirect_link,
-    mail_link,
     metadata_packet,
     nested_kids_link,
     titled_page,
@@ -86,6 +85,29 @@ def _raise(pdf: bytes, **kwargs: object) -> LinkValidationRefusal:
     return caught.value
 
 
+def _literal(uri: str) -> str:
+    escaped = uri.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+    return f"({escaped})"
+
+
+def _action_dict(uri: str, *, typed: bool = True, s: str = "URI", extra: str = "") -> str:
+    type_part = "/Type /Action " if typed else ""
+    suffix = f" {extra}" if extra else ""
+    return f"<< {type_part}/S /{s} /URI {_literal(uri)}{suffix} >>"
+
+
+def _annot_dict(action: str, *, extra: str = "") -> str:
+    suffix = f" {extra}" if extra else ""
+    return (
+        "<< /Type /Annot /Subtype /Link /Rect [0 0 1 1] /Border [0 0 0] /F 4"
+        f"{suffix} /A {action} >>"
+    )
+
+
+def _obj(number: int, body: str) -> bytes:
+    return f"{number} 0 obj\n{body}\nendobj\n".encode("latin-1")
+
+
 def _link_pdf(uris: tuple[str, ...]) -> bytes:
     objects: dict[int, bytes] = {
         1: b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
@@ -95,9 +117,7 @@ def _link_pdf(uris: tuple[str, ...]) -> bytes:
     objects[3] = f"3 0 obj\n<< /Type /Page /Parent 2 0 R /Annots [{refs}] >>\nendobj\n".encode()
     for offset, uri in enumerate(uris):
         number = 4 + offset
-        literal = uri.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
-        body = f"{number} 0 obj\n<< /Subtype /Link /A << /S /URI /URI ({literal}) >> >>\nendobj\n"
-        objects[number] = body.encode("latin-1")
+        objects[number] = _obj(number, _annot_dict(_action_dict(uri)))
     return classic_pdf(objects)
 
 
@@ -157,109 +177,188 @@ def test_a_pdf_with_no_links_is_refused() -> None:
 _GOOD = "https://fixture.notion.site/Sage-Green"
 
 
-def _annot(body: str, *, catalog: str = "") -> bytes:
+def _annot(
+    body: str,
+    *,
+    catalog: str = "",
+    objects: dict[int, bytes] | None = None,
+) -> bytes:
     extra = f" {catalog}" if catalog else ""
-    return classic_pdf(
-        {
-            1: f"1 0 obj\n<< /Type /Catalog /Pages 2 0 R{extra} >>\nendobj\n".encode(),
-            2: b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
-            3: b"3 0 obj\n<< /Type /Page /Parent 2 0 R /Annots [4 0 R] >>\nendobj\n",
-            4: f"4 0 obj\n{body}\nendobj\n".encode("latin-1"),
-        }
-    )
+    built = {
+        1: f"1 0 obj\n<< /Type /Catalog /Pages 2 0 R{extra} >>\nendobj\n".encode(),
+        2: b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+        3: b"3 0 obj\n<< /Type /Page /Parent 2 0 R /Annots [4 0 R] >>\nendobj\n",
+        4: _obj(4, body),
+    }
+    if objects:
+        built.update(objects)
+    return classic_pdf(built)
 
 
-@pytest.mark.parametrize("action", ("Launch", "JavaScript", "SubmitForm", "ImportData", "GoToR"))
-def test_a_non_uri_action_is_malformed(action: str) -> None:
-    pdf = _annot("<< /Subtype /Link /A << /S /" + action + " /URI (" + _GOOD + ") >> >>")
-    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
+def _good_annot(
+    *,
+    s: str = "URI",
+    typed: bool = True,
+    action_extra: str = "",
+    extra: str = "",
+) -> str:
+    action = _action_dict(_GOOD, typed=typed, s=s, extra=action_extra)
+    return _annot_dict(action, extra=extra)
+
+
+def _accepted_good() -> tuple[tuple[str, str], ...]:
+    return (("Sage Green", _GOOD),)
+
+
+def test_a_launch_action_is_malformed() -> None:
+    refusal = _raise(_annot(_good_annot(s="Launch")), accepted=_accepted_good())
     assert refusal.code == "malformed"
     assert refusal.repairs == (AssetRepair(_ASSET, "", "malformed"),)
 
 
+def test_a_javascript_action_is_malformed() -> None:
+    refusal = _raise(_annot(_good_annot(s="JavaScript")), accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+@pytest.mark.parametrize("action", ("SubmitForm", "ImportData", "GoToR"))
+def test_a_non_uri_action_is_malformed(action: str) -> None:
+    refusal = _raise(_annot(_good_annot(s=action)), accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
 def test_an_annotation_uri_cannot_hide_the_action() -> None:
-    pdf = _annot(
-        "<< /Subtype /Link /URI (" + _GOOD + ") /A << /S /URI /URI (https://evil.example/x) >> >>"
+    body = _annot_dict(
+        _action_dict("https://evil.example/x"),
+        extra="/URI " + _literal(_GOOD),
     )
-    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
+    refusal = _raise(_annot(body), accepted=_accepted_good())
     assert refusal.code == "malformed"
 
 
 def test_an_action_next_is_malformed() -> None:
-    pdf = _annot(
-        "<< /Subtype /Link /A << /S /URI /URI ("
-        + _GOOD
-        + ") /Next << /S /URI /URI (https://evil.example/) >> >> >>"
-    )
-    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
+    body = _good_annot(action_extra="/Next << /S /URI /URI (https://evil.example/) >>")
+    refusal = _raise(_annot(body), accepted=_accepted_good())
     assert refusal.code == "malformed"
 
 
 def test_a_link_additional_action_is_malformed() -> None:
-    pdf = _annot(
-        "<< /Subtype /Link /AA << /E << /S /JavaScript /JS (1) >> >> "
-        "/A << /S /URI /URI (" + _GOOD + ") >> >>"
-    )
-    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
-    assert refusal.code == "malformed"
-
-
-@pytest.mark.parametrize(
-    "catalog",
-    (
-        "/OpenAction << /S /URI /URI (https://evil.example/) >>",
-        "/OpenAction << /S /JavaScript >>",
-        "/AA << /WC << /S /Launch >> >>",
-        "/Names << /JavaScript << /Names [] >> >>",
-    ),
-)
-def test_a_catalog_action_is_malformed(catalog: str) -> None:
-    pdf = _annot("<< /Subtype /Link /A << /S /URI /URI (" + _GOOD + ") >> >>", catalog=catalog)
-    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
+    body = _good_annot(extra="/AA << /E << /S /JavaScript /JS (1) >> >>")
+    refusal = _raise(_annot(body), accepted=_accepted_good())
     assert refusal.code == "malformed"
 
 
 def test_an_extra_annotation_key_is_malformed() -> None:
-    pdf = _annot("<< /Subtype /Link /QuadPoints [0 0 1 1] /A << /S /URI /URI (" + _GOOD + ") >> >>")
-    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
+    refusal = _raise(_annot(_good_annot(extra="/PA [0 0 1 1]")), accepted=_accepted_good())
     assert refusal.code == "malformed"
 
 
 def test_an_extra_action_key_is_malformed() -> None:
-    pdf = _annot("<< /Subtype /Link /A << /S /URI /URI (" + _GOOD + ") /NewWindow true >> >>")
-    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
+    refusal = _raise(_annot(_good_annot(action_extra="/NewWindow true")), accepted=_accepted_good())
     assert refusal.code == "malformed"
 
 
-def test_an_indirect_uri_string_is_malformed() -> None:
-    pdf = classic_pdf(
-        {
-            1: b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
-            2: b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
-            3: b"3 0 obj\n<< /Type /Page /Parent 2 0 R /Annots [4 0 R] >>\nendobj\n",
-            4: b"4 0 obj\n<< /Subtype /Link /A << /S /URI /URI 5 0 R >> >>\nendobj\n",
-            5: b"5 0 obj\n(https://fixture.notion.site/Sage-Green)\nendobj\n",
-        }
+def test_a_hash_escaped_s_is_uri() -> None:
+    report = _validate(_annot(_good_annot(s="U#52I")), accepted=_accepted_good())
+    assert report.records[0].link == _GOOD
+
+
+def test_an_action_without_type_is_accepted() -> None:
+    report = _validate(_annot(_good_annot(typed=False)), accepted=_accepted_good())
+    assert report.records[0].link == _GOOD
+
+
+def test_an_indirect_uri_string_resolves_once() -> None:
+    body = _annot_dict("<< /Type /Action /S /URI /URI 5 0 R >>")
+    pdf = _annot(body, objects={5: _obj(5, _literal(_GOOD))})
+    report = _validate(pdf, accepted=_accepted_good())
+    assert report.records[0].link == _GOOD
+
+
+def test_an_indirect_action_resolves_once() -> None:
+    pdf = _annot(
+        _annot_dict("5 0 R"),
+        objects={5: _obj(5, _action_dict(_GOOD))},
     )
-    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=_clock)
+    report = _validate(pdf, accepted=_accepted_good())
+    assert report.records[0].link == _GOOD
+
+
+def test_a_double_indirect_uri_is_malformed() -> None:
+    body = _annot_dict("<< /Type /Action /S /URI /URI 6 0 R >>")
+    pdf = _annot(
+        body,
+        objects={
+            6: b"6 0 obj\n7 0 R\nendobj\n",
+            7: _obj(7, _literal(_GOOD)),
+        },
+    )
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_an_indirect_stream_uri_is_malformed() -> None:
+    payload = _GOOD.encode("ascii")
+    stream = (
+        f"5 0 obj\n<< /Length {len(payload)} >>\nstream\n".encode()
+        + payload
+        + b"\nendstream\nendobj\n"
+    )
+    body = _annot_dict("<< /Type /Action /S /URI /URI 5 0 R >>")
+    refusal = _raise(_annot(body, objects={5: stream}), accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_a_catalog_open_action_is_malformed() -> None:
+    pdf = _annot(
+        _good_annot(),
+        catalog="/OpenAction << /S /URI /URI (https://evil.example/) >>",
+    )
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_a_catalog_additional_action_is_malformed() -> None:
+    pdf = _annot(_good_annot(), catalog="/AA << /WC << /S /Launch >> >>")
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_a_catalog_javascript_key_is_malformed() -> None:
+    pdf = _annot(_good_annot(), catalog="/JavaScript << /Names [] >>")
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_a_catalog_launch_key_is_malformed() -> None:
+    pdf = _annot(_good_annot(), catalog="/Launch << /F (x) >>")
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_a_names_javascript_is_malformed() -> None:
+    pdf = _annot(
+        _good_annot(),
+        catalog="/Names 5 0 R",
+        objects={5: _obj(5, "<< /JavaScript << /Names [] >> >>")},
+    )
+    refusal = _raise(pdf, accepted=_accepted_good())
     assert refusal.code == "malformed"
 
 
 def test_a_catalog_acroform_is_malformed() -> None:
-    pdf = _annot(
-        "<< /Subtype /Link /A << /S /URI /URI (" + _GOOD + ") >> >>",
-        catalog="/AcroForm << /Fields [] >>",
-    )
-    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
+    pdf = _annot(_good_annot(), catalog="/AcroForm << /Fields [] >>")
+    refusal = _raise(pdf, accepted=_accepted_good())
     assert refusal.code == "malformed"
 
 
 def test_a_catalog_embedded_file_is_malformed() -> None:
     pdf = _annot(
-        "<< /Subtype /Link /A << /S /URI /URI (" + _GOOD + ") >> >>",
-        catalog="/Names << /EmbeddedFiles << /Names [] >> >>",
+        _good_annot(),
+        catalog="/Names 5 0 R",
+        objects={5: _obj(5, "<< /EmbeddedFiles << /Names [] >> >>")},
     )
-    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
+    refusal = _raise(pdf, accepted=_accepted_good())
     assert refusal.code == "malformed"
 
 
@@ -352,21 +451,42 @@ def test_a_link_without_a_uri_is_malformed() -> None:
 
 
 def test_an_indirect_annotation_off_host_is_refused() -> None:
+    pdf = classic_pdf(
+        {
+            1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+            2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            3: _obj(3, "<< /Type /Page /Parent 2 0 R /Annots 4 0 R >>"),
+            4: _obj(4, "[5 0 R]"),
+            5: _obj(5, _annot_dict(_action_dict("https://x.com"))),
+        }
+    )
     accepted = (("Sage Green", "https://x.com"),)
-    refusal = _raise(indirect_link(), accepted=accepted, clock=_clock)
+    refusal = _raise(pdf, accepted=accepted, clock=_clock)
     assert refusal.code == "host"
     assert refusal.repairs == (AssetRepair(_ASSET, "https://x.com", "host", 0),)
 
 
 def test_nested_kids_are_walked() -> None:
+    pdf = classic_pdf(
+        {
+            1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+            2: _obj(2, "<< /Type /Pages /Kids 3 0 R /Count 1 >>"),
+            3: _obj(3, "[4 0 R]"),
+            4: _obj(4, "<< /Type /Pages /Parent 2 0 R /Kids 5 0 R /Count 1 >>"),
+            5: _obj(5, "[6 0 R]"),
+            6: _obj(6, "<< /Type /Page /Parent 4 0 R /Annots [7 0 R] >>"),
+            7: _obj(7, _annot_dict(_action_dict("https://x.com"))),
+        }
+    )
     accepted = (("Sage Green", "https://x.com"),)
-    refusal = _raise(nested_kids_link(), accepted=accepted)
+    refusal = _raise(pdf, accepted=accepted)
     assert refusal.code == "host"
     assert link_annotations(nested_kids_link()) == (1, ("https://x.com",))
 
 
 def test_mailto_is_malformed() -> None:
-    refusal = _raise(mail_link(), accepted=(("Sage Green", "mailto:a"),))
+    pdf, accepted = _one("mailto:a")
+    refusal = _raise(pdf, accepted=accepted)
     assert refusal.code == "malformed"
     assert refusal.repairs == (AssetRepair(_ASSET, "mailto:a", "malformed", 0),)
 
@@ -609,6 +729,48 @@ def chromium_installed() -> None:
         _launch_chromium()
 
 
+def _assert_readme_link_shape(pdf: bytes, count: int) -> None:
+    """The real README generator must keep the Chromium link shape."""
+    doc = PdfDocument(pdf)
+    root = doc.deref(doc.trailer.get("Root"))
+    assert isinstance(root, dict)
+    assert set(root) == {"Pages", "Type"}
+    pages = doc.deref(root.get("Pages"))
+    assert isinstance(pages, dict)
+    kids = doc.deref(pages.get("Kids"))
+    assert isinstance(kids, tuple)
+    found: list[dict[str, PdfObject]] = []
+    bare = 0
+    for kid in kids:
+        page = doc.deref(kid)
+        assert isinstance(page, dict)
+        annots = page.get("Annots")
+        if annots is None:
+            bare += 1
+            continue
+        array = doc.deref(annots)
+        assert isinstance(array, tuple)
+        for item in array:
+            annot = doc.deref(item)
+            assert isinstance(annot, dict)
+            found.append(annot)
+    assert bare >= 1
+    assert len(found) == count
+    for annot in found:
+        assert set(annot) == {"Type", "Subtype", "Rect", "Border", "F", "A"}
+        assert isinstance(annot["Type"], PdfName)
+        assert annot["Type"].value == "Annot"
+        assert isinstance(annot["Subtype"], PdfName)
+        assert annot["Subtype"].value == "Link"
+        action = annot["A"]
+        assert isinstance(action, dict)
+        assert set(action) == {"Type", "S", "URI"}
+        assert isinstance(action["Type"], PdfName)
+        assert action["Type"].value == "Action"
+        assert isinstance(action["S"], PdfName)
+        assert action["S"].value == "URI"
+
+
 def test_the_readme_uris_round_trip_exactly(chromium_installed: None) -> None:
     """Chromium stores an origin href with a trailing slash.
 
@@ -626,6 +788,7 @@ def test_the_readme_uris_round_trip_exactly(chromium_installed: None) -> None:
     exported = f"{SECRET_LINK}/"
     assert count == len(names) + 1
     assert uris == (exported,) * count
+    _assert_readme_link_shape(rendered.pdf, count)
     painted = (*((name, SECRET_LINK) for name in names), ("", SECRET_LINK))
     mismatch = _raise(rendered.pdf, accepted=painted, asset="readme")
     assert mismatch.code == "link_mismatch"
