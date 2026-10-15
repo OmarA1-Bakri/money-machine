@@ -1,3 +1,28 @@
+## 2026-10-15 — Session 08 W6 r7: catalog before the walk, page keys, every URI
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+This round answers owner review 5530246698 on `81aca76`. The catalog is `trailer["Root"]`, checked before the walk, so `/Info` or `/Foo` written first cannot hide it. The walk's seen set is `(object number, role)`. A page must equal the generator keys `{Type, Resources, MediaBox, Contents, Tabs, Parent}`, or that set plus `Annots`. Every `/S /URI` outside a link annotation's own `/A` goes through `refuse_graph_uri`. A deep catalog, parsed while resolving `Root` before the info check, is `malformed`. A deep `/Info` chain stays `paid_checkout`. The page-walk depth cap in `_pages` is the gift kids chain. CodeRabbit 4280244489 is the docs claim about a non-Link `/A`: the global `/S` check has no `/A` exemption. This round also validates every other graph `/URI` and refuses a page `/AA` as an extra page key. Duplicate decoded names remain the reader check `pdf duplicate name`.
+
+Clean focused suite, Chromium deselected: 217 passed, 2 deselected. The two Chromium must-pass rows passed on the restored tree. Command: `uv run pytest -q -p no:cacheprovider --tb=line -k "not readme_uris and not gift_pdf_has_no_links" tests/unit/assets/test_link_validation.py tests/unit/assets/test_gift_link_policy.py tests/unit/assets/test_gift_pdf_links.py`. Source restored after each run.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the direct `trailer["Root"]` check | the fourteen catalog rows, including `test_info_before_root_cannot_hide_the_catalog` and `test_foo_before_root_cannot_hide_the_catalog` | 14/203 |
+| Seen set keyed by object number only | `test_a_second_role_widget_is_malformed` | 1/216 |
+| Second-role subtype also allows Widget | the same test | 1/216 |
+| Delete the graph `/URI` check | `test_a_widget_uri_through_an_outline_is_refused` | 1/216 |
+| Delete the page key check | `test_a_page_uri_additional_action_is_malformed` (the code becomes `host`), `test_a_page_additional_action_without_a_uri_is_malformed`, `test_a_page_missing_tabs_is_malformed` | 3/214 |
+| Page equality weakened to a subset of the annotating page | `test_a_page_missing_tabs_is_malformed` | 1/216 |
+| Add `AA` to the annotation extras | `test_a_link_uri_additional_action_is_malformed`, `test_a_link_additional_action_without_an_s_is_malformed` | 2/215 |
+| Delete the `_pages` depth cap | `test_a_deep_kids_chain_is_paid_checkout` | 1/216 |
+| Change the page-walk subtype `raise` to `continue` | `test_a_non_link_annotation_is_malformed` for Widget, Screen, and RichMedia | 3/214 |
+| Delete the URI-stream `raise` | none | 217 passed |
+
+`test_a_second_role_widget_is_malformed` dies for either the object-number seen set or a second-role check that allows Widget. It is the single failure of each of those mutants, and it is not an independent kill of both. The page-level Widget row stays refused when only the second-role check allows Widget, because `delivery_link_uris` compares the subtype to `Link`. `test_a_widget_after_an_outline_is_still_refused` accepts either `host` or `malformed`. It is not a unique kill. The JavaScript `/AA` row stays refused through `/S`, so it does not kill the annotation-extra mutant.
+
+Deleting the URI-stream `raise` still passes. That survivor stays parked, with punycode and uppercase on-host URIs, and the same-host `http` hop.
+
 ## 2026-10-15 — Session 08 W6 r6: decoded names, duplicate keys, and non-URI actions
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.

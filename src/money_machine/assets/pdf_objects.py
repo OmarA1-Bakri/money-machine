@@ -4,16 +4,18 @@
 ``/URI`` string. It does not read an annotation-level ``/URI``.
 ``delivery_link_uris`` is the same page walk for link validation. A link
 annotation must be exactly ``Type``, ``Subtype``, ``Rect``, ``Border``,
-``F``, and ``A``, with ``/Subtype /Link``. Any other annotation subtype is
-refused. The action is exactly ``S`` and ``URI``, plus ``Type /Action`` when
-``Type`` is present. ``/S`` must be ``/URI`` anywhere in the graph, including
-a link action and an outline. An indirect action or URI is resolved one hop.
-A URI stream is refused. The catalog must equal the keys the generator emits,
-``Type`` and ``Pages``. ``/Outlines``, ``/OpenAction``, ``/AA``, ``/Names``,
-and ``/AcroForm`` are not in that set. The root ``/Names`` entry is read on
-its own, so a shared object cannot hide ``/JavaScript`` or ``/EmbeddedFiles``.
-Nesting deeper than 64 raises ``ValueError``. Names are decoded once in the
-reader, and a dictionary with two keys for one name is refused there.
+``F``, and ``A``, with ``/Subtype /Link``. Any other annotation on the page
+``/Annots`` array is refused. The action is exactly ``S`` and ``URI``, plus
+``Type /Action`` when ``Type`` is present. ``/S`` must be ``/URI`` anywhere
+in the graph. A ``/URI`` that is not the link's own action is checked with
+the same rules as a delivery link. An indirect action or URI is resolved one
+hop. A URI stream on a link is refused. The catalog is the trailer ``/Root``,
+read before the walk, and must equal ``Type`` and ``Pages``. A page must
+equal the keys Chromium emits, with ``Annots`` only when the page has
+annotations. The walk remembers ``(object, role)``, so a second role still
+runs that role's check. Nesting deeper than 64 raises ``ValueError``. Names
+are decoded once in the reader, and a dictionary with two keys for one name
+is refused there.
 """
 
 from __future__ import annotations
@@ -107,12 +109,23 @@ _LINK_KEYS = frozenset({"Type", "Subtype", "Rect", "Border", "F", "A"})
 _ACTION_BARE = frozenset({"S", "URI"})
 _ACTION_WITH_TYPE = frozenset({"Type", "S", "URI"})
 _CATALOG_KEYS = frozenset({"Pages", "Type"})
+_PAGE_KEYS = frozenset({"Contents", "MediaBox", "Parent", "Resources", "Tabs", "Type"})
+_PAGE_WITH_ANNOTS = _PAGE_KEYS | {"Annots"}
 _ANNOT_ALLOW_EXTRA: frozenset[str] = frozenset()
 _ACTION_ALLOW_EXTRA: frozenset[str] = frozenset()
 _CATALOG_ALLOW_EXTRA: frozenset[str] = frozenset()
+_PAGE_ALLOW_EXTRA: frozenset[str] = frozenset()
 _ALLOWED_S: frozenset[str] = frozenset({"URI"})
-_ALLOWED_SUBTYPE: frozenset[str] = frozenset({"Link"})
 _MAX_DEPTH = 64
+
+
+class EmbeddedUriRefusal(ValueError):
+    """A ``/URI`` outside a link action failed the delivery-link rules."""
+
+    def __init__(self, code: str, uri: str) -> None:
+        super().__init__(code)
+        self.code = code
+        self.uri = uri
 
 
 def delivery_link_uris(pdf: bytes) -> tuple[str, ...]:
@@ -121,8 +134,9 @@ def delivery_link_uris(pdf: bytes) -> tuple[str, ...]:
     Annotation keys must equal the Chromium set. The action is ``S`` and
     ``URI``, with ``Type /Action`` when ``Type`` is present. ``/S`` must be
     ``/URI``. An indirect action or URI resolves one hop. A URI stream is
-    refused. The catalog keys must equal ``Type`` and ``Pages``. An annotation
-    whose subtype is not ``Link`` is refused.
+    refused. The catalog is checked from the trailer ``/Root`` before the
+    walk. A page must equal the generator's keys. An annotation whose
+    subtype is not ``Link`` is refused here, not by the walk's parent key.
     """
     doc = PdfDocument(pdf)
     _refuse_graph(doc)
@@ -135,47 +149,70 @@ def delivery_link_uris(pdf: bytes) -> tuple[str, ...]:
         for item in annots:
             annot = _dict(doc.deref(item))
             if not _name_is(annot.get("Subtype"), "Link"):
-                continue
+                raise ValueError("pdf annot subtype")
             uris.append(_uri_action(doc, annot))
     return tuple(uris)
 
 
 def _refuse_graph(doc: PdfDocument) -> None:
-    """Refuse a catalog whose keys are not the generator's, and a non-URI ``/S``.
+    """Refuse a bad catalog, a bad page, a non-URI ``/S``, and an unvalidated ``/URI``.
 
-    The catalog is the trailer ``/Root``. Its ``/Names`` entry is resolved
-    directly, including when another key already visited that object. Objects
-    that nothing references are walked afterwards. Nesting deeper than
-    ``_MAX_DEPTH`` is refused.
+    The catalog is ``trailer["Root"]``, checked before the walk so an earlier
+    ``/Info`` or ``/Foo`` cannot hide it. The walk's seen set is
+    ``(object, role)``. An annotation reached earlier under another role is
+    checked again when the role is ``Annots``. Objects that nothing references
+    are walked afterwards. Nesting deeper than ``_MAX_DEPTH`` is refused.
     """
-    seen: set[int] = set()
+    _refuse_trailer_root(doc)
+    seen: set[tuple[int, str | None]] = set()
 
-    def scan(value: PdfObject | None, parent_key: str | None, depth: int) -> None:
+    def scan(
+        value: PdfObject | None,
+        parent_key: str | None,
+        depth: int,
+        *,
+        in_link_action: bool = False,
+    ) -> None:
         if depth > _MAX_DEPTH:
             raise ValueError("pdf depth")
         if isinstance(value, PdfRef):
-            if value.number in seen:
+            role = parent_key
+            if (value.number, role) in seen:
                 return
-            seen.add(value.number)
+            seen_before = any(number == value.number for number, _role in seen)
+            seen.add((value.number, role))
             value = doc.get(value.number)
+            if role == "Annots" and seen_before and isinstance(value, dict):
+                _refuse_annot_on_second_role(value)
         if isinstance(value, dict):
-            if parent_key == "Root":
-                _refuse_root_names(doc, value)
-            _refuse_dict(value, parent_key)
+            _refuse_dict(doc, value, in_link_action=in_link_action)
+            owned = _name_is(value.get("Subtype"), "Link") and _name_is(value.get("Type"), "Annot")
             for key, child in value.items():
-                scan(child, key, depth + 1)
+                scan(child, key, depth + 1, in_link_action=owned and key == "A")
             return
         if isinstance(value, tuple):
             for item in value:
-                scan(item, parent_key, depth + 1)
+                scan(item, parent_key, depth + 1, in_link_action=in_link_action)
             return
         if isinstance(value, PdfStream):
-            scan(value.fields, parent_key, depth + 1)
+            scan(value.fields, parent_key, depth + 1, in_link_action=in_link_action)
 
     scan(doc.trailer, None, 0)
-    for number in doc.entries:
-        if number not in seen:
+    reached = {number for number, _role in seen}
+    for number in list(doc.entries):
+        if number not in reached:
             scan(PdfRef(number, 0), None, 0)
+            reached.add(number)
+
+
+def _refuse_trailer_root(doc: PdfDocument) -> None:
+    """Check the trailer catalog itself, independent of walk order."""
+    root = doc.deref(doc.trailer.get("Root"))
+    if not isinstance(root, dict):
+        raise ValueError("pdf catalog keys")
+    if frozenset(root) - _CATALOG_ALLOW_EXTRA != _CATALOG_KEYS:
+        raise ValueError("pdf catalog keys")
+    _refuse_root_names(doc, root)
 
 
 def _refuse_root_names(doc: PdfDocument, fields: dict[str, PdfObject]) -> None:
@@ -189,16 +226,69 @@ def _refuse_root_names(doc: PdfDocument, fields: dict[str, PdfObject]) -> None:
         raise ValueError("pdf names entry")
 
 
-def _refuse_dict(fields: dict[str, PdfObject], parent_key: str | None) -> None:
-    if parent_key == "Root" and frozenset(fields) - _CATALOG_ALLOW_EXTRA != _CATALOG_KEYS:
-        raise ValueError("pdf catalog keys")
-    if parent_key == "Annots":
-        subtype = fields.get("Subtype")
-        if not isinstance(subtype, PdfName) or subtype.value not in _ALLOWED_SUBTYPE:
-            raise ValueError("pdf annot subtype")
+def _refuse_annot_on_second_role(fields: dict[str, PdfObject]) -> None:
+    """Refuse a non-Link reached again under ``Annots``.
+
+    The page ``/Annots`` array is checked in ``delivery_link_uris``. This
+    visit applies that same subtype rule to an object an earlier role
+    already marked.
+    """
+    if not _name_is(fields.get("Subtype"), "Link"):
+        raise ValueError("pdf annot subtype")
+
+
+def _refuse_dict(
+    doc: PdfDocument,
+    fields: dict[str, PdfObject],
+    *,
+    in_link_action: bool,
+) -> None:
+    _refuse_page(fields)
     action = fields.get("S")
     if isinstance(action, PdfName) and action.value not in _ALLOWED_S:
         raise ValueError("pdf action s")
+    if isinstance(action, PdfName):
+        _refuse_action_uri(doc, fields, in_link_action=in_link_action)
+
+
+def _refuse_page(fields: dict[str, PdfObject]) -> None:
+    if not _name_is(fields.get("Type"), "Page"):
+        return
+    keys = frozenset(fields) - _PAGE_ALLOW_EXTRA
+    if keys != _PAGE_KEYS and keys != _PAGE_WITH_ANNOTS:
+        raise ValueError("pdf page keys")
+
+
+def _refuse_action_uri(
+    doc: PdfDocument,
+    fields: dict[str, PdfObject],
+    *,
+    in_link_action: bool,
+) -> None:
+    """Validate a ``/URI`` the link extractor will not return.
+
+    A link annotation's own action is left to ``validate_pdf_links``, which
+    records that URI by index. Every other ``/S /URI`` uses the same rules.
+    A stream stays unresolved here so the link path owns that refusal.
+    """
+    if in_link_action or "URI" not in fields:
+        return
+    resolved = _once(doc, fields.get("URI"))
+    if isinstance(resolved, PdfStream):
+        return
+    uri = _text_of(resolved)
+    if uri is None:
+        return
+    reason = _graph_uri_reason(uri)
+    if reason is not None:
+        raise EmbeddedUriRefusal(reason, uri)
+
+
+def _graph_uri_reason(uri: str) -> str | None:
+    # link_validation imports this module, so a top-level import cycles.
+    from money_machine.assets.link_validation import refuse_graph_uri
+
+    return refuse_graph_uri(uri)
 
 
 def _uri_action(doc: PdfDocument, annot: dict[str, PdfObject]) -> str:

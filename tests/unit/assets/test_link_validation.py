@@ -108,13 +108,30 @@ def _obj(number: int, body: str) -> bytes:
     return f"{number} 0 obj\n{body}\nendobj\n".encode("latin-1")
 
 
+def _page(
+    parent: int,
+    annots: str | None = None,
+    *,
+    resources: str = "<< >>",
+    extra: str = "",
+    annots_key: str = "Annots",
+) -> str:
+    """A page whose keys match the README generator, plus ``extra`` when set."""
+    annots_part = f" /{annots_key} {annots}" if annots is not None else ""
+    suffix = f" {extra}" if extra else ""
+    return (
+        f"<< /Type /Page /Resources {resources} /MediaBox [0 0 1 1]"
+        f"{annots_part} /Contents << >> /Tabs /S /Parent {parent} 0 R{suffix} >>"
+    )
+
+
 def _link_pdf(uris: tuple[str, ...]) -> bytes:
     objects: dict[int, bytes] = {
         1: b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
         2: b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
     }
     refs = " ".join(f"{number} 0 R" for number in range(4, 4 + len(uris)))
-    objects[3] = f"3 0 obj\n<< /Type /Page /Parent 2 0 R /Annots [{refs}] >>\nendobj\n".encode()
+    objects[3] = _obj(3, _page(2, f"[{refs}]"))
     for offset, uri in enumerate(uris):
         number = 4 + offset
         objects[number] = _obj(number, _annot_dict(_action_dict(uri)))
@@ -183,17 +200,15 @@ def _annot(
     catalog: str = "",
     objects: dict[int, bytes] | None = None,
     page_extra: str = "",
+    resources: str = "<< >>",
     root: str | None = None,
 ) -> bytes:
     extra = f" {catalog}" if catalog else ""
     catalog_body = root if root is not None else f"<< /Type /Catalog /Pages 2 0 R{extra} >>"
-    page_suffix = f" {page_extra}" if page_extra else ""
     built = {
         1: f"1 0 obj\n{catalog_body}\nendobj\n".encode(),
         2: b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
-        3: (
-            f"3 0 obj\n<< /Type /Page /Parent 2 0 R /Annots [4 0 R]{page_suffix} >>\nendobj\n"
-        ).encode(),
+        3: _obj(3, _page(2, "[4 0 R]", resources=resources, extra=page_extra)),
         4: _obj(4, body),
     }
     if objects:
@@ -243,13 +258,26 @@ def test_an_annotation_uri_cannot_hide_the_action() -> None:
 
 
 def test_an_action_next_is_malformed() -> None:
-    body = _good_annot(action_extra="/Next << /S /URI /URI (https://evil.example/) >>")
+    body = _good_annot(action_extra=f"/Next << /S /URI /URI {_literal(_GOOD)} >>")
     refusal = _raise(_annot(body), accepted=_accepted_good())
     assert refusal.code == "malformed"
 
 
 def test_a_link_additional_action_is_malformed() -> None:
     body = _good_annot(extra="/AA << /E << /S /JavaScript /JS (1) >> >>")
+    refusal = _raise(_annot(body), accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_a_link_uri_additional_action_is_malformed() -> None:
+    """``/S /URI`` must not save an extra ``/AA`` key. JavaScript would."""
+    body = _good_annot(extra=f"/AA << /E << /S /URI /URI {_literal(_GOOD)} >> >>")
+    refusal = _raise(_annot(body), accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_a_link_additional_action_without_an_s_is_malformed() -> None:
+    body = _good_annot(extra="/AA << /E << /Foo true >> >>")
     refusal = _raise(_annot(body), accepted=_accepted_good())
     assert refusal.code == "malformed"
 
@@ -408,7 +436,7 @@ def test_a_catalog_missing_type_is_malformed() -> None:
 
 
 def test_a_page_launch_action_is_malformed() -> None:
-    pdf = _annot(_good_annot(), page_extra="/Foo << /S /Launch >>")
+    pdf = _annot(_good_annot(), resources="<< /XObject << /S /Launch >> >>")
     refusal = _raise(pdf, accepted=_accepted_good())
     assert refusal.code == "malformed"
 
@@ -421,7 +449,7 @@ def test_an_unreferenced_launch_action_is_malformed() -> None:
 
 def test_a_deep_page_nest_is_malformed() -> None:
     nested = "[" * 500 + "0" + "]" * 500
-    pdf = _annot(_good_annot(), page_extra=f"/Resources {nested}")
+    pdf = _annot(_good_annot(), resources=nested)
     refusal = _raise(pdf, accepted=_accepted_good())
     assert refusal.code == "malformed"
 
@@ -432,7 +460,7 @@ def test_a_deep_reference_chain_is_malformed() -> None:
         number = 10 + hop
         body = "<< >>" if hop == 1499 else f"<< /Next {number + 1} 0 R >>"
         objects[number] = _obj(number, body)
-    pdf = _annot(_good_annot(), page_extra="/Next 10 0 R", objects=objects)
+    pdf = _annot(_good_annot(), resources="<< /Next 10 0 R >>", objects=objects)
     refusal = _raise(pdf, accepted=_accepted_good())
     assert refusal.code == "malformed"
 
@@ -443,9 +471,9 @@ def test_an_escaped_annots_key_is_not_hidden() -> None:
         {
             1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
             2: _obj(2, "<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>"),
-            3: _obj(3, "<< /Type /Page /Parent 2 0 R /Annots [4 0 R] >>"),
+            3: _obj(3, _page(2, "[4 0 R]")),
             4: _obj(4, _good_annot()),
-            5: _obj(5, "<< /Type /Page /Parent 2 0 R /Ann#6fts [6 0 R] >>"),
+            5: _obj(5, _page(2, "[6 0 R]", annots_key="Ann#6fts")),
             6: _obj(6, evil),
         }
     )
@@ -467,7 +495,7 @@ def test_an_escaped_kids_key_is_walked() -> None:
         {
             1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
             2: _obj(2, "<< /Type /Pages /K#69ds [3 0 R] /Count 1 >>"),
-            3: _obj(3, "<< /Type /Page /Parent 2 0 R /Annots [4 0 R] >>"),
+            3: _obj(3, _page(2, "[4 0 R]")),
             4: _obj(4, _good_annot()),
         }
     )
@@ -483,7 +511,7 @@ def test_an_escaped_metadata_key_is_paid_checkout() -> None:
         {
             1: _obj(1, "<< /Type /Catalog /Pages 2 0 R /Metad#61ta 5 0 R >>"),
             2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
-            3: _obj(3, "<< /Type /Page /Parent 2 0 R /Annots [4 0 R] >>"),
+            3: _obj(3, _page(2, "[4 0 R]")),
             4: _obj(4, _good_annot()),
             5: stream,
         }
@@ -513,7 +541,7 @@ def test_a_decoded_kids_twin_is_malformed() -> None:
         {
             1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
             2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /K#69ds [3 0 R] /Count 1 >>"),
-            3: _obj(3, "<< /Type /Page /Parent 2 0 R /Annots [4 0 R] >>"),
+            3: _obj(3, _page(2, "[4 0 R]")),
             4: _obj(4, _good_annot()),
         }
     )
@@ -553,7 +581,7 @@ def _beside(body: str) -> bytes:
         {
             1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
             2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
-            3: _obj(3, "<< /Type /Page /Parent 2 0 R /Annots [4 0 R 5 0 R] >>"),
+            3: _obj(3, _page(2, "[4 0 R 5 0 R]")),
             4: _obj(4, _good_annot()),
             5: _obj(5, body),
         }
@@ -585,7 +613,7 @@ def test_a_widget_javascript_is_malformed() -> None:
 def test_an_outline_launch_is_malformed() -> None:
     pdf = _annot(
         _good_annot(),
-        page_extra="/Outlines 5 0 R",
+        resources="<< /Outlines 5 0 R >>",
         objects={
             5: _obj(5, "<< /Type /Outlines /First 6 0 R /Count 1 >>"),
             6: _obj(6, "<< /Title (x) /Parent 5 0 R /A << /S /Launch /F (calc.exe) >> >>"),
@@ -675,7 +703,7 @@ def test_a_link_without_a_uri_is_malformed() -> None:
         {
             1: b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
             2: b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
-            3: b"3 0 obj\n<< /Type /Page /Parent 2 0 R /Annots [4 0 R] >>\nendobj\n",
+            3: _obj(3, _page(2, "[4 0 R]")),
             4: b"4 0 obj\n<< /Subtype /Link >>\nendobj\n",
         }
     )
@@ -688,7 +716,7 @@ def test_an_indirect_annotation_off_host_is_refused() -> None:
         {
             1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
             2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
-            3: _obj(3, "<< /Type /Page /Parent 2 0 R /Annots 4 0 R >>"),
+            3: _obj(3, _page(2, "4 0 R")),
             4: _obj(4, "[5 0 R]"),
             5: _obj(5, _annot_dict(_action_dict("https://x.com"))),
         }
@@ -707,7 +735,7 @@ def test_nested_kids_are_walked() -> None:
             3: _obj(3, "[4 0 R]"),
             4: _obj(4, "<< /Type /Pages /Parent 2 0 R /Kids 5 0 R /Count 1 >>"),
             5: _obj(5, "[6 0 R]"),
-            6: _obj(6, "<< /Type /Page /Parent 4 0 R /Annots [7 0 R] >>"),
+            6: _obj(6, _page(4, "[7 0 R]")),
             7: _obj(7, _annot_dict(_action_dict("https://x.com"))),
         }
     )
@@ -789,6 +817,122 @@ def test_a_deep_info_chain_is_refused() -> None:
     refusal = _raise(deep_info_chain(), accepted=(), clock=None)
     assert refusal.code == "paid_checkout"
     assert refusal.repairs == (AssetRepair(_ASSET, "", "paid_checkout"),)
+
+
+def _aliased_root(first: str) -> bytes:
+    """Trailer key ``first`` points at the catalog and is written before ``/Root``."""
+    catalog = (
+        "<< /Type /Catalog /Pages 2 0 R "
+        "/OpenAction << /S /URI /URI (https://evil.example/) >> "
+        "/AA << /WC << /S /URI /URI (https://evil.example/aa) >> >> "
+        "/AcroForm << /Fields [] >> "
+        "/Outlines << /Type /Outlines >> "
+        "/Names 5 0 R >>"
+    )
+    objects = {
+        1: _obj(1, catalog),
+        2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+        3: _obj(3, _page(2, "[4 0 R]")),
+        4: _obj(4, _good_annot()),
+        5: _obj(5, "<< /JavaScript << /Names [] >> >>"),
+    }
+    trailer = f"<< /Size 6 /{first} 1 0 R /Root 1 0 R >>"
+    return classic_pdf(objects, trailer_body=trailer)
+
+
+def test_info_before_root_cannot_hide_the_catalog() -> None:
+    refusal = _raise(_aliased_root("Info"), accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_foo_before_root_cannot_hide_the_catalog() -> None:
+    refusal = _raise(_aliased_root("Foo"), accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_a_page_uri_additional_action_is_malformed() -> None:
+    extra = "/AA << /O << /S /URI /URI (https://evil.example/) >> >>"
+    refusal = _raise(_annot(_good_annot(), page_extra=extra), accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_a_page_additional_action_without_a_uri_is_malformed() -> None:
+    refusal = _raise(
+        _annot(_good_annot(), page_extra="/AA << /E true >>"),
+        accepted=_accepted_good(),
+    )
+    assert refusal.code == "malformed"
+
+
+def test_a_page_missing_tabs_is_malformed() -> None:
+    bare = _page(2, "[4 0 R]").replace(" /Tabs /S", "")
+    pdf = classic_pdf(
+        {
+            1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+            2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            3: _obj(3, bare),
+            4: _obj(4, _good_annot()),
+        }
+    )
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_a_widget_uri_through_an_outline_is_refused() -> None:
+    """An evil widget URI under an allowed ``/Resources`` key, not under ``/Annots``."""
+    widget = _other_annot("Widget", _action_dict("https://evil.example/"))
+    pdf = classic_pdf(
+        {
+            1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+            2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            3: _obj(3, _page(2, "[4 0 R]", resources="<< /Outlines 5 0 R >>")),
+            4: _obj(4, _good_annot()),
+            5: _obj(5, widget),
+        }
+    )
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "host"
+    assert refusal.repairs == (AssetRepair(_ASSET, "https://evil.example/", "host"),)
+
+
+def test_a_widget_after_an_outline_is_still_refused() -> None:
+    """The same widget is also in ``/Annots``. Either the URI or the second role refuses it."""
+    widget = _other_annot("Widget", _action_dict("https://evil.example/"))
+    pdf = classic_pdf(
+        {
+            1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+            2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            3: _obj(3, _page(2, "[4 0 R 5 0 R]", resources="<< /Outlines 5 0 R >>")),
+            4: _obj(4, _good_annot()),
+            5: _obj(5, widget),
+        }
+    )
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code in {"host", "malformed"}
+
+
+def test_a_second_role_widget_is_malformed() -> None:
+    """A good URI, so only the Annots role after ``/Outlines`` refuses the widget."""
+    widget = _other_annot("Widget", _action_dict(_GOOD))
+    resources = "<< /Outlines 5 0 R /Annots [5 0 R] >>"
+    pdf = classic_pdf(
+        {
+            1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+            2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            3: _obj(3, _page(2, "[4 0 R]", resources=resources)),
+            4: _obj(4, _good_annot()),
+            5: _obj(5, widget),
+        }
+    )
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_a_deep_catalog_is_malformed() -> None:
+    nested = "[" * 500 + "0" + "]" * 500
+    pdf = _annot(_good_annot(), catalog=f"/Mark {nested}")
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
 
 
 def test_an_unknown_variant_is_refused_without_opening() -> None:
@@ -976,13 +1120,16 @@ def _assert_readme_link_shape(pdf: bytes, count: int) -> None:
     assert isinstance(kids, tuple)
     found: list[dict[str, PdfObject]] = []
     bare = 0
+    bare_page = {"Type", "Resources", "MediaBox", "Contents", "Tabs", "Parent"}
     for kid in kids:
         page = doc.deref(kid)
         assert isinstance(page, dict)
         annots = page.get("Annots")
         if annots is None:
+            assert set(page) == bare_page
             bare += 1
             continue
+        assert set(page) == bare_page | {"Annots"}
         array = doc.deref(annots)
         assert isinstance(array, tuple)
         for item in array:

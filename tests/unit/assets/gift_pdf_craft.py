@@ -7,7 +7,12 @@ import zlib
 from money_machine.assets.pdf_reader import PdfDocument, PdfRef
 
 
-def classic_pdf(objects: dict[int, bytes], *, info: int | None = None) -> bytes:
+def classic_pdf(
+    objects: dict[int, bytes],
+    *,
+    info: int | None = None,
+    trailer_body: str | None = None,
+) -> bytes:
     """Build a classic cross-reference PDF. Object 1 is the catalog."""
     if not objects or min(objects) < 1:
         raise ValueError("pdf objects")
@@ -27,10 +32,10 @@ def classic_pdf(objects: dict[int, bytes], *, info: int | None = None) -> bytes:
             rows.append("0000000000 65535 f \n")
             continue
         rows.append(f"{offsets[number]:010d} 00000 n \n")
-    info_part = f" /Info {info} 0 R" if info is not None else ""
-    trailer = (
-        f"trailer\n<< /Size {highest + 1} /Root 1 0 R{info_part} >>\nstartxref\n{xref_at}\n%%EOF\n"
-    )
+    if trailer_body is None:
+        info_part = f" /Info {info} 0 R" if info is not None else ""
+        trailer_body = f"<< /Size {highest + 1} /Root 1 0 R{info_part} >>"
+    trailer = f"trailer\n{trailer_body}\nstartxref\n{xref_at}\n%%EOF\n"
     return b"".join(chunks) + "".join(rows).encode("ascii") + trailer.encode("ascii")
 
 
@@ -50,7 +55,11 @@ def titled_page(title: str) -> bytes:
         {
             1: _dict_object(1, "<< /Type /Catalog /Pages 2 0 R >>"),
             2: _dict_object(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
-            3: _dict_object(3, "<< /Type /Page /Parent 2 0 R >>"),
+            3: _dict_object(
+                3,
+                "<< /Type /Page /Resources << >> /MediaBox [0 0 1 1] "
+                "/Contents << >> /Tabs /S /Parent 2 0 R >>",
+            ),
             4: _dict_object(4, f"<< /Title {literal} >>"),
         },
         info=4,

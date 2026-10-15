@@ -24,7 +24,11 @@ from money_machine.assets.gift_links import (
     refuse_paid_checkout,
     refuse_raw_charset,
 )
-from money_machine.assets.pdf_objects import delivery_link_uris, document_strings
+from money_machine.assets.pdf_objects import (
+    EmbeddedUriRefusal,
+    delivery_link_uris,
+    document_strings,
+)
 from money_machine.assets.pdf_reader import PdfDocument
 from money_machine.integrations.notion.publishing import (
     _allowed_secret_host,  # pyright: ignore[reportPrivateUsage]
@@ -113,7 +117,10 @@ def validate_pdf_links(
 ) -> LinkReport:
     """Check every embedded link. A failure raises and names that link only."""
     try:
-        PdfDocument(pdf)
+        opened = PdfDocument(pdf)
+        # A deep catalog is parsed here. A deep /Info chain is not, so that
+        # chain stays paid_checkout below.
+        opened.deref(opened.trailer.get("Root"))
     except ValueError as exc:
         raise _repair(asset, "", "malformed") from exc
     info = _info_refusal(pdf, asset)
@@ -121,6 +128,8 @@ def validate_pdf_links(
         raise info
     try:
         uris = delivery_link_uris(pdf)
+    except EmbeddedUriRefusal as exc:
+        raise _repair(asset, exc.uri, exc.code) from exc
     except ValueError as exc:
         raise _repair(asset, "", "malformed") from exc
     if len(uris) == 0:
@@ -204,6 +213,15 @@ def _offending_info(pdf: bytes) -> str:
 
 def _repair(asset: str, link: str, reason: str) -> LinkValidationRefusal:
     return LinkValidationRefusal(reason, repairs=(AssetRepair(asset, link, reason),))
+
+
+def refuse_graph_uri(uri: str) -> str | None:
+    """Apply the delivery-link rules to a URI that is not a link annotation.
+
+    The variant is empty, so there is no button name to check. The scheme,
+    host, port, and percent rules are the ones a delivery link uses.
+    """
+    return _refuse_link(uri, "", frozenset())
 
 
 def _refuse_link(uri: str, variant: str, known_variants: frozenset[str]) -> str | None:
