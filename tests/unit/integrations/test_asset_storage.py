@@ -580,3 +580,146 @@ def test_s3_same_bytes_are_idempotent() -> None:
     ).storage_uri
     assert first == second
     assert store.read(first) == _PNG
+
+
+def test_a_non_uuid_key_is_refused(tmp_path: Path) -> None:
+    store = _local(tmp_path)
+    with pytest.raises(ValueError, match=r"^storage path$"):
+        store.read(f"fixture://not-a-uuid/2/{_digest(_PNG)}")
+
+
+@pytest.mark.parametrize("spec", ["0", "01", "-1", "x"])
+def test_a_bad_spec_key_is_refused(tmp_path: Path, spec: str) -> None:
+    store = _local(tmp_path)
+    with pytest.raises(ValueError, match=r"^storage path$"):
+        store.read(f"fixture://{_PRODUCT}/{spec}/{_digest(_PNG)}")
+
+
+def test_a_fullwidth_spec_is_refused(tmp_path: Path) -> None:
+    store = _local(tmp_path)
+    with pytest.raises(ValueError, match=r"^storage path$"):
+        store.read(f"fixture://{_PRODUCT}/\uff11/{_digest(_PNG)}")
+
+
+def test_a_non_hex_digest_key_is_refused(tmp_path: Path) -> None:
+    store = _local(tmp_path)
+    with pytest.raises(ValueError, match=r"^storage path$"):
+        store.read(f"fixture://{_PRODUCT}/2/{'g' * 64}")
+
+
+def test_a_leading_slash_key_is_refused(tmp_path: Path) -> None:
+    store = _local(tmp_path)
+    secret = tmp_path / "secret"
+    secret.write_bytes(_OLD)
+    with pytest.raises(ValueError, match=r"^storage path slash$"):
+        store.read(f"fixture:///{_PRODUCT}/2/{_digest(_PNG)}")
+    assert secret.read_bytes() == _OLD
+
+
+def test_a_backslash_key_is_refused(tmp_path: Path) -> None:
+    store = _local(tmp_path)
+    with pytest.raises(ValueError, match=r"^storage path backslash$"):
+        store.read(f"fixture://{_PRODUCT}\\2/{_digest(_PNG)}")
+
+
+def test_a_four_part_key_is_refused(tmp_path: Path) -> None:
+    store = _local(tmp_path)
+    with pytest.raises(ValueError, match=r"^storage path length$"):
+        store.read(f"fixture://{_PRODUCT}/2/{_digest(_PNG)}/extra")
+
+
+def test_a_dot_segment_is_refused_on_its_own(tmp_path: Path) -> None:
+    store = _local(tmp_path)
+    with pytest.raises(ValueError, match=r"^storage path dots$"):
+        store.read(f"fixture://{_PRODUCT}/../{_digest(_PNG)}")
+
+
+def test_the_directory_walk_refuses_a_dot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    store = _local(tmp_path)
+    (store.root / "published").mkdir()
+    secret = tmp_path / "secret"
+    secret.write_bytes(_OLD)
+
+    def dotted(_uri: str) -> tuple[str, str, str, str]:
+        return ("published", "..", "2", _digest(_PNG))
+
+    monkeypatch.setattr("money_machine.integrations.storage.local._key", dotted)
+    with pytest.raises(ValueError, match=r"^storage path$"):
+        store.read("fixture://ignored")
+    assert secret.read_bytes() == _OLD
+
+
+def test_a_raced_link_with_other_bytes_collides(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _local(tmp_path)
+
+    def racing_link(
+        _src: str,
+        dst: str,
+        *,
+        src_dir_fd: int | None = None,
+        dst_dir_fd: int | None = None,
+        follow_symlinks: bool = True,
+    ) -> None:
+        del src_dir_fd, follow_symlinks
+        assert dst_dir_fd is not None
+        descriptor = os.open(dst, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644, dir_fd=dst_dir_fd)
+        os.write(descriptor, _GIF)
+        os.close(descriptor)
+        raise FileExistsError(errno.EEXIST, "exists", dst)
+
+    monkeypatch.setattr(os, "link", racing_link)
+    with pytest.raises(ValueError, match=r"^storage collision$"):
+        _publish(store, _PNG)
+    final = store.root / "published" / str(_PRODUCT) / "2" / _digest(_PNG)
+    assert final.read_bytes() == _GIF
+
+
+def test_a_failed_write_leaves_no_temp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    store = _local(tmp_path)
+
+    def boom(_descriptor: int, _data: bytes | bytearray | memoryview) -> int:
+        raise OSError(errno.EIO, "disk")
+
+    monkeypatch.setattr(os, "write", boom)
+    with pytest.raises(OSError, match="disk"):
+        _publish(store, _PNG)
+    spec_dir = store.root / "published" / str(_PRODUCT) / "2"
+    assert spec_dir.is_dir()
+    assert list(spec_dir.iterdir()) == []
+
+
+def test_cleanup_keeps_an_orphan_temp_name(tmp_path: Path) -> None:
+    store = _local(tmp_path)
+    current = store.put_temporary(
+        product_id=_PRODUCT, spec_version=2, sha256=_digest(_PNG), data=_PNG
+    )
+    orphan = _uri_path(store, current.storage_uri).parent / ".orphan"
+    orphan.write_bytes(b"leak")
+    removed = store.cleanup_temporary(
+        product_id=_PRODUCT, spec_version=2, keep_sha256=_digest(_PNG)
+    )
+    assert orphan.read_bytes() == b"leak"
+    assert removed == ()
+    assert store.read(current.storage_uri) == _PNG
+
+
+def test_cleanup_refuses_a_bad_keep_hash(tmp_path: Path) -> None:
+    store = _local(tmp_path)
+    uri = store.put_temporary(
+        product_id=_PRODUCT, spec_version=2, sha256=_digest(_PNG), data=_PNG
+    ).storage_uri
+    with pytest.raises(ValueError, match=r"^storage hash$"):
+        store.cleanup_temporary(product_id=_PRODUCT, spec_version=2, keep_sha256="nope")
+    assert store.read(uri) == _PNG
+
+
+def test_s3_cleanup_refuses_a_bad_keep_hash() -> None:
+    store = SimS3AssetStore()
+    uri = store.put_temporary(
+        product_id=_PRODUCT, spec_version=2, sha256=_digest(_PNG), data=_PNG
+    ).storage_uri
+    with pytest.raises(ValueError, match=r"^storage hash$"):
+        store.cleanup_temporary(product_id=_PRODUCT, spec_version=2, keep_sha256="nope")
+    assert store.read(uri) == _PNG

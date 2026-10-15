@@ -79,6 +79,8 @@ class SimS3AssetStore:
         self, *, product_id: UUID, spec_version: int, keep_sha256: str
     ) -> tuple[str, ...]:
         """Remove superseded temporary keys. Published keys are not in this prefix."""
+        if len(keep_sha256) != 64 or any(char not in "0123456789abcdef" for char in keep_sha256):
+            raise ValueError("storage hash")
         prefix = f"s3://temporary/{product_id}/{spec_version}/"
         removed: list[str] = []
         for uri in tuple(sorted(self._objects)):

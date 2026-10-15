@@ -1,3 +1,9 @@
+## 2026-10-15 — Session 08 asset storage r3
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-asset-storage-r3-prompt-integrity.md`.
+
+A URI is refused before the walk. A leading slash, a backslash, a wrong part count, and a dot segment each raise their own `storage path …` text. The product must be a lowercase UUID, the spec must match `[1-9][0-9]*`, and the digest must be 64 lowercase hex. The directory walk still refuses a dot when the key parser is bypassed. A link race that plants different bytes collides and leaves those bytes. A failed write removes the `.<hex>` temp. Cleanup refuses a bad keep hash before any delete, on the local store and the S3 simulation, and it leaves an orphan dot-name in place.
+
 ## 2026-10-15 — Session 08 asset storage r2
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.

@@ -31,6 +31,7 @@ _DIRECTORY = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 _READ = os.O_RDONLY | os.O_NOFOLLOW
 _CREATE = os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW
 _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+_SPEC = re.compile(r"[1-9][0-9]*")
 _HEX = re.compile(r"[0-9a-f]{64}")
 _DOTS = frozenset({"", ".", ".."})
 
@@ -91,6 +92,8 @@ class LocalAssetStore:
         self, *, product_id: UUID, spec_version: int, keep_sha256: str
     ) -> tuple[str, ...]:
         """Remove superseded temporary renders. The keep hash stays."""
+        if _HEX.fullmatch(keep_sha256) is None:
+            raise ValueError("storage hash")
         try:
             parent = _open_dir(self.root, ("temporary", str(product_id), str(spec_version)))
         except ValueError as exc:
@@ -144,15 +147,19 @@ def _require_root(root: Path) -> Path:
 def _key(uri: str) -> tuple[str, str, str, str]:
     """Refuse a URI that is not ``role/pid/spec/<64-hex>`` before any walk."""
     role, rest = _split(uri)
-    if rest.startswith("/") or "\\" in rest:
-        raise ValueError("storage path")
+    if rest.startswith("/"):
+        raise ValueError("storage path slash")
+    if "\\" in rest:
+        raise ValueError("storage path backslash")
     parts = rest.split("/")
-    if len(parts) != 3 or any(part in _DOTS for part in parts):
-        raise ValueError("storage path")
+    if len(parts) != 3:
+        raise ValueError("storage path length")
     product, spec, digest = parts
+    if any(part in _DOTS for part in parts):
+        raise ValueError("storage path dots")
     if _UUID.fullmatch(product) is None:
         raise ValueError("storage path")
-    if spec.startswith("0") or not spec.isdigit() or int(spec) < 1:
+    if _SPEC.fullmatch(spec) is None:
         raise ValueError("storage path")
     if _HEX.fullmatch(digest) is None:
         raise ValueError("storage path")
@@ -221,19 +228,18 @@ def _place_in(parent: int, digest: str, data: bytes, uri: str, role: StorageRole
                 raise OSError(errno.EIO, "short write")
             view = view[written:]
         os.fsync(descriptor)
+        try:
+            os.link(temp, digest, src_dir_fd=parent, dst_dir_fd=parent, follow_symlinks=False)
+        except FileExistsError:
+            current = _read_optional(parent, digest)
+            if current == data:
+                return _stored(uri, digest, data, role)
+            refuse_collision(current if current is not None else b"", data)
+        os.fsync(parent)
+        return _stored(uri, digest, data, role)
     finally:
         os.close(descriptor)
-    try:
-        os.link(temp, digest, src_dir_fd=parent, dst_dir_fd=parent, follow_symlinks=False)
-    except FileExistsError:
-        current = _read_optional(parent, digest)
         _unlink_temp(parent, temp)
-        if current == data:
-            return _stored(uri, digest, data, role)
-        refuse_collision(current if current is not None else b"", data)
-    os.fsync(parent)
-    _unlink_temp(parent, temp)
-    return _stored(uri, digest, data, role)
 
 
 def _read_optional(parent: int, name: str) -> bytes | None:
