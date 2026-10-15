@@ -2,7 +2,9 @@
 
 Extraction is ``delivery_link_uris`` (the ``link_annotations`` page walk:
 indirect ``/Annots`` and ``/Kids``, including compressed object streams).
-The action must be ``/URI``. Info and XMP go through
+The action must be ``/URI``. Equal-length URIs are compared by index.
+A shorter PDF is aligned as a subsequence, so a dropped middle names that
+accepted link. Info and XMP go through
 ``refuse_gift_document_info``. The raw allowlist runs before any fold.
 ``refuse_paid_checkout`` is the percent guard. On a full URI it returns at
 ``://`` before it sees ``%xx``, so the percent guard for a URI is applied to
@@ -124,12 +126,17 @@ def validate_pdf_links(
         raise _repair(asset, "", "missing_links")
     pdf_sha256 = hashlib.sha256(pdf).hexdigest()
     expected = tuple(uri for _variant, uri in accepted)
+    pairs, missing = _match(uris, expected)
     records: list[LinkRecord] = []
     repairs: list[AssetRepair] = []
     for index, uri in enumerate(uris):
-        variant = accepted[index][0] if index < len(accepted) else ""
+        accepted_index = pairs.get(index)
+        if accepted_index is None:
+            variant = accepted[index][0] if index < len(accepted) else ""
+        else:
+            variant = accepted[accepted_index][0]
         reason = _refuse_link(uri, variant, known_variants)
-        if reason is None and (index >= len(expected) or uri != expected[index]):
+        if reason is None and accepted_index is None:
             reason = "link_mismatch"
         observation: LinkObservation | None = None
         if reason is None:
@@ -138,15 +145,43 @@ def validate_pdf_links(
         records.append(_record(uri, variant, observation, "", pdf_sha256))
         if reason is not None:
             repairs.append(AssetRepair(asset, uri, reason, index))
-    if len(accepted) > len(uris):
-        for offset, (_variant, uri) in enumerate(accepted[len(uris) :]):
-            repairs.append(AssetRepair(asset, uri, "link_mismatch", len(uris) + offset))
+    for accepted_index in missing:
+        repairs.append(
+            AssetRepair(asset, expected[accepted_index], "link_mismatch", accepted_index)
+        )
     found = tuple(records)
     if repairs:
         raise LinkValidationRefusal(repairs[0].reason, records=found, repairs=tuple(repairs))
     checked_at = clock()
     stamped = tuple(replace(record, checked_at=checked_at) for record in found)
     return LinkReport(records=stamped, repairs=())
+
+
+def _match(
+    uris: tuple[str, ...], expected: tuple[str, ...]
+) -> tuple[dict[int, int], tuple[int, ...]]:
+    """Pair each PDF URI with an accepted URI.
+
+    Equal lengths stay positional, so a permutation is a mismatch. A shorter
+    PDF is aligned as a subsequence: a dropped middle names that accepted
+    link, rather than the link that shifted into its slot.
+    """
+    if len(uris) < len(expected):
+        pairs: dict[int, int] = {}
+        missing: list[int] = []
+        cursor = 0
+        for accepted_index, uri in enumerate(expected):
+            if cursor < len(uris) and uris[cursor] == uri:
+                pairs[cursor] = accepted_index
+                cursor += 1
+            else:
+                missing.append(accepted_index)
+        return pairs, tuple(missing)
+    pairs = {}
+    for index in range(min(len(uris), len(expected))):
+        if uris[index] == expected[index]:
+            pairs[index] = index
+    return pairs, ()
 
 
 def _info_refusal(pdf: bytes, asset: str) -> LinkValidationRefusal | None:

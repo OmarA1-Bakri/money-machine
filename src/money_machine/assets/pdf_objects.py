@@ -1,9 +1,12 @@
 """Gift-PDF surfaces read by walking objects, not by searching bytes.
 
 ``link_annotations`` counts ``/Link`` annotations and returns ``/URI`` strings.
-``delivery_link_uris`` is the same page walk for link validation: the action
-``/S`` must be ``/URI``, and a catalog ``/OpenAction``, ``/AA``, or
-``/Names /JavaScript`` is refused. Outlines are not walked.
+``delivery_link_uris`` is the same page walk for link validation. A link
+annotation may only carry ``Type``, ``Subtype``, ``Rect``, ``Border``, ``F``,
+and ``A``. The action may only carry ``Type``, ``S``, and ``URI``, ``/S``
+must be ``/URI``, and the URI must be a direct string. A catalog
+``/OpenAction``, ``/AA``, ``/AcroForm``, ``/Names /JavaScript``, or
+``/Names /EmbeddedFiles`` is refused. Outlines are not walked.
 """
 
 from __future__ import annotations
@@ -85,19 +88,28 @@ def link_annotations(pdf: bytes) -> tuple[int, tuple[str, ...]]:
     return count, tuple(uris)
 
 
+_LINK_KEYS = frozenset({"Type", "Subtype", "Rect", "Border", "F", "A"})
+_ACTION_KEYS = frozenset({"Type", "S", "URI"})
+
+
 def delivery_link_uris(pdf: bytes) -> tuple[str, ...]:
     """Return each link URI from the page walk, or raise ``ValueError``.
 
-    ``/S`` must be ``/URI``. An annotation ``/URI``, an action ``/Next``, a
-    link ``/AA``, or a catalog ``/OpenAction``, ``/AA``, or
-    ``/Names /JavaScript`` is refused. The URI string is the ``/A /URI`` value.
+    Annotation and action keys must be the Chromium set. ``/S`` must be
+    ``/URI`` and the URI must be a direct string. A catalog ``/OpenAction``,
+    ``/AA``, ``/AcroForm``, ``/Names /JavaScript``, or
+    ``/Names /EmbeddedFiles`` is refused.
     """
     doc = PdfDocument(pdf)
     root = _dict(doc.deref(doc.trailer.get("Root")))
     if "OpenAction" in root or "AA" in root:
         raise ValueError("pdf catalog")
+    if "AcroForm" in root:
+        raise ValueError("pdf catalog")
     names = _dict(doc.deref(root.get("Names")))
     if "JavaScript" in names:
+        raise ValueError("pdf catalog")
+    if "EmbeddedFiles" in names:
         raise ValueError("pdf catalog")
     uris: list[str] = []
     for page in _pages(doc, root.get("Pages")):
@@ -113,12 +125,14 @@ def delivery_link_uris(pdf: bytes) -> tuple[str, ...]:
 
 
 def _uri_action(doc: PdfDocument, annot: dict[str, PdfObject]) -> str:
-    if "URI" in annot or "AA" in annot:
+    if not set(annot).issubset(_LINK_KEYS):
         raise ValueError("pdf link")
     action = _dict(doc.deref(annot.get("A")))
-    if "Next" in action or not _name_is(action.get("S"), "URI"):
+    if not set(action).issubset(_ACTION_KEYS):
         raise ValueError("pdf link")
-    uri = _text_of(doc.deref(action.get("URI")))
+    if not _name_is(action.get("S"), "URI"):
+        raise ValueError("pdf link")
+    uri = _text_of(action.get("URI"))
     if uri is None:
         raise ValueError("pdf link")
     return uri

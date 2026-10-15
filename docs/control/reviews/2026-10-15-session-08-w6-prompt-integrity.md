@@ -91,21 +91,21 @@ The operator instruction for this wave is to extract every embedded link from th
 **G-03 [HIGH] — `> 255` accepts Latin-1 Zoë, and `O_NOFOLLOW` is redundant beside `O_EXCL`**
 
 - **Cheap fake:** The existing charset rows all sit above 255, so `ord > 255` stays green. Dropping `O_EXCL` or `O_NOFOLLOW` stays green because the staging directory is new and empty.
-- **Amendment:** `Zoë` (U+00EB) expects `fixture_charset`. `O_EXCL` refuses an existing file and an existing symlink, and the symlink target is not written. `O_NOFOLLOW` is removed: on Linux, `O_EXCL` already returns `EEXIST` for a symlink and does not follow it. The `/sw.js` continuation is deleted. Production capture passes an empty allow-list, and the loop never changed the network test.
+- **Amendment:** `Zoë` (U+00EB) expects `fixture_charset`. `O_EXCL` refuses an existing file and an existing symlink, and the symlink target is not written. `O_NOFOLLOW` is removed: on Linux, `O_EXCL` already returns `EEXIST` for a symlink and does not follow it. The `/sw.js` continuation stays. This Chromium fetches the worker script as `script`, and the continuation is what makes `service_workers="allow"` fail `test_the_fixture_context_makes_no_network_requests`. Production capture passes an empty allow-list, so `/sw.js` is aborted there.
 
 ## 3. Corrective addendum
 
 This addendum governs Wave 6. The prompt remains the unamended source of record.
 
 1. Prove the prompt hash, then implement fixture link validation, plus the carried #73 fixes named by the operator.
-2. After export, read links with `link_annotations` and Info/XMP with `refuse_gift_document_info`. Do not add a second walker, allowlist, or percent expression.
+2. After export, read links with `delivery_link_uris` (the `link_annotations` page walk) and Info/XMP with `refuse_gift_document_info`. Do not add a second walker or a new percent expression. A link annotation may only carry `Type`, `Subtype`, `Rect`, `Border`, `F`, and `A`. The action may only carry `Type`, `S`, and `URI`, `/S` must be `/URI`, and the URI must be a direct string. A catalog `/OpenAction`, `/AA`, `/AcroForm`, `/Names /JavaScript`, or `/Names /EmbeddedFiles` is `malformed`.
 3. A PDF with zero link annotations is `missing_links`. A link annotation without a URI is `malformed`. `http` is `not_https`. A host outside `_allowed_secret_host` is `host`. Userinfo, whitespace, and `mailto` are `malformed`.
 4. `refuse_raw_charset` runs on the raw variant and on the raw URI probe before any fold. `Zoë` in either place is `paid_checkout`. `%xx` is `refuse_paid_checkout` on the path, query, and fragment, and on Info and XMP. A bare `%` stays on the allowlist.
-5. Each extracted URI must equal the accepted string at that index. The checker then reports the variant, public access, and the duplicate button. The record stores the link, the variant, those three results, the injected timestamp, the PDF sha256, and the link sha256.
+5. When the PDF has as many links as the accepted list, each extracted URI must equal the accepted string at that index. A permutation is `link_mismatch`. A shorter PDF is aligned as a subsequence, and a dropped middle names that accepted link once. The checker then reports the variant, public access, and the duplicate button. The record stores the link, the variant, those three results, the injected timestamp, the PDF sha256, and the link sha256.
 6. A failed link raises. The repair names that asset and that link. Other links in the same PDF are not repaired. The default checker raises `live_link_check`. The default clock raises `live_clock`.
 7. Unknown variants are refused before the checker is called. A redirect chain whose host differs is `redirect_host`. A same-host hop is allowed.
 8. The rendered README paints `SECRET_LINK` once per variant plus the duplication line. Chromium m153 stores each annotation as that string plus `/`. Validation against the painted string is `link_mismatch`. Validation against the annotation string passes, and replacing one annotation fails. The rendered gift PDF has zero links and is `missing_links`.
-9. Add the Latin-1 `Zoë` screenshot row. Delete the `/sw.js` loop. Keep `O_EXCL` and drop `O_NOFOLLOW`, with tests for an existing file and a symlink.
+9. Add the Latin-1 `Zoë` screenshot row. Keep the `/sw.js` continuation so `service_workers="allow"` is killed by the network test. Keep `O_EXCL` and drop `O_NOFOLLOW`, with tests for an existing file and a symlink.
 10. Do not edit the files owned by open pulls #63 and #68, and do not edit `IMPLEMENTATION_STATE.json`. Exit 78 stays HELD. Session 08 stays inactive. Do not print the session exit code. Do not change the committed screenshot or video goldens.
 
 ## 4. Deferrals
@@ -124,7 +124,7 @@ This addendum governs Wave 6. The prompt remains the unamended source of record.
 | Workflow linkage and commissioning | Later Session 08 wave | F-01 |
 | Session exit code | Later, at a real session exit | F-01 |
 | Exit 78 | Held | Operator instruction |
-| Whole-document outlines | Later wave | W3 park. Catalog `/OpenAction`, `/AA`, and `/Names /JavaScript` are refused by the link validator after review round 1. The gift walker still does not scan them |
+| Whole-document outlines | Later wave | W3 park. Catalog `/OpenAction`, `/AA`, `/AcroForm`, `/Names /JavaScript`, and `/Names /EmbeddedFiles` are refused by the link validator. The gift walker still does not scan them |
 | Non-Link URI annotations | Later wave | W3 park. A `/Link` whose `/S` is not `/URI` is refused |
 | Defanged hosts | Later wave | W3 park |
 | José and Zoë in the gift name or community | Later wave | The Latin-1 row is the screenshot gate, not the gift field |

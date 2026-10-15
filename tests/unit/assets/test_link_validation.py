@@ -171,9 +171,7 @@ def _annot(body: str, *, catalog: str = "") -> bytes:
 
 @pytest.mark.parametrize("action", ("Launch", "JavaScript", "SubmitForm", "ImportData", "GoToR"))
 def test_a_non_uri_action_is_malformed(action: str) -> None:
-    pdf = _annot(
-        "<< /Subtype /Link /A << /S /" + action + " /F (calc.exe) /URI (" + _GOOD + ") >> >>"
-    )
+    pdf = _annot("<< /Subtype /Link /A << /S /" + action + " /URI (" + _GOOD + ") >> >>")
     refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
     assert refusal.code == "malformed"
     assert refusal.repairs == (AssetRepair(_ASSET, "", "malformed"),)
@@ -219,6 +217,64 @@ def test_a_catalog_action_is_malformed(catalog: str) -> None:
     pdf = _annot("<< /Subtype /Link /A << /S /URI /URI (" + _GOOD + ") >> >>", catalog=catalog)
     refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
     assert refusal.code == "malformed"
+
+
+def test_an_extra_annotation_key_is_malformed() -> None:
+    pdf = _annot("<< /Subtype /Link /QuadPoints [0 0 1 1] /A << /S /URI /URI (" + _GOOD + ") >> >>")
+    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
+    assert refusal.code == "malformed"
+
+
+def test_an_extra_action_key_is_malformed() -> None:
+    pdf = _annot("<< /Subtype /Link /A << /S /URI /URI (" + _GOOD + ") /NewWindow true >> >>")
+    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
+    assert refusal.code == "malformed"
+
+
+def test_an_indirect_uri_string_is_malformed() -> None:
+    pdf = classic_pdf(
+        {
+            1: b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+            2: b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+            3: b"3 0 obj\n<< /Type /Page /Parent 2 0 R /Annots [4 0 R] >>\nendobj\n",
+            4: b"4 0 obj\n<< /Subtype /Link /A << /S /URI /URI 5 0 R >> >>\nendobj\n",
+            5: b"5 0 obj\n(https://fixture.notion.site/Sage-Green)\nendobj\n",
+        }
+    )
+    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=_clock)
+    assert refusal.code == "malformed"
+
+
+def test_a_catalog_acroform_is_malformed() -> None:
+    pdf = _annot(
+        "<< /Subtype /Link /A << /S /URI /URI (" + _GOOD + ") >> >>",
+        catalog="/AcroForm << /Fields [] >>",
+    )
+    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
+    assert refusal.code == "malformed"
+
+
+def test_a_catalog_embedded_file_is_malformed() -> None:
+    pdf = _annot(
+        "<< /Subtype /Link /A << /S /URI /URI (" + _GOOD + ") >> >>",
+        catalog="/Names << /EmbeddedFiles << /Names [] >> >>",
+    )
+    refusal = _raise(pdf, accepted=(("Sage Green", _GOOD),), clock=None)
+    assert refusal.code == "malformed"
+
+
+def test_links_must_keep_accepted_order() -> None:
+    uris = (_LINKS[1][1], _LINKS[0][1], _LINKS[2][1])
+    refusal = _raise(_link_pdf(uris))
+    assert refusal.code == "link_mismatch"
+    assert [job.link for job in refusal.repairs] == [uris[0], uris[1]]
+
+
+def test_a_dropped_middle_link_is_named() -> None:
+    pdf = _link_pdf((_LINKS[0][1], _LINKS[2][1]))
+    refusal = _raise(pdf)
+    assert refusal.code == "link_mismatch"
+    assert [job.link for job in refusal.repairs] == [_LINKS[1][1]]
 
 
 def test_a_truncated_pdf_is_malformed() -> None:

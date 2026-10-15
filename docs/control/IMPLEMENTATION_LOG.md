@@ -1,3 +1,25 @@
+## 2026-10-15 — Session 08 W6 r3: worker continuation, link order, exact keys
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+Verifier r1 on `0a3f3d17` showed that deleting the `/sw.js` continuation lets `service_workers="allow"` survive. The continuation is restored. This Chromium fetches the worker script as `script`. The script is continued only for an allowed document. Production capture passes an empty allow-list, so `/sw.js` is aborted there.
+
+Equal-length URIs stay positional, so a permutation is `link_mismatch`. A shorter PDF is aligned as a subsequence. Dropping the middle link names that accepted URI once. Annotation keys are limited to `Type`, `Subtype`, `Rect`, `Border`, `F`, and `A`. Action keys are limited to `Type`, `S`, and `URI`. `/S` must be `/URI`. The URI must be a direct string. A catalog `/AcroForm` or `/Names /EmbeddedFiles` is `malformed`, in addition to `/OpenAction`, `/AA`, and `/Names /JavaScript`. `link_annotations` is unchanged.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=no` on the named file. The source was restored after each run. The clean link file is 58 passed. The clean screenshot file, with the link file and the gift policy file, is in the 160-pass run (2 deselected).
+
+- Setting `service_workers` to `allow`: 1 failed, 65 passed (`test_the_fixture_context_makes_no_network_requests`).
+- Comparing an equal-length URI by membership instead of position: 1 failed, 57 passed (`test_links_must_keep_accepted_order`).
+- Repairing only the tail of a shorter PDF: 1 failed, 57 passed (`test_a_dropped_middle_link_is_named`).
+- Dropping the annotation key allowlist: 3 failed, 55 passed (`test_an_extra_annotation_key_is_malformed`, `test_an_annotation_uri_cannot_hide_the_action`, `test_a_link_additional_action_is_malformed`).
+- Dropping the action key allowlist: 2 failed, 56 passed (`test_an_extra_action_key_is_malformed`, `test_an_action_next_is_malformed`).
+- Dropping the `/S` `/URI` check: 5 failed, 53 passed (`test_a_non_uri_action_is_malformed` for `/Launch`, `/JavaScript`, `/SubmitForm`, `/ImportData`, and `/GoToR`).
+- Dereferencing the URI string: 1 failed, 57 passed (`test_an_indirect_uri_string_is_malformed`).
+- Dropping the `/AcroForm` check: 1 failed, 57 passed (`test_a_catalog_acroform_is_malformed`).
+- Dropping the `/Names /EmbeddedFiles` check: 1 failed, 57 passed (`test_a_catalog_embedded_file_is_malformed`).
+
+No row above survived. The `/S` rows use an action whose only keys are `/S` and `/URI`, so an extra `/F` is not what kills them. Outlines and non-Link annotations stay parked.
+
 ## 2026-10-15 — Session 08 W6 r2: link actions, ports, and repair identity
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged because open PR #68 owns it. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
