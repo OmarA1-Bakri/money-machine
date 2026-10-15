@@ -1,3 +1,19 @@
+## 2026-10-15 — Session 08 storage shape and vanished link (#78 carry)
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-sf-carry-prompt-integrity.md`.
+
+A product segment `<uuid>x` raises `storage path`. A 65-hex digest raises `storage path`. After `link` raises `EEXIST`, a name that is gone raises `storage missing` and does not return stored. The vanished payload is empty, so a missing read substituted as `b""` would pass the collision check and return stored.
+
+Clean suite: 72 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_asset_storage.py`. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| `_UUID.fullmatch` → `search` | `test_a_uuid_with_a_suffix_is_refused` | 1/71 |
+| `_HEX.fullmatch` on the digest → `search` | `test_a_65_hex_digest_is_refused` | 1/71 |
+| Missing name substitutes `b""` and returns stored | `test_a_vanished_link_target_fails_closed` | 1/71 |
+
+Searching the product id leaves the 65-hex row green. Searching the digest leaves the suffix row green. Returning stored after a vanished link leaves the raced different-bytes collision green.
+
 ## 2026-10-15 — Session 08 draft walk compare (#83 carry)
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-sf-carry-prompt-integrity.md`.

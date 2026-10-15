@@ -232,9 +232,11 @@ def _place_in(parent: int, digest: str, data: bytes, uri: str, role: StorageRole
             os.link(temp, digest, src_dir_fd=parent, dst_dir_fd=parent, follow_symlinks=False)
         except FileExistsError:
             current = _read_optional(parent, digest)
+            if current is None:
+                raise ValueError("storage missing")
             if current == data:
                 return _stored(uri, digest, data, role)
-            refuse_collision(current if current is not None else b"", data)
+            refuse_collision(current, data)
         os.fsync(parent)
         return _stored(uri, digest, data, role)
     finally:
