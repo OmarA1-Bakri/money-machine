@@ -1,3 +1,16 @@
+## 2026-10-16 — Session 08 Cyrillic Em
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-cyrillic-em-prompt-integrity.md`.
+
+The gift-host fold maps U+043C to `m` and U+041C to `M`. `acme . СОМ` (U+0421 U+041E U+041C) refuses. `acme . coм` (U+043C) refuses. Title case stays prose. A10, A11, and A13 stay `DESIGNED`.
+
+Clean host suite before the #88 fast-forward: 50 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defanged_host.py`. Source restored after each mutant. After fast-forward to `06b898f`, `test_defanged_host.py`, `test_defang_normalizer.py`, and `test_spelled_email.py` passed 90. The mutants below were measured on the pre-forward host file.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete U+041C → `M` | `test_a_cyrillic_em_spaced_com_is_refused` | 1/49 |
+| Delete U+043C → `m` | `test_a_cyrillic_em_spaced_com_is_refused` | 1/49 |
+
 ## 2026-10-15 — Session 08 spec suffix and description order
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.
