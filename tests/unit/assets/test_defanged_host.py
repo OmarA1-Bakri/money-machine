@@ -148,6 +148,12 @@ def test_an_all_caps_spaced_dot_is_refused() -> None:
         assert refuse_paid_checkout(text) == "paid_checkout"
 
 
+def test_a_word_after_a_spaced_dot_keeps_the_boundary() -> None:
+    assert refuse_paid_checkout("acme . com today") is None
+    assert refuse_paid_checkout("acme . com") == "paid_checkout"
+    assert refuse_paid_checkout(". org") is None
+
+
 @pytest.mark.parametrize(
     ("text", "tld"),
     (

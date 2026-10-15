@@ -1,3 +1,15 @@
+## 2026-10-15 — Session 08 spaced-dot boundary
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.
+
+A later word still skips the spaced-dot undo. `acme . com today` stays prose. `acme . com` still refuses. Bare `. org` stays prose, as on this base. Title-case rows stay even when the skip is deleted, so they do not kill it.
+
+Clean suite: 82 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defanged_host.py tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Drop the spaced-dot word boundary | `test_a_word_after_a_spaced_dot_keeps_the_boundary` | 1/81 |
+
 ## 2026-10-15 — Session 08 capital Greek omicron
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.
