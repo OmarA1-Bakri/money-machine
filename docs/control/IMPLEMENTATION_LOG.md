@@ -1,3 +1,16 @@
+## 2026-10-15 — Session 08 spec suffix and description order
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.
+
+`fixture://<uuid>/12x/<64-hex>` raises `storage path`. Changing `_SPEC.fullmatch` to `match` accepts the `12` prefix and the walk then raises `storage missing`. Two walks that list the same descriptions in opposite order still post. Removing `texts.sort()` refuses that reorder with `count` before the post. The marker-swap and description-edit rows stay refusals.
+
+Clean storage suite: 73 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_asset_storage.py`. Clean draft suite: 130 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_etsy_draft_client.py tests/unit/assets/test_etsy_draft_ready.py`. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| `_SPEC.fullmatch` → `match` | `test_a_suffixed_spec_is_refused` | 1/72 |
+| Delete `texts.sort()` | `test_a_reordered_description_still_posts` | 1/129 |
+
 ## 2026-10-15 — Session 08 screenshot URL rule
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.
