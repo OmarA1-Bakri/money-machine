@@ -874,6 +874,17 @@ def test_count_separators_collapse_on_both_sides(identity: str) -> None:
         "500 = reviews",
         "500 (reviews)",
         "Reviews: +500",
+        "Sold: 500",
+        "Orders: 12",
+    ),
+)
+def test_count_punctuation_is_refused(identity: str) -> None:
+    _refuse(_bound("identity", identity))
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
         "500sold",
         "2.5 thousand sold",
         "2.5ksold",
@@ -883,8 +894,6 @@ def test_count_separators_collapse_on_both_sides(identity: str) -> None:
         "RavingFans",
         "500 reviewsX",
         "Xreviews 500",
-        "Sold: 500",
-        "Orders: 12",
         "500.sold_x",
         "12-orders_x",
     ),

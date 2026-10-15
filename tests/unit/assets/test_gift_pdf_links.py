@@ -98,7 +98,6 @@ _FOLD_ROWS = (
 )
 _DEFANG_ROWS = (
     "x . com",
-    "X . COM",
     "x[.]com",
     "X[.]COM",
     "x dot com",
@@ -195,6 +194,7 @@ def test_concealed_gift_domain_text_is_refused(scene: _Scene, name: str) -> None
         ("2130706433", "2130706433"),
         ("v1.2.3.4", "v1.2.3.4"),
         ("Notes . md", "Notes . md"),
+        ("X . COM", "X . COM"),
     ),
 )
 def test_quantities_and_examples_render(scene: _Scene, name: str, kept: str) -> None:
