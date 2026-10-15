@@ -22,6 +22,91 @@ Draft suite: 115 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=lin
 | Delete the page-0 count compare | `test_a_page_zero_reread_count_change_refuses_to_post` | 1/114 |
 
 Dropping `O_EXCL` on the shared create still fails the pending flag row and the record flag row together.
+## 2026-10-15 — Session 08 asset storage r3
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-asset-storage-r3-prompt-integrity.md`.
+
+A URI is refused before the walk. A leading slash, a backslash, a wrong part count, and a dot segment each raise their own `storage path …` text. The product must be a lowercase UUID, the spec must match `[1-9][0-9]*`, and the digest must be 64 lowercase hex. The directory walk still refuses a dot when the key parser is bypassed. A link race that plants different bytes collides and leaves those bytes. A failed write removes the `.<hex>` temp. Cleanup refuses a bad keep hash before any delete, on the local store and the S3 simulation, and it leaves an orphan dot-name in place.
+
+## 2026-10-15 — Session 08 asset storage r2
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+Reads, discard, cleanup, and publish walk from a directory handle with `openat` and `O_NOFOLLOW`. A URI must be `pid/spec/<64-hex>` before that walk. Publish creates a temp file in that directory with `O_CREAT|O_EXCL|O_NOFOLLOW`, fsyncs it, linkat-s it into place without replacing, then fsyncs the directory. A crash before the link leaves the published key free for a retry. `internal_retrieval` reads the object, so a missing file and tampered bytes are refused. S3 still calls `require_digest`, and a tampered S3 object collides instead of being replaced. The #77 draft-client should-fixes stay parked: this branch does not edit that client.
+
+Clean suite: 52 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_asset_storage.py`. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Drop `O_NOFOLLOW` on directory opens | the eight symlink-parent rows, including publish, discard, cleanup, read, and the swap | 8/44 |
+| Drop `O_NOFOLLOW` on the file read | `test_a_symlink_file_is_not_followed` | 1/51 |
+| Drop `O_EXCL` on the temp create | `test_the_temp_file_is_created_exclusive` | 1/51 |
+| Drop `O_NOFOLLOW` on the temp create | `test_the_temp_file_is_created_without_following` | 1/51 |
+| Delete `self.read` in `internal_retrieval` | the missing-object and tampered-object rows | 2/50 |
+| Delete the stored-bytes compare | `test_tampered_bytes_are_refused` and `test_internal_retrieval_refuses_tampered_bytes` | 2/50 |
+| Delete the missing-file raise | `test_internal_retrieval_refuses_a_missing_object` | 1/51 |
+| Delete the file fsync | `test_publish_fsyncs_the_file_before_linking` | 1/51 |
+| Delete the directory fsync | `test_publish_fsyncs_the_file_before_linking` | 1/51 |
+| Delete the leaf symlink check | `test_a_temp_symlink_is_not_removed` | 1/51 |
+| Delete the S3 `require_digest` call | `test_s3_mismatched_digest_is_refused` | 1/51 |
+| Delete the S3 `refuse_collision` call | `test_s3_tampered_bytes_collide` | 1/51 |
+
+Writing straight to the published name fails the crash-retry row and the order row together. The `..` key is refused before the walk. Deleting only the dot-segment line still raises `storage path`, because the spec must be a positive integer.
+
+## 2026-10-15 — Session 08 asset storage
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+Action 8. `LocalAssetStore` writes under an absolute directory opened with `O_DIRECTORY | O_NOFOLLOW`. `SimS3AssetStore` keeps the same versioned keys in memory. `draft` and `live` raise `storage live` on their own lines. Any other mode raises `storage mode`. The simulation stores do not import a network client. Action 9 and `CREATE_ETSY_DRAFT` stay on pull #77. `/Resources` stays `{ExtGState, Font, ProcSet}`.
+
+Clean suite: 38 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_asset_storage.py`. Ruff and pyright on the storage package and this test file reported no errors. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the draft-mode line | `test_draft_mode_is_refused` | 1/37 |
+| Delete the live-mode line | `test_live_mode_is_refused` | 1/37 |
+| Delete the `storage mode` raise | `test_an_unknown_mode_is_refused` | 1/37 |
+| Delete the bool spec check | `test_a_boolean_spec_is_refused` | 1/37 |
+| Delete the `spec_version < 1` check | `test_a_zero_spec_is_refused` | 1/37 |
+| Delete the hash-length check | `test_a_short_hash_is_refused` | 1/37 |
+| Delete the hash-charset check | `test_a_non_hex_hash_is_refused` | 1/37 |
+| Delete the digest compare | `test_a_mismatched_digest_is_refused` | 1/37 |
+| Delete the collision helper body | `test_different_bytes_collide` | 1/37 |
+| Drop the spec segment from `object_uri` | `test_a_spec_bump_keeps_both_objects`, `test_cleanup_removes_a_superseded_temp`, and `test_s3_cleanup_removes_a_superseded_temp` | 3/35 |
+| Delete the `fixture://` published line | `test_discard_refuses_a_published_object` | 1/37 |
+| Delete the `s3://simulation/` published line | `test_s3_discard_refuses_published` | 1/37 |
+| Delete the signature compare | `test_a_token_for_another_uri_is_refused` | 1/37 |
+| Delete the stored-bytes compare | `test_tampered_bytes_are_refused` | 1/37 |
+| Delete the absolute-root check | `test_a_relative_root_is_refused` | 1/37 |
+| Drop `O_NOFOLLOW` on the root | `test_a_symlink_root_is_not_followed` | 1/37 |
+| Delete the parent-directory symlink check | `test_a_symlink_directory_is_not_followed` | 1/37 |
+| Delete the file symlink check in `_place` | `test_a_symlink_file_is_not_followed` | 1/37 |
+| Drop `O_EXCL` | `test_an_existing_file_is_not_truncated` | 1/37 |
+| Delete the same-bytes return in `_place` | `test_the_same_bytes_are_idempotent` | 1/37 |
+| Delete the local keep-hash continue | `test_cleanup_keeps_the_current_temp` | 1/37 |
+| Delete the local cleanup `discard` call | `test_cleanup_removes_a_superseded_temp` | 1/37 |
+| Delete the symlink check in `_file_bytes` | `test_a_temp_symlink_is_not_removed` | 1/37 |
+| Delete the missing-file check in `_file_bytes` | `test_a_missing_local_object_is_refused` | 1/37 |
+| Delete the temp-directory symlink check | `test_cleanup_does_not_follow_a_temp_directory` | 1/37 |
+| Delete the `..` path check | `test_a_traversal_uri_is_refused` | 1/37 |
+| Delete the foreign-scheme raise | `test_a_foreign_uri_is_refused` | 1/37 |
+| Delete the local signed raise | `test_local_signed_retrieval_is_refused` | 1/37 |
+| Replace the `internal:` prefix | `test_internal_retrieval_names_the_object` | 1/37 |
+| Delete the S3 missing-token check | `test_a_missing_object_has_no_token` | 1/37 |
+| Delete the S3 published-role check | `test_a_temporary_object_is_not_signed` | 1/37 |
+| Delete the S3 internal raise | `test_s3_internal_retrieval_is_refused` | 1/37 |
+| Delete the S3 cleanup prefix continue | `test_s3_cleanup_keeps_published` | 1/37 |
+| Delete the S3 keep-hash continue | `test_s3_cleanup_keeps_the_current_temp` | 1/37 |
+| Delete the S3 same-bytes return | `test_s3_same_bytes_are_idempotent` | 1/37 |
+| Delete the S3 read missing check | `test_a_missing_s3_object_is_refused` | 1/37 |
+| Delete the S3 cleanup `discard` call | `test_s3_cleanup_removes_a_superseded_temp` | 1/37 |
+| Delete the S3 temporary-prefix check | `test_s3_discard_refuses_a_foreign_uri` | 1/37 |
+
+Dropping the spec segment writes the object beside the directory cleanup walks, so the two cleanup rows fail with the spec-bump row. Deleting `O_EXCL` truncates the file and fails only the truncation test. Deleting the collision helper still raises `storage place`, so the truncation test stays green and the direct collision test is the kill.
+
+Deleting `storage place` on either store leaves the suite green. Deleting the S3 call to `refuse_collision` does too. Deleting `self.read` inside `internal_retrieval` leaves the suite green because the naming test publishes the object first. An empty temporary directory and a missing S3 discard key have no row; deleting those lines leaves this suite green.
+
+Parked: live S3 transport and credentials, workflow linkage on #77, commissioning A10 and A11, the session exit, and the parked link items (same-host http hop, punycode, `file:` allow, sendBeacon, spelled-out emails, raster text).
 
 ## 2026-10-15 — Session 08 same-host http hop r2
 
