@@ -703,6 +703,7 @@ def test_deleting_the_count_collapse_publishes_a_separator() -> None:
         (":", "500 : reviews", "500.reviews"),
         ("=", "500 = reviews", "500.reviews"),
         ("(", "500 (reviews)", "500.reviews"),
+        (")", "(500) reviews", "500.reviews"),
     ],
 )
 def test_weakening_the_separator_collapse_publishes_that_mark(
@@ -725,6 +726,54 @@ def test_a_thousands_comma_and_a_decimal_stay_whole() -> None:
     assert weaken.hits == 1
     assert problem("identity", "500, reviews", page_count=42) == "class"
     assert problem("identity", "1,000", page_count=42) is None
+
+
+def test_a_closing_paren_joins_a_count_on_either_side() -> None:
+    for value in ("(500) reviews", "(reviews) 500"):
+        assert fact_text_problem("identity", value, page_count=42) == "class"
+    weaken = _WeakenPunct(")")
+    problem = _count_problem(weaken, "punct_close")
+    assert weaken.hits == 1
+    assert problem("identity", "(500) reviews", page_count=42) is None
+    assert problem("identity", "(reviews) 500", page_count=42) is None
+    assert problem("identity", "500 (reviews)", page_count=42) == "class"
+
+
+def test_a_word_first_thousands_group_is_one_count() -> None:
+    prose = "Reviews: 1,000"
+    short = "Reviews: 1"
+    assert fact_text_problem("identity", prose, page_count=42) == "class"
+    assert fact_text_problem("identity", "1,000", page_count=42) is None
+    assert _review_cover(prose, prose) == ()
+    assert any(item.rejection_class == "invented_review" for item in _review_cover(prose, short))
+    narrow = _ReplaceText(
+        r"(?:reviews?|ratings?)\s*[:=]?\s*\d[\d,]*",
+        r"(?:reviews?|ratings?)\s*[:=]?\s*\d",
+    )
+    module = _load_mutant_module(narrow, "review_thousands")
+    assert narrow.hits == 1
+    covered = module.__dict__["reject_invented_review"]
+    assert callable(covered)
+    assert covered(*_review_pair(prose, short)) == ()
+
+
+def _review_cover(prose: str, cited: str) -> tuple[object, ...]:
+    return reject_invented_review(*_review_pair(prose, cited))
+
+
+def _review_pair(prose: str, cited: str) -> tuple[ListingDraft, MerchandisingInput]:
+    request, draft = _request_and_draft()
+    request = _with_fact(request, "reviews", cited)
+    fact = next(item for item in request.facts if item.fact_value == cited)
+    claim = ListingClaim(
+        claim_id=uuid4(),
+        kind="review",
+        fact_id=fact.fact_id,
+        stated_value=cited,
+    )
+    title = draft.title.model_copy(update={"text": prose, "claim_ids": (claim.claim_id,)})
+    copy = draft.model_copy(update={"title": title, "claims": (*draft.claims, claim)})
+    return copy, request
 
 
 def test_word_first_colon_counts_need_the_colon() -> None:
