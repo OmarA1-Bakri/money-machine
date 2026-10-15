@@ -30,7 +30,11 @@ from money_machine.agents.contracts.merchandising import (
     VideoRole,
 )
 from money_machine.assets.design_tokens import DesignTokens, load_tokens
-from money_machine.assets.gift_links import refuse_gift_charset, refuse_paid_checkout
+from money_machine.assets.gift_links import (
+    refuse_gift_charset,
+    refuse_paid_checkout,
+    refuse_raw_charset,
+)
 from money_machine.assets.listing_images import merchandising_version
 from money_machine.assets.video_encode import VideoRefusal, encode_frames, probe_container
 from money_machine.assets.video_font import CAPTION_COLUMNS, has_glyph, wrap_caption
@@ -217,9 +221,13 @@ def refuse_caption_glyphs(texts: tuple[str, ...]) -> str | None:
 
 
 def refuse_caption_charset(texts: tuple[str, ...]) -> str | None:
-    """Return ``paid_checkout`` when painted text leaves the gift allowlist."""
+    """Return ``paid_checkout`` when the full caption leaves the gift allowlist.
+
+    The PDF prefix strip does not run here. ``Free gift: hello`` keeps its
+    colon, and that colon is refused instead of being painted as a blank cell.
+    """
     for text in texts:
-        if refuse_gift_charset(text) is not None:
+        if refuse_raw_charset(text) is not None:
             return "paid_checkout"
     return None
 

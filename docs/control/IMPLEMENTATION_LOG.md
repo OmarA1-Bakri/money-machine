@@ -1,3 +1,35 @@
+## 2026-10-14 — Session 08 W5: fixture variant screenshots
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.
+
+The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The addendum is `docs/control/reviews/2026-10-14-session-08-w5-prompt-integrity.md`. It does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, `AGENTS.md`, `CLAUDE.md`, `claim_validation.py`, or `IMPLEMENTATION_STATE.json`.
+
+`capture_variant_screenshots` paints the three local variant pages in headless Chromium. The viewport is 480×360. The crop is `0,0,480,270`. The PNG is 8-bit RGB. The page is ready when `html[data-mm-ready='loaded']` is attached. There is no sleep. Sensitive checks read `body` inner text after that marker. A comment or script that is not painted is allowed. An email assembled in the DOM is refused. Lineage records the sha256 of the raw PNG and `build_version` 5, checked by a parser that does not call the screenshot module. The raw PNGs satisfy `refuse_unknown_screenshot` for the listing-image and video inputs. The committed listing-screenshot PNGs are unchanged.
+
+The linux x86_64 video hash stays `6318854297cd5d316fdf4c579a73f188ec5f1e2089745534aa9d4ca6245fe248`. Video captions call `refuse_raw_charset` on the full string. `Free gift: hello` is `paid_checkout`. The PDF path still uses `refuse_gift_charset`, which strips `Free gift: `. A dashboard output `Today-panel` is `caption_glyph`. A wrapped dashboard line of 26 characters is painted. A wrapped dashboard line of 27 characters is `caption_fit`. `refuse_caption_width` on a one-element 27-character tuple is `caption_fit`. A 150×90 container is `frame_size`. `default_live_fetcher` is the default argument and raises `live_acquisition` before navigation. An injected fetcher is the only way a live URL returns HTML.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=no -k "not mutant and not accepts and not dropping"`. The source was restored after each run.
+
+Screenshot guards, on `tests/unit/assets/test_variant_screenshots.py` and `tests/unit/assets/test_variant_screenshots_mutants.py`. The clean tree is 16 passed, 3 deselected in 10.14s.
+
+- Deleting the sensitive-text check: 7 failed, 9 passed, 3 deselected.
+- Deleting the unready refusal: 1 failed, 15 passed, 3 deselected.
+- Deleting the readiness wait, still reading the attribute: 2 failed, 14 passed, 3 deselected.
+- Pointing the default fetcher at another callable: 1 failed, 15 passed, 3 deselected (`test_live_fetch_defaults_to_refusal`).
+- Replacing the `live_acquisition` raise with returned HTML: 1 failed, 15 passed, 3 deselected (`test_live_fetch_defaults_to_refusal`).
+
+Video guards, on `tests/unit/assets/test_walkthrough_video.py` and `tests/unit/assets/test_walkthrough_video_mutants.py`. The clean tree is 47 passed, 10 deselected in 6.22s.
+
+- Restoring `refuse_gift_charset` on the caption charset check: 1 failed, 46 passed, 10 deselected (`Free gift: hello`).
+- Checking glyphs only on the injected caption: 1 failed, 46 passed, 10 deselected (`Today-panel`).
+- Raising the wrapped-line limit from 26 to 27: 2 failed, 45 passed, 10 deselected.
+- Skipping the first caption in `refuse_caption_width`: 1 failed, 46 passed, 10 deselected.
+- Deleting the width comparison in `refuse_frame_size`: 1 failed, 46 passed, 10 deselected (150×90).
+
+Parked to next wave: the cross-platform hash; the trailer after the Matroska bytes can be tampered with; the screenshot is read three times (TOCTOU); an undecodable PNG pastes a blank frame; Verifier #71 SF1 (probed-copy validation); Verifier #71 SF3 (page count `!=` to `>`); #70 NIT1 (contrast nearest-pair wording, historical); `-map_metadata -1`, the metadata strip, `SOURCE_DATE_EPOCH`, and `-threads 1` (no byte difference on this wheel); `-flags +bitexact` on its own; live navigation to Notion (the default fetcher refuses; this wave does not fetch); opening or repairing variant links; storage URI and S3; workflow linkage and commissioning; the session exit code; Exit 78; whole-document `/OpenAction`, `/AA`, and outline scanning; non-Link URI annotations; defanged hosts `x . com`, `x[.]com`, `x dot com`, and `x.c0m`; José and Zoë; bare `127.1`, `0x7f000001`, and `2130706433`; deleting the URI loop while `if count:` stays; the newest xref only, with no `/Prev`; #69 publishers and over-refusals; W2 survivors other than the font edge space; Chromium m153 writes no XMP and no `/ID`.
+
+Focused tests: `uv run pytest -q -p no:cacheprovider tests/unit/assets/test_variant_screenshots.py tests/unit/assets/test_variant_screenshots_mutants.py tests/unit/assets/test_walkthrough_video.py tests/unit/assets/test_walkthrough_video_mutants.py` — 76 passed in 20.41s. Full local pytest was not re-run. The 12 `test_compose_preserves_the_postgres_password` failures recorded in W3 stay pre-existing and local (`docker` missing). CI is the gate. `.github/workflows/ci.yml` is unchanged. Playwright is already a dev dependency. `uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Those commands and the pytest runs are the tree before this paragraph was appended. This paragraph was written after that run.
+
 ## 2026-10-14 — Session 08 W4 r2: refuse unpainted caption text
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.
