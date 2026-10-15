@@ -757,7 +757,7 @@ def test_a_word_first_thousands_group_is_one_count() -> None:
     assert covered(*_review_pair(prose, short)) == ()
 
 
-def _review_cover(prose: str, cited: str) -> tuple[object, ...]:
+def _review_cover(prose: str, cited: str) -> tuple[ClaimCorrection, ...]:
     return reject_invented_review(*_review_pair(prose, cited))
 
 
