@@ -1,3 +1,20 @@
+## 2026-10-15 — Session 08 draft lookup
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-draft-lookup-prompt-integrity.md`.
+
+A GET without `state=draft` raises `lookup_state` before the transport. `record()` unlinks a stale `.next` name, without following a symlink, and then creates it with `O_EXCL`. After a short page whose `count` matches, offset 0 is read again. A different `count` raises `count` and does not post. No live Etsy call.
+
+Draft suite: 115 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_etsy_draft_client.py tests/unit/assets/test_etsy_draft_ready.py`. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the missing-state refusal | `test_a_lookup_without_state_is_refused` | 1/114 |
+| Delete the non-draft state refusal | `test_lookup_state_must_be_draft` | 1/114 |
+| Delete the stale `.next` unlink | `test_the_ledger_create_is_exclusive` and `test_the_ledger_create_does_not_follow_a_symlink` | 2/113 |
+| Delete the page-0 count compare | `test_a_page_zero_reread_count_change_refuses_to_post` | 1/114 |
+
+Dropping `O_EXCL` on the shared create still fails the pending flag row and the record flag row together.
+
 ## 2026-10-15 — Session 08 W8 r2: durable ledger and paged lookup
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. Action 8 stays parked. This wave does not emit `DRAFT_CREATED` and does not edit `workflows.yaml`.

@@ -28,6 +28,7 @@ import hashlib
 import os
 import re
 from collections.abc import Mapping
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol
@@ -188,6 +189,8 @@ class DraftLedger:
         payload = f"recorded\n{listing_id}\n".encode()
         path = self._path(spec_version, fixture_hash)
         temporary = path.with_name(path.name + ".next")
+        with suppress(FileNotFoundError):
+            os.unlink(temporary)
         self._create_exclusive(temporary, payload)
         os.replace(temporary, path)
         _fsync_dir(self._directory)
@@ -298,6 +301,22 @@ class EtsyDraftClient:
             seen += len(results)
             if len(results) < PAGE_LIMIT:
                 if seen != expected:
+                    raise EtsyDraftRefused("count")
+                try:
+                    confirm = self.exchange(
+                        "GET",
+                        _listings_path(spec.shop_id),
+                        _draft_query(0),
+                        None,
+                    )
+                except EtsyDraftRefused:
+                    raise
+                except Exception as exc:
+                    raise EtsyDraftRefused("transport") from exc
+                confirm_count = confirm.get("count")
+                if type(confirm_count) is not int or confirm_count < 0:
+                    raise EtsyDraftRefused("malformed")
+                if confirm_count != expected:
                     raise EtsyDraftRefused("count")
                 return found
             offset += PAGE_LIMIT
@@ -429,7 +448,9 @@ def _refuse_get(
     fields = _query_keys(query)
     if set(fields) - _GET_KEYS:
         raise EtsyDraftRefused("query_key")
-    if "state" in fields and fields["state"] != "draft":
+    if "state" not in fields:
+        raise EtsyDraftRefused("lookup_state")
+    if fields["state"] != "draft":
         raise EtsyDraftRefused("lookup_state")
     if "limit" in fields and not _canonical_int(fields["limit"], low=1, high=PAGE_LIMIT):
         raise EtsyDraftRefused("query_limit")

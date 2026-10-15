@@ -180,7 +180,7 @@ def test_the_shop_id_comes_from_the_fixture_not_the_environment(
     assert receipt.ready is True
     assert store.calls[0].path == "/v3/application/shops/123456/listings"
     assert "999" not in store.calls[0].path
-    posted = store.calls[1]
+    posted = next(call for call in store.calls if call.method == "POST")
     assert posted.body is not None
     blob = " ".join(value for _name, value in posted.body)
     assert _LIVE_TOKEN not in blob
@@ -232,9 +232,14 @@ def test_the_create_body_has_no_state_field(tmp_path: Path) -> None:
     assert isinstance(receipt, DraftReceipt)
     assert receipt.state == "draft"
     assert receipt.ready is True
-    get_call, post_call = store.calls
-    assert get_call.method == "GET"
-    assert get_call.query == (("state", "draft"), ("limit", "100"), ("offset", "0"))
+    gets = [call for call in store.calls if call.method == "GET"]
+    posts = [call for call in store.calls if call.method == "POST"]
+    assert len(gets) == 2
+    assert len(posts) == 1
+    assert all(
+        call.query == (("state", "draft"), ("limit", "100"), ("offset", "0")) for call in gets
+    )
+    post_call = posts[0]
     assert post_call.body is not None
     names = tuple(name for name, _value in post_call.body)
     assert names == (
@@ -311,7 +316,7 @@ def test_pending_is_written_before_the_call(tmp_path: Path) -> None:
             return store.exchange(call)
 
     receipt = EtsyDraftClient(_Watch(), ledger).create_draft(spec)
-    assert seen == [None, "pending"]
+    assert seen == [None, None, "pending"]
     assert receipt.listing_id == 5001
     recorded = ledger.get(spec.spec_version, fixture_hash(spec))
     assert recorded is not None
@@ -552,7 +557,7 @@ def test_the_marker_is_its_own_line(tmp_path: Path, description: str, expected: 
     spec = replace(_spec(), description=description)
     client, store, _ledger = _client(tmp_path)
     client.create_draft(spec)
-    posted = store.calls[1]
+    posted = next(call for call in store.calls if call.method == "POST")
     assert posted.body is not None
     fields = dict(posted.body)
     marker = draft_marker(spec.spec_version, fixture_hash(spec))
@@ -720,13 +725,24 @@ def test_a_corrupt_pending_file_refuses_to_post(tmp_path: Path) -> None:
     assert store.posts == 0
 
 
-def test_the_ledger_create_is_exclusive(tmp_path: Path) -> None:
+def test_the_ledger_create_is_exclusive(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     digest = "ab" * 32
     path = tmp_path / f"2-{digest}.next"
     path.write_bytes(b"already\n")
-    with pytest.raises(FileExistsError):
-        DraftLedger(tmp_path).record(2, digest, 7)
-    assert path.read_bytes() == b"already\n"
+    seen: list[int] = []
+    real_open = os.open
+
+    def _spy(opened: object, flags: int, mode: int = 0o777) -> int:
+        seen.append(flags)
+        return real_open(opened, flags, mode)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(os, "open", _spy)
+    DraftLedger(tmp_path).record(2, digest, 7)
+    assert not path.exists()
+    entry = DraftLedger(tmp_path).get(2, digest)
+    assert entry is not None
+    assert entry.listing_id == 7
+    assert any(item & os.O_EXCL for item in seen)
 
 
 def test_the_ledger_create_does_not_follow_a_symlink(tmp_path: Path) -> None:
@@ -734,9 +750,11 @@ def test_the_ledger_create_does_not_follow_a_symlink(tmp_path: Path) -> None:
     target = tmp_path / "stolen"
     target.write_bytes(b"safe")
     (tmp_path / f"2-{digest}.next").symlink_to(target)
-    with pytest.raises(FileExistsError):
-        DraftLedger(tmp_path).record(2, digest, 7)
+    DraftLedger(tmp_path).record(2, digest, 7)
     assert target.read_bytes() == b"safe"
+    entry = DraftLedger(tmp_path).get(2, digest)
+    assert entry is not None
+    assert entry.listing_id == 7
 
 
 def _create_open_flags(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[int]:
@@ -1030,10 +1048,35 @@ def test_a_duplicated_query_key_is_refused(tmp_path: Path) -> None:
     assert store.calls == []
 
 
-def test_a_lookup_without_state_reaches_the_transport(tmp_path: Path) -> None:
+def test_a_lookup_without_state_is_refused(tmp_path: Path) -> None:
     client, store, _ledger = _client(tmp_path)
-    client.exchange("GET", _LISTINGS, (("limit", "25"), ("offset", "0")), None)
-    assert len(store.calls) == 1
+    with pytest.raises(EtsyDraftRefused) as caught:
+        client.exchange("GET", _LISTINGS, (("limit", "25"), ("offset", "0")), None)
+    assert caught.value.code == "lookup_state"
+    assert store.calls == []
+
+
+def test_a_page_zero_reread_count_change_refuses_to_post(tmp_path: Path) -> None:
+    class _GrowAfter:
+        def __init__(self) -> None:
+            self.gets = 0
+            self.posts = 0
+
+        def exchange(self, call: FixtureCall) -> Mapping[str, object]:
+            if call.method == "POST":
+                self.posts += 1
+                return {"listing_id": 5, "state": "draft", "description": "x"}
+            self.gets += 1
+            if self.gets == 1:
+                return {"count": 1, "results": [_draft_row(1)]}
+            return {"count": 2, "results": [_draft_row(1), _draft_row(2)]}
+
+    race = _GrowAfter()
+    client = EtsyDraftClient(race, DraftLedger(tmp_path))
+    with pytest.raises(EtsyDraftRefused) as caught:
+        client.create_draft(_spec())
+    assert caught.value.code == "count"
+    assert race.posts == 0
 
 
 @pytest.mark.parametrize("limit", ["0", "101", "01", "x"])
