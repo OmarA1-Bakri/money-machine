@@ -15,6 +15,37 @@ Draft suite: 115 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=lin
 
 Dropping `O_EXCL` on the shared create still fails the pending flag row and the record flag row together.
 
+## 2026-10-15 — Session 08 same-host http hop r2
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+Every hop is checked, and any scheme other than `https` raises `redirect_host`. A same-host `ws://` or `ftp://` hop is refused. An `http` hop in the middle of a chain is refused when the last hop is `https` again. The repair names the opened URI. The checker is injected. This branch is merged with `b3425319`. It does not edit the Etsy draft client.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_same_host_http_hop.py tests/unit/assets/test_link_validation.py -k "same_host or redirect_to_another or chain_that_skips or mid_chain"`. 7 passed, 118 deselected. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Treat only an `http` scheme as a bad hop | `test_a_same_host_ws_or_ftp_hop_is_refused` | 1/6 |
+| Check only the last hop's scheme | `test_a_mid_chain_http_hop_is_refused` | 1/6 |
+
+Deleting the hop-scheme check fails the `http`, `ws`/`ftp`, and mid-chain rows together (3/4). The other-host redirect, the skipped chain, and the same-host `https` hop stay green.
+
+## 2026-10-15 — Session 08 same-host http hop
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+A redirect hop whose scheme is not `https` raises `redirect_host` and the repair names the opened URI. An `https` hop on the same host stays a passing record. Action 8 stays on #78. Action 9 stays on #77. `/Resources` stays `{ExtGState, Font, ProcSet}`.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_same_host_http_hop.py tests/unit/assets/test_link_validation.py -k "same_host or redirect_to_another or chain_that_skips"`. 5 passed, 118 deselected. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the hop-scheme check | `test_a_same_host_http_hop_is_refused` | 1/4 |
+
+The other-host redirect, the skipped-chain redirect, and the same-host `https` hop stay green when that line is removed.
+
+Parked: punycode and uppercase on-host URIs, `file:` allow, sendBeacon, spelled-out emails, raster text, `_prepare` non-ASCII, live S3, `CREATE_ETSY_DRAFT`, commissioning, and the session exit.
+
 ## 2026-10-15 — Session 08 W8 r2: durable ledger and paged lookup
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. Action 8 stays parked. This wave does not emit `DRAFT_CREATED` and does not edit `workflows.yaml`.
