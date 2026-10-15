@@ -182,6 +182,11 @@ def test_a_capital_cyrillic_es_spaced_com_is_refused() -> None:
     assert refuse_paid_checkout("acme . \u0421OM") == "paid_checkout"
 
 
+def test_a_cyrillic_em_spaced_com_is_refused() -> None:
+    assert refuse_paid_checkout("acme . \u0421\u041e\u041c") == "paid_checkout"
+    assert refuse_paid_checkout("acme . co\u043c") == "paid_checkout"
+
+
 def test_a_capital_greek_omicron_spaced_org_stays() -> None:
     assert refuse_paid_checkout("See . \u039frg") is None
 
