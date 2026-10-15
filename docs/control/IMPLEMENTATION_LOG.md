@@ -1,3 +1,25 @@
+## 2026-10-15 — Session 08 W7: four link carries from #74 r4
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+These four fixes sit on the lineage commit. Every `/Annots` visit requires subtype `Link`, and a later visit also requires the link key set. A `/Kids` chain past depth 64 raises `pdf kids depth`, and the gift checker returns `malformed` for that error. A graph `/URI` outside a link's own `/A` must be one of the accepted links. A page `/AA` raises `pdf page additional action`. The public code stays `malformed`.
+
+Clean focused suite, Chromium deselected: 226 passed, 2 deselected. Command: `uv run pytest -q -p no:cacheprovider --tb=line -k "not readme_uris and not gift_pdf_has_no_links" tests/unit/assets/test_link_validation.py tests/unit/assets/test_gift_link_policy.py tests/unit/assets/test_gift_pdf_links.py tests/unit/assets/test_asset_lineage.py`. Source restored after each run.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Seen set keyed by object number only | `test_a_second_role_widget_is_malformed` | 1/225 |
+| Subtype check also allows Widget | `test_a_resource_annots_widget_is_malformed` | 1/225 |
+| Map `pdf kids depth` back to `paid_checkout` | `test_a_deep_kids_chain_is_malformed` | 1/225 |
+| Delete the `_pages` depth cap | the same kids test | 1/225 |
+| Delete the accepted-link membership check | `test_a_widget_uri_must_be_an_accepted_link` | 1/225 |
+| Delete the page `/AA` message | `test_a_page_additional_action_without_a_uri_is_malformed` | 1/225 |
+| Change the page-walk subtype `raise` to `continue` | none | 226 passed |
+
+The kids classification and the deleted cap both fail only `test_a_deep_kids_chain_is_malformed`. Deleting the cap returns no refusal. `test_a_deep_nest_is_paid_checkout` stays `paid_checkout`. The page-walk `continue` mutant no longer reaches the Widget, Screen, and RichMedia rows, because the first `/Annots` visit already refuses the subtype. Delivery stays a backstop. The URI-stream `raise` was not remeasured this round. It stays parked.
+
+Parked: same-host http hop, punycode/uppercase on-host URIs, the equivalent stream-raise survivor, file: allow, sendBeacon, spelled-out emails, `_prepare` non-ASCII, raster text.
+
 ## 2026-10-15 — Session 08 W7: fixture artifact lineage
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-w7-prompt-integrity.md`.

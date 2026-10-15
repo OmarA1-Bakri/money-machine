@@ -64,7 +64,7 @@ The operator instruction is to keep building toward a complete app. Action 7 is 
 | Workflow linkage through `CREATE_ETSY_DRAFT` | Action 9 | Later wave |
 | Commission A10 and A11 | Action 11 | Operator hold |
 | Session exit code and Exit 78 | Session exit | Operator hold |
-| Same-host http hop, punycode and uppercase on-host URIs, URI-stream raise | Later | W6 park. Graph URI checks and page `/AA` are in W6 |
+| Same-host http hop, punycode and uppercase on-host URIs, the URI-stream raise, `file:` allow, sendBeacon, spelled-out emails, `_prepare` non-ASCII, raster text | Later | Still parked. The four W6 r4 carries land on this branch: separate seen-key and second-role kills, a deep `/Kids` chain as `malformed`, graph URIs tied to the accepted list, and a named page `/AA` |
 
 ## 5. Final verdict
 
