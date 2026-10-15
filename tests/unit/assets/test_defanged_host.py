@@ -10,7 +10,8 @@ from money_machine.assets.gift_links import refuse_paid_checkout
 
 def test_a_spaced_dot_host_is_refused() -> None:
     assert refuse_paid_checkout("x . com") == "paid_checkout"
-    assert refuse_paid_checkout("X . COM") == "paid_checkout"
+    assert refuse_paid_checkout("acme . com") == "paid_checkout"
+    assert refuse_paid_checkout("X . COM") is None
 
 
 def test_a_bracket_dot_host_is_refused() -> None:
@@ -114,9 +115,14 @@ def test_a_spaced_dot_uses_the_curated_list() -> None:
 @pytest.mark.parametrize(
     "text",
     (
+        "Done . Net",
+        "Done . Net.",
+        "Done . \uff2e\uff45\uff54",
         "Rest . Co",
         "Plan . Io",
         "Go . Co",
+        "Go . Com",
+        "See . Org",
         "Rest . Co.",
         "Plan . Io!",
         "Pick one . Shop",
@@ -133,7 +139,7 @@ def test_a_lowercase_spaced_tld_outside_the_set_stays(text: str) -> None:
     assert refuse_paid_checkout(text) is None
 
 
-@pytest.mark.parametrize("text", ("acme . net", "acme . org"))
+@pytest.mark.parametrize("text", ("acme . com", "acme . c0m", "acme . net", "acme . org"))
 def test_a_lowercase_spaced_dot_at_the_end_is_refused(text: str) -> None:
     assert refuse_paid_checkout(text) == "paid_checkout"
 
@@ -152,6 +158,14 @@ def test_an_end_of_text_spaced_form_is_refused(text: str, tld: str) -> None:
 
 def test_a_lowercase_lookalike_spaced_dot_is_refused() -> None:
     assert refuse_paid_checkout("acme . c\u043em") == "paid_checkout"
+
+
+def test_an_uppercase_lookalike_spaced_dot_stays() -> None:
+    assert refuse_paid_checkout("acme . c\u041em") is None
+
+
+def test_a_fullwidth_lowercase_spaced_dot_is_refused() -> None:
+    assert refuse_paid_checkout("acme . \uff4e\uff45\uff54") == "paid_checkout"
 
 
 def test_a_space_split_com_is_refused() -> None:

@@ -6,11 +6,12 @@ The order is fixed:
 2. Find host-like, email-like, and ``hxxp`` candidates.
 3. Undo defanging only inside those candidates. A bare ``dot`` or a bare
    ``at`` is undone only when the next token, with spaces removed, is on
-   :data:`CURATED_TLDS`. A spaced ``.`` is undone only when that token
-   casefolds into ``com``, ``c0m``, ``net``, or ``org``, wherever the
-   token sits, including at the end of the text. ``c0m`` is the zero
-   spelling of ``com``, and a zero in ``org`` counts. Letter lookalikes
-   are already folded. A later word still leaves the spaced form alone.
+   :data:`CURATED_TLDS`. A spaced ``.`` is undone only when that token is
+   all lowercase and is ``com``, ``c0m``, ``net``, or ``org``. Case is
+   read after NFKC. The lookalike fold keeps case, and nothing lowercases
+   the token before that check. ``c0m`` is the zero spelling of ``com``,
+   and a zero in ``org`` counts. A later word still leaves the spaced
+   form alone.
    Bracket and parenthesis forms also accept the IANA snapshot.
 """
 
@@ -26,35 +27,35 @@ _LOOKALIKES = str.maketrans(
     {
         "\u0261": "g",
         "\u03bf": "o",
-        "\u039f": "o",
+        "\u039f": "O",
         "\u0430": "a",
-        "\u0410": "a",
+        "\u0410": "A",
         "\u0435": "e",
-        "\u0415": "e",
+        "\u0415": "E",
         "\u0456": "i",
-        "\u0406": "i",
+        "\u0406": "I",
         "\u0455": "s",
-        "\u0405": "s",
+        "\u0405": "S",
         "\u043e": "o",
-        "\u041e": "o",
+        "\u041e": "O",
         "\u0440": "p",
-        "\u0420": "p",
+        "\u0420": "P",
         "\u0441": "c",
-        "\u0421": "c",
+        "\u0421": "C",
         "\u0443": "y",
-        "\u0423": "y",
+        "\u0423": "Y",
         "\u0445": "x",
-        "\u0425": "x",
+        "\u0425": "X",
         "\u0458": "j",
-        "\u0408": "j",
+        "\u0408": "J",
         "\u04bb": "h",
-        "\u04ba": "h",
+        "\u04ba": "H",
         "\u0501": "d",
-        "\u0500": "d",
+        "\u0500": "D",
         "\u051b": "q",
-        "\u051a": "q",
+        "\u051a": "Q",
         "\u051d": "w",
-        "\u051c": "w",
+        "\u051c": "W",
         "\u3002": ".",
         "\uff61": ".",
     }
@@ -119,7 +120,7 @@ _SPACED_ZERO_TARGETS = frozenset({"org"})
 
 
 def fold_confusables(text: str) -> str:
-    """NFKC, then map lookalike letters and dots onto ASCII."""
+    """NFKC, then map lookalike letters and dots onto ASCII, keeping case."""
     return unicodedata.normalize("NFKC", text).translate(_LOOKALIKES)
 
 
@@ -278,7 +279,13 @@ def _followed_by_word(text: str, index: int) -> bool:
 
 
 def _spaced_dot_tld(token: str) -> bool:
-    """Accept com, c0m, net, or org, in any case, plus a zero lookalike of org."""
+    """Accept only an all-lowercase com, c0m, net, or org.
+
+    The token is already NFKC and lookalike-folded. Case is read here,
+    before any lowercasing. A lowercase zero inside org counts.
+    """
+    if not token.islower():
+        return False
     folded = token.casefold()
     if folded in _SPACED_DOT_TLDS:
         return True
