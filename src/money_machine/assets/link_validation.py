@@ -312,6 +312,8 @@ def _redirects(uri: str, chain: tuple[str, ...]) -> bool:
     origin = urlparse(uri).hostname
     if not chain or chain[0] != uri or origin is None:
         return True
+    if any(urlparse(hop).scheme != "https" for hop in chain):
+        return True
     return any(urlparse(hop).hostname != origin for hop in chain)
 
 
