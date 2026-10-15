@@ -1,3 +1,15 @@
+## 2026-10-15 — Session 08 previous xref
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-pdf-prev-prompt-integrity.md`.
+
+A trailer that contains `Prev` raises `pdf prev`. The reader does not follow the offset. A trailer without that key still parses.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_pdf_prev.py tests/unit/assets/test_link_validation.py tests/unit/assets/test_gift_link_policy.py`. 167 passed. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the `Prev` refusal | `test_a_previous_xref_is_refused` | 1/166 |
+
 ## 2026-10-15 — Session 08 W8 r2: durable ledger and paged lookup
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. Action 8 stays parked. This wave does not emit `DRAFT_CREATED` and does not edit `workflows.yaml`.

@@ -472,6 +472,8 @@ class PdfDocument:
             if not isinstance(found, PdfStream):
                 raise ValueError("pdf xref stream")
             self.entries, self.trailer = _xref_stream(found)
+        if "Prev" in self.trailer:
+            raise ValueError("pdf prev")
         self._pdf = pdf
         self._cache: dict[int, PdfObject] = {}
         self._streams: dict[int, dict[int, PdfObject]] = {}
