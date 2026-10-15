@@ -8,8 +8,9 @@ annotation must be exactly ``Type``, ``Subtype``, ``Rect``, ``Border``,
 ``/Annots`` array is refused. The action is exactly ``S`` and ``URI``, plus
 ``Type /Action`` when ``Type`` is present. ``/S`` must be ``/URI`` anywhere
 in the graph. A ``/URI`` that is not the link's own action is checked with
-the same rules as a delivery link. An indirect action or URI is resolved one
-hop. A URI stream on a link is refused. The catalog is the trailer ``/Root``,
+the same rules as a delivery link, and it must be one of the accepted links.
+An indirect action or URI is resolved one hop. A URI stream on a link is
+refused. The catalog is the trailer ``/Root``,
 read before the walk, and must equal ``Type`` and ``Pages``. A page must
 equal the keys Chromium emits, with ``Annots`` only when the page has
 annotations. The walk remembers ``(object, role)``. Every ``/Annots`` visit
@@ -129,7 +130,7 @@ class EmbeddedUriRefusal(ValueError):
         self.uri = uri
 
 
-def delivery_link_uris(pdf: bytes) -> tuple[str, ...]:
+def delivery_link_uris(pdf: bytes, *, accepted: frozenset[str] = frozenset()) -> tuple[str, ...]:
     """Return each link URI from the page walk, or raise ``ValueError``.
 
     Annotation keys must equal the Chromium set. The action is ``S`` and
@@ -140,7 +141,7 @@ def delivery_link_uris(pdf: bytes) -> tuple[str, ...]:
     subtype is not ``Link`` is refused here, not by the walk's parent key.
     """
     doc = PdfDocument(pdf)
-    _refuse_graph(doc)
+    _refuse_graph(doc, accepted)
     root = _dict(doc.deref(doc.trailer.get("Root")))
     uris: list[str] = []
     for page in _pages(doc, root.get("Pages")):
@@ -155,7 +156,7 @@ def delivery_link_uris(pdf: bytes) -> tuple[str, ...]:
     return tuple(uris)
 
 
-def _refuse_graph(doc: PdfDocument) -> None:
+def _refuse_graph(doc: PdfDocument, accepted: frozenset[str]) -> None:
     """Refuse a bad catalog, a bad page, a non-URI ``/S``, and an unvalidated ``/URI``.
 
     The catalog is ``trailer["Root"]``, checked before the walk so an earlier
@@ -186,7 +187,7 @@ def _refuse_graph(doc: PdfDocument) -> None:
             if role == "Annots" and isinstance(value, dict):
                 _refuse_annot_role(value, second_visit=seen_before)
         if isinstance(value, dict):
-            _refuse_dict(doc, value, in_link_action=in_link_action)
+            _refuse_dict(doc, value, accepted, in_link_action=in_link_action)
             owned = _name_is(value.get("Subtype"), "Link") and _name_is(value.get("Type"), "Annot")
             for key, child in value.items():
                 scan(child, key, depth + 1, in_link_action=owned and key == "A")
@@ -242,6 +243,7 @@ def _refuse_annot_role(fields: dict[str, PdfObject], *, second_visit: bool) -> N
 def _refuse_dict(
     doc: PdfDocument,
     fields: dict[str, PdfObject],
+    accepted: frozenset[str],
     *,
     in_link_action: bool,
 ) -> None:
@@ -250,7 +252,7 @@ def _refuse_dict(
     if isinstance(action, PdfName) and action.value not in _ALLOWED_S:
         raise ValueError("pdf action s")
     if isinstance(action, PdfName):
-        _refuse_action_uri(doc, fields, in_link_action=in_link_action)
+        _refuse_action_uri(doc, fields, accepted, in_link_action=in_link_action)
 
 
 def _refuse_page(fields: dict[str, PdfObject]) -> None:
@@ -264,6 +266,7 @@ def _refuse_page(fields: dict[str, PdfObject]) -> None:
 def _refuse_action_uri(
     doc: PdfDocument,
     fields: dict[str, PdfObject],
+    accepted: frozenset[str],
     *,
     in_link_action: bool,
 ) -> None:
@@ -281,16 +284,16 @@ def _refuse_action_uri(
     uri = _text_of(resolved)
     if uri is None:
         return
-    reason = _graph_uri_reason(uri)
+    reason = _graph_uri_reason(uri, accepted)
     if reason is not None:
         raise EmbeddedUriRefusal(reason, uri)
 
 
-def _graph_uri_reason(uri: str) -> str | None:
+def _graph_uri_reason(uri: str, accepted: frozenset[str]) -> str | None:
     # link_validation imports this module, so a top-level import cycles.
     from money_machine.assets.link_validation import refuse_graph_uri
 
-    return refuse_graph_uri(uri)
+    return refuse_graph_uri(uri, accepted=accepted)
 
 
 def _uri_action(doc: PdfDocument, annot: dict[str, PdfObject]) -> str:

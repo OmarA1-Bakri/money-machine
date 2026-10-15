@@ -911,6 +911,24 @@ def test_a_widget_after_an_outline_is_still_refused() -> None:
     assert refusal.code in {"host", "malformed"}
 
 
+def test_a_widget_uri_must_be_an_accepted_link() -> None:
+    """An on-host widget URI that is not an accepted link is ``link_mismatch``."""
+    uri = "https://fixture.notion.site/Not-The-Link"
+    widget = _other_annot("Widget", _action_dict(uri))
+    pdf = classic_pdf(
+        {
+            1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+            2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            3: _obj(3, _page(2, "[4 0 R]", resources="<< /Outlines 5 0 R >>")),
+            4: _obj(4, _good_annot()),
+            5: _obj(5, widget),
+        }
+    )
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "link_mismatch"
+    assert refusal.repairs == (AssetRepair(_ASSET, uri, "link_mismatch"),)
+
+
 def _link_keyed_widget(uri: str) -> str:
     return (
         "<< /Type /Annot /Subtype /Widget /Rect [0 0 1 1] /Border [0 0 0] /F 4"
