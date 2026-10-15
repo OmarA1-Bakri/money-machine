@@ -1,3 +1,11 @@
+## 2026-10-15 — Session 08 previous xref r2
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-pdf-prev-r2-prompt-integrity.md`.
+
+A decoded `Prev` still raises `pdf prev` and the offset is not followed. The new rows pin that refusal on a classic trailer, an xref-stream dictionary, and `/Pr#65v` on both paths. `/Prev null` and `/Prev (x)` refuse as well. `/XRefStm` is not opened: a stream that redefines `/Pages` leaves the original pages object in use. A single-revision file parses.
+
+Focused suite: 8 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_pdf_prev.py`. Source restored after each mutant. A classic-only check fails the two xref-stream rows. An int-only check fails `null` and `(x)`. A raw `/Prev` search fails both `/Pr#65v` rows. Following `/XRefStm` fails the pages row.
+
 ## 2026-10-15 — Session 08 previous xref
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-pdf-prev-prompt-integrity.md`.
