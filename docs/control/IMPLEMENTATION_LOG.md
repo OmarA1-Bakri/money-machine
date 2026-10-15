@@ -1,3 +1,21 @@
+## 2026-10-15 — Session 08 count punctuation
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-count-punctuation-prompt-integrity.md`.
+
+A separator run beside `review(s)`, `rating(s)`, `sold`, or `orders` now includes `;`, `,`, `:`, `=`, and `(`. `500; reviews`, `reviews, 500`, `500 : reviews`, `500 = reviews`, `500 (reviews)`, `Reviews: +500`, `Sold: 500`, and `Orders: 12` are class claims. `1,000` and `4.9` stay whole. `500, reviews` stays a class claim when the separator comma is removed, because the digit run still holds that comma. `500sold`, `2.5 thousand sold`, `2.5ksold`, the Five_Star family, glued letters, and `500.sold_x` stay parked.
+
+Clean suite: 453 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/domain/test_claim_validation.py tests/unit/agents/test_merchandising.py`. Source restored after each mutant. Counts are that pair of files.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Drop `;` | `test_count_punctuation_is_refused[500; reviews]` | 3/450 |
+| Drop `,` | `test_count_punctuation_is_refused[reviews, 500]` | 2/451 |
+| Drop `:` | `test_word_first_colon_counts_need_the_colon` | 6/447 |
+| Drop `=` | `test_count_punctuation_is_refused[500 = reviews]` | 2/451 |
+| Drop `(` | `test_count_punctuation_is_refused[500 (reviews)]` | 2/451 |
+
+Dropping `;` also fails the colon test's hold row `500; reviews`. Dropping `:` leaves that merchandise row green and fails `Reviews: +500`, `Sold: 500`, and `Orders: 12`.
+
 ## 2026-10-15 — Session 08 draft lookup r2
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-draft-lookup-r2-prompt-integrity.md`.

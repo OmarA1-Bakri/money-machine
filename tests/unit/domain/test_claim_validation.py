@@ -698,6 +698,11 @@ def test_deleting_the_count_collapse_publishes_a_separator() -> None:
         ("_", "500_orders", "500.orders"),
         (".", "500.reviews", "500/reviews"),
         ("+", "500.+ratings", "500.ratings"),
+        (";", "500; reviews", "500.reviews"),
+        (",", "reviews, 500", "reviews.500"),
+        (":", "500 : reviews", "500.reviews"),
+        ("=", "500 = reviews", "500.reviews"),
+        ("(", "500 (reviews)", "500.reviews"),
     ],
 )
 def test_weakening_the_separator_collapse_publishes_that_mark(
@@ -709,6 +714,28 @@ def test_weakening_the_separator_collapse_publishes_that_mark(
     assert weaken.hits == 1
     assert problem("identity", leaks, page_count=42) is None
     assert problem("identity", holds, page_count=42) == "class"
+
+
+def test_a_thousands_comma_and_a_decimal_stay_whole() -> None:
+    assert fact_text_problem("identity", "1,000", page_count=42) is None
+    assert fact_text_problem("identity", "4.9", page_count=42) is None
+    assert fact_text_problem("identity", "500, reviews", page_count=42) == "class"
+    weaken = _WeakenPunct(",")
+    problem = _count_problem(weaken, "punct_comma_hold")
+    assert weaken.hits == 1
+    assert problem("identity", "500, reviews", page_count=42) == "class"
+    assert problem("identity", "1,000", page_count=42) is None
+
+
+def test_word_first_colon_counts_need_the_colon() -> None:
+    for value in ("Reviews: +500", "Sold: 500", "Orders: 12"):
+        assert fact_text_problem("identity", value, page_count=42) == "class"
+    weaken = _WeakenPunct(":")
+    problem = _count_problem(weaken, "punct_colon_word")
+    assert weaken.hits == 1
+    for value in ("Reviews: +500", "Sold: 500", "Orders: 12"):
+        assert problem("identity", value, page_count=42) is None
+    assert problem("identity", "500; reviews", page_count=42) == "class"
 
 
 def test_readding_a_review_exemption_publishes_a_count() -> None:
