@@ -582,6 +582,18 @@ def test_s3_same_bytes_are_idempotent() -> None:
     assert store.read(first) == _PNG
 
 
+def test_a_uuid_with_a_suffix_is_refused(tmp_path: Path) -> None:
+    store = _local(tmp_path)
+    with pytest.raises(ValueError, match=r"^storage path$"):
+        store.read(f"fixture://{_PRODUCT}x/2/{_digest(_PNG)}")
+
+
+def test_a_65_hex_digest_is_refused(tmp_path: Path) -> None:
+    store = _local(tmp_path)
+    with pytest.raises(ValueError, match=r"^storage path$"):
+        store.read(f"fixture://{_PRODUCT}/2/{'a' * 65}")
+
+
 def test_a_non_uuid_key_is_refused(tmp_path: Path) -> None:
     store = _local(tmp_path)
     with pytest.raises(ValueError, match=r"^storage path$"):
@@ -674,6 +686,31 @@ def test_a_raced_link_with_other_bytes_collides(
         _publish(store, _PNG)
     final = store.root / "published" / str(_PRODUCT) / "2" / _digest(_PNG)
     assert final.read_bytes() == _GIF
+
+
+def test_a_vanished_link_target_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _local(tmp_path)
+    empty = b""
+    digest = _digest(empty)
+
+    def vanished_link(
+        _src: str,
+        dst: str,
+        *,
+        src_dir_fd: int | None = None,
+        dst_dir_fd: int | None = None,
+        follow_symlinks: bool = True,
+    ) -> None:
+        del _src, src_dir_fd, dst_dir_fd, follow_symlinks
+        raise FileExistsError(errno.EEXIST, "exists", dst)
+
+    monkeypatch.setattr(os, "link", vanished_link)
+    with pytest.raises(ValueError, match=r"^storage missing$"):
+        store.publish(product_id=_PRODUCT, spec_version=2, sha256=digest, data=empty)
+    final = store.root / "published" / str(_PRODUCT) / "2" / digest
+    assert not final.exists()
 
 
 def test_a_failed_write_leaves_no_temp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

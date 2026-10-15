@@ -1272,6 +1272,53 @@ def test_an_equal_count_swap_onto_page_one_refuses_to_post(tmp_path: Path) -> No
     assert swap.posts == 0
 
 
+def test_a_marker_swap_between_existing_ids_refuses_to_post(tmp_path: Path) -> None:
+    spec = _spec()
+    marker = draft_marker(spec.spec_version, fixture_hash(spec))
+    marked = f"{spec.description}\n{marker}"
+    decoy = "decoy"
+    first = [_draft_row(1, marked), _draft_row(2, decoy)]
+    second = [_draft_row(1, decoy), _draft_row(2, marked)]
+    race = _TwoWalks(first, second)
+    ledger = DraftLedger(tmp_path)
+    client = EtsyDraftClient(race, ledger)
+    with pytest.raises(EtsyDraftRefused) as caught:
+        client.create_draft(spec)
+    assert caught.value.code == "count"
+    assert race.posts == 0
+    assert ledger.get(spec.spec_version, fixture_hash(spec)) is None
+
+
+def test_an_existing_description_change_refuses_to_post(tmp_path: Path) -> None:
+    spec = _spec()
+    marker = draft_marker(spec.spec_version, fixture_hash(spec))
+    marked = f"{spec.description}\n{marker}"
+    edited = f"{spec.description} Edited.\n{marker}"
+    race = _TwoWalks([_draft_row(1, marked)], [_draft_row(1, edited)])
+    ledger = DraftLedger(tmp_path)
+    client = EtsyDraftClient(race, ledger)
+    with pytest.raises(EtsyDraftRefused) as caught:
+        client.create_draft(spec)
+    assert caught.value.code == "count"
+    assert race.posts == 0
+    assert ledger.get(spec.spec_version, fixture_hash(spec)) is None
+
+
+class _TwoWalks:
+    def __init__(self, first: list[dict[str, object]], second: list[dict[str, object]]) -> None:
+        self._walks = (first, second)
+        self.gets = 0
+        self.posts = 0
+
+    def exchange(self, call: FixtureCall) -> Mapping[str, object]:
+        if call.method == "POST":
+            self.posts += 1
+            return _post_body()
+        rows = self._walks[0 if self.gets == 0 else 1]
+        self.gets += 1
+        return {"count": len(rows), "results": rows}
+
+
 def test_a_later_page_swap_with_the_ledger_lost_refuses_to_post(tmp_path: Path) -> None:
     spec = _spec()
     marker = draft_marker(spec.spec_version, fixture_hash(spec))

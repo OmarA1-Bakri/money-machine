@@ -1,3 +1,49 @@
+## 2026-10-15 — Session 08 storage shape and vanished link (#78 carry)
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-sf-carry-prompt-integrity.md`.
+
+A product segment `<uuid>x` raises `storage path`. A 65-hex digest raises `storage path`. After `link` raises `EEXIST`, a name that is gone raises `storage missing` and does not return stored. The vanished payload is empty, so a missing read substituted as `b""` would pass the collision check and return stored.
+
+Clean suite: 72 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_asset_storage.py`. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| `_UUID.fullmatch` → `search` | `test_a_uuid_with_a_suffix_is_refused` | 1/71 |
+| `_HEX.fullmatch` on the digest → `search` | `test_a_65_hex_digest_is_refused` | 1/71 |
+| Missing name substitutes `b""` and returns stored | `test_a_vanished_link_target_fails_closed` | 1/71 |
+
+Searching the product id leaves the 65-hex row green. Searching the digest leaves the suffix row green. Returning stored after a vanished link leaves the raced different-bytes collision green.
+
+## 2026-10-15 — Session 08 draft walk compare (#83 carry)
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-sf-carry-prompt-integrity.md`.
+
+The two walks compare the sorted listing ids, the found id, and the sorted description texts. A marker that moves from one existing id to another refuses with `count` and does not post. An existing id whose description changes, marker still on that id, refuses the same way. Nothing is recorded.
+
+Clean suite: 129 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_etsy_draft_client.py tests/unit/assets/test_etsy_draft_ready.py`. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the found compare | `test_a_marker_swap_between_existing_ids_refuses_to_post` | 1/128 |
+| Delete the description compare | `test_an_existing_description_change_refuses_to_post` | 1/128 |
+
+Deleting the found compare leaves the description edit green. Deleting the description compare leaves the marker swap green.
+
+## 2026-10-15 — Session 08 count parenthesis and thousands (#85 carry)
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-sf-carry-prompt-integrity.md`.
+
+`)` is a count separator on either side. `(500) reviews` and `(reviews) 500` are class claims. `Reviews: 1,000` is one count: the word-first match consumes the thousands commas. A fact `Reviews: 1` does not cover that prose. A fact `Reviews: 1,000` does. `1,000` alone stays allowed. `500 (reviews)` stays a class claim when `)` is removed.
+
+Clean suite: 459 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/domain/test_claim_validation.py tests/unit/agents/test_merchandising.py`. Source restored after each mutant. Counts are that pair of files.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Drop `)` | `test_a_closing_paren_joins_a_count_on_either_side` | 4/455 |
+| Match one digit after the review word | `test_a_word_first_thousands_group_is_one_count` | 1/458 |
+
+Dropping `)` also fails `(500) reviews` and `(reviews) 500` in the merchandise rows. `500 (reviews)` stays green. Matching one digit still refuses `Reviews: 1,000` as a class claim and lets `Reviews: 1` cover it.
+
 ## 2026-10-15 — Session 08 spaced-dot case r7 (#80)
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-punycode-host-r7-prompt-integrity.md`. This restores the lowercase gate that r5 removed. `acme . NET` stays parked.

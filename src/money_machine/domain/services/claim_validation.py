@@ -78,14 +78,15 @@ _SAVINGS_NAME: Final[str] = "automatic savings planner"
 _EXACT_SAVINGS: Final[Pattern[str]] = re.compile(rf"\b{_SAVINGS_NAME}\b")
 # After ``_count_scan``, a digit run next to review(s) or rating(s) is a count
 # in either direction. The collapse set includes ``;``, ``,``, ``:``, ``=``,
-# and ``(`` on either side. A comma inside a digit run stays a thousands
-# separator. There is no year exemption and no rating-scale exemption. A
-# letter or digit glued to the far side of the word is not this count.
+# ``(``, and ``)`` on either side. A comma inside a digit run stays a thousands
+# separator, including a word-first ``Reviews: 1,000``. There is no year
+# exemption and no rating-scale exemption. A letter or digit glued to the far
+# side of the word is not this count.
 _REVIEW_BEFORE: Final[str] = (
     r"\d[\d,]*(?:\.\d+)?\s*k?\+?\s*"
     r"(?:(?:average|avg\.?|customer|buyer|verified)\s+)?(?:reviews?|ratings?)(?![^\W_])"
 )
-_REVIEW_AFTER: Final[str] = r"(?<![^\W_])(?:reviews?|ratings?)\s*[:=]?\s*\d"
+_REVIEW_AFTER: Final[str] = r"(?<![^\W_])(?:reviews?|ratings?)\s*[:=]?\s*\d[\d,]*"
 _REVIEW: Final[Pattern[str]] = re.compile(
     rf"top[-\s_.]?rated|\bhighly reviewed\b|testimonials?|\brated\b|\bfive-star\b"
     rf"|\brav(?:ing|es|ed|e)(?:reviews?|(?!\w))"
@@ -262,7 +263,7 @@ def _prose_automation_text(folded: str) -> str:
 # between the word and a following number is a separator. A comma inside the
 # digit run is not.
 _COUNT_WORD: Final[str] = r"(?:reviews?|ratings?|sold|orders)(?![^\W_])"
-_PUNCT: Final[str] = r"[._/\-+;:=(,]"
+_PUNCT: Final[str] = r"[._/\-+;:=(,)]"
 _SEPARATOR_RUN: Final[str] = rf"(?:\s|{_PUNCT})*{_PUNCT}(?:\s|{_PUNCT})*"
 _COLLAPSE_BEFORE: Final[Pattern[str]] = re.compile(rf"(?<=[\dk+]){_SEPARATOR_RUN}(?={_COUNT_WORD})")
 _COLLAPSE_AFTER: Final[Pattern[str]] = re.compile(
@@ -274,8 +275,8 @@ def _count_scan(text: str) -> str:
     """Scan-only copy: a separator run beside a count word becomes one space.
 
     The run is ``.``, ``_``, ``/``, ``-``, ``+``, ``;``, ``,``, ``:``, ``=``,
-    ``(``, and whitespace, on either side of review(s), rating(s), sold, or
-    orders. Rank text is not rewritten.
+    ``(``, ``)``, and whitespace, on either side of review(s), rating(s), sold,
+    or orders. Rank text is not rewritten.
     """
     return _COLLAPSE_AFTER.sub(r"\1 ", _COLLAPSE_BEFORE.sub(" ", text))
 
