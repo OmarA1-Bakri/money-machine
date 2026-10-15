@@ -112,10 +112,7 @@ def _resources(*font_entries: str) -> str:
     """Page resources whose keys are the measured Chromium set."""
     inner = " ".join(font_entries)
     font = f" {inner}" if inner else ""
-    return (
-        "<< /ExtGState << >> /Font <<"
-        f"{font} >> /ProcSet [/PDF /Text /ImageB /ImageC /ImageI] >>"
-    )
+    return f"<< /ExtGState << >> /Font <<{font} >> /ProcSet [/PDF /Text /ImageB /ImageC /ImageI] >>"
 
 
 def _page(
