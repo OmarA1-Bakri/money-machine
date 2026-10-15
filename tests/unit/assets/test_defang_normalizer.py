@@ -134,6 +134,65 @@ def test_secret_host_capture_calls_the_normalizer(monkeypatch: pytest.MonkeyPatc
         _capture_secret_link("https://fixture.notion.site/Home")
 
 
+def test_a_greek_lunate_sigma_dot_is_refused() -> None:
+    text = "x dot \u03f2om"
+    assert refuse_paid_checkout(text) == "paid_checkout"
+    assert refuse_sensitive_text(text) == "sensitive_data"
+
+
+def test_a_bracket_punycode_tld_is_refused() -> None:
+    text = "evil[.]xn--p1ai"
+    assert refuse_paid_checkout(text) == "paid_checkout"
+    assert refuse_sensitive_text(text) == "sensitive_data"
+
+
+def test_a_lowercase_shop_before_a_word_is_refused() -> None:
+    assert refuse_paid_checkout("x . shop now") == "paid_checkout"
+    assert refuse_sensitive_text("x . shop now") == "sensitive_data"
+    assert refuse_paid_checkout("x . shop") is None
+    assert refuse_paid_checkout("Done . Net") is None
+    assert refuse_paid_checkout("acme . com") == "paid_checkout"
+    assert refuse_paid_checkout("acme . NET") == "paid_checkout"
+    assert refuse_paid_checkout("acme . com today") is None
+
+
+def test_a_digit_three_tld_is_refused() -> None:
+    assert refuse_paid_checkout("x dot n3t") == "paid_checkout"
+    assert refuse_sensitive_text("x dot n3t") == "sensitive_data"
+
+
+def test_a_digit_one_tld_is_refused() -> None:
+    assert refuse_paid_checkout("x dot 1o") == "paid_checkout"
+    assert refuse_sensitive_text("x dot 1o") == "sensitive_data"
+
+
+def test_spaced_letters_with_a_stray_letter_are_refused() -> None:
+    assert refuse_paid_checkout("x dot c o m x") == "paid_checkout"
+    assert refuse_sensitive_text("x dot c o m x") == "sensitive_data"
+    assert refuse_paid_checkout("x dot c o m") == "paid_checkout"
+
+
+def test_screenshot_text_refuses_a_bare_spaced_host() -> None:
+    assert refuse_sensitive_text("acme . com") == "sensitive_data"
+    assert refuse_sensitive_text("acme . NET") == "sensitive_data"
+    assert refuse_paid_checkout("Done . Net") is None
+    assert refuse_sensitive_text("Done . Net") is None
+    assert refuse_sensitive_text("acme . com today") is None
+    assert refuse_sensitive_text("x dot com") is None
+
+
+def test_a_zero_width_char_inside_the_scheme_is_a_url() -> None:
+    text = "h\u200bttp://evil"
+    assert url_matches(text) is True
+    assert refuse_sensitive_text(text) == "sensitive_data"
+
+
+def test_a_bracketed_hxxp_scheme_is_refused() -> None:
+    assert refuse_paid_checkout("hxxp[:]//evil") == "paid_checkout"
+    assert refuse_sensitive_text("hxxp[:]//evil") == "sensitive_data"
+    assert url_matches("hxxp[:]//evil") is True
+
+
 def test_allowed_secret_host_calls_the_normalizer(monkeypatch: pytest.MonkeyPatch) -> None:
     def boom(text: str) -> str:
         raise RuntimeError(text)

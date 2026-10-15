@@ -62,6 +62,16 @@ def test_a_spaced_at_sign_email_is_refused() -> None:
     assert email_rule_matches("ceo at acme dot com") is True
 
 
+def test_a_one_sided_spaced_at_sign_is_refused() -> None:
+    for spelled in ("ceo @acme dot com", "ceo@ acme dot com"):
+        assert email_rule_matches(spelled) is True
+        assert refuse_sensitive_text(spelled) == "sensitive_data"
+        assert refuse_rendered_text(spelled) == "sensitive_data"
+    for prose in ("a @ b", "email me @ noon", "Tag @ home"):
+        assert email_rule_matches(prose) is False
+        assert refuse_sensitive_text(prose) is None
+
+
 def test_a_spaced_email_uses_the_curated_list() -> None:
     assert email_rule_matches("ceo at acme . com") is True
     assert refuse_rendered_text("ceo at acme . com") == "sensitive_data"
