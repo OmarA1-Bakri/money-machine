@@ -162,7 +162,7 @@ def test_a_passed_chain_is_a_ready_draft(tmp_path: Path) -> None:
     assert receipt.ready is True
     assert receipt.state == "draft"
     assert store.posts == 1
-    assert [call.method for call in store.calls] == ["GET", "POST"]
+    assert [call.method for call in store.calls] == ["GET", "GET", "POST"]
 
 
 @pytest.mark.parametrize(

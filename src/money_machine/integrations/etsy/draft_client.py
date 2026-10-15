@@ -9,7 +9,8 @@ Measured from the Etsy Open API v3 Shop Listing document
 
 ``getListingsByShop`` defaults ``state`` to ``active`` and ``limit`` to 25.
 This client sends ``state=draft`` and ``limit=100``, and follows ``offset``
-until a short page. ``count`` is the filtered total. ``updateListing`` is
+until a short page. It then walks every page again. The sorted listing ids
+must match, and every id is an exact int. ``count`` is the filtered total. ``updateListing`` is
 ``PATCH`` on ``/v3/application/shops/{shop_id}/listings/{listing_id}`` and can
 set ``state=active``, which publishes the draft. That pair is not in the
 allowlist, and this class has no publish or activate method.
@@ -28,6 +29,7 @@ import hashlib
 import os
 import re
 from collections.abc import Mapping
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol
@@ -188,6 +190,8 @@ class DraftLedger:
         payload = f"recorded\n{listing_id}\n".encode()
         path = self._path(spec_version, fixture_hash)
         temporary = path.with_name(path.name + ".next")
+        with suppress(FileNotFoundError):
+            os.unlink(temporary)
         self._create_exclusive(temporary, payload)
         os.replace(temporary, path)
         _fsync_dir(self._directory)
@@ -254,8 +258,16 @@ class EtsyDraftClient:
         return self._transport.exchange(FixtureCall(method, path, query, body))
 
     def _adopt(self, spec: DraftSpec, marker: str) -> int | None:
+        found, ids = self._read_pages(spec, marker)
+        confirm_found, confirm_ids = self._read_pages(spec, marker)
+        if ids != confirm_ids or found != confirm_found:
+            raise EtsyDraftRefused("count")
+        return found
+
+    def _read_pages(self, spec: DraftSpec, marker: str) -> tuple[int | None, list[int]]:
         found: int | None = None
         seen = 0
+        ids: list[int] = []
         seen_ids: set[int] = set()
         expected: int | None = None
         offset = 0
@@ -285,10 +297,12 @@ class EtsyDraftClient:
                 if not isinstance(row, dict):
                     raise EtsyDraftRefused("malformed")
                 listing_raw = row.get("listing_id")
-                if type(listing_raw) is int:
-                    if listing_raw in seen_ids:
-                        raise EtsyDraftRefused("count")
-                    seen_ids.add(listing_raw)
+                if type(listing_raw) is not int:
+                    raise EtsyDraftRefused("malformed")
+                if listing_raw in seen_ids:
+                    raise EtsyDraftRefused("count")
+                seen_ids.add(listing_raw)
+                ids.append(listing_raw)
                 if not _line_marker(row.get("description"), marker):
                     continue
                 listing_id = _draft_listing_id(row)
@@ -299,7 +313,8 @@ class EtsyDraftClient:
             if len(results) < PAGE_LIMIT:
                 if seen != expected:
                     raise EtsyDraftRefused("count")
-                return found
+                ids.sort()
+                return found, ids
             offset += PAGE_LIMIT
         raise EtsyDraftRefused("page_cap")
 
@@ -429,7 +444,9 @@ def _refuse_get(
     fields = _query_keys(query)
     if set(fields) - _GET_KEYS:
         raise EtsyDraftRefused("query_key")
-    if "state" in fields and fields["state"] != "draft":
+    if "state" not in fields:
+        raise EtsyDraftRefused("lookup_state")
+    if fields["state"] != "draft":
         raise EtsyDraftRefused("lookup_state")
     if "limit" in fields and not _canonical_int(fields["limit"], low=1, high=PAGE_LIMIT):
         raise EtsyDraftRefused("query_limit")
