@@ -1,3 +1,21 @@
+## 2026-10-15 — Session 08 spelled email
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-spelled-email-prompt-integrity.md`.
+
+A spelled-out email is refused. `ceo at acme-corp dot com` matches the email rule, and both refuse helpers return `sensitive_data`. `Meet at the studio`, `Sage Green`, and `x dot com` stay allowed. `x dot com` stays the parked host defang. Action 8 stays on #78. Action 9 stays on #77. `/Resources` stays `{ExtGState, Font, ProcSet}`.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_spelled_email.py`. 3 passed. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the spelled `or` in `email_rule_matches` | `test_a_spelled_email_rule_matches` | 1/2 |
+| Delete the spelled check in `refuse_sensitive_text` | `test_a_spelled_email_is_refused` | 1/2 |
+| Delete the `_SPELLED_EMAIL` assignment | all three tests, as `NameError` | 3/0 |
+
+The plain-label row stays green when either call site is removed. Deleting the assignment is not a silent survivor.
+
+Parked: uppercase on-host URIs, `file:` allow, sendBeacon, raster text, `_prepare` non-ASCII, bracketed `at`/`dot`, live S3, `CREATE_ETSY_DRAFT`, commissioning, and the session exit.
+
 ## 2026-10-15 — Session 08 W7 r3: page-tree roles and screenshot sources
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
