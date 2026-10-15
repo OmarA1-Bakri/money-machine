@@ -173,9 +173,6 @@ def _refuse_graph(doc: PdfDocument, accepted: frozenset[str]) -> None:
         in_link_action: bool = False,
         under_page_annots: bool = False,
         action_of_annot: bool = False,
-        in_font: bool = False,
-        in_info: bool = False,
-        unreferenced: bool = False,
     ) -> None:
         if depth > _MAX_DEPTH:
             raise ValueError("pdf depth")
@@ -197,15 +194,7 @@ def _refuse_graph(doc: PdfDocument, accepted: frozenset[str]) -> None:
             _refuse_dict(doc, value, accepted, in_link_action=in_link_action)
             annot = _name_is(value.get("Type"), "Annot")
             link = annot and _name_is(value.get("Subtype"), "Link")
-            defer = _defer_page_annots(
-                value,
-                number=number,
-                parent_key=role,
-                in_font=in_font,
-                in_info=in_info,
-                unreferenced=unreferenced,
-                real_pages=real_pages,
-            )
+            defer = _defer_page_annots(value, number=number, real_pages=real_pages)
             for key, child in value.items():
                 scan(
                     child,
@@ -214,8 +203,6 @@ def _refuse_graph(doc: PdfDocument, accepted: frozenset[str]) -> None:
                     in_link_action=under_page_annots and link and key == "A",
                     under_page_annots=defer and key == "Annots",
                     action_of_annot=annot and key == "A",
-                    in_font=in_font or key == "Font",
-                    in_info=in_info or key == "Info",
                 )
             return
         if isinstance(value, tuple):
@@ -227,9 +214,6 @@ def _refuse_graph(doc: PdfDocument, accepted: frozenset[str]) -> None:
                     in_link_action=in_link_action,
                     under_page_annots=under_page_annots,
                     action_of_annot=action_of_annot,
-                    in_font=in_font,
-                    in_info=in_info,
-                    unreferenced=unreferenced,
                 )
             return
         if isinstance(value, PdfStream):
@@ -240,16 +224,13 @@ def _refuse_graph(doc: PdfDocument, accepted: frozenset[str]) -> None:
                 in_link_action=in_link_action,
                 under_page_annots=under_page_annots,
                 action_of_annot=action_of_annot,
-                in_font=in_font,
-                in_info=in_info,
-                unreferenced=unreferenced,
             )
 
     scan(doc.trailer, None, 0)
     reached = {number for number, _role in seen}
     for number in list(doc.entries):
         if number not in reached:
-            scan(PdfRef(number, 0), None, 0, unreferenced=True)
+            scan(PdfRef(number, 0), None, 0)
             reached.add(number)
 
 
@@ -301,33 +282,12 @@ def _defer_page_annots(
     fields: dict[str, PdfObject],
     *,
     number: int | None,
-    parent_key: str | None,
-    in_font: bool,
-    in_info: bool,
-    unreferenced: bool,
     real_pages: set[int],
 ) -> bool:
-    """Defer link URIs only for a page object the page tree reached.
-
-    Each other place returns on its own line. Deleting that line raises
-    ``pdf page place`` for that place only.
-    """
+    """Defer link URIs only for a page object the page tree reached."""
     if not _name_is(fields.get("Type"), "Page"):
         return False
-    if number is not None and number in real_pages:
-        return True
-    inline = number is None
-    if inline and in_font:
-        return False
-    if inline and in_info:
-        return False
-    if unreferenced:
-        return False
-    if parent_key == "Foo":
-        return False
-    if in_font and not inline:
-        return False
-    raise ValueError("pdf page place")
+    return number is not None and number in real_pages
 
 
 def _refuse_annot_role(fields: dict[str, PdfObject]) -> None:

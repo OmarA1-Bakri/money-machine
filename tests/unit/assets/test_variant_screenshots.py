@@ -348,7 +348,7 @@ def test_a_declarative_shadow_root_is_refused() -> None:
         _paint_documents((_SHADOW,))
 
 
-def test_the_fixture_context_makes_no_network_requests() -> None:
+def _service_worker_hits(*, allow: bool) -> list[str]:
     hits: list[str] = []
     page_html = _NETWORK_PAGE.encode()
 
@@ -379,7 +379,15 @@ def test_the_fixture_context_makes_no_network_requests() -> None:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(headless=True, args=list(LAUNCH_ARGS))
             try:
-                context = open_screenshot_context(browser, javascript=True, allowed_http=(doc,))
+                if allow:
+                    context = open_screenshot_context(
+                        browser,
+                        javascript=True,
+                        allowed_http=(doc,),
+                        service_workers="allow",
+                    )
+                else:
+                    context = open_screenshot_context(browser, javascript=True, allowed_http=(doc,))
                 try:
                     page = context.new_page()
                     page.goto(doc, wait_until="domcontentloaded", timeout=4000)
@@ -390,7 +398,15 @@ def test_the_fixture_context_makes_no_network_requests() -> None:
                 browser.close()
     finally:
         server.shutdown()
-    assert hits == ["/"]
+    return hits
+
+
+def test_the_fixture_context_makes_no_network_requests() -> None:
+    assert _service_worker_hits(allow=False) == ["/"]
+
+
+def test_allowing_service_workers_fetches_the_worker_script() -> None:
+    assert "/sw.js" in _service_worker_hits(allow=True)
 
 
 def test_lineage_hash_and_build_version_are_independent() -> None:
