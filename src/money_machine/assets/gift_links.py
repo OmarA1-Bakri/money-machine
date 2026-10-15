@@ -103,7 +103,9 @@ def refuse_gift_link_annotations(pdf: bytes) -> str | None:
     """Return ``paid_checkout`` when the gift PDF has any link annotation."""
     try:
         count, uris = link_annotations(pdf)
-    except ValueError:
+    except ValueError as exc:
+        if str(exc) == "pdf kids depth":
+            return "malformed"
         return "paid_checkout"
     for uri in uris:
         if refuse_paid_checkout(uri) is not None:

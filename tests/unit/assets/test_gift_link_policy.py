@@ -232,7 +232,7 @@ def test_an_escaped_metadata_key_is_paid_checkout() -> None:
     assert refuse_gift_document_info(pdf) == "paid_checkout"
 
 
-def test_a_deep_kids_chain_is_paid_checkout() -> None:
+def test_a_deep_kids_chain_is_malformed() -> None:
     objects = {1: _gift_obj(1, "<< /Type /Catalog /Pages 10 0 R >>")}
     for hop in range(500):
         number = 10 + hop
@@ -241,7 +241,7 @@ def test_a_deep_kids_chain_is_paid_checkout() -> None:
         else:
             body = f"<< /Kids [{number + 1} 0 R] >>"
         objects[number] = _gift_obj(number, body)
-    assert refuse_gift_link_annotations(classic_pdf(objects)) == "paid_checkout"
+    assert refuse_gift_link_annotations(classic_pdf(objects)) == "malformed"
 
 
 def test_a_deep_nest_is_paid_checkout() -> None:

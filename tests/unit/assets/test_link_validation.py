@@ -929,6 +929,19 @@ def test_a_reentered_action_is_refused() -> None:
     assert str(refusal.__cause__) == "pdf seen key"
 
 
+def test_a_deep_kids_chain_is_malformed() -> None:
+    objects: dict[int, bytes] = {1: _obj(1, "<< /Type /Catalog /Pages 10 0 R >>")}
+    for hop in range(500):
+        number = 10 + hop
+        if hop == 499:
+            body = "<< /Type /Page /Parent 10 0 R >>"
+        else:
+            body = f"<< /Kids [{number + 1} 0 R] >>"
+        objects[number] = _obj(number, body)
+    refusal = _raise(classic_pdf(objects), accepted=_accepted_good(), clock=None)
+    assert refusal.code == "malformed"
+
+
 def test_a_second_role_widget_is_malformed() -> None:
     """A good URI, so only the Annots role after ``/Outlines`` refuses the widget."""
     widget = _other_annot("Widget", _action_dict(_GOOD))

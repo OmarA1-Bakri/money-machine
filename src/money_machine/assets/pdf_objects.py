@@ -61,7 +61,7 @@ def _pages(
     depth: int = 0,
 ) -> tuple[dict[str, PdfObject], ...]:
     if depth > _MAX_DEPTH:
-        raise ValueError("pdf depth")
+        raise ValueError("pdf kids depth")
     if isinstance(node, PdfRef):
         if node.number in seen:
             raise ValueError("pdf page")
