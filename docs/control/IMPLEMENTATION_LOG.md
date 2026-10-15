@@ -1,3 +1,23 @@
+## 2026-10-15 — Session 08 spaced-dot set (#80)
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-punycode-host-r5-prompt-integrity.md`. This supersedes the r4 lowercase gate for the spaced form. #81 and #82 are not updated.
+
+A spaced `.` is undone when the token casefolds into `{com, c0m, net, org}`, wherever that token sits, including at the end of the text. `c0m` is the zero spelling of `com`. A zero inside `org` (`0rg`) also counts. Letter lookalikes are folded first. A later word still skips the undo, so `Plan 2 . Net profit` stays prose. `Rest . Co`, `Plan . Io`, `Rest . Co.`, `Plan . Io!`, `Pick one . Shop`, `Pick one . Shop local`, and `Tea . Co op` return None. `X . COM` refuses again. Bare `dot`, bare `at`, and bracket forms stay on the curated list.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_defanged_host.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. 68 passed. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Require `islower` | `test_a_spaced_dot_host_is_refused` | 1/67 |
+| Use `CURATED_TLDS` for the spaced form | `Pick one . Shop`, `x . shop`, `x . sh0p`, `acme . io`, and `acme . co` | 10/58 |
+| Drop `c0m` | `test_a_lowercase_spaced_dot_at_the_end_is_refused[mail me at acme . c0m]` | 1/67 |
+| Drop `net` | `test_a_lowercase_spaced_dot_at_the_end_is_refused[acme . net]` | 1/67 |
+| Drop `org` | `test_a_lowercase_spaced_dot_at_the_end_is_refused[acme . org]` | 1/67 |
+| Drop the zero map | `test_a_spaced_zero_lookalike_is_refused` | 1/67 |
+| Add `shop` to the zero targets | `test_a_lowercase_spaced_tld_outside_the_set_stays[x . sh0p]` | 1/67 |
+| Drop the Cyrillic small `o` fold | `test_a_lowercase_lookalike_spaced_dot_is_refused` | 1/67 |
+| Drop the spaced-dot word boundary | `test_quantities_and_plain_names_stay` | 1/67 |
+
 ## 2026-10-15 — Session 08 spaced-dot case (#80)
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-punycode-host-r4-prompt-integrity.md`.

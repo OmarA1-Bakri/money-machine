@@ -6,9 +6,12 @@ The order is fixed:
 2. Find host-like, email-like, and ``hxxp`` candidates.
 3. Undo defanging only inside those candidates. A bare ``dot`` or a bare
    ``at`` is undone only when the next token, with spaces removed, is on
-   :data:`CURATED_TLDS`. A spaced ``.`` is undone only when that token is
-   all lowercase and is ``com``, ``c0m``, ``net``, or ``org``. Bracket
-   and parenthesis forms also accept the IANA snapshot.
+   :data:`CURATED_TLDS`. A spaced ``.`` is undone only when that token
+   casefolds into ``com``, ``c0m``, ``net``, or ``org``, wherever the
+   token sits, including at the end of the text. ``c0m`` is the zero
+   spelling of ``com``, and a zero in ``org`` counts. Letter lookalikes
+   are already folded. A later word still leaves the spaced form alone.
+   Bracket and parenthesis forms also accept the IANA snapshot.
 """
 
 from __future__ import annotations
@@ -112,6 +115,7 @@ _EXACT_HOST = re.compile(
 )
 _HXXP = re.compile(r"hxxp(s?://)", re.IGNORECASE)
 _SPACED_DOT_TLDS = frozenset({"com", "c0m", "net", "org"})
+_SPACED_ZERO_TARGETS = frozenset({"org"})
 
 
 def fold_confusables(text: str) -> str:
@@ -274,10 +278,12 @@ def _followed_by_word(text: str, index: int) -> bool:
 
 
 def _spaced_dot_tld(token: str) -> bool:
-    """A capitalised word after a spaced dot is prose, so it is left alone."""
-    if not token.islower():
-        return False
-    return token.casefold() in _SPACED_DOT_TLDS
+    """Accept com, c0m, net, or org, in any case, plus a zero lookalike of org."""
+    folded = token.casefold()
+    if folded in _SPACED_DOT_TLDS:
+        return True
+    mapped = folded.translate(_ZERO_TO_O)
+    return mapped != folded and mapped in _SPACED_ZERO_TARGETS
 
 
 def _curated_tld(token: str) -> bool:
