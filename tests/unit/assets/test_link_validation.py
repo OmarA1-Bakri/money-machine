@@ -911,6 +911,24 @@ def test_a_widget_after_an_outline_is_still_refused() -> None:
     assert refusal.code in {"host", "malformed"}
 
 
+def test_a_reentered_action_is_refused() -> None:
+    """The action object is reached from ``/XObject`` and again from the link ``/A``."""
+    link = "<< /Type /Annot /Subtype /Link /Rect [0 0 1 1] /Border [0 0 0] /F 4 /A 5 0 R >>"
+    pdf = classic_pdf(
+        {
+            1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+            2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            3: _obj(3, _page(2, "[4 0 R]", resources="<< /XObject 5 0 R >>")),
+            4: _obj(4, link),
+            5: _obj(5, _action_dict(_GOOD)),
+        }
+    )
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+    assert isinstance(refusal.__cause__, ValueError)
+    assert str(refusal.__cause__) == "pdf seen key"
+
+
 def test_a_second_role_widget_is_malformed() -> None:
     """A good URI, so only the Annots role after ``/Outlines`` refuses the widget."""
     widget = _other_annot("Widget", _action_dict(_GOOD))
