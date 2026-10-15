@@ -1,12 +1,16 @@
-"""Fixture variant screenshots: viewport, crop, readiness, secrets, lineage."""
+"""Fixture variant screenshots: template, crop, readiness, secrets, lineage."""
 
 from __future__ import annotations
 
 import hashlib
+import html
+import inspect
 import struct
 import subprocess
 import sys
+import threading
 from collections.abc import Callable
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from uuid import UUID
 
@@ -14,11 +18,25 @@ import pytest
 from playwright.sync_api import sync_playwright
 
 from money_machine.assets.listing_images import refuse_unknown_screenshot as refuse_unknown_image
+from money_machine.assets.screenshot_text import (
+    email_rule_matches,
+    escape_fixture,
+    fill_template,
+    notion_host_rule_matches,
+    token_rule_matches,
+)
 from money_machine.assets.screenshots import (
+    LAUNCH_ARGS,
+    SCREENSHOT_TEMPLATE_VERSION,
     CapturedScreenshot,
+    ScreenshotLineage,
+    ScreenshotRefusal,
     VariantPage,
     capture_variant_screenshots,
     default_live_fetcher,
+    open_screenshot_context,
+    paint_documents,
+    variant_template_path,
     write_screenshot_inputs,
 )
 from money_machine.assets.video import refuse_unknown_screenshot as refuse_unknown_video
@@ -27,27 +45,15 @@ from tests.fixtures.listing_screenshots import fixture_screenshot_hashes, fixtur
 from tests.fixtures.merchandising import consistent_request
 
 _ROOT = Path(__file__).resolve().parents[2] / "fixtures" / "variant_pages"
+_TEMPLATE_SHA256 = "f38abcd419f3ff5dfb23264e2f63ad2c597e255cc1728b1cb4fe48237b505866"
+_PNG_SHA256 = "2efb97e6c323fe81f763181f2d773d167a49b6f5ca29452e8778a5e9a60d836b"
 _BUILD = 5
 _PRODUCT = UUID("00000000-0000-4000-8000-0000000000b1")
 _VARIANTS = ("Sage Green", "Navy Blue", "Rose Gold")
-_FILES = {
-    "Sage Green": _ROOT / "sage-green.html",
-    "Navy Blue": _ROOT / "navy-blue.html",
-    "Rose Gold": _ROOT / "rose-gold.html",
-}
 _LIVE = "https://www.notion.so/private-variant-page"
-_DELAYED_EMAIL = """<!DOCTYPE html>
-<html>
-<body style="margin:0;background:#112233">
-<script>
-setTimeout(function () {
-  document.documentElement.setAttribute("data-mm-ready", "loaded");
-  var node = document.createElement("p");
-  node.textContent = ["person", "example.com"].join("@");
-  document.body.appendChild(node);
-}, 40);
-</script>
-</body>
+_HOSTILE = """<!DOCTYPE html>
+<html data-mm-ready="loaded">
+<body style="margin:0;background:#ff00ff"><p>Sample fixture Sage Green</p></body>
 </html>
 """
 _HIDDEN_EMAIL = """<!DOCTYPE html>
@@ -60,6 +66,54 @@ _HIDDEN_EMAIL = """<!DOCTYPE html>
 </body>
 </html>
 """
+_DELAYED_EMAIL = """<!DOCTYPE html>
+<html data-mm-ready="loaded">
+<body style="margin:0;background:#112233">
+<div id="swatch" style="width:4px;height:4px;background:#00ff00"></div>
+<p style="margin:12px">Sample fixture</p>
+<script>
+document.getElementById("swatch").style.background = "#ff00ff";
+setTimeout(function () {
+  var node = document.createElement("p");
+  node.textContent = "person@example.com";
+  document.body.appendChild(node);
+  document.getElementById("swatch").style.background = "#ff00ff";
+}, 60);
+</script>
+</body>
+</html>
+"""
+_STRUCTURE = """<!DOCTYPE html>
+<html data-mm-ready="loaded">
+<head><style>body::before { content: "BEFORE"; }</style></head>
+<body style="margin:0;background:#112233">
+<input><textarea></textarea><canvas></canvas><iframe></iframe>
+<p>Sample fixture</p>
+</body>
+</html>
+"""
+_SHADOW = """<!DOCTYPE html>
+<html data-mm-ready="loaded">
+<body style="margin:0;background:#112233">
+<div style="width:4px;height:4px;background:#00ff00"></div>
+<p style="margin:12px">Sample fixture</p>
+<div><template shadowrootmode="open"><span>inside</span></template></div>
+</body>
+</html>
+"""
+_NETWORK_PAGE = """<!DOCTYPE html>
+<html><body>
+<img src="/img.png">
+<link rel="stylesheet" href="/app.css">
+<iframe src="/frame"></iframe>
+<script>
+fetch("/fetch");
+navigator.sendBeacon("/beacon", "x");
+new WebSocket("ws://" + location.host + "/ws");
+navigator.serviceWorker.register("/sw.js");
+</script>
+</body></html>
+"""
 
 
 def _launch_chromium() -> None:
@@ -69,7 +123,7 @@ def _launch_chromium() -> None:
 
 
 @pytest.fixture(scope="module", autouse=True)
-def chromium_installed() -> None:
+def _browser() -> None:  # pyright: ignore[reportUnusedFunction]
     try:
         _launch_chromium()
     except Exception:
@@ -78,7 +132,7 @@ def chromium_installed() -> None:
 
 
 def _pages() -> tuple[VariantPage, ...]:
-    return tuple(VariantPage(name=name, html_path=_FILES[name]) for name in _VARIANTS)
+    return tuple(VariantPage(name=name) for name in _VARIANTS)
 
 
 def _capture(
@@ -152,14 +206,40 @@ def _fields(text: str) -> dict[str, str]:
     return dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
 
 
-def _write(tmp_path: Path, name: str, html: str) -> VariantPage:
-    path = tmp_path / name
-    path.write_text(html, encoding="utf-8")
-    return VariantPage(name="Sample", html_path=path)
+def _shot(name: str, payload: bytes = b"png") -> CapturedScreenshot:
+    digest = hashlib.sha256(payload).hexdigest()
+    lineage = ScreenshotLineage(
+        product_id=_PRODUCT,
+        spec_version=1,
+        build_version=_BUILD,
+        screenshot_sha256=digest,
+        variant=name,
+        template_version=SCREENSHOT_TEMPLATE_VERSION,
+        viewport_width=480,
+        viewport_height=360,
+        crop_x=0,
+        crop_y=0,
+        crop_width=480,
+        crop_height=270,
+        qa_status="passed",
+        source="fixture",
+    )
+    return CapturedScreenshot(png=payload, lineage_png=payload, lineage=lineage)
 
 
-def test_viewport_is_clipped_and_has_no_chrome(chromium_installed: None) -> None:
-    del chromium_installed
+def _template() -> str:
+    return (_ROOT / "variant.html").read_text(encoding="utf-8")
+
+
+def test_the_variant_template_is_pinned() -> None:
+    files = sorted(path.name for path in _ROOT.iterdir())
+    assert files == ["variant.html"]
+    digest = hashlib.sha256((_ROOT / "variant.html").read_bytes()).hexdigest()
+    assert digest == _TEMPLATE_SHA256
+    assert variant_template_path() == _ROOT / "variant.html"
+
+
+def test_viewport_is_clipped_and_has_no_chrome() -> None:
     shot = _capture()[0]
     width, height, colour = _ihdr(shot.png)
     assert (width, height, colour) == (480, 270, 2)
@@ -172,8 +252,12 @@ def test_viewport_is_clipped_and_has_no_chrome(chromium_installed: None) -> None
     assert b"\xff\x00\x00" not in pixels
 
 
-def test_the_same_fixture_has_the_same_hash(chromium_installed: None) -> None:
-    del chromium_installed
+def test_the_canonical_png_hash_is_pinned() -> None:
+    shot = _capture((VariantPage(name="Sage Green"),))[0]
+    assert hashlib.sha256(shot.png).hexdigest() == _PNG_SHA256
+
+
+def test_the_same_fixture_has_the_same_hash() -> None:
     first = _capture()
     second = _capture()
     assert tuple(shot.png for shot in first) == tuple(shot.png for shot in second)
@@ -181,31 +265,15 @@ def test_the_same_fixture_has_the_same_hash(chromium_installed: None) -> None:
     assert len(set(hashes)) == 3
 
 
-def test_a_missing_readiness_marker_is_refused(tmp_path: Path, chromium_installed: None) -> None:
-    del chromium_installed
-    page = _write(
-        tmp_path,
-        "blank.html",
-        "<!DOCTYPE html><html><body><p>Sample fixture</p></body></html>",
-    )
-    with pytest.raises(ValueError, match="not_ready"):
-        _capture((page,))
+def test_a_missing_readiness_marker_is_refused() -> None:
+    html_doc = "<!DOCTYPE html><html><body><p>Sample fixture</p></body></html>"
+    with pytest.raises(ScreenshotRefusal, match="not_ready"):
+        paint_documents((html_doc,))
 
 
-def test_a_late_marker_is_waited_for(tmp_path: Path, chromium_installed: None) -> None:
-    del chromium_installed
-    page = _write(
-        tmp_path,
-        "late.html",
-        """<!DOCTYPE html><html><body style="margin:0;background:#112233">
-        <script>setTimeout(function () {
-          document.documentElement.setAttribute("data-mm-ready", "loaded");
-          document.body.insertAdjacentHTML("afterbegin",
-            "<div style='width:4px;height:4px;background:#00ff00'></div>");
-        }, 40);</script></body></html>""",
-    )
-    shot = _capture((page,))[0]
-    _width, _height, rgb = decode_png_rgb(shot.png)
+def test_a_delayed_email_script_cannot_paint() -> None:
+    png = paint_documents((_DELAYED_EMAIL,))[0]
+    _width, _height, rgb = decode_png_rgb(png)
     assert rgb[0:3] == b"\x00\xff\x00"
 
 
@@ -220,35 +288,82 @@ def test_a_late_marker_is_waited_for(tmp_path: Path, chromium_installed: None) -
         "0123456789abcdef0123456789abcdef",
     ],
 )
-def test_rendered_secrets_are_refused(tmp_path: Path, chromium_installed: None, body: str) -> None:
-    del chromium_installed
-    page = _write(
-        tmp_path,
-        "secret.html",
-        "<!DOCTYPE html><html data-mm-ready='loaded'><body><p>" + body + "</p></body></html>",
+def test_rendered_secrets_are_refused(body: str) -> None:
+    html_doc = "<!DOCTYPE html><html data-mm-ready='loaded'><body><p>" + body + "</p></body></html>"
+    with pytest.raises(ScreenshotRefusal, match="sensitive_data"):
+        paint_documents((html_doc,))
+
+
+def test_rendered_fullwidth_at_is_refused() -> None:
+    html_doc = (
+        "<!DOCTYPE html><html data-mm-ready='loaded'><body>"
+        "<p>user\uff20example.com</p></body></html>"
     )
-    with pytest.raises(ValueError, match="sensitive_data"):
-        _capture((page,))
+    with pytest.raises(ScreenshotRefusal, match="sensitive_data"):
+        paint_documents((html_doc,))
 
 
-def test_a_secret_that_is_not_painted_is_allowed(tmp_path: Path, chromium_installed: None) -> None:
-    del chromium_installed
-    page = _write(tmp_path, "hidden.html", _HIDDEN_EMAIL)
-    shot = _capture((page,))[0]
-    assert hashlib.sha256(shot.png).hexdigest() == shot.lineage.screenshot_sha256
+def test_a_secret_that_is_not_painted_is_allowed() -> None:
+    png = paint_documents((_HIDDEN_EMAIL,))[0]
+    assert png.startswith(b"\x89PNG")
 
 
-def test_a_secret_assembled_into_the_dom_is_refused(
-    tmp_path: Path, chromium_installed: None
-) -> None:
-    del chromium_installed
-    page = _write(tmp_path, "assembled.html", _DELAYED_EMAIL)
-    with pytest.raises(ValueError, match="sensitive_data"):
-        _capture((page,))
+def test_a_structural_page_is_refused() -> None:
+    with pytest.raises(ScreenshotRefusal, match="structure"):
+        paint_documents((_STRUCTURE,))
 
 
-def test_lineage_hash_and_build_version_are_independent(chromium_installed: None) -> None:
-    del chromium_installed
+def test_a_declarative_shadow_root_is_refused() -> None:
+    with pytest.raises(ScreenshotRefusal, match="structure"):
+        paint_documents((_SHADOW,))
+
+
+def test_the_fixture_context_makes_no_network_requests() -> None:
+    hits: list[str] = []
+    page_html = _NETWORK_PAGE.encode()
+
+    class _Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            hits.append(self.path)
+            body = page_html if self.path == "/" else b""
+            self.send_response(200)
+            self.send_header("content-type", "text/html")
+            self.send_header("content-length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_POST(self) -> None:
+            hits.append(self.path)
+            self.send_response(204)
+            self.end_headers()
+
+        def log_message(self, format: str, *args: object) -> None:
+            del format, args
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        port = server.server_address[1]
+        doc = f"http://127.0.0.1:{port}/"
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True, args=list(LAUNCH_ARGS))
+            try:
+                context = open_screenshot_context(browser, javascript=True, allowed_http=(doc,))
+                try:
+                    page = context.new_page()
+                    page.goto(doc, wait_until="domcontentloaded", timeout=4000)
+                    page.wait_for_timeout(500)
+                finally:
+                    context.close()
+            finally:
+                browser.close()
+    finally:
+        server.shutdown()
+    assert hits == ["/"]
+
+
+def test_lineage_hash_and_build_version_are_independent() -> None:
     shot = _capture()[0]
     parsed = _fields(_lineage_chunk(shot.lineage_png))
     digest = hashlib.sha256(shot.png).hexdigest()
@@ -263,41 +378,212 @@ def test_lineage_hash_and_build_version_are_independent(chromium_installed: None
 
 
 def test_live_fetch_defaults_to_refusal() -> None:
-    import inspect
-
     fetcher = inspect.signature(capture_variant_screenshots).parameters["fetcher"].default
     assert fetcher is default_live_fetcher
-    with pytest.raises(ValueError, match="live_acquisition"):
+    with pytest.raises(ScreenshotRefusal, match="live_acquisition"):
         default_live_fetcher(_LIVE)
     page = VariantPage(name="Sage Green", live_url=_LIVE)
-    with pytest.raises(ValueError, match="live_acquisition"):
+    with pytest.raises(ScreenshotRefusal, match="live_acquisition"):
         _capture((page,))
 
 
-def test_an_injected_fetcher_is_what_a_live_url_calls(
-    chromium_installed: None,
-) -> None:
-    del chromium_installed
-    html = _FILES["Sage Green"].read_text(encoding="utf-8")
+def test_fetcher_html_is_not_painted() -> None:
     seen: list[str] = []
 
     def _fetch(url: str) -> str:
         seen.append(url)
-        return html
+        return _HOSTILE
 
     page = VariantPage(name="Sage Green", live_url=_LIVE)
     shot = _capture((page,), fetcher=_fetch)[0]
+    plain = _capture((VariantPage(name="Sage Green"),))[0]
     assert seen == [_LIVE]
     assert shot.lineage.source == "injected"
-    assert shot.lineage.screenshot_sha256 == hashlib.sha256(shot.png).hexdigest()
+    assert shot.png == plain.png
 
 
-def test_captures_satisfy_the_image_and_video_screenshot_inputs(
-    tmp_path: Path, chromium_installed: None
-) -> None:
-    del chromium_installed
+def test_an_html_path_is_not_painted(tmp_path: Path) -> None:
+    path = tmp_path / "hostile.html"
+    path.write_text(_HOSTILE, encoding="utf-8")
+    shot = _capture((VariantPage(name="Sage Green", html_path=path),))[0]
+    plain = _capture((VariantPage(name="Sage Green"),))[0]
+    assert shot.png == plain.png
+
+
+def test_no_pages_are_refused() -> None:
+    with pytest.raises(ScreenshotRefusal, match="missing_page"):
+        _capture(())
+
+
+def test_a_missing_page_is_screenshot_refusal(tmp_path: Path) -> None:
+    page = VariantPage(name="Sage Green", html_path=tmp_path / "missing.html")
+    with pytest.raises(ScreenshotRefusal, match="missing_page"):
+        _capture((page,))
+
+
+def test_a_newline_in_the_variant_name_is_refused() -> None:
+    page = VariantPage(name="Navy\nbuild_version=99")
+    with pytest.raises(ScreenshotRefusal, match="output_name"):
+        _capture((page,))
+
+
+def _refuse_name(name: str, code: str) -> None:
+    with pytest.raises(ScreenshotRefusal, match=code):
+        _capture((VariantPage(name=name),))
+
+
+def test_notion_so_case_is_refused() -> None:
+    _refuse_name("NOTION.SO", "sensitive_data")
+
+
+def test_fullwidth_at_is_refused() -> None:
+    _refuse_name("user\uff20example.com", "sensitive_data")
+
+
+def test_a_zero_width_space_in_an_email_is_refused() -> None:
+    _refuse_name("ceo\u200b@acme-corp.com", "sensitive_data")
+
+
+def test_a_soft_hyphen_in_an_email_is_refused() -> None:
+    _refuse_name("ceo\u00ad@acme-corp.com", "sensitive_data")
+
+
+def test_a_fullwidth_dot_host_is_refused() -> None:
+    _refuse_name("notion\uff0eso", "sensitive_data")
+
+
+def test_a_cyrillic_o_host_is_refused() -> None:
+    _refuse_name("n\u043etion.so", "sensitive_data")
+
+
+def test_a_bidi_reversed_host_is_refused() -> None:
+    _refuse_name("\u202eos.noiton", "sensitive_data")
+
+
+def test_an_ascii_email_is_refused() -> None:
+    _refuse_name("ceo@acme-corp.com", "sensitive_data")
+
+
+def test_secret_token_at_notion_is_refused() -> None:
+    value = "secret_token@notion.so"
+    assert token_rule_matches(value) is False
+    assert email_rule_matches(value) is True
+    assert notion_host_rule_matches(value) is True
+    _refuse_name(value, "sensitive_data")
+
+
+def test_a_bare_ntn_is_refused() -> None:
+    _refuse_name("ntnabcdefghij", "sensitive_data")
+
+
+def test_a_bearer_token_with_a_space_is_refused() -> None:
+    _refuse_name("Bearer abcdefghij", "sensitive_data")
+
+
+def test_a_fullwidth_less_than_is_refused() -> None:
+    _refuse_name("\uff1ctemplate", "fixture_markup")
+
+
+def test_markup_in_a_fixture_value_is_refused_and_escaped() -> None:
+    values = (
+        '<template shadowrootmode="open">x</template>',
+        '<iframe srcdoc="<p>x</p>"></iframe>',
+    )
+    template = _template()
+    for value in values:
+        with pytest.raises(ScreenshotRefusal, match="fixture_markup"):
+            _capture((VariantPage(name=value),))
+        assert escape_fixture(value) == html.escape(value, quote=True)
+        filled = fill_template(template, value)
+        assert "<template" not in filled
+        assert "<iframe" not in filled
+
+
+def test_an_attribute_quote_breakout_is_refused_and_escaped() -> None:
+    value = 'x" data-breakout="yes'
+    with pytest.raises(ScreenshotRefusal, match="fixture_markup"):
+        _capture((VariantPage(name=value),))
+    escaped = escape_fixture(value)
+    assert escaped == html.escape(value, quote=True)
+    assert '"' not in escaped
+    filled = fill_template(_template(), value)
+    assert filled.count(escaped) == 2
+
+
+def test_an_empty_output_name_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(ScreenshotRefusal, match="output_name"):
+        write_screenshot_inputs((_shot(""),), tmp_path)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_name_that_slugs_to_empty_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(ScreenshotRefusal, match="output_name"):
+        write_screenshot_inputs((_shot("---"),), tmp_path)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_duplicate_names_are_refused(tmp_path: Path) -> None:
+    shots = (_shot("Sage Green", b"a"), _shot("Sage Green", b"b"))
+    with pytest.raises(ScreenshotRefusal, match="output_collision"):
+        write_screenshot_inputs(shots, tmp_path)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_colliding_slugs_are_refused_before_write(tmp_path: Path) -> None:
+    shots = (_shot("Navy Blue", b"a"), _shot("navy-blue", b"b"))
+    with pytest.raises(ScreenshotRefusal, match="output_collision"):
+        write_screenshot_inputs(shots, tmp_path)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_newline_name_is_refused_before_write(tmp_path: Path) -> None:
+    with pytest.raises(ScreenshotRefusal, match="output_name"):
+        write_screenshot_inputs((_shot("Navy\nbuild_version=99"),), tmp_path)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_symlink_directory_is_refused(tmp_path: Path) -> None:
+    victim = tmp_path / "victim"
+    victim.mkdir()
+    (victim / "keep.txt").write_text("safe", encoding="utf-8")
+    link = tmp_path / "out"
+    link.symlink_to(victim, target_is_directory=True)
+    with pytest.raises(ScreenshotRefusal, match="output_path"):
+        write_screenshot_inputs((_shot("Sage Green"),), link)
+    assert (victim / "keep.txt").read_text(encoding="utf-8") == "safe"
+    assert not (victim / "sage-green.png").exists()
+
+
+def test_a_symlink_output_is_not_followed(tmp_path: Path) -> None:
+    victim = tmp_path / "victim.png"
+    victim.write_bytes(b"victim")
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "sage-green.png").symlink_to(victim)
+    with pytest.raises(ScreenshotRefusal, match="output_path"):
+        write_screenshot_inputs((_shot("Sage Green"),), out)
+    assert victim.read_bytes() == b"victim"
+
+
+def test_a_stale_file_is_left_in_place(tmp_path: Path) -> None:
+    stale = tmp_path / "stale.png"
+    stale.write_bytes(b"stale")
+    with pytest.raises(ScreenshotRefusal, match="output_path"):
+        write_screenshot_inputs((_shot("Sage Green"),), tmp_path)
+    assert stale.read_bytes() == b"stale"
+
+
+def test_the_allowlist_is_only_this_run(tmp_path: Path) -> None:
+    shot = _shot("Sage Green", b"one")
+    _paths, digests = write_screenshot_inputs((shot,), tmp_path)
+    assert digests == frozenset({shot.lineage.screenshot_sha256})
+    assert (tmp_path / "sage-green.png").read_bytes() == b"one"
+
+
+def test_captures_satisfy_the_image_and_video_screenshot_inputs(tmp_path: Path) -> None:
     shots = _capture()
     _written, digests = write_screenshot_inputs(shots, tmp_path)
+    assert digests == {shot.lineage.screenshot_sha256 for shot in shots}
     paths = fixture_screenshot_paths()
     paths["colour_options"] = tmp_path / "sage-green.png"
     allowed = fixture_screenshot_hashes() | digests

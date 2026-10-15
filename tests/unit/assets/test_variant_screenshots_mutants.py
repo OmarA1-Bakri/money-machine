@@ -13,9 +13,12 @@ import pytest
 from playwright.sync_api import sync_playwright
 
 _SHOTS = Path(__file__).resolve().parents[3] / "src" / "money_machine" / "assets" / "screenshots.py"
-_ROOT = Path(__file__).resolve().parents[2] / "fixtures" / "variant_pages"
 _LIVE = "https://www.notion.so/private-variant-page"
 _PRODUCT = UUID("00000000-0000-4000-8000-0000000000b1")
+_HOSTILE = (
+    "<!DOCTYPE html><html data-mm-ready='loaded'>"
+    "<body style='margin:0;background:#ff00ff'><p>Sample fixture Sage Green</p></body></html>"
+)
 
 
 class _DropRefusal(ast.NodeTransformer):
@@ -59,17 +62,14 @@ def _load(tree: ast.Module, name: str) -> types.ModuleType:
 
 def _live_html_mutant() -> types.ModuleType:
     source = _SHOTS.read_text(encoding="utf-8")
-    html = (_ROOT / "sage-green.html").read_text(encoding="utf-8")
-    literal = repr(html)
     mutated = source.replace(
         'raise ScreenshotRefusal("live_acquisition")',
-        f"return {literal}",
+        f"return {_HOSTILE!r}",
         1,
     )
     if mutated == source:
         raise AssertionError("live raise was not replaced")
-    parsed = ast.parse(mutated)
-    return _load(parsed, "screenshot_mutant_live_fetch")
+    return _load(ast.parse(mutated), "screenshot_mutant_live_fetch")
 
 
 def _launch_chromium() -> None:
@@ -87,48 +87,27 @@ def _browser() -> None:  # pyright: ignore[reportUnusedFunction]
         _launch_chromium()
 
 
-def test_sensitive_mutant_accepts(tmp_path: Path) -> None:
-    module = _mutant("refuse_sensitive_text")
-    path = tmp_path / "email.html"
-    path.write_text(
-        "<!DOCTYPE html><html data-mm-ready='loaded'><body><p>person@example.com</p></body></html>",
-        encoding="utf-8",
+def test_sensitive_mutant_accepts() -> None:
+    module = _mutant("refuse_rendered_text")
+    html_doc = (
+        "<!DOCTYPE html><html data-mm-ready='loaded'><body><p>person@example.com</p></body></html>"
     )
-    page = module.VariantPage(name="Sample", html_path=path)
-    accepted = module.capture_variant_screenshots(
-        (page,),
-        build_version=5,
-        product_id=_PRODUCT,
-        spec_version=1,
-    )
-    assert accepted[0].png.startswith(b"\x89PNG")
+    accepted = module.paint_documents((html_doc,))
+    assert accepted[0].startswith(b"\x89PNG")
 
 
-def test_unready_mutant_accepts(tmp_path: Path) -> None:
+def test_unready_mutant_accepts() -> None:
     module = _mutant("refuse_unready")
-    path = tmp_path / "blank.html"
-    path.write_text(
-        "<!DOCTYPE html><html><body><p>Sample fixture</p></body></html>",
-        encoding="utf-8",
-    )
-    page = module.VariantPage(name="Sample", html_path=path)
-    accepted = module.capture_variant_screenshots(
-        (page,),
-        build_version=5,
-        product_id=_PRODUCT,
-        spec_version=1,
-    )
-    assert accepted[0].png.startswith(b"\x89PNG")
+    html_doc = "<!DOCTYPE html><html><body><p>Sample fixture</p></body></html>"
+    accepted = module.paint_documents((html_doc,))
+    assert accepted[0].startswith(b"\x89PNG")
 
 
-def test_live_refusal_mutant_accepts() -> None:
+def test_live_refusal_mutant_does_not_paint() -> None:
     module = _live_html_mutant()
     page = module.VariantPage(name="Sage Green", live_url=_LIVE)
-    accepted = module.capture_variant_screenshots(
-        (page,),
-        build_version=5,
-        product_id=_PRODUCT,
-        spec_version=1,
-    )
-    assert accepted[0].png.startswith(b"\x89PNG")
+    kwargs = {"build_version": 5, "product_id": _PRODUCT, "spec_version": 1}
+    accepted = module.capture_variant_screenshots((page,), **kwargs)
+    plain = module.capture_variant_screenshots((module.VariantPage(name="Sage Green"),), **kwargs)
+    assert accepted[0].png == plain[0].png
     assert accepted[0].lineage.source == "injected"

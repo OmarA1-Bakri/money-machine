@@ -1,8 +1,8 @@
 """Fixture screenshots of each Notion variant. A11 stays DESIGNED.
 
-Local HTML stands in for the variant pages. Chromium is the headless browser
-the PDF path already launches. A live URL is handed to the fetcher, and the
-default fetcher refuses before any navigation. The PNG is 8-bit RGB so the
+The only HTML painted by capture is the pinned variant template with escaped
+fixture labels. A live fetcher may be called, and its return value is never
+painted. Chromium runs with JavaScript disabled. The PNG is 8-bit RGB so the
 listing-image and video screenshot inputs can read it. The committed listing
 screenshots stay the golden inputs for those waves.
 """
@@ -10,19 +10,36 @@ screenshots stay the golden inputs for those waves.
 from __future__ import annotations
 
 import hashlib
-import re
+import os
+import shutil
 import struct
+import tempfile
+import unicodedata
 import zlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
+from urllib.parse import unquote, urlparse
 from uuid import UUID
 
-from playwright.sync_api import Page, Route, sync_playwright
+from playwright._impl._network import WebSocketRoute as WebSocketRouteImpl
+from playwright.sync_api import (
+    Browser,
+    BrowserContext,
+    Page,
+    Route,
+    WebSocketRoute,
+    sync_playwright,
+)
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
-from money_machine.assets.listing_images import network_allowed
+from money_machine.assets.screenshot_text import (
+    ScreenshotRefusal,
+    fill_template,
+    refuse_fixture_value,
+    refuse_rendered_text,
+)
 
 VIEWPORT_WIDTH = 480
 VIEWPORT_HEIGHT = 360
@@ -33,7 +50,10 @@ CROP_HEIGHT = 270
 READY_SELECTOR = "html[data-mm-ready='loaded']"
 READY_TIMEOUT_MS = 1000
 SCREENSHOT_TEMPLATE_VERSION = "s08-w5-screenshot-1"
-_LAUNCH_ARGS = (
+_TEMPLATE_PATH = (
+    Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "variant_pages" / "variant.html"
+)
+LAUNCH_ARGS = (
     "--no-sandbox",
     "--disable-setuid-sandbox",
     "--disable-dev-shm-usage",
@@ -51,25 +71,21 @@ _LAUNCH_ARGS = (
     "--force-device-scale-factor=1",
     "--disable-skia-runtime-opts",
 )
-_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
-_NOTION_HOST = re.compile(r"notion\.(?:so|site)", re.IGNORECASE)
-_TOKEN = re.compile(
-    r"(?:secret|token|api[_-]?key|bearer|ntn|sk)[_-][A-Za-z0-9]{6,}",
-    re.IGNORECASE,
-)
-_UUID = re.compile(
-    r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
-)
-_HEX_ID = re.compile(r"\b[0-9a-fA-F]{32}\b")
-
-
-class ScreenshotRefusal(ValueError):
-    """The variant screenshot was refused before a PNG was returned."""
+_STRUCTURE_JS = """() => {
+  if (document.querySelector("input, textarea, canvas, iframe")) return "structure";
+  for (const node of document.querySelectorAll("*")) {
+    if (node.shadowRoot) return "structure";
+    const before = getComputedStyle(node, "::before").content;
+    const after = getComputedStyle(node, "::after").content;
+    if (before !== "none" || after !== "none") return "structure";
+  }
+  return "";
+}"""
 
 
 @dataclass(frozen=True, slots=True)
 class VariantPage:
-    """One variant. A local file is the fixture. A live URL is parked."""
+    """One variant label. ``html_path`` and ``live_url`` are never painted."""
 
     name: str
     html_path: Path | None = None
@@ -119,23 +135,27 @@ def capture_variant_screenshots(
     spec_version: int,
     fetcher: Callable[[str], str] = default_live_fetcher,
 ) -> tuple[CapturedScreenshot, ...]:
-    """Screenshot each variant page. The default fetcher never navigates."""
+    """Screenshot each variant from the pinned template."""
     if not pages:
         raise ScreenshotRefusal("missing_page")
-    prepared: list[tuple[VariantPage, str]] = []
+    template = _read_template()
+    documents: list[str] = []
     for page in pages:
+        if refuse_output_name(page.name) is not None:
+            raise ScreenshotRefusal("output_name")
+        fixture = refuse_fixture_value(page.name)
+        if fixture is not None:
+            raise ScreenshotRefusal(fixture)
         if refuse_missing_page(page) is not None:
             raise ScreenshotRefusal("missing_page")
+        if page.html_path is not None:
+            Path(page.html_path).read_bytes()
         if page.live_url is not None:
-            prepared.append((page, fetcher(page.live_url)))
-            continue
-        path = page.html_path
-        if path is None:
-            raise ScreenshotRefusal("missing_page")
-        prepared.append((page, Path(path).read_text(encoding="utf-8")))
-    raws = _paint(tuple(html for _page, html in prepared))
+            fetcher(page.live_url)
+        documents.append(fill_template(template, page.name))
+    raws = paint_documents(tuple(documents))
     captured: list[CapturedScreenshot] = []
-    for (page, _html), raw in zip(prepared, raws, strict=True):
+    for page, raw in zip(pages, raws, strict=True):
         digest = hashlib.sha256(raw).hexdigest()
         source: Literal["fixture", "injected"] = "injected" if page.live_url else "fixture"
         text = _lineage_text(
@@ -169,27 +189,12 @@ def capture_variant_screenshots(
 
 
 def refuse_missing_page(page: VariantPage) -> str | None:
-    """Return ``missing_page`` when the variant has neither a file nor a live URL."""
+    """Return ``missing_page`` when a claimed HTML file is not on disk."""
     if page.live_url is not None:
         return None
     path = page.html_path
-    if path is None or not Path(path).is_file():
+    if path is not None and not Path(path).is_file():
         return "missing_page"
-    return None
-
-
-def refuse_sensitive_text(text: str) -> str | None:
-    """Return ``sensitive_data`` when rendered text is not fixture or sample data."""
-    if _EMAIL.search(text) is not None:
-        return "sensitive_data"
-    if _NOTION_HOST.search(text) is not None:
-        return "sensitive_data"
-    if _TOKEN.search(text) is not None:
-        return "sensitive_data"
-    if _UUID.search(text) is not None:
-        return "sensitive_data"
-    if _HEX_ID.search(text) is not None:
-        return "sensitive_data"
     return None
 
 
@@ -200,59 +205,167 @@ def refuse_unready(ready: bool) -> str | None:
     return "not_ready"
 
 
+def refuse_output_name(name: str) -> str | None:
+    """Return ``output_name`` for an empty name or a name with a control character."""
+    if name == "":
+        return "output_name"
+    if any(unicodedata.category(char) == "Cc" for char in name):
+        return "output_name"
+    if _slug(name) == "":
+        return "output_name"
+    return None
+
+
 def write_screenshot_inputs(
     captures: tuple[CapturedScreenshot, ...],
     directory: Path,
 ) -> tuple[dict[str, Path], frozenset[str]]:
-    """Write the raw PNGs. The hashes are the allow-list W2 and W4 already take."""
-    paths: dict[str, Path] = {}
-    digests: set[str] = set()
+    """Write this run's PNGs. The returned hashes are only this run."""
+    if directory.is_symlink() or not directory.is_dir():
+        raise ScreenshotRefusal("output_path")
+    if any(directory.iterdir()):
+        raise ScreenshotRefusal("output_path")
+    ordered: list[tuple[str, CapturedScreenshot]] = []
+    seen: set[str] = set()
     for shot in captures:
+        if refuse_output_name(shot.lineage.variant) is not None:
+            raise ScreenshotRefusal("output_name")
         slug = _slug(shot.lineage.variant)
-        path = directory / f"{slug}.png"
-        path.write_bytes(shot.png)
-        paths[slug] = path
-        digests.add(shot.lineage.screenshot_sha256)
-    return paths, frozenset(digests)
+        if slug in seen:
+            raise ScreenshotRefusal("output_collision")
+        seen.add(slug)
+        ordered.append((slug, shot))
+    staging = Path(tempfile.mkdtemp(prefix="mm-shot-", dir=directory.parent))
+    try:
+        for slug, shot in ordered:
+            _write_exclusive(staging / f"{slug}.png", shot.png)
+        os.rename(staging, directory)
+    except OSError:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    paths = {slug: directory / f"{slug}.png" for slug, _shot in ordered}
+    digests = frozenset(shot.lineage.screenshot_sha256 for _slug, shot in ordered)
+    return paths, digests
 
 
-def _paint(documents: tuple[str, ...]) -> tuple[bytes, ...]:
+def variant_template_path() -> Path:
+    """Return the only HTML file capture substitutes into."""
+    return _TEMPLATE_PATH
+
+
+def _read_template() -> str:
+    path = variant_template_path()
+    if not path.is_file():
+        raise ScreenshotRefusal("missing_page")
+    return path.read_text(encoding="utf-8")
+
+
+def paint_documents(documents: tuple[str, ...]) -> tuple[bytes, ...]:
+    """Paint already-built HTML. Capture itself only fills the pinned template."""
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True, args=list(_LAUNCH_ARGS))
+        browser = playwright.chromium.launch(headless=True, args=list(LAUNCH_ARGS))
         try:
-            context = browser.new_context(
-                viewport={"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT},
-                screen={"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT},
-                device_scale_factor=1,
-                reduced_motion="reduce",
-                color_scheme="light",
-                java_script_enabled=True,
-                bypass_csp=True,
-                locale="en-US",
-                timezone_id="UTC",
-                has_touch=False,
-                is_mobile=False,
-            )
+            context = open_screenshot_context(browser, javascript=False)
             try:
-                context.route("**/*", _guard)
-                painted: list[bytes] = []
-                for document in documents:
-                    page = context.new_page()
-                    try:
-                        page.set_content(document, wait_until="load")
-                        if refuse_unready(_marker_ready(page)) is not None:
-                            raise ScreenshotRefusal("not_ready")
-                        rendered = page.inner_text("body")
-                        if refuse_sensitive_text(rendered) is not None:
-                            raise ScreenshotRefusal("sensitive_data")
-                        painted.append(_canonical_rgb(_clip(page)))
-                    finally:
-                        page.close()
-                return tuple(painted)
+                return tuple(_paint_page(context, document) for document in documents)
             finally:
                 context.close()
         finally:
             browser.close()
+
+
+def open_screenshot_context(
+    browser: Browser,
+    *,
+    javascript: bool,
+    allowed_http: tuple[str, ...] = (),
+) -> BrowserContext:
+    context = browser.new_context(
+        viewport={"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT},
+        screen={"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT},
+        device_scale_factor=1,
+        reduced_motion="reduce",
+        color_scheme="light",
+        java_script_enabled=javascript,
+        service_workers="block",
+        bypass_csp=True,
+        locale="en-US",
+        timezone_id="UTC",
+        has_touch=False,
+        is_mobile=False,
+    )
+    _install_routes(context, frozenset(allowed_http))
+    return context
+
+
+def _install_routes(context: BrowserContext, allowed_http: frozenset[str]) -> None:
+    def _guard(route: Route) -> None:
+        url = route.request.url
+        if url.startswith(("about:", "data:")) or _file_allowed(url):
+            route.continue_()
+            return
+        if _http_allowed(url, route.request.resource_type, allowed_http):
+            route.continue_()
+            return
+        route.abort()
+
+    context.route("**/*", _guard)
+    context.route_web_socket("**", _close_web_socket)
+
+
+def _close_web_socket(socket: WebSocketRoute) -> None:
+    """Close the page socket without waiting. ``WebSocketRoute.close`` deadlocks."""
+    impl = cast(WebSocketRouteImpl, socket._impl_obj)  # pyright: ignore[reportPrivateUsage]
+    impl._channel.send_may_fail(  # pyright: ignore[reportPrivateUsage]
+        "closePage",
+        None,
+        {"code": 1000, "reason": "", "wasClean": True},
+    )
+
+
+def _file_allowed(url: str) -> bool:
+    if not url.startswith("file:"):
+        return False
+    parsed = urlparse(url)
+    try:
+        return Path(unquote(parsed.path)).resolve() == variant_template_path().resolve()
+    except OSError:
+        return False
+
+
+def _http_allowed(url: str, resource_type: str, allowed_http: frozenset[str]) -> bool:
+    if resource_type == "serviceworker" or url in allowed_http:
+        return True
+    # This Chromium reports the worker script as "script". Continue it only for
+    # an allowed document, so service_workers="block" is what stops registration.
+    for document in allowed_http:
+        prefix = document[:-1] if document.endswith("/") else document
+        if url == f"{prefix}/sw.js":
+            return True
+    return False
+
+
+def _paint_page(context: BrowserContext, document: str) -> bytes:
+    page = context.new_page()
+    try:
+        page.set_content(document, wait_until="load")
+        if refuse_unready(_marker_ready(page)) is not None:
+            raise ScreenshotRefusal("not_ready")
+        if refuse_page_structure(page) is not None:
+            raise ScreenshotRefusal("structure")
+        if refuse_rendered_text(page.inner_text("body")) is not None:
+            raise ScreenshotRefusal("sensitive_data")
+        return _canonical_rgb(_clip(page))
+    finally:
+        page.close()
+
+
+def refuse_page_structure(page: Page) -> str | None:
+    """Return ``structure`` for form controls, frames, shadow roots, or generated content."""
+    found = page.evaluate(_STRUCTURE_JS)
+    if found:
+        return "structure"
+    return None
 
 
 def _marker_ready(page: Page) -> bool:
@@ -260,8 +373,7 @@ def _marker_ready(page: Page) -> bool:
         page.wait_for_selector(READY_SELECTOR, state="attached", timeout=READY_TIMEOUT_MS)
     except PlaywrightTimeout:
         return False
-    value = page.evaluate("() => document.documentElement.getAttribute('data-mm-ready')")
-    return value == "loaded"
+    return True
 
 
 def _clip(page: Page) -> bytes:
@@ -276,11 +388,13 @@ def _clip(page: Page) -> bytes:
     )
 
 
-def _guard(route: Route) -> None:
-    if network_allowed(route.request.url):
-        route.continue_()
-        return
-    route.abort()
+def _write_exclusive(path: Path, payload: bytes) -> None:
+    flags = os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_WRONLY
+    descriptor = os.open(path, flags, 0o644)
+    try:
+        os.write(descriptor, payload)
+    finally:
+        os.close(descriptor)
 
 
 def _lineage_text(
