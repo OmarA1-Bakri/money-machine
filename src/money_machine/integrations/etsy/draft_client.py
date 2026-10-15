@@ -474,9 +474,13 @@ def _refuse_post(
 
 
 def _row_text(description: object) -> str:
-    """The description compared across the two walks. A non-string is empty."""
+    """The description compared across the two walks. A non-string is empty.
+
+    A CRLF and a LF of the same text are one description. The marker check
+    already folds ``\\r\\n`` before it reads lines.
+    """
     if isinstance(description, str):
-        return description
+        return description.replace("\r\n", "\n")
     return ""
 
 
