@@ -133,11 +133,20 @@ def test_a_lowercase_spaced_tld_outside_the_set_stays(text: str) -> None:
     assert refuse_paid_checkout(text) is None
 
 
-@pytest.mark.parametrize(
-    "text",
-    ("mail me at acme . com", "mail me at acme . c0m", "acme . net", "acme . org"),
-)
+@pytest.mark.parametrize("text", ("acme . net", "acme . org"))
 def test_a_lowercase_spaced_dot_at_the_end_is_refused(text: str) -> None:
+    assert refuse_paid_checkout(text) == "paid_checkout"
+
+
+@pytest.mark.parametrize(
+    ("text", "tld"),
+    (
+        ("mail me at acme . com", "com"),
+        ("mail me at acme . c0m", "c0m"),
+    ),
+)
+def test_an_end_of_text_spaced_form_is_refused(text: str, tld: str) -> None:
+    assert text.endswith(" " + tld)
     assert refuse_paid_checkout(text) == "paid_checkout"
 
 

@@ -1,3 +1,17 @@
+## 2026-10-15 — Session 08 end-of-text spaced refuse (#80)
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-punycode-host-r6-prompt-integrity.md`.
+
+`mail me at acme . com` and `mail me at acme . c0m` are the whole text. The TLD is the last token. Each returns `paid_checkout`. Dropping `c0m` fails only the `c0m` row. Dropping `com` fails the `com` row and leaves the `c0m` row green. Skipping the undo when the token ends the text fails both rows. `Plan 2 . Net profit` stays green for that mutant.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_defanged_host.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. 68 passed. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Skip the undo when the token ends the text | both `test_an_end_of_text_spaced_form_is_refused` rows | 9/59 |
+| Drop `com` | `test_an_end_of_text_spaced_form_is_refused[mail me at acme . com-com]` | 6/62 |
+| Drop `c0m` | `test_an_end_of_text_spaced_form_is_refused[mail me at acme . c0m-c0m]` | 1/67 |
+
 ## 2026-10-15 — Session 08 spaced-dot set (#80)
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-punycode-host-r5-prompt-integrity.md`. This supersedes the r4 lowercase gate for the spaced form. #81 and #82 are not updated.
