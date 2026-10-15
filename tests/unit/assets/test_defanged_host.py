@@ -2,14 +2,7 @@
 
 from __future__ import annotations
 
-from money_machine.assets.defang_tlds import (
-    CURATED_TLDS,
-    IANA_TLDS,
-    brace_defanged,
-    iana_tld,
-    paren_defanged,
-    square_bracket_defanged,
-)
+from money_machine.assets.defang_tlds import CURATED_TLDS, IANA_TLDS
 from money_machine.assets.gift_links import refuse_paid_checkout
 
 
@@ -21,6 +14,7 @@ def test_a_spaced_dot_host_is_refused() -> None:
 def test_a_bracket_dot_host_is_refused() -> None:
     assert refuse_paid_checkout("x[.]com") == "paid_checkout"
     assert refuse_paid_checkout("X[.]COM") == "paid_checkout"
+    assert refuse_paid_checkout("x[.]c0m") == "paid_checkout"
 
 
 def test_a_spelled_dot_host_is_refused() -> None:
@@ -43,6 +37,9 @@ def test_quantities_and_plain_names_stay() -> None:
         "v1.2.3.4",
         "polka dot journal",
         "x dot company",
+        "Day 1 . Shop list",
+        "Plan 2 . Net profit",
+        "Mr . Co Jones",
     ):
         assert refuse_paid_checkout(text) is None
 
@@ -70,14 +67,11 @@ def test_a_newline_does_not_form_a_spaced_host() -> None:
 def test_the_curated_tld_list_is_exact() -> None:
     assert frozenset({"com", "c0m", "net", "io", "shop", "org", "co"}) == CURATED_TLDS
     assert len(IANA_TLDS) == 1437
-    assert iana_tld("md")
-    assert not iana_tld("c0m")
+    assert "md" in IANA_TLDS
+    assert "c0m" not in IANA_TLDS
 
 
-def test_evil_bracket_md_is_caught_by_all_three_detectors() -> None:
-    assert square_bracket_defanged("evil[.]md")
-    assert paren_defanged("evil(.)md")
-    assert brace_defanged("evil{.}md")
+def test_evil_bracket_md_is_refused() -> None:
     assert refuse_paid_checkout("evil[.]md") == "paid_checkout"
     assert refuse_paid_checkout("evil(.)md") == "paid_checkout"
     assert refuse_paid_checkout("evil{.}md") == "paid_checkout"

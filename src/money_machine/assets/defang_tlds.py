@@ -1,53 +1,15 @@
-"""TLD lists for defanged hosts.
+"""TLD lists for the shared defang normalizer.
 
-A bare ``dot`` and a spaced ``.`` use :data:`CURATED_TLDS` plus lookalikes.
-Square, parenthesis, and brace defangs use the embedded IANA snapshot.
+A bare ``dot``, a bare ``at``, and a spaced ``.`` use :data:`CURATED_TLDS`
+plus a zero lookalike. Square, parenthesis, and brace defangs use the
+embedded IANA snapshot plus that curated set, so ``c0m`` is included.
 The snapshot is ``tlds-alpha-by-domain.txt`` version 2026101500, fetched
 2026-10-15 and lowercased. Nothing here contacts the network.
 """
 
 from __future__ import annotations
 
-import re
-from collections.abc import Callable
-
 CURATED_TLDS = frozenset({"com", "c0m", "net", "io", "shop", "org", "co"})
-_ZERO_TO_O = str.maketrans({"0": "o"})
-_MAX_CURATED = max(len(item) for item in CURATED_TLDS)
-_H = r"[ \t]"
-_LABEL = r"(?:[A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9-]*[A-Za-z0-9])"
-_CURATED_TOKEN = r"([A-Za-z0-9]+(?:[ \t]+[A-Za-z0-9]+)*)"
-_IANA_TOKEN = r"([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)"
-_INNER = _H + r"*(?:\.|dot)" + _H + r"*"
-_BARE = re.compile(
-    rf"(?<![A-Za-z0-9]){_LABEL}{_H}+dot{_H}+{_CURATED_TOKEN}(?![A-Za-z0-9])",
-    re.IGNORECASE,
-)
-_SPACED = re.compile(
-    rf"(?<![A-Za-z0-9]){_LABEL}(?:{_H}+\.{_H}*|{_H}*\.{_H}+){_CURATED_TOKEN}(?![A-Za-z0-9])",
-    re.IGNORECASE,
-)
-_SQUARE = re.compile(
-    rf"(?<![A-Za-z0-9]){_LABEL}{_H}*\[{_INNER}\]{_H}*{_IANA_TOKEN}(?![A-Za-z0-9])",
-    re.IGNORECASE,
-)
-_PAREN = re.compile(
-    rf"(?<![A-Za-z0-9]){_LABEL}{_H}*\({_INNER}\){_H}*{_IANA_TOKEN}(?![A-Za-z0-9])",
-    re.IGNORECASE,
-)
-_BRACE = re.compile(
-    "(?<![A-Za-z0-9])"
-    + _LABEL
-    + _H
-    + r"*\{"
-    + _INNER
-    + r"\}"
-    + _H
-    + r"*"
-    + _IANA_TOKEN
-    + r"(?![A-Za-z0-9])",
-    re.IGNORECASE,
-)
 
 _IANA_TEXT = """\
 aaa
@@ -1489,72 +1451,3 @@ zuerich
 zw
 """
 IANA_TLDS = frozenset(_IANA_TEXT.split())
-
-
-def curated_tld(token: str) -> bool:
-    """Return whether ``token`` is a curated TLD or a space or zero lookalike."""
-    parts = token.split()
-    if not parts:
-        return False
-    if len(parts) == 1:
-        return _curated_compact(parts[0])
-    letters = _single_letters(parts)
-    if len(letters) >= 2 and _curated_compact("".join(letters)):
-        return True
-    return _curated_compact(parts[0])
-
-
-def iana_tld(token: str) -> bool:
-    """Return whether ``token`` is in the IANA snapshot. No lookalike fold."""
-    return token.casefold() in IANA_TLDS
-
-
-def bare_dot_defanged(text: str) -> bool:
-    """Return whether a bare ``dot`` names a curated TLD."""
-    return _any(_BARE, text, curated_tld)
-
-
-def spaced_dot_defanged(text: str) -> bool:
-    """Return whether a spaced ``.`` names a curated TLD."""
-    return _any(_SPACED, text, curated_tld)
-
-
-def square_bracket_defanged(text: str) -> bool:
-    """Return whether ``[.]`` or ``[dot]`` names an IANA TLD."""
-    return _any(_SQUARE, text, iana_tld)
-
-
-def paren_defanged(text: str) -> bool:
-    """Return whether ``(.)`` or ``(dot)`` names an IANA TLD."""
-    return _any(_PAREN, text, iana_tld)
-
-
-def brace_defanged(text: str) -> bool:
-    """Return whether ``{.}`` or ``{dot}`` names an IANA TLD."""
-    return _any(_BRACE, text, iana_tld)
-
-
-def _curated_compact(token: str) -> bool:
-    compact = token.casefold()
-    if compact in CURATED_TLDS:
-        return True
-    return compact.translate(_ZERO_TO_O) in CURATED_TLDS
-
-
-def _single_letters(parts: list[str]) -> list[str]:
-    letters: list[str] = []
-    for part in parts:
-        if len(part) != 1:
-            break
-        letters.append(part)
-        if len(letters) == _MAX_CURATED:
-            break
-    return letters
-
-
-def _any(pattern: re.Pattern[str], text: str, accept: Callable[[str], bool]) -> bool:
-    for match in pattern.finditer(text):
-        token = match.group(1)
-        if token is not None and accept(token):
-            return True
-    return False

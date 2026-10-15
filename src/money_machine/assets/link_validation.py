@@ -32,6 +32,7 @@ from money_machine.assets.pdf_objects import (
 from money_machine.assets.pdf_reader import PdfDocument
 from money_machine.integrations.notion.publishing import (
     _allowed_secret_host,  # pyright: ignore[reportPrivateUsage]
+    _secret_host_is_ascii,  # pyright: ignore[reportPrivateUsage]
 )
 
 _URL_MARKS = frozenset(":/?#[]@")
@@ -234,6 +235,14 @@ def refuse_graph_uri(uri: str, *, accepted: frozenset[str]) -> str | None:
 
 
 def _refuse_link(uri: str, variant: str, known_variants: frozenset[str]) -> str | None:
+    parsed = _parsed(uri)
+    # A non-ASCII host is ``host``. The raw allowlist would call it paid_checkout.
+    if (
+        parsed is not None
+        and isinstance(parsed.hostname, str)
+        and not _secret_host_is_ascii(parsed.hostname)
+    ):
+        return "host"
     if variant != "" and refuse_raw_charset(variant) is not None:
         return "paid_checkout"
     if refuse_raw_charset(_allowlist_probe(uri)) is not None:
