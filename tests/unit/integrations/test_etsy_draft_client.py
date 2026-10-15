@@ -1305,9 +1305,7 @@ def test_an_existing_description_change_refuses_to_post(tmp_path: Path) -> None:
 
 
 class _TwoWalks:
-    def __init__(
-        self, first: list[dict[str, object]], second: list[dict[str, object]]
-    ) -> None:
+    def __init__(self, first: list[dict[str, object]], second: list[dict[str, object]]) -> None:
         self._walks = (first, second)
         self.gets = 0
         self.posts = 0

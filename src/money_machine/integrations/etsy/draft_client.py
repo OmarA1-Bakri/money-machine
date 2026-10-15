@@ -264,9 +264,7 @@ class EtsyDraftClient:
             raise EtsyDraftRefused("count")
         return found
 
-    def _read_pages(
-        self, spec: DraftSpec, marker: str
-    ) -> tuple[int | None, list[int], list[str]]:
+    def _read_pages(self, spec: DraftSpec, marker: str) -> tuple[int | None, list[int], list[str]]:
         found: int | None = None
         seen = 0
         ids: list[int] = []

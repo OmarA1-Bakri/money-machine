@@ -585,7 +585,7 @@ def test_s3_same_bytes_are_idempotent() -> None:
 def test_a_uuid_with_a_suffix_is_refused(tmp_path: Path) -> None:
     store = _local(tmp_path)
     with pytest.raises(ValueError, match=r"^storage path$"):
-        store.read(f"fixture://{str(_PRODUCT)}x/2/{_digest(_PNG)}")
+        store.read(f"fixture://{_PRODUCT}x/2/{_digest(_PNG)}")
 
 
 def test_a_65_hex_digest_is_refused(tmp_path: Path) -> None:

@@ -233,7 +233,7 @@ def _place_in(parent: int, digest: str, data: bytes, uri: str, role: StorageRole
         except FileExistsError:
             current = _read_optional(parent, digest)
             if current is None:
-                raise ValueError("storage missing")
+                raise ValueError("storage missing") from None
             if current == data:
                 return _stored(uri, digest, data, role)
             refuse_collision(current, data)
