@@ -1,3 +1,34 @@
+## 2026-10-15 — Session 08 defanged host r2
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defanged-host-r2-prompt-integrity.md`.
+
+A bare `dot` and a spaced `.` use the curated list `{com, c0m, net, io, shop, org, co}` plus lookalikes (spaces removed, `0` folded to `o`). Square, parenthesis, and brace defangs use the embedded IANA snapshot (version 2026101500, 1,437 labels) with no lookalike fold. `evil[.]md`, `evil(.)md`, and `evil{.}md` are `paid_checkout`. `Notes . md` stays allowed. `_HOST` and the real-dot `c0m` pattern stay. Separators are horizontal whitespace.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defanged_host.py tests/unit/assets/test_gift_link_policy.py -k "not render and not paint and not chromium"`. 62 passed. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the spaced-dot check | `test_a_spaced_dot_host_is_refused` | 3/59 |
+| Delete the square-bracket check | `test_a_bracket_dot_host_is_refused` | 3/59 |
+| Delete the parenthesis check | `test_a_paren_md_defang_is_refused` | 2/60 |
+| Delete the brace check | `test_a_brace_md_defang_is_refused` | 2/60 |
+| Delete the bare-`dot` check | `test_a_spelled_dot_host_is_refused` | 4/58 |
+| Delete the real-dot `c0m` check | `test_a_leet_com_host_is_refused` | 1/61 |
+| Point one bracket detector at the curated list | `test_evil_bracket_md_is_caught_by_all_three_detectors` | 2/60 |
+| Point a spaced `.` at the IANA list | `test_notes_spaced_md_does_not_trigger` | 2/60 |
+| Point a bare `dot` at the IANA list | `test_a_bare_dot_md_does_not_trigger` | 5/57 |
+| Drop the `0`→`o` fold | `test_a_zero_lookalike_is_refused` | 1/61 |
+| Drop space joining | `test_a_space_split_com_is_refused` | 1/61 |
+| Use `\s` instead of `[ \t]` | `test_a_newline_does_not_form_a_spaced_host` | 1/61 |
+| Drop `c0m` from the curated set | `test_the_curated_tld_list_is_exact` | 1/61 |
+| Treat every two-letter token as a TLD | `test_a_non_iana_bracket_tld_stays` | 1/61 |
+| Drop the word `dot` inside brackets | the three pair tests | 3/59 |
+| Require a space on both sides of `.` | `test_a_spaced_dot_uses_the_curated_list` | 1/61 |
+
+The new gift-render rows for those defanged names, and `Notes . md`, passed in `tests/unit/assets/test_gift_pdf_links.py`.
+
+Parked: bracket lookalike `x[.]c0m` (not an IANA TLD; no allow test), spelled emails on #81, Unicode hosts on #80, live S3, `CREATE_ETSY_DRAFT`, commissioning, and the session exit.
+
 ## 2026-10-15 — Session 08 defanged host
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defanged-host-prompt-integrity.md`.

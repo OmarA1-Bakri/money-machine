@@ -1,9 +1,9 @@
 """Gift-link refusal. Painted strings are not rewritten.
 
 The raw allowlist runs on gift fields before any fold. Folded checks stay
-scheme, ``www.``, host, IPv4, percent, and ``_PAID``. A dotted address may
-follow a dot. ``/OpenAction``, ``/AA``, and outline scanning are intentionally
-absent.
+scheme, ``www.``, host, defanged host, IPv4, percent, and ``_PAID``. A dotted
+address may follow a dot. ``/OpenAction``, ``/AA``, and outline scanning are
+intentionally absent.
 """
 
 from __future__ import annotations
@@ -11,6 +11,13 @@ from __future__ import annotations
 import re
 import unicodedata
 
+from money_machine.assets.defang_tlds import (
+    bare_dot_defanged,
+    brace_defanged,
+    paren_defanged,
+    spaced_dot_defanged,
+    square_bracket_defanged,
+)
 from money_machine.assets.pdf_objects import document_strings, link_annotations
 
 _PAID = re.compile(
@@ -27,18 +34,6 @@ _HOST = re.compile(
     re.IGNORECASE,
 )
 _LABEL = r"(?:[A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9-]*[A-Za-z0-9])"
-_SPACED_HOST = re.compile(
-    rf"(?<![A-Za-z0-9]){_LABEL}\s+\.\s+[A-Za-z]{{2,}}(?![A-Za-z0-9])",
-    re.IGNORECASE,
-)
-_BRACKET_HOST = re.compile(
-    rf"(?<![A-Za-z0-9]){_LABEL}\[\.\][A-Za-z]{{2,}}(?![A-Za-z0-9])",
-    re.IGNORECASE,
-)
-_SPELLED_HOST = re.compile(
-    rf"(?<![A-Za-z0-9]){_LABEL}\s+dot\s+com(?![A-Za-z0-9])",
-    re.IGNORECASE,
-)
 _LEET_HOST = re.compile(
     rf"(?<![A-Za-z0-9]){_LABEL}\.c0m(?![A-Za-z0-9])",
     re.IGNORECASE,
@@ -107,11 +102,15 @@ def refuse_paid_checkout(text: str) -> str | None:
         return "paid_checkout"
     if _HOST.search(folded) is not None:
         return "paid_checkout"
-    if _SPACED_HOST.search(folded) is not None:
+    if spaced_dot_defanged(folded):
         return "paid_checkout"
-    if _BRACKET_HOST.search(folded) is not None:
+    if square_bracket_defanged(folded):
         return "paid_checkout"
-    if _SPELLED_HOST.search(folded) is not None:
+    if paren_defanged(folded):
+        return "paid_checkout"
+    if brace_defanged(folded):
+        return "paid_checkout"
+    if bare_dot_defanged(folded):
         return "paid_checkout"
     if _LEET_HOST.search(folded) is not None:
         return "paid_checkout"
