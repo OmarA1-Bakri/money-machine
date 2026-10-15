@@ -18,6 +18,7 @@ def test_a_spelled_email_rule_matches() -> None:
     assert email_rule_matches("ceo@acme-corp.com") is True
     assert email_rule_matches("Meet at the studio") is False
     assert email_rule_matches("x dot com") is False
+    assert email_rule_matches("dot matrix") is False
 
 
 def test_a_spelled_email_is_refused() -> None:
@@ -29,6 +30,7 @@ def test_a_plain_label_is_allowed() -> None:
     assert refuse_rendered_text("Sage Green") is None
     assert refuse_fixture_value("Meet at the studio") is None
     assert refuse_rendered_text("x dot com") is None
+    assert refuse_rendered_text("dot matrix") is None
     assert email_rule_matches("evil[.]md") is False
 
 
@@ -90,7 +92,7 @@ def test_a_non_iana_bracket_email_stays() -> None:
     assert refuse_rendered_text("ceo [at] acme [dot] zz") is None
 
 
-def test_evil_bracket_md_is_caught_by_all_three_detectors() -> None:
+def test_evil_bracket_md_is_caught_by_the_host_detector() -> None:
     assert refuse_sensitive_text("evil[.]md") == "sensitive_data"
     assert refuse_rendered_text("evil[.]md") == "sensitive_data"
     assert refuse_fixture_value("evil[.]md") == "sensitive_data"

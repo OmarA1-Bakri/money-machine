@@ -14,48 +14,14 @@ from __future__ import annotations
 import html
 import re
 import unicodedata
-from collections.abc import Callable
 
-from money_machine.assets.defang_tlds import (
-    brace_defanged,
-    curated_tld,
-    iana_tld,
-    paren_defanged,
-    square_bracket_defanged,
+from money_machine.assets.defang_normalizer import (
+    bracket_host_matches,
+    email_matches,
+    lookalike_host_matches,
+    url_matches,
 )
 
-_H = r"[ \t]"
-_LOCAL = r"[A-Za-z0-9._%+-]+"
-_EHOST = r"[A-Za-z0-9.-]+"
-_CURATED_TOKEN = r"([A-Za-z0-9]+(?:[ \t]+[A-Za-z0-9]+)*)"
-_IANA_LABEL = r"([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)"
-_EMAIL = re.compile(rf"{_LOCAL}@{_EHOST}\.[A-Za-z]{{2,}}")
-_SPELLED_EMAIL = re.compile(
-    rf"\b{_LOCAL}{_H}+at{_H}+{_EHOST}{_H}+dot{_H}+{_CURATED_TOKEN}(?![A-Za-z0-9])",
-    re.IGNORECASE,
-)
-_SPACED_EMAIL = re.compile(
-    rf"\b{_LOCAL}{_H}+at{_H}+{_EHOST}(?:{_H}+\.{_H}*|{_H}*\.{_H}+){_CURATED_TOKEN}(?![A-Za-z0-9])",
-    re.IGNORECASE,
-)
-_AT_SQUARE = rf"{_H}*\[{_H}*at{_H}*\]{_H}*"
-_DOT_SQUARE = rf"{_H}*\[{_H}*(?:\.|dot){_H}*\]{_H}*"
-_AT_PAREN = rf"{_H}*\({_H}*at{_H}*\){_H}*"
-_DOT_PAREN = rf"{_H}*\({_H}*(?:\.|dot){_H}*\){_H}*"
-_AT_BRACE = _H + r"*\{" + _H + r"*at" + _H + r"*\}" + _H + r"*"
-_DOT_BRACE = _H + r"*\{" + _H + r"*(?:\.|dot)" + _H + r"*\}" + _H + r"*"
-_SQUARE_EMAIL = re.compile(
-    rf"\b{_LOCAL}{_AT_SQUARE}{_EHOST}{_DOT_SQUARE}{_IANA_LABEL}(?![A-Za-z0-9])",
-    re.IGNORECASE,
-)
-_PAREN_EMAIL = re.compile(
-    rf"\b{_LOCAL}{_AT_PAREN}{_EHOST}{_DOT_PAREN}{_IANA_LABEL}(?![A-Za-z0-9])",
-    re.IGNORECASE,
-)
-_BRACE_EMAIL = re.compile(
-    rf"\b{_LOCAL}{_AT_BRACE}{_EHOST}{_DOT_BRACE}{_IANA_LABEL}(?![A-Za-z0-9])",
-    re.IGNORECASE,
-)
 _NOTION_HOST = re.compile(r"notion\.(?:so|site)", re.IGNORECASE)
 _TOKEN = re.compile(
     r"(?:secret|token|api[_-]?key|bearer|ntn|sk)[_-][A-Za-z0-9]{6,}",
@@ -82,14 +48,7 @@ class ScreenshotRefusal(ValueError):
 
 def email_rule_matches(text: str) -> bool:
     """Return whether the email rule matches. Host and token rules are separate."""
-    return (
-        _EMAIL.search(text) is not None
-        or _curated_email(_SPELLED_EMAIL, text)
-        or _curated_email(_SPACED_EMAIL, text)
-        or _iana_email(_SQUARE_EMAIL, text)
-        or _iana_email(_PAREN_EMAIL, text)
-        or _iana_email(_BRACE_EMAIL, text)
-    )
+    return email_matches(text)
 
 
 def notion_host_rule_matches(text: str) -> bool:
@@ -116,13 +75,12 @@ def fill_template(template: str, label: str) -> str:
 
 def refuse_sensitive_text(text: str) -> str | None:
     """Return ``sensitive_data`` when text is not fixture or sample data."""
-    if email_rule_matches(text):
-        return "sensitive_data"
-    if square_bracket_defanged(text):
-        return "sensitive_data"
-    if paren_defanged(text):
-        return "sensitive_data"
-    if brace_defanged(text):
+    if (
+        email_matches(text)
+        or url_matches(text)
+        or bracket_host_matches(text)
+        or lookalike_host_matches(text)
+    ):
         return "sensitive_data"
     if _NOTION_HOST.search(text) is not None:
         return "sensitive_data"
@@ -158,22 +116,6 @@ def refuse_fixture_value(value: str) -> str | None:
 def refuse_rendered_text(text: str) -> str | None:
     """Refuse rendered text. Visible markup is not itself sensitive."""
     return _prepare(text, markup=False)
-
-
-def _curated_email(pattern: re.Pattern[str], text: str) -> bool:
-    return _tld_hit(pattern, text, curated_tld)
-
-
-def _iana_email(pattern: re.Pattern[str], text: str) -> bool:
-    return _tld_hit(pattern, text, iana_tld)
-
-
-def _tld_hit(pattern: re.Pattern[str], text: str, accept: Callable[[str], bool]) -> bool:
-    for match in pattern.finditer(text):
-        token = match.group(1)
-        if token is not None and accept(token):
-            return True
-    return False
 
 
 def _prepare(text: str, *, markup: bool) -> str | None:
