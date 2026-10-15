@@ -9,7 +9,8 @@ Measured from the Etsy Open API v3 Shop Listing document
 
 ``getListingsByShop`` defaults ``state`` to ``active`` and ``limit`` to 25.
 This client sends ``state=draft`` and ``limit=100``, and follows ``offset``
-until a short page. ``count`` is the filtered total. ``updateListing`` is
+until a short page. It then walks every page again. The sorted listing ids
+must match, and every id is an exact int. ``count`` is the filtered total. ``updateListing`` is
 ``PATCH`` on ``/v3/application/shops/{shop_id}/listings/{listing_id}`` and can
 set ``state=active``, which publishes the draft. That pair is not in the
 allowlist, and this class has no publish or activate method.
@@ -257,8 +258,16 @@ class EtsyDraftClient:
         return self._transport.exchange(FixtureCall(method, path, query, body))
 
     def _adopt(self, spec: DraftSpec, marker: str) -> int | None:
+        found, ids = self._read_pages(spec, marker)
+        confirm_found, confirm_ids = self._read_pages(spec, marker)
+        if ids != confirm_ids or found != confirm_found:
+            raise EtsyDraftRefused("count")
+        return found
+
+    def _read_pages(self, spec: DraftSpec, marker: str) -> tuple[int | None, list[int]]:
         found: int | None = None
         seen = 0
+        ids: list[int] = []
         seen_ids: set[int] = set()
         expected: int | None = None
         offset = 0
@@ -288,10 +297,12 @@ class EtsyDraftClient:
                 if not isinstance(row, dict):
                     raise EtsyDraftRefused("malformed")
                 listing_raw = row.get("listing_id")
-                if type(listing_raw) is int:
-                    if listing_raw in seen_ids:
-                        raise EtsyDraftRefused("count")
-                    seen_ids.add(listing_raw)
+                if type(listing_raw) is not int:
+                    raise EtsyDraftRefused("malformed")
+                if listing_raw in seen_ids:
+                    raise EtsyDraftRefused("count")
+                seen_ids.add(listing_raw)
+                ids.append(listing_raw)
                 if not _line_marker(row.get("description"), marker):
                     continue
                 listing_id = _draft_listing_id(row)
@@ -302,23 +313,8 @@ class EtsyDraftClient:
             if len(results) < PAGE_LIMIT:
                 if seen != expected:
                     raise EtsyDraftRefused("count")
-                try:
-                    confirm = self.exchange(
-                        "GET",
-                        _listings_path(spec.shop_id),
-                        _draft_query(0),
-                        None,
-                    )
-                except EtsyDraftRefused:
-                    raise
-                except Exception as exc:
-                    raise EtsyDraftRefused("transport") from exc
-                confirm_count = confirm.get("count")
-                if type(confirm_count) is not int or confirm_count < 0:
-                    raise EtsyDraftRefused("malformed")
-                if confirm_count != expected:
-                    raise EtsyDraftRefused("count")
-                return found
+                ids.sort()
+                return found, ids
             offset += PAGE_LIMIT
         raise EtsyDraftRefused("page_cap")
 

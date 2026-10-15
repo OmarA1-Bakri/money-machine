@@ -1006,7 +1006,7 @@ def test_an_insert_and_delete_with_a_pending_key_does_not_post(tmp_path: Path) -
     client = EtsyDraftClient(shift, DraftLedger(tmp_path))
     with pytest.raises(EtsyDraftRefused) as caught:
         client.create_draft(spec)
-    assert caught.value.code == "pending"
+    assert caught.value.code == "count"
     assert shift.posts == 0
 
 
@@ -1077,6 +1077,230 @@ def test_a_page_zero_reread_count_change_refuses_to_post(tmp_path: Path) -> None
         client.create_draft(_spec())
     assert caught.value.code == "count"
     assert race.posts == 0
+
+
+def _post_body() -> dict[str, object]:
+    return {"listing_id": 5, "state": "draft", "description": "x"}
+
+
+@pytest.mark.parametrize("bad", [True, 1.0, "1", None])
+def test_a_reread_count_must_be_an_exact_int(tmp_path: Path, bad: object) -> None:
+    class _BadCount:
+        def __init__(self) -> None:
+            self.gets = 0
+            self.posts = 0
+
+        def exchange(self, call: FixtureCall) -> Mapping[str, object]:
+            if call.method == "POST":
+                self.posts += 1
+                return _post_body()
+            self.gets += 1
+            row = [_draft_row(1)]
+            if self.gets == 1:
+                return {"count": 1, "results": row}
+            return {"count": bad, "results": row}
+
+    race = _BadCount()
+    client = EtsyDraftClient(race, DraftLedger(tmp_path))
+    with pytest.raises(EtsyDraftRefused) as caught:
+        client.create_draft(_spec())
+    assert caught.value.code == "malformed"
+    assert race.posts == 0
+
+
+def test_a_reread_transport_error_refuses_to_post(tmp_path: Path) -> None:
+    class _Down:
+        def __init__(self) -> None:
+            self.gets = 0
+            self.posts = 0
+
+        def exchange(self, call: FixtureCall) -> Mapping[str, object]:
+            if call.method == "POST":
+                self.posts += 1
+                return _post_body()
+            self.gets += 1
+            if self.gets > 1:
+                raise RuntimeError("down")
+            return {"count": 1, "results": [_draft_row(1)]}
+
+    down = _Down()
+    client = EtsyDraftClient(down, DraftLedger(tmp_path))
+    with pytest.raises(EtsyDraftRefused) as caught:
+        client.create_draft(_spec())
+    assert caught.value.code == "transport"
+    assert down.posts == 0
+
+
+def test_a_reread_without_results_is_malformed(tmp_path: Path) -> None:
+    class _Missing:
+        def __init__(self) -> None:
+            self.gets = 0
+            self.posts = 0
+
+        def exchange(self, call: FixtureCall) -> Mapping[str, object]:
+            if call.method == "POST":
+                self.posts += 1
+                return _post_body()
+            self.gets += 1
+            if self.gets == 1:
+                return {"count": 1, "results": [_draft_row(1)]}
+            return {"count": 1}
+
+    missing = _Missing()
+    client = EtsyDraftClient(missing, DraftLedger(tmp_path))
+    with pytest.raises(EtsyDraftRefused) as caught:
+        client.create_draft(_spec())
+    assert caught.value.code == "malformed"
+    assert missing.posts == 0
+
+
+def test_a_true_listing_id_on_the_first_read_is_malformed(tmp_path: Path) -> None:
+    class _TrueId:
+        def __init__(self) -> None:
+            self.posts = 0
+
+        def exchange(self, call: FixtureCall) -> Mapping[str, object]:
+            if call.method == "POST":
+                self.posts += 1
+                return _post_body()
+            row = _draft_row(1)
+            row["listing_id"] = True
+            return {"count": 1, "results": [row]}
+
+    bad = _TrueId()
+    client = EtsyDraftClient(bad, DraftLedger(tmp_path))
+    with pytest.raises(EtsyDraftRefused) as caught:
+        client.create_draft(_spec())
+    assert caught.value.code == "malformed"
+    assert bad.posts == 0
+
+
+def test_a_true_listing_id_on_the_reread_is_malformed(tmp_path: Path) -> None:
+    class _TrueId:
+        def __init__(self) -> None:
+            self.gets = 0
+            self.posts = 0
+
+        def exchange(self, call: FixtureCall) -> Mapping[str, object]:
+            if call.method == "POST":
+                self.posts += 1
+                return _post_body()
+            self.gets += 1
+            row = _draft_row(1)
+            if self.gets > 1:
+                row["listing_id"] = True
+            return {"count": 1, "results": [row]}
+
+    bad = _TrueId()
+    client = EtsyDraftClient(bad, DraftLedger(tmp_path))
+    with pytest.raises(EtsyDraftRefused) as caught:
+        client.create_draft(_spec())
+    assert caught.value.code == "malformed"
+    assert bad.posts == 0
+
+
+def test_a_duplicate_listing_id_on_the_first_read_refuses_to_post(tmp_path: Path) -> None:
+    class _Dup:
+        def __init__(self) -> None:
+            self.posts = 0
+
+        def exchange(self, call: FixtureCall) -> Mapping[str, object]:
+            if call.method == "POST":
+                self.posts += 1
+                return _post_body()
+            return {"count": 2, "results": [_draft_row(1), _draft_row(1)]}
+
+    dup = _Dup()
+    client = EtsyDraftClient(dup, DraftLedger(tmp_path))
+    with pytest.raises(EtsyDraftRefused) as caught:
+        client.create_draft(_spec())
+    assert caught.value.code == "count"
+    assert dup.posts == 0
+
+
+def test_a_duplicate_listing_id_on_the_reread_refuses_to_post(tmp_path: Path) -> None:
+    class _Dup:
+        def __init__(self) -> None:
+            self.gets = 0
+            self.posts = 0
+
+        def exchange(self, call: FixtureCall) -> Mapping[str, object]:
+            if call.method == "POST":
+                self.posts += 1
+                return _post_body()
+            self.gets += 1
+            if self.gets == 1:
+                return {"count": 2, "results": [_draft_row(1), _draft_row(2)]}
+            return {"count": 2, "results": [_draft_row(1), _draft_row(1)]}
+
+    dup = _Dup()
+    client = EtsyDraftClient(dup, DraftLedger(tmp_path))
+    with pytest.raises(EtsyDraftRefused) as caught:
+        client.create_draft(_spec())
+    assert caught.value.code == "count"
+    assert dup.posts == 0
+
+
+def test_an_equal_count_swap_onto_page_one_refuses_to_post(tmp_path: Path) -> None:
+    spec = _spec()
+    marker = draft_marker(spec.spec_version, fixture_hash(spec))
+    rows = [_draft_row(index + 1) for index in range(101)]
+    rows[100] = _draft_row(9001, f"{spec.description}\n{marker}")
+
+    class _Swap:
+        def __init__(self) -> None:
+            self.posts = 0
+            self.shifted = False
+
+        def exchange(self, call: FixtureCall) -> Mapping[str, object]:
+            if call.method == "POST":
+                self.posts += 1
+                return _post_body()
+            query = dict(call.query)
+            if query["offset"] == "100" and not self.shifted:
+                rows.pop(0)
+                rows.append(_draft_row(9002))
+                self.shifted = True
+            offset = int(query["offset"])
+            return {"count": len(rows), "results": rows[offset : offset + 100]}
+
+    swap = _Swap()
+    client = EtsyDraftClient(swap, DraftLedger(tmp_path))
+    with pytest.raises(EtsyDraftRefused) as caught:
+        client.create_draft(spec)
+    assert caught.value.code == "count"
+    assert swap.posts == 0
+
+
+def test_a_later_page_swap_with_the_ledger_lost_refuses_to_post(tmp_path: Path) -> None:
+    spec = _spec()
+    marker = draft_marker(spec.spec_version, fixture_hash(spec))
+    rows = [_draft_row(index + 1) for index in range(270)]
+    rows[100] = _draft_row(9001, f"{spec.description}\n{marker}")
+
+    class _Later:
+        def __init__(self) -> None:
+            self.gets = 0
+            self.posts = 0
+
+        def exchange(self, call: FixtureCall) -> Mapping[str, object]:
+            if call.method == "POST":
+                self.posts += 1
+                return _post_body()
+            self.gets += 1
+            if self.gets == 4:
+                rows.pop(260)
+                rows.append(_draft_row(9002))
+            query = dict(call.query)
+            offset = int(query["offset"])
+            return {"count": len(rows), "results": rows[offset : offset + 100]}
+
+    later = _Later()
+    client = EtsyDraftClient(later, DraftLedger(tmp_path))
+    with pytest.raises(EtsyDraftRefused) as caught:
+        client.create_draft(spec)
+    assert caught.value.code == "count"
+    assert later.posts == 0
 
 
 @pytest.mark.parametrize("limit", ["0", "101", "01", "x"])
