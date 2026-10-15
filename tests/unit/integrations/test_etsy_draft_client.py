@@ -1319,6 +1319,42 @@ def test_a_reordered_description_still_posts(tmp_path: Path) -> None:
     assert race.posts == 1
 
 
+def test_an_empty_description_and_a_missing_one_still_post(tmp_path: Path) -> None:
+    """A blank description and a row with no description field compare equal."""
+    spec = _spec()
+    marker = draft_marker(spec.spec_version, fixture_hash(spec))
+    empty = {
+        "listing_id": 1,
+        "title": "decoy 1",
+        "description": "",
+        "state": "draft",
+    }
+    missing = {"listing_id": 1, "title": "decoy 1", "state": "draft"}
+
+    class _Blank:
+        def __init__(self) -> None:
+            self.gets = 0
+            self.posts = 0
+
+        def exchange(self, call: FixtureCall) -> Mapping[str, object]:
+            if call.method == "POST":
+                self.posts += 1
+                return {
+                    "listing_id": 5,
+                    "state": "draft",
+                    "description": f"{spec.description}\n{marker}",
+                }
+            rows = [empty] if self.gets == 0 else [missing]
+            self.gets += 1
+            return {"count": len(rows), "results": rows}
+
+    race = _Blank()
+    client = EtsyDraftClient(race, DraftLedger(tmp_path))
+    receipt = client.create_draft(spec)
+    assert receipt.ready is True
+    assert race.posts == 1
+
+
 def test_an_existing_description_change_refuses_to_post(tmp_path: Path) -> None:
     spec = _spec()
     marker = draft_marker(spec.spec_version, fixture_hash(spec))
