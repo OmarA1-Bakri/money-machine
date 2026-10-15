@@ -1,3 +1,22 @@
+## 2026-10-15 — Session 08 spaced-dot case (#80)
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-punycode-host-r4-prompt-integrity.md`.
+
+A spaced `.` is undone only when the TLD word is all lowercase and, after that check, casefolds into `{com, c0m, net, org}`. Title case and all caps stay prose, including at the end of the text. A lowercase Cyrillic `o` still folds to `com` and refuses. Bare `dot`, bare `at`, and bracket forms stay on the curated list.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_defanged_host.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. 65 passed. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the lowercase check | `test_a_capitalised_spaced_dot_at_the_end_stays[Done . Net]` and `test_a_spaced_dot_host_is_refused` | 2/63 |
+| Reject only `isupper` | `test_a_capitalised_spaced_dot_at_the_end_stays[Done . Net]` | 1/64 |
+| Casefold the token inside `_read_tld` | the same two rows as deleting the lowercase check | 2/63 |
+| Use `CURATED_TLDS` for the spaced form | `x . shop`, `acme . io`, and `acme . co` | 3/62 |
+| Drop `c0m` | `test_a_lowercase_spaced_dot_at_the_end_is_refused[mail me at acme . c0m]` | 1/64 |
+| Drop `net` | `test_a_lowercase_spaced_dot_at_the_end_is_refused[acme . net]` | 1/64 |
+| Drop `org` | `test_a_lowercase_spaced_dot_at_the_end_is_refused[acme . org]` | 1/64 |
+| Drop the Cyrillic small `o` fold | `test_a_lowercase_lookalike_spaced_dot_is_refused` | 1/64 |
+
 ## 2026-10-15 — Session 08 shared defang normalizer (#80)
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-punycode-host-r3-prompt-integrity.md`.

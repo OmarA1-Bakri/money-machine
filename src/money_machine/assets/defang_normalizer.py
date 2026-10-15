@@ -4,10 +4,11 @@ The order is fixed:
 
 1. NFKC, then fold lookalike letters and dots to ASCII.
 2. Find host-like, email-like, and ``hxxp`` candidates.
-3. Undo defanging only inside those candidates. A bare ``dot``, a bare
-   ``at``, or a spaced ``.`` is undone only when the next token, with
-   spaces removed, is on :data:`CURATED_TLDS`. Bracket and parenthesis
-   forms also accept the IANA snapshot.
+3. Undo defanging only inside those candidates. A bare ``dot`` or a bare
+   ``at`` is undone only when the next token, with spaces removed, is on
+   :data:`CURATED_TLDS`. A spaced ``.`` is undone only when that token is
+   all lowercase and is ``com``, ``c0m``, ``net``, or ``org``. Bracket
+   and parenthesis forms also accept the IANA snapshot.
 """
 
 from __future__ import annotations
@@ -110,6 +111,7 @@ _EXACT_HOST = re.compile(
     re.IGNORECASE,
 )
 _HXXP = re.compile(r"hxxp(s?://)", re.IGNORECASE)
+_SPACED_DOT_TLDS = frozenset({"com", "c0m", "net", "org"})
 
 
 def fold_confusables(text: str) -> str:
@@ -181,7 +183,7 @@ def _undo_span(text: str, start: int, end: int) -> str:
     restored = _HXXP.sub(r"http\1", chunk)
     restored = _replace_dots(restored, _BRACKET_DOT_RE, _bracket_tld, boundary=False, tail=tail)
     restored = _replace_dots(restored, _BARE_DOT_RE, _curated_tld, boundary=False, tail=tail)
-    restored = _replace_dots(restored, _SPACED_DOT_RE, _curated_tld, boundary=True, tail=tail)
+    restored = _replace_dots(restored, _SPACED_DOT_RE, _spaced_dot_tld, boundary=True, tail=tail)
     restored = _replace_ats(restored, _BRACKET_AT_RE, bracket=True)
     return _replace_ats(restored, _BARE_AT_RE, bracket=False)
 
@@ -255,8 +257,8 @@ def _read_tld(text: str, start: int) -> tuple[str, int, bool] | None:
             letters.append(text[nxt])
             probe = nxt + 1
         if len(letters) >= 2:
-            return "".join(letters).casefold(), probe, True
-    return text[start:end].casefold(), end, False
+            return "".join(letters), probe, True
+    return text[start:end], end, False
 
 
 def _word_follows(chunk: str, index: int, tail: str) -> bool:
@@ -269,6 +271,13 @@ def _followed_by_word(text: str, index: int) -> bool:
     while index < len(text) and text[index] in " \t":
         index += 1
     return index < len(text) and text[index].isalnum()
+
+
+def _spaced_dot_tld(token: str) -> bool:
+    """A capitalised word after a spaced dot is prose, so it is left alone."""
+    if not token.islower():
+        return False
+    return token.casefold() in _SPACED_DOT_TLDS
 
 
 def _curated_tld(token: str) -> bool:

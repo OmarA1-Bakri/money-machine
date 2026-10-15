@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import pytest
+
 from money_machine.assets.defang_tlds import CURATED_TLDS, IANA_TLDS
 from money_machine.assets.gift_links import refuse_paid_checkout
 
 
 def test_a_spaced_dot_host_is_refused() -> None:
     assert refuse_paid_checkout("x . com") == "paid_checkout"
-    assert refuse_paid_checkout("X . COM") == "paid_checkout"
+    assert refuse_paid_checkout("X . COM") is None
 
 
 def test_a_bracket_dot_host_is_refused() -> None:
@@ -107,7 +109,39 @@ def test_a_bare_dot_uses_the_curated_list() -> None:
 def test_a_spaced_dot_uses_the_curated_list() -> None:
     assert refuse_paid_checkout("x. com") == "paid_checkout"
     assert refuse_paid_checkout("x .com") == "paid_checkout"
-    assert refuse_paid_checkout("x . shop") == "paid_checkout"
+
+
+@pytest.mark.parametrize(
+    "text",
+    (
+        "Rest . Co",
+        "Plan . Io",
+        "Go . Co",
+        "Done . Net",
+        "Rest . Co.",
+        "Plan . Io!",
+        "Pick one . Shop",
+    ),
+)
+def test_a_capitalised_spaced_dot_at_the_end_stays(text: str) -> None:
+    assert refuse_paid_checkout(text) is None
+
+
+@pytest.mark.parametrize("text", ("x . shop", "acme . io", "acme . co"))
+def test_a_lowercase_spaced_tld_outside_the_set_stays(text: str) -> None:
+    assert refuse_paid_checkout(text) is None
+
+
+@pytest.mark.parametrize(
+    "text",
+    ("mail me at acme . com", "mail me at acme . c0m", "acme . net", "acme . org"),
+)
+def test_a_lowercase_spaced_dot_at_the_end_is_refused(text: str) -> None:
+    assert refuse_paid_checkout(text) == "paid_checkout"
+
+
+def test_a_lowercase_lookalike_spaced_dot_is_refused() -> None:
+    assert refuse_paid_checkout("acme . c\u043em") == "paid_checkout"
 
 
 def test_a_space_split_com_is_refused() -> None:
