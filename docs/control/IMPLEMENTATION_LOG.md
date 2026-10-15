@@ -1,3 +1,144 @@
+## 2026-10-15 — Session 08 W8 r2: durable ledger and paged lookup
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. Action 8 stays parked. This wave does not emit `DRAFT_CREATED` and does not edit `workflows.yaml`.
+
+The allowlist is unchanged: `GET` and `POST` `/v3/application/shops/{shop_id}/listings`. `getListingsByShop` still defaults `state` to `active` and `limit` to 25. The client sends `state=draft`, `limit=100`, and `offset`, and stops on a short page. `count` must stay stable and must equal the number of rows seen. Ten full pages raise `page_cap`. A transport error raises `transport`. A pending key is written to the injected ledger directory with `O_CREAT|O_EXCL|O_NOFOLLOW`, then the file and the directory are fsynced, and only then does `POST` run. A pending key whose lookup does not adopt a draft is not posted again. An unreadable or corrupt pending file refuses before `POST`. Query and body keys are case-folded and trimmed before the allowlist check; a key that changes, or collides, is refused. The `/sw.js` continuation is restored, and `service_workers` stays `"block"` unless a test passes `"allow"`.
+
+Draft suite: 114 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_etsy_draft_client.py tests/unit/assets/test_etsy_draft_ready.py`. The two service-worker rows passed. Source was restored after each mutant. Counts below are failures on that 114-test suite unless noted. The r1 table under the next heading is unchanged.
+
+| Mutant | Killing test | F |
+|---|---|---|
+| Stop after the first page | `test_an_empty_ledger_adopts_the_page_two_orphan_without_a_post` (also the pending page-2 restart and the insert/delete row) | 3 |
+| Delete the page cap | `test_a_full_page_cap_refuses_to_post` | 1 |
+| Delete the stable-count check | `test_a_count_that_changes_between_pages_refuses_to_post` | 1 |
+| Delete the short-page count check | `test_a_short_page_whose_count_does_not_match_refuses_to_post` | 1 |
+| Delete the repeated-id check | `test_a_repeated_listing_id_refuses_to_post` | 1 |
+| Delete the oversize-page check | `test_a_page_longer_than_the_limit_is_malformed` | 1 |
+| Delete the transport wrapper | `test_a_lookup_transport_error_refuses_to_post` | 1 |
+| Relabel a lookup refusal as transport | `test_a_lookup_refusal_is_not_relabelled_as_transport` and `test_a_missing_or_real_token_never_opens_a_socket` | 2 |
+| Refuse pending before lookup | `test_a_pending_restart_adopts_when_lookup_finds_the_draft` | 3 |
+| Delete the pending re-POST refusal | `test_a_pending_key_with_no_draft_does_not_post` | 2 |
+| POST before the pending write | `test_pending_is_written_before_the_call` | 2 |
+| Delete `put_pending` | `test_pending_is_written_before_the_call` | 2 |
+| Delete the file fsync | `test_put_pending_fsyncs_the_file` | 2 |
+| Delete the directory fsync | `test_put_pending_fsyncs_the_directory` | 2 |
+| Drop `O_NOFOLLOW` on create | `test_the_pending_create_uses_nofollow` | 1 |
+| Drop `O_EXCL` on create | `test_the_pending_create_uses_exclusive` | 3 |
+| Drop `O_CREAT` on create | `test_the_pending_create_uses_create` | 33 |
+| Drop `O_NOFOLLOW` on read | `test_an_unreadable_pending_file_refuses_to_post` | 1 |
+| Treat a corrupt file as missing | `test_a_corrupt_pending_file_refuses_to_post` | 1 |
+| Follow a broken symlink | `test_a_broken_pending_symlink_refuses_to_post` | 1 |
+| Delete the query case check | `test_a_query_key_that_changes_case_is_refused` | 2 |
+| Delete the query space check | `test_a_query_key_with_whitespace_is_refused` | 2 |
+| Delete the query duplicate check | `test_a_duplicated_query_key_is_refused` | 1 |
+| Skip query normalization on POST | both POST query-shape rows; the GET rows still pass | 2 |
+| Delete the non-empty POST query check | `test_a_post_query_is_refused_before_the_transport` | 1 |
+| Delete the body case check | `test_a_body_key_that_changes_case_is_refused` | 1 |
+| Delete the body space check | `test_a_body_key_with_whitespace_is_refused` | 1 |
+| Delete the body duplicate check | `test_a_duplicated_body_key_is_refused` | 1 |
+| Delete the missing-body check | `test_a_missing_body_is_refused` | 1 |
+| Delete the extra-body-key check | `test_a_state_field_on_create_is_refused_before_the_transport` | 1 |
+| Delete the missing-body-key check | `test_a_missing_body_key_is_refused` | 1 |
+| Delete the GET-body check | `test_a_get_with_a_body_is_refused_before_the_transport` | 1 |
+| Delete the unknown query-key check | `test_an_unknown_query_key_is_refused_before_the_transport` | 1 |
+| Delete the lookup-state check | `test_lookup_state_must_be_draft` | 1 |
+| Delete the limit check | all four `test_a_bad_limit_is_refused` rows | 4 |
+| Delete the offset check | both `test_a_bad_offset_is_refused` rows | 2 |
+| Delete the digit check | `test_a_bad_limit_is_refused[x]` | 1 |
+| Delete the leading-zero check | `test_a_bad_limit_is_refused[01]` and `test_a_bad_offset_is_refused[01]` | 2 |
+| Delete the low bound | `test_a_bad_limit_is_refused[0]` | 1 |
+| Drop the high bound | `test_a_bad_limit_is_refused[101]` | 1 |
+| Delete CRLF normalization | `test_a_crlf_marker_line_is_adopted` | 1 |
+| Delete trailing-whitespace normalization | `test_a_trailing_space_on_the_marker_line_is_adopted` | 1 |
+| Delete the marker-injection check | `test_an_injected_marker_line_is_refused_before_the_transport` | 1 |
+| Omit one fixture-hash field | that field's `test_a_changed_field_changes_the_fixture_hash` row; description and title also fail their adoption rows | 1 or 2 |
+| Omit the hash from the marker | `test_the_marker_embeds_the_fixture_hash` | 3 |
+| Drop `state=draft` from the lookup query | `test_a_crash_after_create_adopts_the_existing_draft` | 5 |
+| Default `service_workers` to `allow` | `test_the_fixture_context_makes_no_network_requests` | 1 of 2 |
+| Delete the `/sw.js` continuation | `test_allowing_service_workers_fetches_the_worker_script` | 1 of 2 |
+
+Parked to next wave: human publish before retry, and live Etsy. Action 8 S3, upload operations, `updateListing` and publish, commissioning, the session exit, and the W7 leftovers stay parked.
+
+## 2026-10-15 — Session 08 W8: fixture Etsy draft
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. Action 8 stays parked. A10, A11, and A13 stay `DESIGNED`. This wave does not emit `DRAFT_CREATED` and does not edit `workflows.yaml`.
+
+Measured from the Etsy Open API v3 Shop Listing document (`x-generated-from: https://www.etsy.com/openapi/generated/oas/3.0.0.json`, `x-last-validated: 2026-05-30`). The allowlist is exactly:
+
+| Method | Path template | operationId |
+|---|---|---|
+| `GET` | `/v3/application/shops/{shop_id}/listings` | `getListingsByShop` |
+| `POST` | `/v3/application/shops/{shop_id}/listings` | `createDraftListing` |
+
+`getListingsByShop` defaults `state` to `active`. This client sends `state=draft`. `updateListing` is `PATCH /v3/application/shops/{shop_id}/listings/{listing_id}` and can set `state=active`. That pair is not on the allowlist. A path outside the collection template raises `off_list` in the path check. A method other than `GET` or `POST` on the template raises `off_list` in the allowlist check. The class has no `publish` and no `activate`. The create body has no `state` field. A response whose `state` is not `draft` is not recorded.
+
+The client has no default transport and does not read `ETSY_API_KEY`, `ETSY_SHARED_SECRET`, `ETSY_ACCESS_TOKEN`, `ETSY_REFRESH_TOKEN`, or `ETSY_SHOP_ID`. `None` raises `fixture_transport` before any socket. The ledger key is `(spec_version, fixture_hash)`. `pending` is written before the call. A retry adopts a listing only when a whole description line equals `mm-draft:{spec_version}:{fixture_hash}`. Title is not a key.
+
+`_defer_page_annots` is `number is not None and number in real_pages` for a `/Type /Page` object. The five placement returns and `pdf page place` are gone. `_source_blocked` is `resolved.kind != "screenshot"` after the unknown-source return. The `/sw.js` continuation in `_http_allowed` is gone. `test_the_fixture_context_makes_no_network_requests` still passes. The Latin-1 `Zoë` check (`ord > 127`) and `O_EXCL` are unchanged and still kill; `O_NOFOLLOW` stays absent.
+
+Draft suite: 52 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_etsy_draft_client.py tests/unit/assets/test_etsy_draft_ready.py`. Focused PDF and lineage suite, Chromium deselected: 254 passed, 2 deselected. Command: `uv run pytest -q -p no:cacheprovider --tb=line -k "not readme_uris and not gift_pdf_has_no_links" tests/unit/assets/test_link_validation.py tests/unit/assets/test_gift_link_policy.py tests/unit/assets/test_gift_pdf_links.py tests/unit/assets/test_asset_lineage.py`. Source restored after each mutant. The W7 r3 counts below (252 passed) are the previous tree.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the missing-transport refuse | `test_a_missing_or_real_token_never_opens_a_socket` | 1/51 |
+| Delete allowlist membership | `test_patch_state_active_never_reaches_the_transport` | 1/51 |
+| Map every path onto the template | `test_a_listing_id_path_is_off_list` | 1/51 |
+| Widen the allowlist with `DELETE` | `test_the_measured_allowlist_is_the_draft_pair` | 1/51 |
+| Add `activate` | `test_publish_and_activate_are_not_methods` | 1/51 |
+| Delete the `GET` `state=draft` check | `test_lookup_state_must_be_draft` | 1/51 |
+| Delete the create `state` field check | `test_a_state_field_on_create_is_refused_before_the_transport` | 1/51 |
+| Drop `type` from the create body | `test_the_create_body_has_no_state_field` | 1/51 |
+| Delete the recorded short-circuit | `test_a_plain_retry_creates_no_second_listing` | 1/51 |
+| Delete `put_pending` | `test_pending_is_written_before_the_call` | 1/51 |
+| Let `put_pending` replace a recorded row | `test_a_recorded_row_is_not_replaced_by_pending` | 1/51 |
+| Treat the marker as a substring | `test_a_marker_inside_a_longer_line_is_not_adopted` | 1/51 |
+| Also adopt the same title | both `test_a_same_title_decoy_is_not_adopted` rows | 2/50 |
+| Delete the description type check | `test_a_decoy_without_a_description_is_not_adopted` | 1/51 |
+| Delete the non-dict result check | `test_a_non_dict_result_is_malformed` | 1/51 |
+| Delete the `state == draft` check | `test_an_active_create_response_is_not_recorded` and `test_an_active_listing_with_the_marker_is_not_adopted` | 2/50 |
+| Delete the response marker check | `test_a_create_response_without_the_marker_is_refused` | 1/51 |
+| Delete the `listing_id` type check | `test_a_create_response_listing_id_must_be_a_positive_int[5]` | 1/51 |
+| Delete the `listing_id` range check | `test_a_create_response_listing_id_must_be_a_positive_int[0]` | 1/51 |
+| Delete the duplicate-marker raise | `test_two_listings_with_the_same_marker_are_refused` | 1/51 |
+| Delete the results-list check | `test_a_lookup_without_results_is_malformed` | 1/51 |
+| Delete the empty-description marker branch | `test_the_marker_is_its_own_line[-None]` | 1/51 |
+| Delete the trailing-newline marker branch | `test_the_marker_is_its_own_line[A fixture description.\n-keep-newline]` | 1/51 |
+| Join the marker onto the description | `test_the_marker_is_its_own_line[A fixture description.-separate-line]` (the echoed body then fails the marker check, so ten other creates fail too) | 11/41 |
+| Delete the `spec_version` type check | `test_a_bad_draft_field_is_refused_before_the_transport[spec_version-True-spec_version]` | 1/51 |
+| Delete the `spec_version` range check | `test_a_bad_draft_field_is_refused_before_the_transport[spec_version-0-spec_version]` | 1/51 |
+| Delete the `shop_id` type check | `test_a_boolean_shop_id_is_refused` | 1/51 |
+| Delete the `shop_id` range check | `test_a_bad_draft_field_is_refused_before_the_transport[shop_id-0-shop_id]` | 1/51 |
+| Delete the `quantity` type check | `test_a_bad_draft_field_is_refused_before_the_transport[quantity-True-quantity]` | 1/51 |
+| Delete the `quantity` range check | `test_a_bad_draft_field_is_refused_before_the_transport[quantity-0-quantity]` | 1/51 |
+| Delete the `taxonomy_id` type check | `test_a_bad_draft_field_is_refused_before_the_transport[taxonomy_id-True-taxonomy_id]` | 1/51 |
+| Delete the `taxonomy_id` range check | `test_a_bad_draft_field_is_refused_before_the_transport[taxonomy_id-0-taxonomy_id]` | 1/51 |
+| Delete the empty-title check | `test_a_bad_draft_field_is_refused_before_the_transport[title--title]` | 1/51 |
+| Delete the newline-title check | `test_a_bad_draft_field_is_refused_before_the_transport[title-two\nlines-title]` | 1/51 |
+| Delete the carriage-return title check | `test_a_bad_draft_field_is_refused_before_the_transport[title-two\rlines-title]` | 1/51 |
+| Delete the empty-price check | `test_a_bad_draft_field_is_refused_before_the_transport[price--price]` | 1/51 |
+| Delete the product-QA gate | `test_each_gate_refuses_on_its_own[changes0-product_qa]` | 1/51 |
+| Delete the claims gate | `test_each_gate_refuses_on_its_own[changes1-claims]` | 1/51 |
+| Delete the screenshot gate | `test_each_gate_refuses_on_its_own[changes2-screenshots]` | 1/51 |
+| Delete the listing-image gate | `test_each_gate_refuses_on_its_own[changes3-listing_images]` | 1/51 |
+| Delete the video gate | `test_each_gate_refuses_on_its_own[changes4-video]` and `test_each_gate_refuses_on_its_own[changes5-video]` | 2/50 |
+| Delete the delivery-PDF count clause | `test_each_gate_refuses_on_its_own[changes8-delivery_pdfs]` | 1/51 |
+| Delete the delivery-PDF role clause | `test_each_gate_refuses_on_its_own[changes7-delivery_pdfs]` | 1/51 |
+| Delete the links gate | `test_each_gate_refuses_on_its_own[changes9-links]` | 1/51 |
+| Delete the asset-QA gate | `test_each_gate_refuses_on_its_own[changes10-asset_qa]` | 1/51 |
+| `_source_blocked` returns false | the eight non-screenshot source rows | 8/246 |
+| Delete the spec comparison | `test_a_spec_bump_is_stale` | 1/253 |
+| Delete the QA check | `test_a_qa_status_other_than_passed_is_stale`, `test_a_stale_source_marks_the_dependent`, and `test_a_dependent_listed_before_its_source_is_stale` | 3/251 |
+| Drop the product filter | `test_another_product_is_omitted` | 1/253 |
+| Delete the unknown-source check | `test_an_unknown_source_is_stale` | 1/253 |
+| Source walk returns false | `test_a_stale_source_marks_the_dependent`, `test_a_dependent_listed_before_its_source_is_stale`, and `test_an_unknown_source_is_stale` | 3/251 |
+| One pass instead of repeating | `test_a_dependent_listed_before_its_source_is_stale` | 1/253 |
+| Defer every `/Type /Page` | the six fake-page rows, including ExtGState | 6/248 |
+| Never defer a page | the eight on-page link rows | 8/246 |
+
+`ord > 255` fails `test_a_latin1_zoe_is_refused`. Dropping `O_EXCL` fails `test_an_existing_file_is_not_truncated` and `test_a_symlink_file_is_not_followed`. Those two rows stay closed.
+
+Parked: Action 8 S3, upload operations, `updateListing` and publish, commissioning, the session exit code, and the W7 leftovers (same-host http, punycode, `file:` allow, sendBeacon, spelled-out emails, `_prepare` non-ASCII, raster text).
+
 ## 2026-10-15 — Session 08 W7 r3: page-tree roles and screenshot sources
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.

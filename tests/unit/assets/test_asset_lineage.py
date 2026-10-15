@@ -292,6 +292,22 @@ def test_a_listing_sourced_from_another_listing_is_stale() -> None:
     assert tuple(asset.output_sha256 for asset in stale) == ("cc",)
 
 
+def test_a_delivery_pdf_sourced_from_a_listing_is_stale() -> None:
+    image = _listing("bb", ())
+    pdf = replace(_pdf("dd"), source_screenshot_sha256=("bb",))
+    current, stale = split_current((image, pdf), product_id=_PRODUCT, spec_version=2)
+    assert tuple(asset.output_sha256 for asset in current) == ("bb",)
+    assert tuple(asset.output_sha256 for asset in stale) == ("dd",)
+
+
+def test_a_screenshot_sourced_from_a_listing_is_stale() -> None:
+    image = _listing("bb", ())
+    shot = replace(_shot("aa"), source_screenshot_sha256=("bb",))
+    current, stale = split_current((image, shot), product_id=_PRODUCT, spec_version=2)
+    assert tuple(asset.output_sha256 for asset in current) == ("bb",)
+    assert tuple(asset.output_sha256 for asset in stale) == ("aa",)
+
+
 def test_a_listing_sourced_from_a_walkthrough_is_stale() -> None:
     shot = _shot("aa")
     video = _walkthrough("ww", ("aa",))

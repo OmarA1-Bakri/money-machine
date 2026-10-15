@@ -1087,16 +1087,13 @@ def test_a_fake_page_inline_in_info_is_refused() -> None:
     _assert_evil_page(classic_pdf(objects, trailer_body=trailer))
 
 
-def test_a_fake_page_under_extgstate_is_malformed() -> None:
-    """A page reached from ExtGState is not one of the named places."""
+def test_a_fake_page_under_extgstate_is_refused() -> None:
+    """A page reached from ExtGState is outside the page tree."""
     resources = (
         "<< /ExtGState << /G0 5 0 R >> /Font << >> /ProcSet [/PDF /Text /ImageB /ImageC /ImageI] >>"
     )
     pdf = _annot(_good_annot(), resources=resources, objects={5: _obj(5, _evil_page())})
-    refusal = _raise(pdf, accepted=_accepted_good())
-    assert refusal.code == "malformed"
-    assert isinstance(refusal.__cause__, ValueError)
-    assert refusal.__cause__.args == ("pdf page place",)
+    _assert_evil_page(pdf)
 
 
 def test_a_short_link_in_annots_is_malformed() -> None:

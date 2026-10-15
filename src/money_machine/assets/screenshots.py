@@ -278,6 +278,7 @@ def open_screenshot_context(
     *,
     javascript: bool,
     allowed_http: tuple[str, ...] = (),
+    service_workers: Literal["allow", "block"] = "block",
 ) -> BrowserContext:
     context = browser.new_context(
         viewport={"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT},
@@ -286,7 +287,7 @@ def open_screenshot_context(
         reduced_motion="reduce",
         color_scheme="light",
         java_script_enabled=javascript,
-        service_workers="block",
+        service_workers=service_workers,
         bypass_csp=True,
         locale="en-US",
         timezone_id="UTC",
