@@ -154,6 +154,10 @@ def test_a_word_after_a_spaced_dot_keeps_the_boundary() -> None:
     assert refuse_paid_checkout(". org") is None
 
 
+def test_spaced_letters_before_a_word_are_refused() -> None:
+    assert refuse_paid_checkout("x . c o m today") == "paid_checkout"
+
+
 @pytest.mark.parametrize(
     ("text", "tld"),
     (
