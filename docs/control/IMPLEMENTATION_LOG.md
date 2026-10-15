@@ -1,3 +1,32 @@
+## 2026-10-15 — Session 08 spelled email r2
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-spelled-email-r2-prompt-integrity.md`.
+
+A bare `dot` and a spaced `.` inside an email use the curated list `{com, c0m, net, io, shop, org, co}` plus lookalikes. Bracketed `at` / `dot` pairs use the IANA snapshot. `ceo at acme dot io` is an email. `ceo at acme dot md` is not. `x dot com` stays allowed. `evil[.]md` is `sensitive_data` from `refuse_sensitive_text`, `refuse_rendered_text`, and `refuse_fixture_value`. `Notes . md` stays allowed. `email_rule_matches("evil[.]md")` stays false. Separators are horizontal whitespace. The TLD module matches #82.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_spelled_email.py`. 18 passed. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the bare-`dot` email check | `test_a_spelled_email_rule_matches` | 3/15 |
+| Delete the spaced-email check | `test_a_spaced_email_uses_the_curated_list` | 1/17 |
+| Delete the square email check | `test_a_square_email_is_refused` | 2/16 |
+| Delete the parenthesis email check | `test_a_paren_email_is_refused` | 2/16 |
+| Delete the brace email check | `test_a_brace_email_is_refused` | 2/16 |
+| Delete the square host check | `test_evil_bracket_md_is_caught_by_all_three_detectors` | 1/17 |
+| Delete the parenthesis host check | `test_a_paren_md_host_is_refused` | 1/17 |
+| Delete the brace host check | `test_a_brace_md_host_is_refused` | 1/17 |
+| Point a bare `dot` at the IANA list | `test_a_bare_dot_md_email_stays` | 3/15 |
+| Point a square email at the curated list | `test_a_square_email_md_uses_iana` | 1/17 |
+| Point a parenthesis email at the curated list | `test_a_paren_email_md_uses_iana` | 1/17 |
+| Point a brace email at the curated list | `test_a_brace_email_md_uses_iana` | 1/17 |
+| Accept any spelled token | `test_a_bare_dot_md_email_stays` | 1/17 |
+| Use `\s` instead of `[ \t]` | `test_a_newline_does_not_join_an_email` | 1/17 |
+
+`test_an_ascii_email_is_refused` and `test_secret_token_at_notion_is_refused` passed.
+
+Parked: gift-text defangs on #82, Unicode hosts on #80, raster text, live S3, `CREATE_ETSY_DRAFT`, commissioning, and the session exit.
+
 ## 2026-10-15 — Session 08 spelled email
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-spelled-email-prompt-integrity.md`.
