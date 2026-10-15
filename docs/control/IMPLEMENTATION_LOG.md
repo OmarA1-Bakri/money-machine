@@ -1,3 +1,21 @@
+## 2026-10-15 — Session 08 W7: fixture artifact lineage
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-w7-prompt-integrity.md`.
+
+`bind_asset` projects a screenshot, listing image, walkthrough, or delivery PDF into one record. The storage URI is `fixture://{product_id}/{spec_version}/{output_sha256}`. `split_current` omits other products. For the named product, a different spec version, a QA status other than `passed`, or a source hash of an already-stale asset makes that asset stale. The walk repeats, so a dependent listed before its source still becomes stale. A current asset is returned unchanged. S3, the workflow chain, and commissioning stay later.
+
+`uv run pytest -q -p no:cacheprovider tests/unit/assets/test_asset_lineage.py` — 7 passed. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the spec comparison | `test_a_spec_bump_is_stale` | 1/6 |
+| Drop the product filter | `test_another_product_is_omitted` | 1/6 |
+| Delete the QA check | `test_a_qa_status_other_than_passed_is_stale` | 1/6 |
+| Source walk returns false | `test_a_stale_source_marks_the_dependent` and `test_a_dependent_listed_before_its_source_is_stale` | 2/5 |
+| One pass instead of repeating | `test_a_dependent_listed_before_its_source_is_stale` | 1/6 |
+
+The source-first row stays green when the walk runs once. The order row also dies when the source walk returns false. The spec and QA rows stay green on that source mutant because the root asset in the chain is stale for both reasons.
+
 ## 2026-10-15 — Session 08 W6 r7: catalog before the walk, page keys, every URI
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
