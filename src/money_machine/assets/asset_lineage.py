@@ -4,9 +4,9 @@ The storage URI is a fixture name. Object storage is a later wave. A product
 change is a new ``spec_version`` for one ``product_id``. Stale identity is
 ``(spec_version, output_sha256)``, so two specs can share one output hash.
 A source hash is resolved against that same spec. An unknown source is stale.
-Only a screenshot may be a source. A listing, walkthrough, or delivery PDF
-hash is stale, including a listing that names itself and two listings that
-name each other.
+Only a screenshot may be a source. Any other resolved kind is stale,
+including a listing that names itself, a delivery PDF named from a listing,
+and a screenshot named from a listing.
 """
 
 from __future__ import annotations
@@ -168,7 +168,10 @@ def _is_stale(
         return True
     if asset.qa_status != "passed":
         return True
-    if any(_source_blocked(asset, src, owned) for src in asset.source_screenshot_sha256):
+    if any(
+        _source_blocked(src, spec_version=asset.spec_version, owned=owned)
+        for src in asset.source_screenshot_sha256
+    ):
         return True
     return any(
         _source_stale(src, spec_version=asset.spec_version, stale_ids=stale_ids, known=known)
@@ -176,26 +179,17 @@ def _is_stale(
     )
 
 
-def _source_blocked(asset: BoundAsset, src: str, owned: tuple[BoundAsset, ...]) -> bool:
-    """True when this source exists and is not an allowed screenshot.
-
-    Each non-screenshot shape returns on its own line. Deleting that line
-    leaves the shape allowed. A screenshot falls through.
-    """
-    resolved = _resolve_source(owned, asset.spec_version, src)
+def _source_blocked(
+    src: str,
+    *,
+    spec_version: int,
+    owned: tuple[BoundAsset, ...],
+) -> bool:
+    """True when this source exists and is not a screenshot."""
+    resolved = _resolve_source(owned, spec_version, src)
     if resolved is None:
         return False
-    if _self_sourced(asset, resolved):
-        return True
-    if _mutually_sourced(asset, resolved):
-        return True
-    if resolved.kind == "delivery_pdf":
-        return True
-    if asset.kind == "walkthrough" and resolved.kind == "listing_image":
-        return True
-    if _one_way_listing(asset, resolved):
-        return True
-    return resolved.kind == "walkthrough"
+    return resolved.kind != "screenshot"
 
 
 def _resolve_source(
@@ -210,27 +204,6 @@ def _resolve_source(
         if found is None:
             found = candidate
     return found
-
-
-def _self_sourced(asset: BoundAsset, resolved: BoundAsset) -> bool:
-    return resolved.kind != "screenshot" and resolved.output_sha256 == asset.output_sha256
-
-
-def _mutually_sourced(asset: BoundAsset, resolved: BoundAsset) -> bool:
-    return (
-        resolved.kind != "screenshot"
-        and resolved.output_sha256 != asset.output_sha256
-        and asset.output_sha256 in resolved.source_screenshot_sha256
-    )
-
-
-def _one_way_listing(asset: BoundAsset, resolved: BoundAsset) -> bool:
-    return (
-        resolved.kind == "listing_image"
-        and asset.kind == "listing_image"
-        and resolved.output_sha256 != asset.output_sha256
-        and asset.output_sha256 not in resolved.source_screenshot_sha256
-    )
 
 
 def _source_stale(
