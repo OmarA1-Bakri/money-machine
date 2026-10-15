@@ -1,3 +1,28 @@
+## 2026-10-15 — Session 08 asset storage r2
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+Reads, discard, cleanup, and publish walk from a directory handle with `openat` and `O_NOFOLLOW`. A URI must be `pid/spec/<64-hex>` before that walk. Publish creates a temp file in that directory with `O_CREAT|O_EXCL|O_NOFOLLOW`, fsyncs it, linkat-s it into place without replacing, then fsyncs the directory. A crash before the link leaves the published key free for a retry. `internal_retrieval` reads the object, so a missing file and tampered bytes are refused. S3 still calls `require_digest`, and a tampered S3 object collides instead of being replaced. The #77 draft-client should-fixes stay parked: this branch does not edit that client.
+
+Clean suite: 52 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_asset_storage.py`. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Drop `O_NOFOLLOW` on directory opens | the eight symlink-parent rows, including publish, discard, cleanup, read, and the swap | 8/44 |
+| Drop `O_NOFOLLOW` on the file read | `test_a_symlink_file_is_not_followed` | 1/51 |
+| Drop `O_EXCL` on the temp create | `test_the_temp_file_is_created_exclusive` | 1/51 |
+| Drop `O_NOFOLLOW` on the temp create | `test_the_temp_file_is_created_without_following` | 1/51 |
+| Delete `self.read` in `internal_retrieval` | the missing-object and tampered-object rows | 2/50 |
+| Delete the stored-bytes compare | `test_tampered_bytes_are_refused` and `test_internal_retrieval_refuses_tampered_bytes` | 2/50 |
+| Delete the missing-file raise | `test_internal_retrieval_refuses_a_missing_object` | 1/51 |
+| Delete the file fsync | `test_publish_fsyncs_the_file_before_linking` | 1/51 |
+| Delete the directory fsync | `test_publish_fsyncs_the_file_before_linking` | 1/51 |
+| Delete the leaf symlink check | `test_a_temp_symlink_is_not_removed` | 1/51 |
+| Delete the S3 `require_digest` call | `test_s3_mismatched_digest_is_refused` | 1/51 |
+| Delete the S3 `refuse_collision` call | `test_s3_tampered_bytes_collide` | 1/51 |
+
+Writing straight to the published name fails the crash-retry row and the order row together. The `..` key is refused before the walk. Deleting only the dot-segment line still raises `storage path`, because the spec must be a positive integer.
+
 ## 2026-10-15 — Session 08 asset storage
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
