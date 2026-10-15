@@ -105,6 +105,7 @@ _DEFANG_ROWS = (
     "x.c0m",
     "X.C0M",
     "evil[.]md",
+    "X . COM",
 )
 _CONCEALED_ROWS = (
     "Checklist at www.etsy.com/listing/123456/planner",
@@ -194,7 +195,6 @@ def test_concealed_gift_domain_text_is_refused(scene: _Scene, name: str) -> None
         ("2130706433", "2130706433"),
         ("v1.2.3.4", "v1.2.3.4"),
         ("Notes . md", "Notes . md"),
-        ("X . COM", "X . COM"),
     ),
 )
 def test_quantities_and_examples_render(scene: _Scene, name: str, kept: str) -> None:

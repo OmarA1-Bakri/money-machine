@@ -11,7 +11,6 @@ from money_machine.assets.gift_links import refuse_paid_checkout
 def test_a_spaced_dot_host_is_refused() -> None:
     assert refuse_paid_checkout("x . com") == "paid_checkout"
     assert refuse_paid_checkout("acme . com") == "paid_checkout"
-    assert refuse_paid_checkout("X . COM") is None
 
 
 def test_a_bracket_dot_host_is_refused() -> None:
@@ -142,6 +141,11 @@ def test_a_lowercase_spaced_tld_outside_the_set_stays(text: str) -> None:
 @pytest.mark.parametrize("text", ("acme . com", "acme . c0m", "acme . net", "acme . org"))
 def test_a_lowercase_spaced_dot_at_the_end_is_refused(text: str) -> None:
     assert refuse_paid_checkout(text) == "paid_checkout"
+
+
+def test_an_all_caps_spaced_dot_is_refused() -> None:
+    for text in ("acme . NET", "acme . COM", "mail me at acme . COM", "X . COM"):
+        assert refuse_paid_checkout(text) == "paid_checkout"
 
 
 @pytest.mark.parametrize(

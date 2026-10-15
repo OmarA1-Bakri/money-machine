@@ -1,3 +1,17 @@
+## 2026-10-15 — Session 08 all-caps spaced dot
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.
+
+An all-uppercase spaced token in `{com, c0m, net, org}` refuses. `acme . NET`, `acme . COM`, `mail me at acme . COM`, and `X . COM` are `paid_checkout`. Title case stays prose, including `Done . Net` and `Go . Com`. The uppercase token is casefolded only after the case check.
+
+Clean suite: 79 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defanged_host.py tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Accept only an all-lowercase token | `test_an_all_caps_spaced_dot_is_refused` | 1/78 |
+
+Title-case rows stay green under that mutant.
+
 ## 2026-10-15 — Session 08 spaced at-sign email
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.

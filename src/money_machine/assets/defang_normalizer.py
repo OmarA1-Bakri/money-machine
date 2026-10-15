@@ -7,11 +7,11 @@ The order is fixed:
 3. Undo defanging only inside those candidates. A bare ``dot`` or a bare
    ``at`` is undone only when the next token, with spaces removed, is on
    :data:`CURATED_TLDS`. A spaced ``.`` is undone only when that token is
-   all lowercase and is ``com``, ``c0m``, ``net``, or ``org``. Case is
-   read after NFKC. The lookalike fold keeps case, and nothing lowercases
-   the token before that check. ``c0m`` is the zero spelling of ``com``,
-   and a zero in ``org`` counts. A later word still leaves the spaced
-   form alone.
+   all lowercase or all uppercase and is ``com``, ``c0m``, ``net``, or
+   ``org``. Case is read after NFKC. The lookalike fold keeps case. An
+   all-uppercase token is casefolded after that check. A mixed-case token
+   stays prose. ``c0m`` is the zero spelling of ``com``, and a zero in
+   ``org`` counts. A later word still leaves the spaced form alone.
    Bracket and parenthesis forms also accept the IANA snapshot.
 """
 
@@ -281,11 +281,14 @@ def _followed_by_word(text: str, index: int) -> bool:
 
 
 def _spaced_dot_tld(token: str) -> bool:
-    """Accept only an all-lowercase com, c0m, net, or org.
+    """Accept an all-lowercase or all-uppercase com, c0m, net, or org.
 
-    The token is already NFKC and lookalike-folded. Case is read here,
-    before any lowercasing. A lowercase zero inside org counts.
+    The token is already NFKC and lookalike-folded. Case is read here.
+    An all-uppercase token is casefolded after that check. A mixed-case
+    token stays prose. A lowercase zero inside org counts.
     """
+    if token.isupper():
+        token = token.casefold()
     if not token.islower():
         return False
     folded = token.casefold()
