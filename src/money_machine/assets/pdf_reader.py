@@ -8,6 +8,7 @@ from typing import Literal
 
 _WS = b"\x00\t\n\x0c\r "
 _DELIM = _WS + b"()<>[]{}/%"
+_MAX_DEPTH = 64
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,7 +193,7 @@ class _Reader:
             hex_digits += "0"
         return PdfText(_decode_text(bytes.fromhex(hex_digits)), hex_digits)
 
-    def _array(self) -> tuple[PdfObject, ...]:
+    def _array(self, depth: int) -> tuple[PdfObject, ...]:
         self.i += 1
         items: list[PdfObject] = []
         while True:
@@ -200,9 +201,9 @@ class _Reader:
             if self._at(b"]"):
                 self.i += 1
                 return tuple(items)
-            items.append(self.value())
+            items.append(self.value(depth + 1))
 
-    def _dict(self) -> dict[str, PdfObject] | PdfStream:
+    def _dict(self, depth: int) -> dict[str, PdfObject] | PdfStream:
         self.i += 2
         fields: dict[str, PdfObject] = {}
         while True:
@@ -211,7 +212,7 @@ class _Reader:
                 self.i += 2
                 break
             key = self._name().value
-            fields[key] = self.value()
+            fields[key] = self.value(depth + 1)
         self._skip()
         if not self._at(b"stream"):
             return fields
@@ -227,14 +228,16 @@ class _Reader:
         self.i += length
         return PdfStream(fields, _inflate(fields, payload))
 
-    def value(self) -> PdfObject:
+    def value(self, depth: int = 0) -> PdfObject:
+        if depth > _MAX_DEPTH:
+            raise ValueError("pdf depth")
         self._skip()
         if self.i >= self.n:
             raise ValueError("pdf value")
         if self._at(b"<<"):
-            return self._dict()
+            return self._dict(depth)
         if self._at(b"["):
-            return self._array()
+            return self._array(depth)
         if self._at(b"("):
             return self._literal()
         if self._at(b"<"):

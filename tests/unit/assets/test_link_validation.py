@@ -182,12 +182,18 @@ def _annot(
     *,
     catalog: str = "",
     objects: dict[int, bytes] | None = None,
+    page_extra: str = "",
+    root: str | None = None,
 ) -> bytes:
     extra = f" {catalog}" if catalog else ""
+    catalog_body = root if root is not None else f"<< /Type /Catalog /Pages 2 0 R{extra} >>"
+    page_suffix = f" {page_extra}" if page_extra else ""
     built = {
-        1: f"1 0 obj\n<< /Type /Catalog /Pages 2 0 R{extra} >>\nendobj\n".encode(),
+        1: f"1 0 obj\n{catalog_body}\nendobj\n".encode(),
         2: b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
-        3: b"3 0 obj\n<< /Type /Page /Parent 2 0 R /Annots [4 0 R] >>\nendobj\n",
+        3: (
+            f"3 0 obj\n<< /Type /Page /Parent 2 0 R /Annots [4 0 R]{page_suffix} >>\nendobj\n"
+        ).encode(),
         4: _obj(4, body),
     }
     if objects:
@@ -250,6 +256,27 @@ def test_a_link_additional_action_is_malformed() -> None:
 
 def test_an_extra_annotation_key_is_malformed() -> None:
     refusal = _raise(_annot(_good_annot(extra="/PA [0 0 1 1]")), accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_a_link_missing_border_is_malformed() -> None:
+    body = f"<< /Type /Annot /Subtype /Link /Rect [0 0 1 1] /F 4 /A {_action_dict(_GOOD)} >>"
+    refusal = _raise(_annot(body), accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_a_link_type_must_be_annot() -> None:
+    body = (
+        "<< /Type /XObject /Subtype /Link /Rect [0 0 1 1] /Border [0 0 0] /F 4 /A "
+        f"{_action_dict(_GOOD)} >>"
+    )
+    refusal = _raise(_annot(body), accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_an_action_type_must_be_action() -> None:
+    action = f"<< /Type /Font /S /URI /URI {_literal(_GOOD)} >>"
+    refusal = _raise(_annot(_annot_dict(action)), accepted=_accepted_good())
     assert refusal.code == "malformed"
 
 
@@ -319,7 +346,7 @@ def test_a_catalog_open_action_is_malformed() -> None:
 
 
 def test_a_catalog_additional_action_is_malformed() -> None:
-    pdf = _annot(_good_annot(), catalog="/AA << /WC << /S /Launch >> >>")
+    pdf = _annot(_good_annot(), catalog="/AA << /WC << /S /URI >> >>")
     refusal = _raise(pdf, accepted=_accepted_good())
     assert refusal.code == "malformed"
 
@@ -358,6 +385,48 @@ def test_a_catalog_embedded_file_is_malformed() -> None:
         catalog="/Names 5 0 R",
         objects={5: _obj(5, "<< /EmbeddedFiles << /Names [] >> >>")},
     )
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_an_extra_catalog_key_is_malformed() -> None:
+    pdf = _annot(_good_annot(), catalog="/Outlines << /Type /Outlines >>")
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_a_catalog_missing_type_is_malformed() -> None:
+    pdf = _annot(_good_annot(), root="<< /Pages 2 0 R >>")
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_a_page_launch_action_is_malformed() -> None:
+    pdf = _annot(_good_annot(), page_extra="/Foo << /S /Launch >>")
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_an_unreferenced_launch_action_is_malformed() -> None:
+    pdf = _annot(_good_annot(), objects={5: _obj(5, "<< /S /Launch >>")})
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_a_deep_page_nest_is_malformed() -> None:
+    nested = "[" * 1200 + "0" + "]" * 1200
+    pdf = _annot(_good_annot(), page_extra=f"/Resources {nested}")
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_a_deep_reference_chain_is_malformed() -> None:
+    objects: dict[int, bytes] = {}
+    for hop in range(80):
+        number = 10 + hop
+        body = "<< >>" if hop == 79 else f"<< /Next {number + 1} 0 R >>"
+        objects[number] = _obj(number, body)
+    pdf = _annot(_good_annot(), page_extra="/Next 10 0 R", objects=objects)
     refusal = _raise(pdf, accepted=_accepted_good())
     assert refusal.code == "malformed"
 
@@ -735,6 +804,8 @@ def _assert_readme_link_shape(pdf: bytes, count: int) -> None:
     root = doc.deref(doc.trailer.get("Root"))
     assert isinstance(root, dict)
     assert set(root) == {"Pages", "Type"}
+    assert isinstance(root["Type"], PdfName)
+    assert root["Type"].value == "Catalog"
     pages = doc.deref(root.get("Pages"))
     assert isinstance(pages, dict)
     kids = doc.deref(pages.get("Kids"))

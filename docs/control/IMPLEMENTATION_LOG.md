@@ -1,3 +1,33 @@
+## 2026-10-15 — Session 08 W6 r5: catalog keys, depth cap, and SF kill rows
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+The catalog is the trailer `/Root`. Its keys must equal `{Type, Pages}`, which is what the README generator emits. The README must-pass asserts that set and `/Type /Catalog`. `/Outlines`, `/OpenAction`, `/AA`, `/Names`, `/AcroForm`, `/Launch`, and `/JavaScript` are outside the set. A dictionary other than a link `/A` whose `/S` is `/Launch` is refused, including an xref object nothing references. The reader and the graph walk refuse nesting deeper than 64. `validate_pdf_links` maps that `ValueError` to `malformed`.
+
+The round-4 membership row was 1 failed, 63 passed. `expected[index] in uris` on that 64-test file is 2 failed, 62 passed.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=line -k "not mutant and not accepts and not dropping" tests/unit/assets/test_link_validation.py`. The source was restored after each run. The clean link file is 73 passed.
+
+- Weakening annotation equality to a subset check: 1 failed, 72 passed (`test_a_link_missing_border_is_malformed`).
+- Weakening catalog equality to a subset check: 1 failed, 72 passed (`test_a_catalog_missing_type_is_malformed`).
+- Deleting the `/Type /Annot` check: 1 failed, 72 passed (`test_a_link_type_must_be_annot`).
+- Deleting the `/Type /Action` check: 1 failed, 72 passed (`test_an_action_type_must_be_action`).
+- Deleting the unreferenced-object scan: 1 failed, 72 passed (`test_an_unreferenced_launch_action_is_malformed`).
+- Adding `Outlines` to the catalog extras: 1 failed, 72 passed (`test_an_extra_catalog_key_is_malformed`).
+- Adding `OpenAction` to the catalog extras: 1 failed, 72 passed (`test_a_catalog_open_action_is_malformed`).
+- Adding `AA` to the catalog extras: 1 failed, 72 passed (`test_a_catalog_additional_action_is_malformed`).
+- Adding `Names` to the catalog extras: 2 failed, 71 passed (`test_a_names_javascript_is_malformed`, `test_a_catalog_embedded_file_is_malformed`).
+- Adding `AcroForm` to the catalog extras: 1 failed, 72 passed (`test_a_catalog_acroform_is_malformed`).
+- Adding `JavaScript` to the catalog extras: 1 failed, 72 passed (`test_a_catalog_javascript_key_is_malformed`).
+- Adding `Launch` to the catalog extras: 1 failed, 72 passed (`test_a_catalog_launch_key_is_malformed`).
+- Deleting the reader depth cap: 1 failed, 72 passed (`test_a_deep_page_nest_is_malformed`).
+- Deleting the graph depth cap: 1 failed, 72 passed (`test_a_deep_reference_chain_is_malformed`).
+- Deleting the graph `/S /Launch` check: 2 failed, 71 passed (`test_a_page_launch_action_is_malformed`, `test_an_unreferenced_launch_action_is_malformed`).
+- Adding `Launch` to the `/S` allow-set: 1 failed, 72 passed (`test_a_launch_action_is_malformed`).
+- Comparing an equal-length URI with `expected[index] in uris`: 2 failed, 71 passed (`test_links_must_keep_accepted_order`, `test_the_readme_uris_round_trip_exactly`).
+
+No measured row above survived. Escaped keys, duplicate decoded names, and non-Link actions stay open.
+
 ## 2026-10-15 — Session 08 W6 r4: exact link shape and object-graph refusals
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
