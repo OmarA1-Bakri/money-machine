@@ -1,3 +1,40 @@
+## 2026-10-15 — Session 08 W6 r6: decoded names, duplicate keys, and non-URI actions
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+This round answers owner review 5529339737 on `ba63c18`. The reader decodes `#xx` once, inside `_Reader._name`, and later lookups use that stored name. A dictionary with two keys that decode to one name, or with the same raw key twice, raises `ValueError`. The root `/Names` object is read with `PdfDocument.get` even when another catalog key already visited it, and `/JavaScript` or `/EmbeddedFiles` there is refused. The reader, the page walk, and the graph walk stop past depth 64. An annotation in `/Annots` must have subtype `Link`. Any `/S` other than `/URI` is refused, including an outline action. An indirect `/A` or `/URI` is still one hop through `PdfDocument.get`. The `/sw.js` continuation is unchanged.
+
+Clean link file: 90 passed. Link file plus gift policy: 132 passed, 2 deselected. The same two files with every `classic_pdf` name `#xx`-escaped: 132 passed, 2 deselected. Gift PDF and screenshot files under that escape: 138 passed, 2 deselected. Each mutant below was run again on the escaped fixtures and failed the same tests.
+
+Command: `uv run pytest -q -p no:cacheprovider --tb=line -k "not mutant and not accepts and not dropping"`. Source restored after each run.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| `decode_pdf_name` returns the raw token | six link rows (`test_a_hash_escaped_s_is_uri`, `test_an_escaped_annots_key_is_not_hidden`, `test_an_escaped_subtype_is_a_link`, `test_an_escaped_kids_key_is_walked`, `test_an_escaped_metadata_key_is_paid_checkout`, `test_a_decoded_kids_twin_is_malformed`) and four gift rows (`test_an_escaped_annots_key_is_paid_checkout`, `test_an_escaped_subtype_link_is_paid_checkout`, `test_an_escaped_kids_key_is_walked`, `test_an_escaped_metadata_key_is_paid_checkout`) | 10/122 on both files |
+| Delete the duplicate-name check | `test_a_decoded_action_twin_is_malformed`, `test_a_decoded_s_twin_is_malformed`, `test_a_decoded_kids_twin_is_malformed`, `test_a_repeated_raw_action_key_is_malformed` | 4/86 |
+| Delete the direct `/Names` read | `test_a_shared_names_reference_is_malformed` for JavaScript and EmbeddedFiles | 2/88 |
+| Add `Names` to the catalog extras | `test_a_names_tree_without_scripts_is_malformed` | 1/89 |
+| Delete the reader depth cap | `test_a_deep_page_nest_is_malformed` (500 nested arrays; the uncapped parse raises `RecursionError`) | 1/89 |
+| Delete the graph depth cap | `test_a_deep_reference_chain_is_malformed` (1500-object `/Next` chain; uncapped walk raises `RecursionError`) | 1/89 |
+| Delete the page-walk depth cap | `test_a_deep_kids_chain_is_paid_checkout` | 1/131 on both files |
+| Delete the subtype allowlist | `test_a_non_link_annotation_is_malformed` for Widget, Screen, and RichMedia | 3/87 |
+| Add `Widget` to the subtype allow-set | `test_a_non_link_annotation_is_malformed[Widget]` | 1/89 |
+| Delete the graph `/S` check | launch, JavaScript, SubmitForm, ImportData, GoToR, the page launch, the unreferenced launch, and `test_an_outline_launch_is_malformed` | 8/82 |
+| Add `Launch` to the `/S` allow-set | the link, page, unreferenced, and outline launch rows | 4/86 |
+| Delete the unreferenced-object scan | `test_an_unreferenced_launch_action_is_malformed` | 1/89 |
+| Annotation equality weakened to a subset check | `test_a_link_missing_border_is_malformed` | 1/89 |
+| Catalog equality weakened to a subset check | `test_a_catalog_missing_type_is_malformed` | 1/89 |
+| Delete the `/Type /Annot` check | `test_a_link_type_must_be_annot` | 1/89 |
+| Delete the `/Type /Action` check | `test_an_action_type_must_be_action` | 1/89 |
+| Add `Outlines`, `OpenAction`, `AA`, `AcroForm`, `JavaScript`, or `Launch` to the catalog extras | that key's own row | 1/89 each |
+| `expected[index] in uris` | `test_links_must_keep_accepted_order`, `test_the_readme_uris_round_trip_exactly` | 2/88 |
+
+On the 64-test file at `ba63c18`, that membership mutant is 2 failed, 62 passed. An indirect `/URI` is one hop. The body does not call it a direct string.
+
+`test_a_widget_launch_is_malformed` and `test_a_widget_javascript_is_malformed` stay refused if only one of the subtype check and the `/S` check is removed. They are not unique kills. The `/S /URI` subtype rows and the outline `/Launch` row are the unique ones.
+
+Deleting the URI-stream `raise` still passes (90 passed). Returning the stream bytes remains the kill. Adding `Names` to the extras no longer fails the JavaScript or EmbeddedFiles rows, because the direct `/Names` read still refuses them.
+
 ## 2026-10-15 — Session 08 W6 r5: catalog keys, depth cap, and SF kill rows
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.

@@ -4,14 +4,16 @@
 ``/URI`` string. It does not read an annotation-level ``/URI``.
 ``delivery_link_uris`` is the same page walk for link validation. A link
 annotation must be exactly ``Type``, ``Subtype``, ``Rect``, ``Border``,
-``F``, and ``A``, with ``/Subtype /Link``. The action is exactly ``S`` and
-``URI``, plus ``Type /Action`` when ``Type`` is present. ``/S`` must be
-``/URI`` after ``#xx`` decoding. An indirect action or URI is resolved one
-hop. A URI stream is refused. The catalog must equal the keys the generator
-emits, ``Type`` and ``Pages``. ``/Outlines``, ``/OpenAction``, ``/AA``,
-``/Names``, and ``/AcroForm`` are not in that set. A dictionary other than a
-link action whose ``/S`` is ``/Launch`` is refused, including an object
-nothing references. Nesting deeper than 64 raises ``ValueError``.
+``F``, and ``A``, with ``/Subtype /Link``. Any other annotation subtype is
+refused. The action is exactly ``S`` and ``URI``, plus ``Type /Action`` when
+``Type`` is present. ``/S`` must be ``/URI`` anywhere in the graph, including
+a link action and an outline. An indirect action or URI is resolved one hop.
+A URI stream is refused. The catalog must equal the keys the generator emits,
+``Type`` and ``Pages``. ``/Outlines``, ``/OpenAction``, ``/AA``, ``/Names``,
+and ``/AcroForm`` are not in that set. The root ``/Names`` entry is read on
+its own, so a shared object cannot hide ``/JavaScript`` or ``/EmbeddedFiles``.
+Nesting deeper than 64 raises ``ValueError``. Names are decoded once in the
+reader, and a dictionary with two keys for one name is refused there.
 """
 
 from __future__ import annotations
@@ -27,17 +29,12 @@ from money_machine.assets.pdf_reader import (
     PdfRef,
     PdfStream,
     PdfText,
-    decode_pdf_name,
     token_boundary,
 )
 
 
 def _name_is(value: PdfObject | None, expected: str) -> bool:
-    return isinstance(value, PdfName) and decode_pdf_name(value.value) == expected
-
-
-def _decoded(fields: dict[str, PdfObject]) -> dict[str, PdfObject]:
-    return {decode_pdf_name(key): value for key, value in fields.items()}
+    return isinstance(value, PdfName) and value.value == expected
 
 
 def _once(doc: PdfDocument, value: PdfObject | None) -> PdfObject | None:
@@ -57,7 +54,10 @@ def _pages(
     doc: PdfDocument,
     node: PdfObject | None,
     seen: frozenset[int] = frozenset(),
+    depth: int = 0,
 ) -> tuple[dict[str, PdfObject], ...]:
+    if depth > _MAX_DEPTH:
+        raise ValueError("pdf depth")
     if isinstance(node, PdfRef):
         if node.number in seen:
             raise ValueError("pdf page")
@@ -69,7 +69,7 @@ def _pages(
     kids = doc.deref(page.get("Kids"))
     if not isinstance(kids, tuple):
         raise ValueError("pdf page")
-    return tuple(item for kid in kids for item in _pages(doc, kid, seen))
+    return tuple(item for kid in kids for item in _pages(doc, kid, seen, depth + 1))
 
 
 def _text_of(value: PdfObject | None) -> str | None:
@@ -111,6 +111,7 @@ _ANNOT_ALLOW_EXTRA: frozenset[str] = frozenset()
 _ACTION_ALLOW_EXTRA: frozenset[str] = frozenset()
 _CATALOG_ALLOW_EXTRA: frozenset[str] = frozenset()
 _ALLOWED_S: frozenset[str] = frozenset({"URI"})
+_ALLOWED_SUBTYPE: frozenset[str] = frozenset({"Link"})
 _MAX_DEPTH = 64
 
 
@@ -118,9 +119,10 @@ def delivery_link_uris(pdf: bytes) -> tuple[str, ...]:
     """Return each link URI from the page walk, or raise ``ValueError``.
 
     Annotation keys must equal the Chromium set. The action is ``S`` and
-    ``URI``, with ``Type /Action`` when ``Type`` is present. ``/S`` must
-    decode to ``/URI``. An indirect action or URI resolves one hop. A URI
-    stream is refused. The catalog keys must equal ``Type`` and ``Pages``.
+    ``URI``, with ``Type /Action`` when ``Type`` is present. ``/S`` must be
+    ``/URI``. An indirect action or URI resolves one hop. A URI stream is
+    refused. The catalog keys must equal ``Type`` and ``Pages``. An annotation
+    whose subtype is not ``Link`` is refused.
     """
     doc = PdfDocument(pdf)
     _refuse_graph(doc)
@@ -131,7 +133,7 @@ def delivery_link_uris(pdf: bytes) -> tuple[str, ...]:
         if not isinstance(annots, tuple):
             continue
         for item in annots:
-            annot = _decoded(_dict(doc.deref(item)))
+            annot = _dict(doc.deref(item))
             if not _name_is(annot.get("Subtype"), "Link"):
                 continue
             uris.append(_uri_action(doc, annot))
@@ -139,10 +141,12 @@ def delivery_link_uris(pdf: bytes) -> tuple[str, ...]:
 
 
 def _refuse_graph(doc: PdfDocument) -> None:
-    """Refuse a catalog whose keys are not the generator's, and stray launches.
+    """Refuse a catalog whose keys are not the generator's, and a non-URI ``/S``.
 
-    The catalog is the trailer ``/Root``. Objects that nothing references are
-    walked afterwards. Nesting deeper than ``_MAX_DEPTH`` is refused.
+    The catalog is the trailer ``/Root``. Its ``/Names`` entry is resolved
+    directly, including when another key already visited that object. Objects
+    that nothing references are walked afterwards. Nesting deeper than
+    ``_MAX_DEPTH`` is refused.
     """
     seen: set[int] = set()
 
@@ -155,9 +159,10 @@ def _refuse_graph(doc: PdfDocument) -> None:
             seen.add(value.number)
             value = doc.get(value.number)
         if isinstance(value, dict):
-            fields = _decoded(value)
-            _refuse_dict(fields, parent_key)
-            for key, child in fields.items():
+            if parent_key == "Root":
+                _refuse_root_names(doc, value)
+            _refuse_dict(value, parent_key)
+            for key, child in value.items():
                 scan(child, key, depth + 1)
             return
         if isinstance(value, tuple):
@@ -173,11 +178,27 @@ def _refuse_graph(doc: PdfDocument) -> None:
             scan(PdfRef(number, 0), None, 0)
 
 
+def _refuse_root_names(doc: PdfDocument, fields: dict[str, PdfObject]) -> None:
+    """Refuse ``/JavaScript`` or ``/EmbeddedFiles`` on the root ``/Names`` object."""
+    names = fields.get("Names")
+    if isinstance(names, PdfRef):
+        names = doc.get(names.number)
+    if not isinstance(names, dict):
+        return
+    if "JavaScript" in names or "EmbeddedFiles" in names:
+        raise ValueError("pdf names entry")
+
+
 def _refuse_dict(fields: dict[str, PdfObject], parent_key: str | None) -> None:
     if parent_key == "Root" and frozenset(fields) - _CATALOG_ALLOW_EXTRA != _CATALOG_KEYS:
         raise ValueError("pdf catalog keys")
-    if parent_key != "A" and _name_is(fields.get("S"), "Launch"):
-        raise ValueError("pdf s launch")
+    if parent_key == "Annots":
+        subtype = fields.get("Subtype")
+        if not isinstance(subtype, PdfName) or subtype.value not in _ALLOWED_SUBTYPE:
+            raise ValueError("pdf annot subtype")
+    action = fields.get("S")
+    if isinstance(action, PdfName) and action.value not in _ALLOWED_S:
+        raise ValueError("pdf action s")
 
 
 def _uri_action(doc: PdfDocument, annot: dict[str, PdfObject]) -> str:
@@ -188,14 +209,12 @@ def _uri_action(doc: PdfDocument, annot: dict[str, PdfObject]) -> str:
         raise ValueError("pdf link type")
     if not _name_is(annot.get("Subtype"), "Link"):
         raise ValueError("pdf link subtype")
-    action = _decoded(_dict(_once(doc, annot.get("A"))))
+    action = _dict(_once(doc, annot.get("A")))
     keys = frozenset(action) - _ACTION_ALLOW_EXTRA
     if keys == _ACTION_WITH_TYPE and not _name_is(action.get("Type"), "Action"):
         raise ValueError("pdf action type")
     if keys != _ACTION_WITH_TYPE and keys != _ACTION_BARE:
         raise ValueError("pdf action keys")
-    if not any(_name_is(action.get("S"), name) for name in _ALLOWED_S):
-        raise ValueError("pdf action s")
     resolved = _once(doc, action.get("URI"))
     if isinstance(resolved, PdfStream):
         raise ValueError("pdf uri stream")

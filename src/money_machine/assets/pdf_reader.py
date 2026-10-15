@@ -134,7 +134,8 @@ class _Reader:
         start = self.i
         while self.i < self.n and self.data[self.i] not in _DELIM:
             self.i += 1
-        return PdfName(self.data[start : self.i].decode("latin-1"))
+        raw = self.data[start : self.i].decode("latin-1")
+        return PdfName(decode_pdf_name(raw))
 
     def _literal(self) -> PdfText:
         self.i += 1
@@ -212,6 +213,8 @@ class _Reader:
                 self.i += 2
                 break
             key = self._name().value
+            if key in fields:
+                raise ValueError("pdf duplicate name")
             fields[key] = self.value(depth + 1)
         self._skip()
         if not self._at(b"stream"):
@@ -282,7 +285,11 @@ def _decode_text(raw: bytes) -> str:
 
 
 def decode_pdf_name(raw: str) -> str:
-    """Decode a PDF name's ``#xx`` escapes. The reader stores the raw token."""
+    """Decode one PDF name's ``#xx`` escapes.
+
+    The reader calls this while storing the name. Key lookups use that stored
+    value and do not decode a second time.
+    """
     chars: list[str] = []
     index = 0
     while index < len(raw):
@@ -304,9 +311,9 @@ def decode_pdf_name(raw: str) -> str:
 def _filter_names(fields: dict[str, PdfObject]) -> tuple[str, ...]:
     found = fields.get("Filter")
     if isinstance(found, PdfName):
-        return (decode_pdf_name(found.value),)
+        return (found.value,)
     if isinstance(found, tuple):
-        return tuple(decode_pdf_name(item.value) for item in found if isinstance(item, PdfName))
+        return tuple(item.value for item in found if isinstance(item, PdfName))
     return ()
 
 
