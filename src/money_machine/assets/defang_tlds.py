@@ -1,8 +1,9 @@
 """TLD lists for the shared defang normalizer.
 
-A bare ``dot``, a bare ``at``, and a spaced ``.`` use :data:`CURATED_TLDS`
-plus a zero lookalike. Square, parenthesis, and brace defangs use the
-embedded IANA snapshot plus that curated set, so ``c0m`` is included.
+A bare ``dot`` and a bare ``at`` use :data:`CURATED_TLDS` plus a zero
+lookalike. A spaced ``.`` is decided in the normalizer and is not this
+set. Square, parenthesis, and brace defangs use the embedded IANA
+snapshot plus that curated set, so ``c0m`` is included.
 The snapshot is ``tlds-alpha-by-domain.txt`` version 2026101500, fetched
 2026-10-15 and lowercased. Nothing here contacts the network.
 """

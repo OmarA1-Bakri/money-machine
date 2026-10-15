@@ -63,6 +63,277 @@ Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/asse
 | Delete the `c0m` check | `test_a_leet_com_host_is_refused` | 1/48 |
 
 Parked: uppercase on-host URIs, `file:` allow, sendBeacon, raster text, `_prepare` non-ASCII, spelled dots other than `com`, leet digits other than `c0m`, bare `127.1`, live S3, `CREATE_ETSY_DRAFT`, commissioning, and the session exit.
+## 2026-10-15 — Session 08 spaced-dot case r7 (#80)
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-punycode-host-r7-prompt-integrity.md`. This restores the lowercase gate that r5 removed. `acme . NET` stays parked.
+
+A spaced `.` refuses only when the token is all lowercase and, after that check, casefolds into `{com, c0m, net, org}`. Case is read after NFKC. Uppercase lookalikes fold to uppercase ASCII, so a Cyrillic capital `O` in `com` stays prose. A lowercase Cyrillic `o` still refuses. `Done . Net`, `Done . Net.`, `Done . Ｎｅｔ`, `Go . Com`, and `See . Org` return None. `acme . com`, `acme . c0m`, `acme . net`, and `mail me at acme . com` return `paid_checkout`. `X . COM` stays again.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_defanged_host.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. 77 passed. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the lowercase check | `test_a_spaced_dot_host_is_refused` (`X . COM` stays) | 7/70 |
+| Reject only `isupper` | `test_a_capitalised_spaced_dot_at_the_end_stays[Go . Com]` | 6/71 |
+| Fold capital Cyrillic `O` to lowercase `o` | `test_an_uppercase_lookalike_spaced_dot_stays` | 1/76 |
+| Skip NFKC | `test_a_fullwidth_lowercase_spaced_dot_is_refused` | 4/73 |
+| Casefold after NFKC | `test_a_capitalised_spaced_dot_at_the_end_stays[Done . Ｎｅｔ]` | 7/70 |
+
+Rejecting only `isupper` leaves `X . COM` green. Deleting the lowercase check refuses it. `Plan 2 . Net profit` stays green for both.
+
+## 2026-10-15 — Session 08 end-of-text spaced refuse (#80)
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-punycode-host-r6-prompt-integrity.md`.
+
+`mail me at acme . com` and `mail me at acme . c0m` are the whole text. The TLD is the last token. Each returns `paid_checkout`. Dropping `c0m` fails only the `c0m` row. Dropping `com` fails the `com` row and leaves the `c0m` row green. Skipping the undo when the token ends the text fails both rows. `Plan 2 . Net profit` stays green for that mutant.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_defanged_host.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. 68 passed. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Skip the undo when the token ends the text | both `test_an_end_of_text_spaced_form_is_refused` rows | 9/59 |
+| Drop `com` | `test_an_end_of_text_spaced_form_is_refused[mail me at acme . com-com]` | 6/62 |
+| Drop `c0m` | `test_an_end_of_text_spaced_form_is_refused[mail me at acme . c0m-c0m]` | 1/67 |
+
+## 2026-10-15 — Session 08 spaced-dot set (#80)
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-punycode-host-r5-prompt-integrity.md`. This supersedes the r4 lowercase gate for the spaced form. #81 and #82 are not updated.
+
+A spaced `.` is undone when the token casefolds into `{com, c0m, net, org}`, wherever that token sits, including at the end of the text. `c0m` is the zero spelling of `com`. A zero inside `org` (`0rg`) also counts. Letter lookalikes are folded first. A later word still skips the undo, so `Plan 2 . Net profit` stays prose. `Rest . Co`, `Plan . Io`, `Rest . Co.`, `Plan . Io!`, `Pick one . Shop`, `Pick one . Shop local`, and `Tea . Co op` return None. `X . COM` refuses again. Bare `dot`, bare `at`, and bracket forms stay on the curated list.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_defanged_host.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. 68 passed. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Require `islower` | `test_a_spaced_dot_host_is_refused` | 1/67 |
+| Use `CURATED_TLDS` for the spaced form | `Pick one . Shop`, `x . shop`, `x . sh0p`, `acme . io`, and `acme . co` | 10/58 |
+| Drop `c0m` | `test_a_lowercase_spaced_dot_at_the_end_is_refused[mail me at acme . c0m]` | 1/67 |
+| Drop `net` | `test_a_lowercase_spaced_dot_at_the_end_is_refused[acme . net]` | 1/67 |
+| Drop `org` | `test_a_lowercase_spaced_dot_at_the_end_is_refused[acme . org]` | 1/67 |
+| Drop the zero map | `test_a_spaced_zero_lookalike_is_refused` | 1/67 |
+| Add `shop` to the zero targets | `test_a_lowercase_spaced_tld_outside_the_set_stays[x . sh0p]` | 1/67 |
+| Drop the Cyrillic small `o` fold | `test_a_lowercase_lookalike_spaced_dot_is_refused` | 1/67 |
+| Drop the spaced-dot word boundary | `test_quantities_and_plain_names_stay` | 1/67 |
+
+## 2026-10-15 — Session 08 spaced-dot case (#80)
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-punycode-host-r4-prompt-integrity.md`.
+
+A spaced `.` is undone only when the TLD word is all lowercase and, after that check, casefolds into `{com, c0m, net, org}`. Title case and all caps stay prose, including at the end of the text. A lowercase Cyrillic `o` still folds to `com` and refuses. Bare `dot`, bare `at`, and bracket forms stay on the curated list.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_defanged_host.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. 65 passed. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the lowercase check | `test_a_capitalised_spaced_dot_at_the_end_stays[Done . Net]` and `test_a_spaced_dot_host_is_refused` | 2/63 |
+| Reject only `isupper` | `test_a_capitalised_spaced_dot_at_the_end_stays[Done . Net]` | 1/64 |
+| Casefold the token inside `_read_tld` | the same two rows as deleting the lowercase check | 2/63 |
+| Use `CURATED_TLDS` for the spaced form | `x . shop`, `acme . io`, and `acme . co` | 3/62 |
+| Drop `c0m` | `test_a_lowercase_spaced_dot_at_the_end_is_refused[mail me at acme . c0m]` | 1/64 |
+| Drop `net` | `test_a_lowercase_spaced_dot_at_the_end_is_refused[acme . net]` | 1/64 |
+| Drop `org` | `test_a_lowercase_spaced_dot_at_the_end_is_refused[acme . org]` | 1/64 |
+| Drop the Cyrillic small `o` fold | `test_a_lowercase_lookalike_spaced_dot_is_refused` | 1/64 |
+
+## 2026-10-15 — Session 08 shared defang normalizer (#80)
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-punycode-host-r3-prompt-integrity.md`.
+
+`normalize_defanged` is the only defang pipeline. It folds, finds candidates, then undoes defanging inside those spans. Gift checkout, screenshot text, and the secret-host check call it. A bare `dot`, a bare `at`, or a spaced `.` undoes only for `{com, c0m, net, io, shop, org, co}` plus a zero lookalike. Bracket forms also accept the IANA snapshot. `fíxture.notion.site` and a fullwidth label are refused from `_capture_secret_link` and from `_allowed_secret_host`. A PDF with that host raises `host` before the raw allowlist. `urlparse` does not IDNA-encode. The docstring does not say parsing produces `xn--`.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_defanged_host.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. 50 passed. Gift PDF rows for the defanged names and `Notes . md`: 38 passed, 42 deselected. Source restored after each mutant. Counts are that 50-test set unless noted.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Detect candidates before the fold | `test_step_order_is_fold_then_candidates_then_undo` | 3/47 |
+| Email TLD `{2,}` to `{3,}` | `test_a_bare_dot_email_uses_the_curated_list` | 4/46 |
+| Host detector skips the normalizer | `test_each_detector_calls_the_normalizer` | 17/33 |
+| Email detector skips the normalizer | `test_each_detector_calls_the_normalizer` | 13/37 |
+| URL detector skips the normalizer | `test_each_detector_calls_the_normalizer` | 2/48 |
+| Drop the capture-site normalizer call | `test_secret_host_capture_calls_the_normalizer` | 1/49 |
+| Drop the allowlist normalizer call | `test_allowed_secret_host_calls_the_normalizer` | 1/49 |
+| Drop the spaced-dot word boundary | `test_quantities_and_plain_names_stay` | 1/49 |
+| ` _secret_host_is_ascii` returns true | `test_a_unicode_homoglyph_host_is_refused` | 3/11 on the punycode plus normalizer files |
+
+Parked: live S3, `CREATE_ETSY_DRAFT`, commissioning, and the session exit.
+
+## 2026-10-15 — Session 08 punycode host r2
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-punycode-host-r2-prompt-integrity.md`.
+
+A non-ASCII secret host is refused before the `xn--` check. `urlparse` does not IDNA-encode, so `fíxture.notion.site` and a fullwidth label contain no `xn--`. Both are `secret link host is not allowed`. A plain `fixture.notion.site` host stays allowed. The punycode PDF row passes a checker that raises if it is called. The curated and IANA defang lists stay on #81 and #82.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_punycode_host.py tests/unit/integrations/notion/test_publishing.py -k "punycode or secret_link_host or unicode or fullwidth"`. 10 passed, 172 deselected. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the non-ASCII host return | `test_a_unicode_homoglyph_host_is_refused` | 2/8 |
+| Delete the `xn--` host return | `test_a_punycode_notion_host_is_refused` | 1/9 |
+
+Parked: uppercase on-host URIs, gift and screenshot defangs, live S3, `CREATE_ETSY_DRAFT`, commissioning, and the session exit.
+
+## 2026-10-15 — Session 08 punycode host
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+A secret hostname containing `xn--` is refused. A delivery link with that host raises `host`. A plain `fixture.notion.site` link still validates. Uppercase hosts stay parked because the raw netloc is folded in `link_validation.py`, which pull #79 owns. Action 8 stays on #78. Action 9 stays on #77. `/Resources` stays `{ExtGState, Font, ProcSet}`.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_punycode_host.py tests/unit/integrations/notion/test_publishing.py -k "punycode or secret_link_host"`. 8 passed, 172 deselected. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the `xn--` host return | `test_a_punycode_notion_host_is_refused` | 1/7 |
+
+The plain Notion host row and the existing secret-host rows stay green when that return is removed.
+
+Parked: uppercase on-host URIs, `file:` allow, sendBeacon, spelled-out emails, raster text, `_prepare` non-ASCII, live S3, `CREATE_ETSY_DRAFT`, commissioning, and the session exit.
+## 2026-10-15 — Session 08 count punctuation
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-count-punctuation-prompt-integrity.md`.
+
+A separator run beside `review(s)`, `rating(s)`, `sold`, or `orders` now includes `;`, `,`, `:`, `=`, and `(`. `500; reviews`, `reviews, 500`, `500 : reviews`, `500 = reviews`, `500 (reviews)`, `Reviews: +500`, `Sold: 500`, and `Orders: 12` are class claims. `1,000` and `4.9` stay whole. `500, reviews` stays a class claim when the separator comma is removed, because the digit run still holds that comma. `500sold`, `2.5 thousand sold`, `2.5ksold`, the Five_Star family, glued letters, and `500.sold_x` stay parked.
+
+Clean suite: 453 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/domain/test_claim_validation.py tests/unit/agents/test_merchandising.py`. Source restored after each mutant. Counts are that pair of files.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Drop `;` | `test_count_punctuation_is_refused[500; reviews]` | 3/450 |
+| Drop `,` | `test_count_punctuation_is_refused[reviews, 500]` | 2/451 |
+| Drop `:` | `test_word_first_colon_counts_need_the_colon` | 6/447 |
+| Drop `=` | `test_count_punctuation_is_refused[500 = reviews]` | 2/451 |
+| Drop `(` | `test_count_punctuation_is_refused[500 (reviews)]` | 2/451 |
+
+Dropping `;` also fails the colon test's hold row `500; reviews`. Dropping `:` leaves that merchandise row green and fails `Reviews: +500`, `Sold: 500`, and `Orders: 12`.
+
+## 2026-10-15 — Session 08 draft lookup r2
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-draft-lookup-r2-prompt-integrity.md`.
+
+Lookup walks every draft page, then walks them again. The sorted listing ids and the adopted id must match. A delete-and-insert that keeps `count` equal raises `count` and does not post, including a swap that moves an orphan onto page 1 and a swap on a later page while the ledger is empty. `count` and every `listing_id` must be an exact int. `True`, `1.0`, `"1"`, and `None` raise `malformed`. A transport error or a missing `results` on the second walk raises and does not post. Pending is still written only after both walks.
+
+Draft suite: 127 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_etsy_draft_client.py tests/unit/assets/test_etsy_draft_ready.py`. Source restored after each mutant.
+
+## 2026-10-15 — Session 08 draft lookup
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-draft-lookup-prompt-integrity.md`.
+
+A GET without `state=draft` raises `lookup_state` before the transport. `record()` unlinks a stale `.next` name, without following a symlink, and then creates it with `O_EXCL`. After a short page whose `count` matches, offset 0 is read again. A different `count` raises `count` and does not post. No live Etsy call.
+
+Draft suite: 115 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_etsy_draft_client.py tests/unit/assets/test_etsy_draft_ready.py`. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the missing-state refusal | `test_a_lookup_without_state_is_refused` | 1/114 |
+| Delete the non-draft state refusal | `test_lookup_state_must_be_draft` | 1/114 |
+| Delete the stale `.next` unlink | `test_the_ledger_create_is_exclusive` and `test_the_ledger_create_does_not_follow_a_symlink` | 2/113 |
+| Delete the page-0 count compare | `test_a_page_zero_reread_count_change_refuses_to_post` | 1/114 |
+
+Dropping `O_EXCL` on the shared create still fails the pending flag row and the record flag row together.
+
+## 2026-10-15 — Session 08 previous xref r2
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-pdf-prev-r2-prompt-integrity.md`.
+
+A decoded `Prev` still raises `pdf prev` and the offset is not followed. The new rows pin that refusal on a classic trailer, an xref-stream dictionary, and `/Pr#65v` on both paths. `/Prev null` and `/Prev (x)` refuse as well. `/XRefStm` is not opened: a stream that redefines `/Pages` leaves the original pages object in use. A single-revision file parses.
+
+Focused suite: 8 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_pdf_prev.py`. Source restored after each mutant. A classic-only check fails the two xref-stream rows. An int-only check fails `null` and `(x)`. A raw `/Prev` search fails both `/Pr#65v` rows. Following `/XRefStm` fails the pages row.
+
+## 2026-10-15 — Session 08 previous xref
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-pdf-prev-prompt-integrity.md`.
+
+A trailer that contains `Prev` raises `pdf prev`. The reader does not follow the offset. A trailer without that key still parses.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_pdf_prev.py tests/unit/assets/test_link_validation.py tests/unit/assets/test_gift_link_policy.py`. 167 passed. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the `Prev` refusal | `test_a_previous_xref_is_refused` | 1/166 |
+
+## 2026-10-15 — Session 08 asset storage r3
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-asset-storage-r3-prompt-integrity.md`.
+
+A URI is refused before the walk. A leading slash, a backslash, a wrong part count, and a dot segment each raise their own `storage path …` text. The product must be a lowercase UUID, the spec must match `[1-9][0-9]*`, and the digest must be 64 lowercase hex. The directory walk still refuses a dot when the key parser is bypassed. A link race that plants different bytes collides and leaves those bytes. A failed write removes the `.<hex>` temp. Cleanup refuses a bad keep hash before any delete, on the local store and the S3 simulation, and it leaves an orphan dot-name in place.
+
+## 2026-10-15 — Session 08 asset storage r2
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+Reads, discard, cleanup, and publish walk from a directory handle with `openat` and `O_NOFOLLOW`. A URI must be `pid/spec/<64-hex>` before that walk. Publish creates a temp file in that directory with `O_CREAT|O_EXCL|O_NOFOLLOW`, fsyncs it, linkat-s it into place without replacing, then fsyncs the directory. A crash before the link leaves the published key free for a retry. `internal_retrieval` reads the object, so a missing file and tampered bytes are refused. S3 still calls `require_digest`, and a tampered S3 object collides instead of being replaced. The #77 draft-client should-fixes stay parked: this branch does not edit that client.
+
+Clean suite: 52 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_asset_storage.py`. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Drop `O_NOFOLLOW` on directory opens | the eight symlink-parent rows, including publish, discard, cleanup, read, and the swap | 8/44 |
+| Drop `O_NOFOLLOW` on the file read | `test_a_symlink_file_is_not_followed` | 1/51 |
+| Drop `O_EXCL` on the temp create | `test_the_temp_file_is_created_exclusive` | 1/51 |
+| Drop `O_NOFOLLOW` on the temp create | `test_the_temp_file_is_created_without_following` | 1/51 |
+| Delete `self.read` in `internal_retrieval` | the missing-object and tampered-object rows | 2/50 |
+| Delete the stored-bytes compare | `test_tampered_bytes_are_refused` and `test_internal_retrieval_refuses_tampered_bytes` | 2/50 |
+| Delete the missing-file raise | `test_internal_retrieval_refuses_a_missing_object` | 1/51 |
+| Delete the file fsync | `test_publish_fsyncs_the_file_before_linking` | 1/51 |
+| Delete the directory fsync | `test_publish_fsyncs_the_file_before_linking` | 1/51 |
+| Delete the leaf symlink check | `test_a_temp_symlink_is_not_removed` | 1/51 |
+| Delete the S3 `require_digest` call | `test_s3_mismatched_digest_is_refused` | 1/51 |
+| Delete the S3 `refuse_collision` call | `test_s3_tampered_bytes_collide` | 1/51 |
+
+Writing straight to the published name fails the crash-retry row and the order row together. The `..` key is refused before the walk. Deleting only the dot-segment line still raises `storage path`, because the spec must be a positive integer.
+
+## 2026-10-15 — Session 08 asset storage
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+Action 8. `LocalAssetStore` writes under an absolute directory opened with `O_DIRECTORY | O_NOFOLLOW`. `SimS3AssetStore` keeps the same versioned keys in memory. `draft` and `live` raise `storage live` on their own lines. Any other mode raises `storage mode`. The simulation stores do not import a network client. Action 9 and `CREATE_ETSY_DRAFT` stay on pull #77. `/Resources` stays `{ExtGState, Font, ProcSet}`.
+
+Clean suite: 38 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_asset_storage.py`. Ruff and pyright on the storage package and this test file reported no errors. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the draft-mode line | `test_draft_mode_is_refused` | 1/37 |
+| Delete the live-mode line | `test_live_mode_is_refused` | 1/37 |
+| Delete the `storage mode` raise | `test_an_unknown_mode_is_refused` | 1/37 |
+| Delete the bool spec check | `test_a_boolean_spec_is_refused` | 1/37 |
+| Delete the `spec_version < 1` check | `test_a_zero_spec_is_refused` | 1/37 |
+| Delete the hash-length check | `test_a_short_hash_is_refused` | 1/37 |
+| Delete the hash-charset check | `test_a_non_hex_hash_is_refused` | 1/37 |
+| Delete the digest compare | `test_a_mismatched_digest_is_refused` | 1/37 |
+| Delete the collision helper body | `test_different_bytes_collide` | 1/37 |
+| Drop the spec segment from `object_uri` | `test_a_spec_bump_keeps_both_objects`, `test_cleanup_removes_a_superseded_temp`, and `test_s3_cleanup_removes_a_superseded_temp` | 3/35 |
+| Delete the `fixture://` published line | `test_discard_refuses_a_published_object` | 1/37 |
+| Delete the `s3://simulation/` published line | `test_s3_discard_refuses_published` | 1/37 |
+| Delete the signature compare | `test_a_token_for_another_uri_is_refused` | 1/37 |
+| Delete the stored-bytes compare | `test_tampered_bytes_are_refused` | 1/37 |
+| Delete the absolute-root check | `test_a_relative_root_is_refused` | 1/37 |
+| Drop `O_NOFOLLOW` on the root | `test_a_symlink_root_is_not_followed` | 1/37 |
+| Delete the parent-directory symlink check | `test_a_symlink_directory_is_not_followed` | 1/37 |
+| Delete the file symlink check in `_place` | `test_a_symlink_file_is_not_followed` | 1/37 |
+| Drop `O_EXCL` | `test_an_existing_file_is_not_truncated` | 1/37 |
+| Delete the same-bytes return in `_place` | `test_the_same_bytes_are_idempotent` | 1/37 |
+| Delete the local keep-hash continue | `test_cleanup_keeps_the_current_temp` | 1/37 |
+| Delete the local cleanup `discard` call | `test_cleanup_removes_a_superseded_temp` | 1/37 |
+| Delete the symlink check in `_file_bytes` | `test_a_temp_symlink_is_not_removed` | 1/37 |
+| Delete the missing-file check in `_file_bytes` | `test_a_missing_local_object_is_refused` | 1/37 |
+| Delete the temp-directory symlink check | `test_cleanup_does_not_follow_a_temp_directory` | 1/37 |
+| Delete the `..` path check | `test_a_traversal_uri_is_refused` | 1/37 |
+| Delete the foreign-scheme raise | `test_a_foreign_uri_is_refused` | 1/37 |
+| Delete the local signed raise | `test_local_signed_retrieval_is_refused` | 1/37 |
+| Replace the `internal:` prefix | `test_internal_retrieval_names_the_object` | 1/37 |
+| Delete the S3 missing-token check | `test_a_missing_object_has_no_token` | 1/37 |
+| Delete the S3 published-role check | `test_a_temporary_object_is_not_signed` | 1/37 |
+| Delete the S3 internal raise | `test_s3_internal_retrieval_is_refused` | 1/37 |
+| Delete the S3 cleanup prefix continue | `test_s3_cleanup_keeps_published` | 1/37 |
+| Delete the S3 keep-hash continue | `test_s3_cleanup_keeps_the_current_temp` | 1/37 |
+| Delete the S3 same-bytes return | `test_s3_same_bytes_are_idempotent` | 1/37 |
+| Delete the S3 read missing check | `test_a_missing_s3_object_is_refused` | 1/37 |
+| Delete the S3 cleanup `discard` call | `test_s3_cleanup_removes_a_superseded_temp` | 1/37 |
+| Delete the S3 temporary-prefix check | `test_s3_discard_refuses_a_foreign_uri` | 1/37 |
+
+Dropping the spec segment writes the object beside the directory cleanup walks, so the two cleanup rows fail with the spec-bump row. Deleting `O_EXCL` truncates the file and fails only the truncation test. Deleting the collision helper still raises `storage place`, so the truncation test stays green and the direct collision test is the kill.
+
+Deleting `storage place` on either store leaves the suite green. Deleting the S3 call to `refuse_collision` does too. Deleting `self.read` inside `internal_retrieval` leaves the suite green because the naming test publishes the object first. An empty temporary directory and a missing S3 discard key have no row; deleting those lines leaves this suite green.
+
+Parked: live S3 transport and credentials, workflow linkage on #77, commissioning A10 and A11, the session exit, and the parked link items (same-host http hop, punycode, `file:` allow, sendBeacon, spelled-out emails, raster text).
 
 ## 2026-10-15 — Session 08 same-host http hop r2
 
