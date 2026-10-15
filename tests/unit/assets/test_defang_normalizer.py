@@ -181,6 +181,12 @@ def test_screenshot_text_refuses_a_bare_spaced_host() -> None:
     assert refuse_sensitive_text("x dot com") is None
 
 
+def test_a_zero_width_char_inside_the_scheme_is_a_url() -> None:
+    text = "h\u200bttp://evil"
+    assert url_matches(text) is True
+    assert refuse_sensitive_text(text) == "sensitive_data"
+
+
 def test_a_bracketed_hxxp_scheme_is_refused() -> None:
     assert refuse_paid_checkout("hxxp[:]//evil") == "paid_checkout"
     assert refuse_sensitive_text("hxxp[:]//evil") == "sensitive_data"

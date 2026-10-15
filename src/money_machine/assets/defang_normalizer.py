@@ -2,7 +2,7 @@
 
 The order is fixed:
 
-1. Map U+03F2 to ``c``, then NFKC, then fold the other lookalikes.
+1. Map U+03F2 to ``c``, then NFKC, then fold the other lookalikes and drop format characters.
 2. Find host-like, email-like, and ``hxxp`` candidates.
 3. Undo defanging only inside those candidates. A bare ``dot`` or a bare
    ``at`` is undone only when the next token, with spaces removed, is on
@@ -146,9 +146,11 @@ def fold_confusables(text: str) -> str:
     """NFKC, then map lookalike letters and dots onto ASCII, keeping case.
 
     U+03F2 is replaced first. NFKC would turn that lunate sigma into final sigma.
+    Format characters, including a zero-width space inside a scheme, are removed.
     """
     marked = text.translate(_LUNATE_SIGMA)
-    return unicodedata.normalize("NFKC", marked).translate(_LOOKALIKES)
+    folded = unicodedata.normalize("NFKC", marked).translate(_LOOKALIKES)
+    return "".join(char for char in folded if unicodedata.category(char) != "Cf")
 
 
 def candidate_spans(text: str) -> tuple[tuple[int, int], ...]:
