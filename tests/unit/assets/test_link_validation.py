@@ -911,8 +911,31 @@ def test_a_widget_after_an_outline_is_still_refused() -> None:
     assert refusal.code in {"host", "malformed"}
 
 
+def _link_keyed_widget(uri: str) -> str:
+    return (
+        "<< /Type /Annot /Subtype /Widget /Rect [0 0 1 1] /Border [0 0 0] /F 4"
+        f" /A {_action_dict(uri)} >>"
+    )
+
+
+def test_a_resource_annots_widget_is_malformed() -> None:
+    """A full-key widget whose first role is ``/Annots`` is a subtype refusal."""
+    widget = _link_keyed_widget(_GOOD)
+    pdf = classic_pdf(
+        {
+            1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+            2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            3: _obj(3, _page(2, "[4 0 R]", resources="<< /Annots [5 0 R] >>")),
+            4: _obj(4, _good_annot()),
+            5: _obj(5, widget),
+        }
+    )
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
 def test_a_second_role_widget_is_malformed() -> None:
-    """A good URI, so only the Annots role after ``/Outlines`` refuses the widget."""
+    """A short widget is refused when ``/Annots`` is a later role."""
     widget = _other_annot("Widget", _action_dict(_GOOD))
     resources = "<< /Outlines 5 0 R /Annots [5 0 R] >>"
     pdf = classic_pdf(

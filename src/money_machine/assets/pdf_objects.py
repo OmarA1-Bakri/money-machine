@@ -12,10 +12,10 @@ the same rules as a delivery link. An indirect action or URI is resolved one
 hop. A URI stream on a link is refused. The catalog is the trailer ``/Root``,
 read before the walk, and must equal ``Type`` and ``Pages``. A page must
 equal the keys Chromium emits, with ``Annots`` only when the page has
-annotations. The walk remembers ``(object, role)``, so a second role still
-runs that role's check. Nesting deeper than 64 raises ``ValueError``. Names
-are decoded once in the reader, and a dictionary with two keys for one name
-is refused there.
+annotations. The walk remembers ``(object, role)``. Every ``/Annots`` visit
+checks the subtype, and a later visit also checks the link keys. Nesting
+deeper than 64 raises ``ValueError``. Names are decoded once in the reader,
+and a dictionary with two keys for one name is refused there.
 """
 
 from __future__ import annotations
@@ -159,8 +159,8 @@ def _refuse_graph(doc: PdfDocument) -> None:
 
     The catalog is ``trailer["Root"]``, checked before the walk so an earlier
     ``/Info`` or ``/Foo`` cannot hide it. The walk's seen set is
-    ``(object, role)``. An annotation reached earlier under another role is
-    checked again when the role is ``Annots``. Objects that nothing references
+    ``(object, role)``. Every ``Annots`` visit checks the subtype, and a
+    later visit also checks the link keys. Objects that nothing references
     are walked afterwards. Nesting deeper than ``_MAX_DEPTH`` is refused.
     """
     _refuse_trailer_root(doc)
@@ -182,8 +182,8 @@ def _refuse_graph(doc: PdfDocument) -> None:
             seen_before = any(number == value.number for number, _role in seen)
             seen.add((value.number, role))
             value = doc.get(value.number)
-            if role == "Annots" and seen_before and isinstance(value, dict):
-                _refuse_annot_on_second_role(value)
+            if role == "Annots" and isinstance(value, dict):
+                _refuse_annot_role(value, second_visit=seen_before)
         if isinstance(value, dict):
             _refuse_dict(doc, value, in_link_action=in_link_action)
             owned = _name_is(value.get("Subtype"), "Link") and _name_is(value.get("Type"), "Annot")
@@ -226,13 +226,14 @@ def _refuse_root_names(doc: PdfDocument, fields: dict[str, PdfObject]) -> None:
         raise ValueError("pdf names entry")
 
 
-def _refuse_annot_on_second_role(fields: dict[str, PdfObject]) -> None:
-    """Refuse a non-Link reached again under ``Annots``.
+def _refuse_annot_role(fields: dict[str, PdfObject], *, second_visit: bool) -> None:
+    """Check an annotation reached under ``Annots``.
 
-    The page ``/Annots`` array is checked in ``delivery_link_uris``. This
-    visit applies that same subtype rule to an object an earlier role
-    already marked.
+    Every visit requires ``/Subtype /Link``. A later visit also requires the
+    link key set. The page array is checked again in ``delivery_link_uris``.
     """
+    if second_visit and frozenset(fields) - _ANNOT_ALLOW_EXTRA != _LINK_KEYS:
+        raise ValueError("pdf link keys")
     if not _name_is(fields.get("Subtype"), "Link"):
         raise ValueError("pdf annot subtype")
 
