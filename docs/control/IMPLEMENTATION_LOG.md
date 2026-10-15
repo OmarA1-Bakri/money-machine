@@ -1,3 +1,15 @@
+## 2026-10-15 — Session 08 capital Greek omicron
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.
+
+U+039F (Greek capital omicron) folds to Latin `O`. `See . Οrg` stays prose. Mapping that character to lowercase `o` would make `org` and refuse it. The capital Cyrillic `O` stay is a different character.
+
+Clean suite: 81 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defanged_host.py tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_spelled_email.py tests/unit/assets/test_punycode_host.py`. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Map U+039F to lowercase `o` | `test_a_capital_greek_omicron_spaced_org_stays` | 1/80 |
+
 ## 2026-10-15 — Session 08 capital Cyrillic Es
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-defang-followup-prompt-integrity.md`.

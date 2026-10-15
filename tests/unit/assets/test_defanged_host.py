@@ -172,6 +172,10 @@ def test_a_capital_cyrillic_es_spaced_com_is_refused() -> None:
     assert refuse_paid_checkout("acme . \u0421OM") == "paid_checkout"
 
 
+def test_a_capital_greek_omicron_spaced_org_stays() -> None:
+    assert refuse_paid_checkout("See . \u039frg") is None
+
+
 def test_a_fullwidth_lowercase_spaced_dot_is_refused() -> None:
     assert refuse_paid_checkout("acme . \uff4e\uff45\uff54") == "paid_checkout"
 
