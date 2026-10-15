@@ -13,9 +13,10 @@ hop. A URI stream on a link is refused. The catalog is the trailer ``/Root``,
 read before the walk, and must equal ``Type`` and ``Pages``. A page must
 equal the keys Chromium emits, with ``Annots`` only when the page has
 annotations. The walk remembers ``(object, role)``. Every ``/Annots`` visit
-checks the subtype, and a later visit also checks the link keys. Nesting
-deeper than 64 raises ``ValueError``. Names are decoded once in the reader,
-and a dictionary with two keys for one name is refused there.
+checks the subtype, and a later visit also checks the link keys. The page walk
+stops a ``/Kids`` chain past depth 64 with ``pdf kids depth``. Names are
+decoded once in the reader, and a dictionary with two keys for one name is
+refused there.
 """
 
 from __future__ import annotations
@@ -59,7 +60,7 @@ def _pages(
     depth: int = 0,
 ) -> tuple[dict[str, PdfObject], ...]:
     if depth > _MAX_DEPTH:
-        raise ValueError("pdf depth")
+        raise ValueError("pdf kids depth")
     if isinstance(node, PdfRef):
         if node.number in seen:
             raise ValueError("pdf page")
