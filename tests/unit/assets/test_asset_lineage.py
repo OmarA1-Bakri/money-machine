@@ -167,13 +167,41 @@ def test_a_qa_status_other_than_passed_is_stale() -> None:
 
 def test_a_stale_source_marks_the_dependent() -> None:
     image = _listing("bb", ("aa",))
-    current, stale = split_current((_root(), image), product_id=_PRODUCT, spec_version=2)
+    source = replace(_shot("aa"), qa_status="stale")
+    current, stale = split_current((source, image), product_id=_PRODUCT, spec_version=2)
     assert current == ()
     assert tuple(asset.output_sha256 for asset in stale) == ("aa", "bb")
 
 
 def test_a_dependent_listed_before_its_source_is_stale() -> None:
     image = _listing("bb", ("aa",))
-    current, stale = split_current((image, _root()), product_id=_PRODUCT, spec_version=2)
+    source = replace(_shot("aa"), qa_status="stale")
+    current, stale = split_current((image, source), product_id=_PRODUCT, spec_version=2)
     assert current == ()
     assert tuple(asset.output_sha256 for asset in stale) == ("bb", "aa")
+
+
+def test_a_shared_output_keeps_each_spec() -> None:
+    """Two specs can share one output. Spec 2 stays current and keeps a dependent."""
+    older = replace(_shot("aa", spec=1), qa_status="stale")
+    newer = _shot("aa", spec=2)
+    image = _listing("bb", ("aa",))
+    current, stale = split_current(
+        (older, newer, image),
+        product_id=_PRODUCT,
+        spec_version=2,
+    )
+    assert current == (newer, image)
+    assert current[0] is newer
+    assert current[1] is image
+    assert len(stale) == 1
+    assert stale[0].spec_version == 1
+    assert stale[0].output_sha256 == "aa"
+    assert stale[0].qa_status == "stale"
+
+
+def test_an_unknown_source_is_stale() -> None:
+    image = _listing("bb", ("missing",))
+    current, stale = split_current((image,), product_id=_PRODUCT, spec_version=2)
+    assert current == ()
+    assert tuple(asset.output_sha256 for asset in stale) == ("bb",)

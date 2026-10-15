@@ -1,23 +1,15 @@
 """Gift-PDF surfaces read by walking objects, not by searching bytes.
 
 ``link_annotations`` counts ``/Link`` annotations and returns each action
-``/URI`` string. It does not read an annotation-level ``/URI``.
-``delivery_link_uris`` is the same page walk for link validation. A link
-annotation must be exactly ``Type``, ``Subtype``, ``Rect``, ``Border``,
-``F``, and ``A``, with ``/Subtype /Link``. Any other annotation on the page
-``/Annots`` array is refused. The action is exactly ``S`` and ``URI``, plus
-``Type /Action`` when ``Type`` is present. ``/S`` must be ``/URI`` anywhere
-in the graph. A ``/URI`` that is not the link's own action is checked with
-the same rules as a delivery link, and it must be one of the accepted links.
-An indirect action or URI is resolved one hop. A URI stream on a link is
-refused. The catalog is the trailer ``/Root``, read before the walk, and must
-equal ``Type`` and ``Pages``. A page must equal the keys Chromium emits, with
-``Annots`` only when the page has annotations. A page ``/AA`` is named on its
-own. The walk remembers ``(object, role)``. Every ``/Annots`` visit checks
-the subtype, and a later visit also checks the link keys. The page walk
-stops a ``/Kids`` chain past depth 64 with ``pdf kids depth``. Names are
-decoded once in the reader, and a dictionary with two keys for one name is
-refused there.
+``/URI``. ``delivery_link_uris`` is that walk for link validation. A link is
+exactly ``Type``, ``Subtype``, ``Rect``, ``Border``, ``F``, and ``A``, with
+``/Subtype /Link``. ``/S`` must be ``/URI``. Any other ``/URI`` must be an
+accepted link. The catalog is trailer ``/Root`` and equals ``Type`` and
+``Pages``. A page equals the Chromium keys, plus ``Annots`` when present.
+``/Resources`` equals the measured set ``ExtGState``, ``Font``, and
+``ProcSet``. Role checks see the resolved value. A ``/URI`` is deferred only
+for a page ``/Annots`` link. A ``/Kids`` chain past depth 64 raises
+``pdf kids depth``.
 """
 
 from __future__ import annotations
@@ -117,7 +109,10 @@ _ANNOT_ALLOW_EXTRA: frozenset[str] = frozenset()
 _ACTION_ALLOW_EXTRA: frozenset[str] = frozenset()
 _CATALOG_ALLOW_EXTRA: frozenset[str] = frozenset()
 _PAGE_ALLOW_EXTRA: frozenset[str] = frozenset()
+# Measured from Chromium README and gift output: the only /S name is URI.
 _ALLOWED_S: frozenset[str] = frozenset({"URI"})
+# Measured page /Resources keys. README has two pages, the gift one. Both match.
+_RESOURCE_KEYS = frozenset({"ExtGState", "Font", "ProcSet"})
 _MAX_DEPTH = 64
 
 
@@ -137,8 +132,9 @@ def delivery_link_uris(pdf: bytes, *, accepted: frozenset[str] = frozenset()) ->
     ``URI``, with ``Type /Action`` when ``Type`` is present. ``/S`` must be
     ``/URI``. An indirect action or URI resolves one hop. A URI stream is
     refused. The catalog is checked from the trailer ``/Root`` before the
-    walk. A page must equal the generator's keys. An annotation whose
-    subtype is not ``Link`` is refused here, not by the walk's parent key.
+    walk. A page must equal the generator's keys. ``/Resources`` must equal
+    the measured Chromium set. An annotation whose subtype is not ``Link``
+    is refused by the same role check the graph walk uses.
     """
     doc = PdfDocument(pdf)
     _refuse_graph(doc, accepted)
@@ -150,8 +146,7 @@ def delivery_link_uris(pdf: bytes, *, accepted: frozenset[str] = frozenset()) ->
             continue
         for item in annots:
             annot = _dict(doc.deref(item))
-            if not _name_is(annot.get("Subtype"), "Link"):
-                raise ValueError("pdf annot subtype")
+            _refuse_annot_role(annot)
             uris.append(_uri_action(doc, annot))
     return tuple(uris)
 
@@ -161,8 +156,8 @@ def _refuse_graph(doc: PdfDocument, accepted: frozenset[str]) -> None:
 
     The catalog is ``trailer["Root"]``, checked before the walk so an earlier
     ``/Info`` or ``/Foo`` cannot hide it. The walk's seen set is
-    ``(object, role)``. Every ``Annots`` visit checks the subtype, and a
-    later visit also checks the link keys. Objects that nothing references
+    ``(object, role)``. Role checks run after a reference is resolved, so an
+    inline dictionary hits the same check. Objects that nothing references
     are walked afterwards. Nesting deeper than ``_MAX_DEPTH`` is refused.
     """
     _refuse_trailer_root(doc)
@@ -174,30 +169,58 @@ def _refuse_graph(doc: PdfDocument, accepted: frozenset[str]) -> None:
         depth: int,
         *,
         in_link_action: bool = False,
+        under_page_annots: bool = False,
+        action_of_annot: bool = False,
     ) -> None:
         if depth > _MAX_DEPTH:
             raise ValueError("pdf depth")
+        role = parent_key
         if isinstance(value, PdfRef):
-            role = parent_key
             if (value.number, role) in seen:
                 return
-            seen_before = any(number == value.number for number, _role in seen)
             seen.add((value.number, role))
             value = doc.get(value.number)
-            if role == "Annots" and isinstance(value, dict):
-                _refuse_annot_role(value, second_visit=seen_before)
         if isinstance(value, dict):
+            _refuse_resolved_role(
+                value,
+                role=role,
+                in_link_action=in_link_action,
+                action_of_annot=action_of_annot,
+            )
             _refuse_dict(doc, value, accepted, in_link_action=in_link_action)
-            owned = _name_is(value.get("Subtype"), "Link") and _name_is(value.get("Type"), "Annot")
+            annot = _name_is(value.get("Type"), "Annot")
+            link = annot and _name_is(value.get("Subtype"), "Link")
+            page = _name_is(value.get("Type"), "Page")
             for key, child in value.items():
-                scan(child, key, depth + 1, in_link_action=owned and key == "A")
+                scan(
+                    child,
+                    key,
+                    depth + 1,
+                    in_link_action=under_page_annots and link and key == "A",
+                    under_page_annots=page and key == "Annots",
+                    action_of_annot=annot and key == "A",
+                )
             return
         if isinstance(value, tuple):
             for item in value:
-                scan(item, parent_key, depth + 1, in_link_action=in_link_action)
+                scan(
+                    item,
+                    parent_key,
+                    depth + 1,
+                    in_link_action=in_link_action,
+                    under_page_annots=under_page_annots,
+                    action_of_annot=action_of_annot,
+                )
             return
         if isinstance(value, PdfStream):
-            scan(value.fields, parent_key, depth + 1, in_link_action=in_link_action)
+            scan(
+                value.fields,
+                parent_key,
+                depth + 1,
+                in_link_action=in_link_action,
+                under_page_annots=under_page_annots,
+                action_of_annot=action_of_annot,
+            )
 
     scan(doc.trailer, None, 0)
     reached = {number for number, _role in seen}
@@ -228,13 +251,36 @@ def _refuse_root_names(doc: PdfDocument, fields: dict[str, PdfObject]) -> None:
         raise ValueError("pdf names entry")
 
 
-def _refuse_annot_role(fields: dict[str, PdfObject], *, second_visit: bool) -> None:
+def _refuse_resolved_role(
+    fields: dict[str, PdfObject],
+    *,
+    role: str | None,
+    in_link_action: bool,
+    action_of_annot: bool,
+) -> None:
+    """Apply the role check to one dictionary, inline or just resolved."""
+    if role == "Annots":
+        _refuse_annot_role(fields)
+        return
+    if role == "Resources":
+        if frozenset(fields) != _RESOURCE_KEYS:
+            raise ValueError("pdf resource keys")
+        return
+    if role == "AA":
+        raise ValueError("pdf additional action")
+    if role == "A" and not in_link_action and not action_of_annot:
+        raise ValueError("pdf action role")
+    if _name_is(fields.get("Subtype"), "Link"):
+        raise ValueError("pdf link lookalike")
+
+
+def _refuse_annot_role(fields: dict[str, PdfObject]) -> None:
     """Check an annotation reached under ``Annots``.
 
-    Every visit requires ``/Subtype /Link``. A later visit also requires the
-    link key set. The page array is checked again in ``delivery_link_uris``.
+    Every visit requires the link keys and ``/Subtype /Link``. The page walk
+    calls this same check.
     """
-    if second_visit and frozenset(fields) - _ANNOT_ALLOW_EXTRA != _LINK_KEYS:
+    if frozenset(fields) - _ANNOT_ALLOW_EXTRA != _LINK_KEYS:
         raise ValueError("pdf link keys")
     if not _name_is(fields.get("Subtype"), "Link"):
         raise ValueError("pdf annot subtype")
@@ -304,8 +350,6 @@ def _uri_action(doc: PdfDocument, annot: dict[str, PdfObject]) -> str:
         raise ValueError("pdf link keys")
     if not _name_is(annot.get("Type"), "Annot"):
         raise ValueError("pdf link type")
-    if not _name_is(annot.get("Subtype"), "Link"):
-        raise ValueError("pdf link subtype")
     action = _dict(_once(doc, annot.get("A")))
     keys = frozenset(action) - _ACTION_ALLOW_EXTRA
     if keys == _ACTION_WITH_TYPE and not _name_is(action.get("Type"), "Action"):

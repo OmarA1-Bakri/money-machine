@@ -1,3 +1,43 @@
+## 2026-10-15 — Session 08 W7 r2: resolved roles, measured keys
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+Role checks run on the resolved dictionary, inline or indirect. The page walk calls that same annotation check. A `/URI` is deferred only for a link reached from a page `/Annots` array. Stale lineage identity is `(spec_version, output_sha256)`. A source hash is resolved at that spec. An unknown source is stale.
+
+Measured from Chromium README and gift output this round. `/Resources` is `{ExtGState, Font, ProcSet}` on both README pages and the gift page. `/XObject`, `/Pattern`, `/Shading`, `/ColorSpace`, and `/Properties` are absent. The only `/S` name is `URI`, four times on the README and never on the gift. `/Transparency`, `/Alpha`, and `/Luminosity` are absent. ExtGState blend is `/BM /Normal`.
+
+`uv run pytest -q -p no:cacheprovider --tb=line` on the restored tree: 12 failed, 4537 passed, 193 skipped. The 12 failures are `test_compose_preserves_the_postgres_password` because Docker is absent in this environment. Focused suite, Chromium deselected: 240 passed, 2 deselected. Command: `uv run pytest -q -p no:cacheprovider --tb=line -k "not readme_uris and not gift_pdf_has_no_links" tests/unit/assets/test_link_validation.py tests/unit/assets/test_gift_link_policy.py tests/unit/assets/test_gift_pdf_links.py tests/unit/assets/test_asset_lineage.py`. The two Chromium rows passed on the restored tree. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Seen set keyed by object number only | `test_a_second_role_widget_is_malformed` | 1/239 |
+| Delete the `/Annots` subtype check | `test_a_resource_annots_widget_is_malformed` and `test_an_inline_page_annotation_is_malformed` for Widget, Screen, FileAttachment, and RichMedia | 5/235 |
+| Subtype check also allows Widget | the resource widget row and the inline Widget row | 2/238 |
+| Delete the `/Annots` link-key check | `test_a_short_link_in_annots_is_malformed` | 1/239 |
+| Delete the `/Resources` key check | `test_an_unmeasured_resource_key_is_malformed` | 1/239 |
+| Add `GoToR` to the `/S` allowlist | `test_a_non_uri_action_is_malformed[GoToR]` and `test_an_unmeasured_s_name_is_malformed[GoToR]` | 2/238 |
+| Add `SubmitForm` to the `/S` allowlist | `test_a_non_uri_action_is_malformed[SubmitForm]` and `test_an_unmeasured_s_name_is_malformed[SubmitForm]` | 2/238 |
+| Defer `/URI` for every Link `/A` | `test_a_resource_link_uri_is_not_an_accepted_action` | 1/239 |
+| Delete the non-annotation `/A` check | `test_an_inline_action_outside_a_link_is_malformed` | 1/239 |
+| Delete the `/AA` role check | `test_an_inline_additional_action_is_malformed` | 1/239 |
+| Delete the `/Subtype /Link` look-alike check | `test_a_link_lookalike_outside_annots_is_malformed` | 1/239 |
+| Delete the URI-stream `raise` | `test_an_indirect_stream_uri_is_malformed` | 1/239 |
+| Delete the accepted-link membership check | `test_a_widget_uri_must_be_an_accepted_link` | 1/239 |
+| Map `pdf kids depth` back to `paid_checkout` | `test_a_deep_kids_chain_is_malformed` | 1/239 |
+| Delete the `_pages` depth cap | the same kids test | 1/239 |
+| Delete the page `/AA` message | `test_a_page_additional_action_without_a_uri_is_malformed` | 1/239 |
+| Key stale ids by output hash only | `test_a_shared_output_keeps_each_spec` | 1/239 |
+| Delete the unknown-source check | `test_an_unknown_source_is_stale` | 1/239 |
+| Source walk returns false | `test_a_stale_source_marks_the_dependent` and `test_a_dependent_listed_before_its_source_is_stale` | 2/238 |
+| One pass instead of repeating | `test_a_dependent_listed_before_its_source_is_stale` | 1/239 |
+| Delete the spec comparison | `test_a_spec_bump_is_stale` | 1/239 |
+| Delete the QA check | the QA row and both same-spec source rows | 3/237 |
+| Drop the product filter | `test_another_product_is_omitted` | 1/239 |
+
+The page walk calls `_refuse_annot_role`. There is no second subtype `raise` to turn into `continue`. Allowing Widget leaves Screen, FileAttachment, and RichMedia refused. The source rows use a same-spec QA-stale screenshot, so deleting the QA check fails them too. `test_a_deep_nest_is_paid_checkout` stays `paid_checkout`. A merchandising or template version change without a spec bump is not a product change. Prompt section 7 stores those versions and invalidates on a later product change, which this wave treats as `spec_version`.
+
+Parked: same-host http hop, punycode/uppercase on-host URIs, the URI-stream raise (message pinned), `file:` allow, sendBeacon, spelled-out emails, `_prepare` non-ASCII, raster text.
+
 ## 2026-10-15 — Session 08 W7: four link carries from #74 r4
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.

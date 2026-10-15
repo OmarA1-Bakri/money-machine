@@ -1,7 +1,9 @@
 """Project rendered assets into one lineage record and drop stale dependents.
 
 The storage URI is a fixture name. Object storage is a later wave. A product
-change is a new ``spec_version`` for one ``product_id``.
+change is a new ``spec_version`` for one ``product_id``. Stale identity is
+``(spec_version, output_sha256)``, so two specs can share one output hash.
+A source hash is resolved against that same spec. An unknown source is stale.
 """
 
 from __future__ import annotations
@@ -120,32 +122,65 @@ def split_current(
     its source still becomes stale.
     """
     owned = tuple(asset for asset in assets if asset.product_id == product_id)
-    stale_ids: set[str] = set()
+    known = {(asset.spec_version, asset.output_sha256) for asset in owned}
+    stale_ids: set[tuple[int, str]] = set()
     pending = list(owned)
     progressed = True
     while progressed:
         progressed = False
         rest: list[BoundAsset] = []
         for asset in pending:
-            if _is_stale(asset, spec_version=spec_version, stale_ids=stale_ids):
-                stale_ids.add(asset.output_sha256)
+            if _is_stale(
+                asset,
+                spec_version=spec_version,
+                stale_ids=stale_ids,
+                known=known,
+            ):
+                stale_ids.add((asset.spec_version, asset.output_sha256))
                 progressed = True
                 continue
             rest.append(asset)
         pending = rest
-    current = tuple(asset for asset in owned if asset.output_sha256 not in stale_ids)
+    current = tuple(
+        asset for asset in owned if (asset.spec_version, asset.output_sha256) not in stale_ids
+    )
     stale = tuple(
-        replace(asset, qa_status="stale") for asset in owned if asset.output_sha256 in stale_ids
+        replace(asset, qa_status="stale")
+        for asset in owned
+        if (asset.spec_version, asset.output_sha256) in stale_ids
     )
     return current, stale
 
 
-def _is_stale(asset: BoundAsset, *, spec_version: int, stale_ids: set[str]) -> bool:
+def _is_stale(
+    asset: BoundAsset,
+    *,
+    spec_version: int,
+    stale_ids: set[tuple[int, str]],
+    known: set[tuple[int, str]],
+) -> bool:
     if asset.spec_version != spec_version:
         return True
     if asset.qa_status != "passed":
         return True
-    return any(src in stale_ids for src in asset.source_screenshot_sha256)
+    return any(
+        _source_stale(src, spec_version=asset.spec_version, stale_ids=stale_ids, known=known)
+        for src in asset.source_screenshot_sha256
+    )
+
+
+def _source_stale(
+    src: str,
+    *,
+    spec_version: int,
+    stale_ids: set[tuple[int, str]],
+    known: set[tuple[int, str]],
+) -> bool:
+    """A source is stale when this spec has no such asset, or that asset is stale."""
+    identity = (spec_version, src)
+    if identity not in known:
+        return True
+    return identity in stale_ids
 
 
 def _bound(

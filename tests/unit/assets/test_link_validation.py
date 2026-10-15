@@ -108,17 +108,29 @@ def _obj(number: int, body: str) -> bytes:
     return f"{number} 0 obj\n{body}\nendobj\n".encode("latin-1")
 
 
+def _resources(*font_entries: str) -> str:
+    """Page resources whose keys are the measured Chromium set."""
+    inner = " ".join(font_entries)
+    font = f" {inner}" if inner else ""
+    return (
+        "<< /ExtGState << >> /Font <<"
+        f"{font} >> /ProcSet [/PDF /Text /ImageB /ImageC /ImageI] >>"
+    )
+
+
 def _page(
     parent: int,
     annots: str | None = None,
     *,
-    resources: str = "<< >>",
+    resources: str | None = None,
     extra: str = "",
     annots_key: str = "Annots",
 ) -> str:
     """A page whose keys match the README generator, plus ``extra`` when set."""
     annots_part = f" /{annots_key} {annots}" if annots is not None else ""
     suffix = f" {extra}" if extra else ""
+    if resources is None:
+        resources = _resources()
     return (
         f"<< /Type /Page /Resources {resources} /MediaBox [0 0 1 1]"
         f"{annots_part} /Contents << >> /Tabs /S /Parent {parent} 0 R{suffix} >>"
@@ -200,7 +212,7 @@ def _annot(
     catalog: str = "",
     objects: dict[int, bytes] | None = None,
     page_extra: str = "",
-    resources: str = "<< >>",
+    resources: str | None = None,
     root: str | None = None,
 ) -> bytes:
     extra = f" {catalog}" if catalog else ""
@@ -362,6 +374,8 @@ def test_an_indirect_stream_uri_is_malformed() -> None:
     body = _annot_dict("<< /Type /Action /S /URI /URI 5 0 R >>")
     refusal = _raise(_annot(body, objects={5: stream}), accepted=_accepted_good())
     assert refusal.code == "malformed"
+    assert isinstance(refusal.__cause__, ValueError)
+    assert refusal.__cause__.args == ("pdf uri stream",)
 
 
 def test_a_catalog_open_action_is_malformed() -> None:
@@ -436,7 +450,7 @@ def test_a_catalog_missing_type_is_malformed() -> None:
 
 
 def test_a_page_launch_action_is_malformed() -> None:
-    pdf = _annot(_good_annot(), resources="<< /XObject << /S /Launch >> >>")
+    pdf = _annot(_good_annot(), resources=_resources("/Hold << /S /Launch >>"))
     refusal = _raise(pdf, accepted=_accepted_good())
     assert refusal.code == "malformed"
 
@@ -460,7 +474,7 @@ def test_a_deep_reference_chain_is_malformed() -> None:
         number = 10 + hop
         body = "<< >>" if hop == 1499 else f"<< /Next {number + 1} 0 R >>"
         objects[number] = _obj(number, body)
-    pdf = _annot(_good_annot(), resources="<< /Next 10 0 R >>", objects=objects)
+    pdf = _annot(_good_annot(), resources=_resources("/Next 10 0 R"), objects=objects)
     refusal = _raise(pdf, accepted=_accepted_good())
     assert refusal.code == "malformed"
 
@@ -613,7 +627,7 @@ def test_a_widget_javascript_is_malformed() -> None:
 def test_an_outline_launch_is_malformed() -> None:
     pdf = _annot(
         _good_annot(),
-        resources="<< /Outlines 5 0 R >>",
+        resources=_resources("/Outlines 5 0 R"),
         objects={
             5: _obj(5, "<< /Type /Outlines /First 6 0 R /Count 1 >>"),
             6: _obj(6, "<< /Title (x) /Parent 5 0 R /A << /S /Launch /F (calc.exe) >> >>"),
@@ -887,7 +901,7 @@ def test_a_widget_uri_through_an_outline_is_refused() -> None:
         {
             1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
             2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
-            3: _obj(3, _page(2, "[4 0 R]", resources="<< /Outlines 5 0 R >>")),
+            3: _obj(3, _page(2, "[4 0 R]", resources=_resources("/Outlines 5 0 R"))),
             4: _obj(4, _good_annot()),
             5: _obj(5, widget),
         }
@@ -904,7 +918,7 @@ def test_a_widget_after_an_outline_is_still_refused() -> None:
         {
             1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
             2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
-            3: _obj(3, _page(2, "[4 0 R 5 0 R]", resources="<< /Outlines 5 0 R >>")),
+            3: _obj(3, _page(2, "[4 0 R 5 0 R]", resources=_resources("/Outlines 5 0 R"))),
             4: _obj(4, _good_annot()),
             5: _obj(5, widget),
         }
@@ -921,7 +935,7 @@ def test_a_widget_uri_must_be_an_accepted_link() -> None:
         {
             1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
             2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
-            3: _obj(3, _page(2, "[4 0 R]", resources="<< /Outlines 5 0 R >>")),
+            3: _obj(3, _page(2, "[4 0 R]", resources=_resources("/Outlines 5 0 R"))),
             4: _obj(4, _good_annot()),
             5: _obj(5, widget),
         }
@@ -939,15 +953,14 @@ def _link_keyed_widget(uri: str) -> str:
 
 
 def test_a_resource_annots_widget_is_malformed() -> None:
-    """A full-key widget whose first role is ``/Annots`` is a subtype refusal."""
+    """An inline full-key widget under Font ``/Annots`` is a subtype refusal."""
     widget = _link_keyed_widget(_GOOD)
     pdf = classic_pdf(
         {
             1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
             2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
-            3: _obj(3, _page(2, "[4 0 R]", resources="<< /Annots [5 0 R] >>")),
+            3: _obj(3, _page(2, "[4 0 R]", resources=_resources(f"/Annots [{widget}]"))),
             4: _obj(4, _good_annot()),
-            5: _obj(5, widget),
         }
     )
     refusal = _raise(pdf, accepted=_accepted_good())
@@ -957,7 +970,7 @@ def test_a_resource_annots_widget_is_malformed() -> None:
 def test_a_second_role_widget_is_malformed() -> None:
     """A short widget is refused when ``/Annots`` is a later role."""
     widget = _other_annot("Widget", _action_dict(_GOOD))
-    resources = "<< /Outlines 5 0 R /Annots [5 0 R] >>"
+    resources = _resources("/Outlines 5 0 R /Annots [5 0 R]")
     pdf = classic_pdf(
         {
             1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
@@ -969,6 +982,96 @@ def test_a_second_role_widget_is_malformed() -> None:
     )
     refusal = _raise(pdf, accepted=_accepted_good())
     assert refusal.code == "malformed"
+
+
+@pytest.mark.parametrize("subtype", ("Widget", "Screen", "FileAttachment", "RichMedia"))
+def test_an_inline_page_annotation_is_malformed(subtype: str) -> None:
+    """A full-key non-link in the page array is refused by the subtype check."""
+    annot = (
+        "<< /Type /Annot /Subtype /"
+        f"{subtype} /Rect [0 0 1 1] /Border [0 0 0] /F 4 /A {_action_dict(_GOOD)} >>"
+    )
+    pdf = classic_pdf(
+        {
+            1: _obj(1, "<< /Type /Catalog /Pages 2 0 R >>"),
+            2: _obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            3: _obj(3, _page(2, f"[{annot}]")),
+        }
+    )
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+
+
+def test_an_inline_action_outside_a_link_is_malformed() -> None:
+    """``/A`` under Font is not a page-link action."""
+    pdf = _annot(_good_annot(), resources=_resources(f"/A {_action_dict(_GOOD)}"))
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+    assert isinstance(refusal.__cause__, ValueError)
+    assert refusal.__cause__.args == ("pdf action role",)
+
+
+def test_an_inline_additional_action_is_malformed() -> None:
+    """``/AA`` under Font is refused by the role check, not by page keys."""
+    pdf = _annot(_good_annot(), resources=_resources("/AA << /E true >>"))
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+    assert isinstance(refusal.__cause__, ValueError)
+    assert refusal.__cause__.args == ("pdf additional action",)
+
+
+def test_a_resource_link_uri_is_not_an_accepted_action() -> None:
+    """A link-shaped dictionary under Resources is not a page ``/Annots`` link."""
+    link = _annot_dict(_action_dict("https://evil.example/"))
+    pdf = _annot(_good_annot(), resources=_resources(f"/Annots [{link}]"))
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "host"
+    assert refusal.repairs == (AssetRepair(_ASSET, "https://evil.example/", "host"),)
+
+
+def test_a_short_link_in_annots_is_malformed() -> None:
+    """A Link that is missing keys is refused on its ``/Annots`` visit."""
+    short = "<< /Type /Annot /Subtype /Link /Rect [0 0 1 1] >>"
+    pdf = _annot(_good_annot(), resources=_resources(f"/Annots [{short}]"))
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+    assert isinstance(refusal.__cause__, ValueError)
+    assert refusal.__cause__.args == ("pdf link keys",)
+
+
+def test_an_unmeasured_resource_key_is_malformed() -> None:
+    """``/XObject`` is not in the measured Chromium resource set."""
+    resources = (
+        "<< /ExtGState << >> /Font << >> "
+        "/ProcSet [/PDF /Text /ImageB /ImageC /ImageI] /XObject << >> >>"
+    )
+    refusal = _raise(_annot(_good_annot(), resources=resources), accepted=_accepted_good())
+    assert refusal.code == "malformed"
+    assert isinstance(refusal.__cause__, ValueError)
+    assert refusal.__cause__.args == ("pdf resource keys",)
+
+
+def test_a_link_lookalike_outside_annots_is_malformed() -> None:
+    """``/Subtype /Link`` outside ``/Annots`` is not a link annotation."""
+    body = "<< /Subtype /Link /Rect [0 0 1 1] >>"
+    pdf = _annot(_good_annot(), resources=_resources(f"/Hold {body}"))
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+    assert isinstance(refusal.__cause__, ValueError)
+    assert refusal.__cause__.args == ("pdf link lookalike",)
+
+
+@pytest.mark.parametrize("name", ("GoToR", "SubmitForm"))
+def test_an_unmeasured_s_name_is_malformed(name: str) -> None:
+    """A non-role ``/S`` outside the measured set is refused."""
+    pdf = _annot(
+        _good_annot(),
+        resources=_resources(f"/Hold << /S /{name} /F (x.pdf) >>"),
+    )
+    refusal = _raise(pdf, accepted=_accepted_good())
+    assert refusal.code == "malformed"
+    assert isinstance(refusal.__cause__, ValueError)
+    assert refusal.__cause__.args == ("pdf action s",)
 
 
 def test_a_deep_catalog_is_malformed() -> None:
@@ -1194,6 +1297,37 @@ def _assert_readme_link_shape(pdf: bytes, count: int) -> None:
         assert action["Type"].value == "Action"
         assert isinstance(action["S"], PdfName)
         assert action["S"].value == "URI"
+    _assert_measured_resources(pdf)
+
+
+def _assert_measured_resources(pdf: bytes) -> None:
+    """README and gift pages emit one resource key set, and ``/S`` is only URI."""
+    doc = PdfDocument(pdf)
+    keysets: set[frozenset[str]] = set()
+    names: set[str] = set()
+    seen: set[int] = set()
+
+    def visit(value: PdfObject | None, parent: str | None) -> None:
+        if isinstance(value, dict):
+            marker = id(value)
+            if marker in seen:
+                return
+            seen.add(marker)
+            if parent == "Resources":
+                keysets.add(frozenset(value))
+            action = value.get("S")
+            if isinstance(action, PdfName):
+                names.add(action.value)
+            for key, child in value.items():
+                visit(doc.deref(child), key)
+            return
+        if isinstance(value, tuple):
+            for item in value:
+                visit(doc.deref(item), parent)
+
+    visit(doc.deref(doc.trailer.get("Root")), None)
+    assert keysets == {frozenset({"ExtGState", "Font", "ProcSet"})}
+    assert names <= frozenset({"URI"})
 
 
 def test_the_readme_uris_round_trip_exactly(chromium_installed: None) -> None:
@@ -1241,6 +1375,7 @@ def test_the_gift_pdf_has_no_links(chromium_installed: None) -> None:
     copy = merchandise(request)
     tokens = load_tokens(listing_token_payload())
     rendered = render_gift_pdf(copy, request, tokens, build_version=4)
+    _assert_measured_resources(rendered.pdf)
     assert link_annotations(rendered.pdf) == (0, ())
     refusal = _raise(rendered.pdf, accepted=(), asset="free_gift", clock=None)
     assert refusal.code == "missing_links"
