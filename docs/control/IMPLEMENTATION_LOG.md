@@ -1,3 +1,19 @@
+## 2026-10-15 — Session 08 punycode host
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+A secret hostname containing `xn--` is refused. A delivery link with that host raises `host`. A plain `fixture.notion.site` link still validates. Uppercase hosts stay parked because the raw netloc is folded in `link_validation.py`, which pull #79 owns. Action 8 stays on #78. Action 9 stays on #77. `/Resources` stays `{ExtGState, Font, ProcSet}`.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_punycode_host.py tests/unit/integrations/notion/test_publishing.py -k "punycode or secret_link_host"`. 8 passed, 172 deselected. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the `xn--` host return | `test_a_punycode_notion_host_is_refused` | 1/7 |
+
+The plain Notion host row and the existing secret-host rows stay green when that return is removed.
+
+Parked: uppercase on-host URIs, `file:` allow, sendBeacon, spelled-out emails, raster text, `_prepare` non-ASCII, live S3, `CREATE_ETSY_DRAFT`, commissioning, and the session exit.
+
 ## 2026-10-15 — Session 08 W7 r3: page-tree roles and screenshot sources
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.

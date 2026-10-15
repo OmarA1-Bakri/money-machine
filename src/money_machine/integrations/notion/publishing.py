@@ -163,6 +163,9 @@ def _secret_port(parsed: ParseResult) -> int | None:
 
 
 def _allowed_secret_host(host: str) -> bool:
+    """Plain Notion hosts only. An IDNA label is ``xn--`` after parsing."""
+    if "xn--" in host:
+        return False
     if host in _EXACT_SECRET_HOSTS:
         return True
     if not host.endswith(_NOTION_SITE_SUFFIX):
