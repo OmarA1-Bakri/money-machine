@@ -258,16 +258,19 @@ class EtsyDraftClient:
         return self._transport.exchange(FixtureCall(method, path, query, body))
 
     def _adopt(self, spec: DraftSpec, marker: str) -> int | None:
-        found, ids = self._read_pages(spec, marker)
-        confirm_found, confirm_ids = self._read_pages(spec, marker)
-        if ids != confirm_ids or found != confirm_found:
+        found, ids, texts = self._read_pages(spec, marker)
+        confirm_found, confirm_ids, confirm_texts = self._read_pages(spec, marker)
+        if ids != confirm_ids or found != confirm_found or texts != confirm_texts:
             raise EtsyDraftRefused("count")
         return found
 
-    def _read_pages(self, spec: DraftSpec, marker: str) -> tuple[int | None, list[int]]:
+    def _read_pages(
+        self, spec: DraftSpec, marker: str
+    ) -> tuple[int | None, list[int], list[str]]:
         found: int | None = None
         seen = 0
         ids: list[int] = []
+        texts: list[str] = []
         seen_ids: set[int] = set()
         expected: int | None = None
         offset = 0
@@ -303,6 +306,7 @@ class EtsyDraftClient:
                     raise EtsyDraftRefused("count")
                 seen_ids.add(listing_raw)
                 ids.append(listing_raw)
+                texts.append(_row_text(row.get("description")))
                 if not _line_marker(row.get("description"), marker):
                     continue
                 listing_id = _draft_listing_id(row)
@@ -314,7 +318,8 @@ class EtsyDraftClient:
                 if seen != expected:
                     raise EtsyDraftRefused("count")
                 ids.sort()
-                return found, ids
+                texts.sort()
+                return found, ids, texts
             offset += PAGE_LIMIT
         raise EtsyDraftRefused("page_cap")
 
@@ -468,6 +473,13 @@ def _refuse_post(
         raise EtsyDraftRefused("body_extra")
     if _BODY_KEYS - set(fields):
         raise EtsyDraftRefused("body_missing")
+
+
+def _row_text(description: object) -> str:
+    """The description compared across the two walks. A non-string is empty."""
+    if isinstance(description, str):
+        return description
+    return ""
 
 
 def _description_lines(description: str) -> tuple[str, ...]:

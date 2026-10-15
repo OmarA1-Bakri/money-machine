@@ -1,3 +1,18 @@
+## 2026-10-15 — Session 08 draft walk compare (#83 carry)
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-sf-carry-prompt-integrity.md`.
+
+The two walks compare the sorted listing ids, the found id, and the sorted description texts. A marker that moves from one existing id to another refuses with `count` and does not post. An existing id whose description changes, marker still on that id, refuses the same way. Nothing is recorded.
+
+Clean suite: 129 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_etsy_draft_client.py tests/unit/assets/test_etsy_draft_ready.py`. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the found compare | `test_a_marker_swap_between_existing_ids_refuses_to_post` | 1/128 |
+| Delete the description compare | `test_an_existing_description_change_refuses_to_post` | 1/128 |
+
+Deleting the found compare leaves the description edit green. Deleting the description compare leaves the marker swap green.
+
 ## 2026-10-15 — Session 08 count parenthesis and thousands (#85 carry)
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-sf-carry-prompt-integrity.md`.
