@@ -272,7 +272,17 @@ def _refuse_page(fields: dict[str, PdfObject]) -> None:
         return
     keys = frozenset(fields) - _PAGE_ALLOW_EXTRA
     if keys != _PAGE_KEYS and keys != _PAGE_WITH_ANNOTS:
+        if "AA" in fields and _contains_uri(fields.get("AA")):
+            raise ValueError("pdf page /AA")
         raise ValueError("pdf page keys")
+
+
+def _contains_uri(value: PdfObject | None) -> bool:
+    if isinstance(value, dict):
+        return "URI" in value or any(_contains_uri(child) for child in value.values())
+    if isinstance(value, tuple):
+        return any(_contains_uri(item) for item in value)
+    return False
 
 
 def _refuse_action_uri(

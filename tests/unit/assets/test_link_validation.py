@@ -850,10 +850,12 @@ def test_foo_before_root_cannot_hide_the_catalog() -> None:
     assert refusal.code == "malformed"
 
 
-def test_a_page_uri_additional_action_is_malformed() -> None:
+def test_a_page_uri_additional_action_is_page_aa() -> None:
     extra = "/AA << /O << /S /URI /URI (https://evil.example/) >> >>"
     refusal = _raise(_annot(_good_annot(), page_extra=extra), accepted=_accepted_good())
-    assert refusal.code == "malformed"
+    assert refusal.code == "page_aa"
+    assert isinstance(refusal.__cause__, ValueError)
+    assert str(refusal.__cause__) == "pdf page /AA"
 
 
 def test_a_page_additional_action_without_a_uri_is_malformed() -> None:

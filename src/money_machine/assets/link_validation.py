@@ -131,7 +131,8 @@ def validate_pdf_links(
     except EmbeddedUriRefusal as exc:
         raise _repair(asset, exc.uri, exc.code) from exc
     except ValueError as exc:
-        raise _repair(asset, "", "malformed") from exc
+        code = "page_aa" if str(exc) == "pdf page /AA" else "malformed"
+        raise _repair(asset, "", code) from exc
     if len(uris) == 0:
         raise _repair(asset, "", "missing_links")
     pdf_sha256 = hashlib.sha256(pdf).hexdigest()
