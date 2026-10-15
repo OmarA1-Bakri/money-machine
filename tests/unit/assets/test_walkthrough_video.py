@@ -39,6 +39,7 @@ from money_machine.assets.video import (
     RenderedWalkthrough,
     VideoRefusal,
     caption_blocks,
+    refuse_caption_width,
     render_walkthrough,
 )
 from money_machine.assets.video_font import blit, wrap_caption
@@ -323,6 +324,12 @@ def test_a_url_like_caption_is_refused(scene: _Scene) -> None:
 def test_a_colon_caption_is_refused(scene: _Scene) -> None:
     with pytest.raises(VideoRefusal, match="paid_checkout"):
         _render(scene, injected_caption="a:b")
+
+
+def test_free_gift_hello_is_refused(scene: _Scene) -> None:
+    """The PDF prefix strip must not run on a caption. Restoring it accepts this."""
+    with pytest.raises(VideoRefusal, match="paid_checkout"):
+        _render(scene, injected_caption="Free gift: hello")
 
 
 def test_a_checkout_caption_is_refused(scene: _Scene) -> None:
@@ -610,6 +617,34 @@ def test_a_harmless_27_character_caption_is_refused(scene: _Scene) -> None:
         _render(scene, injected_caption=_HARMLESS_27)
 
 
+def test_a_26_character_dashboard_line_is_painted(scene: _Scene) -> None:
+    request, copy = _dashboard(scene, ("a" * 25,))
+    dashboard = caption_blocks(copy.draft, request.rules.quantity)[0].text
+    lines = wrap_caption(dashboard)
+    assert any(len(line) == 26 for line in lines)
+    assert all(len(line) <= 26 for line in lines)
+    walk = _render(scene, request=request, copy=copy)
+    palette = scene.tokens.palette
+    assert palette is not None
+    raw = _decode(walk.video)
+    assert _band(raw, 0) == _expected_band(
+        dashboard, "", _rgb(palette.text), _rgb(palette.background)
+    )
+
+
+def test_a_27_character_dashboard_line_is_refused(scene: _Scene) -> None:
+    request, copy = _dashboard(scene, ("a" * 26,))
+    dashboard = caption_blocks(copy.draft, request.rules.quantity)[0].text
+    assert any(len(line) == 27 for line in wrap_caption(dashboard))
+    with pytest.raises(VideoRefusal, match="caption_fit"):
+        _render(scene, request=request, copy=copy)
+
+
+def test_the_first_caption_width_is_checked() -> None:
+    assert refuse_caption_width(("c" * 27,)) == "caption_fit"
+    assert refuse_caption_width(("c" * 26,)) is None
+
+
 def test_too_many_caption_lines_are_refused(scene: _Scene) -> None:
     request, copy = _dashboard(scene, _ROW_OUTPUTS)
     assert validate_claims(copy.draft, request).passed is True
@@ -671,6 +706,15 @@ def test_a_hyphenated_caption_is_refused(scene: _Scene) -> None:
         _render(scene, injected_caption="x-.com")
 
 
+def test_today_panel_claim_caption_is_refused(scene: _Scene) -> None:
+    request, copy = _dashboard(scene, ("Today-panel",))
+    assert validate_claims(copy.draft, request).passed is True
+    caption = caption_blocks(copy.draft, request.rules.quantity)[0].text
+    assert "Today-panel" in caption
+    with pytest.raises(VideoRefusal, match="caption_glyph"):
+        _render(scene, request=request, copy=copy)
+
+
 def test_a_33_second_container_is_refused(scene: _Scene, monkeypatch: pytest.MonkeyPatch) -> None:
     long = _mkv(_WIDTH, _HEIGHT, 330, 10)
     monkeypatch.setattr("money_machine.assets.video._encode", _hold(long))
@@ -688,6 +732,13 @@ def test_a_12_fps_container_is_refused(scene: _Scene, monkeypatch: pytest.Monkey
 def test_a_160_by_80_container_is_refused(scene: _Scene, monkeypatch: pytest.MonkeyPatch) -> None:
     flat = _mkv(_WIDTH, 80, 300, 10)
     monkeypatch.setattr("money_machine.assets.video._encode", _hold(flat))
+    with pytest.raises(VideoRefusal, match="frame_size"):
+        _render(scene)
+
+
+def test_a_150_by_90_container_is_refused(scene: _Scene, monkeypatch: pytest.MonkeyPatch) -> None:
+    narrow = _mkv(150, 90, 300, 10)
+    monkeypatch.setattr("money_machine.assets.video._encode", _hold(narrow))
     with pytest.raises(VideoRefusal, match="frame_size"):
         _render(scene)
 

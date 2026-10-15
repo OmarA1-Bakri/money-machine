@@ -154,6 +154,45 @@ def test_small_container_mutant_accepts(
     assert accepted.video.startswith(small)
 
 
+class _RenameCall(ast.NodeTransformer):
+    """Point the caption charset check back at the PDF prefix strip."""
+
+    def __init__(self) -> None:
+        self.renamed = 0
+
+    def visit_Call(self, node: ast.Call) -> ast.AST:
+        self.generic_visit(node)
+        if isinstance(node.func, ast.Name) and node.func.id == "refuse_raw_charset":
+            node.func.id = "refuse_gift_charset"
+            self.renamed += 1
+        return node
+
+
+def _prefix_strip_mutant() -> types.ModuleType:
+    rename = _RenameCall()
+    tree = rename.visit(ast.parse(_VIDEO.read_text(encoding="utf-8")))
+    if rename.renamed != 1 or not isinstance(tree, ast.Module):
+        raise AssertionError(f"prefix strip renamed {rename.renamed}")
+    ast.fix_missing_locations(tree)
+    name = "video_mutant_prefix_strip"
+    module = types.ModuleType(name)
+    module.__file__ = str(_VIDEO)
+    sys.modules[name] = module
+    exec(compile(tree, str(_VIDEO), "exec"), module.__dict__)
+    return module
+
+
+def test_prefix_strip_mutant_accepts_free_gift_hello(
+    scene: video_tests._Scene,  # pyright: ignore[reportPrivateUsage]
+) -> None:
+    accepted = video_tests._render(  # pyright: ignore[reportPrivateUsage]
+        scene,
+        injected_caption="Free gift: hello",
+        render=_prefix_strip_mutant().render_walkthrough,
+    )
+    assert accepted.video.startswith(b"\x1a\x45\xdf\xa3")
+
+
 def test_short_container_mutant_accepts(
     scene: video_tests._Scene,  # pyright: ignore[reportPrivateUsage]
 ) -> None:

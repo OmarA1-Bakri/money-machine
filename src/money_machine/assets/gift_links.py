@@ -69,6 +69,18 @@ def refuse_gift_charset(text: str) -> str | None:
     return None
 
 
+def refuse_raw_charset(text: str) -> str | None:
+    """Allowlist on the whole string. No prefix strip and no period trim.
+
+    PDF gift fields use :func:`refuse_gift_charset`, which removes
+    ``Free gift: `` before the check. A caption that keeps that prefix
+    must not.
+    """
+    if any(char not in _ALLOWED for char in text):
+        return "paid_checkout"
+    return None
+
+
 def refuse_paid_checkout(text: str) -> str | None:
     """Return ``paid_checkout`` when folded gift text looks like a URL or address."""
     folded = fold_gift_text(text)
