@@ -20,6 +20,7 @@ from money_machine.assets.defang_normalizer import (
     email_matches,
     lookalike_host_matches,
     stray_spaced_letter_host_matches,
+    tight_spaced_host_matches,
     trailing_outside_host_matches,
     url_matches,
 )
@@ -84,6 +85,7 @@ def refuse_sensitive_text(text: str) -> str | None:
         or lookalike_host_matches(text)
         or trailing_outside_host_matches(text)
         or stray_spaced_letter_host_matches(text)
+        or tight_spaced_host_matches(text)
     ):
         return "sensitive_data"
     if _NOTION_HOST.search(text) is not None:

@@ -172,6 +172,15 @@ def test_spaced_letters_with_a_stray_letter_are_refused() -> None:
     assert refuse_paid_checkout("x dot c o m") == "paid_checkout"
 
 
+def test_screenshot_text_refuses_a_bare_spaced_host() -> None:
+    assert refuse_sensitive_text("acme . com") == "sensitive_data"
+    assert refuse_sensitive_text("acme . NET") == "sensitive_data"
+    assert refuse_paid_checkout("Done . Net") is None
+    assert refuse_sensitive_text("Done . Net") is None
+    assert refuse_sensitive_text("acme . com today") is None
+    assert refuse_sensitive_text("x dot com") is None
+
+
 def test_a_bracketed_hxxp_scheme_is_refused() -> None:
     assert refuse_paid_checkout("hxxp[:]//evil") == "paid_checkout"
     assert refuse_sensitive_text("hxxp[:]//evil") == "sensitive_data"

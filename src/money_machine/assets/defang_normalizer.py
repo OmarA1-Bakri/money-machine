@@ -228,6 +228,14 @@ def stray_spaced_letter_host_matches(text: str) -> bool:
     return host_matches(text)
 
 
+def tight_spaced_host_matches(text: str) -> bool:
+    """A spaced dot whose restored TLD is com, c0m, net, or org."""
+    folded = fold_confusables(text)
+    if _SPACED_DOT_RE.search(folded) is None:
+        return False
+    return host_matches(text)
+
+
 def _undo_span(text: str, start: int, end: int) -> str:
     chunk = text[start:end]
     tail = text[end:]
