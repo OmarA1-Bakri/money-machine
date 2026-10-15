@@ -35,6 +35,7 @@ from money_machine.assets.screenshots import (
     VariantPage,
     _bind_lineage_png,  # pyright: ignore[reportPrivateUsage]
     _paint_documents,  # pyright: ignore[reportPrivateUsage]
+    _write_exclusive,  # pyright: ignore[reportPrivateUsage]
     capture_variant_screenshots,
     default_live_fetcher,
     open_screenshot_context,
@@ -537,6 +538,11 @@ def test_a_fullwidth_less_than_is_refused() -> None:
     _refuse_name("\uff1ctemplate", "fixture_charset")
 
 
+def test_a_latin1_zoe_is_refused() -> None:
+    """U+00EB is inside Latin-1 and above 127. A ``> 255`` check would accept it."""
+    _refuse_name("Zo\u00eb", "fixture_charset")
+
+
 def test_an_ampersand_in_a_fixture_value_is_refused() -> None:
     _refuse_name("A & B", "fixture_markup")
 
@@ -665,6 +671,24 @@ def test_a_symlink_output_is_not_followed(tmp_path: Path) -> None:
     (out / "sage-green.png").symlink_to(victim)
     with pytest.raises(ScreenshotRefusal, match="output_path"):
         write_screenshot_inputs((_shot("Sage Green"),), out)
+    assert victim.read_bytes() == b"victim"
+
+
+def test_an_existing_file_is_not_truncated(tmp_path: Path) -> None:
+    target = tmp_path / "sage-green.png"
+    target.write_bytes(b"old")
+    with pytest.raises(FileExistsError):
+        _write_exclusive(target, b"new")
+    assert target.read_bytes() == b"old"
+
+
+def test_a_symlink_file_is_not_followed(tmp_path: Path) -> None:
+    victim = tmp_path / "victim.png"
+    victim.write_bytes(b"victim")
+    link = tmp_path / "sage-green.png"
+    link.symlink_to(victim)
+    with pytest.raises(FileExistsError):
+        _write_exclusive(link, b"new")
     assert victim.read_bytes() == b"victim"
 
 

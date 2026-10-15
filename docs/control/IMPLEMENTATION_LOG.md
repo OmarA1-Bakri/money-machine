@@ -1,3 +1,53 @@
+## 2026-10-15 — Session 08 W6: link injection and validation
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.
+
+The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The addendum is `docs/control/reviews/2026-10-15-session-08-w6-prompt-integrity.md`. This wave does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, `AGENTS.md`, `CLAUDE.md`, `gift_links.py`, `pdf_objects.py`, or `IMPLEMENTATION_STATE.json`.
+
+`validate_pdf_links` reads annotations with `link_annotations` and Info/XMP with `refuse_gift_document_info`. The raw allowlist is `refuse_raw_charset` on the variant and on a probe of the URI. The probe blanks `:/?#[]@` and a `%xx` triplet that `refuse_paid_checkout` already matches, and it does not fold. A bare `%` stays in the probe. Percent on a URI is `refuse_paid_checkout` on the path, query, and fragment, because that function returns at `://` before it sees `%xx`. Host admission is `_allowed_secret_host`. The default checker raises `live_link_check`. The default clock raises `live_clock`. A failure raises `LinkValidationRefusal` and the repair names that asset and that link.
+
+Chromium m153 stores each README origin href as `SECRET_LINK` plus `/`. Validation against the painted string is `link_mismatch`. Validation against the annotation string passes. Replacing one annotation fails. The gift PDF has zero links and is `missing_links`.
+
+`refuse_fixture_value` still refuses raw code points above 127. `Zoë` (U+00EB) is `fixture_charset`. The `/sw.js` continuation is deleted. `O_NOFOLLOW` is not combined with `O_EXCL`: on Linux, `O_EXCL` already returns `EEXIST` for a symlink and does not follow it. `O_EXCL` stays.
+
+The linux x86_64 video hash stays `6318854297cd5d316fdf4c579a73f188ec5f1e2089745534aa9d4ca6245fe248`. The Sage Green PNG pin stays `2efb97e6c323fe81f763181f2d773d167a49b6f5ca29452e8778a5e9a60d836b`. The template pin stays `f38abcd419f3ff5dfb23264e2f63ad2c597e255cc1728b1cb4fe48237b505866`. Screenshot `build_version` stays 5. `video.py` was not edited.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=no -k "not mutant and not accepts and not dropping"` on the named file. The source was restored after each run. The clean link file is 33 passed. The clean screenshot file is 66 passed. This pair has no deselected tests.
+
+- Dropping the exact URI inequality: 5 failed, 27 passed (`test_swapping_one_link_is_refused`, `test_swapping_one_link_only_in_case_is_refused`, `test_the_readme_uris_round_trip_exactly`).
+- Comparing URIs with `casefold`: 1 failed, 31 passed (`test_swapping_one_link_only_in_case_is_refused`).
+- Dropping the variant allowlist: 1 failed, 31 passed (`test_a_latin1_variant_is_refused_before_fold`).
+- Dropping the URI allowlist: 2 failed, 30 passed (`test_a_latin1_uri_is_refused_before_fold`, `test_a_bare_percent_is_refused`).
+- Blanking every `%`, including a bare one: 1 failed, 31 passed (`test_a_bare_percent_is_refused`).
+- Dropping `refuse_paid_checkout` on the path, query, and fragment: 1 failed, 31 passed (`test_a_percent_triplet_in_the_path_is_refused`).
+- Skipping `refuse_gift_document_info`: 3 failed, 29 passed (`test_object_stream_info_percent_is_refused`, `test_xmp_percent_surface_is_refused`, `test_a_deep_info_chain_is_refused`).
+- Allowing zero links: 2 failed, 30 passed (`test_a_pdf_with_no_links_is_refused`, `test_the_gift_pdf_has_no_links`).
+- Allowing a link with no URI: 1 failed, 31 passed (`test_a_link_without_a_uri_is_malformed`).
+- Allowing a scheme other than `https`: 1 failed, 31 passed (`test_http_is_refused`).
+- Dropping the empty-host check: 1 failed, 31 passed (`test_mailto_is_malformed`, code becomes `not_https`).
+- Dropping `_allowed_secret_host`: 2 failed, 30 passed (`test_an_indirect_annotation_off_host_is_refused`, `test_nested_kids_are_walked`).
+- Allowing userinfo: 1 failed, 31 passed (`test_userinfo_is_malformed`).
+- Allowing whitespace: 1 failed, 31 passed (`test_a_space_in_the_uri_is_malformed`).
+- Allowing an unknown variant: 1 failed, 31 passed (`test_an_unknown_variant_is_refused_without_opening`).
+- Allowing a cross-host hop: 1 failed, 31 passed (`test_a_redirect_to_another_host_is_refused`).
+- Refusing every chain longer than one hop: 1 failed, 32 passed (`test_a_same_host_hop_is_allowed`).
+- Dropping the check that the chain starts with the opened URI: 1 failed, 32 passed (`test_a_chain_that_skips_the_opened_uri_is_refused`).
+- Ignoring the observed variant: 1 failed, 31 passed (`test_the_wrong_variant_is_refused`).
+- Allowing an auth wall: 2 failed, 30 passed (`test_an_auth_wall_is_refused`, `test_one_failed_link_does_not_repair_the_others`).
+- Allowing a missing duplicate button: 1 failed, 31 passed (`test_a_missing_duplicate_button_is_refused`).
+- Repairing every URI when one fails: 6 failed, 26 passed (`test_one_failed_link_does_not_repair_the_others` and the one-link swap rows).
+- Ignoring accepted URIs past the PDF: 1 failed, 31 passed (`test_a_missing_accepted_link_is_named`).
+- Making the default checker return a pass: 1 failed, 31 passed (`test_the_checker_defaults_to_refusal`).
+- Making the default clock return a stamp: 1 failed, 31 passed (`test_the_clock_defaults_to_refusal`).
+- Switching the fixture allowlist from `> 127` to `> 255`: 1 failed, 65 passed (`test_a_latin1_zoe_is_refused`).
+- Dropping `O_EXCL`: 2 failed, 64 passed (`test_an_existing_file_is_not_truncated`, `test_a_symlink_file_is_not_followed`).
+
+The chain-start row and the same-host row were measured after `test_a_chain_that_skips_the_opened_uri_is_refused` landed, so their passed count is 32. The earlier link rows were measured on the 32-test file and their passed counts are one lower. No link guard above survived.
+
+Parked to next wave: the `file:` allow; `sendBeacon` from `set_content` while JavaScript is on; spelled-out `at ... dot com` addresses; refusing non-ASCII labels inside `_prepare`; `-flags +bitexact` on its own; the cross-platform hash; trailer tampering after the Matroska bytes; text inside raster images; José and Zoë in the gift name or community; whole-document `/OpenAction`, `/AA`, and outline scanning; non-Link URI annotations; defanged hosts; bare `127.1`, `0x7f000001`, and `2130706433`; storage URI and S3; workflow linkage and commissioning; the session exit code; Exit 78.
+
+`uv run ruff check .` exit 0. `uv run ruff format --check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. Full local pytest was not re-run. The 12 `test_compose_preserves_the_postgres_password` failures recorded in W3 stay pre-existing and local (`docker` missing). CI is the gate. `.github/workflows/ci.yml` is unchanged.
+
 ## 2026-10-15 — Session 08 W5 r3: raw ASCII allowlist and split structure kills
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.

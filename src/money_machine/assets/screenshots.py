@@ -333,17 +333,7 @@ def _file_allowed(url: str) -> bool:
 
 
 def _http_allowed(url: str, _resource_type: str, allowed_http: frozenset[str]) -> bool:
-    if url in allowed_http:
-        return True
-    # This Chromium reports the worker script as "script", not "serviceworker".
-    # Continue that script only for an allowed document. Production capture
-    # passes an empty allow-list, so the script is aborted there. The
-    # continuation is what makes service_workers="allow" visible to the test.
-    for document in allowed_http:
-        prefix = document[:-1] if document.endswith("/") else document
-        if url == f"{prefix}/sw.js":
-            return True
-    return False
+    return url in allowed_http
 
 
 def _paint_page(context: BrowserContext, document: str) -> bytes:
@@ -390,7 +380,13 @@ def _clip(page: Page) -> bytes:
 
 
 def _write_exclusive(path: Path, payload: bytes) -> None:
-    flags = os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_WRONLY
+    """Create a new file.
+
+    ``O_EXCL`` refuses an existing path. On Linux that includes a symlink,
+    and the open does not follow it. ``O_NOFOLLOW`` does not change that
+    outcome while ``O_EXCL`` is set, so it is not combined here.
+    """
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
     descriptor = os.open(path, flags, 0o644)
     try:
         os.write(descriptor, payload)
