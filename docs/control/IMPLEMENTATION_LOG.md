@@ -1,3 +1,18 @@
+## 2026-10-15 — Session 08 punycode host r2
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-punycode-host-r2-prompt-integrity.md`.
+
+A non-ASCII secret host is refused before the `xn--` check. `urlparse` does not IDNA-encode, so `fíxture.notion.site` and a fullwidth label contain no `xn--`. Both are `secret link host is not allowed`. A plain `fixture.notion.site` host stays allowed. The punycode PDF row passes a checker that raises if it is called. The curated and IANA defang lists stay on #81 and #82.
+
+Focused command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_punycode_host.py tests/unit/integrations/notion/test_publishing.py -k "punycode or secret_link_host or unicode or fullwidth"`. 10 passed, 172 deselected. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the non-ASCII host return | `test_a_unicode_homoglyph_host_is_refused` | 2/8 |
+| Delete the `xn--` host return | `test_a_punycode_notion_host_is_refused` | 1/9 |
+
+Parked: uppercase on-host URIs, gift and screenshot defangs, live S3, `CREATE_ETSY_DRAFT`, commissioning, and the session exit.
+
 ## 2026-10-15 — Session 08 punycode host
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.

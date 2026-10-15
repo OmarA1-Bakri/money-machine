@@ -9,6 +9,8 @@ from money_machine.assets.link_validation import (
     LinkValidationRefusal,
     validate_pdf_links,
 )
+from money_machine.integrations.notion.errors import SchemaBuilderError
+from money_machine.integrations.notion.publishing import build_published_page
 from tests.unit.assets.gift_pdf_craft import classic_pdf
 
 _PLAIN = "https://fixture.notion.site/Sage-Green"
@@ -39,6 +41,10 @@ def _pdf(uri: str) -> bytes:
     )
 
 
+def _checker_must_not_run(uri: str, variant: str) -> LinkObservation:
+    raise AssertionError(uri, variant)
+
+
 def test_a_punycode_notion_host_is_refused() -> None:
     with pytest.raises(LinkValidationRefusal) as caught:
         validate_pdf_links(
@@ -46,10 +52,35 @@ def test_a_punycode_notion_host_is_refused() -> None:
             asset="readme",
             accepted=(("Sage Green", _PUNY),),
             known_variants=_KNOWN,
+            checker=_checker_must_not_run,
             clock=lambda: _STAMP,
         )
     assert caught.value.code == "host"
     assert [job.link for job in caught.value.repairs] == [_PUNY]
+
+
+def _publish_secret(link: str) -> None:
+    build_published_page(
+        "a" * 32,
+        "workspace",
+        True,
+        True,
+        False,
+        link,
+        True,
+        ("b" * 32,),
+        ("c" * 32,),
+    )
+
+
+def test_a_unicode_homoglyph_host_is_refused() -> None:
+    with pytest.raises(SchemaBuilderError, match="host is not allowed"):
+        _publish_secret("https://f\u00edxture.notion.site/Home")
+
+
+def test_a_fullwidth_host_is_refused() -> None:
+    with pytest.raises(SchemaBuilderError, match="host is not allowed"):
+        _publish_secret("https://\uff46ixture.notion.site/Home")
 
 
 def test_a_plain_notion_host_is_allowed() -> None:

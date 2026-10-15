@@ -163,7 +163,13 @@ def _secret_port(parsed: ParseResult) -> int | None:
 
 
 def _allowed_secret_host(host: str) -> bool:
-    """Plain Notion hosts only. An IDNA label is ``xn--`` after parsing."""
+    """Plain Notion hosts only.
+
+    ``urlparse`` does not IDNA-encode, so a Unicode label never contains
+    ``xn--``. Non-ASCII hosts are refused first.
+    """
+    if not host.isascii():
+        return False
     if "xn--" in host:
         return False
     if host in _EXACT_SECRET_HOSTS:
