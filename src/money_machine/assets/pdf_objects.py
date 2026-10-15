@@ -1,37 +1,26 @@
 """Gift-PDF surfaces read by walking objects, not by searching bytes.
 
 ``link_annotations`` counts ``/Link`` annotations and returns each action
-``/URI`` string. It does not read an annotation-level ``/URI``.
-``delivery_link_uris`` is the same page walk for link validation. A link
-annotation must be exactly ``Type``, ``Subtype``, ``Rect``, ``Border``,
-``F``, and ``A``, with ``/Subtype /Link``. Any other annotation on the page
-``/Annots`` array is refused. The action is exactly ``S`` and ``URI``, plus
-``Type /Action`` when ``Type`` is present. ``/S`` must be ``/URI`` anywhere
-in the graph. A ``/URI`` that is not the link's own action is checked with
-the same rules as a delivery link. An indirect action or URI is resolved one
-hop. A URI stream on a link is refused. The catalog is the trailer ``/Root``,
-read before the walk, and must equal ``Type`` and ``Pages``. A page must
-equal the keys Chromium emits, with ``Annots`` only when the page has
-annotations. The walk remembers ``(object, role)``, so a second role still
-runs that role's check. Nesting deeper than 64 raises ``ValueError``. Names
-are decoded once in the reader, and a dictionary with two keys for one name
-is refused there.
+``/URI``. ``delivery_link_uris`` is that walk for link validation. A link is
+exactly ``Type``, ``Subtype``, ``Rect``, ``Border``, ``F``, and ``A``, with
+``/Subtype /Link``. ``/S`` must be ``/URI``. Any other ``/URI`` must be an
+accepted link. The catalog is trailer ``/Root`` and equals ``Type`` and
+``Pages``. A page equals the Chromium keys, plus ``Annots`` when present.
+``/Resources`` equals the measured set ``ExtGState``, ``Font``, and
+``ProcSet``. Role checks see the resolved value. A ``/URI`` is deferred only
+for a ``/Annots`` link on a page the ``/Kids`` walk reached. A ``/Kids``
+chain past depth 64 raises ``pdf kids depth``.
 """
 
 from __future__ import annotations
 
-import re
-
 from money_machine.assets.pdf_reader import (
-    CMap,
     PdfDocument,
     PdfName,
     PdfObject,
-    PdfReader,
     PdfRef,
     PdfStream,
     PdfText,
-    token_boundary,
 )
 
 
@@ -57,21 +46,26 @@ def _pages(
     node: PdfObject | None,
     seen: frozenset[int] = frozenset(),
     depth: int = 0,
+    numbers: set[int] | None = None,
 ) -> tuple[dict[str, PdfObject], ...]:
     if depth > _MAX_DEPTH:
-        raise ValueError("pdf depth")
+        raise ValueError("pdf kids depth")
+    number: int | None = None
     if isinstance(node, PdfRef):
         if node.number in seen:
             raise ValueError("pdf page")
         seen = seen | {node.number}
+        number = node.number
     found = doc.deref(node)
     page = _dict(found)
     if _name_is(page.get("Type"), "Page"):
+        if numbers is not None and number is not None:
+            numbers.add(number)
         return (page,)
     kids = doc.deref(page.get("Kids"))
     if not isinstance(kids, tuple):
         raise ValueError("pdf page")
-    return tuple(item for kid in kids for item in _pages(doc, kid, seen, depth + 1))
+    return tuple(item for kid in kids for item in _pages(doc, kid, seen, depth + 1, numbers))
 
 
 def _text_of(value: PdfObject | None) -> str | None:
@@ -115,7 +109,10 @@ _ANNOT_ALLOW_EXTRA: frozenset[str] = frozenset()
 _ACTION_ALLOW_EXTRA: frozenset[str] = frozenset()
 _CATALOG_ALLOW_EXTRA: frozenset[str] = frozenset()
 _PAGE_ALLOW_EXTRA: frozenset[str] = frozenset()
+# Measured from Chromium README and gift output: the only /S name is URI.
 _ALLOWED_S: frozenset[str] = frozenset({"URI"})
+# Measured page /Resources keys. README has two pages, the gift one. Both match.
+_RESOURCE_KEYS = frozenset({"ExtGState", "Font", "ProcSet"})
 _MAX_DEPTH = 64
 
 
@@ -128,18 +125,18 @@ class EmbeddedUriRefusal(ValueError):
         self.uri = uri
 
 
-def delivery_link_uris(pdf: bytes) -> tuple[str, ...]:
+def delivery_link_uris(pdf: bytes, *, accepted: frozenset[str] = frozenset()) -> tuple[str, ...]:
     """Return each link URI from the page walk, or raise ``ValueError``.
 
     Annotation keys must equal the Chromium set. The action is ``S`` and
     ``URI``, with ``Type /Action`` when ``Type`` is present. ``/S`` must be
     ``/URI``. An indirect action or URI resolves one hop. A URI stream is
     refused. The catalog is checked from the trailer ``/Root`` before the
-    walk. A page must equal the generator's keys. An annotation whose
-    subtype is not ``Link`` is refused here, not by the walk's parent key.
+    walk. A page must equal the generator's keys. ``/Resources`` must equal
+    the measured Chromium set. Annotation roles are the graph walk's check.
     """
     doc = PdfDocument(pdf)
-    _refuse_graph(doc)
+    _refuse_graph(doc, accepted)
     root = _dict(doc.deref(doc.trailer.get("Root")))
     uris: list[str] = []
     for page in _pages(doc, root.get("Pages")):
@@ -147,23 +144,25 @@ def delivery_link_uris(pdf: bytes) -> tuple[str, ...]:
         if not isinstance(annots, tuple):
             continue
         for item in annots:
-            annot = _dict(doc.deref(item))
-            if not _name_is(annot.get("Subtype"), "Link"):
-                raise ValueError("pdf annot subtype")
-            uris.append(_uri_action(doc, annot))
+            uris.append(_uri_action(doc, _dict(doc.deref(item))))
     return tuple(uris)
 
 
-def _refuse_graph(doc: PdfDocument) -> None:
+def _refuse_graph(doc: PdfDocument, accepted: frozenset[str]) -> None:
     """Refuse a bad catalog, a bad page, a non-URI ``/S``, and an unvalidated ``/URI``.
 
     The catalog is ``trailer["Root"]``, checked before the walk so an earlier
     ``/Info`` or ``/Foo`` cannot hide it. The walk's seen set is
-    ``(object, role)``. An annotation reached earlier under another role is
-    checked again when the role is ``Annots``. Objects that nothing references
-    are walked afterwards. Nesting deeper than ``_MAX_DEPTH`` is refused.
+    ``(object, role)``. Role checks run after a reference is resolved, so an
+    inline dictionary hits the same check. A page is an object ``_pages``
+    reached from ``/Root`` through ``/Pages`` and ``/Kids``. Objects that
+    nothing references are walked afterwards. Nesting deeper than
+    ``_MAX_DEPTH`` is refused.
     """
     _refuse_trailer_root(doc)
+    real_pages: set[int] = set()
+    root = _dict(doc.deref(doc.trailer.get("Root")))
+    _pages(doc, root.get("Pages"), numbers=real_pages)
     seen: set[tuple[int, str | None]] = set()
 
     def scan(
@@ -172,36 +171,85 @@ def _refuse_graph(doc: PdfDocument) -> None:
         depth: int,
         *,
         in_link_action: bool = False,
+        under_page_annots: bool = False,
+        action_of_annot: bool = False,
+        in_font: bool = False,
+        in_info: bool = False,
+        unreferenced: bool = False,
     ) -> None:
         if depth > _MAX_DEPTH:
             raise ValueError("pdf depth")
+        role = parent_key
+        number: int | None = None
         if isinstance(value, PdfRef):
-            role = parent_key
+            number = value.number
             if (value.number, role) in seen:
                 return
-            seen_before = any(number == value.number for number, _role in seen)
             seen.add((value.number, role))
             value = doc.get(value.number)
-            if role == "Annots" and seen_before and isinstance(value, dict):
-                _refuse_annot_on_second_role(value)
         if isinstance(value, dict):
-            _refuse_dict(doc, value, in_link_action=in_link_action)
-            owned = _name_is(value.get("Subtype"), "Link") and _name_is(value.get("Type"), "Annot")
+            _refuse_resolved_role(
+                value,
+                role=role,
+                in_link_action=in_link_action,
+                action_of_annot=action_of_annot,
+            )
+            _refuse_dict(doc, value, accepted, in_link_action=in_link_action)
+            annot = _name_is(value.get("Type"), "Annot")
+            link = annot and _name_is(value.get("Subtype"), "Link")
+            defer = _defer_page_annots(
+                value,
+                number=number,
+                parent_key=role,
+                in_font=in_font,
+                in_info=in_info,
+                unreferenced=unreferenced,
+                real_pages=real_pages,
+            )
             for key, child in value.items():
-                scan(child, key, depth + 1, in_link_action=owned and key == "A")
+                scan(
+                    child,
+                    key,
+                    depth + 1,
+                    in_link_action=under_page_annots and link and key == "A",
+                    under_page_annots=defer and key == "Annots",
+                    action_of_annot=annot and key == "A",
+                    in_font=in_font or key == "Font",
+                    in_info=in_info or key == "Info",
+                )
             return
         if isinstance(value, tuple):
             for item in value:
-                scan(item, parent_key, depth + 1, in_link_action=in_link_action)
+                scan(
+                    item,
+                    parent_key,
+                    depth + 1,
+                    in_link_action=in_link_action,
+                    under_page_annots=under_page_annots,
+                    action_of_annot=action_of_annot,
+                    in_font=in_font,
+                    in_info=in_info,
+                    unreferenced=unreferenced,
+                )
             return
         if isinstance(value, PdfStream):
-            scan(value.fields, parent_key, depth + 1, in_link_action=in_link_action)
+            scan(
+                value.fields,
+                parent_key,
+                depth + 1,
+                in_link_action=in_link_action,
+                under_page_annots=under_page_annots,
+                action_of_annot=action_of_annot,
+                in_font=in_font,
+                in_info=in_info,
+                unreferenced=unreferenced,
+            )
 
     scan(doc.trailer, None, 0)
     reached = {number for number, _role in seen}
     for number in list(doc.entries):
         if number not in reached:
-            scan(PdfRef(number, 0), None, 0)
+            scan(PdfRef(number, 0), None, 0, unreferenced=True)
             reached.add(number)
 
 
@@ -226,13 +274,66 @@ def _refuse_root_names(doc: PdfDocument, fields: dict[str, PdfObject]) -> None:
         raise ValueError("pdf names entry")
 
 
-def _refuse_annot_on_second_role(fields: dict[str, PdfObject]) -> None:
-    """Refuse a non-Link reached again under ``Annots``.
+def _refuse_resolved_role(
+    fields: dict[str, PdfObject],
+    *,
+    role: str | None,
+    in_link_action: bool,
+    action_of_annot: bool,
+) -> None:
+    """Apply the role check to one dictionary, inline or just resolved."""
+    if role == "Annots":
+        _refuse_annot_role(fields)
+        return
+    if role == "Resources":
+        if frozenset(fields) != _RESOURCE_KEYS:
+            raise ValueError("pdf resource keys")
+        return
+    if role == "AA":
+        raise ValueError("pdf additional action")
+    if role == "A" and not in_link_action and not action_of_annot:
+        raise ValueError("pdf action role")
+    if _name_is(fields.get("Subtype"), "Link"):
+        raise ValueError("pdf link lookalike")
 
-    The page ``/Annots`` array is checked in ``delivery_link_uris``. This
-    visit applies that same subtype rule to an object an earlier role
-    already marked.
+
+def _defer_page_annots(
+    fields: dict[str, PdfObject],
+    *,
+    number: int | None,
+    parent_key: str | None,
+    in_font: bool,
+    in_info: bool,
+    unreferenced: bool,
+    real_pages: set[int],
+) -> bool:
+    """Defer link URIs only for a page object the page tree reached.
+
+    Each other place returns on its own line. Deleting that line raises
+    ``pdf page place`` for that place only.
     """
+    if not _name_is(fields.get("Type"), "Page"):
+        return False
+    if number is not None and number in real_pages:
+        return True
+    inline = number is None
+    if inline and in_font:
+        return False
+    if inline and in_info:
+        return False
+    if unreferenced:
+        return False
+    if parent_key == "Foo":
+        return False
+    if in_font and not inline:
+        return False
+    raise ValueError("pdf page place")
+
+
+def _refuse_annot_role(fields: dict[str, PdfObject]) -> None:
+    """Check an annotation reached under ``Annots``."""
+    if frozenset(fields) - _ANNOT_ALLOW_EXTRA != _LINK_KEYS:
+        raise ValueError("pdf link keys")
     if not _name_is(fields.get("Subtype"), "Link"):
         raise ValueError("pdf annot subtype")
 
@@ -240,6 +341,7 @@ def _refuse_annot_on_second_role(fields: dict[str, PdfObject]) -> None:
 def _refuse_dict(
     doc: PdfDocument,
     fields: dict[str, PdfObject],
+    accepted: frozenset[str],
     *,
     in_link_action: bool,
 ) -> None:
@@ -248,12 +350,14 @@ def _refuse_dict(
     if isinstance(action, PdfName) and action.value not in _ALLOWED_S:
         raise ValueError("pdf action s")
     if isinstance(action, PdfName):
-        _refuse_action_uri(doc, fields, in_link_action=in_link_action)
+        _refuse_action_uri(doc, fields, accepted, in_link_action=in_link_action)
 
 
 def _refuse_page(fields: dict[str, PdfObject]) -> None:
     if not _name_is(fields.get("Type"), "Page"):
         return
+    if "AA" in fields:
+        raise ValueError("pdf page additional action")
     keys = frozenset(fields) - _PAGE_ALLOW_EXTRA
     if keys != _PAGE_KEYS and keys != _PAGE_WITH_ANNOTS:
         raise ValueError("pdf page keys")
@@ -262,6 +366,7 @@ def _refuse_page(fields: dict[str, PdfObject]) -> None:
 def _refuse_action_uri(
     doc: PdfDocument,
     fields: dict[str, PdfObject],
+    accepted: frozenset[str],
     *,
     in_link_action: bool,
 ) -> None:
@@ -279,16 +384,16 @@ def _refuse_action_uri(
     uri = _text_of(resolved)
     if uri is None:
         return
-    reason = _graph_uri_reason(uri)
+    reason = _graph_uri_reason(uri, accepted)
     if reason is not None:
         raise EmbeddedUriRefusal(reason, uri)
 
 
-def _graph_uri_reason(uri: str) -> str | None:
+def _graph_uri_reason(uri: str, accepted: frozenset[str]) -> str | None:
     # link_validation imports this module, so a top-level import cycles.
     from money_machine.assets.link_validation import refuse_graph_uri
 
-    return refuse_graph_uri(uri)
+    return refuse_graph_uri(uri, accepted=accepted)
 
 
 def _uri_action(doc: PdfDocument, annot: dict[str, PdfObject]) -> str:
@@ -297,8 +402,6 @@ def _uri_action(doc: PdfDocument, annot: dict[str, PdfObject]) -> str:
         raise ValueError("pdf link keys")
     if not _name_is(annot.get("Type"), "Annot"):
         raise ValueError("pdf link type")
-    if not _name_is(annot.get("Subtype"), "Link"):
-        raise ValueError("pdf link subtype")
     action = _dict(_once(doc, annot.get("A")))
     keys = frozenset(action) - _ACTION_ALLOW_EXTRA
     if keys == _ACTION_WITH_TYPE and not _name_is(action.get("Type"), "Action"):
@@ -330,118 +433,14 @@ def document_strings(pdf: bytes) -> tuple[str, ...]:
     return tuple(found)
 
 
-def _cmap(data: bytes) -> CMap:
-    text = data.decode("latin-1")
-    width = 2
-    space = re.search(r"begincodespacerange(.*?)endcodespacerange", text, re.S)
-    if space is not None:
-        codes = re.findall(r"<([0-9A-Fa-f]+)>", space.group(1))
-        if codes:
-            width = max(1, len(codes[0]) // 2)
-    mapping: dict[int, str] = {}
-    for block in re.findall(r"beginbfchar(.*?)endbfchar", text, re.S):
-        for src, dst in re.findall(r"<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>", block):
-            mapping[int(src, 16)] = bytes.fromhex(dst).decode("utf-16-be", errors="replace")
-    for block in re.findall(r"beginbfrange(.*?)endbfrange", text, re.S):
-        pairs = re.findall(
-            r"<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*(?:<([0-9A-Fa-f]+)>|\[(.*?)\])",
-            block,
-            re.S,
-        )
-        for src, end, single, array in pairs:
-            if single:
-                target = bytes.fromhex(single)
-                for code in range(int(src, 16), int(end, 16) + 1):
-                    mapping[code] = target.decode("utf-16-be", errors="replace")
-                    last = int.from_bytes(target[-2:], "big") + 1
-                    target = target[:-2] + last.to_bytes(2, "big")
-                continue
-            code = int(src, 16)
-            for dst in re.findall(r"<([0-9A-Fa-f]+)>", array):
-                mapping[code] = bytes.fromhex(dst).decode("utf-16-be", errors="replace")
-                code += 1
-    return CMap(width, mapping)
+def read_dict(value: PdfObject | None) -> dict[str, PdfObject]:
+    """Return a dictionary object, or an empty dictionary."""
+    return _dict(value)
 
 
-def _fonts(doc: PdfDocument, page: dict[str, PdfObject]) -> dict[str, CMap]:
-    node: PdfObject | None = page
-    resources: dict[str, PdfObject] = {}
-    for _ in range(6):
-        current = _dict(doc.deref(node))
-        if "Resources" in current:
-            resources = _dict(doc.deref(current.get("Resources")))
-            break
-        node = current.get("Parent")
-    fonts = _dict(doc.deref(resources.get("Font")))
-    decoded: dict[str, CMap] = {}
-    for name, ref in fonts.items():
-        font = _dict(doc.deref(ref))
-        tounicode = doc.deref(font.get("ToUnicode"))
-        if isinstance(tounicode, PdfStream):
-            decoded[name] = _cmap(tounicode.data)
-    return decoded
-
-
-def _page_bytes(doc: PdfDocument, page: dict[str, PdfObject]) -> bytes:
-    contents = doc.deref(page.get("Contents"))
-    if isinstance(contents, PdfStream):
-        return contents.data
-    if not isinstance(contents, tuple):
-        return b""
-    parts = [
-        item.data for item in (doc.deref(part) for part in contents) if isinstance(item, PdfStream)
-    ]
-    return b"\n".join(parts)
-
-
-def _show(value: PdfObject, cmap: CMap | None) -> str:
-    if not isinstance(value, PdfText):
-        return ""
-    if value.hex_digits is None or cmap is None:
-        return value.text
-    step = cmap.width * 2
-    chars: list[str] = []
-    digits = value.hex_digits
-    for index in range(0, len(digits), step):
-        chars.append(cmap.codes.get(int(digits[index : index + step], 16), ""))
-    return "".join(chars)
-
-
-def _operators(content: bytes, fonts: dict[str, CMap]) -> str:
-    reader = PdfReader(content)
-    stack: list[PdfObject] = []
-    pieces: list[str] = []
-    current: CMap | None = None
-    while reader.i < reader.n:
-        reader.skip()
-        if reader.i >= reader.n:
-            break
-        byte = reader.data[reader.i]
-        if token_boundary(byte) or chr(byte).isdigit() or byte in b"+-.":
-            stack.append(reader.value())
-            continue
-        word = reader.word().decode("latin-1")
-        if word == "Tj" and stack:
-            pieces.append(_show(stack.pop(), current))
-        elif word == "TJ" and stack:
-            array = stack.pop()
-            if isinstance(array, tuple):
-                pieces.extend(_show(item, current) for item in array)
-        elif word == "'" and stack:
-            pieces.append(_show(stack.pop(), current))
-        elif word == "Tf" and len(stack) >= 2:
-            stack.pop()
-            name = stack.pop()
-            if isinstance(name, PdfName):
-                current = fonts.get(name.value)
-        else:
-            stack.clear()
-    return "".join(pieces)
-
-
-def page_texts(pdf: bytes) -> tuple[str, ...]:
-    """Painted text of each page, in page-tree order."""
-    doc = PdfDocument(pdf)
-    root = _dict(doc.deref(doc.trailer.get("Root")))
-    pages = _pages(doc, root.get("Pages"))
-    return tuple(_operators(_page_bytes(doc, page), _fonts(doc, page)) for page in pages)
+def read_pages(
+    doc: PdfDocument,
+    node: PdfObject | None,
+) -> tuple[dict[str, PdfObject], ...]:
+    """Return the page dictionaries reached from ``/Pages``."""
+    return _pages(doc, node)

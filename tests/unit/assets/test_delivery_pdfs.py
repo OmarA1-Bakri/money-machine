@@ -36,7 +36,8 @@ from money_machine.assets.delivery_pdfs import (
 )
 from money_machine.assets.design_tokens import DesignTokens, listing_token_payload, load_tokens
 from money_machine.assets.listing_images import network_allowed
-from money_machine.assets.pdf_objects import link_annotations, page_texts
+from money_machine.assets.pdf_objects import link_annotations
+from money_machine.assets.pdf_text import page_texts
 from money_machine.domain.services.claim_validation import validate_claims
 from money_machine.domain.services.listing_text import TextSlot, render
 from tests.fixtures.merchandising import SECRET_LINK, consistent_request

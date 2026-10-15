@@ -1,3 +1,113 @@
+## 2026-10-15 — Session 08 W7 r3: page-tree roles and screenshot sources
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+A page is an object `_pages` reaches from trailer `/Root` through `/Pages` and `/Kids`. Only that object's `/Annots` links defer URI checks. A `/Type /Page` inline under Font, inline in `/Info`, unreferenced, on trailer `/Foo`, or referenced from Font (`/F1 5 0 R`) keeps its URI in the graph check. Any other place raises `pdf page place`. The page walk no longer calls `_refuse_annot_role`; the graph `/Annots` visit is that check.
+
+A source must be a screenshot of the same spec. A listing that names its own hash, a listing named from a delivery PDF, two listings that name each other, a walkthrough named from a listing, a listing named from another listing, and a listing named from a walkthrough are stale. Existence for the unknown-source check still uses every owned asset. Painted text lives in `pdf_text.py`.
+
+`/Resources` stays `{ExtGState, Font, ProcSet}`. It grows only with a measured row when a template emits `XObject`, `Pattern`, or `Shading`.
+
+Clean focused suite, Chromium deselected: 252 passed, 2 deselected. Command: `uv run pytest -q -p no:cacheprovider --tb=line -k "not readme_uris and not gift_pdf_has_no_links" tests/unit/assets/test_link_validation.py tests/unit/assets/test_gift_link_policy.py tests/unit/assets/test_gift_pdf_links.py tests/unit/assets/test_asset_lineage.py`. The README round-trip, the gift with no links, and `test_readme_pages_place_setup_before_access` passed. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the inline-Font page return | `test_a_fake_page_inline_under_font_is_refused` | 1/251 |
+| Delete the `/Info` page return | `test_a_fake_page_inline_in_info_is_refused` | 1/251 |
+| Delete the unreferenced-page return | `test_an_unreferenced_fake_page_is_refused` | 1/251 |
+| Delete the trailer `/Foo` page return | `test_a_fake_page_on_trailer_foo_is_refused` | 1/251 |
+| Delete the Font-reference page return | `test_a_fake_page_referenced_from_font_is_refused` | 1/251 |
+| Replace `pdf page place` with `return False` | `test_a_fake_page_under_extgstate_is_malformed` | 1/251 |
+| Delete the self-source return | `test_a_self_sourced_listing_is_stale` | 1/251 |
+| Delete the mutual-source return | `test_mutually_sourced_listings_are_stale` | 1/251 |
+| Delete the delivery-PDF source return | `test_a_listing_sourced_from_a_delivery_pdf_is_stale` | 1/251 |
+| Delete the walkthrough-from-listing return | `test_a_walkthrough_sourced_from_a_listing_is_stale` | 1/251 |
+| Delete the one-way listing return | `test_a_listing_sourced_from_another_listing_is_stale` | 1/251 |
+| Allow a walkthrough hash as a source | `test_a_listing_sourced_from_a_walkthrough_is_stale` | 1/251 |
+| Source walk returns false | `test_a_stale_source_marks_the_dependent`, `test_a_dependent_listed_before_its_source_is_stale`, and `test_an_unknown_source_is_stale` | 3/249 |
+
+The source-walk mutant leaves the six new source rows stale. Each of those rows fails only when its own return is removed.
+
+## 2026-10-15 — Session 08 W7 r2: resolved roles, measured keys
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+Role checks run on the resolved dictionary, inline or indirect. The page walk calls that same annotation check. A `/URI` is deferred only for a link reached from a page `/Annots` array. Stale lineage identity is `(spec_version, output_sha256)`. A source hash is resolved at that spec. An unknown source is stale.
+
+Measured from Chromium README and gift output this round. `/Resources` is `{ExtGState, Font, ProcSet}` on both README pages and the gift page. `/XObject`, `/Pattern`, `/Shading`, `/ColorSpace`, and `/Properties` are absent. The only `/S` name is `URI`, four times on the README and never on the gift. `/Transparency`, `/Alpha`, and `/Luminosity` are absent. ExtGState blend is `/BM /Normal`.
+
+`uv run pytest -q -p no:cacheprovider --tb=line` on the restored tree: 12 failed, 4537 passed, 193 skipped. The 12 failures are `test_compose_preserves_the_postgres_password` because Docker is absent in this environment. Focused suite, Chromium deselected: 240 passed, 2 deselected. Command: `uv run pytest -q -p no:cacheprovider --tb=line -k "not readme_uris and not gift_pdf_has_no_links" tests/unit/assets/test_link_validation.py tests/unit/assets/test_gift_link_policy.py tests/unit/assets/test_gift_pdf_links.py tests/unit/assets/test_asset_lineage.py`. The two Chromium rows passed on the restored tree. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Seen set keyed by object number only | `test_a_second_role_widget_is_malformed` | 1/239 |
+| Delete the `/Annots` subtype check | `test_a_resource_annots_widget_is_malformed` and `test_an_inline_page_annotation_is_malformed` for Widget, Screen, FileAttachment, and RichMedia | 5/235 |
+| Subtype check also allows Widget | the resource widget row and the inline Widget row | 2/238 |
+| Delete the `/Annots` link-key check | `test_a_short_link_in_annots_is_malformed` | 1/239 |
+| Delete the `/Resources` key check | `test_an_unmeasured_resource_key_is_malformed` | 1/239 |
+| Add `GoToR` to the `/S` allowlist | `test_a_non_uri_action_is_malformed[GoToR]` and `test_an_unmeasured_s_name_is_malformed[GoToR]` | 2/238 |
+| Add `SubmitForm` to the `/S` allowlist | `test_a_non_uri_action_is_malformed[SubmitForm]` and `test_an_unmeasured_s_name_is_malformed[SubmitForm]` | 2/238 |
+| Defer `/URI` for every Link `/A` | `test_a_resource_link_uri_is_not_an_accepted_action` | 1/239 |
+| Delete the non-annotation `/A` check | `test_an_inline_action_outside_a_link_is_malformed` | 1/239 |
+| Delete the `/AA` role check | `test_an_inline_additional_action_is_malformed` | 1/239 |
+| Delete the `/Subtype /Link` look-alike check | `test_a_link_lookalike_outside_annots_is_malformed` | 1/239 |
+| Delete the URI-stream `raise` | `test_an_indirect_stream_uri_is_malformed` | 1/239 |
+| Delete the accepted-link membership check | `test_a_widget_uri_must_be_an_accepted_link` | 1/239 |
+| Map `pdf kids depth` back to `paid_checkout` | `test_a_deep_kids_chain_is_malformed` | 1/239 |
+| Delete the `_pages` depth cap | the same kids test | 1/239 |
+| Delete the page `/AA` message | `test_a_page_additional_action_without_a_uri_is_malformed` | 1/239 |
+| Key stale ids by output hash only | `test_a_shared_output_keeps_each_spec` | 1/239 |
+| Delete the unknown-source check | `test_an_unknown_source_is_stale` | 1/239 |
+| Source walk returns false | `test_a_stale_source_marks_the_dependent` and `test_a_dependent_listed_before_its_source_is_stale` | 2/238 |
+| One pass instead of repeating | `test_a_dependent_listed_before_its_source_is_stale` | 1/239 |
+| Delete the spec comparison | `test_a_spec_bump_is_stale` | 1/239 |
+| Delete the QA check | the QA row and both same-spec source rows | 3/237 |
+| Drop the product filter | `test_another_product_is_omitted` | 1/239 |
+
+The page walk calls `_refuse_annot_role`. There is no second subtype `raise` to turn into `continue`. Allowing Widget leaves Screen, FileAttachment, and RichMedia refused. The source rows use a same-spec QA-stale screenshot, so deleting the QA check fails them too. `test_a_deep_nest_is_paid_checkout` stays `paid_checkout`. A merchandising or template version change without a spec bump is not a product change. Prompt section 7 stores those versions and invalidates on a later product change, which this wave treats as `spec_version`.
+
+Parked: same-host http hop, punycode/uppercase on-host URIs, the URI-stream raise (message pinned), `file:` allow, sendBeacon, spelled-out emails, `_prepare` non-ASCII, raster text.
+
+## 2026-10-15 — Session 08 W7: four link carries from #74 r4
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
+
+These four fixes sit on the lineage commit. Every `/Annots` visit requires subtype `Link`, and a later visit also requires the link key set. A `/Kids` chain past depth 64 raises `pdf kids depth`, and the gift checker returns `malformed` for that error. A graph `/URI` outside a link's own `/A` must be one of the accepted links. A page `/AA` raises `pdf page additional action`. The public code stays `malformed`.
+
+Clean focused suite, Chromium deselected: 226 passed, 2 deselected. Command: `uv run pytest -q -p no:cacheprovider --tb=line -k "not readme_uris and not gift_pdf_has_no_links" tests/unit/assets/test_link_validation.py tests/unit/assets/test_gift_link_policy.py tests/unit/assets/test_gift_pdf_links.py tests/unit/assets/test_asset_lineage.py`. Source restored after each run.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Seen set keyed by object number only | `test_a_second_role_widget_is_malformed` | 1/225 |
+| Subtype check also allows Widget | `test_a_resource_annots_widget_is_malformed` | 1/225 |
+| Map `pdf kids depth` back to `paid_checkout` | `test_a_deep_kids_chain_is_malformed` | 1/225 |
+| Delete the `_pages` depth cap | the same kids test | 1/225 |
+| Delete the accepted-link membership check | `test_a_widget_uri_must_be_an_accepted_link` | 1/225 |
+| Delete the page `/AA` message | `test_a_page_additional_action_without_a_uri_is_malformed` | 1/225 |
+| Change the page-walk subtype `raise` to `continue` | none | 226 passed |
+
+The kids classification and the deleted cap both fail only `test_a_deep_kids_chain_is_malformed`. Deleting the cap returns no refusal. `test_a_deep_nest_is_paid_checkout` stays `paid_checkout`. The page-walk `continue` mutant no longer reaches the Widget, Screen, and RichMedia rows, because the first `/Annots` visit already refuses the subtype. Delivery stays a backstop. The URI-stream `raise` was not remeasured this round. It stays parked.
+
+Parked: same-host http hop, punycode/uppercase on-host URIs, the equivalent stream-raise survivor, file: allow, sendBeacon, spelled-out emails, `_prepare` non-ASCII, raster text.
+
+## 2026-10-15 — Session 08 W7: fixture artifact lineage
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-15-session-08-w7-prompt-integrity.md`.
+
+`bind_asset` projects a screenshot, listing image, walkthrough, or delivery PDF into one record. The storage URI is `fixture://{product_id}/{spec_version}/{output_sha256}`. `split_current` omits other products. For the named product, a different spec version, a QA status other than `passed`, or a source hash of an already-stale asset makes that asset stale. The walk repeats, so a dependent listed before its source still becomes stale. A current asset is returned unchanged. S3, the workflow chain, and commissioning stay later.
+
+`uv run pytest -q -p no:cacheprovider tests/unit/assets/test_asset_lineage.py` — 7 passed. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the spec comparison | `test_a_spec_bump_is_stale` | 1/6 |
+| Drop the product filter | `test_another_product_is_omitted` | 1/6 |
+| Delete the QA check | `test_a_qa_status_other_than_passed_is_stale` | 1/6 |
+| Source walk returns false | `test_a_stale_source_marks_the_dependent` and `test_a_dependent_listed_before_its_source_is_stale` | 2/5 |
+| One pass instead of repeating | `test_a_dependent_listed_before_its_source_is_stale` | 1/6 |
+
+The source-first row stays green when the walk runs once. The order row also dies when the source walk returns false. The spec and QA rows stay green on that source mutant because the root asset in the chain is stale for both reasons.
+
 ## 2026-10-15 — Session 08 W6 r7: catalog before the walk, page keys, every URI
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. `.github/workflows/ci.yml` is unchanged. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.

@@ -57,7 +57,8 @@ def titled_page(title: str) -> bytes:
             2: _dict_object(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
             3: _dict_object(
                 3,
-                "<< /Type /Page /Resources << >> /MediaBox [0 0 1 1] "
+                "<< /Type /Page /Resources << /ExtGState << >> /Font << >> "
+                "/ProcSet [/PDF /Text /ImageB /ImageC /ImageI] >> /MediaBox [0 0 1 1] "
                 "/Contents << >> /Tabs /S /Parent 2 0 R >>",
             ),
             4: _dict_object(4, f"<< /Title {literal} >>"),

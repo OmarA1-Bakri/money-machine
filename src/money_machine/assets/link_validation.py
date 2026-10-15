@@ -127,7 +127,10 @@ def validate_pdf_links(
     if info is not None:
         raise info
     try:
-        uris = delivery_link_uris(pdf)
+        uris = delivery_link_uris(
+            pdf,
+            accepted=frozenset(uri for _variant, uri in accepted),
+        )
     except EmbeddedUriRefusal as exc:
         raise _repair(asset, exc.uri, exc.code) from exc
     except ValueError as exc:
@@ -215,13 +218,19 @@ def _repair(asset: str, link: str, reason: str) -> LinkValidationRefusal:
     return LinkValidationRefusal(reason, repairs=(AssetRepair(asset, link, reason),))
 
 
-def refuse_graph_uri(uri: str) -> str | None:
+def refuse_graph_uri(uri: str, *, accepted: frozenset[str]) -> str | None:
     """Apply the delivery-link rules to a URI that is not a link annotation.
 
     The variant is empty, so there is no button name to check. The scheme,
-    host, port, and percent rules are the ones a delivery link uses.
+    host, port, and percent rules are the ones a delivery link uses. A URI
+    that passes those rules still has to be one of the accepted links.
     """
-    return _refuse_link(uri, "", frozenset())
+    reason = _refuse_link(uri, "", frozenset())
+    if reason is not None:
+        return reason
+    if uri not in accepted:
+        return "link_mismatch"
+    return None
 
 
 def _refuse_link(uri: str, variant: str, known_variants: frozenset[str]) -> str | None:
