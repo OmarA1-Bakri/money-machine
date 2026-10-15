@@ -9,6 +9,7 @@ import struct
 import subprocess
 import sys
 import threading
+import unicodedata
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -32,10 +33,11 @@ from money_machine.assets.screenshots import (
     ScreenshotLineage,
     ScreenshotRefusal,
     VariantPage,
+    _bind_lineage_png,  # pyright: ignore[reportPrivateUsage]
+    _paint_documents,  # pyright: ignore[reportPrivateUsage]
     capture_variant_screenshots,
     default_live_fetcher,
     open_screenshot_context,
-    paint_documents,
     variant_template_path,
     write_screenshot_inputs,
 )
@@ -83,9 +85,26 @@ setTimeout(function () {
 </body>
 </html>
 """
-_STRUCTURE = """<!DOCTYPE html>
+_BEFORE = """<!DOCTYPE html>
 <html data-mm-ready="loaded">
 <head><style>body::before { content: "BEFORE"; }</style></head>
+<body style="margin:0;background:#112233">
+<div style="width:4px;height:4px;background:#00ff00"></div>
+<p style="margin:12px">Sample fixture</p>
+</body>
+</html>
+"""
+_AFTER = """<!DOCTYPE html>
+<html data-mm-ready="loaded">
+<head><style>body::after { content: "AFTER"; }</style></head>
+<body style="margin:0;background:#112233">
+<div style="width:4px;height:4px;background:#00ff00"></div>
+<p style="margin:12px">Sample fixture</p>
+</body>
+</html>
+"""
+_CONTROLS = """<!DOCTYPE html>
+<html data-mm-ready="loaded">
 <body style="margin:0;background:#112233">
 <input><textarea></textarea><canvas></canvas><iframe></iframe>
 <p>Sample fixture</p>
@@ -268,11 +287,11 @@ def test_the_same_fixture_has_the_same_hash() -> None:
 def test_a_missing_readiness_marker_is_refused() -> None:
     html_doc = "<!DOCTYPE html><html><body><p>Sample fixture</p></body></html>"
     with pytest.raises(ScreenshotRefusal, match="not_ready"):
-        paint_documents((html_doc,))
+        _paint_documents((html_doc,))
 
 
 def test_a_delayed_email_script_cannot_paint() -> None:
-    png = paint_documents((_DELAYED_EMAIL,))[0]
+    png = _paint_documents((_DELAYED_EMAIL,))[0]
     _width, _height, rgb = decode_png_rgb(png)
     assert rgb[0:3] == b"\x00\xff\x00"
 
@@ -291,7 +310,7 @@ def test_a_delayed_email_script_cannot_paint() -> None:
 def test_rendered_secrets_are_refused(body: str) -> None:
     html_doc = "<!DOCTYPE html><html data-mm-ready='loaded'><body><p>" + body + "</p></body></html>"
     with pytest.raises(ScreenshotRefusal, match="sensitive_data"):
-        paint_documents((html_doc,))
+        _paint_documents((html_doc,))
 
 
 def test_rendered_fullwidth_at_is_refused() -> None:
@@ -300,22 +319,32 @@ def test_rendered_fullwidth_at_is_refused() -> None:
         "<p>user\uff20example.com</p></body></html>"
     )
     with pytest.raises(ScreenshotRefusal, match="sensitive_data"):
-        paint_documents((html_doc,))
+        _paint_documents((html_doc,))
 
 
 def test_a_secret_that_is_not_painted_is_allowed() -> None:
-    png = paint_documents((_HIDDEN_EMAIL,))[0]
+    png = _paint_documents((_HIDDEN_EMAIL,))[0]
     assert png.startswith(b"\x89PNG")
 
 
-def test_a_structural_page_is_refused() -> None:
+def test_generated_before_content_is_refused() -> None:
     with pytest.raises(ScreenshotRefusal, match="structure"):
-        paint_documents((_STRUCTURE,))
+        _paint_documents((_BEFORE,))
+
+
+def test_generated_after_content_is_refused() -> None:
+    with pytest.raises(ScreenshotRefusal, match="structure"):
+        _paint_documents((_AFTER,))
+
+
+def test_form_canvas_and_iframe_are_refused() -> None:
+    with pytest.raises(ScreenshotRefusal, match="structure"):
+        _paint_documents((_CONTROLS,))
 
 
 def test_a_declarative_shadow_root_is_refused() -> None:
     with pytest.raises(ScreenshotRefusal, match="structure"):
-        paint_documents((_SHADOW,))
+        _paint_documents((_SHADOW,))
 
 
 def test_the_fixture_context_makes_no_network_requests() -> None:
@@ -432,32 +461,58 @@ def _refuse_name(name: str, code: str) -> None:
         _capture((VariantPage(name=name),))
 
 
+def _refuse_rendered(body: str, code: str) -> None:
+    html_doc = (
+        "<!DOCTYPE html><html data-mm-ready='loaded'><body><p>" + body + "</p></body></html>"
+    )
+    with pytest.raises(ScreenshotRefusal, match=code):
+        _paint_documents((html_doc,))
+
+
 def test_notion_so_case_is_refused() -> None:
     _refuse_name("NOTION.SO", "sensitive_data")
 
 
 def test_fullwidth_at_is_refused() -> None:
-    _refuse_name("user\uff20example.com", "sensitive_data")
+    _refuse_rendered("user\uff20example.com", "sensitive_data")
 
 
 def test_a_zero_width_space_in_an_email_is_refused() -> None:
-    _refuse_name("ceo\u200b@acme-corp.com", "sensitive_data")
+    _refuse_rendered("ceo\u200b@acme-corp.com", "sensitive_data")
 
 
 def test_a_soft_hyphen_in_an_email_is_refused() -> None:
-    _refuse_name("ceo\u00ad@acme-corp.com", "sensitive_data")
+    _refuse_rendered("ceo\u00ad@acme-corp.com", "sensitive_data")
 
 
 def test_a_fullwidth_dot_host_is_refused() -> None:
-    _refuse_name("notion\uff0eso", "sensitive_data")
+    _refuse_rendered("notion\uff0eso", "sensitive_data")
 
 
 def test_a_cyrillic_o_host_is_refused() -> None:
-    _refuse_name("n\u043etion.so", "sensitive_data")
+    _refuse_rendered("n\u043etion.so", "sensitive_data")
 
 
 def test_a_bidi_reversed_host_is_refused() -> None:
-    _refuse_name("\u202eos.noiton", "sensitive_data")
+    _refuse_rendered("\u202eos.noiton", "sensitive_data")
+
+
+def test_a_cyrillic_i_host_is_refused() -> None:
+    _refuse_name("not\u0456on.so", "fixture_charset")
+
+
+def test_a_greek_omicron_host_is_refused() -> None:
+    _refuse_name("n\u03bftion.so", "fixture_charset")
+
+
+def test_a_combining_grapheme_joiner_is_refused() -> None:
+    _refuse_name("not\u034fion.so", "fixture_charset")
+
+
+def test_fullwidth_notion_so_is_refused_before_fold() -> None:
+    value = "\uff4e\uff4f\uff54\uff49\uff4f\uff4e\uff0e\uff53\uff4f"
+    assert notion_host_rule_matches(unicodedata.normalize("NFKC", value)) is True
+    _refuse_name(value, "fixture_charset")
 
 
 def test_an_ascii_email_is_refused() -> None:
@@ -481,7 +536,40 @@ def test_a_bearer_token_with_a_space_is_refused() -> None:
 
 
 def test_a_fullwidth_less_than_is_refused() -> None:
-    _refuse_name("\uff1ctemplate", "fixture_markup")
+    _refuse_name("\uff1ctemplate", "fixture_charset")
+
+
+def test_an_ampersand_in_a_fixture_value_is_refused() -> None:
+    _refuse_name("A & B", "fixture_markup")
+
+
+def test_an_apostrophe_in_a_fixture_value_is_refused() -> None:
+    _refuse_name("O'Brien", "fixture_markup")
+
+
+def test_a_github_token_is_refused() -> None:
+    _refuse_name("ghp_abcdefghijklmnop", "sensitive_data")
+
+
+def test_an_aws_access_key_is_refused() -> None:
+    _refuse_name("AKIAAAAAAAAAAAAAAAAA", "sensitive_data")
+
+
+def test_a_slack_bot_token_is_refused() -> None:
+    _refuse_name("xoxb-1234567890", "sensitive_data")
+
+
+def test_a_template_needs_two_label_slots() -> None:
+    with pytest.raises(ScreenshotRefusal, match="template"):
+        fill_template("<p>{{label}}</p>", "Sage Green")
+    with pytest.raises(ScreenshotRefusal, match="template"):
+        fill_template("{{label}}{{label}}{{label}}", "Sage Green")
+
+
+def test_lineage_text_is_ascii() -> None:
+    png = next(iter(fixture_screenshot_paths().values())).read_bytes()
+    with pytest.raises(ScreenshotRefusal, match="lineage"):
+        _bind_lineage_png(png, "variant=\u0456")
 
 
 def test_markup_in_a_fixture_value_is_refused_and_escaped() -> None:
@@ -540,6 +628,23 @@ def test_a_newline_name_is_refused_before_write(tmp_path: Path) -> None:
     with pytest.raises(ScreenshotRefusal, match="output_name"):
         write_screenshot_inputs((_shot("Navy\nbuild_version=99"),), tmp_path)
     assert list(tmp_path.iterdir()) == []
+
+
+def test_a_symlink_to_an_empty_directory_is_refused(tmp_path: Path) -> None:
+    victim = tmp_path / "victim"
+    victim.mkdir()
+    link = tmp_path / "out"
+    link.symlink_to(victim, target_is_directory=True)
+    with pytest.raises(ScreenshotRefusal, match="output_path"):
+        write_screenshot_inputs((_shot("Sage Green"),), link)
+    assert list(victim.iterdir()) == []
+
+
+def test_the_output_directory_is_replaced(tmp_path: Path) -> None:
+    before = tmp_path.stat().st_ino
+    write_screenshot_inputs((_shot("Sage Green", b"one"),), tmp_path)
+    assert tmp_path.stat().st_ino != before
+    assert (tmp_path / "sage-green.png").read_bytes() == b"one"
 
 
 def test_a_symlink_directory_is_refused(tmp_path: Path) -> None:

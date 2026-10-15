@@ -1,10 +1,12 @@
 """Fixture-value text policy for variant screenshots.
 
-Normalise before any pattern runs. Bidirectional controls are refused before
-characters in category Cf are stripped: those controls are themselves Cf, and
-stripping them first turns a reversed host into ASCII that does not match.
-Markup characters are refused on fixture values only. Escaping is a second
-layer and does not replace the refusal.
+Fixture values are refused when the raw string is not ASCII. NFKC and the
+pattern checks run only after that allowlist, so a fullwidth host is not
+folded into ASCII before the refusal. Bidirectional controls are refused
+before characters in category Cf are stripped: those controls are themselves
+Cf, and stripping them first turns a reversed host into ASCII that does not
+match. Markup characters are refused on fixture values only. Escaping is a
+second layer and does not replace the refusal.
 """
 
 from __future__ import annotations
@@ -21,6 +23,9 @@ _TOKEN = re.compile(
 )
 _NTN_BARE = re.compile(r"\bntn[A-Za-z0-9]{6,}\b", re.IGNORECASE)
 _BEARER_SPACE = re.compile(r"\bbearer\s+[A-Za-z0-9._-]{6,}\b", re.IGNORECASE)
+_GHP = re.compile(r"\bghp_[A-Za-z0-9]{16,}\b")
+_AKIA = re.compile(r"\bAKIA[A-Z0-9]{16}\b")
+_XOXB = re.compile(r"\bxoxb-[A-Za-z0-9-]{10,}\b")
 _UUID = re.compile(
     r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
 )
@@ -74,6 +79,12 @@ def refuse_sensitive_text(text: str) -> str | None:
         return "sensitive_data"
     if _BEARER_SPACE.search(text) is not None:
         return "sensitive_data"
+    if _GHP.search(text) is not None:
+        return "sensitive_data"
+    if _AKIA.search(text) is not None:
+        return "sensitive_data"
+    if _XOXB.search(text) is not None:
+        return "sensitive_data"
     if _UUID.search(text) is not None:
         return "sensitive_data"
     if _HEX_ID.search(text) is not None:
@@ -82,7 +93,12 @@ def refuse_sensitive_text(text: str) -> str | None:
 
 
 def refuse_fixture_value(value: str) -> str | None:
-    """Refuse a fixture label before it is substituted into the template."""
+    """Refuse a fixture label before it is substituted into the template.
+
+    The allowlist reads the raw value. NFKC runs later, inside ``_prepare``.
+    """
+    if any(ord(char) > 127 for char in value):
+        return "fixture_charset"
     return _prepare(value, markup=True)
 
 

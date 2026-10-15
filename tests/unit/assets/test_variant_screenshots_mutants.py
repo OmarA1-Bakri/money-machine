@@ -92,14 +92,14 @@ def test_sensitive_mutant_accepts() -> None:
     html_doc = (
         "<!DOCTYPE html><html data-mm-ready='loaded'><body><p>person@example.com</p></body></html>"
     )
-    accepted = module.paint_documents((html_doc,))
+    accepted = module._paint_documents((html_doc,))
     assert accepted[0].startswith(b"\x89PNG")
 
 
 def test_unready_mutant_accepts() -> None:
     module = _mutant("refuse_unready")
     html_doc = "<!DOCTYPE html><html><body><p>Sample fixture</p></body></html>"
-    accepted = module.paint_documents((html_doc,))
+    accepted = module._paint_documents((html_doc,))
     assert accepted[0].startswith(b"\x89PNG")
 
 

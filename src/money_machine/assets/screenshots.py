@@ -76,8 +76,9 @@ _STRUCTURE_JS = """() => {
   for (const node of document.querySelectorAll("*")) {
     if (node.shadowRoot) return "structure";
     const before = getComputedStyle(node, "::before").content;
+    if (before !== "none") return "structure";
     const after = getComputedStyle(node, "::after").content;
-    if (before !== "none" || after !== "none") return "structure";
+    if (after !== "none") return "structure";
   }
   return "";
 }"""
@@ -153,7 +154,7 @@ def capture_variant_screenshots(
         if page.live_url is not None:
             fetcher(page.live_url)
         documents.append(fill_template(template, page.name))
-    raws = paint_documents(tuple(documents))
+    raws = _paint_documents(tuple(documents))
     captured: list[CapturedScreenshot] = []
     for page, raw in zip(pages, raws, strict=True):
         digest = hashlib.sha256(raw).hexdigest()
@@ -206,9 +207,7 @@ def refuse_unready(ready: bool) -> str | None:
 
 
 def refuse_output_name(name: str) -> str | None:
-    """Return ``output_name`` for an empty name or a name with a control character."""
-    if name == "":
-        return "output_name"
+    """Return ``output_name`` for an empty slug or a name with a control character."""
     if any(unicodedata.category(char) == "Cc" for char in name):
         return "output_name"
     if _slug(name) == "":
@@ -260,7 +259,7 @@ def _read_template() -> str:
     return path.read_text(encoding="utf-8")
 
 
-def paint_documents(documents: tuple[str, ...]) -> tuple[bytes, ...]:
+def _paint_documents(documents: tuple[str, ...]) -> tuple[bytes, ...]:
     """Paint already-built HTML. Capture itself only fills the pinned template."""
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True, args=list(LAUNCH_ARGS))
@@ -333,11 +332,13 @@ def _file_allowed(url: str) -> bool:
         return False
 
 
-def _http_allowed(url: str, resource_type: str, allowed_http: frozenset[str]) -> bool:
-    if resource_type == "serviceworker" or url in allowed_http:
+def _http_allowed(url: str, _resource_type: str, allowed_http: frozenset[str]) -> bool:
+    if url in allowed_http:
         return True
-    # This Chromium reports the worker script as "script". Continue it only for
-    # an allowed document, so service_workers="block" is what stops registration.
+    # This Chromium reports the worker script as "script", not "serviceworker".
+    # Continue that script only for an allowed document. Production capture
+    # passes an empty allow-list, so the script is aborted there. The
+    # continuation is what makes service_workers="allow" visible to the test.
     for document in allowed_http:
         prefix = document[:-1] if document.endswith("/") else document
         if url == f"{prefix}/sw.js":

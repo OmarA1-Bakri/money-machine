@@ -1,3 +1,70 @@
+## 2026-10-15 — Session 08 W5 r3: raw ASCII allowlist and split structure kills
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.
+
+Reviewer review 5527439709 and Verifier r2 both failed `3a35951d6be8374cbf7a107423937c08501d4a3b`. This round does not edit `src/money_machine/control/`, `tests/bootstrap/`, `.github/workflows/`, `AGENTS.md`, `CLAUDE.md`, `claim_validation.py`, `IMPLEMENTATION_STATE.json`, `video.py`, `gift_links.py`, or `listing_images.py`. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The addendum is `docs/control/reviews/2026-10-14-session-08-w5-prompt-integrity.md`.
+
+`refuse_fixture_value` refuses any raw code point above 127 before NFKC. The code is `fixture_charset`. NFKC, the markup set, and the sensitive patterns run only after that. `html.escape(value, quote=True)` is still the second layer. Rendered text still goes through `_prepare` and does not use the raw allowlist. `ghp_`, `AKIA`, and `xoxb-` are separate pattern checks. `paint_documents` is now `_paint_documents`. The `resource_type == "serviceworker"` continuation was removed. This Chromium fetches the worker script as `script`, and `/sw.js` is continued only for an allowed document. Production capture passes an empty allow-list. The empty-string output check was removed because a slug of `""` already refuses it. `os.rename` of the staging directory is what replaces the destination. `O_EXCL` and `O_NOFOLLOW` stay.
+
+The linux x86_64 video hash stays `6318854297cd5d316fdf4c579a73f188ec5f1e2089745534aa9d4ca6245fe248`. `video.py` was not edited. Screenshot `build_version` stays 5. The Sage Green PNG pin and the template pin are unchanged.
+
+Kills below use `uv run pytest -q -p no:cacheprovider --tb=no -k "not mutant and not accepts and not dropping"`. The source was restored after each run. The clean tree is 63 passed, 3 deselected.
+
+- Deleting the `::before` clause: 1 failed, 62 passed (`test_generated_before_content_is_refused`).
+- Deleting the `::after` clause: 1 failed, 62 passed (`test_generated_after_content_is_refused`).
+- Deleting the form/canvas/iframe clause: 1 failed, 62 passed (`test_form_canvas_and_iframe_are_refused`).
+- Deleting the shadow-root clause: 1 failed, 62 passed (`test_a_declarative_shadow_root_is_refused`).
+- Deleting the structure call: 4 failed, 59 passed (the four tests above).
+- Deleting the raw ASCII allowlist: 5 failed, 58 passed (`test_a_cyrillic_i_host_is_refused`, `test_a_greek_omicron_host_is_refused`, `test_a_combining_grapheme_joiner_is_refused`, `test_fullwidth_notion_so_is_refused_before_fold`, `test_a_fullwidth_less_than_is_refused`).
+- Moving the allowlist to after NFKC: 2 failed, 61 passed (`test_fullwidth_notion_so_is_refused_before_fold`, `test_a_fullwidth_less_than_is_refused`). The fullwidth host folds to `notion.so` and the later host check returns `sensitive_data`.
+- Switching lineage `encode("ascii")` to `encode("utf-8")`: 1 failed, 62 passed (`test_lineage_text_is_ascii`).
+- Removing `&` from the markup set: 1 failed, 62 passed (`test_an_ampersand_in_a_fixture_value_is_refused`).
+- Removing `'` from the markup set: 1 failed, 62 passed (`test_an_apostrophe_in_a_fixture_value_is_refused`).
+- Removing `"` from the markup set: 1 failed, 62 passed (`test_an_attribute_quote_breakout_is_refused_and_escaped`).
+- Deleting the markup check: 4 failed, 59 passed (ampersand, apostrophe, markup, quote breakout).
+- Deleting the `ghp_` check: 1 failed, 62 passed (`test_a_github_token_is_refused`).
+- Deleting the `AKIA` check: 1 failed, 62 passed (`test_an_aws_access_key_is_refused`).
+- Deleting the `xoxb-` check: 1 failed, 62 passed (`test_a_slack_bot_token_is_refused`).
+- Deleting the two-placeholder check: 1 failed, 62 passed (`test_a_template_needs_two_label_slots`).
+- Replacing `os.rename` with a copy into the existing directory: 1 failed, 62 passed (`test_the_output_directory_is_replaced`).
+- Deleting `is_symlink()`: 1 failed, 62 passed (`test_a_symlink_to_an_empty_directory_is_refused`).
+- Deleting the non-empty directory check: 2 failed, 61 passed (`test_a_symlink_output_is_not_followed`, `test_a_stale_file_is_left_in_place`).
+- Replacing NFKC with the raw string: 3 failed, 60 passed (`test_rendered_fullwidth_at_is_refused`).
+- Deleting the Cf strip: 2 failed, 61 passed (`test_a_zero_width_space_in_an_email_is_refused`).
+- Deleting the bidi refusal: 1 failed, 62 passed (`test_a_bidi_reversed_host_is_refused`).
+- Deleting the Cyrillic о/О map: 1 failed, 62 passed (`test_a_cyrillic_o_host_is_refused`).
+- Deleting the email check: 6 failed, 57 passed (`test_an_ascii_email_is_refused`).
+- Deleting the Notion host check: 5 failed, 58 passed (`test_notion_so_case_is_refused`).
+- Dropping `re.IGNORECASE` on the host regex: 1 failed, 62 passed (`test_notion_so_case_is_refused`).
+- Deleting the bare `ntn` check: 1 failed, 62 passed (`test_a_bare_ntn_is_refused`).
+- Deleting the bearer-space check: 1 failed, 62 passed (`test_a_bearer_token_with_a_space_is_refused`).
+- Skipping normalisation in `refuse_rendered_text`: 7 failed, 56 passed (`test_rendered_fullwidth_at_is_refused`).
+- `html.escape(..., quote=False)`: 2 failed, 61 passed (`test_an_attribute_quote_breakout_is_refused_and_escaped`).
+- Returning the raw value from `escape_fixture`: 2 failed, 61 passed (`test_markup_in_a_fixture_value_is_refused_and_escaped`).
+- Substituting the label without `escape_fixture`: 2 failed, 61 passed (`test_markup_in_a_fixture_value_is_refused_and_escaped`).
+- Painting with JavaScript enabled: 1 failed, 62 passed (`test_a_delayed_email_script_cannot_paint`).
+- Deleting the unready refusal: 1 failed, 62 passed (`test_a_missing_readiness_marker_is_refused`).
+- Making the readiness wait always true: 1 failed, 62 passed (`test_a_missing_readiness_marker_is_refused`).
+- Continuing every route: 1 failed, 62 passed (`test_the_fixture_context_makes_no_network_requests`).
+- Deleting `route_web_socket`: 1 failed, 62 passed (`test_the_fixture_context_makes_no_network_requests`).
+- Setting `service_workers` to `allow`: 1 failed, 62 passed (`test_the_fixture_context_makes_no_network_requests`).
+- Deleting the slug-collision check: 2 failed, 61 passed (`test_colliding_slugs_are_refused_before_write`).
+- Returning the raw clip instead of the canonical RGB PNG: 1 failed, 62 passed (`test_the_canonical_png_hash_is_pinned`).
+- Deleting the empty-pages refusal: 1 failed, 62 passed (`test_no_pages_are_refused`).
+- Deleting the missing-page refusal: 1 failed, 62 passed (`test_a_missing_page_is_screenshot_refusal`).
+
+Survivors, same filter, source restored after each run:
+
+- Dropping `O_EXCL`: 63 passed, 3 deselected. The staging directory is new and empty.
+- Dropping `O_NOFOLLOW`: 63 passed, 3 deselected. The same.
+- Allowing every `file:` URL: 63 passed, 3 deselected.
+
+Video guards were not remeasured. `video.py` is unchanged from W5 r1. On the r1 video filter the clean tree is 47 passed, 10 deselected. #72 SF1 `test_free_gift_hello_is_refused` is 1 failed, 46 passed. SF2 `test_today_panel_claim_caption_is_refused` is 1 failed, 46 passed. SF3 `test_a_27_character_dashboard_line_is_refused` is 2 failed, 45 passed. Skipping the first caption is 1 failed, 46 passed (`test_the_first_caption_width_is_checked`). SF4 `test_a_150_by_90_container_is_refused` is 1 failed, 46 passed.
+
+Parked to next wave: `sendBeacon` from `set_content` while JavaScript is on (production capture leaves JavaScript off); spelled-out `at ... dot com` addresses; refusing non-ASCII labels inside `_prepare` (the raw allowlist on `refuse_fixture_value` is the fixture gate); the `file:` allow, which survived above; text inside raster images; over-refusal of unpainted text; hex and UUID false positives; live navigation; the second `loaded` equality check; template-only bypasses (`::marker`, SVG text, `@font-face`); the cross-platform hash; the trailer after the Matroska bytes; the screenshot read three times (TOCTOU); an undecodable PNG pastes a blank frame; Verifier #71 SF1; Verifier #71 SF3; #70 NIT1; `-map_metadata -1`, the metadata strip, `SOURCE_DATE_EPOCH`, and `-threads 1`; `-flags +bitexact` on its own; opening or repairing variant links; storage URI and S3; workflow linkage and commissioning; the session exit code; Exit 78; whole-document `/OpenAction`, `/AA`, and outline scanning; non-Link URI annotations; defanged hosts; José and Zoë; bare `127.1`, `0x7f000001`, and `2130706433`; deleting the URI loop while `if count:` stays; the newest xref only, with no `/Prev`; #69 publishers and over-refusals; W2 survivors other than the font edge space; Chromium m153 writes no XMP and no `/ID`.
+
+`uv run ruff check .` exit 0. ruff 0.16.2, config `pyproject.toml` line-length 100, target-version py312. `uv run pyright` 1.1.411: 0 errors, 0 warnings, 0 informations. The filtered screenshot suite above is the tree before this paragraph was appended. Full local pytest was not re-run. The 12 `test_compose_preserves_the_postgres_password` failures recorded in W3 stay pre-existing and local (`docker` missing). CI is the gate. `.github/workflows/ci.yml` is unchanged.
+
 ## 2026-10-15 — Session 08 W5 r2: pinned template, escaped fixture values
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. The twelve evidence keys stay false. `commissioned_agents` stays empty. A07, A08, A09, A10, and A11 stay DESIGNED. A10 and A11 are not registered. Exit 78 stays HELD. Fixture-only: no live HTTP, no Notion, no Etsy, no Canva.
