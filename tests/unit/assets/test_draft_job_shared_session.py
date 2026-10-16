@@ -290,6 +290,59 @@ async def test_a_different_worker_job_records_its_own_event() -> None:
     assert draft_jobs(uow) == []
 
 
+def _pending_draft(product_id: UUID) -> Job:
+    job_id = SuccessorFactory.derive_product_job_id(product_id, "DraftListingJob")
+    return Job(
+        id=job_id,
+        workflow_id=WORKFLOW,
+        job_type="DraftListingJob",
+        object_type="listing_versions",
+        object_id=product_id,
+        owner_agent_id="A13",
+        status="PENDING",
+        input={},
+        success_contract={},
+        scheduled_at=OPENED_AT,
+        attempt=0,
+        max_attempts=3,
+        idempotency_key=f"DraftListingJob:{product_id}",
+        side_effect_class="EXTERNAL_WRITE",
+        retry_class="RECONCILE_FIRST",
+        allowed_mode="simulation",
+        version=1,
+    )
+
+
+async def test_a_legacy_product_key_beside_a_pending_job_stays_one_event(
+    tmp_path: Path,
+) -> None:
+    evidence = chain_evidence()
+    uow = SharedUow()
+    legacy_key = f"ASSETS_COMPLETED:{evidence.product_id}:{WORKFLOW}:null"
+    product_key = f"ASSETS_COMPLETED:{evidence.product_id}:product"
+    await uow.events.append(
+        event_name=EventName.ASSETS_COMPLETED,
+        aggregate_type="products",
+        aggregate_id=evidence.product_id,
+        workflow_id=WORKFLOW,
+        job_id=None,
+        dedupe_key=legacy_key,
+        occurred_at=OPENED_AT,
+    )
+    uow.session.add(_pending_draft(evidence.product_id))
+    shop = Store()
+    client = EtsyDraftClient(shop, DraftLedger(tmp_path))
+    receipt = await open_ready_draft(evidence, client, uow)
+    assert receipt.ready is True
+    assert uow.events.names == ["ASSETS_COMPLETED"]
+    assert await uow.events.by_dedupe_key(legacy_key) is not None
+    assert await uow.events.by_dedupe_key(product_key) is None
+    assert len(draft_jobs(uow)) == 1
+    assert draft_jobs(uow)[0].status == "READY"
+    assert draft_jobs(uow)[0].updated_at == OPENED_AT
+    assert shop.posts == 1
+
+
 async def test_a_pending_job_beside_another_workflows_event_records_one(
     tmp_path: Path,
 ) -> None:
