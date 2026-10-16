@@ -1,3 +1,16 @@
+## 2026-10-16 — Session 08 c0m gift and screenshot split
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-c0m-split-prompt-integrity.md`.
+
+`acme . c0\u043c` (U+043C) already refuses on both paths. The fold `\u043c` to `m` stays. `test_paid_checkout_refuses_a_lowercase_cyrillic_em_in_c0m` calls only `refuse_paid_checkout`. `test_screenshot_text_refuses_a_lowercase_cyrillic_em_in_c0m` calls only `refuse_sensitive_text`. `x dot co\u043c` stays on `test_screenshot_text_refuses_a_lowercase_cyrillic_em_dot`. Prose stays prose. `listing_text.py` and the Etsy draft client are unchanged. A10, A11, and A13 stay `DESIGNED`.
+
+Clean suite: 94 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_defanged_host.py tests/unit/assets/test_spelled_email.py`. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| `refuse_paid_checkout` returns before the host check for `acme . c0\u043c` | `test_paid_checkout_refuses_a_lowercase_cyrillic_em_in_c0m` | 1/93 |
+| `refuse_sensitive_text` returns before the host rules for `acme . c0\u043c` | `test_screenshot_text_refuses_a_lowercase_cyrillic_em_in_c0m` | 1/93 |
+
 ## 2026-10-16 — Session 08 defang should-fix sweep
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-defang-sf-sweep-prompt-integrity.md`.
