@@ -1,3 +1,11 @@
+## 2026-10-16 — Session evidence index for sessions 00-15
+
+`current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. No evidence key flips.
+
+`docs/control/SESSION_EVIDENCE.md` lists every contract key for sessions 00-08 and records sessions 09-15 as having no contract. Sessions 00-06 are true at their completion commits. Session 07 is false at `00b952a83bffcec8d442468223d64dd9b2d3e6df` under D-0032. Sessions 08-15 are not activated. The index is rendered from `src/money_machine/control/session_evidence.py` and checked against those commits by `tests/bootstrap/test_session_evidence.py`.
+
+`uv run pytest -q -p no:cacheprovider --tb=short tests/bootstrap/test_session_evidence.py tests/bootstrap/test_prompt_integrity.py` printed 9 passed. `ruff format`, `ruff check`, and `pyright` on the new module and its test were clean. A full repository suite was not run.
+
 ## 2026-10-16 — Session 11 fixture intake, session not activated
 
 Session 11 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. Exit 78 stays HELD. A16 stays `DESIGNED` with an empty `commissioning_evidence` list. `config/agents.yaml`, `config/workflows.yaml`, `worker.py`, and `scheduler.py` are unchanged. No live Etsy, Notion, or S3 call. The exit string is not written.
