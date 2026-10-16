@@ -19,9 +19,9 @@ from money_machine.assets.defang_normalizer import (
     bracket_host_matches,
     email_matches,
     lookalike_host_matches,
+    spaced_letter_host_matches,
     stray_spaced_letter_host_matches,
     tight_spaced_host_matches,
-    trailing_outside_host_matches,
     url_matches,
 )
 
@@ -83,7 +83,7 @@ def refuse_sensitive_text(text: str) -> str | None:
         or url_matches(text)
         or bracket_host_matches(text)
         or lookalike_host_matches(text)
-        or trailing_outside_host_matches(text)
+        or spaced_letter_host_matches(text)
         or stray_spaced_letter_host_matches(text)
         or tight_spaced_host_matches(text)
     ):

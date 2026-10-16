@@ -11,12 +11,15 @@ The order is fixed:
    ``org``. Case is read after NFKC. The lookalike fold keeps case. An
    all-uppercase token is casefolded after that check. A lowercase token
    is compared as itself. A mixed-case token stays prose. ``c0m`` is the
-   zero spelling of ``com``, and a zero in
-   ``org`` counts. A later word still leaves that spaced form alone.
-   Spaced letters that begin one of those TLDs still undo when another
-   word or a stray letter follows. A lowercase ``co``, ``io``, or ``shop``
-   after a spaced ``.`` undoes when another word follows. A bare ``dot``
-   also maps ``1`` to ``i`` and ``3`` to ``e``. U+03F2 folds to ``c``
+   zero spelling of ``com``. A zero in ``org`` is the same digit map,
+   so ``0rg`` is ``org``. A later word still leaves a tight spaced form
+   alone. Spaced letters that begin one of those TLDs still undo when
+   another word or a stray letter follows. A lowercase ``co``, ``io``,
+   or ``shop``, including letters split by spaces, undoes after a spaced
+   ``.`` only when the label is one character and another word follows.
+   A digit label does not take the digit map, so a step number stays
+   prose. A bare ``dot`` maps ``1`` to ``i`` and ``3`` to ``e``. A spaced
+   ``.`` does the same, and ``1o`` is ``io``. U+03F2 folds to ``c``
    before NFKC. Bracket labels may contain ``--``. ``hxxp[:]`` is a
    scheme defang. Bracket and parenthesis forms also accept the IANA
    snapshot.
@@ -69,7 +72,6 @@ _LOOKALIKES = str.maketrans(
         "\uff61": ".",
     }
 )
-_ZERO_TO_O = str.maketrans({"0": "o"})
 _LUNATE_SIGMA = str.maketrans({"\u03f2": "c"})
 _CURATED_DIGITS = str.maketrans({"0": "o", "1": "i", "3": "e"})
 _LABEL = r"[A-Za-z0-9]+(?:-+[A-Za-z0-9]+)*"
@@ -131,17 +133,16 @@ _EXACT_HOST = re.compile(
 )
 _HXXP = re.compile(r"hxxp(s?)(?:\[:\]|:)(//)", re.IGNORECASE)
 _DIGIT_TLD = re.compile(r"dot[ \t]+[A-Za-z]*[13][A-Za-z0-9]*", re.IGNORECASE)
-_OUTSIDE_WORD = re.compile(
-    r"(?<![A-Za-z0-9])[A-Za-z0-9]+"
-    r"(?:[ \t]+\.[ \t]*|[ \t]*\.[ \t]+)"
-    r"(?:co|io|shop)(?![A-Za-z0-9])[ \t]+[A-Za-z0-9]"
+_SPACED_LETTERS = re.compile(
+    r"(?:dot|\.)[ \t]+[A-Za-z0-9](?:[ \t]+[A-Za-z0-9])+(?![A-Za-z0-9])",
+    re.IGNORECASE,
 )
 _STRAY_LETTER = re.compile(
     r"(?:dot|\.)[ \t]+(?:[A-Za-z0-9][ \t]+){3}[A-Za-z0-9](?![A-Za-z0-9])",
     re.IGNORECASE,
 )
 _SPACED_DOT_TLDS = frozenset({"com", "c0m", "net", "org"})
-_SPACED_ZERO_TARGETS = frozenset({"org"})
+_SPACED_DIGIT_TARGETS = _SPACED_DOT_TLDS | frozenset({"io"})
 
 
 def fold_confusables(text: str) -> str:
@@ -216,12 +217,20 @@ def lookalike_host_matches(text: str) -> bool:
     return host_matches(text)
 
 
-def trailing_outside_host_matches(text: str) -> bool:
-    """A lowercase ``co``, ``io``, or ``shop`` after a spaced dot, then a word."""
+def spaced_letter_host_matches(text: str) -> bool:
+    """Single letters after ``dot`` or a dot restore that same host.
+
+    ``x dot com`` has no spaced letters, so this helper does not match it.
+    The spaced letters and the host are one candidate. A later ``x dot com``
+    does not satisfy a spaced-letter run in another clause.
+    """
     folded = fold_confusables(text)
-    if _OUTSIDE_WORD.search(folded) is None:
-        return False
-    return host_matches(text)
+    spans = candidate_spans(folded)
+    for match in _SPACED_LETTERS.finditer(folded):
+        for start, end in spans:
+            if start <= match.start() and match.end() <= end and host_matches(folded[start:end]):
+                return True
+    return False
 
 
 def stray_spaced_letter_host_matches(text: str) -> bool:
@@ -314,12 +323,14 @@ def _chosen_tld(
         return _outside_curated(
             token,
             token_end,
-            spaced,
             boundary=boundary,
             chunk=chunk,
             tail=tail,
+            tld_start=start,
         )
     token, token_end, spaced = accepted
+    if _relies_on_digit_map(token) and _label_before(chunk, start).isdigit():
+        return None
     if boundary and not spaced and _word_follows(chunk, token_end, tail):
         return None
     return token, token_end
@@ -347,17 +358,45 @@ def _longest_accepted(
 def _outside_curated(
     token: str,
     token_end: int,
-    spaced: bool,
     *,
     boundary: bool,
     chunk: str,
     tail: str,
+    tld_start: int,
 ) -> tuple[str, int] | None:
-    if spaced or not boundary or not _word_follows(chunk, token_end, tail):
+    if not boundary or not _word_follows(chunk, token_end, tail):
         return None
     if not token.islower() or token in _SPACED_DOT_TLDS or token not in CURATED_TLDS:
         return None
+    if len(_label_before(chunk, tld_start)) != 1:
+        return None
     return token, token_end
+
+
+def _label_before(text: str, tld_start: int) -> str:
+    index = tld_start
+    while index > 0 and text[index - 1] in " \t":
+        index -= 1
+    if index >= 3 and text[index - 3 : index].casefold() == "dot":
+        index -= 3
+        while index > 0 and text[index - 1] in " \t":
+            index -= 1
+    elif index > 0 and text[index - 1] == ".":
+        index -= 1
+        while index > 0 and text[index - 1] in " \t":
+            index -= 1
+    end = index
+    while index > 0 and (text[index - 1].isalnum() or text[index - 1] == "-"):
+        index -= 1
+    return text[index:end]
+
+
+def _relies_on_digit_map(token: str) -> bool:
+    folded = token.casefold()
+    if folded in _SPACED_DOT_TLDS or folded in CURATED_TLDS:
+        return False
+    mapped = folded.translate(_CURATED_DIGITS)
+    return mapped != folded and mapped in _SPACED_DIGIT_TARGETS | CURATED_TLDS
 
 
 def _spaced_prefixes(text: str, start: int) -> list[tuple[str, int]]:
@@ -420,8 +459,8 @@ def _spaced_dot_tld(token: str) -> bool:
     The token is already NFKC and lookalike-folded. Case is read here.
     An all-uppercase token is casefolded after that check. A lowercase
     token is compared as itself. A mixed-case token stays prose. A
-    lowercase zero inside org counts. A 3 that maps to e is accepted
-    when the mapped token is in the same set, so n3t is net.
+    lowercase zero inside org is the digit map. A 3 that maps to e is
+    ``net``. A 1 that maps to i is ``io``, which a tight ``io`` is not.
     """
     if token.isupper():
         token = token.casefold()
@@ -429,11 +468,8 @@ def _spaced_dot_tld(token: str) -> bool:
         return False
     if token in _SPACED_DOT_TLDS:
         return True
-    zero_mapped = token.translate(_ZERO_TO_O)
-    if zero_mapped != token and zero_mapped in _SPACED_ZERO_TARGETS:
-        return True
     digit_mapped = token.translate(_CURATED_DIGITS)
-    return digit_mapped != token and digit_mapped in _SPACED_DOT_TLDS
+    return digit_mapped != token and digit_mapped in _SPACED_DIGIT_TARGETS
 
 
 def _curated_tld(token: str) -> bool:
