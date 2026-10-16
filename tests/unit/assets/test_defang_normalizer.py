@@ -167,6 +167,42 @@ def test_a_spaced_digit_three_net_is_refused() -> None:
     assert refuse_paid_checkout("x . N3t") is None
 
 
+def test_a_spaced_digit_one_io_is_refused() -> None:
+    assert refuse_paid_checkout("x . 1o") == "paid_checkout"
+    assert refuse_sensitive_text("x . 1o") == "sensitive_data"
+    assert refuse_paid_checkout("acme . 1o") == "paid_checkout"
+    assert refuse_sensitive_text("acme . 1o") == "sensitive_data"
+    assert refuse_paid_checkout("acme . io") is None
+    assert refuse_sensitive_text("acme . io") is None
+
+
+def test_lowercase_word_labels_stay_prose() -> None:
+    for text in ("read . io docs", "go . shop now", "tea . co op"):
+        assert refuse_paid_checkout(text) is None
+        assert refuse_sensitive_text(text) is None
+
+
+def test_a_step_number_dot_one_o_stays_prose() -> None:
+    assert refuse_paid_checkout("step 3 dot 1o") is None
+    assert refuse_sensitive_text("step 3 dot 1o") is None
+
+
+def test_letter_spaced_co_before_a_word_is_refused() -> None:
+    assert refuse_paid_checkout("x . c o today") == "paid_checkout"
+    assert refuse_sensitive_text("x . c o today") == "sensitive_data"
+
+
+def test_spaced_com_letters_refuse_on_both_paths() -> None:
+    assert refuse_paid_checkout("x dot c o m") == "paid_checkout"
+    assert refuse_sensitive_text("x dot c o m") == "sensitive_data"
+
+
+def test_spaced_letters_do_not_borrow_another_host() -> None:
+    text = "notes: dot c o; x dot com"
+    assert refuse_sensitive_text(text) is None
+    assert refuse_paid_checkout(text) == "paid_checkout"
+
+
 def test_a_digit_one_tld_is_refused() -> None:
     assert refuse_paid_checkout("x dot 1o") == "paid_checkout"
     assert refuse_sensitive_text("x dot 1o") == "sensitive_data"

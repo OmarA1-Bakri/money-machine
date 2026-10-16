@@ -1,3 +1,30 @@
+## 2026-10-16 — Session 08 defang should-fix sweep
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-defang-sf-sweep-prompt-integrity.md`.
+
+`_ZERO_TO_O` is deleted. A spaced digit map that lands on `io` refuses. Literal `acme . io` stays prose. #95 folds a leftover CR to LF, so `alpha\rbeta` and `alpha\nbeta` post. `alpha\rbeta` and `alphabeta` still refuse. The CRLF row reuses `_TwoWalks`. A word-length label stays prose, and a digit label does not take the digit map. `x . c o today` and `x dot c o m` refuse on both paths. `trailing_outside_host_matches` is deleted. Screenshot text still allows `x dot com`. A10, A11, and A13 stay `DESIGNED`.
+
+Clean defang suite: 99 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_defanged_host.py tests/unit/assets/test_spelled_email.py`. Clean draft suite after #97: 123 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_etsy_draft_client.py`. Full suite on `0edbd30`, before #95: 12 failed, 4906 passed, 193 skipped. The same command on `e6516655`: 12 failed, 4900 passed, 193 skipped. Both runs fail the same twelve `test_compose_preserves_the_postgres_password` rows. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Drop `0` from `_CURATED_DIGITS` | not unique: `test_a_zero_lookalike_is_refused`, `test_a_spaced_zero_lookalike_is_refused`, `test_a_bare_dot_email_uses_the_curated_list` | 3/95 |
+| `_SPACED_DIGIT_TARGETS = _SPACED_DOT_TLDS` | `test_a_spaced_digit_one_io_is_refused` | 1/97 |
+| Delete the one-character label gate | `test_lowercase_word_labels_stay_prose` | 1/97 |
+| Delete the digit-label veto | `test_a_step_number_dot_one_o_stays_prose` | 1/97 |
+| Reject a letter-spaced outside TLD | `test_letter_spaced_co_before_a_word_is_refused` | 1/97 |
+| Delete `spaced_letter_host_matches` | `test_spaced_com_letters_refuse_on_both_paths` | 1/97 |
+| `_row_text` returns `replace("\r", "")` | not unique after #97: `test_a_cr_description_and_an_lf_one_still_post`, `test_a_lone_cr_description_is_not_the_same_text` | 2/121 |
+| `_row_text` returns `description` | not unique after #97: `test_a_cr_description_and_an_lf_one_still_post`, `test_a_crlf_description_and_an_lf_one_still_post` | 2/121 |
+
+Deleting `tight_spaced_host_matches` is not unique: 4 failed, 94 passed.
+
+`spaced_letter_host_matches` requires the spaced letters and the host to be one candidate. `notes: dot c o; x dot com` stays allowed on the screenshot path. Gift checkout still refuses it. `alpha\rbeta` against `alphabeta` still refuses after the leftover CR folds to LF.
+
+Clean defang suite after the candidate check: 99 passed. Same defang command as above. Replacing the candidate check with `host_matches(text)` fails only `test_spaced_letters_do_not_borrow_another_host` (1 failed, 98 passed). Deleting the helper call still fails only `test_spaced_com_letters_refuse_on_both_paths` (1 failed, 98 passed).
+
+On this tree, folding only `\r\n` in `_description_lines` fails only `test_a_lone_cr_marker_line_is_adopted` (1 failed, 122 passed).
+
 ## 2026-10-16 — Session 08 lone CR marker line
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-marker-cr-prompt-integrity.md`.
