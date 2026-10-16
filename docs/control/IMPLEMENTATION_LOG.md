@@ -1,3 +1,25 @@
+## 2026-10-16 — Session 08 defang wave 2
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-defang-sf-wave2-prompt-integrity.md`.
+
+A lone CR before `mm-draft:` in a spec is `marker_injection` and posts nothing. A marker line with a trailing CR is adopted and posts nothing. Two `mm-draft:` lines in one row raise `duplicate_marker` and post nothing, including a second line that is not the exact marker. One exact marker line still adopts. A decoy with one different `mm-draft:` line still posts. `spaced_letter_host_matches` still requires the host inside the spaced-letter span. `acme dot a b; x dot com` stays allowed on the screenshot path and still refuses on the gift path. An outside TLD is casefolded before the set check, and `not token.islower()` still rejects `x . CO today` on both paths. A one-letter alphabetic label undoes a tight spaced TLD when a word follows, so `x . com today` refuses on both paths, matching `x . co today`. `x . net today` refuses the same way. `acme . com today`, `3 . com today`, and `acme . io` stay prose. Screenshot text still allows `x dot com` and `x dot NET`. `refuse_sensitive_text("acme . CO\u041c")` is `sensitive_data`. A10, A11, and A13 stay `DESIGNED`.
+
+RED before the one-letter exception: `test_paid_checkout_refuses_a_one_letter_com_before_a_word` and `test_screenshot_text_refuses_a_one_letter_com_before_a_word` saw `None`. RED before the duplicate-line raise: `test_one_row_with_two_marker_lines_is_not_adopted` adopted the row. Clean defang suite: 106 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_defanged_host.py tests/unit/assets/test_spelled_email.py`. Clean draft suite: 126 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_etsy_draft_client.py`. Full suite on this branch: 12 failed, 4919 passed, 193 skipped. The same command on `1bb7e0c`: 12 failed, 4910 passed, 193 skipped. Both runs fail the same twelve `test_compose_preserves_the_postgres_password` rows. Docker is absent. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| `_require_spec` splits on `\n` only | `test_a_lone_cr_injected_marker_is_refused_before_the_transport` | 1/125 |
+| Delete the leftover `\r` fold in `_description_lines` | not unique: `test_a_lone_cr_marker_line_is_adopted`, `test_a_trailing_cr_on_the_marker_line_is_adopted`, `test_a_lone_cr_injected_marker_is_refused_before_the_transport` | 3/123 |
+| `_line_marker` returns `any(line == marker)` | `test_one_row_with_two_marker_lines_is_not_adopted` | 1/125 |
+| Raise only when the exact marker line is repeated | `test_one_row_with_two_marker_lines_is_not_adopted` | 1/125 |
+| `host_matches(folded)` inside the span loop | `test_spaced_letters_do_not_borrow_a_host_inside_their_span` | 1/105 |
+| `host_matches(folded)` after any spaced-letter match, ignoring spans | not unique: `test_spaced_letters_do_not_borrow_another_host`, `test_spaced_letters_do_not_borrow_a_host_inside_their_span` | 2/104 |
+| Delete `not token.islower()` | not unique: `test_paid_checkout_keeps_an_uppercase_outside_tld_as_prose`, `test_screenshot_text_keeps_an_uppercase_outside_tld_as_prose`, `test_quantities_and_plain_names_stay` (`Day 1 . Shop list`) | 3/103 |
+| Always return `None` when a word follows a tight token | `test_paid_checkout_refuses_a_one_letter_com_before_a_word`, `test_screenshot_text_refuses_a_one_letter_com_before_a_word` | 2/104 |
+| `refuse_paid_checkout` returns `None` for `x . com today` | `test_paid_checkout_refuses_a_one_letter_com_before_a_word` | 1/105 |
+| `refuse_sensitive_text` returns `None` for `x . com today` | `test_screenshot_text_refuses_a_one_letter_com_before_a_word` | 1/105 |
+| Delete `"\u041c": "M"` | not unique: `test_screenshot_text_refuses_a_capital_cyrillic_em`, `test_a_cyrillic_em_spaced_com_is_refused` | 2/104 |
+
 ## 2026-10-16 — Session 08 c0m gift and screenshot split
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-c0m-split-prompt-integrity.md`.
