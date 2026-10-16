@@ -68,33 +68,38 @@ def _caller_row(source: Job) -> Job:
     )
 
 
-async def test_a_later_workflow_keeps_the_callers_session(tmp_path: Path) -> None:
-    for status in ("RUNNING", "SUCCEEDED"):
-        ledger = tmp_path / status
-        ledger.mkdir()
-        shop = Store()
-        client = EtsyDraftClient(shop, DraftLedger(ledger))
-        uow = SharedUow()
-        evidence = chain_evidence()
-        await open_ready_draft(evidence, client, uow)
-        draft = draft_jobs(uow)[0]
-        draft.status = status
-        uow.session.add(_caller_row(draft))
-        await uow.events.append(
-            event_name=EventName.SHOP_BOOTSTRAPPED,
-            aggregate_type="shops",
-            aggregate_id=evidence.product_id,
-            workflow_id=WORKFLOW,
-            job_id=None,
-            dedupe_key=f"caller:{status}",
-            occurred_at=OPENED_AT,
-        )
-        with pytest.raises(InvalidTransitionError, match=f"{status} -> READY"):
-            await open_ready_draft(evidence, client, uow, workflow_id=OTHER_WORKFLOW)
-        assert [job.status for job in draft_jobs(uow)] == [status]
-        assert uow.events.names.count("ASSETS_COMPLETED") == 1
-        assert "SHOP_BOOTSTRAPPED" in uow.events.names
-        assert any(job.job_type == "CallerSentinel" for job in uow.session.jobs)
+async def _later_status_keeps_the_session(tmp_path: Path, status: str) -> None:
+    shop = Store()
+    client = EtsyDraftClient(shop, DraftLedger(tmp_path))
+    uow = SharedUow()
+    evidence = chain_evidence()
+    await open_ready_draft(evidence, client, uow)
+    draft = draft_jobs(uow)[0]
+    draft.status = status
+    uow.session.add(_caller_row(draft))
+    await uow.events.append(
+        event_name=EventName.SHOP_BOOTSTRAPPED,
+        aggregate_type="shops",
+        aggregate_id=evidence.product_id,
+        workflow_id=WORKFLOW,
+        job_id=None,
+        dedupe_key=f"caller:{status}",
+        occurred_at=OPENED_AT,
+    )
+    with pytest.raises(InvalidTransitionError, match=f"{status} -> READY"):
+        await open_ready_draft(evidence, client, uow, workflow_id=OTHER_WORKFLOW)
+    assert [job.status for job in draft_jobs(uow)] == [status]
+    assert uow.events.names.count("ASSETS_COMPLETED") == 1
+    assert "SHOP_BOOTSTRAPPED" in uow.events.names
+    assert any(job.job_type == "CallerSentinel" for job in uow.session.jobs)
+
+
+async def test_a_later_running_job_keeps_the_callers_session(tmp_path: Path) -> None:
+    await _later_status_keeps_the_session(tmp_path, "RUNNING")
+
+
+async def test_a_later_succeeded_job_keeps_the_callers_session(tmp_path: Path) -> None:
+    await _later_status_keeps_the_session(tmp_path, "SUCCEEDED")
 
 
 async def test_another_workflow_does_not_record_a_second_event(tmp_path: Path) -> None:
@@ -113,6 +118,7 @@ async def test_worker_assets_completed_does_not_add_a_pending_draft(
     tmp_path: Path,
 ) -> None:
     uow = SharedUow()
+    uow.session.add(_asset_job(_ASSET_JOB))
     await EventDispatcher(cast(UnitOfWork, uow)).dispatch(
         event_name=EventName.ASSETS_COMPLETED,
         aggregate_type="Job",
@@ -161,22 +167,21 @@ async def test_the_idempotency_key_is_the_product(tmp_path: Path) -> None:
     assert draft_jobs(uow)[0].idempotency_key == f"DraftListingJob:{evidence.product_id}"
 
 
-def _pending_draft(evidence_product: UUID) -> Job:
-    job_id = SuccessorFactory.derive_product_job_id(evidence_product, "DraftListingJob")
+def _asset_job(job_id: UUID) -> Job:
     return Job(
         id=job_id,
         workflow_id=WORKFLOW,
-        job_type="DraftListingJob",
+        job_type="AssetFactoryJob",
         object_type="listing_versions",
-        object_id=evidence_product,
+        object_id=job_id,
         owner_agent_id="A13",
-        status="PENDING",
+        status="SUCCEEDED",
         input={},
         success_contract={},
         scheduled_at=OPENED_AT,
         attempt=0,
         max_attempts=3,
-        idempotency_key=f"DraftListingJob:{evidence_product}",
+        idempotency_key=f"asset:{job_id}",
         side_effect_class="EXTERNAL_WRITE",
         retry_class="RECONCILE_FIRST",
         allowed_mode="simulation",
@@ -185,6 +190,8 @@ def _pending_draft(evidence_product: UUID) -> Job:
 
 
 async def _worker_assets(uow: SharedUow, workflow_id: UUID, job_id: UUID) -> None:
+    if await uow.session.get(Job, job_id) is None:
+        uow.session.add(_asset_job(job_id))
     await EventDispatcher(cast(UnitOfWork, uow)).dispatch(
         event_name=EventName.ASSETS_COMPLETED,
         aggregate_type="Job",
@@ -199,23 +206,16 @@ async def _worker_assets(uow: SharedUow, workflow_id: UUID, job_id: UUID) -> Non
 async def test_an_existing_pending_job_becomes_ready(tmp_path: Path) -> None:
     evidence = chain_evidence()
     uow = SharedUow()
-    uow.session.add(_pending_draft(evidence.product_id))
-    await uow.events.append(
+    await EventDispatcher(cast(UnitOfWork, uow)).dispatch(
         event_name=EventName.ASSETS_COMPLETED,
         aggregate_type="products",
         aggregate_id=evidence.product_id,
         workflow_id=WORKFLOW,
         job_id=None,
-        dedupe_key=":".join(
-            (
-                EventName.ASSETS_COMPLETED.value,
-                str(evidence.product_id),
-                str(WORKFLOW),
-                "null",
-            )
-        ),
+        payload={},
         occurred_at=OPENED_AT,
     )
+    assert [job.status for job in draft_jobs(uow)] == ["PENDING"]
     shop = Store()
     client = EtsyDraftClient(shop, DraftLedger(tmp_path))
     receipt = await open_ready_draft(evidence, client, uow)
@@ -224,6 +224,7 @@ async def test_an_existing_pending_job_becomes_ready(tmp_path: Path) -> None:
     assert len(drafts) == 1
     assert drafts[0].status == "READY"
     assert drafts[0].attempt == 0
+    assert drafts[0].updated_at == OPENED_AT
     assert uow.events.names == ["ASSETS_COMPLETED"]
     assert uow.session.flush_statuses[-1] == ("READY",)
     assert shop.posts == 1
@@ -285,5 +286,98 @@ async def test_a_different_worker_job_records_its_own_event() -> None:
     uow = SharedUow()
     await _worker_assets(uow, WORKFLOW, _ASSET_JOB)
     await _worker_assets(uow, WORKFLOW, _OTHER_ASSET_JOB)
+    assert uow.events.names == ["ASSETS_COMPLETED", "ASSETS_COMPLETED"]
+    assert draft_jobs(uow) == []
+
+
+async def test_a_pending_job_beside_another_workflows_event_records_one(
+    tmp_path: Path,
+) -> None:
+    evidence = chain_evidence()
+    uow = SharedUow()
+    await EventDispatcher(cast(UnitOfWork, uow)).dispatch(
+        event_name=EventName.ASSETS_COMPLETED,
+        aggregate_type="products",
+        aggregate_id=evidence.product_id,
+        workflow_id=OTHER_WORKFLOW,
+        job_id=None,
+        payload={},
+        occurred_at=OPENED_AT,
+    )
+    assert [job.status for job in draft_jobs(uow)] == ["PENDING"]
+    shop = Store()
+    client = EtsyDraftClient(shop, DraftLedger(tmp_path))
+    receipt = await open_ready_draft(evidence, client, uow)
+    assert receipt.ready is True
+    assert [job.status for job in draft_jobs(uow)] == ["READY"]
+    assert len(draft_jobs(uow)) == 1
+    assert uow.events.names == ["ASSETS_COMPLETED"]
+
+
+async def test_a_worker_assets_event_without_a_job_row_is_refused() -> None:
+    uow = SharedUow()
+    with pytest.raises(ValueError, match="requires a job"):
+        await EventDispatcher(cast(UnitOfWork, uow)).dispatch(
+            event_name=EventName.ASSETS_COMPLETED,
+            aggregate_type="Job",
+            aggregate_id=_ASSET_JOB,
+            workflow_id=WORKFLOW,
+            job_id=_ASSET_JOB,
+            payload={},
+            occurred_at=OPENED_AT,
+        )
+    assert uow.events.names == []
+    assert draft_jobs(uow) == []
+
+
+async def test_a_worker_assets_event_without_a_job_id_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    uow = SharedUow()
+    original = uow.session.get
+
+    async def _get(_entity: object, ident: UUID | None) -> Job | None:
+        if ident is None:
+            raise AssertionError("null job id")
+        return await original(_entity, ident)
+
+    monkeypatch.setattr(uow.session, "get", _get)
+    with pytest.raises(ValueError, match="requires a job"):
+        await EventDispatcher(cast(UnitOfWork, uow)).dispatch(
+            event_name=EventName.ASSETS_COMPLETED,
+            aggregate_type="Job",
+            aggregate_id=_ASSET_JOB,
+            workflow_id=WORKFLOW,
+            job_id=None,
+            payload={},
+            occurred_at=OPENED_AT,
+        )
+    assert uow.events.names == []
+    assert draft_jobs(uow) == []
+
+
+async def test_two_job_ids_on_one_worker_aggregate_record_two_events() -> None:
+    uow = SharedUow()
+    uow.session.add(_asset_job(_ASSET_JOB))
+    uow.session.add(_asset_job(_OTHER_ASSET_JOB))
+    dispatcher = EventDispatcher(cast(UnitOfWork, uow))
+    await dispatcher.dispatch(
+        event_name=EventName.ASSETS_COMPLETED,
+        aggregate_type="Job",
+        aggregate_id=_ASSET_JOB,
+        workflow_id=WORKFLOW,
+        job_id=_ASSET_JOB,
+        payload={},
+        occurred_at=OPENED_AT,
+    )
+    await dispatcher.dispatch(
+        event_name=EventName.ASSETS_COMPLETED,
+        aggregate_type="Job",
+        aggregate_id=_ASSET_JOB,
+        workflow_id=OTHER_WORKFLOW,
+        job_id=_OTHER_ASSET_JOB,
+        payload={},
+        occurred_at=OPENED_AT,
+    )
     assert uow.events.names == ["ASSETS_COMPLETED", "ASSETS_COMPLETED"]
     assert draft_jobs(uow) == []

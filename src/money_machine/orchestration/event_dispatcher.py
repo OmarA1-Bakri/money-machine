@@ -10,11 +10,14 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from sqlalchemy import select
+
 from money_machine.domain.enums import DecisionType
 from money_machine.domain.events import EventName
 from money_machine.domain.models.portfolio import PortfolioDecision
 from money_machine.orchestration.successor_factory import SuccessorFactory
 from money_machine.persistence.repositories.events import EventAppendError
+from money_machine.persistence.tables import Job
 
 if TYPE_CHECKING:
     from money_machine.persistence.unit_of_work import UnitOfWork
@@ -49,8 +52,14 @@ class EventDispatcher:
         if event_name is EventName.ASSETS_COMPLETED and aggregate_type == "Job":
             # One job completion is one event. A second workflow must not
             # append another row for that same job. The global key is unchanged.
-            job_part = str(job_id) if job_id is not None else "null"
-            dedupe_key = f"{event_name.value}:{aggregate_id}:job:{job_part}"
+            # ``:job:{job_id}`` stays: one aggregate can name two job ids, and
+            # those are two completions. The worker sets the ids equal.
+            if job_id is None or not isinstance(await self.uow.session.get(Job, job_id), Job):
+                raise ValueError("worker ASSETS_COMPLETED requires a job")
+            dedupe_key = f"{event_name.value}:{aggregate_id}:job:{job_id}"
+        elif event_name is EventName.ASSETS_COMPLETED and aggregate_type == "products":
+            # One product has one completion, including across workflows.
+            dedupe_key = f"{event_name.value}:{aggregate_id}:product"
 
         # Append event to log (idempotent via dedupe key)
         event_already_existed = False
@@ -137,12 +146,8 @@ class EventDispatcher:
             # This decision was already dispatched. Find the existing successor job.
             # The successor_job_id is deterministically derived in _create_successor_entry_job,
             # so we can look it up by querying jobs with the successor workflow_id.
-            from money_machine.persistence.tables import Job
-
             if decision.successor_workflow_id:
                 # Query for jobs in the successor workflow
-                from sqlalchemy import select
-
                 stmt = select(Job).where(Job.workflow_id == decision.successor_workflow_id).limit(1)
                 result = await self.uow.session.execute(stmt)
                 existing_job = result.scalars().first()

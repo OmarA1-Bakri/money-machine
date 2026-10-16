@@ -106,6 +106,10 @@ class _Session:
         self.boundaries.append(boundary)
         return boundary
 
+    def discard(self, job_id: UUID) -> None:
+        self.jobs[:] = [job for job in self.jobs if job.id != job_id]
+        self._by_id.pop(job_id, None)
+
     def snapshot(
         self,
     ) -> tuple[
@@ -487,22 +491,17 @@ async def test_an_illegal_transition_is_refused(tmp_path: Path) -> None:
 async def test_an_existing_event_with_no_job_does_not_flush(tmp_path: Path) -> None:
     evidence = chain_evidence()
     uow = _Uow()
-    await uow.events.append(
+    await EventDispatcher(cast(UnitOfWork, uow)).dispatch(
         event_name=EventName.ASSETS_COMPLETED,
         aggregate_type="products",
         aggregate_id=evidence.product_id,
         workflow_id=_WORKFLOW,
         job_id=None,
-        dedupe_key=":".join(
-            (
-                EventName.ASSETS_COMPLETED.value,
-                str(evidence.product_id),
-                str(_WORKFLOW),
-                "null",
-            )
-        ),
+        payload={},
         occurred_at=_NOW,
     )
+    created = _drafts(uow)[0]
+    uow.session.discard(created.id)
     uow.session.flush_statuses.clear()
     shop = Store()
     client = EtsyDraftClient(shop, DraftLedger(tmp_path))

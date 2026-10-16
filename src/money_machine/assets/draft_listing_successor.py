@@ -34,10 +34,10 @@ async def create_ready_draft_listing_job(
 
     A gate refusal raises ``DraftGateError`` before any event is written.
     One product has one draft job and one ``ASSETS_COMPLETED`` event. A
-    second workflow does not append another event when that job is already
-    ``READY``. A job that is still ``PENDING`` beside that event moves to
-    ``READY``. A failure or cancellation after dispatch rolls this call's
-    writes back to a savepoint and leaves the caller's session in place.
+    second workflow does not append another event, including when that job
+    is still ``PENDING``. The pending job moves to ``READY``. A failure or
+    cancellation after dispatch rolls this call's writes back to a savepoint
+    and leaves the caller's session in place.
     """
     receipt = prepare_etsy_draft(evidence, client)
     async with uow.session.begin_nested():
@@ -59,7 +59,11 @@ async def _record_ready_draft(
     workflow_id: UUID,
     occurred_at: datetime,
 ) -> None:
-    """Append at most one product event and move the draft job to ``READY``."""
+    """Append at most one product event and move the draft job to ``READY``.
+
+    The product event is one row per product. Another workflow's existing
+    row is not appended again.
+    """
     product_job_id = SuccessorFactory.derive_product_job_id(evidence.product_id, "DraftListingJob")
     existing = await uow.session.get(Job, product_job_id)
     if isinstance(existing, Job) and JobStatus(existing.status) is JobStatus.READY:
