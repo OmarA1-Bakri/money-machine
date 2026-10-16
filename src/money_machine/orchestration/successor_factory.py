@@ -77,6 +77,7 @@ class SuccessorFactory:
         workflow_id: UUID,
         parent_job_id: UUID | None,
         aggregate_id: UUID | None = None,
+        aggregate_type: str | None = None,
         payload: dict[str, object] | None = None,
         occurred_at: datetime | None = None,
     ) -> tuple[UUID, ...]:
@@ -88,6 +89,7 @@ class SuccessorFactory:
         - Unknown events (not in the map) fail closed with ValueError
         - Events mapped to empty list return empty tuple (no successors)
         - Creates all successor job types listed for the event
+        - A ``Job`` aggregate does not insert ``DraftListingJob`` (D-0034)
 
         Returns the IDs of created successor jobs.
         Raises ValueError if event is unknown (fail closed).
@@ -116,6 +118,9 @@ class SuccessorFactory:
         created_job_ids: list[UUID] = []
 
         for job_type in successor_job_types:
+            # The worker keys completion on the job, not the product (D-0034).
+            if job_type == "DraftListingJob" and aggregate_type == "Job":
+                continue
             job_id = await self._create_successor_job(
                 workflow_id=workflow_id,
                 parent_job_id=parent_job_id,
@@ -327,7 +332,7 @@ class SuccessorFactory:
         if job_type == "DraftListingJob":
             if aggregate_id is None:
                 raise ValueError("DraftListingJob requires the product aggregate")
-            job_id = self._derive_product_job_id(aggregate_id, job_type)
+            job_id = self.derive_product_job_id(aggregate_id, job_type)
             existing = await self.uow.session.get(Job, job_id)
             if isinstance(existing, Job):
                 return existing.id
@@ -419,7 +424,7 @@ class SuccessorFactory:
         return "workflow_runs"
 
     @staticmethod
-    def _derive_product_job_id(product_id: UUID, job_type: str) -> UUID:
+    def derive_product_job_id(product_id: UUID, job_type: str) -> UUID:
         """One stable id for a product-scoped job, independent of workflow and parent."""
         digest = sha256(f"{product_id}:{job_type}".encode()).digest()[:16]
         return UUID(bytes=digest)

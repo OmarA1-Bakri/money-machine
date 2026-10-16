@@ -1,3 +1,23 @@
+## 2026-10-16 — Session 08 draft job should-fix sweep
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-draft-job-sf-sweep-prompt-integrity.md`. The D-0034 graph is unchanged. No pricing or copy gate was added. A10, A11, and A13 stay `DESIGNED`.
+
+A failure inside `create_ready_draft_listing_job` rolls back a nested transaction. The caller's other rows stay. A later workflow that finds the product job `RUNNING` or `SUCCEEDED` raises `InvalidTransitionError` and leaves the first job, the first `ASSETS_COMPLETED` event, and the caller's sentinel row. A second workflow does not leave a second `ASSETS_COMPLETED` event when the job is already `READY`. An `ASSETS_COMPLETED` event whose aggregate type is `Job` does not insert a `PENDING` draft job. A missing product id raises `ValueError` and inserts nothing. The idempotency key is `DraftListingJob:{product_id}`. `except Exception` still rolls the inner write back when the error is `InvalidTransitionError`. `JOB_AND_EVENT_CONTRACTS.md` line 163 says `pricing`. Line 165 says `no successor`.
+
+RED before the savepoint: `test_a_later_workflow_keeps_the_callers_session` ended with no draft job. `test_another_workflow_does_not_record_a_second_event` saw two `ASSETS_COMPLETED` names. `test_worker_assets_completed_does_not_add_a_pending_draft` saw a draft job from the worker aggregate. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_draft_job_shared_session.py`. Clean successor, gate, and shared-session files: 42 passed. `uv run ruff format --check src tests scripts migrations` exit 0. `uv run ruff check src tests scripts apps migrations` exit 0. `uv run pyright` exit 0. Full suite on this branch: 12 failed, 4951 passed, 193 skipped. The #102 baseline on `35aefac0` is 12 failed, 4946 passed, 193 skipped. The passed count is that baseline plus these 5 tests. Both runs fail the same twelve `test_compose_preserves_the_postgres_password` rows. Docker is absent. PostgreSQL is absent locally, so the 193 database tests stayed skipped. Source restored after each mutant.
+
+| Mutant | Killing test | Unique | F/P |
+|---|---|---|---|
+| `uow.rollback()` instead of the savepoint | `test_a_later_workflow_keeps_the_callers_session` | yes | 1/41 |
+| `except RuntimeError` | `test_a_later_workflow_keeps_the_callers_session` | yes | 1/41 |
+| Append when the job is already `READY` | `test_another_workflow_does_not_record_a_second_event` | yes | 1/41 |
+| Insert `DraftListingJob` for a `Job` aggregate | `test_worker_assets_completed_does_not_add_a_pending_draft` | yes | 1/41 |
+| Drop the `aggregate_type` pass-through | `test_worker_assets_completed_does_not_add_a_pending_draft` | yes | 1/41 |
+| Drop the missing-product-id raise | `test_a_missing_product_id_is_refused` | yes | 1/41 |
+| Per-workflow idempotency key | `test_the_idempotency_key_is_the_product` | yes | 1/41 |
+
+Mutant counts are `tests/unit/assets/test_draft_job_shared_session.py`, `tests/unit/assets/test_draft_listing_successor.py`, and `tests/unit/assets/test_etsy_draft_ready.py` (42 tests).
+
 ## 2026-10-16 — Session 08 successor hardening
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. D-0034 records the graph change. A10, A11, and A13 stay `DESIGNED`.

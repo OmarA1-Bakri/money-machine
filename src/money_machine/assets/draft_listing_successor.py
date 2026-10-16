@@ -16,6 +16,7 @@ from money_machine.domain.enums import JobStatus
 from money_machine.domain.events import EventName
 from money_machine.integrations.etsy.draft_client import DraftReceipt, EtsyDraftClient
 from money_machine.orchestration.event_dispatcher import EventDispatcher
+from money_machine.orchestration.successor_factory import SuccessorFactory
 from money_machine.orchestration.transition_guard import require_job_transition
 from money_machine.persistence.tables import Job
 from money_machine.persistence.unit_of_work import UnitOfWork
@@ -32,38 +33,64 @@ async def create_ready_draft_listing_job(
     """Return the ready draft and leave one unrun ``DraftListingJob``.
 
     A gate refusal raises ``DraftGateError`` before any event is written.
-    One product has one draft job. Copy and pricing do not spawn another,
-    and a second workflow does not either. A failure after dispatch rolls
-    the event and the job back.
+    One product has one draft job and one ``ASSETS_COMPLETED`` event. A
+    second workflow does not append another event when that job is already
+    ``READY``. A failure after dispatch rolls this call's writes back to a
+    savepoint and leaves the caller's session in place.
     """
     receipt = prepare_etsy_draft(evidence, client)
+    boundary = uow.session.begin_nested()
+    await boundary.start()
     try:
-        dispatcher = EventDispatcher(uow)
-        job_ids = await dispatcher.dispatch(
-            event_name=EventName.ASSETS_COMPLETED,
-            aggregate_type="products",
-            aggregate_id=evidence.product_id,
+        await _record_ready_draft(
+            evidence,
+            uow,
+            receipt=receipt,
             workflow_id=workflow_id,
-            job_id=None,
-            payload={
-                "spec_version": evidence.spec_version,
-                "listing_id": receipt.listing_id,
-            },
             occurred_at=occurred_at,
         )
-        for job_id in job_ids:
-            job = await uow.session.get(Job, job_id)
-            if not isinstance(job, Job):
-                raise RuntimeError("draft successor missing")
-            status = JobStatus(job.status)
-            if status is JobStatus.READY:
-                continue
-            require_job_transition(status, JobStatus.READY)
-            job.status = JobStatus.READY.value
-            job.updated_at = occurred_at
-        if job_ids:
-            await uow.session.flush()
+        await boundary.commit()
     except Exception:
-        await uow.rollback()
+        await boundary.rollback()
         raise
     return receipt
+
+
+async def _record_ready_draft(
+    evidence: DraftEvidence,
+    uow: UnitOfWork,
+    *,
+    receipt: DraftReceipt,
+    workflow_id: UUID,
+    occurred_at: datetime,
+) -> None:
+    """Append at most one product event and move the draft job to ``READY``."""
+    product_job_id = SuccessorFactory.derive_product_job_id(evidence.product_id, "DraftListingJob")
+    existing = await uow.session.get(Job, product_job_id)
+    if isinstance(existing, Job) and JobStatus(existing.status) is JobStatus.READY:
+        return
+    dispatcher = EventDispatcher(uow)
+    job_ids = await dispatcher.dispatch(
+        event_name=EventName.ASSETS_COMPLETED,
+        aggregate_type="products",
+        aggregate_id=evidence.product_id,
+        workflow_id=workflow_id,
+        job_id=None,
+        payload={
+            "spec_version": evidence.spec_version,
+            "listing_id": receipt.listing_id,
+        },
+        occurred_at=occurred_at,
+    )
+    for job_id in job_ids:
+        job = await uow.session.get(Job, job_id)
+        if not isinstance(job, Job):
+            raise RuntimeError("draft successor missing")
+        status = JobStatus(job.status)
+        if status is JobStatus.READY:
+            continue
+        require_job_transition(status, JobStatus.READY)
+        job.status = JobStatus.READY.value
+        job.updated_at = occurred_at
+    if job_ids:
+        await uow.session.flush()
