@@ -1,3 +1,23 @@
+## 2026-10-16 — Session 09 and Session 10 fixture waves merged
+
+Sessions 09 and 10 are not activated and are not complete. `current_session` stays 7. `session_status` stays complete for Session 07. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`, the Session 07 close pointer from D-0032. That pointer is not the trunk tip. The trunk tip after these merges is `0c11c41a24ab222d0dd9457a9f9c573e09dbac52`. Exit 78 stays HELD. A12, A13, A14, and A15 stay `DESIGNED`. No live Etsy, Notion, or S3 call. No publish, spend, price change, or customer message.
+
+The entries below this one describe the commits that wrote them. They do not describe the trunk tip. The Session 09 entry says its commit is the addendum only and that Sessions 10–15 stay deferred. That was true of `a6264a90a478d6b885604c43a575cf50619f0e37`. The Session 10 entry says its commit is the addendum only. That was true of `546e2c32780ccbe23139f3765bfad9e7fbc6f0e9`. The fixture modules landed later, in the merges below.
+
+| Merge | Tip it brought | What landed |
+|---|---|---|
+| `adb483185f5b5d06e963c095ced0186bda1a4530` (#106) | `a6264a90a478d6b885604c43a575cf50619f0e37` | Session 09 prompt-integrity addendum |
+| `6e2699329d9edd6f45b069f8f1acd4eb61aac54d` (#107) | `e4483da28da8eacf9bcb16f48aeb280160aa0b8e` | `etsy_preflight.py` |
+| `e72ebfe6071e55ad526ef9c73a46fc3898e4aa33` (#108) | `3c4802b59d191996e1d8337067435a23829dc6b7` | `mutation_receipt.py` |
+| `71fa29a4a2feae428e529981740a9ce37af48f83` (#109) | `c290878c946ea630a6cc990ecf99fada96ec4def` | `publishing_ramp_decision.py` |
+| `c13fa4a07823fc9a16700e12e0523cc2411ec600` | parents `546e2c32780ccbe23139f3765bfad9e7fbc6f0e9` and `71fa29a4a2feae428e529981740a9ce37af48f83` | both log entries kept |
+| `9690073128d78b886429adab4cab095bfed3b717` (#111) | `c13fa4a07823fc9a16700e12e0523cc2411ec600` | Session 10 prompt-integrity addendum |
+| `d62810ef7dd2513dadfa2757b82cd984210c6502` (#112) | `e3e86ad24196af41c222e9ce8a9684723b45e60b` | `maturity_clock.py` |
+| `ccda90e18521b3749594d8aff8ea27d1aa8af779` (#113) | `d4a990f7eb736716765b63910af2f6b758eb665a` | `metrics_fixture.py` |
+| `0c11c41a24ab222d0dd9457a9f9c573e09dbac52` (#114) | `93c37131d278529b734a9d19c023f9af7149add8` | `portfolio_eligibility.py` |
+
+`c13fa4a07823fc9a16700e12e0523cc2411ec600` exists because both addenda prepended `IMPLEMENTATION_LOG.md`. The resolved file keeps the Session 10 entry and then the Session 09 entry. Counts for the six focused files are in `TEST_EVIDENCE.md`. A full repository suite was not run on `0c11c41a24ab222d0dd9457a9f9c573e09dbac52`. Persisted scheduler rows, a fixture-confirmed `LISTING_CULLED`, live stats, live deactivation, and the Notion successor build stay deferred. Sessions 11–15 have not started.
+
 ## 2026-10-16 — Session 10 prompt integrity
 
 Session 10 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. The prompt file is unchanged. SHA-256 remains `250a666a2e0e81790066b96caaf0f017fde59027cc2921b1417ea71c99677e7a`. The corrective addendum is `docs/control/reviews/2026-10-16-session-10-prompt-integrity.md`.
