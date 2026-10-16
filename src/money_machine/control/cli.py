@@ -10,8 +10,8 @@ from pathlib import Path
 from money_machine.control.state import (
     ControlStateError,
     apply_activation_transition,
+    apply_active_evidence_record_transition,
     apply_completion_transition,
-    apply_evidence_record_transition,
 )
 
 _COMMANDS = {
@@ -26,8 +26,8 @@ _COMMANDS = {
         "proposed activated state; this file is never modified",
     ),
     "record-evidence": (
-        apply_evidence_record_transition,
-        "record Session 07 keys the fixture proof earned",
+        apply_active_evidence_record_transition,
+        "record keys the fixture proof earned for the active session",
         "proposed evidence state; this file is never modified",
     ),
 }

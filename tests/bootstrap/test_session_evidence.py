@@ -62,14 +62,16 @@ def test_live_pointer_is_incomplete_session_08() -> None:
     record = CLOSED_SESSION_EVIDENCE[7]
     assert live["current_session"] == 8
     assert live["session_status"] == "incomplete"
-    assert live["state_revision"] == 67
+    assert live["state_revision"] == 68
     assert live["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7]
     assert live["next_session"] == 8
     assert live["head_sha"] == record.head_sha
     assert live["evidence_closure_commit_sha"] == "5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb"
     evidence = live["required_completion_evidence"]
     assert isinstance(evidence, dict)
-    assert evidence == {key: False for key in sorted(SESSION_EVIDENCE_KEYS[8])}
+    expected = {key: True for key in sorted(SESSION_EVIDENCE_KEYS[8])}
+    expected["evidence_closure_commit_recorded"] = False
+    assert evidence == expected
 
 
 def test_open_sessions_have_no_recorded_true_key() -> None:

@@ -1,3 +1,11 @@
+## 2026-10-16 — Session 08 evidence keys recorded
+
+`record-evidence` advanced `state_revision` from 67 to 68. `updated_at` is `2026-10-16T22:00:00Z`. The ten behavioral keys and `control_files_and_checkpoint_current` are true. `evidence_closure_commit_recorded` stays false. `current_session` stays 8. `session_status` stays `incomplete`. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6, 7]`. `next_session` stays 8. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `evidence_closure_commit_sha` stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `commissioned_agents` stays empty. Exit 78 stays HELD. A07, A08, A09, A10, and A11 stay `DESIGNED`. The exit string is not written. Session 08 is incomplete. Sessions 09–15 stay unactivated.
+
+D-0038 is the only path that flips these keys. `prove_session_08()` runs the fixture chain and returns the ten behavioral keys. A candidate that sets one key, or that sets the closure key, is refused. Completion stays refused while `head_sha` differs from the prior closure commit.
+
+`uv run pytest -q -p no:cacheprovider --tb=line` on the Session 08 evidence transition, the Session 07 evidence transition, the evidence index, prompt integrity, the Session 08 activation checks, the prior-evidence checks, and the live pin tests printed 53 passed in 17.03s. `tests/bootstrap/test_session_08_proof.py` printed 1 passed in 14.45s. `ruff format`, `ruff check`, and `pyright` on the touched control modules were clean. A full repository suite was not run.
+
 ## 2026-10-16 — Session 08 activated, every key false
 
 `activate` advanced `state_revision` from 66 to 67. `updated_at` is `2026-10-16T20:00:00Z`. `current_session` is 8. `session_status` is `incomplete`. The twelve Session 08 evidence keys are installed and every one is false. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6, 7]`. `next_session` stays 8. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `evidence_closure_commit_sha` stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `commissioned_agents` stays empty. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. The exit string is not written. Session 08 is incomplete. Sessions 09–15 stay unactivated.

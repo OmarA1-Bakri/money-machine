@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 08 has eleven earned keys, the closure key is still false (2026-10-16)
+
+Revision 68 records the ten behavioral keys and `control_files_and_checkpoint_current`. `evidence_closure_commit_recorded` stays false, so Session 08 stays incomplete. `updated_at` is `2026-10-16T22:00:00Z`. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `evidence_closure_commit_sha` stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. Exit 78 stays HELD. A07, A08, A09, A10, and A11 stay `DESIGNED`. `commissioned_agents` stays empty. The exit string is not written. The next honest step is a later completion transition. That transition is still refused while `head_sha` differs from the prior closure commit. Session 09 is not activated.
+
 ## Session 08 is activated and incomplete (2026-10-16)
 
 Revision 67 installs the twelve Session 08 keys, and every one is false. `updated_at` is `2026-10-16T20:00:00Z`. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `evidence_closure_commit_sha` stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. `commissioned_agents` stays empty. The exit string is not written. The next honest step is Session 08 work under `11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md`. Completion of Session 08, and activation of Session 09, are later transitions.

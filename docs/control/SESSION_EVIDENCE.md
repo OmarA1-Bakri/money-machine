@@ -1,8 +1,8 @@
 # Session evidence
 
-The checked-in pointer is Session 08 at state revision 67.
+The checked-in pointer is Session 08 at state revision 68.
 `current_session` is 8. `session_status` is incomplete.
-Session 08 evidence keys are installed and every one is false.
+Eleven Session 08 evidence keys are true. The closure key is false.
 Sessions 00-06 closed with every contract key true.
 Session 07's close commit keeps every contract key false under D-0032.
 D-0036 recorded the twelve Session 07 keys true. The closure commit is
@@ -202,7 +202,8 @@ D-0036 records the live keys later. This table is the close commit.
 
 ## Sessions 08-15
 
-Session 08 is activated and incomplete. Its keys are false.
+Session 08 is activated and incomplete. Eleven keys are true.
+The closure key is false. The session is not complete.
 Sessions 09-15 are not activated. A fixture path is code on the trunk.
 It is not a recorded evidence key.
 
@@ -210,8 +211,8 @@ It is not a recorded evidence key.
 
 Prompt: `11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md`.
 Status: incomplete.
-Evidence contract: defined, not installed.
-Activated and incomplete. Every key is false. Fixture modules are not a true key.
+Evidence contract: installed.
+Activated and incomplete. The closure key is not recorded. The session is not complete.
 
 Fixture paths:
 
@@ -225,18 +226,18 @@ Fixture paths:
 
 | Key | Recorded |
 |---|---|
-| `asset_lineage_recorded` | false |
-| `asset_storage_implemented` | false |
-| `claim_validation_implemented` | false |
-| `control_files_and_checkpoint_current` | false |
-| `creative_asset_agent_implemented` | false |
-| `design_tokens_implemented` | false |
+| `asset_lineage_recorded` | true |
+| `asset_storage_implemented` | true |
+| `claim_validation_implemented` | true |
+| `control_files_and_checkpoint_current` | true |
+| `creative_asset_agent_implemented` | true |
+| `design_tokens_implemented` | true |
 | `evidence_closure_commit_recorded` | false |
-| `link_validation_implemented` | false |
-| `merchandising_agent_implemented` | false |
-| `merchandising_asset_tests_pass` | false |
-| `merchandising_workflow_linked` | false |
-| `screenshot_acquisition_implemented` | false |
+| `link_validation_implemented` | true |
+| `merchandising_agent_implemented` | true |
+| `merchandising_asset_tests_pass` | true |
+| `merchandising_workflow_linked` | true |
+| `screenshot_acquisition_implemented` | true |
 
 ## Session 09
 

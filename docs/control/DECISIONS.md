@@ -502,3 +502,28 @@ The activation is the D-0010 transition. `current_session` becomes 8. `session_s
 ### Consequences
 
 Revision 67 is the activated, incomplete Session 08 pointer. The next honest step is Session 08 work under `11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md`. Completion of Session 08 is a later transition and requires its own earned keys. The historical Session 07 close at `00b952a83bffcec8d442468223d64dd9b2d3e6df` stays all false.
+
+## D-0038 — Session 08 keys are earned by the fixture chain
+
+**Status:** accepted 2026-10-16. Operator instruction: continue after Session 08 activation.
+
+### Context
+
+D-0037 activated Session 08. The twelve Session 08 evidence keys were installed false. The fixture modules for merchandising, claims, tokens, screenshots, images, video, delivery PDFs, links, lineage, local storage, and the ready draft are already in the tree. `apply-completion` cannot flip those keys: completion requires them to be true already, except the closure key, and it also requires `head_sha` to equal the prior closure commit. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. The prior closure is `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. A hand edit is not a transition.
+
+### Decision
+
+`record-evidence` on an incomplete Session 08 (`apply_session_08_evidence_record_transition`) is the only way these keys change:
+
+- The ten behavioral keys flip together, and only when `prove_session_08()` returns that exact set. `control_files_and_checkpoint_current` flips in the same transition when the five control files exist.
+- `evidence_closure_commit_recorded` stays false. `evidence_closure_commit_sha` stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`.
+- `current_session` stays 8. `session_status` stays `incomplete`. A key that is already true cannot become false. A candidate that sets one key, or that sets the closure key, is refused.
+- The worktree check is the D-0036 check. The recorded `repo_root` and `branch` stay as they are.
+
+The proof uses fixture inputs only. It does not open a live Notion, Etsy, or S3 client. A10 and A11 stay `DESIGNED`. Exit 78 stays HELD. The exit string is not written.
+
+### Consequences
+
+Session 08 stays incomplete after the keys are recorded. Completion is a later transition and is still refused while `head_sha` differs from the prior closure commit. Sessions 09–15 stay unactivated. The historical Session 07 close stays all false.
+
+Revision 68 records the ten behavioral keys and `control_files_and_checkpoint_current`. `evidence_closure_commit_recorded` stays false. `updated_at` is `2026-10-16T22:00:00Z`.

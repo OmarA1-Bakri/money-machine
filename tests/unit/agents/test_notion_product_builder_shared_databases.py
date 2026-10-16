@@ -572,6 +572,14 @@ def test_live_pointer_is_incomplete_session_eight() -> None:
     assert state["commissioned_agents"] == []
     evidence = state["required_completion_evidence"]
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[8]
-    assert all(value is False for value in evidence.values())
-    assert state["state_revision"] == 67
+    assert evidence["evidence_closure_commit_recorded"] is False
+    assert all(
+        value is True
+        for key, value in evidence.items()
+        if key != "evidence_closure_commit_recorded"
+    )
+    assert state["state_revision"] == 68
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")
+    assert "SESSION_08_MERCHANDISING_AND_ASSETS_COMPLETE" not in STATE_PATH.read_text(
+        encoding="utf-8"
+    )

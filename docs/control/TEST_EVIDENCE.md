@@ -1,5 +1,20 @@
 # Test Evidence
 
+## 2026-10-16 — Session 08 evidence keys
+
+**Verification scope**: live `record-evidence` from revision 67 to 68. No live HTTP. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. The closure key stays false. Session 08 stays incomplete. Sessions 09–15 stay unactivated.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 8, `incomplete`, revision 68, `updated_at` `2026-10-16T22:00:00Z` | PASS |
+| Keys | Ten behavioral keys and `control_files_and_checkpoint_current` true; closure key false | PASS |
+| Head | Stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` | PASS |
+| Closure | Stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb` | PASS |
+| Proof | `prove_session_08()` returns the ten behavioral keys | PASS |
+| Exit string | `SESSION_08_MERCHANDISING_AND_ASSETS_COMPLETE` is absent | PASS |
+
+The focused pytest printed 53 passed in 17.03s. The proof test printed 1 passed in 14.45s. A full repository suite was not run.
+
 ## 2026-10-16 — Session 08 activation
 
 **Verification scope**: live `activate` from revision 66 to 67. No live HTTP. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. Session 08 keys are all false. Sessions 09–15 stay unactivated.

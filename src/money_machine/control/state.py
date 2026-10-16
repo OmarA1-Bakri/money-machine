@@ -21,6 +21,13 @@ from money_machine.control.session_07_proof import (
     Session07ProofError,
     prove_session_07,
 )
+from money_machine.control.session_08_proof import (
+    BEHAVIORAL_EVIDENCE_KEYS as SESSION_08_BEHAVIORAL_KEYS,
+)
+from money_machine.control.session_08_proof import (
+    Session08ProofError,
+    prove_session_08,
+)
 
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 BOOTSTRAP_COMMIT_SUBJECT = "chore(bootstrap): initialise money machine autonomous monorepo"
@@ -285,6 +292,13 @@ _EVIDENCE_MUTABLE_FIELDS = frozenset(
         "updated_at",
         "required_completion_evidence",
         "evidence_closure_commit_sha",
+    }
+)
+_SESSION_08_EVIDENCE_MUTABLE_FIELDS = frozenset(
+    {
+        "state_revision",
+        "updated_at",
+        "required_completion_evidence",
     }
 )
 _CONTROL_FILE_PATHS = (
@@ -1021,6 +1035,109 @@ def apply_evidence_record_transition(state_path: Path, candidate_path: Path) -> 
         candidate_path,
         validate_evidence_record_transition,
         _verify_evidence_repository,
+    )
+
+
+def _session_08_evidence_values(state: ControlState) -> dict[str, bool]:
+    evidence = state["required_completion_evidence"]
+    expected = set(SESSION_08_BEHAVIORAL_KEYS) | {CONTROL_EVIDENCE_KEY, _CLOSURE_EVIDENCE_KEY}
+    if set(evidence) != expected:
+        raise ControlStateError("session 08 evidence keys are missing or unsupported")
+    return evidence
+
+
+def _session_08_flipped(previous: ControlState, current: ControlState) -> set[str]:
+    before = _session_08_evidence_values(previous)
+    after = _session_08_evidence_values(current)
+    reverted = sorted(key for key, value in before.items() if value is True and after[key] is False)
+    if reverted:
+        raise ControlStateError("evidence record cannot revoke a key: " + ", ".join(reverted))
+    return {key for key, value in before.items() if value is False and after[key] is True}
+
+
+def validate_session_08_evidence_record(previous: ControlState, current: ControlState) -> None:
+    """Record Session 08 keys that the fixture proof earned. The session stays incomplete.
+
+    The ten behavioral keys and the control-file key flip together. The closure key
+    stays false, and the closure commit does not move.
+    """
+    if previous["current_session"] != 8 or current["current_session"] != 8:
+        raise ControlStateError(
+            "unsupported evidence record: only session 08 can record these keys"
+        )
+    if previous["session_status"] != "incomplete" or current["session_status"] != "incomplete":
+        raise ControlStateError("unsupported evidence record: session 08 must stay incomplete")
+    _require_same_fields(previous, current, _SESSION_08_EVIDENCE_MUTABLE_FIELDS, "evidence record")
+    if current["state_revision"] != previous["state_revision"] + 1:
+        raise ControlStateError("state revision must advance exactly once")
+    if current["updated_at"] == previous["updated_at"]:
+        raise ControlStateError("updated_at must change for the evidence record")
+    flipped = _session_08_flipped(previous, current)
+    if not flipped:
+        raise ControlStateError("evidence record must change at least one key")
+    if current["required_completion_evidence"][_CLOSURE_EVIDENCE_KEY] is not False:
+        raise ControlStateError("the closure key stays false")
+    earned = set(SESSION_08_BEHAVIORAL_KEYS) | {CONTROL_EVIDENCE_KEY}
+    missing = sorted(
+        key for key in earned if current["required_completion_evidence"][key] is not True
+    )
+    if missing:
+        raise ControlStateError(
+            "evidence record must set every key the fixture proof earned: " + ", ".join(missing)
+        )
+    extra = sorted(flipped - earned)
+    if extra:
+        raise ControlStateError("evidence record cannot set an unearned key: " + ", ".join(extra))
+    if flipped != earned:
+        raise ControlStateError("evidence record must flip every earned key together")
+
+
+def _require_session_08_proof() -> None:
+    try:
+        earned = prove_session_08()
+    except Session08ProofError as error:
+        raise ControlStateError(f"session 08 evidence proof refused: {error.code}") from error
+    if earned != SESSION_08_BEHAVIORAL_KEYS:
+        raise ControlStateError("session 08 evidence proof did not earn the behavioral keys")
+
+
+def _verify_session_08_evidence_repository(
+    state_path: Path,
+    previous: ControlState,
+    current: ControlState,
+) -> None:
+    del previous, current
+    root = _evidence_worktree(state_path)
+    _require_control_files(root)
+    _require_session_08_proof()
+
+
+def apply_session_08_evidence_record_transition(
+    state_path: Path, candidate_path: Path
+) -> ControlState:
+    """Validate a Session 08 evidence candidate and atomically replace the state file."""
+    return _apply_transition(
+        state_path,
+        candidate_path,
+        validate_session_08_evidence_record,
+        _verify_session_08_evidence_repository,
+    )
+
+
+def apply_active_evidence_record_transition(state_path: Path, candidate_path: Path) -> ControlState:
+    """Record evidence for the session the pointer is on.
+
+    Session 07 stays on its own transition. Incomplete Session 08 uses the fixture-chain
+    transition. Any other pointer is refused before a file is written.
+    """
+    previous, _raw = _parse_state(state_path, "current state")
+    if previous["current_session"] == 7 and previous["session_status"] == "complete":
+        return apply_evidence_record_transition(state_path, candidate_path)
+    if previous["current_session"] == 8 and previous["session_status"] == "incomplete":
+        return apply_session_08_evidence_record_transition(state_path, candidate_path)
+    raise ControlStateError(
+        "unsupported evidence record: only session 07 or incomplete session 08 "
+        "can record these keys"
     )
 
 

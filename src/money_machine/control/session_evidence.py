@@ -131,7 +131,7 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
             "src/money_machine/assets/asset_lineage.py",
             "src/money_machine/integrations/storage/local.py",
         ),
-        "Activated and incomplete. Every key is false. Fixture modules are not a true key.",
+        "Activated and incomplete. The closure key is not recorded. The session is not complete.",
     ),
     OpenSessionEvidence(
         9,
@@ -192,9 +192,9 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 08 at state revision 67.",
+        "The checked-in pointer is Session 08 at state revision 68.",
         "`current_session` is 8. `session_status` is incomplete.",
-        "Session 08 evidence keys are installed and every one is false.",
+        "Eleven Session 08 evidence keys are true. The closure key is false.",
         "Sessions 00-06 closed with every contract key true.",
         "Session 07's close commit keeps every contract key false under D-0032.",
         "D-0036 recorded the twelve Session 07 keys true. The closure commit is",
@@ -236,14 +236,15 @@ def render_session_evidence() -> str:
         [
             "## Sessions 08-15",
             "",
-            "Session 08 is activated and incomplete. Its keys are false.",
+            "Session 08 is activated and incomplete. Eleven keys are true.",
+            "The closure key is false. The session is not complete.",
             "Sessions 09-15 are not activated. A fixture path is code on the trunk.",
             "It is not a recorded evidence key.",
             "",
         ]
     )
     for record in OPEN_SESSION_EVIDENCE:
-        contract = "defined, not installed" if record.session in SESSION_EVIDENCE_KEYS else "absent"
+        contract = "installed" if record.session == 8 else "absent"
         lines.extend(
             [
                 f"## Session {record.session:02d}",
@@ -267,8 +268,13 @@ def render_session_evidence() -> str:
         if record.session in SESSION_EVIDENCE_KEYS:
             lines.append("| Key | Recorded |")
             lines.append("|---|---|")
-            recorded = "false" if record.session == 8 else "not installed"
             for key in _keys(record.session):
+                if record.session != 8:
+                    recorded = "not installed"
+                elif key == "evidence_closure_commit_recorded":
+                    recorded = "false"
+                else:
+                    recorded = "true"
                 lines.append(f"| `{key}` | {recorded} |")
             lines.append("")
     return "\n".join(lines)

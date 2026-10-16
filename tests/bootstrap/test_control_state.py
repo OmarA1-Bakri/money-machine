@@ -339,10 +339,13 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
         # When True with session incomplete, it signals readiness for Verifier review
         assert isinstance(evidence[CLOSURE_EVIDENCE_KEY], bool)
         if session == 8:
-            assert not any(evidence.values())
+            assert evidence[CLOSURE_EVIDENCE_KEY] is False
+            assert all(
+                value is True for key, value in evidence.items() if key != CLOSURE_EVIDENCE_KEY
+            )
             assert state["head_sha"] == SESSION_07_CLOSE_TIP
             assert state["evidence_closure_commit_sha"] == SESSION_07_EARNED_COMMIT
-            assert state["state_revision"] == 67
+            assert state["state_revision"] == 68
             assert state["commissioned_agents"] == []
     else:
         assert state["session_status"] == "complete"
@@ -1567,7 +1570,7 @@ def test_session_eight_activation_rejects_false_session_seven_evidence(tmp_path:
     assert STATE_PATH.read_bytes() == checked_in
     assert load_state()["current_session"] == 8
     assert load_state()["session_status"] == "incomplete"
-    assert load_state()["state_revision"] == 67
+    assert load_state()["state_revision"] == 68
 
 
 def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: Path) -> None:
@@ -1593,10 +1596,11 @@ def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: 
     assert live["current_session"] == 8
     assert live["session_status"] == "incomplete"
     assert live["next_session"] == 8
-    assert live["state_revision"] == 67
+    assert live["state_revision"] == 68
     live_evidence = live["required_completion_evidence"]
     assert set(live_evidence) == set(SESSION_08_EVIDENCE_KEYS)
-    assert not any(live_evidence.values())
+    assert live_evidence[CLOSURE_EVIDENCE_KEY] is False
+    assert all(value is True for key, value in live_evidence.items() if key != CLOSURE_EVIDENCE_KEY)
 
 
 def test_activation_uses_the_worktree_when_recorded_root_is_absent(tmp_path: Path) -> None:
