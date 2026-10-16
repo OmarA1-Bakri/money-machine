@@ -1594,6 +1594,24 @@ def test_a_crlf_marker_line_is_adopted(tmp_path: Path) -> None:
     assert posts == []
 
 
+def test_a_lone_cr_marker_line_is_adopted(tmp_path: Path) -> None:
+    """A marker after a bare CR is its own line. CRLF folding does not see it."""
+    spec = _spec()
+    marker = draft_marker(spec.spec_version, fixture_hash(spec))
+    description = f"A fixture description.\r{marker}"
+    assert "\r\n" not in description
+    row: dict[str, object] = {
+        "listing_id": 42,
+        "title": "other",
+        "description": description,
+        "state": "draft",
+    }
+    transport, posts = _show(row)
+    receipt = EtsyDraftClient(transport, DraftLedger(tmp_path)).create_draft(spec)
+    assert receipt.listing_id == 42
+    assert posts == []
+
+
 def test_a_trailing_space_on_the_marker_line_is_adopted(tmp_path: Path) -> None:
     spec = _spec()
     marker = draft_marker(spec.spec_version, fixture_hash(spec))
