@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 10 wave 2 ledger, sessions still not activated (2026-10-16)
+
+`closed_loop_store.py` stores weekly and monthly trigger rows in a ledger and returns `LISTING_CULLED` only after a fixture status of `CONFIRMED`. That is Session 10 wave 2 from the 2026-10-16 addendum. It is not a session close. `current_session` stays 7. `next_session` stays 8. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The deactivation is unexecuted. Session 11 starts only after its own prompt-integrity addendum.
+
 ## Fixture waves on trunk, sessions not activated (2026-10-16)
 
 Trunk tip `0c11c41a24ab222d0dd9457a9f9c573e09dbac52` contains the Session 09 and Session 10 fixture modules and both prompt-integrity addenda. That tip is not a session close. `head_sha` in `IMPLEMENTATION_STATE.json` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. D-0032 binds that field to Omar's Session 07 close. `current_session` stays 7. `next_session` stays 8. `next_prompt` stays `11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md`. Session 08 is named and is not activated. Sessions 09 and 10 are not activated. Exit 78 stays HELD. A12, A13, A14, and A15 stay `DESIGNED`.

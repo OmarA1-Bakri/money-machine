@@ -1,5 +1,16 @@
 # Test Evidence
 
+## 2026-10-16 — Session 10 wave 2 ledger
+
+**Verification scope**: `closed_loop_store.py` and `test_closed_loop_store.py`. No `IMPLEMENTATION_STATE.json` change. No live HTTP. No Exit 78 lift. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Weekly triggers | One `WEEKLY_REVIEW` row per new collection and one shop review. A second persist adds nothing and keeps the first `next_fire_at` | PASS. Combined command with the metrics and portfolio files: 20 passed |
+| Monthly trigger | A `MonthlyRecord` inserts one `MONTHLY_DEEP_PASS`. A weekly plan does not. A second insert returns none | PASS |
+| Fixture cull | `CONFIRMED` returns `LISTING_CULLED`, keeps the lesson and artifact ids, and leaves `deactivation_executed` false. `UNKNOWN` and `FAILED` return no event | PASS |
+| Session pointer | `current_session` 7. Session 10 is not complete. Session 11 has not started | UNCHANGED |
+
 ## 2026-10-16 — Session 09 and Session 10 fixture waves on trunk tip `0c11c41`
 
 **Verification scope**: The six fixture modules after merges #106–#109 and #111–#114. No `IMPLEMENTATION_STATE.json` change. No live HTTP. No Exit 78 lift. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` and is not this tip.
