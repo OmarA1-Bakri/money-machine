@@ -486,7 +486,8 @@ def _row_text(description: object) -> str:
 
 
 def _description_lines(description: str) -> tuple[str, ...]:
-    text = description.replace("\r\n", "\n")
+    """CR, CRLF, and LF are one break before the marker line compare."""
+    text = description.replace("\r\n", "\n").replace("\r", "\n")
     return tuple(line.rstrip(" \t") for line in text.split("\n"))
 
 
