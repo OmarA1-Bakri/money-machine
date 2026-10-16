@@ -155,6 +155,29 @@ def _evidence(**changes: object) -> DraftEvidence:
     return replace(evidence, **changes)
 
 
+def chain_assets(
+    *,
+    shots: int = 1,
+    images: int | None = None,
+    videos: int = 1,
+    pdfs: int = 2,
+    stale_image: bool = False,
+) -> tuple[BoundAsset, ...]:
+    """The same asset bundle the gate tests refuse or accept."""
+    return _assets(
+        shots=shots,
+        images=images,
+        videos=videos,
+        pdfs=pdfs,
+        stale_image=stale_image,
+    )
+
+
+def chain_evidence(**changes: object) -> DraftEvidence:
+    """The same draft evidence the gate tests pass to ``prepare_etsy_draft``."""
+    return _evidence(**changes)
+
+
 def test_a_passed_chain_is_a_ready_draft(tmp_path: Path) -> None:
     store = Store()
     client = EtsyDraftClient(store, DraftLedger(tmp_path))

@@ -1,3 +1,34 @@
+## 2026-10-16 — Session 08 successor draft job
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-successor-draft-prompt-integrity.md`. D-0033 records the naming choice.
+
+`ASSET_QA_PASSED` and `CREATE_ETSY_DRAFT` stay prompt labels. `create_ready_draft_listing_job` calls `prepare_etsy_draft` first. A `DraftGateError` writes no event and no job. A receipt dispatches `ASSETS_COMPLETED` through `EventDispatcher` and `SuccessorFactory`. `config/workflows.yaml` already maps that event to `[DraftListingJob]` and was not edited. The new job moves from `PENDING` to `READY`. `claim_ready_job` and the worker are not called. A second dispatch inserts nothing. A10, A11, and A13 stay `DESIGNED`.
+
+RED before the body: 14 failed, 1 passed. The passing row was `test_assets_completed_still_names_only_draft_listing_job`. The other fourteen raised `NotImplementedError`. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_draft_listing_successor.py`. Clean successor file: 15 passed. Clean successor file plus the existing gate file: 27 passed. `uv run ruff check .` exit 0. `uv run ruff format --check .` exit 0. `uv run pyright` exit 0. Full suite on this branch: 12 failed, 4936 passed, 193 skipped. The 4921 baseline on `973dd08a` is 12 failed, 4921 passed, 193 skipped. The passed count is that baseline plus these 15 tests. Both runs fail the same twelve `test_compose_preserves_the_postgres_password` rows. Docker is absent. PostgreSQL is absent locally, so the 193 database tests stayed skipped. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Return before dispatch | not unique: `test_passed_chain_creates_exactly_one_draft_listing_job`, `test_redispatch_does_not_duplicate_the_job`, `test_draft_listing_job_is_ready_and_not_executed` | 3/24 |
+| Dispatch `PRICING_COMPLETED` | `test_passed_chain_creates_exactly_one_draft_listing_job` | 1/26 |
+| Dispatch `LISTING_COPY_COMPLETED` | not unique: `test_passed_chain_creates_exactly_one_draft_listing_job`, `test_redispatch_does_not_duplicate_the_job` | 2/25 |
+| New `job_id` on every dispatch | `test_redispatch_does_not_duplicate_the_job` | 1/26 |
+| Skip the `PENDING` to `READY` transition | `test_draft_listing_job_is_ready_and_not_executed` | 1/26 |
+| Set status `RUNNING` | `test_draft_listing_job_is_ready_and_not_executed` | 1/26 |
+| Set `attempt` to 1 | `test_draft_listing_job_is_ready_and_not_executed` | 1/26 |
+| Dispatch before `prepare_etsy_draft` | not unique: all 11 `test_each_failing_gate_creates_no_successor` rows and `test_draft_listing_job_is_ready_and_not_executed` | 12/15 |
+| Call `claim_ready_job` | not unique: `test_passed_chain_creates_exactly_one_draft_listing_job`, `test_redispatch_does_not_duplicate_the_job`, `test_draft_listing_job_is_ready_and_not_executed` | 3/24 |
+| Add `ASSET_QA_PASSED` to `event_successor_map` | `test_assets_completed_still_names_only_draft_listing_job` | 1/26 |
+| Delete the `product_qa` gate | not unique: `test_each_failing_gate_creates_no_successor[changes0-product_qa]`, `test_each_gate_refuses_on_its_own[changes0-product_qa]` | 2/25 |
+| Delete the `claims` gate | not unique: `test_each_failing_gate_creates_no_successor[changes1-claims]`, `test_each_gate_refuses_on_its_own[changes1-claims]` | 2/25 |
+| Delete the `screenshots` gate | not unique: `test_each_failing_gate_creates_no_successor[changes2-screenshots]`, `test_each_gate_refuses_on_its_own[changes2-screenshots]` | 2/25 |
+| Delete the `listing_images` gate | not unique: `test_each_failing_gate_creates_no_successor[changes3-listing_images]`, `test_each_gate_refuses_on_its_own[changes3-listing_images]` | 2/25 |
+| Delete the `video` gate | not unique: both `video` rows of `test_each_failing_gate_creates_no_successor` and both `video` rows of `test_each_gate_refuses_on_its_own` | 4/23 |
+| Delete the `delivery_pdfs` gate | not unique: the three `delivery_pdfs` rows in each of those two tests | 6/21 |
+| Delete the `links` gate | not unique: `test_each_failing_gate_creates_no_successor[changes9-links]`, `test_each_gate_refuses_on_its_own[changes9-links]` | 2/25 |
+| Delete the `asset_qa` gate | not unique: `test_each_failing_gate_creates_no_successor[changes10-asset_qa]`, `test_each_gate_refuses_on_its_own[changes10-asset_qa]` | 2/25 |
+
+Mutant counts are the successor file plus `tests/unit/assets/test_etsy_draft_ready.py` (27 tests). The old gate file does not fail when a refused chain still inserts a job.
+
 ## 2026-10-16 — Session 08 foreign duplicate markers
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-dup-marker-foreign-prompt-integrity.md`.

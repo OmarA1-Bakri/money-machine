@@ -395,3 +395,24 @@ Record Session 07 with the Session 06 pointer convention, and do not flip the tw
 ### Consequences
 
 Session 08 is named as the next prompt and is not activated. `current_session` stays 7. A later activation would install Session 08's evidence keys and is a separate change. The twelve Session 07 keys stay false, so they are not evidence that the product build or QA is complete.
+
+## D-0033 — Session 08 draft successor reuses ASSETS_COMPLETED
+
+**Status:** accepted for the Session 08 successor-draft slice, 2026-10-16.
+
+### Context
+
+Prompt sections 9 and 10 name the chain step `ASSET_QA_PASSED` and the ready step `CREATE_ETSY_DRAFT`. Those strings are not in `EventName` and they are not job types. `config/workflows.yaml` already maps `ASSETS_COMPLETED` to `[DraftListingJob]`. Session 03 finding M11 and D-0029 voided the prompt's example job names as a second vocabulary. D-0029 recorded the graph and did not create the job. This slice creates the job. A13 is still `DESIGNED`, so the job is not run.
+
+### Decision
+
+- `ASSET_QA_PASSED` is the prompt label for the existing event `ASSETS_COMPLETED`.
+- `CREATE_ETSY_DRAFT` ready is the prompt label for one `DraftListingJob` in status `READY`.
+- Those prompt labels are not added to `EventName`, to `config/workflows.yaml`, or to a second successor map.
+- `create_ready_draft_listing_job` calls `prepare_etsy_draft` first. A `DraftGateError` propagates and does not dispatch. A receipt dispatches `ASSETS_COMPLETED` through `EventDispatcher` and `SuccessorFactory`.
+- The factory inserts the job as `PENDING`. This slice then takes the legal `PENDING` to `READY` transition. It does not call `claim_ready_job` and it does not start the worker.
+- The same product and workflow dispatch again uses the existing event dedupe key. The factory is not called again.
+
+### Consequences
+
+A passed asset chain leaves exactly one ready `DraftListingJob`. A refused chain leaves none. Re-dispatch does not insert a second job. Running that job waits until A13 is commissioned. Exit 78 stays HELD. Session 08 stays inactive.
