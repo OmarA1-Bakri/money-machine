@@ -35,13 +35,12 @@ async def create_ready_draft_listing_job(
     A gate refusal raises ``DraftGateError`` before any event is written.
     One product has one draft job and one ``ASSETS_COMPLETED`` event. A
     second workflow does not append another event when that job is already
-    ``READY``. A failure after dispatch rolls this call's writes back to a
-    savepoint and leaves the caller's session in place.
+    ``READY``. A job that is still ``PENDING`` beside that event moves to
+    ``READY``. A failure or cancellation after dispatch rolls this call's
+    writes back to a savepoint and leaves the caller's session in place.
     """
     receipt = prepare_etsy_draft(evidence, client)
-    boundary = uow.session.begin_nested()
-    await boundary.start()
-    try:
+    async with uow.session.begin_nested():
         await _record_ready_draft(
             evidence,
             uow,
@@ -49,10 +48,6 @@ async def create_ready_draft_listing_job(
             workflow_id=workflow_id,
             occurred_at=occurred_at,
         )
-        await boundary.commit()
-    except Exception:
-        await boundary.rollback()
-        raise
     return receipt
 
 
@@ -82,15 +77,17 @@ async def _record_ready_draft(
         },
         occurred_at=occurred_at,
     )
-    for job_id in job_ids:
+    # An existing event returns no ids. The pending product job is still moved.
+    target_ids = job_ids
+    if not target_ids and isinstance(existing, Job):
+        target_ids = (existing.id,)
+    for job_id in target_ids:
         job = await uow.session.get(Job, job_id)
         if not isinstance(job, Job):
             raise RuntimeError("draft successor missing")
         status = JobStatus(job.status)
-        if status is JobStatus.READY:
-            continue
         require_job_transition(status, JobStatus.READY)
         job.status = JobStatus.READY.value
         job.updated_at = occurred_at
-    if job_ids:
+    if target_ids:
         await uow.session.flush()

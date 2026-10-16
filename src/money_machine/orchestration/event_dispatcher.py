@@ -46,6 +46,11 @@ class EventDispatcher:
             occurred_at = datetime.now(UTC)
 
         dedupe_key = self._dedupe_key(event_name, aggregate_id, workflow_id, job_id)
+        if event_name is EventName.ASSETS_COMPLETED and aggregate_type == "Job":
+            # One job completion is one event. A second workflow must not
+            # append another row for that same job. The global key is unchanged.
+            job_part = str(job_id) if job_id is not None else "null"
+            dedupe_key = f"{event_name.value}:{aggregate_id}:job:{job_part}"
 
         # Append event to log (idempotent via dedupe key)
         event_already_existed = False
