@@ -1361,29 +1361,26 @@ def test_a_crlf_description_and_an_lf_one_still_post(tmp_path: Path) -> None:
     marker = draft_marker(spec.spec_version, fixture_hash(spec))
     crlf = _draft_row(1, "alpha\r\nbeta")
     lf = _draft_row(1, "alpha\nbeta")
-
-    class _Newlines:
-        def __init__(self) -> None:
-            self.gets = 0
-            self.posts = 0
-
-        def exchange(self, call: FixtureCall) -> Mapping[str, object]:
-            if call.method == "POST":
-                self.posts += 1
-                return {
-                    "listing_id": 5,
-                    "state": "draft",
-                    "description": f"{spec.description}\n{marker}",
-                }
-            rows = [crlf] if self.gets == 0 else [lf]
-            self.gets += 1
-            return {"count": len(rows), "results": rows}
-
-    race = _Newlines()
+    posted = {
+        "listing_id": 5,
+        "state": "draft",
+        "description": f"{spec.description}\n{marker}",
+    }
+    race = _TwoWalks([crlf], [lf], posted)
     client = EtsyDraftClient(race, DraftLedger(tmp_path))
     receipt = client.create_draft(spec)
     assert receipt.ready is True
     assert race.posts == 1
+
+
+def test_a_lone_cr_description_is_not_the_same_text(tmp_path: Path) -> None:
+    """A lone CR stays in the description, so the two walks refuse."""
+    race = _TwoWalks([_draft_row(1, "alpha\rbeta")], [_draft_row(1, "alphabeta")])
+    client = EtsyDraftClient(race, DraftLedger(tmp_path))
+    with pytest.raises(EtsyDraftRefused) as caught:
+        client.create_draft(_spec())
+    assert caught.value.code == "count"
+    assert race.posts == 0
 
 
 def test_an_existing_description_change_refuses_to_post(tmp_path: Path) -> None:
@@ -1402,14 +1399,22 @@ def test_an_existing_description_change_refuses_to_post(tmp_path: Path) -> None:
 
 
 class _TwoWalks:
-    def __init__(self, first: list[dict[str, object]], second: list[dict[str, object]]) -> None:
+    def __init__(
+        self,
+        first: list[dict[str, object]],
+        second: list[dict[str, object]],
+        posted: Mapping[str, object] | None = None,
+    ) -> None:
         self._walks = (first, second)
+        self._posted = posted
         self.gets = 0
         self.posts = 0
 
     def exchange(self, call: FixtureCall) -> Mapping[str, object]:
         if call.method == "POST":
             self.posts += 1
+            if self._posted is not None:
+                return self._posted
             return _post_body()
         rows = self._walks[0 if self.gets == 0 else 1]
         self.gets += 1
