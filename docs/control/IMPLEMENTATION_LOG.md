@@ -1,3 +1,11 @@
+## 2026-10-16 — Session 10 wave 2 trigger ledger and fixture-confirmed cull
+
+Session 10 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. `scheduler.py`, `config/workflows.yaml`, and `config/agents.yaml` are unchanged.
+
+`closed_loop_store.py` inserts one `WEEKLY_REVIEW` ledger row per new weekly plan record and one `MONTHLY_DEEP_PASS` row for a monthly record. A second insert of the same key adds nothing and leaves `next_fire_at` where it was. `LISTING_CULLED` is returned only when `confirm_fixture_cull` reads fixture status `CONFIRMED` for a `CULL` that already has a deactivation job id. The deactivation stays unexecuted. The lesson and the artifact ids are retained. `UNKNOWN` and `FAILED` return no event and no lesson. This is not a live Etsy write and it does not call `schedule_maturity_timer`.
+
+`uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_closed_loop_store.py tests/unit/assets/test_metrics_fixture.py tests/unit/assets/test_portfolio_eligibility.py` printed 20 passed. `ruff format`, `ruff check`, and `pyright` on the new module and its test were clean. A full repository suite was not run. Session 11 has not started.
+
 ## 2026-10-16 — Session 09 and Session 10 fixture waves merged
 
 Sessions 09 and 10 are not activated and are not complete. `current_session` stays 7. `session_status` stays complete for Session 07. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`, the Session 07 close pointer from D-0032. That pointer is not the trunk tip. The trunk tip after these merges is `0c11c41a24ab222d0dd9457a9f9c573e09dbac52`. Exit 78 stays HELD. A12, A13, A14, and A15 stay `DESIGNED`. No live Etsy, Notion, or S3 call. No publish, spend, price change, or customer message.
