@@ -1,3 +1,9 @@
+## 2026-10-16 — Session 10 prompt integrity
+
+Session 10 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. The prompt file is unchanged. SHA-256 remains `250a666a2e0e81790066b96caaf0f017fde59027cc2921b1417ea71c99677e7a`. The corrective addendum is `docs/control/reviews/2026-10-16-session-10-prompt-integrity.md`.
+
+Fidelity, safety, and gameability each returned CONDITIONAL APPROVE. This commit is the addendum only. No production module, no test, and no commissioning change. A14 and A15 stay `DESIGNED`. The first wave is three fixture lanes: a metrics snapshot plan, the accumulated-live-days clock, and portfolio eligibility. Live stats, live deactivation, the Notion successor build, persisted scheduler rows, and Sessions 11–15 stay deferred. The base is `edc0632fb43777d834053d5dbfe42f31f3478ab7`.
+
 ## 2026-10-16 — Session 09 prompt integrity
 
 Session 09 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. The prompt file is unchanged. SHA-256 remains `eab1e4a5ae05008e06607526a1bf45b0fb35850a5bbf82e4002bd94954f58936`. The corrective addendum is `docs/control/reviews/2026-10-16-session-09-prompt-integrity.md`.
