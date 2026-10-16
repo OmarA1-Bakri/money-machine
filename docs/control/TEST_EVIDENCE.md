@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-16 — Session evidence index
+
+**Verification scope**: `session_evidence.py`, `SESSION_EVIDENCE.md`, and `test_session_evidence.py`. No `IMPLEMENTATION_STATE.json` change. No live HTTP. No key flip.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Sessions 00-06 | Each completion commit has every contract key true | PASS. Git object check inside the 9 passed |
+| Session 07 | `00b952a83bffcec8d442468223d64dd9b2d3e6df` has all twelve keys false. The live file matches revision 64 | PASS |
+| Sessions 08-15 | Not activated. Session 08's contract is not installed. Sessions 09-15 have no contract | PASS |
+| Index bytes | `SESSION_EVIDENCE.md` equals `render_session_evidence()` | PASS |
+
+`uv run pytest -q -p no:cacheprovider --tb=short tests/bootstrap/test_session_evidence.py tests/bootstrap/test_prompt_integrity.py` printed `9 passed in 0.05s`. A full repository suite was not run.
+
 ## 2026-10-16 — Session 11 fixture intake
 
 **Verification scope**: `support_intake.py`, `test_support_intake.py`, and `tests/bootstrap/test_prompt_integrity.py`. No `IMPLEMENTATION_STATE.json` change. No live HTTP. No Exit 78 lift. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`.
