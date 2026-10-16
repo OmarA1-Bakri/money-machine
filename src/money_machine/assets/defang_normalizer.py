@@ -369,8 +369,7 @@ def _outside_curated(
 ) -> tuple[str, int] | None:
     if not boundary or not _word_follows(chunk, token_end, tail):
         return None
-    folded = token.casefold()
-    if not token.islower() or folded in _SPACED_DOT_TLDS or folded not in CURATED_TLDS:
+    if not token.islower() or token in _SPACED_DOT_TLDS or token not in CURATED_TLDS:
         return None
     if len(_label_before(chunk, tld_start)) != 1:
         return None

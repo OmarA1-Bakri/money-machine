@@ -1659,6 +1659,56 @@ def test_one_row_with_two_marker_lines_is_not_adopted(tmp_path: Path) -> None:
         assert posts == []
 
 
+def test_a_foreign_two_marker_row_does_not_halt_draft_creation(tmp_path: Path) -> None:
+    """A shop or description hash that is not ours is not adopted."""
+    spec = _spec()
+    ours = draft_marker(spec.spec_version, fixture_hash(spec))
+    foreigners = (
+        replace(spec, shop_id=99),
+        replace(spec, description="Other description."),
+    )
+    for index, foreign in enumerate(foreigners):
+        foreign_marker = draft_marker(foreign.spec_version, fixture_hash(foreign))
+        assert foreign_marker != ours
+        row: dict[str, object] = {
+            "listing_id": 9,
+            "title": "other",
+            "description": f"Unrelated.\n{foreign_marker}\n{foreign_marker}",
+            "state": "draft",
+        }
+        ledger_dir = tmp_path / str(index)
+        ledger_dir.mkdir()
+        client, store, _ledger = _client(ledger_dir, Store([row]))
+        receipt = client.create_draft(spec)
+        assert receipt.listing_id == 5001
+        assert store.posts == 1
+
+
+def test_our_marker_is_adopted_beside_a_foreign_two_marker_row(tmp_path: Path) -> None:
+    spec = _spec()
+    marker = draft_marker(spec.spec_version, fixture_hash(spec))
+    foreign = replace(spec, shop_id=99)
+    foreign_marker = draft_marker(foreign.spec_version, fixture_hash(foreign))
+    rows: list[dict[str, object]] = [
+        {
+            "listing_id": 9,
+            "title": "other",
+            "description": f"Unrelated.\n{foreign_marker}\n{foreign_marker}",
+            "state": "draft",
+        },
+        {
+            "listing_id": 42,
+            "title": "other",
+            "description": f"{spec.description}\n{marker}",
+            "state": "draft",
+        },
+    ]
+    client, store, _ledger = _client(tmp_path, Store(rows))
+    receipt = client.create_draft(spec)
+    assert receipt.listing_id == 42
+    assert store.posts == 0
+
+
 def test_a_trailing_space_on_the_marker_line_is_adopted(tmp_path: Path) -> None:
     spec = _spec()
     marker = draft_marker(spec.spec_version, fixture_hash(spec))

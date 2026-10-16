@@ -20,7 +20,9 @@ version plus a hash of the fixture fields. The pending file is created with
 ``O_CREAT|O_EXCL|O_NOFOLLOW`` and fsynced, with the directory, before
 ``POST``. A pending key with no adopted draft is not posted again. The
 description carries one exact line, ``mm-draft:{spec_version}:{fixture_hash}``.
-Two ``mm-draft:`` lines in one row are refused. A retry adopts that line and never a title.
+Two ``mm-draft:`` lines refuse when one of them is this draft's marker.
+A row whose marker lines are not ours is not adopted. A retry adopts one
+exact line and never a title.
 """
 
 from __future__ import annotations
@@ -494,12 +496,13 @@ def _description_lines(description: str) -> tuple[str, ...]:
 def _line_marker(description: object, marker: str) -> bool:
     """True only when one whole normalized line equals the marker.
 
-    Two ``mm-draft:`` lines in one description are a duplicate marker.
+    Two ``mm-draft:`` lines refuse when one of them is this marker.
+    A foreign row is not this draft.
     """
     if not isinstance(description, str):
         return False
     lines = [line for line in _description_lines(description) if line.startswith("mm-draft:")]
-    if len(lines) > 1:
+    if marker in lines and len(lines) > 1:
         raise EtsyDraftRefused("duplicate_marker")
     return lines == [marker]
 
