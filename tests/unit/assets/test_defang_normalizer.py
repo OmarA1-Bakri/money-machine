@@ -161,6 +161,12 @@ def test_a_digit_three_tld_is_refused() -> None:
     assert refuse_sensitive_text("x dot n3t") == "sensitive_data"
 
 
+def test_a_spaced_digit_three_net_is_refused() -> None:
+    assert refuse_paid_checkout("x . n3t") == "paid_checkout"
+    assert refuse_sensitive_text("x . n3t") == "sensitive_data"
+    assert refuse_paid_checkout("x . N3t") is None
+
+
 def test_a_digit_one_tld_is_refused() -> None:
     assert refuse_paid_checkout("x dot 1o") == "paid_checkout"
     assert refuse_sensitive_text("x dot 1o") == "sensitive_data"
