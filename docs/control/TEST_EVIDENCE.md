@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-16 — Session 11 fixture intake
+
+**Verification scope**: `support_intake.py`, `test_support_intake.py`, and `tests/bootstrap/test_prompt_integrity.py`. No `IMPLEMENTATION_STATE.json` change. No live HTTP. No Exit 78 lift. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Prompt hash | `14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md` SHA-256 `f5e5c5a000285286bbc3389ae4dd564b3accd9cc820f01b506b8b1cb536a1428`. Addendum `docs/control/reviews/2026-10-16-session-11-prompt-integrity.md` | PASS. Prompt-integrity file is in the 29 passed |
+| Intake | Thirteen codes map from the argument. A second key returns the first incident. Secrets are refused. Account verification is blocked. Dedupe cites the existing product. Phase 0 is refused. No-sales steps sit at day 0 and day 14 and stay uninserted | PASS |
+| Close and reply | `RESOLVED` requires a later matching hash from another job. Draft uses that verification's fix and path. `auto` and a failed read return no body. Send count stays 0. One idempotency key keeps one repair version | PASS |
+| A16 and pointer | Committed `config/agents.yaml` still says `DESIGNED` with empty evidence. `current_session` stays 7. Session 11 is not complete | UNCHANGED |
+
+`uv run pytest -q -p no:cacheprovider --tb=short tests/unit/assets/test_support_intake.py tests/bootstrap/test_prompt_integrity.py` printed `29 passed in 0.09s`. `ruff format`, `ruff check`, and `pyright` on the two intake files reported 0 errors. A full repository suite was not run.
+
 ## 2026-10-16 — Session 10 wave 2 ledger
 
 **Verification scope**: `closed_loop_store.py` and `test_closed_loop_store.py`. No `IMPLEMENTATION_STATE.json` change. No live HTTP. No Exit 78 lift. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`.
