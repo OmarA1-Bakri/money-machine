@@ -1,3 +1,27 @@
+## 2026-10-16 — Session 08 draft job should-fix sweep 3
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-draft-job-sf-sweep3-prompt-integrity.md`. The D-0034 graph is unchanged. No pricing or copy gate was added. Defang rules are unchanged. A10, A11, and A13 stay `DESIGNED`.
+
+A `PENDING` `DraftListingJob` beside another workflow's product `ASSETS_COMPLETED` stays one event and moves to `READY`. The product key omits `workflow_id`. The global key for every other event is unchanged. A worker `ASSETS_COMPLETED` with no job id, or with a job id and no `Job` row, raises `ValueError` and appends nothing. Ignore was the other option and was not taken: an empty return is what a duplicate already does, so a silent skip looks recorded. The worker passes `job.id` for both ids after that row is loaded, so a real completion still appends. `:job:{job_id}` stays on the worker key. Two job ids on one aggregate are two events, so the fragment is not the same as `aggregate_id` alone. One job id across two workflows is still one event. `RUNNING` and `SUCCEEDED` each have their own test. Restoring the deleted `READY` continue still fails nothing. PostgreSQL savepoint release, cancellation, and concurrency stay untested. The fixture is the only evidence.
+
+RED before the production change: 3 failed, 48 passed. `test_a_pending_job_beside_another_workflows_event_records_one` saw two `ASSETS_COMPLETED` names. `test_a_worker_assets_event_without_a_job_row_is_refused` and `test_a_worker_assets_event_without_a_job_id_is_refused` did not raise. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_draft_job_shared_session.py tests/unit/assets/test_draft_listing_successor.py tests/unit/assets/test_etsy_draft_ready.py`. Clean suite after the split and the worker-key row: 52 passed. `uv run ruff format --check src tests scripts migrations` exit 0. `uv run ruff check src tests scripts apps migrations` exit 0. `uv run pyright` exit 0. Full suite on this branch: 12 failed, 4961 passed, 193 skipped. The #104 baseline on `3385ad299f6b28ebea60fc2025f2bee42a0f5611` is 12 failed, 4956 passed, 193 skipped. The passed count is that baseline plus these 5 tests. Both runs fail the same twelve `test_compose_preserves_the_postgres_password` rows. Docker is absent. PostgreSQL is absent locally, so the 193 database tests stayed skipped. Source restored after each mutant.
+
+| Mutant | Killing test | Unique | F/P |
+|---|---|---|---|
+| Put `workflow_id` back in the product key | `test_a_pending_job_beside_another_workflows_event_records_one` | yes | 1/51 |
+| Append a worker event when the `Job` row is absent | `test_a_worker_assets_event_without_a_job_row_is_refused` | yes | 1/51 |
+| Look up a null job id | `test_a_worker_assets_event_without_a_job_id_is_refused` | yes | 1/51 |
+| Drop `:job:{job_id}` | `test_two_job_ids_on_one_worker_aggregate_record_two_events` | yes | 1/51 |
+| Put `workflow_id` back in the worker key | `test_a_second_workflow_does_not_record_another_worker_event` | yes | 1/51 |
+| One key for every worker job | `test_a_different_worker_job_records_its_own_event`, `test_two_job_ids_on_one_worker_aggregate_record_two_events` | no | 2/50 |
+| Skip the missing-job guard | `test_a_worker_assets_event_without_a_job_row_is_refused`, `test_a_worker_assets_event_without_a_job_id_is_refused` | no | 2/50 |
+| Delete `updated_at` | `test_an_existing_pending_job_becomes_ready` | yes | 1/51 |
+| Allow `SUCCEEDED -> READY` | `test_a_later_succeeded_job_keeps_the_callers_session` | yes | 1/51 |
+| Allow `RUNNING -> READY` | `test_a_later_running_job_keeps_the_callers_session` | yes | 1/51 |
+| Restore the `READY` continue | none; the branch is unreachable and stays removed | removed | 0/52 |
+
+Mutant counts are `tests/unit/assets/test_draft_job_shared_session.py`, `tests/unit/assets/test_draft_listing_successor.py`, and `tests/unit/assets/test_etsy_draft_ready.py` (52 tests).
+
 ## 2026-10-16 — Session 08 draft job should-fix sweep 2
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-draft-job-sf-sweep2-prompt-integrity.md`. The D-0034 graph is unchanged. No pricing or copy gate was added. A10, A11, and A13 stay `DESIGNED`.
