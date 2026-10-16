@@ -1355,6 +1355,37 @@ def test_an_empty_description_and_a_missing_one_still_post(tmp_path: Path) -> No
     assert race.posts == 1
 
 
+def test_a_cr_description_and_an_lf_one_still_post(tmp_path: Path) -> None:
+    """The same decoy text with a bare CR or LF is one description."""
+    spec = _spec()
+    marker = draft_marker(spec.spec_version, fixture_hash(spec))
+    cr = _draft_row(1, "alpha\rbeta")
+    lf = _draft_row(1, "alpha\nbeta")
+
+    class _Newlines:
+        def __init__(self) -> None:
+            self.gets = 0
+            self.posts = 0
+
+        def exchange(self, call: FixtureCall) -> Mapping[str, object]:
+            if call.method == "POST":
+                self.posts += 1
+                return {
+                    "listing_id": 5,
+                    "state": "draft",
+                    "description": f"{spec.description}\n{marker}",
+                }
+            rows = [cr] if self.gets == 0 else [lf]
+            self.gets += 1
+            return {"count": len(rows), "results": rows}
+
+    race = _Newlines()
+    client = EtsyDraftClient(race, DraftLedger(tmp_path))
+    receipt = client.create_draft(spec)
+    assert receipt.ready is True
+    assert race.posts == 1
+
+
 def test_a_crlf_description_and_an_lf_one_still_post(tmp_path: Path) -> None:
     """The same decoy text with CRLF or LF is one description."""
     spec = _spec()
