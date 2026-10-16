@@ -49,39 +49,47 @@ class EventDispatcher:
             occurred_at = datetime.now(UTC)
 
         dedupe_key = self._dedupe_key(event_name, aggregate_id, workflow_id, job_id)
+        event_already_existed = False
         if event_name is EventName.ASSETS_COMPLETED and aggregate_type == "Job":
             # One job completion is one event. A second workflow must not
             # append another row for that same job. The global key is unchanged.
             # ``:job:{job_id}`` stays: one aggregate can name two job ids, and
-            # those are two completions. The worker sets the ids equal.
+            # those are two completions. The worker sets both ids to ``job.id``.
+            # Replacing ``aggregate_id`` with ``job_id`` still records two
+            # events for that caller, so the substitution stays unpinned.
             if job_id is None or not isinstance(await self.uow.session.get(Job, job_id), Job):
                 raise ValueError("worker ASSETS_COMPLETED requires a job")
             dedupe_key = f"{event_name.value}:{aggregate_id}:job:{job_id}"
         elif event_name is EventName.ASSETS_COMPLETED and aggregate_type == "products":
             # One product has one completion, including across workflows.
+            # #101-#104 wrote ``ASSETS_COMPLETED:{product}:{workflow}:null``.
+            # That row is this event. Look it up. Do not rewrite it (D-0035).
             dedupe_key = f"{event_name.value}:{aggregate_id}:product"
+            legacy_key = self._dedupe_key(event_name, aggregate_id, workflow_id, None)
+            if await self.uow.events.by_dedupe_key(legacy_key) is not None:
+                event_already_existed = True
 
         # Append event to log (idempotent via dedupe key)
-        event_already_existed = False
-        try:
-            await self.uow.events.append(
-                event_name=event_name,
-                aggregate_type=aggregate_type,
-                aggregate_id=aggregate_id,
-                workflow_id=workflow_id,
-                job_id=job_id,
-                payload=payload or {},
-                dedupe_key=dedupe_key,
-                occurred_at=occurred_at,
-            )
-        except EventAppendError:
-            # Event already exists - this is idempotent dispatch
-            existing = await self.uow.events.by_dedupe_key(dedupe_key)
-            if existing is None:
-                raise
-            # Event already existed - do not create successors again
-            # (would cause PK collision with deterministic IDs)
-            event_already_existed = True
+        if not event_already_existed:
+            try:
+                await self.uow.events.append(
+                    event_name=event_name,
+                    aggregate_type=aggregate_type,
+                    aggregate_id=aggregate_id,
+                    workflow_id=workflow_id,
+                    job_id=job_id,
+                    payload=payload or {},
+                    dedupe_key=dedupe_key,
+                    occurred_at=occurred_at,
+                )
+            except EventAppendError:
+                # Event already exists - this is idempotent dispatch
+                existing = await self.uow.events.by_dedupe_key(dedupe_key)
+                if existing is None:
+                    raise
+                # Event already existed - do not create successors again
+                # (would cause PK collision with deterministic IDs)
+                event_already_existed = True
 
         # Only create successors if this is a NEW event
         # Idempotent dispatch (event_already_existed=True) skips successor creation
