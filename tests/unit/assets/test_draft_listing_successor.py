@@ -64,6 +64,14 @@ class _Events:
         self.names.clear()
         self._keys.clear()
 
+    def snapshot(self) -> tuple[tuple[str, ...], frozenset[str]]:
+        return tuple(self.names), frozenset(self._keys)
+
+    def restore(self, names: tuple[str, ...], keys: frozenset[str]) -> None:
+        self.names[:] = names
+        self._keys.clear()
+        self._keys.update(keys)
+
     async def by_dedupe_key(self, dedupe_key: str) -> object | None:
         if dedupe_key not in self._keys:
             return None
@@ -75,6 +83,7 @@ class _Session:
         self.jobs: list[Job] = []
         self._by_id: dict[UUID, Job] = {}
         self.flush_statuses: list[tuple[str, ...]] = []
+        self.events: _Events | None = None
 
     def add(self, instance: object) -> None:
         if isinstance(instance, Job):
@@ -90,6 +99,73 @@ class _Session:
 
     async def get(self, _entity: object, ident: UUID) -> Job | None:
         return self._by_id.get(ident)
+
+    def begin_nested(self) -> _Boundary:
+        return _Boundary(self)
+
+    def snapshot(
+        self,
+    ) -> tuple[
+        list[Job],
+        dict[UUID, Job],
+        dict[UUID, tuple[str, datetime]],
+        list[tuple[str, ...]],
+    ]:
+        fields = {job.id: (job.status, job.updated_at) for job in self.jobs}
+        return list(self.jobs), dict(self._by_id), fields, list(self.flush_statuses)
+
+    def restore(
+        self,
+        jobs: list[Job],
+        by_id: dict[UUID, Job],
+        fields: dict[UUID, tuple[str, datetime]],
+        flushes: list[tuple[str, ...]],
+    ) -> None:
+        self.jobs[:] = jobs
+        self._by_id.clear()
+        self._by_id.update(by_id)
+        for job in jobs:
+            status, updated_at = fields[job.id]
+            job.status = status
+            job.updated_at = updated_at
+        self.flush_statuses[:] = flushes
+
+
+class _Boundary:
+    """Savepoint. Rollback restores this session and does not clear an outer row."""
+
+    def __init__(self, session: _Session) -> None:
+        self._session = session
+        self._events: tuple[tuple[str, ...], frozenset[str]] | None = None
+        self._rows: (
+            tuple[
+                list[Job],
+                dict[UUID, Job],
+                dict[UUID, tuple[str, datetime]],
+                list[tuple[str, ...]],
+            ]
+            | None
+        ) = None
+
+    async def start(self) -> _Boundary:
+        events = self._session.events
+        if events is None:
+            raise RuntimeError("session has no events")
+        self._events = events.snapshot()
+        self._rows = self._session.snapshot()
+        return self
+
+    async def commit(self) -> None:
+        return None
+
+    async def rollback(self) -> None:
+        events = self._session.events
+        if events is None or self._events is None or self._rows is None:
+            raise RuntimeError("nested transaction has not started")
+        names, keys = self._events
+        events.restore(names, keys)
+        jobs, by_id, fields, flushes = self._rows
+        self._session.restore(jobs, by_id, fields, flushes)
 
 
 class _MissingJob(_Session):
@@ -110,6 +186,7 @@ class _Uow:
     def __init__(self, session: _Session | None = None) -> None:
         self.events = _Events()
         self.session = session if session is not None else _Session()
+        self.session.events = self.events
 
     async def rollback(self) -> None:
         self.events.clear()
@@ -146,6 +223,14 @@ async def _open(
 
 def _drafts(uow: _Uow) -> list[Job]:
     return [job for job in uow.session.jobs if job.job_type == "DraftListingJob"]
+
+
+WORKFLOW = _WORKFLOW
+OTHER_WORKFLOW = _OTHER_WORKFLOW
+OPENED_AT = _NOW
+SharedUow = _Uow
+open_ready_draft = _open
+draft_jobs = _drafts
 
 
 async def _dispatch(

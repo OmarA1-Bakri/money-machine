@@ -160,9 +160,9 @@ An incident records its type, affected object/version, opening event/job, safe d
 | `COMPETITOR_PURCHASED` | capped, reconciled purchase receipt | teardown |
 | `VARIANT_LINKS_VERIFIED` | isolated duplicable link receipts | screenshot capture |
 | `SCREENSHOTS_CAPTURED` | truthful screenshot artifact set | copy and asset factory |
-| `LISTING_COPY_COMPLETED` | validated copy fields and claim evidence | pricing/draft assembly |
+| `LISTING_COPY_COMPLETED` | validated copy fields and claim evidence | pricing |
 | `DELIVERY_FILES_COMPLETED` | link-tested delivery artifacts | package/preflight |
-| `PRICING_COMPLETED` | bounded price decision | draft assembly |
+| `PRICING_COMPLETED` | bounded price decision | no successor |
 | `PROOF_FEEDBACK_CAPTURED` | consented proof-recipient feedback | repair or weekly review |
 | `SCHEDULE_CONFIGURED` | idempotent recurring trigger | scheduled review |
 | `BUILD_SLOT_DEFERRED` | no eligible/cap-admitted work now | deterministic reevaluation |

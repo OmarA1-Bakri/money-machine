@@ -88,6 +88,7 @@ class EventDispatcher:
             workflow_id=workflow_id,
             parent_job_id=job_id,
             aggregate_id=aggregate_id,
+            aggregate_type=aggregate_type,
             payload=payload,
             occurred_at=occurred_at,
         )
