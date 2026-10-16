@@ -1,5 +1,27 @@
 # Test Evidence
 
+## 2026-10-16 — Session 09 and Session 10 fixture waves on trunk tip `0c11c41`
+
+**Verification scope**: The six fixture modules after merges #106–#109 and #111–#114. No `IMPLEMENTATION_STATE.json` change. No live HTTP. No Exit 78 lift. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` and is not this tip.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Trunk tip | `0c11c41a24ab222d0dd9457a9f9c573e09dbac52` is merge #114. Parents include `93c37131d278529b734a9d19c023f9af7149add8` | RECORDED |
+| State pointer | `head_sha` `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`, revision 64, `current_session` 7, `next_session` 8 | UNCHANGED |
+| Sessions 09 and 10 | Not activated. A12, A13, A14, and A15 stay `DESIGNED`. Exit 78 stays HELD | RECORDED |
+| Preflight CI | Run [38886595199](https://github.com/OmarA1-Bakri/money-machine/actions/runs/38886595199) on `e4483da28da8eacf9bcb16f48aeb280160aa0b8e`, conclusion success | PASS |
+| Receipt CI | Run [38886734152](https://github.com/OmarA1-Bakri/money-machine/actions/runs/38886734152) on `3c4802b59d191996e1d8337067435a23829dc6b7`, conclusion success | PASS |
+| Ramp CI | Run [38886837334](https://github.com/OmarA1-Bakri/money-machine/actions/runs/38886837334) on `c290878c946ea630a6cc990ecf99fada96ec4def`, conclusion success | PASS |
+| Maturity CI | Run [38891347533](https://github.com/OmarA1-Bakri/money-machine/actions/runs/38891347533) on `e3e86ad24196af41c222e9ce8a9684723b45e60b`, conclusion success. Lane count 5 passed | PASS |
+| Metrics CI | Run [38891467783](https://github.com/OmarA1-Bakri/money-machine/actions/runs/38891467783) on `d4a990f7eb736716765b63910af2f6b758eb665a`, conclusion success. Lane count 4 passed | PASS |
+| Portfolio CI | Run [38891757966](https://github.com/OmarA1-Bakri/money-machine/actions/runs/38891757966) on `93c37131d278529b734a9d19c023f9af7149add8`, conclusion success. Lane count 7 passed | PASS |
+| Six files together on the tip | `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_etsy_preflight.py tests/unit/assets/test_publishing_ramp_decision.py tests/unit/assets/test_mutation_receipt.py tests/unit/assets/test_metrics_fixture.py tests/unit/assets/test_maturity_clock.py tests/unit/assets/test_portfolio_eligibility.py` printed `38 passed in 0.30s` | PASS |
+| Full repository suite | Not run on `0c11c41a24ab222d0dd9457a9f9c573e09dbac52` | NOT RUN |
+
+**Status**: The fixture code is on the trunk tip. That is not Session 09 complete and it is not Session 10 complete.
+
+# Test Evidence (earlier records)
+
 ## 2026-10-10 — Session 07 close record and adopt :408/:413 killing tests
 
 **Verification scope**: Fixture-only follow-up to #64. No `src/` change. No live HTTP, no `--execute`, no Exit 78 lift. State revision 63 to 64. `head_sha` `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` is Omar's squash of #64. It is the tip-sync pointer, not this commit.

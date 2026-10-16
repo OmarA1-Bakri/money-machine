@@ -1,5 +1,15 @@
 # Next Session
 
+## Fixture waves on trunk, sessions not activated (2026-10-16)
+
+Trunk tip `0c11c41a24ab222d0dd9457a9f9c573e09dbac52` contains the Session 09 and Session 10 fixture modules and both prompt-integrity addenda. That tip is not a session close. `head_sha` in `IMPLEMENTATION_STATE.json` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. D-0032 binds that field to Omar's Session 07 close. `current_session` stays 7. `next_session` stays 8. `next_prompt` stays `11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md`. Session 08 is named and is not activated. Sessions 09 and 10 are not activated. Exit 78 stays HELD. A12, A13, A14, and A15 stay `DESIGNED`.
+
+The merges are `adb483185f5b5d06e963c095ced0186bda1a4530` (#106), `6e2699329d9edd6f45b069f8f1acd4eb61aac54d` (#107), `e72ebfe6071e55ad526ef9c73a46fc3898e4aa33` (#108), `71fa29a4a2feae428e529981740a9ce37af48f83` (#109), `9690073128d78b886429adab4cab095bfed3b717` (#111), `d62810ef7dd2513dadfa2757b82cd984210c6502` (#112), `ccda90e18521b3749594d8aff8ea27d1aa8af779` (#113), and `0c11c41a24ab222d0dd9457a9f9c573e09dbac52` (#114). `c13fa4a07823fc9a16700e12e0523cc2411ec600` keeps both log entries. The older Session 09 log line that says Sessions 10–15 stay deferred describes `a6264a90a478d6b885604c43a575cf50619f0e37` only.
+
+What is on the tip: in-memory Etsy preflight, publishing-ramp decision, mutation receipt, metrics snapshot plan, accumulated-live-days clock, and portfolio eligibility. What is not on the tip: a live publish, a live stats read, a live deactivation, a Notion successor build, a scheduler run, or a commissioning change. Session 11 has not started.
+
+# Next Session (earlier handoffs)
+
 **Session 06 is COMPLETE** (2026-10-02, W11 control flip @ `0f94d585`) — Notion integration foundation delivered W1–W10 (#39–#49). All eight evidence keys TRUE. Exit 78 unchanged: worker conditional lift (D-0028 gates), scheduler held. No production Notion or Etsy mutation. Default CLI probe remains `FakeNotionProbe`.
 
 **Session 05 is COMPLETE** (2026-09-24, W11 control flip @ `9b791d45`) — domain agent implementation delivered L1-L4 (Etsy adapters, A03 research, A05 scoring/ProductSpec, A06 dedupe/workflow linking).
