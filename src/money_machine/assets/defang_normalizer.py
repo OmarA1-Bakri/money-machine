@@ -420,7 +420,8 @@ def _spaced_dot_tld(token: str) -> bool:
     The token is already NFKC and lookalike-folded. Case is read here.
     An all-uppercase token is casefolded after that check. A lowercase
     token is compared as itself. A mixed-case token stays prose. A
-    lowercase zero inside org counts.
+    lowercase zero inside org counts. A 3 that maps to e is accepted
+    when the mapped token is in the same set, so n3t is net.
     """
     if token.isupper():
         token = token.casefold()
@@ -428,8 +429,11 @@ def _spaced_dot_tld(token: str) -> bool:
         return False
     if token in _SPACED_DOT_TLDS:
         return True
-    mapped = token.translate(_ZERO_TO_O)
-    return mapped != token and mapped in _SPACED_ZERO_TARGETS
+    zero_mapped = token.translate(_ZERO_TO_O)
+    if zero_mapped != token and zero_mapped in _SPACED_ZERO_TARGETS:
+        return True
+    digit_mapped = token.translate(_CURATED_DIGITS)
+    return digit_mapped != token and digit_mapped in _SPACED_DOT_TLDS
 
 
 def _curated_tld(token: str) -> bool:
