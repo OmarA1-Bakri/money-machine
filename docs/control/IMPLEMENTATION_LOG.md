@@ -10,6 +10,18 @@ RED before the fold: 1 failed. `test_a_cr_description_and_an_lf_one_still_post` 
 |---|---|---|
 | Delete the leftover `\r` fold in `_row_text` | `test_a_cr_description_and_an_lf_one_still_post` | 1/120 |
 
+## 2026-10-16 — Session 08 spaced n3t
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-spaced-n3t-prompt-integrity.md`.
+
+A spaced-dot token maps `3` to `e` and `1` to `i` after the case gate. The mapped token refuses only when it is `com`, `c0m`, `net`, or `org`. `x . n3t` is `paid_checkout` and `sensitive_data`. `x . N3t` stays prose. `x dot n3t` still refuses without this row. A10, A11, and A13 stay `DESIGNED`.
+
+Clean suite: 91 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_defanged_host.py tests/unit/assets/test_spelled_email.py`. Source restored after the mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Delete the spaced digit map | `test_a_spaced_digit_three_net_is_refused` | 1/90 |
+
 ## 2026-10-16 — Session 08 CRLF draft description
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-crlf-description-prompt-integrity.md`.
