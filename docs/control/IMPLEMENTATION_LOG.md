@@ -4,6 +4,12 @@ Session 10 is not activated and is not complete. `current_session` stays 7. `sta
 
 Fidelity, safety, and gameability each returned CONDITIONAL APPROVE. This commit is the addendum only. No production module, no test, and no commissioning change. A14 and A15 stay `DESIGNED`. The first wave is three fixture lanes: a metrics snapshot plan, the accumulated-live-days clock, and portfolio eligibility. Live stats, live deactivation, the Notion successor build, persisted scheduler rows, and Sessions 11–15 stay deferred. The base is `edc0632fb43777d834053d5dbfe42f31f3478ab7`.
 
+## 2026-10-16 — Session 09 prompt integrity
+
+Session 09 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. The prompt file is unchanged. SHA-256 remains `eab1e4a5ae05008e06607526a1bf45b0fb35850a5bbf82e4002bd94954f58936`. The corrective addendum is `docs/control/reviews/2026-10-16-session-09-prompt-integrity.md`.
+
+Fidelity, safety, and gameability each returned CONDITIONAL APPROVE. This commit is the addendum only. No production module, no test, and no commissioning change. A12 and A13 stay `DESIGNED`. The first wave is three fixture lanes: preflight checks, the ramp predicate, and the redacted mutation receipt. Live publish, checkout, the live draft smoke, the job-graph proof, and Sessions 10–15 stay deferred. The base is `edc0632fb43777d834053d5dbfe42f31f3478ab7`.
+
 ## 2026-10-16 — Session 08 draft job should-fix sweep 3
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-draft-job-sf-sweep3-prompt-integrity.md`. The D-0034 graph is unchanged. No pricing or copy gate was added. Defang rules are unchanged. A10, A11, and A13 stay `DESIGNED`.
