@@ -438,3 +438,21 @@ A second `workflow_id` for the same product did the same. Keying `DraftListingJo
 ### Consequences
 
 One product aggregate has at most one `DraftListingJob`, including after copy and pricing complete on their own job aggregates. A refused asset chain still writes no draft job. Exit 78 stays HELD. Session 08 stays inactive. A10, A11, and A13 stay `DESIGNED`.
+
+## D-0035 — Legacy product ASSETS_COMPLETED key is looked up
+
+**Status:** accepted for the Session 08 legacy-dedupe slice, 2026-10-16.
+
+### Context
+
+#105 stores a product `ASSETS_COMPLETED` under `ASSETS_COMPLETED:{product}:product`. `create_ready_draft_listing_job` in #101–#104 stored `ASSETS_COMPLETED:{product}:{workflow}:null`, because `job_id` was null and the key still carried `workflow_id`. The dispatcher checks the new key only. A row under the old key is not that row, so a later dispatch appends a second event. `EventRepository` appends and does not update a stored key. Exit 78 stays HELD. Session 08 is not activated. The writes so far are fixture-only. D-0034 is unchanged.
+
+### Decision
+
+On a product `ASSETS_COMPLETED` dispatch, look up `ASSETS_COMPLETED:{product}:{workflow}:null` for this call's `workflow_id`. If that row exists, treat the event as already recorded and do not append. Leave the stored key as it is. New writes still use `ASSETS_COMPLETED:{product}:product`.
+
+A migration that rewrote `dedupe_key` was the other option. It was not taken. The event log is append-only, so rewriting the key would mutate history. This slice does not open a PostgreSQL session, and a migration would not run against the fixture that holds the seeded row. The lookup recognizes the old key where the row already is.
+
+### Consequences
+
+A seeded legacy row beside a `PENDING` `DraftListingJob` stays one event, keeps the legacy key, does not gain the product key, and the job moves to `READY`. The global key for every other event is unchanged. No migration is added. Exit 78 stays HELD. Session 08 stays inactive.

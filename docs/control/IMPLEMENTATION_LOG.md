@@ -1,3 +1,22 @@
+## 2026-10-16 — Session 08 legacy product dedupe key
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-legacy-dedupe-prompt-integrity.md`. The D-0034 graph is unchanged. No pricing or copy gate was added. Defang rules are unchanged. A10, A11, and A13 stay `DESIGNED`.
+
+A product `ASSETS_COMPLETED` written by `create_ready_draft_listing_job` in #101–#104 is stored as `ASSETS_COMPLETED:{product}:{workflow}:null`. #105 checks `ASSETS_COMPLETED:{product}:product` only. A seeded legacy row beside a `PENDING` `DraftListingJob` now stays one event. The legacy key remains. The product key is not written. The job moves to `READY`. D-0035 records the lookup. A migration that rewrote `dedupe_key` was not taken: the event log is append-only, and this slice opens no PostgreSQL session. The worker key still starts with `aggregate_id`. Replacing that with `job_id` survives, because `worker.py` sets both ids to `job.id` and `test_two_job_ids_on_one_worker_aggregate_record_two_events` still sees two events. Allowing `READY` from `RUNNING` in `JOB_TRANSITIONS` is killed by `test_a_later_running_job_keeps_the_callers_session`. PostgreSQL savepoint release, cancellation, and concurrency stay untested. The fixture is the only evidence.
+
+RED before the production change: `test_a_legacy_product_key_beside_a_pending_job_stays_one_event` saw two `ASSETS_COMPLETED` names. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_draft_job_shared_session.py::test_a_legacy_product_key_beside_a_pending_job_stays_one_event`. Clean suite after the lookup: 53 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_draft_job_shared_session.py tests/unit/assets/test_draft_listing_successor.py tests/unit/assets/test_etsy_draft_ready.py`. `uv run ruff format --check src tests scripts migrations` exit 0. `uv run ruff check src tests scripts apps migrations` exit 0. `uv run pyright` exit 0. Full suite on this branch: 12 failed, 4962 passed, 193 skipped. The #105 baseline on `edc0632fb43777d834053d5dbfe42f31f3478ab7` is 12 failed, 4961 passed, 193 skipped. The passed count is that baseline plus this 1 test. Both runs fail the same twelve `test_compose_preserves_the_postgres_password` rows. Docker is absent. PostgreSQL is absent locally, so the 193 database tests stayed skipped. Source restored after each mutant.
+
+| Mutant | Killing test | Unique | F/P |
+|---|---|---|---|
+| Check only the new product key | `test_a_legacy_product_key_beside_a_pending_job_stays_one_event` | yes | 1/52 |
+| Write the legacy key again | `test_a_pending_job_beside_another_workflows_event_records_one` | yes | 1/52 |
+| Replace `aggregate_id` with `job_id` | none; `worker.py` sets both ids to `job.id` | survivor | 0/53 |
+| Drop `:job:{job_id}` | `test_two_job_ids_on_one_worker_aggregate_record_two_events` | yes | 1/52 |
+| Allow `RUNNING -> READY` in `JOB_TRANSITIONS` | `test_a_later_running_job_keeps_the_callers_session` | yes | 1/52 |
+| Allow `SUCCEEDED -> READY` in `JOB_TRANSITIONS` | `test_a_later_succeeded_job_keeps_the_callers_session` | yes | 1/52 |
+
+Mutant counts are `tests/unit/assets/test_draft_job_shared_session.py`, `tests/unit/assets/test_draft_listing_successor.py`, and `tests/unit/assets/test_etsy_draft_ready.py` (53 tests).
+
 ## 2026-10-16 — Session 08 draft job should-fix sweep 3
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-draft-job-sf-sweep3-prompt-integrity.md`. The D-0034 graph is unchanged. No pricing or copy gate was added. Defang rules are unchanged. A10, A11, and A13 stay `DESIGNED`.
