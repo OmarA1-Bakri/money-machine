@@ -571,7 +571,7 @@ def test_aesthetics_module_does_not_name_a_live_client() -> None:
         assert token.casefold() not in source.casefold()
 
 
-def test_session_seven_close_keeps_evidence_false() -> None:
+def test_session_seven_records_the_earned_keys() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert state["current_session"] == 7
     assert state["session_status"] == "complete"
@@ -585,7 +585,12 @@ def test_session_seven_close_keeps_evidence_false() -> None:
     assert state["commissioned_agents"] == []
     evidence = state["required_completion_evidence"]
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
-    assert all(value is False for value in evidence.values())
-    assert evidence["notification_dashboard_built"] is False
-    assert state["state_revision"] == 64
+    assert evidence["evidence_closure_commit_recorded"] is False
+    assert evidence["notification_dashboard_built"] is True
+    assert all(
+        value is True
+        for key, value in evidence.items()
+        if key != "evidence_closure_commit_recorded"
+    )
+    assert state["state_revision"] == 65
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")

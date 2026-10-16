@@ -57,16 +57,19 @@ def test_closed_snapshots_match_the_commits_that_hold_them() -> None:
         assert all(item is record.all_keys_true for item in values)
 
 
-def test_live_pointer_still_matches_the_session_07_close() -> None:
+def test_live_pointer_records_the_earned_session_07_keys() -> None:
     live = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     record = CLOSED_SESSION_EVIDENCE[7]
     assert live["current_session"] == 7
     assert live["session_status"] == "complete"
-    assert live["state_revision"] == record.state_revision
+    assert live["state_revision"] == 65
     assert live["head_sha"] == record.head_sha
     assert live["evidence_closure_commit_sha"] == record.evidence_closure_commit_sha
-    assert live["required_completion_evidence"] == {
-        key: False for key in sorted(SESSION_EVIDENCE_KEYS[7])
+    evidence = live["required_completion_evidence"]
+    assert isinstance(evidence, dict)
+    assert evidence["evidence_closure_commit_recorded"] is False
+    assert evidence == {
+        key: key != "evidence_closure_commit_recorded" for key in sorted(SESSION_EVIDENCE_KEYS[7])
     }
 
 

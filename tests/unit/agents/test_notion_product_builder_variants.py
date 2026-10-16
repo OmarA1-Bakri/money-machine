@@ -3458,7 +3458,7 @@ async def test_spec_page_must_be_the_stored_home(tmp_path: Path) -> None:
         notion_variants_module._require_one_spec_page(probe, spec, stored)  # pyright: ignore[reportPrivateUsage]
 
 
-def test_session_seven_close_keeps_evidence_false() -> None:
+def test_session_seven_records_the_earned_keys() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert state["current_session"] == 7
     assert state["session_status"] == "complete"
@@ -3472,8 +3472,13 @@ def test_session_seven_close_keeps_evidence_false() -> None:
     assert state["commissioned_agents"] == []
     evidence = state["required_completion_evidence"]
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
-    assert all(value is False for value in evidence.values())
-    assert evidence["variant_builder_implemented"] is False
-    assert evidence["product_qa_implemented"] is False
-    assert state["state_revision"] == 64
+    assert evidence["evidence_closure_commit_recorded"] is False
+    assert evidence["variant_builder_implemented"] is True
+    assert evidence["product_qa_implemented"] is True
+    assert all(
+        value is True
+        for key, value in evidence.items()
+        if key != "evidence_closure_commit_recorded"
+    )
+    assert state["state_revision"] == 65
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")

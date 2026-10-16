@@ -1,3 +1,11 @@
+## 2026-10-16 — Session 07 eleven evidence keys recorded
+
+`record-evidence` advanced `state_revision` from 64 to 65. `updated_at` is `2026-10-16T19:00:00Z`. The ten behavioral keys and `control_files_and_checkpoint_current` are true. `evidence_closure_commit_recorded` stays false. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `current_session` stays 7. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. The exit string is not written. Session 08 is not activated.
+
+The historical close `00b952a83bffcec8d442468223d64dd9b2d3e6df` stays all false. The live sandbox was not started.
+
+`uv run pytest -q -p no:cacheprovider --tb=short tests/bootstrap/test_session_07_evidence_record.py tests/bootstrap/test_session_07_proof.py tests/bootstrap/test_session_evidence.py tests/bootstrap/test_control_state.py::test_checked_in_state_is_a_valid_session_continuity_shape tests/bootstrap/test_control_state.py::test_session_eight_activation_rejects_false_session_seven_evidence tests/bootstrap/test_control_state.py::test_session_eight_activation_accepts_true_session_seven_evidence` printed 22 passed in 2.51s. The eight live pin tests in the product-builder modules and `test_state_commissioning_and_exit_78_are_unchanged` passed in the same session. A full repository suite was not run.
+
 ## 2026-10-16 — Session 07 evidence transition, keys still false
 
 `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. No evidence key flips. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. The exit string is not written.

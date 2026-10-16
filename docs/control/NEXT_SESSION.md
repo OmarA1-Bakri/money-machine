@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 07 has eleven earned keys, the closure key is still false (2026-10-16)
+
+Revision 65 records the ten behavioral keys and `control_files_and_checkpoint_current`. `evidence_closure_commit_recorded` stays false, so Session 08 activation is still refused. `current_session` stays 7. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. The next honest step is the closure transition onto this commit, then activation of Session 08.
+
 ## Session 07 evidence can be recorded, the pointer is still Session 07 (2026-10-16)
 
 D-0036 adds `record-evidence`. The fixture proof earns the ten behavioral keys. The control-file key flips with them. The closure key flips only after that commit exists. `current_session` stays 7. `state_revision` stays 64. The twelve keys are still false. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. Session 08 is not activated.

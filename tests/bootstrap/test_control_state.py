@@ -344,8 +344,11 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
         evidence = state["required_completion_evidence"]
         assert evidence.keys() == control_state.SESSION_EVIDENCE_KEYS[session]
         if session == 7:
-            # Omar's merge is the close gate. The twelve keys stay false.
-            assert all(value is False for value in evidence.values())
+            # D-0036 records the earned keys. The closure key waits for its own commit.
+            assert evidence[CLOSURE_EVIDENCE_KEY] is False
+            assert all(
+                value is True for key, value in evidence.items() if key != CLOSURE_EVIDENCE_KEY
+            )
         else:
             assert all(evidence.values())
     assert state["transition_contract"]["completion_requires_next_session"] == state["next_session"]
@@ -1521,7 +1524,7 @@ def session_eight_activation_paths(
     if prior_evidence_true:
         state["required_completion_evidence"] = dict.fromkeys(SESSION_07_EVIDENCE_KEYS, True)
     else:
-        assert all(value is False for value in state["required_completion_evidence"].values())
+        state["required_completion_evidence"] = dict.fromkeys(SESSION_07_EVIDENCE_KEYS, False)
     state["repo_root"] = str(repo)
     state["branch"] = BRANCH
     write_state(state_path, state)
@@ -1557,7 +1560,7 @@ def test_session_eight_activation_rejects_false_session_seven_evidence(tmp_path:
     assert state_path.read_bytes() == original
     assert STATE_PATH.read_bytes() == checked_in
     assert load_state()["current_session"] == 7
-    assert load_state()["state_revision"] == 64
+    assert load_state()["state_revision"] == 65
 
 
 def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: Path) -> None:
@@ -1582,7 +1585,14 @@ def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: 
     live = load_state()
     assert live["current_session"] == 7
     assert live["next_session"] == 8
-    assert all(value is False for value in live["required_completion_evidence"].values())
+    assert live["state_revision"] == 65
+    live_evidence = live["required_completion_evidence"]
+    assert live_evidence[CLOSURE_EVIDENCE_KEY] is False
+    assert all(
+        live_evidence[key] is True
+        for key in SESSION_07_EVIDENCE_KEYS
+        if key != CLOSURE_EVIDENCE_KEY
+    )
 
 
 def _false_key_session_eight_pair() -> tuple[ControlState, ControlState]:

@@ -41,6 +41,17 @@ def _live() -> ControlState:
     return cast(ControlState, copy.deepcopy(loaded))
 
 
+def _false_pointer() -> ControlState:
+    """The D-0032 shape: every Session 07 key false, whatever the live file says."""
+    state = _live()
+    evidence = dict(state["required_completion_evidence"])
+    for key in evidence:
+        evidence[key] = False
+    state["required_completion_evidence"] = evidence
+    state["updated_at"] = "2026-10-10T05:36:46Z"
+    return state
+
+
 def _advance(previous: ControlState, updated_at: str) -> ControlState:
     current = copy.deepcopy(previous)
     current["state_revision"] = previous["state_revision"] + 1
@@ -93,7 +104,7 @@ def _repo(tmp_path: Path, state: ControlState, *, proof: str) -> Path:
 
 
 def test_one_behavioral_key_is_refused() -> None:
-    previous = _live()
+    previous = _false_pointer()
     current = _advance(previous, EARNED_AT)
     evidence = dict(current["required_completion_evidence"])
     evidence["home_dashboard_built"] = True
@@ -104,7 +115,7 @@ def test_one_behavioral_key_is_refused() -> None:
 
 
 def test_closure_before_the_eleven_is_refused() -> None:
-    previous = _live()
+    previous = _false_pointer()
     current = _advance(previous, EARNED_AT)
     evidence = dict(current["required_completion_evidence"])
     evidence[CLOSURE_EVIDENCE_KEY] = True
@@ -116,7 +127,7 @@ def test_closure_before_the_eleven_is_refused() -> None:
 
 
 def test_closure_with_the_eleven_is_refused() -> None:
-    previous = _live()
+    previous = _false_pointer()
     current = _eleven(previous)
     evidence = dict(current["required_completion_evidence"])
     evidence[CLOSURE_EVIDENCE_KEY] = True
@@ -128,7 +139,7 @@ def test_closure_with_the_eleven_is_refused() -> None:
 
 
 def test_a_true_key_cannot_be_revoked() -> None:
-    previous = _live()
+    previous = _false_pointer()
     evidence = dict(previous["required_completion_evidence"])
     evidence["home_dashboard_built"] = True
     previous["required_completion_evidence"] = evidence
@@ -173,7 +184,7 @@ def test_session_must_stay_seven_and_complete() -> None:
 
 
 def test_head_sha_and_early_closure_sha_stay_put() -> None:
-    previous = _live()
+    previous = _false_pointer()
     moved_head = _eleven(previous)
     moved_head["head_sha"] = "c" * 40
     moved_closure = _eleven(previous)
@@ -186,7 +197,7 @@ def test_head_sha_and_early_closure_sha_stay_put() -> None:
 
 
 def test_eleven_key_shape_is_accepted_and_an_empty_flip_is_not() -> None:
-    previous = _live()
+    previous = _false_pointer()
     validate_evidence_record_transition(previous, _eleven(previous))
     empty = _advance(previous, EARNED_AT)
 
@@ -195,7 +206,7 @@ def test_eleven_key_shape_is_accepted_and_an_empty_flip_is_not() -> None:
 
 
 def test_closure_shape_is_accepted_only_after_the_eleven() -> None:
-    eleven = _eleven(_live())
+    eleven = _eleven(_false_pointer())
     current = _advance(eleven, CLOSURE_AT)
     evidence = dict(current["required_completion_evidence"])
     evidence[CLOSURE_EVIDENCE_KEY] = True
@@ -207,7 +218,7 @@ def test_closure_shape_is_accepted_only_after_the_eleven() -> None:
 
 def test_missing_control_file_is_refused_before_the_proof(tmp_path: Path) -> None:
     live_bytes = STATE_PATH.read_bytes()
-    previous = _live()
+    previous = _false_pointer()
     proof = "def prove_session_07() -> None:\n    return None\n"
     state_path = _repo(tmp_path, previous, proof=proof)
     (state_path.parent / "NEXT_SESSION.md").unlink()
@@ -217,13 +228,14 @@ def test_missing_control_file_is_refused_before_the_proof(tmp_path: Path) -> Non
     with pytest.raises(ControlStateError, match="control files are missing"):
         apply_evidence_record_transition(state_path, candidate)
 
-    assert json.loads(state_path.read_text(encoding="utf-8"))["state_revision"] == 64
+    stored = json.loads(state_path.read_text(encoding="utf-8"))
+    assert stored["state_revision"] == previous["state_revision"]
     assert STATE_PATH.read_bytes() == live_bytes
 
 
 def test_record_evidence_earns_the_eleven_keys(tmp_path: Path) -> None:
     live_bytes = STATE_PATH.read_bytes()
-    previous = _live()
+    previous = _false_pointer()
     state_path = _repo(
         tmp_path, previous, proof="def prove_session_07() -> None:\n    return None\n"
     )
@@ -247,7 +259,7 @@ def test_record_evidence_earns_the_eleven_keys(tmp_path: Path) -> None:
 
 def test_closure_requires_the_eleven_true_commit(tmp_path: Path) -> None:
     live_bytes = STATE_PATH.read_bytes()
-    false_state = _live()
+    false_state = _false_pointer()
     proof = "def prove_session_07() -> None:\n    return None\n"
     state_path = _repo(tmp_path, false_state, proof=proof)
     false_sha = _git(state_path.parent, "rev-parse", "HEAD")

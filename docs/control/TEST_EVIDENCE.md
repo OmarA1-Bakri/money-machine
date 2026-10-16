@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-16 — Session 07 eleven keys
+
+**Verification scope**: live `record-evidence` to revision 65, the pin tests, and the evidence index. No live HTTP. Closure key stays false. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Eleven keys | CLI `record-evidence` set revision 65 and the eleven keys true | PASS |
+| Closure key | Stays false. Closure SHA stays `0f94d585f23d79e5ac18479f01e14f67cbaad332` | PASS |
+| Historical close | `00b952a8` still has all twelve keys false | PASS |
+| Live pins | Continuity, activation, and the product-builder state tests match revision 65 | PASS |
+| Exit string | `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE` is absent | PASS |
+
+`uv run pytest -q -p no:cacheprovider --tb=short tests/bootstrap/test_session_07_evidence_record.py tests/bootstrap/test_session_07_proof.py tests/bootstrap/test_session_evidence.py tests/bootstrap/test_control_state.py::test_checked_in_state_is_a_valid_session_continuity_shape tests/bootstrap/test_control_state.py::test_session_eight_activation_rejects_false_session_seven_evidence tests/bootstrap/test_control_state.py::test_session_eight_activation_accepts_true_session_seven_evidence` printed `22 passed in 2.51s`. A full repository suite was not run.
+
 ## 2026-10-16 — Session 07 evidence transition
 
 **Verification scope**: `session_07_proof.py`, `state.py` evidence transition, `cli.py` `record-evidence`, and the two bootstrap tests. No `IMPLEMENTATION_STATE.json` change. No live HTTP. No key flip. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`.

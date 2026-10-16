@@ -1,9 +1,9 @@
 """Pinned completion evidence for sessions 00 through 15.
 
-Sessions 00-06 closed with every contract key true. Session 07 closed under
-D-0032 with every contract key false. Sessions 08-15 are not activated, so
-none of their keys is recorded true. This module does not edit
-``IMPLEMENTATION_STATE.json``.
+Sessions 00-06 closed with every contract key true. Session 07's close
+commit under D-0032 has every contract key false. D-0036 records the live
+pointer separately. Sessions 08-15 are not activated, so none of their
+keys is recorded true. This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
 from __future__ import annotations
@@ -192,10 +192,11 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 07 at state revision 64.",
-        "`current_session` stays 7. `IMPLEMENTATION_STATE.json` is not edited by this index.",
+        "The checked-in pointer is Session 07 at state revision 65.",
+        "`current_session` stays 7. The closure key is still false.",
         "Sessions 00-06 closed with every contract key true.",
-        "Session 07 closed under D-0032 with every contract key false.",
+        "Session 07's close commit keeps every contract key false under D-0032.",
+        "D-0036 records eleven keys true on the live state. The closure key stays false.",
         "Sessions 08-15 are not activated, so none of their keys is recorded true.",
         "",
     ]
