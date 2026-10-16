@@ -15,3 +15,11 @@
 - Use Level 1/2/3 validation: focused RED/GREEN, one affected integration pass, then heavyweight gates only at a session exit or explicit high-risk boundary.
 - Resume from a metadata-only checkpoint before replanning or rescanning. Limit retries, reviews, repeated reads, and progress reports per `docs/DEVELOPMENT-GOVERNANCE.md`.
 - Every completed session updates the five files in `docs/control/`, passes its exit gates, receives independent review, and is committed before the next session closes.
+
+## Cursor Cloud specific instructions
+
+Cloud Agents use native PostgreSQL 16 on `127.0.0.1:5432`, not the Compose `postgres` service. Login shells source `/etc/profile.d/money-machine-dev.sh`, which sets `APP_ENV=development`, `MONEY_MACHINE_DATABASE_URL=postgresql+asyncpg://money_machine@127.0.0.1:5432/money_machine`, and `MONEY_MACHINE_DATABASE_PASSWORD` to the documented development default `local_development_only`. The role is a superuser, matching the Compose image, so tests can `DROP DATABASE ... WITH (FORCE)`.
+
+Do not start Compose Postgres while that server owns port 5432. `docker compose config` only validates the files. Production Compose validation needs `POSTGRES_PASSWORD` set for interpolation, as CI does.
+
+The environment start script migrates, seeds, and serves the API on port 8000 and the operator console on port 3000. Restart the API with `bash scripts/dev.sh` and the console with `pnpm --filter @money-machine/web dev --hostname 127.0.0.1 --port 3000`. Install dependencies with `uv sync --frozen` and `pnpm install --frozen-lockfile`.
