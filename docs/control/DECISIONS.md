@@ -482,3 +482,23 @@ The worktree is the Git root that contains the state file. The recorded `repo_ro
 ### Consequences
 
 Session 08 stays inactive until a later activation, and that activation still requires every Session 07 key to be true. The historical close at `00b952a83bffcec8d442468223d64dd9b2d3e6df` stays all false. The live sandbox is not started. No live Etsy, Notion, or S3 call is made.
+
+## D-0037 — Session 08 activates when the recorded root is absent
+
+**Status:** accepted 2026-10-16. Operator instruction: open pull 120 and activate Session 08.
+
+### Context
+
+D-0036 left Session 08 inactive until a later activation, and that activation still requires every Session 07 key to be true. Those twelve keys are true at revision 66. `activate` calls `_validate_repo_identity` when `repo_root` is a directory. The recorded root is `/mnt/d/Money Machine`. That directory is the operator machine. It is absent on the machine that applies this transition, and the checkout branch is `cursor/s07-earn-evidence-7da5` while the recorded `branch` field stays `build/full-automation`.
+
+### Decision
+
+When `Path(repo_root)` is a directory, `_validate_repo_identity` still requires that directory, the same inode as the Git toplevel, and `symbolic-ref` equal to the recorded branch `build/full-automation`.
+
+When the recorded root is not a directory, activation uses the D-0036 worktree check. The state file must be `docs/control/IMPLEMENTATION_STATE.json` inside the Git toplevel that contains it. The recorded `repo_root` and `branch` fields stay as they are.
+
+The activation is the D-0010 transition. `current_session` becomes 8. `session_status` becomes `incomplete`. `state_revision` advances by one. `updated_at` changes. Session 08's twelve evidence keys are installed and every one is false. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6, 7]`. `next_session` stays 8. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `evidence_closure_commit_sha` stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `commissioned_agents` stays empty. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. The exit string is not written. Session 08 is not complete. Sessions 09–15 are not activated.
+
+### Consequences
+
+Revision 67 is the activated, incomplete Session 08 pointer. The next honest step is Session 08 work under `11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md`. Completion of Session 08 is a later transition and requires its own earned keys. The historical Session 07 close at `00b952a83bffcec8d442468223d64dd9b2d3e6df` stays all false.

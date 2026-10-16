@@ -684,10 +684,10 @@ async def test_dashboard_piece_parser_rejects_bad_inputs(tmp_path: Path) -> None
     assert len(probe.pages) == pages
 
 
-def test_session_seven_records_the_earned_keys() -> None:
+def test_live_pointer_is_incomplete_session_eight() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    assert state["current_session"] == 7
-    assert state["session_status"] == "complete"
+    assert state["current_session"] == 8
+    assert state["session_status"] == "incomplete"
     assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7]
     assert state["next_session"] == 8
     assert state["next_prompt"] == "11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md"
@@ -697,13 +697,7 @@ def test_session_seven_records_the_earned_keys() -> None:
     assert state["last_verified_commit"] == BOOTSTRAP_SHA
     assert state["commissioned_agents"] == []
     evidence = state["required_completion_evidence"]
-    assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
-    assert evidence["evidence_closure_commit_recorded"] is True
-    assert evidence["home_dashboard_built"] is True
-    assert all(
-        value is True
-        for key, value in evidence.items()
-        if key != "evidence_closure_commit_recorded"
-    )
-    assert state["state_revision"] == 66
+    assert evidence.keys() == SESSION_EVIDENCE_KEYS[8]
+    assert all(value is False for value in evidence.values())
+    assert state["state_revision"] == 67
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")

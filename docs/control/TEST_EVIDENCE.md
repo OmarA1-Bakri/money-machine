@@ -1,5 +1,20 @@
 # Test Evidence
 
+## 2026-10-16 — Session 08 activation
+
+**Verification scope**: live `activate` from revision 66 to 67. No live HTTP. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. Session 08 keys are all false. Sessions 09–15 stay unactivated.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 8, `incomplete`, revision 67, `updated_at` `2026-10-16T20:00:00Z` | PASS |
+| Keys | Twelve Session 08 keys installed, every value false | PASS |
+| Head | Stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` | PASS |
+| Closure | Stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb` | PASS |
+| Absent root | Canonical worktree check accepts; a noncanonical path is refused | PASS |
+| Exit string | `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE` is absent | PASS |
+
+The focused pytest printed 42 passed in 3.09s. A full repository suite was not run.
+
 ## 2026-10-16 — Session 07 closure key
 
 **Verification scope**: live `record-evidence` from revision 65 to 66. No live HTTP. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. Session 08 is not activated.

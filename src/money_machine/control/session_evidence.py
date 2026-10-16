@@ -131,7 +131,7 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
             "src/money_machine/assets/asset_lineage.py",
             "src/money_machine/integrations/storage/local.py",
         ),
-        "Contract exists and is not installed. Fixture modules are not a true key.",
+        "Activated and incomplete. Every key is false. Fixture modules are not a true key.",
     ),
     OpenSessionEvidence(
         9,
@@ -192,13 +192,14 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 07 at state revision 66.",
-        "`current_session` stays 7. Every Session 07 evidence key is true.",
+        "The checked-in pointer is Session 08 at state revision 67.",
+        "`current_session` is 8. `session_status` is incomplete.",
+        "Session 08 evidence keys are installed and every one is false.",
         "Sessions 00-06 closed with every contract key true.",
         "Session 07's close commit keeps every contract key false under D-0032.",
-        "D-0036 records the twelve keys true. The closure commit is",
+        "D-0036 recorded the twelve Session 07 keys true. The closure commit is",
         "`5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.",
-        "Sessions 08-15 are not activated, so none of their keys is recorded true.",
+        "Sessions 09-15 are not activated.",
         "",
     ]
     for record in CLOSED_SESSION_EVIDENCE:
@@ -235,7 +236,8 @@ def render_session_evidence() -> str:
         [
             "## Sessions 08-15",
             "",
-            "These sessions are not activated. A fixture path is code on the trunk.",
+            "Session 08 is activated and incomplete. Its keys are false.",
+            "Sessions 09-15 are not activated. A fixture path is code on the trunk.",
             "It is not a recorded evidence key.",
             "",
         ]
@@ -247,7 +249,7 @@ def render_session_evidence() -> str:
                 f"## Session {record.session:02d}",
                 "",
                 f"Prompt: `{SESSION_PROMPTS[record.session]}`.",
-                "Status: not activated.",
+                "Status: incomplete." if record.session == 8 else "Status: not activated.",
                 f"Evidence contract: {contract}.",
                 record.gap,
                 "",
@@ -265,7 +267,8 @@ def render_session_evidence() -> str:
         if record.session in SESSION_EVIDENCE_KEYS:
             lines.append("| Key | Recorded |")
             lines.append("|---|---|")
+            recorded = "false" if record.session == 8 else "not installed"
             for key in _keys(record.session):
-                lines.append(f"| `{key}` | not installed |")
+                lines.append(f"| `{key}` | {recorded} |")
             lines.append("")
     return "\n".join(lines)

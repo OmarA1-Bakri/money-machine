@@ -187,8 +187,7 @@ SESSION_EVIDENCE_KEYS: Mapping[int, frozenset[str]] = MappingProxyType(
         ),
         8: frozenset(
             {
-                # Session 08 contract. A future activation installs these all false.
-                # This wave does not activate the session and does not record any key true.
+                # Session 08 contract. Activation installs every key false.
                 "merchandising_agent_implemented",
                 "claim_validation_implemented",
                 "design_tokens_implemented",
@@ -874,7 +873,12 @@ def _verify_activation_repository(
     current: ControlState,
 ) -> None:
     del previous
-    _validate_repo_identity(state_path, current)
+    if Path(current["repo_root"]).is_dir():
+        _validate_repo_identity(state_path, current)
+        return
+    # D-0037. The recorded root is the operator machine. This checkout still
+    # has to be the canonical state file inside its own Git worktree.
+    _evidence_worktree(state_path)
 
 
 def _evidence_values(state: ControlState) -> dict[str, bool]:

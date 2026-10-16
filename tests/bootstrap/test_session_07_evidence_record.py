@@ -42,12 +42,18 @@ def _live() -> ControlState:
 
 
 def _false_pointer() -> ControlState:
-    """The D-0032 shape: every Session 07 key false, whatever the live file says."""
+    """The D-0032 shape: session 07 complete and every key false.
+
+    The live file may already be a later session. These tests still start from
+    the session that `record-evidence` is allowed to change.
+    """
     state = _live()
-    evidence = dict(state["required_completion_evidence"])
-    for key in evidence:
-        evidence[key] = False
-    state["required_completion_evidence"] = evidence
+    state["current_session"] = 7
+    state["session_status"] = "complete"
+    state["next_session"] = 8
+    state["completed_sessions"] = [0, 1, 2, 3, 4, 5, 6, 7]
+    keys = set(BEHAVIORAL_EVIDENCE_KEYS) | {CONTROL_EVIDENCE_KEY, CLOSURE_EVIDENCE_KEY}
+    state["required_completion_evidence"] = dict.fromkeys(sorted(keys), False)
     state["updated_at"] = "2026-10-10T05:36:46Z"
     return state
 
@@ -153,7 +159,7 @@ def test_a_true_key_cannot_be_revoked() -> None:
 
 
 def test_revision_must_advance_once() -> None:
-    previous = _live()
+    previous = _false_pointer()
     current = copy.deepcopy(previous)
     current["updated_at"] = EARNED_AT
 
@@ -162,7 +168,7 @@ def test_revision_must_advance_once() -> None:
 
 
 def test_updated_at_must_change() -> None:
-    previous = _live()
+    previous = _false_pointer()
     current = _eleven(previous)
     current["updated_at"] = previous["updated_at"]
 
@@ -171,7 +177,7 @@ def test_updated_at_must_change() -> None:
 
 
 def test_session_must_stay_seven_and_complete() -> None:
-    previous = _live()
+    previous = _false_pointer()
     moved = _eleven(previous)
     moved["current_session"] = 8
     incomplete = _eleven(previous)

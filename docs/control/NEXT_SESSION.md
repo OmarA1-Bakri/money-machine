@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 08 is activated and incomplete (2026-10-16)
+
+Revision 67 installs the twelve Session 08 keys, and every one is false. `updated_at` is `2026-10-16T20:00:00Z`. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `evidence_closure_commit_sha` stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. `commissioned_agents` stays empty. The exit string is not written. The next honest step is Session 08 work under `11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md`. Completion of Session 08, and activation of Session 09, are later transitions.
+
 ## Session 07 evidence is complete, Session 08 is not activated (2026-10-16)
 
 Revision 66 has every Session 07 evidence key true. `evidence_closure_commit_sha` is `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `current_session` stays 7. `session_status` stays complete. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. The next legal command is activation of Session 08. That command installs Session 08's keys all false and leaves Session 08 incomplete. It has not been run.

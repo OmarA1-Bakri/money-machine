@@ -1,12 +1,13 @@
 # Session evidence
 
-The checked-in pointer is Session 07 at state revision 66.
-`current_session` stays 7. Every Session 07 evidence key is true.
+The checked-in pointer is Session 08 at state revision 67.
+`current_session` is 8. `session_status` is incomplete.
+Session 08 evidence keys are installed and every one is false.
 Sessions 00-06 closed with every contract key true.
 Session 07's close commit keeps every contract key false under D-0032.
-D-0036 records the twelve keys true. The closure commit is
+D-0036 recorded the twelve Session 07 keys true. The closure commit is
 `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.
-Sessions 08-15 are not activated, so none of their keys is recorded true.
+Sessions 09-15 are not activated.
 
 ## Session 00
 
@@ -201,15 +202,16 @@ D-0036 records the live keys later. This table is the close commit.
 
 ## Sessions 08-15
 
-These sessions are not activated. A fixture path is code on the trunk.
+Session 08 is activated and incomplete. Its keys are false.
+Sessions 09-15 are not activated. A fixture path is code on the trunk.
 It is not a recorded evidence key.
 
 ## Session 08
 
 Prompt: `11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md`.
-Status: not activated.
+Status: incomplete.
 Evidence contract: defined, not installed.
-Contract exists and is not installed. Fixture modules are not a true key.
+Activated and incomplete. Every key is false. Fixture modules are not a true key.
 
 Fixture paths:
 
@@ -223,18 +225,18 @@ Fixture paths:
 
 | Key | Recorded |
 |---|---|
-| `asset_lineage_recorded` | not installed |
-| `asset_storage_implemented` | not installed |
-| `claim_validation_implemented` | not installed |
-| `control_files_and_checkpoint_current` | not installed |
-| `creative_asset_agent_implemented` | not installed |
-| `design_tokens_implemented` | not installed |
-| `evidence_closure_commit_recorded` | not installed |
-| `link_validation_implemented` | not installed |
-| `merchandising_agent_implemented` | not installed |
-| `merchandising_asset_tests_pass` | not installed |
-| `merchandising_workflow_linked` | not installed |
-| `screenshot_acquisition_implemented` | not installed |
+| `asset_lineage_recorded` | false |
+| `asset_storage_implemented` | false |
+| `claim_validation_implemented` | false |
+| `control_files_and_checkpoint_current` | false |
+| `creative_asset_agent_implemented` | false |
+| `design_tokens_implemented` | false |
+| `evidence_closure_commit_recorded` | false |
+| `link_validation_implemented` | false |
+| `merchandising_agent_implemented` | false |
+| `merchandising_asset_tests_pass` | false |
+| `merchandising_workflow_linked` | false |
+| `screenshot_acquisition_implemented` | false |
 
 ## Session 09
 
