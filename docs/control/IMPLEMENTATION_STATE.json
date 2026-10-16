@@ -6,9 +6,9 @@
   "branch": "build/full-automation",
   "head_sha": "b782751fdb1b255c436ff7f6fa655e6d783b1e8c",
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "evidence_closure_commit_sha": "0f94d585f23d79e5ac18479f01e14f67cbaad332",
+  "evidence_closure_commit_sha": "5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 65,
+  "state_revision": 66,
   "session_status": "complete",
   "current_session": 7,
   "completed_sessions": [
@@ -135,7 +135,7 @@
     "build_workflow_linked": true,
     "product_build_tests_pass": true,
     "control_files_and_checkpoint_current": true,
-    "evidence_closure_commit_recorded": false
+    "evidence_closure_commit_recorded": true
   },
   "transition_contract": {
     "completion_requires_all_evidence_true": true,
@@ -150,5 +150,5 @@
   },
   "next_session": 8,
   "next_prompt": "11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md",
-  "updated_at": "2026-10-16T19:00:00Z"
+  "updated_at": "2026-10-16T19:10:00Z"
 }

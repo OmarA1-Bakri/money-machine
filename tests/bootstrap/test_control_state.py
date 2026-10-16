@@ -40,6 +40,8 @@ BOOTSTRAP_COMMIT_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 SESSION_06_PRIOR_WAVE_TIP = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
 # Session 07 close tip-syncs head_sha to Omar's #64 squash, not this state file.
 SESSION_07_CLOSE_TIP = "b782751fdb1b255c436ff7f6fa655e6d783b1e8c"
+# Commit that records the eleven earned keys with the closure key still false.
+SESSION_07_EARNED_COMMIT = "5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb"
 
 
 class ControlState(TypedDict):
@@ -344,11 +346,8 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
         evidence = state["required_completion_evidence"]
         assert evidence.keys() == control_state.SESSION_EVIDENCE_KEYS[session]
         if session == 7:
-            # D-0036 records the earned keys. The closure key waits for its own commit.
-            assert evidence[CLOSURE_EVIDENCE_KEY] is False
-            assert all(
-                value is True for key, value in evidence.items() if key != CLOSURE_EVIDENCE_KEY
-            )
+            # D-0036 records every key, including the closure key, through record-evidence.
+            assert all(evidence.values())
         else:
             assert all(evidence.values())
     assert state["transition_contract"]["completion_requires_next_session"] == state["next_session"]
@@ -368,7 +367,7 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
         if state["session_status"] == "complete":
             if session == 7:
                 assert state["head_sha"] == SESSION_07_CLOSE_TIP
-                assert closure == SESSION_06_PRIOR_WAVE_TIP
+                assert closure == SESSION_07_EARNED_COMMIT
                 assert state["head_sha"] != closure
             else:
                 assert state["head_sha"] == closure
@@ -1560,7 +1559,7 @@ def test_session_eight_activation_rejects_false_session_seven_evidence(tmp_path:
     assert state_path.read_bytes() == original
     assert STATE_PATH.read_bytes() == checked_in
     assert load_state()["current_session"] == 7
-    assert load_state()["state_revision"] == 65
+    assert load_state()["state_revision"] == 66
 
 
 def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: Path) -> None:
@@ -1585,14 +1584,9 @@ def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: 
     live = load_state()
     assert live["current_session"] == 7
     assert live["next_session"] == 8
-    assert live["state_revision"] == 65
+    assert live["state_revision"] == 66
     live_evidence = live["required_completion_evidence"]
-    assert live_evidence[CLOSURE_EVIDENCE_KEY] is False
-    assert all(
-        live_evidence[key] is True
-        for key in SESSION_07_EVIDENCE_KEYS
-        if key != CLOSURE_EVIDENCE_KEY
-    )
+    assert all(live_evidence[key] is True for key in SESSION_07_EVIDENCE_KEYS)
 
 
 def _false_key_session_eight_pair() -> tuple[ControlState, ControlState]:

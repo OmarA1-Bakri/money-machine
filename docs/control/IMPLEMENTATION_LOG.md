@@ -1,3 +1,11 @@
+## 2026-10-16 — Session 07 closure key recorded
+
+`record-evidence` advanced `state_revision` from 65 to 66. `updated_at` is `2026-10-16T19:10:00Z`. `evidence_closure_commit_recorded` is true. `evidence_closure_commit_sha` is `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`, the commit that holds the eleven true keys and `def prove_session_07`. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `current_session` stays 7. `session_status` stays complete. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. The exit string is not written. Session 08 is not activated.
+
+Every Session 07 evidence key is now true. Activation of Session 08 is the next legal command. It is not part of this commit.
+
+`uv run pytest -q -p no:cacheprovider --tb=line` on the evidence transition, the evidence index, the two Session 08 activation checks, and the live pin tests printed 29 passed. `test_checked_in_state_is_a_valid_session_continuity_shape` compares the closure sha with the last commit that touches the state file. That commit is this one, so the closure sha and the state-file commit differ. A full repository suite was not run.
+
 ## 2026-10-16 — Session 07 eleven evidence keys recorded
 
 `record-evidence` advanced `state_revision` from 64 to 65. `updated_at` is `2026-10-16T19:00:00Z`. The ten behavioral keys and `control_files_and_checkpoint_current` are true. `evidence_closure_commit_recorded` stays false. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `current_session` stays 7. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. The exit string is not written. Session 08 is not activated.

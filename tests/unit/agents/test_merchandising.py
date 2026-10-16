@@ -398,12 +398,12 @@ def test_modules_do_not_import_a_network_provider() -> None:
 def test_state_commissioning_and_exit_78_are_unchanged() -> None:
     state = json.loads(Path("docs/control/IMPLEMENTATION_STATE.json").read_text(encoding="utf-8"))
     assert state["current_session"] == 7
-    assert state["state_revision"] == 65
+    assert state["state_revision"] == 66
     assert state["session_status"] == "complete"
     assert state["next_session"] == 8
     assert state["commissioned_agents"] == []
     evidence = state["required_completion_evidence"]
-    assert evidence["evidence_closure_commit_recorded"] is False
+    assert evidence["evidence_closure_commit_recorded"] is True
     assert all(
         value is True
         for key, value in evidence.items()

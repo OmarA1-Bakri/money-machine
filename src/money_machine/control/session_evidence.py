@@ -192,11 +192,12 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 07 at state revision 65.",
-        "`current_session` stays 7. The closure key is still false.",
+        "The checked-in pointer is Session 07 at state revision 66.",
+        "`current_session` stays 7. Every Session 07 evidence key is true.",
         "Sessions 00-06 closed with every contract key true.",
         "Session 07's close commit keeps every contract key false under D-0032.",
-        "D-0036 records eleven keys true on the live state. The closure key stays false.",
+        "D-0036 records the twelve keys true. The closure commit is",
+        "`5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.",
         "Sessions 08-15 are not activated, so none of their keys is recorded true.",
         "",
     ]
@@ -224,9 +225,9 @@ def render_session_evidence() -> str:
             lines.extend(
                 [
                     "",
-                    "D-0032 keeps these twelve keys false.",
+                    "D-0032 keeps these twelve keys false on this close commit.",
                     "The close is the operator gate. It is not `validate_completion_transition`.",
-                    "Activation of Session 08 stays refused while any of these keys is false.",
+                    "D-0036 records the live keys later. This table is the close commit.",
                 ]
             )
         lines.append("")

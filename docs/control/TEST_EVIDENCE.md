@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-16 — Session 07 closure key
+
+**Verification scope**: live `record-evidence` from revision 65 to 66. No live HTTP. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. Session 08 is not activated.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Closure key | True at revision 66 | PASS |
+| Closure commit | `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb` contains the proof and the eleven true keys | PASS |
+| Head | Stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` | PASS |
+| Historical close | `00b952a8` still has all twelve keys false | PASS |
+| Exit string | `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE` is absent | PASS |
+
+The focused pytest printed 29 passed before this commit. The continuity shape test requires this commit to be the state-file pointer, distinct from the closure sha. A full repository suite was not run.
+
 ## 2026-10-16 — Session 07 eleven keys
 
 **Verification scope**: live `record-evidence` to revision 65, the pin tests, and the evidence index. No live HTTP. Closure key stays false. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`.

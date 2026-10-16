@@ -33,7 +33,7 @@ STATE_PATH = ROOT / "docs/control/IMPLEMENTATION_STATE.json"
 MODULE_PATH = ROOT / "src/money_machine/agents/implementations/notion_product_builder.py"
 WHEN = datetime(2026, 10, 3, 0, 30, tzinfo=UTC)
 LATER = datetime(2026, 10, 3, 1, 0, tzinfo=UTC)
-CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
+CLOSURE_SHA = "5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb"
 HEAD_SHA = "b782751fdb1b255c436ff7f6fa655e6d783b1e8c"
 
 
@@ -588,11 +588,11 @@ def test_session_seven_records_the_earned_keys() -> None:
     assert state["commissioned_agents"] == []
     evidence = state["required_completion_evidence"]
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
-    assert evidence["evidence_closure_commit_recorded"] is False
+    assert evidence["evidence_closure_commit_recorded"] is True
     assert evidence["notion_product_builder_implemented"] is True
     assert all(
         value is True
         for key, value in evidence.items()
         if key != "evidence_closure_commit_recorded"
     )
-    assert state["state_revision"] == 65
+    assert state["state_revision"] == 66
