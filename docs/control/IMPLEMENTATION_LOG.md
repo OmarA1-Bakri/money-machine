@@ -1,3 +1,29 @@
+## 2026-10-16 — Session 08 successor hardening
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. D-0034 records the graph change. A10, A11, and A13 stay `DESIGNED`.
+
+`create_ready_draft_listing_job` still calls `prepare_etsy_draft` first. A `DraftGateError` writes no event and no job. A receipt dispatches `ASSETS_COMPLETED` with the product as the aggregate. `DraftListingJob` is created only from that event. `LISTING_COPY_COMPLETED` maps to `[PricingJob]`. `PRICING_COMPLETED` maps to `[]`. The matching `successor_job_types` lists match. The factory id and idempotency key for `DraftListingJob` use the product aggregate, and an existing row is returned. A job that is already `READY` stays `READY`. A failure after dispatch calls `UnitOfWork.rollback`. The final flush runs only when dispatch returned job ids. `claim_ready_job` and the worker are not called.
+
+RED before the product key, one product aggregate: copy, pricing, and the asset chain left 3 `DraftListingJob` rows, and a second `workflow_id` left 2. RED after that key, with the worker aggregate (`aggregate_type="Job"`, `aggregate_id` the parent job): `test_worker_shaped_copy_and_pricing_do_not_add_a_second_draft_job` still saw 3 (`assert 3 == 1`). Clean successor file plus the gate file: 37 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_draft_listing_successor.py tests/unit/assets/test_etsy_draft_ready.py`. `uv run ruff format --check src tests scripts migrations` exit 0. `uv run ruff check src tests scripts apps migrations` exit 0. `uv run pyright` exit 0. Full suite on this branch: 12 failed, 4946 passed, 193 skipped. The #101 baseline on `5ba7f8e8` is 12 failed, 4936 passed, 193 skipped. The passed count is that baseline plus these 10 tests. Both runs fail the same twelve `test_compose_preserves_the_postgres_password` rows. Docker is absent. PostgreSQL is absent locally, so the 193 database tests stayed skipped. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Drop the `DraftListingJob` product id | unique: `test_another_workflow_does_not_add_a_second_draft_job` | 1/36 |
+| Product key uses `workflow_id` | unique: `test_another_workflow_does_not_add_a_second_draft_job` | 1/36 |
+| Drop the existing-row return | unique: `test_another_workflow_does_not_add_a_second_draft_job` | 1/36 |
+| Drop the already-`READY` skip | unique: `test_another_workflow_does_not_add_a_second_draft_job` | 1/36 |
+| Drop `await uow.rollback()` | unique: `test_a_failure_after_dispatch_leaves_no_job_or_event` | 1/36 |
+| Delete the final flush | unique: `test_the_ready_status_is_flushed` | 1/36 |
+| Flush when `job_ids` is empty | unique: `test_an_existing_event_with_no_job_does_not_flush` | 1/36 |
+| Drop the missing-successor guard | unique: `test_a_missing_successor_is_refused` | 1/36 |
+| Drop `require_job_transition` | not unique: `test_a_failure_after_dispatch_leaves_no_job_or_event`, `test_an_illegal_transition_is_refused` | 2/35 |
+| Image gate uses `<` | not unique: `test_each_failing_gate_creates_no_successor[changes4-listing_images]`, `test_each_gate_refuses_on_its_own[changes4-listing_images]` | 2/35 |
+| Call `claim_ready_job` before return | not unique: `test_passed_chain_creates_exactly_one_draft_listing_job`, `test_redispatch_does_not_duplicate_the_job`, `test_draft_listing_job_is_ready_and_not_executed`, `test_copy_and_pricing_routes_do_not_add_a_second_draft_job`, `test_worker_shaped_copy_and_pricing_do_not_add_a_second_draft_job`, `test_another_workflow_does_not_add_a_second_draft_job`, `test_the_ready_status_is_flushed`, `test_an_existing_event_with_no_job_does_not_flush` | 8/29 |
+| Restore `DraftListingJob` on the copy and pricing event edges | not unique: `test_assets_completed_still_names_only_draft_listing_job`, `test_worker_shaped_copy_and_pricing_do_not_add_a_second_draft_job` | 2/35 |
+| Restore those `successor_job_types` only | unique: `test_assets_completed_still_names_only_draft_listing_job` | 1/36 |
+
+Mutant counts are the successor file plus `tests/unit/assets/test_etsy_draft_ready.py` (37 tests).
+
 ## 2026-10-16 — Session 08 successor draft job
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-successor-draft-prompt-integrity.md`. D-0033 records the naming choice.

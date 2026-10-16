@@ -195,6 +195,7 @@ def test_a_passed_chain_is_a_ready_draft(tmp_path: Path) -> None:
         ({"claims_passed": False}, "claims"),
         ({"assets": _assets(shots=0)}, "screenshots"),
         ({"assets": _assets(images=len(IMAGE_ROLES) - 1)}, "listing_images"),
+        ({"assets": _assets(images=len(IMAGE_ROLES) + 1)}, "listing_images"),
         ({"assets": _assets(videos=0)}, "video"),
         ({"assets": _assets(videos=2)}, "video"),
         ({"assets": _assets(pdfs=1), "pdf_roles": ("readme",)}, "delivery_pdfs"),

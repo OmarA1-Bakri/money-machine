@@ -32,29 +32,38 @@ async def create_ready_draft_listing_job(
     """Return the ready draft and leave one unrun ``DraftListingJob``.
 
     A gate refusal raises ``DraftGateError`` before any event is written.
-    A second call with the same product and workflow does not insert again.
+    One product has one draft job. Copy and pricing do not spawn another,
+    and a second workflow does not either. A failure after dispatch rolls
+    the event and the job back.
     """
     receipt = prepare_etsy_draft(evidence, client)
-    dispatcher = EventDispatcher(uow)
-    job_ids = await dispatcher.dispatch(
-        event_name=EventName.ASSETS_COMPLETED,
-        aggregate_type="products",
-        aggregate_id=evidence.product_id,
-        workflow_id=workflow_id,
-        job_id=None,
-        payload={
-            "spec_version": evidence.spec_version,
-            "listing_id": receipt.listing_id,
-        },
-        occurred_at=occurred_at,
-    )
-    for job_id in job_ids:
-        job = await uow.session.get(Job, job_id)
-        if not isinstance(job, Job):
-            raise RuntimeError("draft successor missing")
-        require_job_transition(JobStatus(job.status), JobStatus.READY)
-        job.status = JobStatus.READY.value
-        job.updated_at = occurred_at
-    if job_ids:
-        await uow.session.flush()
+    try:
+        dispatcher = EventDispatcher(uow)
+        job_ids = await dispatcher.dispatch(
+            event_name=EventName.ASSETS_COMPLETED,
+            aggregate_type="products",
+            aggregate_id=evidence.product_id,
+            workflow_id=workflow_id,
+            job_id=None,
+            payload={
+                "spec_version": evidence.spec_version,
+                "listing_id": receipt.listing_id,
+            },
+            occurred_at=occurred_at,
+        )
+        for job_id in job_ids:
+            job = await uow.session.get(Job, job_id)
+            if not isinstance(job, Job):
+                raise RuntimeError("draft successor missing")
+            status = JobStatus(job.status)
+            if status is JobStatus.READY:
+                continue
+            require_job_transition(status, JobStatus.READY)
+            job.status = JobStatus.READY.value
+            job.updated_at = occurred_at
+        if job_ids:
+            await uow.session.flush()
+    except Exception:
+        await uow.rollback()
+        raise
     return receipt
