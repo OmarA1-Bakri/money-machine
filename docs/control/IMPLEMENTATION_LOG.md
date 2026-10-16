@@ -1,3 +1,19 @@
+## 2026-10-16 — Session 08 foreign duplicate markers
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-dup-marker-foreign-prompt-integrity.md`.
+
+A foreign shop row and a foreign description row, each with two `mm-draft:` lines, are not adopted. Draft creation posts. Our single marker is still adopted when that foreign row is listed first. A row that carries our marker and a second `mm-draft:` line still raises `duplicate_marker` and posts nothing. `token.casefold()` in `_outside_curated` is removed. Restoring it does not fail the defang suite. `not token.islower()` stays. The one-letter com rule, screenshot `x dot com`, and the bare end-of-text host are unchanged. A10, A11, and A13 stay `DESIGNED`.
+
+RED before the skip: `test_a_foreign_two_marker_row_does_not_halt_draft_creation` and `test_our_marker_is_adopted_beside_a_foreign_two_marker_row` raised `duplicate_marker`. Clean draft suite: 128 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/integrations/test_etsy_draft_client.py`. Clean defang suite: 106 passed. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_defang_normalizer.py tests/unit/assets/test_defanged_host.py tests/unit/assets/test_spelled_email.py`. Full suite on this branch: 12 failed, 4921 passed, 193 skipped. The #99 baseline on `bc00efbd` was 12 failed, 4919 passed, 193 skipped. Both runs fail the same twelve `test_compose_preserves_the_postgres_password` rows. Docker is absent. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| `_line_marker` raises on every two-line row | not unique: `test_a_foreign_two_marker_row_does_not_halt_draft_creation`, `test_our_marker_is_adopted_beside_a_foreign_two_marker_row` | 2/126 |
+| Halt at the end of the walk when nothing was adopted and a description has two `mm-draft:` lines | `test_a_foreign_two_marker_row_does_not_halt_draft_creation` | 1/127 |
+| Return not-found at the first foreign two-line row | `test_our_marker_is_adopted_beside_a_foreign_two_marker_row` | 1/127 |
+| `_line_marker` returns `lines == [marker]` and does not raise | `test_one_row_with_two_marker_lines_is_not_adopted` | 1/127 |
+| Restore `token.casefold()` in `_outside_curated` | none; the defang suite still passes, so the call was removed | 0/106 |
+
 ## 2026-10-16 — Session 08 defang wave 2
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-defang-sf-wave2-prompt-integrity.md`.
