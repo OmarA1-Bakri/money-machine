@@ -218,14 +218,19 @@ def lookalike_host_matches(text: str) -> bool:
 
 
 def spaced_letter_host_matches(text: str) -> bool:
-    """Single letters after ``dot`` or a dot restore a host.
+    """Single letters after ``dot`` or a dot restore that same host.
 
     ``x dot com`` has no spaced letters, so this helper does not match it.
+    The spaced letters and the host are one candidate. A later ``x dot com``
+    does not satisfy a spaced-letter run in another clause.
     """
     folded = fold_confusables(text)
-    if _SPACED_LETTERS.search(folded) is None:
-        return False
-    return host_matches(text)
+    spans = candidate_spans(folded)
+    for match in _SPACED_LETTERS.finditer(folded):
+        for start, end in spans:
+            if start <= match.start() and match.end() <= end and host_matches(folded[start:end]):
+                return True
+    return False
 
 
 def stray_spaced_letter_host_matches(text: str) -> bool:

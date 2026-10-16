@@ -19,6 +19,10 @@ Clean defang suite: 98 passed. Command: `uv run pytest -q -p no:cacheprovider --
 
 Deleting `tight_spaced_host_matches` is not unique: 4 failed, 94 passed.
 
+`spaced_letter_host_matches` requires the spaced letters and the host to be one candidate. `notes: dot c o; x dot com` stays allowed on the screenshot path. Gift checkout still refuses it. The lone-CR row is not the #95 bare-CR pin: #95 posts `alpha\rbeta` against `alpha\nbeta`. This row still refuses `alpha\rbeta` against `alphabeta`.
+
+Clean defang suite after the candidate check: 99 passed. Same defang command as above. Replacing the candidate check with `host_matches(text)` fails only `test_spaced_letters_do_not_borrow_another_host` (1 failed, 98 passed). Deleting the helper call still fails only `test_spaced_com_letters_refuse_on_both_paths` (1 failed, 98 passed).
+
 ## 2026-10-16 — Session 08 spaced n3t
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-spaced-n3t-prompt-integrity.md`.

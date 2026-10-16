@@ -197,6 +197,12 @@ def test_spaced_com_letters_refuse_on_both_paths() -> None:
     assert refuse_sensitive_text("x dot c o m") == "sensitive_data"
 
 
+def test_spaced_letters_do_not_borrow_another_host() -> None:
+    text = "notes: dot c o; x dot com"
+    assert refuse_sensitive_text(text) is None
+    assert refuse_paid_checkout(text) == "paid_checkout"
+
+
 def test_a_digit_one_tld_is_refused() -> None:
     assert refuse_paid_checkout("x dot 1o") == "paid_checkout"
     assert refuse_sensitive_text("x dot 1o") == "sensitive_data"
