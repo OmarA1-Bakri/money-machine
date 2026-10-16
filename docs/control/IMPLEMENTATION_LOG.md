@@ -1,3 +1,23 @@
+## 2026-10-16 — Session 08 draft job should-fix sweep 2
+
+Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-draft-job-sf-sweep2-prompt-integrity.md`. The D-0034 graph is unchanged. No pricing or copy gate was added. A10, A11, and A13 stay `DESIGNED`.
+
+An existing `PENDING` `DraftListingJob` beside an existing product `ASSETS_COMPLETED` moves to `READY`. `receipt.ready` stays `True`. Returning `ready=False` was the other option and was not taken: the draft post has already happened, and a `PENDING` job is not claimed. `RUNNING`, `SUCCEEDED`, and `CANCELLED` still raise. An existing event with no job still does not flush. `async with session.begin_nested()` commits on success and rolls back on `asyncio.CancelledError`. The unreachable `READY` continue is removed. A worker-path `ASSETS_COMPLETED` for one job id is one event across two workflows. A different job id still records its own event. The global dedupe key is unchanged.
+
+RED before the production change, with the worker case still one test: 4 failed, 42 passed. `test_an_existing_pending_job_becomes_ready` saw `PENDING`. `test_cancellation_rolls_the_savepoint_back` saw 2 `ASSETS_COMPLETED`. `test_the_savepoint_commit_keeps_the_draft` saw no job after rollback. The worker row saw 3 `ASSETS_COMPLETED`. Command: `uv run pytest -q -p no:cacheprovider --tb=line tests/unit/assets/test_draft_job_shared_session.py tests/unit/assets/test_draft_listing_successor.py tests/unit/assets/test_etsy_draft_ready.py`. Clean suite after the worker row was split: 47 passed. `uv run ruff format --check src tests scripts migrations` exit 0. `uv run ruff check src tests scripts apps migrations` exit 0. `uv run pyright` exit 0. Full suite on this branch: 12 failed, 4956 passed, 193 skipped. The #103 baseline on `cd300e7e` is 12 failed, 4951 passed, 193 skipped. The passed count is that baseline plus these 5 tests. Both runs fail the same twelve `test_compose_preserves_the_postgres_password` rows. Docker is absent. PostgreSQL is absent locally, so the 193 database tests stayed skipped. Source restored after each mutant.
+
+| Mutant | Killing test | F/P |
+|---|---|---|
+| Skip the existing `PENDING` transition | unique: `test_an_existing_pending_job_becomes_ready` | 1/46 |
+| `except Exception` with the savepoint commit kept | unique: `test_cancellation_rolls_the_savepoint_back` | 1/46 |
+| Leave the savepoint open | unique: `test_the_savepoint_commit_keeps_the_draft` | 1/46 |
+| Put `workflow_id` back in the worker key | unique: `test_a_second_workflow_does_not_record_another_worker_event` | 1/46 |
+| One key for every worker job | unique: `test_a_different_worker_job_records_its_own_event` | 1/46 |
+| Record no worker event | not unique: `test_worker_assets_completed_does_not_add_a_pending_draft`, `test_a_second_workflow_does_not_record_another_worker_event`, `test_a_different_worker_job_records_its_own_event` | 3/44 |
+| Restore the `READY` continue | none; the branch is unreachable and stays removed | 0/47 |
+
+Mutant counts are the shared-session file, the successor file, and `tests/unit/assets/test_etsy_draft_ready.py` (47 tests).
+
 ## 2026-10-16 — Session 08 draft job should-fix sweep
 
 Session 08 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. Fixture-only. The prompt file is unchanged. SHA-256 remains `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`. The corrective addendum is `docs/control/reviews/2026-10-16-session-08-draft-job-sf-sweep-prompt-integrity.md`. The D-0034 graph is unchanged. No pricing or copy gate was added. A10, A11, and A13 stay `DESIGNED`.

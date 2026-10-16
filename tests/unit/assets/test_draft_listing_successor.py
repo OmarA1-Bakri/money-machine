@@ -84,6 +84,7 @@ class _Session:
         self._by_id: dict[UUID, Job] = {}
         self.flush_statuses: list[tuple[str, ...]] = []
         self.events: _Events | None = None
+        self.boundaries: list[_Boundary] = []
 
     def add(self, instance: object) -> None:
         if isinstance(instance, Job):
@@ -101,7 +102,9 @@ class _Session:
         return self._by_id.get(ident)
 
     def begin_nested(self) -> _Boundary:
-        return _Boundary(self)
+        boundary = _Boundary(self)
+        self.boundaries.append(boundary)
+        return boundary
 
     def snapshot(
         self,
@@ -132,10 +135,12 @@ class _Session:
 
 
 class _Boundary:
-    """Savepoint. Rollback restores this session and does not clear an outer row."""
+    """Savepoint. Commit releases it. Rollback restores the session up to it."""
 
     def __init__(self, session: _Session) -> None:
         self._session = session
+        self._open = False
+        self.committed = False
         self._events: tuple[tuple[str, ...], frozenset[str]] | None = None
         self._rows: (
             tuple[
@@ -148,24 +153,47 @@ class _Boundary:
         ) = None
 
     async def start(self) -> _Boundary:
+        if self._open or self.committed:
+            raise RuntimeError("nested transaction already started")
         events = self._session.events
         if events is None:
             raise RuntimeError("session has no events")
         self._events = events.snapshot()
         self._rows = self._session.snapshot()
+        self._open = True
         return self
 
+    async def __aenter__(self) -> _Boundary:
+        return await self.start()
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        _exc: BaseException | None,
+        _tb: object,
+    ) -> None:
+        if exc_type is None:
+            await self.commit()
+        else:
+            await self.rollback()
+
     async def commit(self) -> None:
-        return None
+        if not self._open:
+            raise RuntimeError("nested transaction has not started")
+        self._open = False
+        self.committed = True
 
     async def rollback(self) -> None:
+        if self.committed:
+            return
         events = self._session.events
-        if events is None or self._events is None or self._rows is None:
+        if not self._open or events is None or self._events is None or self._rows is None:
             raise RuntimeError("nested transaction has not started")
         names, keys = self._events
         events.restore(names, keys)
         jobs, by_id, fields, flushes = self._rows
         self._session.restore(jobs, by_id, fields, flushes)
+        self._open = False
 
 
 class _MissingJob(_Session):

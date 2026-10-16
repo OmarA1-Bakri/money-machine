@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import socket
 from pathlib import Path
 from typing import cast
@@ -9,6 +10,7 @@ from uuid import UUID
 
 import pytest
 
+import money_machine.assets.draft_listing_successor as successor
 from money_machine.domain.errors import InvalidTransitionError
 from money_machine.domain.events import EventName
 from money_machine.integrations.etsy.draft_client import DraftLedger, EtsyDraftClient
@@ -28,6 +30,7 @@ from tests.unit.assets.test_etsy_draft_ready import chain_evidence
 from tests.unit.integrations.test_etsy_draft_client import Store
 
 _ASSET_JOB = UUID("00000000-0000-4000-8000-0000000000a1")
+_OTHER_ASSET_JOB = UUID("00000000-0000-4000-8000-0000000000a2")
 _SENTINEL = UUID("00000000-0000-4000-8000-0000000000ee")
 
 
@@ -120,6 +123,7 @@ async def test_worker_assets_completed_does_not_add_a_pending_draft(
         occurred_at=OPENED_AT,
     )
     assert draft_jobs(uow) == []
+    assert uow.events.names == ["ASSETS_COMPLETED"]
     shop = Store()
     client = EtsyDraftClient(shop, DraftLedger(tmp_path))
     await open_ready_draft(chain_evidence(), client, uow)
@@ -155,3 +159,131 @@ async def test_the_idempotency_key_is_the_product(tmp_path: Path) -> None:
     evidence = chain_evidence()
     await open_ready_draft(evidence, client, uow)
     assert draft_jobs(uow)[0].idempotency_key == f"DraftListingJob:{evidence.product_id}"
+
+
+def _pending_draft(evidence_product: UUID) -> Job:
+    job_id = SuccessorFactory.derive_product_job_id(evidence_product, "DraftListingJob")
+    return Job(
+        id=job_id,
+        workflow_id=WORKFLOW,
+        job_type="DraftListingJob",
+        object_type="listing_versions",
+        object_id=evidence_product,
+        owner_agent_id="A13",
+        status="PENDING",
+        input={},
+        success_contract={},
+        scheduled_at=OPENED_AT,
+        attempt=0,
+        max_attempts=3,
+        idempotency_key=f"DraftListingJob:{evidence_product}",
+        side_effect_class="EXTERNAL_WRITE",
+        retry_class="RECONCILE_FIRST",
+        allowed_mode="simulation",
+        version=1,
+    )
+
+
+async def _worker_assets(uow: SharedUow, workflow_id: UUID, job_id: UUID) -> None:
+    await EventDispatcher(cast(UnitOfWork, uow)).dispatch(
+        event_name=EventName.ASSETS_COMPLETED,
+        aggregate_type="Job",
+        aggregate_id=job_id,
+        workflow_id=workflow_id,
+        job_id=job_id,
+        payload={},
+        occurred_at=OPENED_AT,
+    )
+
+
+async def test_an_existing_pending_job_becomes_ready(tmp_path: Path) -> None:
+    evidence = chain_evidence()
+    uow = SharedUow()
+    uow.session.add(_pending_draft(evidence.product_id))
+    await uow.events.append(
+        event_name=EventName.ASSETS_COMPLETED,
+        aggregate_type="products",
+        aggregate_id=evidence.product_id,
+        workflow_id=WORKFLOW,
+        job_id=None,
+        dedupe_key=":".join(
+            (
+                EventName.ASSETS_COMPLETED.value,
+                str(evidence.product_id),
+                str(WORKFLOW),
+                "null",
+            )
+        ),
+        occurred_at=OPENED_AT,
+    )
+    shop = Store()
+    client = EtsyDraftClient(shop, DraftLedger(tmp_path))
+    receipt = await open_ready_draft(evidence, client, uow)
+    drafts = draft_jobs(uow)
+    assert receipt.ready is True
+    assert len(drafts) == 1
+    assert drafts[0].status == "READY"
+    assert drafts[0].attempt == 0
+    assert uow.events.names == ["ASSETS_COMPLETED"]
+    assert uow.session.flush_statuses[-1] == ("READY",)
+    assert shop.posts == 1
+
+
+async def test_cancellation_rolls_the_savepoint_back(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shop = Store()
+    client = EtsyDraftClient(shop, DraftLedger(tmp_path))
+    uow = SharedUow()
+    evidence = chain_evidence()
+    await open_ready_draft(evidence, client, uow)
+    draft = draft_jobs(uow)[0]
+    draft.status = "RUNNING"
+    uow.session.add(_caller_row(draft))
+    await uow.events.append(
+        event_name=EventName.SHOP_BOOTSTRAPPED,
+        aggregate_type="shops",
+        aggregate_id=evidence.product_id,
+        workflow_id=WORKFLOW,
+        job_id=None,
+        dedupe_key="caller:cancel",
+        occurred_at=OPENED_AT,
+    )
+
+    def _cancel(_source: object, _target: object) -> None:
+        raise asyncio.CancelledError()
+
+    monkeypatch.setattr(successor, "require_job_transition", _cancel)
+    with pytest.raises(asyncio.CancelledError):
+        await open_ready_draft(evidence, client, uow, workflow_id=OTHER_WORKFLOW)
+    assert [job.status for job in draft_jobs(uow)] == ["RUNNING"]
+    assert uow.events.names.count("ASSETS_COMPLETED") == 1
+    assert "SHOP_BOOTSTRAPPED" in uow.events.names
+    assert any(job.job_type == "CallerSentinel" for job in uow.session.jobs)
+
+
+async def test_the_savepoint_commit_keeps_the_draft(tmp_path: Path) -> None:
+    shop = Store()
+    client = EtsyDraftClient(shop, DraftLedger(tmp_path))
+    uow = SharedUow()
+    await open_ready_draft(chain_evidence(), client, uow)
+    await uow.session.boundaries[-1].rollback()
+    assert [job.status for job in draft_jobs(uow)] == ["READY"]
+    assert uow.events.names == ["ASSETS_COMPLETED"]
+
+
+async def test_a_second_workflow_does_not_record_another_worker_event() -> None:
+    uow = SharedUow()
+    await _worker_assets(uow, WORKFLOW, _ASSET_JOB)
+    await _worker_assets(uow, OTHER_WORKFLOW, _ASSET_JOB)
+    assert uow.events.names == ["ASSETS_COMPLETED"]
+    assert draft_jobs(uow) == []
+
+
+async def test_a_different_worker_job_records_its_own_event() -> None:
+    uow = SharedUow()
+    await _worker_assets(uow, WORKFLOW, _ASSET_JOB)
+    await _worker_assets(uow, WORKFLOW, _OTHER_ASSET_JOB)
+    assert uow.events.names == ["ASSETS_COMPLETED", "ASSETS_COMPLETED"]
+    assert draft_jobs(uow) == []
