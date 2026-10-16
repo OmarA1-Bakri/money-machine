@@ -76,6 +76,7 @@ class SuccessorFactory:
         event_name: EventName,
         workflow_id: UUID,
         parent_job_id: UUID | None,
+        aggregate_id: UUID | None = None,
         payload: dict[str, object] | None = None,
         occurred_at: datetime | None = None,
     ) -> tuple[UUID, ...]:
@@ -118,6 +119,7 @@ class SuccessorFactory:
             job_id = await self._create_successor_job(
                 workflow_id=workflow_id,
                 parent_job_id=parent_job_id,
+                aggregate_id=aggregate_id,
                 job_type=job_type,
                 occurred_at=occurred_at,
             )
@@ -285,6 +287,7 @@ class SuccessorFactory:
         *,
         workflow_id: UUID,
         parent_job_id: UUID | None,
+        aggregate_id: UUID | None,
         job_type: str,
         occurred_at: datetime,
     ) -> UUID:
@@ -319,12 +322,23 @@ class SuccessorFactory:
         if job_def is None:
             raise ValueError(f"Job type '{job_type}' not found in workflow configuration")
 
-        # Derive deterministic job ID
-        job_id = self._derive_successor_job_id(
-            workflow_id=workflow_id,
-            parent_job_id=parent_job_id,
-            job_type=job_type,
-        )
+        # DraftListingJob is one row per product aggregate (D-0034).
+        # A second workflow must not insert another.
+        if job_type == "DraftListingJob":
+            if aggregate_id is None:
+                raise ValueError("DraftListingJob requires the product aggregate")
+            job_id = self._derive_product_job_id(aggregate_id, job_type)
+            existing = await self.uow.session.get(Job, job_id)
+            if isinstance(existing, Job):
+                return existing.id
+            idempotency_key = f"{job_type}:{aggregate_id}"
+        else:
+            job_id = self._derive_successor_job_id(
+                workflow_id=workflow_id,
+                parent_job_id=parent_job_id,
+                job_type=job_type,
+            )
+            idempotency_key = f"{job_type}:{workflow_id}:{parent_job_id or 'none'}"
 
         # Infer object_type from job type patterns (real heuristics, not placeholders)
         object_type = self._infer_object_type(job_type)
@@ -350,7 +364,7 @@ class SuccessorFactory:
             scheduled_at=occurred_at,
             attempt=0,
             max_attempts=3,
-            idempotency_key=f"{job_type}:{workflow_id}:{parent_job_id or 'none'}",
+            idempotency_key=idempotency_key,
             side_effect_class=job_def.side_effect_class,
             retry_class=job_def.retry_class,
             allowed_mode=allowed_mode,
@@ -403,6 +417,12 @@ class SuccessorFactory:
 
         # Default to workflow_runs for orchestration/provisioning jobs
         return "workflow_runs"
+
+    @staticmethod
+    def _derive_product_job_id(product_id: UUID, job_type: str) -> UUID:
+        """One stable id for a product-scoped job, independent of workflow and parent."""
+        digest = sha256(f"{product_id}:{job_type}".encode()).digest()[:16]
+        return UUID(bytes=digest)
 
     @staticmethod
     def _derive_successor_job_id(

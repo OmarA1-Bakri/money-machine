@@ -34,10 +34,10 @@ event_successor_map:
   
   # Merchandising (parallel successors)
   SCREENSHOTS_CAPTURED: [ListingCopyJob, AssetFactoryJob, DeliveryBuildJob]
-  LISTING_COPY_COMPLETED: [PricingJob, DraftListingJob]
+  LISTING_COPY_COMPLETED: [PricingJob]
   ASSETS_COMPLETED: [DraftListingJob]
   DELIVERY_FILES_COMPLETED: [PreflightJob]
-  PRICING_COMPLETED: [DraftListingJob]
+  PRICING_COMPLETED: []
   
   # Publishing
   DRAFT_CREATED: [PreflightJob]
@@ -274,7 +274,7 @@ workflows:
         allowed_modes: [simulation, draft, live]
         output_contracts: [AgentResult, ListingPackage]
         admitted_events: [LISTING_COPY_COMPLETED]
-        successor_job_types: [PricingJob, DraftListingJob]
+        successor_job_types: [PricingJob]
       - job_type: AssetFactoryJob
         owner_agent_id: A11
         side_effect_class: NONE
@@ -298,7 +298,7 @@ workflows:
         allowed_modes: [simulation, draft, live]
         output_contracts: [AgentResult, ListingPackage]
         admitted_events: [PRICING_COMPLETED]
-        successor_job_types: [DraftListingJob]
+        successor_job_types: []
       - job_type: DraftListingJob
         owner_agent_id: A13
         side_effect_class: EXTERNAL_WRITE

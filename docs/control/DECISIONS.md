@@ -416,3 +416,25 @@ Prompt sections 9 and 10 name the chain step `ASSET_QA_PASSED` and the ready ste
 ### Consequences
 
 A passed asset chain leaves exactly one ready `DraftListingJob`. A refused chain leaves none. Re-dispatch does not insert a second job. Running that job waits until A13 is commissioned. Exit 78 stays HELD. Session 08 stays inactive.
+
+## D-0034 — One DraftListingJob per product
+
+**Status:** accepted for the Session 08 successor-hardening slice, 2026-10-16.
+
+### Context
+
+D-0033 left `config/workflows.yaml` as it was. That file mapped `LISTING_COPY_COMPLETED` to `[PricingJob, DraftListingJob]` and `PRICING_COMPLETED` to `[DraftListingJob]`. The same lists were on `ListingCopyJob.successor_job_types` and `PricingJob.successor_job_types`. `CHAPTER_TO_CAPABILITY_MAP.md` and `PROMPT_LIBRARY_MAP.md` name those edges. The factory derived a successor id from workflow, parent job, and job type, so each of those events inserted its own `DraftListingJob`.
+
+A second `workflow_id` for the same product did the same. Keying `DraftListingJob` on the event aggregate collapses both only when the aggregate is the product. The worker dispatches completion events with `aggregate_type="Job"` and `aggregate_id=job.id`. Copy, pricing, and the asset chain are then three aggregates and three draft jobs.
+
+### Decision
+
+- `DraftListingJob` is created only from `ASSETS_COMPLETED`.
+- `LISTING_COPY_COMPLETED` maps to `[PricingJob]`. `PRICING_COMPLETED` maps to `[]`. The matching `successor_job_types` lists match those maps.
+- The factory id and idempotency key for `DraftListingJob` are `sha256(f"{aggregate_id}:{job_type}")` and `DraftListingJob:{aggregate_id}`. An existing row is returned. Other job types keep the workflow-and-parent id.
+- `create_ready_draft_listing_job` still dispatches `ASSETS_COMPLETED` with `aggregate_id` set to the product. A second workflow that finds the job already `READY` does not transition it again.
+- The playbook maps are not rewritten. This record is the contradiction.
+
+### Consequences
+
+One product aggregate has at most one `DraftListingJob`, including after copy and pricing complete on their own job aggregates. A refused asset chain still writes no draft job. Exit 78 stays HELD. Session 08 stays inactive. A10, A11, and A13 stay `DESIGNED`.

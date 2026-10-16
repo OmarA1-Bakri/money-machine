@@ -10,16 +10,20 @@ from uuid import UUID
 
 import pytest
 
+import money_machine.assets.draft_listing_successor as successor
+import money_machine.orchestration.worker as worker
 from money_machine.agents.contracts.merchandising import IMAGE_ROLES
 from money_machine.assets.draft_listing_successor import create_ready_draft_listing_job
 from money_machine.assets.etsy_draft import DraftEvidence, DraftGateError
+from money_machine.domain.errors import InvalidTransitionError
 from money_machine.domain.events import EventName
 from money_machine.integrations.etsy.draft_client import (
     DraftLedger,
     DraftReceipt,
     EtsyDraftClient,
 )
-from money_machine.orchestration.successor_factory import load_event_successor_map
+from money_machine.orchestration.event_dispatcher import EventDispatcher
+from money_machine.orchestration.successor_factory import load_workflows_config
 from money_machine.persistence.repositories.events import EventAppendError
 from money_machine.persistence.tables import Job
 from money_machine.persistence.unit_of_work import UnitOfWork
@@ -27,6 +31,9 @@ from tests.unit.assets.test_etsy_draft_ready import chain_assets, chain_evidence
 from tests.unit.integrations.test_etsy_draft_client import Store
 
 _WORKFLOW = UUID("00000000-0000-4000-8000-0000000000d1")
+_OTHER_WORKFLOW = UUID("00000000-0000-4000-8000-0000000000d2")
+_COPY_JOB = UUID("00000000-0000-4000-8000-0000000000c1")
+_PRICE_JOB = UUID("00000000-0000-4000-8000-0000000000c2")
 _NOW = datetime(2026, 10, 16, 12, 0, tzinfo=UTC)
 
 
@@ -53,6 +60,10 @@ class _Events:
         self._keys.add(dedupe_key)
         self.names.append(event_name.value)
 
+    def clear(self) -> None:
+        self.names.clear()
+        self._keys.clear()
+
     async def by_dedupe_key(self, dedupe_key: str) -> object | None:
         if dedupe_key not in self._keys:
             return None
@@ -63,6 +74,7 @@ class _Session:
     def __init__(self) -> None:
         self.jobs: list[Job] = []
         self._by_id: dict[UUID, Job] = {}
+        self.flush_statuses: list[tuple[str, ...]] = []
 
     def add(self, instance: object) -> None:
         if isinstance(instance, Job):
@@ -70,16 +82,38 @@ class _Session:
             self._by_id[instance.id] = instance
 
     async def flush(self) -> None:
-        return None
+        self.flush_statuses.append(tuple(job.status for job in self.jobs))
+
+    def clear(self) -> None:
+        self.jobs.clear()
+        self._by_id.clear()
 
     async def get(self, _entity: object, ident: UUID) -> Job | None:
         return self._by_id.get(ident)
 
 
+class _MissingJob(_Session):
+    async def get(self, _entity: object, ident: UUID) -> Job | None:
+        assert isinstance(ident, UUID)
+        return None
+
+
+class _CancelledJob(_Session):
+    async def get(self, _entity: object, ident: UUID) -> Job | None:
+        job = self._by_id.get(ident)
+        if job is not None:
+            job.status = "CANCELLED"
+        return job
+
+
 class _Uow:
-    def __init__(self) -> None:
+    def __init__(self, session: _Session | None = None) -> None:
         self.events = _Events()
-        self.session = _Session()
+        self.session = session if session is not None else _Session()
+
+    async def rollback(self) -> None:
+        self.events.clear()
+        self.session.clear()
 
 
 @pytest.fixture(autouse=True)
@@ -98,19 +132,54 @@ async def _open(
     evidence: DraftEvidence,
     client: EtsyDraftClient,
     uow: _Uow,
+    *,
+    workflow_id: UUID = _WORKFLOW,
 ) -> DraftReceipt:
     return await create_ready_draft_listing_job(
         evidence,
         client,
         cast(UnitOfWork, uow),
+        workflow_id=workflow_id,
+        occurred_at=_NOW,
+    )
+
+
+def _drafts(uow: _Uow) -> list[Job]:
+    return [job for job in uow.session.jobs if job.job_type == "DraftListingJob"]
+
+
+async def _dispatch(
+    uow: _Uow,
+    event_name: EventName,
+    product_id: UUID,
+    *,
+    job_id: UUID,
+    aggregate_type: str = "products",
+    aggregate_id: UUID | None = None,
+) -> None:
+    await EventDispatcher(cast(UnitOfWork, uow)).dispatch(
+        event_name=event_name,
+        aggregate_type=aggregate_type,
+        aggregate_id=product_id if aggregate_id is None else aggregate_id,
         workflow_id=_WORKFLOW,
+        job_id=job_id,
+        payload={},
         occurred_at=_NOW,
     )
 
 
 def test_assets_completed_still_names_only_draft_listing_job() -> None:
-    successor_map = load_event_successor_map()
+    successor_map, config = load_workflows_config()
     assert successor_map["ASSETS_COMPLETED"] == ["DraftListingJob"]
+    assert successor_map["LISTING_COPY_COMPLETED"] == ["PricingJob"]
+    assert successor_map["PRICING_COMPLETED"] == []
+    workflow = next(
+        item for item in config.workflows if item.workflow_type == "ProductLifecycleWorkflow"
+    )
+    jobs = {job.job_type: tuple(job.successor_job_types) for job in workflow.jobs}
+    assert jobs["ListingCopyJob"] == ("PricingJob",)
+    assert jobs["PricingJob"] == ()
+    assert jobs["AssetFactoryJob"] == ("DraftListingJob",)
     assert "ASSET_QA_PASSED" not in successor_map
     assert "CREATE_ETSY_DRAFT" not in successor_map
 
@@ -135,6 +204,7 @@ async def test_passed_chain_creates_exactly_one_draft_listing_job(tmp_path: Path
         ({"claims_passed": False}, "claims"),
         ({"assets": chain_assets(shots=0)}, "screenshots"),
         ({"assets": chain_assets(images=len(IMAGE_ROLES) - 1)}, "listing_images"),
+        ({"assets": chain_assets(images=len(IMAGE_ROLES) + 1)}, "listing_images"),
         ({"assets": chain_assets(videos=0)}, "video"),
         ({"assets": chain_assets(videos=2)}, "video"),
         ({"assets": chain_assets(pdfs=1), "pdf_roles": ("readme",)}, "delivery_pdfs"),
@@ -183,14 +253,8 @@ async def test_draft_listing_job_is_ready_and_not_executed(
         called.append("executed")
         raise AssertionError("executed")
 
-    monkeypatch.setattr(
-        "money_machine.orchestration.leases.claim_ready_job",
-        _executed,
-    )
-    monkeypatch.setattr(
-        "money_machine.orchestration.worker._execute_job_with_runner",
-        _executed,
-    )
+    monkeypatch.setattr(worker, "claim_ready_job", _executed)
+    monkeypatch.setattr(worker, "_execute_job_with_runner", _executed)
     shop = Store()
     client = EtsyDraftClient(shop, DraftLedger(tmp_path))
     uow = _Uow()
@@ -203,3 +267,133 @@ async def test_draft_listing_job_is_ready_and_not_executed(
     assert job.heartbeat_at is None
     assert "DRAFT_CREATED" not in uow.events.names
     assert called == []
+
+
+async def test_copy_and_pricing_routes_do_not_add_a_second_draft_job(tmp_path: Path) -> None:
+    shop = Store()
+    client = EtsyDraftClient(shop, DraftLedger(tmp_path))
+    uow = _Uow()
+    evidence = chain_evidence()
+    await _dispatch(uow, EventName.LISTING_COPY_COMPLETED, evidence.product_id, job_id=_COPY_JOB)
+    await _dispatch(uow, EventName.PRICING_COMPLETED, evidence.product_id, job_id=_PRICE_JOB)
+    await _open(evidence, client, uow)
+    drafts = _drafts(uow)
+    assert len(drafts) == 1
+    assert drafts[0].status == "READY"
+    assert len([job for job in uow.session.jobs if job.job_type == "PricingJob"]) == 1
+    assert shop.posts == 1
+
+
+async def test_worker_shaped_copy_and_pricing_do_not_add_a_second_draft_job(
+    tmp_path: Path,
+) -> None:
+    shop = Store()
+    client = EtsyDraftClient(shop, DraftLedger(tmp_path))
+    uow = _Uow()
+    evidence = chain_evidence()
+    await _dispatch(
+        uow,
+        EventName.LISTING_COPY_COMPLETED,
+        evidence.product_id,
+        job_id=_COPY_JOB,
+        aggregate_type="Job",
+        aggregate_id=_COPY_JOB,
+    )
+    await _dispatch(
+        uow,
+        EventName.PRICING_COMPLETED,
+        evidence.product_id,
+        job_id=_PRICE_JOB,
+        aggregate_type="Job",
+        aggregate_id=_PRICE_JOB,
+    )
+    await _open(evidence, client, uow)
+    drafts = _drafts(uow)
+    assert len(drafts) == 1
+    assert drafts[0].status == "READY"
+    assert len([job for job in uow.session.jobs if job.job_type == "PricingJob"]) == 1
+    assert shop.posts == 1
+
+
+async def test_another_workflow_does_not_add_a_second_draft_job(tmp_path: Path) -> None:
+    shop = Store()
+    client = EtsyDraftClient(shop, DraftLedger(tmp_path))
+    uow = _Uow()
+    evidence = chain_evidence()
+    first = await _open(evidence, client, uow)
+    second = await _open(evidence, client, uow, workflow_id=_OTHER_WORKFLOW)
+    assert first.ready is True
+    assert second.ready is True
+    assert len(_drafts(uow)) == 1
+    assert _drafts(uow)[0].status == "READY"
+    assert shop.posts == 1
+
+
+async def test_a_failure_after_dispatch_leaves_no_job_or_event(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _boom(_source: object, _target: object) -> None:
+        raise RuntimeError("after dispatch")
+
+    monkeypatch.setattr(successor, "require_job_transition", _boom)
+    shop = Store()
+    client = EtsyDraftClient(shop, DraftLedger(tmp_path))
+    uow = _Uow()
+    with pytest.raises(RuntimeError, match="after dispatch"):
+        await _open(chain_evidence(), client, uow)
+    assert uow.session.jobs == []
+    assert uow.events.names == []
+    assert shop.posts == 1
+
+
+async def test_the_ready_status_is_flushed(tmp_path: Path) -> None:
+    shop = Store()
+    client = EtsyDraftClient(shop, DraftLedger(tmp_path))
+    uow = _Uow()
+    await _open(chain_evidence(), client, uow)
+    assert uow.session.flush_statuses[-1] == ("READY",)
+
+
+async def test_a_missing_successor_is_refused(tmp_path: Path) -> None:
+    shop = Store()
+    client = EtsyDraftClient(shop, DraftLedger(tmp_path))
+    uow = _Uow(_MissingJob())
+    with pytest.raises(RuntimeError, match="draft successor missing"):
+        await _open(chain_evidence(), client, uow)
+
+
+async def test_an_illegal_transition_is_refused(tmp_path: Path) -> None:
+    shop = Store()
+    client = EtsyDraftClient(shop, DraftLedger(tmp_path))
+    uow = _Uow(_CancelledJob())
+    with pytest.raises(InvalidTransitionError, match="CANCELLED -> READY"):
+        await _open(chain_evidence(), client, uow)
+
+
+async def test_an_existing_event_with_no_job_does_not_flush(tmp_path: Path) -> None:
+    evidence = chain_evidence()
+    uow = _Uow()
+    await uow.events.append(
+        event_name=EventName.ASSETS_COMPLETED,
+        aggregate_type="products",
+        aggregate_id=evidence.product_id,
+        workflow_id=_WORKFLOW,
+        job_id=None,
+        dedupe_key=":".join(
+            (
+                EventName.ASSETS_COMPLETED.value,
+                str(evidence.product_id),
+                str(_WORKFLOW),
+                "null",
+            )
+        ),
+        occurred_at=_NOW,
+    )
+    uow.session.flush_statuses.clear()
+    shop = Store()
+    client = EtsyDraftClient(shop, DraftLedger(tmp_path))
+    receipt = await _open(evidence, client, uow)
+    assert receipt.ready is True
+    assert uow.session.jobs == []
+    assert uow.session.flush_statuses == []
