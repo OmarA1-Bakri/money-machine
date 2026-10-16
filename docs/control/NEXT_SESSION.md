@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 11 fixture intake, session still not activated (2026-10-16)
+
+`support_intake.py` records one in-memory incident and a draft reply that is never sent. That is the Session 11 slice allowed by the 2026-10-16 addendum. It is not a session close. `current_session` stays 7. `next_session` stays 8. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. Exit 78 stays HELD. A16 stays `DESIGNED`. The twelve Session 07 evidence keys are still false, so `validate_activation_transition` still refuses Session 08. Sessions 09, 10, and 11 have no evidence contract. Reaching `current_session` 11 still requires honest Session 07 evidence, then completion and activation of 08, 09, and 10, each with its own contract. Fresh PDF, Notion, formula, and buyer-path reads stay deferred. No buyer message is sent.
+
 ## Session 10 wave 2 ledger, sessions still not activated (2026-10-16)
 
 `closed_loop_store.py` stores weekly and monthly trigger rows in a ledger and returns `LISTING_CULLED` only after a fixture status of `CONFIRMED`. That is Session 10 wave 2 from the 2026-10-16 addendum. It is not a session close. `current_session` stays 7. `next_session` stays 8. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The deactivation is unexecuted. Session 11 starts only after its own prompt-integrity addendum.

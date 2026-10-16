@@ -1,3 +1,13 @@
+## 2026-10-16 — Session 11 fixture intake, session not activated
+
+Session 11 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. Exit 78 stays HELD. A16 stays `DESIGNED` with an empty `commissioning_evidence` list. `config/agents.yaml`, `config/workflows.yaml`, `worker.py`, and `scheduler.py` are unchanged. No live Etsy, Notion, or S3 call. The exit string is not written.
+
+The prompt file is unchanged. SHA-256 remains `f5e5c5a000285286bbc3389ae4dd564b3accd9cc820f01b506b8b1cb536a1428`. The corrective addendum is `docs/control/reviews/2026-10-16-session-11-prompt-integrity.md`. Fidelity, safety, and gameability each returned CONDITIONAL APPROVE. The base of that review is `c01c7fc8f2894193499fcdcdbb850674419c8e9a`.
+
+`support_intake.py` stores one in-memory incident per shop, opaque buyer reference, and received time. A second call returns the first incident and the first summary. The issue code is an argument. The thirteen labels map onto the existing `IncidentType` and name existing job types. No job is inserted. `ACCOUNT_VERIFICATION` stays `BLOCKED`. `resolve_issue` returns `RESOLVED` only after a later matching read from a different job. Draft mode returns one acknowledgement, the verification's own fix and access path, and one reply invitation, with a send count of 0. `auto` returns no body. A URL, an email, `Bearer`, or `sk_` is refused and is not echoed.
+
+`uv run pytest -q -p no:cacheprovider --tb=short tests/unit/assets/test_support_intake.py tests/bootstrap/test_prompt_integrity.py` printed 29 passed. `ruff format`, `ruff check`, and `pyright` on the module and its test were clean. A full repository suite was not run. Activation of Session 08 remains refused because the twelve Session 07 evidence keys are false.
+
 ## 2026-10-16 — Session 10 wave 2 trigger ledger and fixture-confirmed cull
 
 Session 10 is not activated and is not complete. `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. `scheduler.py`, `config/workflows.yaml`, and `config/agents.yaml` are unchanged.
