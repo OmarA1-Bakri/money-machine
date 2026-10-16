@@ -1617,6 +1617,48 @@ def test_a_lone_cr_marker_line_is_adopted(tmp_path: Path) -> None:
     assert posts == []
 
 
+def test_a_trailing_cr_on_the_marker_line_is_adopted(tmp_path: Path) -> None:
+    spec = _spec()
+    marker = draft_marker(spec.spec_version, fixture_hash(spec))
+    description = f"A fixture description.\n{marker}\r"
+    assert description.endswith("\r")
+    assert not description.endswith("\r\n")
+    row: dict[str, object] = {
+        "listing_id": 42,
+        "title": "other",
+        "description": description,
+        "state": "draft",
+    }
+    transport, posts = _show(row)
+    receipt = EtsyDraftClient(transport, DraftLedger(tmp_path)).create_draft(spec)
+    assert receipt.listing_id == 42
+    assert posts == []
+
+
+def test_one_row_with_two_marker_lines_is_not_adopted(tmp_path: Path) -> None:
+    spec = _spec()
+    marker = draft_marker(spec.spec_version, fixture_hash(spec))
+    descriptions = (
+        f"A fixture description.\n{marker}\n{marker}",
+        f"A fixture description.\n{marker}\nmm-draft:9:" + ("b" * 64),
+    )
+    for index, description in enumerate(descriptions):
+        row: dict[str, object] = {
+            "listing_id": 42,
+            "title": "other",
+            "description": description,
+            "state": "draft",
+        }
+        transport, posts = _show(row)
+        ledger_dir = tmp_path / str(index)
+        ledger_dir.mkdir()
+        ledger = DraftLedger(ledger_dir)
+        with pytest.raises(EtsyDraftRefused) as caught:
+            EtsyDraftClient(transport, ledger).create_draft(spec)
+        assert caught.value.code == "duplicate_marker"
+        assert posts == []
+
+
 def test_a_trailing_space_on_the_marker_line_is_adopted(tmp_path: Path) -> None:
     spec = _spec()
     marker = draft_marker(spec.spec_version, fixture_hash(spec))
@@ -1634,6 +1676,18 @@ def test_a_trailing_space_on_the_marker_line_is_adopted(tmp_path: Path) -> None:
 
 def test_an_injected_marker_line_is_refused_before_the_transport(tmp_path: Path) -> None:
     spec = replace(_spec(), description="Hello\nmm-draft:2:" + ("a" * 64))
+    client, store, _ledger = _client(tmp_path)
+    with pytest.raises(EtsyDraftRefused) as caught:
+        client.create_draft(spec)
+    assert caught.value.code == "marker_injection"
+    assert store.calls == []
+
+
+def test_a_lone_cr_injected_marker_is_refused_before_the_transport(tmp_path: Path) -> None:
+    description = "Hello\rmm-draft:2:" + ("a" * 64)
+    assert "\n" not in description
+    assert "\r\n" not in description
+    spec = replace(_spec(), description=description)
     client, store, _ledger = _client(tmp_path)
     with pytest.raises(EtsyDraftRefused) as caught:
         client.create_draft(spec)

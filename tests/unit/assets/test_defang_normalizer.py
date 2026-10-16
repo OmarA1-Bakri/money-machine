@@ -203,6 +203,17 @@ def test_spaced_letters_do_not_borrow_another_host() -> None:
     assert refuse_paid_checkout(text) == "paid_checkout"
 
 
+def test_spaced_letters_do_not_borrow_a_host_inside_their_span() -> None:
+    """Spaced letters must match the host in that same span.
+
+    ``host_matches`` on the whole text still sees ``x dot com``. The spaced
+    letters sit in the earlier clause, so the screenshot path stays allowed.
+    """
+    text = "acme dot a b; x dot com"
+    assert refuse_sensitive_text(text) is None
+    assert refuse_paid_checkout(text) == "paid_checkout"
+
+
 def test_a_digit_one_tld_is_refused() -> None:
     assert refuse_paid_checkout("x dot 1o") == "paid_checkout"
     assert refuse_sensitive_text("x dot 1o") == "sensitive_data"
@@ -233,6 +244,38 @@ def test_paid_checkout_refuses_a_lowercase_cyrillic_em_in_c0m() -> None:
 
 def test_screenshot_text_refuses_a_lowercase_cyrillic_em_in_c0m() -> None:
     assert refuse_sensitive_text("acme . c0\u043c") == "sensitive_data"
+
+
+def test_screenshot_text_refuses_a_capital_cyrillic_em() -> None:
+    assert refuse_sensitive_text("acme . CO\u041c") == "sensitive_data"
+
+
+def test_paid_checkout_refuses_a_one_letter_com_before_a_word() -> None:
+    assert refuse_paid_checkout("x . com today") == "paid_checkout"
+    assert refuse_paid_checkout("x . co today") == "paid_checkout"
+    assert refuse_paid_checkout("x . net today") == "paid_checkout"
+    assert refuse_paid_checkout("acme . com today") is None
+    assert refuse_paid_checkout("3 . com today") is None
+    assert refuse_paid_checkout("acme . io") is None
+
+
+def test_paid_checkout_keeps_an_uppercase_outside_tld_as_prose() -> None:
+    assert refuse_paid_checkout("x . CO today") is None
+
+
+def test_screenshot_text_refuses_a_one_letter_com_before_a_word() -> None:
+    assert refuse_sensitive_text("x . com today") == "sensitive_data"
+    assert refuse_sensitive_text("x . co today") == "sensitive_data"
+    assert refuse_sensitive_text("x . net today") == "sensitive_data"
+    assert refuse_sensitive_text("acme . com today") is None
+    assert refuse_sensitive_text("3 . com today") is None
+    assert refuse_sensitive_text("acme . io") is None
+    assert refuse_sensitive_text("x dot com") is None
+    assert refuse_sensitive_text("x dot NET") is None
+
+
+def test_screenshot_text_keeps_an_uppercase_outside_tld_as_prose() -> None:
+    assert refuse_sensitive_text("x . CO today") is None
 
 
 def test_a_zero_width_char_inside_the_scheme_is_a_url() -> None:

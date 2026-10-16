@@ -12,9 +12,10 @@ The order is fixed:
    all-uppercase token is casefolded after that check. A lowercase token
    is compared as itself. A mixed-case token stays prose. ``c0m`` is the
    zero spelling of ``com``. A zero in ``org`` is the same digit map,
-   so ``0rg`` is ``org``. A later word still leaves a tight spaced form
-   alone. Spaced letters that begin one of those TLDs still undo when
-   another word or a stray letter follows. A lowercase ``co``, ``io``,
+   so ``0rg`` is ``org``. A later word leaves a tight spaced form
+   alone unless the label is one letter. Spaced letters that begin one
+   of those TLDs still undo when another word or a stray letter follows.
+   A lowercase ``co``, ``io``,
    or ``shop``, including letters split by spaces, undoes after a spaced
    ``.`` only when the label is one character and another word follows.
    A digit label does not take the digit map, so a step number stays
@@ -329,9 +330,11 @@ def _chosen_tld(
             tld_start=start,
         )
     token, token_end, spaced = accepted
-    if _relies_on_digit_map(token) and _label_before(chunk, start).isdigit():
+    label = _label_before(chunk, start)
+    if _relies_on_digit_map(token) and label.isdigit():
         return None
-    if boundary and not spaced and _word_follows(chunk, token_end, tail):
+    word_follows = boundary and not spaced and _word_follows(chunk, token_end, tail)
+    if word_follows and (len(label) != 1 or not label.isalpha()):
         return None
     return token, token_end
 
@@ -366,7 +369,8 @@ def _outside_curated(
 ) -> tuple[str, int] | None:
     if not boundary or not _word_follows(chunk, token_end, tail):
         return None
-    if not token.islower() or token in _SPACED_DOT_TLDS or token not in CURATED_TLDS:
+    folded = token.casefold()
+    if not token.islower() or folded in _SPACED_DOT_TLDS or folded not in CURATED_TLDS:
         return None
     if len(_label_before(chunk, tld_start)) != 1:
         return None
