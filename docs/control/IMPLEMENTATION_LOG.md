@@ -1,3 +1,11 @@
+## 2026-10-16 — Session 07 evidence transition, keys still false
+
+`current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. No evidence key flips. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. The exit string is not written.
+
+D-0036 amends D-0032's flip ban. `prove_session_07()` runs the mass and business fixture builds. `record-evidence` flips the ten behavioral keys and `control_files_and_checkpoint_current` only when that proof returns them and the five control files exist. The closure key flips later, alone, onto a commit that already holds those eleven as true. The live sandbox is not started. D-0029 and D-0030 stay in force.
+
+`uv run pytest -q -p no:cacheprovider --tb=short tests/bootstrap/test_session_07_evidence_record.py tests/bootstrap/test_session_07_proof.py` printed 14 passed in 1.24s. `ruff format`, `ruff check`, and `pyright` on the proof, the transition, the CLI, and the tests were clean. A full repository suite was not run.
+
 ## 2026-10-16 — Session evidence index for sessions 00-15
 
 `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. No evidence key flips.

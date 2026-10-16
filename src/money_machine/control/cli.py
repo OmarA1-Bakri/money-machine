@@ -11,6 +11,7 @@ from money_machine.control.state import (
     ControlStateError,
     apply_activation_transition,
     apply_completion_transition,
+    apply_evidence_record_transition,
 )
 
 _COMMANDS = {
@@ -23,6 +24,11 @@ _COMMANDS = {
         apply_activation_transition,
         "validate and atomically activate the recorded next session",
         "proposed activated state; this file is never modified",
+    ),
+    "record-evidence": (
+        apply_evidence_record_transition,
+        "record Session 07 keys the fixture proof earned",
+        "proposed evidence state; this file is never modified",
     ),
 }
 

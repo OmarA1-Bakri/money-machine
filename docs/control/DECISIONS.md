@@ -456,3 +456,29 @@ A migration that rewrote `dedupe_key` was the other option. It was not taken. Th
 ### Consequences
 
 A seeded legacy row beside a `PENDING` `DraftListingJob` stays one event, keeps the legacy key, does not gain the product key, and the job moves to `READY`. The global key for every other event is unchanged. No migration is added. Exit 78 stays HELD. Session 08 stays inactive.
+
+## D-0036 — Session 07 keys are earned by the fixture proof
+
+**Status:** accepted 2026-10-16. Operator instruction: earn the keys.
+
+### Context
+
+D-0032 closed Session 07 at `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` and left the twelve evidence keys false. `session_status` is already `complete`, so `apply-completion` cannot flip them. `activate` refuses Session 08 while any Session 07 key is false. A hand edit of `IMPLEMENTATION_STATE.json` is not a transition.
+
+The fixture product build already runs phase 1 through the test matrix for the mass tier and the business tier. That run is the proof. The live Notion sandbox stays unauthorized. A07, A08, and A09 stay `DESIGNED`. D-0029 still records `ListingCopyJob` as a ready name and does not insert the job. D-0030 still leaves the three section-11 fixture defects blocked. This proof does not repair them in place.
+
+### Decision
+
+D-0032's pointer stays. `current_session` stays 7. `session_status` stays complete. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `commissioned_agents` stays empty. Exit 78 stays HELD. The exit string is not written.
+
+Keys change only through `record-evidence` (`apply_evidence_record_transition`):
+
+- The ten behavioral keys flip together, and only when `prove_session_07()` returns that exact set. The control-file key flips in the same transition when the five control files exist. `evidence_closure_commit_sha` stays the Session 06 tip for that transition.
+- `evidence_closure_commit_recorded` flips alone, later. `evidence_closure_commit_sha` then becomes a commit that contains `def prove_session_07` and a state file where the other eleven keys are true and the closure key is still false. `head_sha` does not move.
+- A key that is already true cannot become false. A candidate that sets one key, or that sets the closure key early, is refused.
+
+The worktree is the Git root that contains the state file. The recorded `repo_root` is not required to exist on the machine that applies the transition.
+
+### Consequences
+
+Session 08 stays inactive until a later activation, and that activation still requires every Session 07 key to be true. The historical close at `00b952a83bffcec8d442468223d64dd9b2d3e6df` stays all false. The live sandbox is not started. No live Etsy, Notion, or S3 call is made.

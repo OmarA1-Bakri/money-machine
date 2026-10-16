@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-16 — Session 07 evidence transition
+
+**Verification scope**: `session_07_proof.py`, `state.py` evidence transition, `cli.py` `record-evidence`, and the two bootstrap tests. No `IMPLEMENTATION_STATE.json` change. No live HTTP. No key flip. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Behavioral keys | `prove_session_07()` returns the ten keys for mass and business | PASS |
+| One key, early closure, revocation, revision, session, head | `validate_evidence_record_transition` refuses | PASS |
+| Eleven keys | Temp-repo `apply_evidence_record_transition` after the proof | PASS |
+| Closure | Refused when the named commit is still all false; accepted when that commit has the eleven true and `def prove_session_07` | PASS |
+| Live file | Bytes unchanged. Revision stays 64 | PASS |
+
+`uv run pytest -q -p no:cacheprovider --tb=short tests/bootstrap/test_session_07_evidence_record.py tests/bootstrap/test_session_07_proof.py` printed `14 passed in 1.24s`. A full repository suite was not run.
+
 ## 2026-10-16 — Session evidence index
 
 **Verification scope**: `session_evidence.py`, `SESSION_EVIDENCE.md`, and `test_session_evidence.py`. No `IMPLEMENTATION_STATE.json` change. No live HTTP. No key flip.

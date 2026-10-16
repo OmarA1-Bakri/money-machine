@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -13,6 +14,13 @@ from contextlib import contextmanager, suppress
 from pathlib import Path
 from types import MappingProxyType
 from typing import TypedDict, cast
+
+from money_machine.control.session_07_proof import (
+    BEHAVIORAL_EVIDENCE_KEYS,
+    CONTROL_EVIDENCE_KEY,
+    Session07ProofError,
+    prove_session_07,
+)
 
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 BOOTSTRAP_COMMIT_SUBJECT = "chore(bootstrap): initialise money machine autonomous monorepo"
@@ -161,9 +169,8 @@ SESSION_EVIDENCE_KEYS: Mapping[int, frozenset[str]] = MappingProxyType(
         ),
         7: frozenset(
             {
-                # Session 07 installs the contract and leaves every key false.
-                # Wave 1 is the fixture design shell. Wave 2 stores shared databases.
-                # Neither wave completes the builder.
+                # D-0032 installed this contract with every key false.
+                # D-0036 records a key only through record-evidence.
                 "notion_product_builder_implemented",
                 "shared_databases_built",
                 "home_dashboard_built",
@@ -272,6 +279,21 @@ _COMPLETION_MUTABLE_FIELDS = frozenset(
         "blockers",
         "transition_contract",
     }
+)
+_EVIDENCE_MUTABLE_FIELDS = frozenset(
+    {
+        "state_revision",
+        "updated_at",
+        "required_completion_evidence",
+        "evidence_closure_commit_sha",
+    }
+)
+_CONTROL_FILE_PATHS = (
+    Path("docs/control/IMPLEMENTATION_STATE.json"),
+    Path("docs/control/IMPLEMENTATION_LOG.md"),
+    Path("docs/control/DECISIONS.md"),
+    Path("docs/control/TEST_EVIDENCE.md"),
+    Path("docs/control/NEXT_SESSION.md"),
 )
 
 
@@ -853,6 +875,149 @@ def _verify_activation_repository(
 ) -> None:
     del previous
     _validate_repo_identity(state_path, current)
+
+
+def _evidence_values(state: ControlState) -> dict[str, bool]:
+    evidence = state["required_completion_evidence"]
+    if set(evidence) != set(BEHAVIORAL_EVIDENCE_KEYS) | {
+        CONTROL_EVIDENCE_KEY,
+        _CLOSURE_EVIDENCE_KEY,
+    }:
+        raise ControlStateError("session 07 evidence keys are missing or unsupported")
+    return evidence
+
+
+def _flipped_evidence(previous: ControlState, current: ControlState) -> set[str]:
+    before = _evidence_values(previous)
+    after = _evidence_values(current)
+    reverted = sorted(key for key, value in before.items() if value is True and after[key] is False)
+    if reverted:
+        raise ControlStateError("evidence record cannot revoke a key: " + ", ".join(reverted))
+    return {key for key, value in before.items() if value is False and after[key] is True}
+
+
+def validate_evidence_record_transition(previous: ControlState, current: ControlState) -> None:
+    """Record Session 07 keys that the fixture proof earned. The pointer stays on session 7.
+
+    The behavioral keys and the control-file key flip together. The closure key flips
+    only after those eleven are already true, and only with a new closure commit.
+    """
+    if previous["current_session"] != 7 or current["current_session"] != 7:
+        raise ControlStateError(
+            "unsupported evidence record: only session 07 can record these keys"
+        )
+    if previous["session_status"] != "complete" or current["session_status"] != "complete":
+        raise ControlStateError("unsupported evidence record: session 07 must stay complete")
+    _require_same_fields(previous, current, _EVIDENCE_MUTABLE_FIELDS, "evidence record")
+    if current["state_revision"] != previous["state_revision"] + 1:
+        raise ControlStateError("state revision must advance exactly once")
+    if current["updated_at"] == previous["updated_at"]:
+        raise ControlStateError("updated_at must change for the evidence record")
+    flipped = _flipped_evidence(previous, current)
+    if not flipped:
+        raise ControlStateError("evidence record must change at least one key")
+    earned = set(BEHAVIORAL_EVIDENCE_KEYS) | {CONTROL_EVIDENCE_KEY}
+    if _CLOSURE_EVIDENCE_KEY in flipped:
+        if flipped != {_CLOSURE_EVIDENCE_KEY}:
+            raise ControlStateError("the closure key flips alone")
+        missing = sorted(
+            key for key in earned if previous["required_completion_evidence"][key] is not True
+        )
+        if missing:
+            raise ControlStateError(
+                "closure requires the earned session 07 keys: " + ", ".join(missing)
+            )
+        if current["evidence_closure_commit_sha"] == previous["evidence_closure_commit_sha"]:
+            raise ControlStateError("closure commit must change when the closure key flips")
+        if not SHA_PATTERN.fullmatch(current["evidence_closure_commit_sha"] or ""):
+            raise ControlStateError("closure commit must be a full git sha")
+        return
+    if current["evidence_closure_commit_sha"] != previous["evidence_closure_commit_sha"]:
+        raise ControlStateError("closure commit cannot change before the closure key")
+    if _CLOSURE_EVIDENCE_KEY in current["required_completion_evidence"] and (
+        current["required_completion_evidence"][_CLOSURE_EVIDENCE_KEY] is True
+    ):
+        raise ControlStateError("the closure key stays false until the earned keys are recorded")
+    missing = sorted(
+        key for key in earned if current["required_completion_evidence"][key] is not True
+    )
+    if missing:
+        raise ControlStateError(
+            "evidence record must set every key the fixture proof earned: " + ", ".join(missing)
+        )
+    extra = sorted(flipped - earned)
+    if extra:
+        raise ControlStateError("evidence record cannot set an unearned key: " + ", ".join(extra))
+
+
+def _evidence_worktree(state_path: Path) -> Path:
+    root = Path(_git(state_path.parent, "rev-parse", "--show-toplevel").stdout.strip())
+    expected = (root / CANONICAL_STATE_RELATIVE_PATH).resolve()
+    if state_path.resolve() != expected:
+        raise ControlStateError("state file must be the canonical implementation state")
+    return root
+
+
+def _require_control_files(root: Path) -> None:
+    missing = [str(path) for path in _CONTROL_FILE_PATHS if not (root / path).is_file()]
+    if missing:
+        raise ControlStateError("control files are missing: " + ", ".join(missing))
+
+
+def _require_earned_proof() -> None:
+    try:
+        earned = asyncio.run(prove_session_07())
+    except Session07ProofError as error:
+        raise ControlStateError(f"session 07 evidence proof refused: {error.code}") from error
+    if earned != BEHAVIORAL_EVIDENCE_KEYS:
+        raise ControlStateError("session 07 evidence proof did not earn the behavioral keys")
+
+
+def _require_closure_commit(root: Path, sha: str) -> None:
+    _git(root, "cat-file", "-e", f"{sha}^{{commit}}")
+    _git(root, "merge-base", "--is-ancestor", sha, "HEAD")
+    proof = _git(root, "show", f"{sha}:src/money_machine/control/session_07_proof.py").stdout
+    if "def prove_session_07" not in proof:
+        raise ControlStateError("closure commit does not contain the session 07 proof")
+    raw = _git(root, "show", f"{sha}:docs/control/IMPLEMENTATION_STATE.json").stdout
+    decoded = cast(object, json.loads(raw))
+    if not isinstance(decoded, dict):
+        raise ControlStateError("closure commit state is not an object")
+    evidence = cast(dict[str, object], decoded).get("required_completion_evidence")
+    if not isinstance(evidence, dict):
+        raise ControlStateError("closure commit has no evidence map")
+    values = cast(dict[object, object], evidence)
+    for key in BEHAVIORAL_EVIDENCE_KEYS | {CONTROL_EVIDENCE_KEY}:
+        if values.get(key) is not True:
+            raise ControlStateError(f"closure commit has not earned {key}")
+    if values.get(_CLOSURE_EVIDENCE_KEY) is not False:
+        raise ControlStateError("closure commit must still have the closure key false")
+
+
+def _verify_evidence_repository(
+    state_path: Path,
+    previous: ControlState,
+    current: ControlState,
+) -> None:
+    del previous
+    root = _evidence_worktree(state_path)
+    _require_control_files(root)
+    _require_earned_proof()
+    if current["required_completion_evidence"][_CLOSURE_EVIDENCE_KEY] is True:
+        closure = current["evidence_closure_commit_sha"]
+        if closure is None:
+            raise ControlStateError("closure commit must be a full git sha")
+        _require_closure_commit(root, closure)
+
+
+def apply_evidence_record_transition(state_path: Path, candidate_path: Path) -> ControlState:
+    """Validate a Session 07 evidence candidate and atomically replace the state file."""
+    return _apply_transition(
+        state_path,
+        candidate_path,
+        validate_evidence_record_transition,
+        _verify_evidence_repository,
+    )
 
 
 def apply_completion_transition(state_path: Path, candidate_path: Path) -> ControlState:
