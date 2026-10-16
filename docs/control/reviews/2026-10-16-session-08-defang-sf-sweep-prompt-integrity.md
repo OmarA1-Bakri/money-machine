@@ -35,12 +35,12 @@ Action 5 refuses sample data in screenshot text. Action 6 refuses a paid checkou
 - **Consequence:** A spaced translate that drops `1` to `i` still passes every row. `x dot 1o` only kills the bare path.
 - **Amendment:** A spaced token whose digit map is `io` refuses. `x . 1o` and `acme . 1o` are `paid_checkout` and `sensitive_data`. Literal `acme . io` stays prose. Dropping `io` from the spaced digit targets fails only that row.
 
-**F-03 [HIGH] — A lone CR is the safe direction, and stripping every CR is unpinned**
+**F-03 [HIGH] — Deleting a CR is a different string from folding it**
 
 - **Prompt lines:** Action 9, draft lookup.
-- **Authority:** `_row_text` folds `\r\n` to `\n` and leaves a lone `\r`. The #92 row posts when the two walks differ only by CRLF versus LF. Stripping every `\r` still posts that row.
-- **Consequence:** `description.replace("\r", "")` ships. A lone CR compared with the same text without that CR would post.
-- **Amendment:** `alpha\rbeta` against `alphabeta` refuses with `count` and zero posts. The CRLF pair still posts. The fold stays `\r\n` to `\n`.
+- **Authority:** #95 folds `\r\n` to `\n`, then folds a leftover `\r` to `\n`. `alpha\rbeta` and `alpha\nbeta` post. The #92 row posts when the two walks differ only by CRLF versus LF.
+- **Consequence:** `description.replace("\r", "")` makes `alpha\rbeta` equal `alphabeta`, and that pair would post.
+- **Amendment:** A lone CR folds to LF. `alpha\rbeta` against `alphabeta` still refuses with `count` and zero posts. The CR-versus-LF pair posts. The CRLF pair still posts.
 
 **F-04 [HIGH] — Lowercase words are not hosts**
 
@@ -91,7 +91,7 @@ Action 5 refuses sample data in screenshot text. Action 6 refuses a paid checkou
 1. Prove the prompt hash. It stays `a7a406cecd9c93efdec1045f394b911e614cd79366840e33d5c53d9968f7cd33`.
 2. Delete the dead `_ZERO_TO_O` branch. `x . 0rg` still refuses.
 3. Accept a spaced digit map that lands on `io`. `x . 1o` and `acme . 1o` refuse on both paths. Literal `acme . io` stays prose.
-4. A lone `\r` is not folded. `alpha\rbeta` against `alphabeta` refuses with `count` and zero posts. The CRLF pair still posts.
+4. #95 folds a leftover `\r` to `\n`, so `alpha\rbeta` and `alpha\nbeta` post. `alpha\rbeta` against `alphabeta` still refuses with `count` and zero posts. The CRLF pair still posts.
 5. Reuse `_TwoWalks` for the CRLF post when the posted body can be passed in.
 6. A `co`, `io`, or `shop` after a spaced dot, including letter-spaced `c o`, undoes only when the label is one character and a word follows. A digit label does not take the digit map. The four prose rows stay prose. `x . shop now` and `x dot 1o` still refuse.
 7. `x . c o today` and `x dot c o m` refuse on both paths. Screenshot text still allows `x dot com`.
