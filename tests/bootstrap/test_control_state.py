@@ -1571,7 +1571,7 @@ def test_session_eight_activation_rejects_false_session_seven_evidence(tmp_path:
     assert STATE_PATH.read_bytes() == checked_in
     assert load_state()["current_session"] == 12
     assert load_state()["session_status"] == "incomplete"
-    assert load_state()["state_revision"] == 94
+    assert load_state()["state_revision"] == 95
     assert load_state()["next_session"] == 12
 
 
@@ -1598,7 +1598,7 @@ def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: 
     assert live["current_session"] == 12
     assert live["session_status"] == "incomplete"
     assert live["next_session"] == 12
-    assert live["state_revision"] == 94
+    assert live["state_revision"] == 95
     assert live["head_sha"] == "d095501665fbda0f9e6a0e77b57531bc33fda4e2"
     assert live["evidence_closure_commit_sha"] == live["head_sha"]
     live_evidence = live["required_completion_evidence"]
@@ -1606,7 +1606,8 @@ def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: 
     assert live_evidence["console_read_model_implemented"] is True
     assert live_evidence["exception_views_implemented"] is True
     assert live_evidence["telemetry_redaction_implemented"] is True
-    assert sum(value is True for value in live_evidence.values()) == 3
+    assert live_evidence["operator_actions_fail_closed"] is True
+    assert sum(value is True for value in live_evidence.values()) == 4
 
 
 def test_activation_uses_the_worktree_when_recorded_root_is_absent(tmp_path: Path) -> None:

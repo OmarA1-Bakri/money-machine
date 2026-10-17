@@ -77,7 +77,7 @@ def test_live_pointer_is_incomplete_session_10() -> None:
     """Session 09 stays closed. Session 12 records the read model, views, and redaction."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 94
+    assert live["state_revision"] == 95
     assert live["current_session"] == 12
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(12))
@@ -89,7 +89,8 @@ def test_live_pointer_is_incomplete_session_10() -> None:
     assert evidence["console_read_model_implemented"] is True
     assert evidence["exception_views_implemented"] is True
     assert evidence["telemetry_redaction_implemented"] is True
-    assert sum(value is True for value in evidence.values()) == 3
+    assert evidence["operator_actions_fail_closed"] is True
+    assert sum(value is True for value in evidence.values()) == 4
     assert "SESSION_09_ETSY_PUBLISHING_COMPLETE" not in text
 
 

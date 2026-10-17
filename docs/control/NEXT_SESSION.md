@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 12 operator actions fail closed (2026-10-17)
+
+Revision 95 records `console_read_model_implemented`, `exception_views_implemented`, `telemetry_redaction_implemented`, and `operator_actions_fail_closed`. The control-file key and the closure key stay false. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. The next honest step is `control_files_and_checkpoint_current`, through its own proof.
+
 ## Session 12 telemetry redaction is recorded (2026-10-17)
 
 Revision 94 records `console_read_model_implemented`, `exception_views_implemented`, and `telemetry_redaction_implemented`. The other three Session 12 keys stay false. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. The next honest step is `operator_actions_fail_closed`, through its own proof.

@@ -1,7 +1,7 @@
-"""Earn the Session 12 read-model, exception-view, and telemetry-redaction keys.
+"""Earn the Session 12 read-model, view, telemetry, and fail-closed action keys.
 
 The proof does not open a socket, read a credential, or write a cap.
-The telemetry key may be either bool: the record flips it after this proof has run.
+The action key may be either bool: the record flips it after this proof has run.
 """
 
 from __future__ import annotations
@@ -11,6 +11,11 @@ import inspect
 import json
 from pathlib import Path
 
+from money_machine.assets.operator_actions import (
+    OPERATOR_ACTIONS,
+    OperatorActionRefusal,
+    refuse_operator_action,
+)
 from money_machine.assets.operator_console import (
     BlockerView,
     CompletionView,
@@ -38,16 +43,27 @@ from money_machine.assets.telemetry_redaction import (
 READ_MODEL_EVIDENCE_KEY = "console_read_model_implemented"
 VIEWS_EVIDENCE_KEY = "exception_views_implemented"
 TELEMETRY_EVIDENCE_KEY = "telemetry_redaction_implemented"
+ACTIONS_EVIDENCE_KEY = "operator_actions_fail_closed"
 EARNED_EVIDENCE_KEYS = frozenset(
-    {READ_MODEL_EVIDENCE_KEY, VIEWS_EVIDENCE_KEY, TELEMETRY_EVIDENCE_KEY}
+    {
+        READ_MODEL_EVIDENCE_KEY,
+        VIEWS_EVIDENCE_KEY,
+        TELEMETRY_EVIDENCE_KEY,
+        ACTIONS_EVIDENCE_KEY,
+    }
 )
 _UNEARNED_KEYS = (
-    "operator_actions_fail_closed",
     "control_files_and_checkpoint_current",
     "evidence_closure_commit_recorded",
 )
 _SESSION_12_KEYS = frozenset(
-    {READ_MODEL_EVIDENCE_KEY, VIEWS_EVIDENCE_KEY, TELEMETRY_EVIDENCE_KEY, *_UNEARNED_KEYS}
+    {
+        READ_MODEL_EVIDENCE_KEY,
+        VIEWS_EVIDENCE_KEY,
+        TELEMETRY_EVIDENCE_KEY,
+        ACTIONS_EVIDENCE_KEY,
+        *_UNEARNED_KEYS,
+    }
 )
 _CONTROL_FILES = (
     Path("docs/control/IMPLEMENTATION_STATE.json"),
@@ -76,6 +92,7 @@ def prove_session_12() -> frozenset[str]:
     _prove_read_model()
     _prove_views()
     _prove_telemetry()
+    _prove_actions()
     _prove_control_files()
     return EARNED_EVIDENCE_KEYS
 
@@ -597,6 +614,69 @@ def _prove_telemetry() -> None:
             raise Session12ProofError("telemetry_redaction")
 
 
+def _prove_actions() -> None:
+    """Every named operator action is refused. The worker and the scheduler stay byte-identical."""
+    module = inspect.getmodule(refuse_operator_action)
+    if module is None or module.__file__ is None:
+        raise Session12ProofError("operator_action")
+    source = Path(module.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    imported: list[str] = []
+    calls: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module is not None:
+            imported.append(node.module)
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            calls.append(node.func.id)
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            calls.append(node.func.attr)
+    folded = " ".join(imported)
+    if any(
+        token in folded
+        for token in ("socket", "httpx", "urllib", "requests", "worker", "scheduler")
+    ):
+        raise Session12ProofError("operator_action")
+    if any(name in calls for name in ("open", "write", "pause", "resume", "capture", "send")):
+        raise Session12ProofError("operator_write")
+    if len(OPERATOR_ACTIONS) != 9 or len(set(OPERATOR_ACTIONS)) != 9:
+        raise Session12ProofError("operator_action")
+    root = Path(__file__).resolve().parents[3]
+    watched = (
+        root / "src/money_machine/orchestration/worker.py",
+        root / "src/money_machine/orchestration/scheduler.py",
+    )
+    before = tuple(path.read_bytes() for path in watched)
+    for action in OPERATOR_ACTIONS:
+        try:
+            refuse_operator_action(action)
+        except OperatorActionRefusal as error:
+            if error.code != "closed":
+                raise Session12ProofError("operator_action") from error
+        else:
+            raise Session12ProofError("operator_action")
+    for action in ("edit_database", "pause/resume workflow", "trigger safe schedule run"):
+        try:
+            refuse_operator_action(action)
+        except OperatorActionRefusal as error:
+            if error.code != "closed":
+                raise Session12ProofError("operator_action") from error
+        else:
+            raise Session12ProofError("operator_action")
+    try:
+        refuse_operator_action("connected")
+    except OperatorActionRefusal as error:
+        if error.code != "unknown":
+            raise Session12ProofError("operator_status_word") from error
+    else:
+        raise Session12ProofError("operator_status_word")
+    if tuple(path.read_bytes() for path in watched) != before:
+        raise Session12ProofError("operator_write")
+    if "Exit 78 held" not in watched[0].read_text(encoding="utf-8"):
+        raise Session12ProofError("operator_write")
+
+
 def _prove_control_files() -> None:
     """The continuity files and the catalogue match the checked-in pointer."""
     root = Path(__file__).resolve().parents[3]
@@ -634,7 +714,8 @@ def _prove_control_files() -> None:
         or len(evidence) != len(recorded)
         or evidence.get(READ_MODEL_EVIDENCE_KEY) is not True
         or evidence.get(VIEWS_EVIDENCE_KEY) is not True
-        or not isinstance(evidence.get(TELEMETRY_EVIDENCE_KEY), bool)
+        or evidence.get(TELEMETRY_EVIDENCE_KEY) is not True
+        or not isinstance(evidence.get(ACTIONS_EVIDENCE_KEY), bool)
         or any(evidence.get(key) is not False for key in _UNEARNED_KEYS)
     ):
         raise Session12ProofError("control_checkpoint")

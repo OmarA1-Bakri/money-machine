@@ -1050,3 +1050,19 @@ Session 12 is incomplete at revision 93. D-0067 recorded the exception views. Th
 ### Consequences
 
 Revision 94 is incomplete Session 12. Three keys are true. The next honest step is `operator_actions_fail_closed`, through its own proof.
+
+## D-0069 — Session 12 records fail-closed operator actions
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 12 is incomplete at revision 94. D-0068 recorded telemetry redaction. The prompt-integrity addendum names the operator actions and fails them closed. A live pause, resume, cap change, credential write, or schedule run stays deferred. `worker.py` and `scheduler.py` stay untouched. Exit 78 stays HELD.
+
+### Decision
+
+`record-evidence` sets `operator_actions_fail_closed` true and keeps the read-model, exception-view, and telemetry keys true. The control-file key and the closure key stay false. The nine named actions are inspect, retry an eligible failed job, reconcile an uncertain effect, supply credential status, pause a workflow, resume a workflow, change standing authority, create a customer issue, and trigger a schedule run. Each one is refused. Arbitrary database editing is refused. A status word is not an action. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. No socket is opened and no cap is written.
+
+### Consequences
+
+Revision 95 is incomplete Session 12. Four keys are true. The next honest step is `control_files_and_checkpoint_current`, through its own proof.

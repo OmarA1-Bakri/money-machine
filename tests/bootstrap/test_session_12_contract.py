@@ -69,7 +69,8 @@ def test_live_pointer_is_the_session_12_activation() -> None:
     expected["console_read_model_implemented"] = True
     expected["exception_views_implemented"] = True
     expected["telemetry_redaction_implemented"] = True
-    assert live["state_revision"] == 94
+    expected["operator_actions_fail_closed"] = True
+    assert live["state_revision"] == 95
     assert live["current_session"] == 12
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(12))
