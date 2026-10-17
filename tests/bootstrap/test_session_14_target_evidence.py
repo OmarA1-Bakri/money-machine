@@ -111,7 +111,7 @@ def test_record_refuses_a_second_key() -> None:
     previous = _previous()
     current = _earned(previous)
     evidence = dict(current["required_completion_evidence"])
-    evidence["release_rollback_implemented"] = True
+    evidence["service_controls_fail_closed"] = True
     current["required_completion_evidence"] = evidence
     with pytest.raises(ControlStateError, match="exactly the keys"):
         validate_session_14_evidence_record(previous, current)

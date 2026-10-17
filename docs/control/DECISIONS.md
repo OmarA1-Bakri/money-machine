@@ -1290,3 +1290,19 @@ Session 14 is incomplete at revision 106. `deployment_target_recorded` is true (
 ### Consequences
 
 The next honest step is `release_rollback_implemented`. The proof binds an image tag to a commit, plans a backup before migration, refuses live postgres, and fails a compatibility check when the schema is incompatible. It does not push an image. A live deploy stays deferred.
+
+## D-0084 — Session 14 release plan
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 14 is incomplete at revision 107. `deployment_target_recorded` and `production_packaging_defined` are true (D-0082, D-0083). The package check does not push an image or open live postgres. `docs/architecture/DEPLOYMENT.md` already requires a backup before a migration that cannot be reversed, schema-compatible code before destructive cleanup, and an image rollback only when schema compatibility is proved.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 107 to 108. `updated_at` is `2026-10-17T15:15:00Z`. `release_rollback_implemented` is true. `deployment_target_recorded` and `production_packaging_defined` stay true. The other three Session 14 keys stay false. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. `src/money_machine/deploy/release.py` binds `money-machine:<commit>` to the 40-hex commit, calls the fixture backup before the schema check, refuses `postgres` with `live_postgres`, refuses `push` with `image_push`, refuses an unbound tag, and refuses an unreachable schema with `incompatible_schema`. A destructive fixture revision stays forward-compatible after the backup and `rollback_image` raises `rollback_refused`. `image_pushed` stays false. No image is pushed. No git tag is created. Exit 78 stays HELD.
+
+### Consequences
+
+The next honest step is `service_controls_fail_closed`. The proof refuses start, stop, restart, status, logs, scale, a second scheduler, migrate, and a safe update. A status word is not a running service. It does not open a docker socket. A live deploy and a scheduled production backup stay deferred. Exit 78 stays HELD. The exit string is not written.

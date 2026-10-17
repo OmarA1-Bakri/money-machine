@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 14 release plan recorded
+
+`record-evidence` advanced `state_revision` from 107 to 108. `updated_at` is `2026-10-17T15:15:00Z`. `deployment_target_recorded`, `production_packaging_defined`, and `release_rollback_implemented` are true. The other three Session 14 keys stay false. `current_session` stays 14. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. The release plan binds the image tag to the closure commit, plans a fixture backup before the schema check, refuses live postgres, and refuses an incompatible schema. No image is pushed. Exit 78 stays HELD.
+
 ## 2026-10-17 — Session 14 production package recorded
 
 `record-evidence` advanced `state_revision` from 106 to 107. `updated_at` is `2026-10-17T15:10:00Z`. `deployment_target_recorded` and `production_packaging_defined` are true. The other four Session 14 keys stay false. `current_session` stays 14. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. The package check reads `compose.prod.yaml` and the six runbooks. Worker and scheduler restart stay `no`. No image is built. Exit 78 stays HELD.

@@ -1,9 +1,10 @@
 # Session evidence
 
-The checked-in pointer is Session 14 at state revision 107.
+The checked-in pointer is Session 14 at state revision 108.
 `current_session` is 14. `session_status` is incomplete.
 `deployment_target_recorded` and `production_packaging_defined` are true.
-The other four Session 14 keys are false.
+`release_rollback_implemented` is true.
+The other three Session 14 keys are false.
 Session 10 is complete and every one of its keys is true.
 Session 09 is complete and every one of its keys is true.
 Session 08 is complete and every one of its keys is true.
@@ -15,7 +16,7 @@ Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
 Session 13 is complete. Every key is true.
-Session 14 is incomplete. The target and the package are recorded.
+Session 14 is incomplete. The target, the package, and the release plan are recorded.
 Session 15 has no contract.
 
 ## Session 00
@@ -278,7 +279,7 @@ Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
 Session 13 is complete. Every key is true.
-Session 14 is incomplete. The target and the package are recorded.
+Session 14 is incomplete. The target, the package, and the release plan are recorded.
 Session 15 has no contract.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
@@ -287,7 +288,7 @@ A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 Prompt: `14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md`.
 Status: complete.
 Evidence contract: installed.
-Every Session 11 key is earned. Session 12 is complete. Session 13 is complete. Session 14 is activated and incomplete. The deployment target and the production package are recorded. A live deploy is not recorded. A16 stays DESIGNED.
+Every Session 11 key is earned. Session 12 is complete. Session 13 is complete. Session 14 is incomplete. The target, the package, and the release plan are recorded. A live deploy is not recorded. A16 stays DESIGNED.
 
 Fixture paths:
 
@@ -307,7 +308,7 @@ Fixture paths:
 Prompt: `15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md`.
 Status: complete.
 Evidence contract: installed.
-Every Session 12 key is earned. Session 13 is complete. Session 14 is activated and incomplete. The deployment target and the production package are recorded. A live deploy is not recorded. Exit 78 stays HELD.
+Every Session 12 key is earned. Session 13 is complete. Session 14 is incomplete. The target, the package, and the release plan are recorded. A live deploy is not recorded. Exit 78 stays HELD.
 
 Fixture paths:
 
@@ -330,7 +331,7 @@ Fixture paths:
 Prompt: `16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md`.
 Status: complete.
 Evidence contract: installed.
-Every Session 13 key is earned. Session 14 is activated and incomplete. The deployment target and the production package are recorded. A live deploy is not recorded. Exit 78 stays HELD.
+Every Session 13 key is earned. Session 14 is incomplete. The target, the package, and the release plan are recorded. A live deploy is not recorded. Exit 78 stays HELD.
 
 Fixture paths:
 
@@ -353,12 +354,13 @@ Fixture paths:
 Prompt: `17_SESSION_14_DEPLOYMENT.md`.
 Status: incomplete.
 Evidence contract: installed.
-The deployment target and the production package are recorded. The other keys are not earned. A live deploy is not recorded.
+The target, the package, and the release plan are recorded. The other keys are not earned.
 
 Fixture paths:
 
 - `src/money_machine/deploy/target.py`
 - `src/money_machine/deploy/packaging.py`
+- `src/money_machine/deploy/release.py`
 
 | Key | Recorded |
 |---|---|
@@ -366,7 +368,7 @@ Fixture paths:
 | `deployment_target_recorded` | true |
 | `evidence_closure_commit_recorded` | false |
 | `production_packaging_defined` | true |
-| `release_rollback_implemented` | false |
+| `release_rollback_implemented` | true |
 | `service_controls_fail_closed` | false |
 
 ## Session 15

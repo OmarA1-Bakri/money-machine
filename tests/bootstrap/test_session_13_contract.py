@@ -67,13 +67,13 @@ def test_session_13_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_is_incomplete_session_13() -> None:
-    """Session 13 stays closed. Session 14 records the target and the package."""
+    """Session 13 stays closed. Session 14 records the release plan."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 107
+    assert live["state_revision"] == 108
     assert live["current_session"] == 14
     assert live["session_status"] == "incomplete"
-    assert live["updated_at"] == "2026-10-17T15:10:00Z"
+    assert live["updated_at"] == "2026-10-17T15:15:00Z"
     assert live["completed_sessions"] == list(range(14))
     assert live["next_session"] == 14
     assert live["head_sha"] == CLOSURE_HEAD
@@ -82,7 +82,8 @@ def test_live_pointer_is_incomplete_session_13() -> None:
     assert set(evidence) == set(SESSION_EVIDENCE_KEYS[14])
     assert evidence["deployment_target_recorded"] is True
     assert evidence["production_packaging_defined"] is True
-    assert sum(1 for value in evidence.values() if value is True) == 2
+    assert evidence["release_rollback_implemented"] is True
+    assert sum(1 for value in evidence.values() if value is True) == 3
     assert "SESSION_13_E2E_AND_HARDENING_COMPLETE" not in text
 
 

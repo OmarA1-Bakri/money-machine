@@ -74,10 +74,10 @@ def test_session_09_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_is_incomplete_session_10() -> None:
-    """Session 09 stays closed. Session 14 records the target and the package."""
+    """Session 09 stays closed. Session 14 records the release plan."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 107
+    assert live["state_revision"] == 108
     assert live["current_session"] == 14
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(14))
@@ -88,7 +88,8 @@ def test_live_pointer_is_incomplete_session_10() -> None:
     assert set(evidence) == set(SESSION_EVIDENCE_KEYS[14])
     assert evidence["deployment_target_recorded"] is True
     assert evidence["production_packaging_defined"] is True
-    assert sum(1 for value in evidence.values() if value is True) == 2
+    assert evidence["release_rollback_implemented"] is True
+    assert sum(1 for value in evidence.values() if value is True) == 3
     assert "SESSION_09_ETSY_PUBLISHING_COMPLETE" not in text
 
 

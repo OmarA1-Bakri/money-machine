@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 14 release plan is recorded (2026-10-17)
+
+Revision 108 is incomplete Session 14. `deployment_target_recorded`, `production_packaging_defined`, and `release_rollback_implemented` are true. The other three Session 14 keys are false. `completed_sessions` stays 0 through 13. `next_session` stays 14. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. The next honest step is `service_controls_fail_closed`: refuse start, stop, restart, status, logs, scale, a second scheduler, migrate, and a safe update. A status word is not a running service. A live deploy stays deferred.
+
 ## Session 14 production package is recorded (2026-10-17)
 
 Revision 107 is incomplete Session 14. `deployment_target_recorded` and `production_packaging_defined` are true. The other four Session 14 keys are false. `completed_sessions` stays 0 through 13. `next_session` stays 14. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. The next honest step is `release_rollback_implemented`: bind an image tag to a commit, plan a backup before migration, refuse live postgres, and fail a compatibility check when the schema is incompatible. A live deploy stays deferred.
