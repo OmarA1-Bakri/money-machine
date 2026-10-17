@@ -2,8 +2,16 @@
 
 Sessions 00-06 closed with every contract key true. Session 07's close
 commit under D-0032 has every contract key false. D-0036 records the live
-pointer separately. Session 08 is complete at revision 69. Sessions 09-15
-are not activated. This module does not edit ``IMPLEMENTATION_STATE.json``.
+pointer separately. Sessions 08, 09, and 10 are complete. Session 10 is
+revision 83 and every one of its keys is true (D-0055). Session 11 is
+complete at revision 90. Every Session 11 key is true (D-0063). Session 12
+is complete at revision 97. Every Session 12 key is true (D-0071).
+Session 13 is complete at revision 104. Every Session 13 key is true
+(D-0079). Session 14 is complete at revision 111. Every Session 14 key
+is true (D-0087). Session 15 is incomplete at revision 114.
+``deployed_state_checked`` and ``provider_connections_fail_closed`` are
+true (D-0090, D-0091). A live account is not connected.
+This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
 from __future__ import annotations
@@ -29,11 +37,13 @@ class ClosedSessionEvidence:
 
 @dataclass(frozen=True, slots=True)
 class OpenSessionEvidence:
-    """A session that has not been activated."""
+    """A session that is not complete. ``activated`` means its keys are installed."""
 
     session: int
     fixture_paths: tuple[str, ...]
     gap: str
+    activated: bool = False
+    true_keys: frozenset[str] = frozenset()
 
 
 CLOSED_SESSION_EVIDENCE: tuple[ClosedSessionEvidence, ...] = (
@@ -127,52 +137,135 @@ CLOSED_SESSION_EVIDENCE: tuple[ClosedSessionEvidence, ...] = (
         9,
         True,
     ),
+    ClosedSessionEvidence(
+        9,
+        "379446ac8fefa71a4752eb32cc15fd41471060e9",
+        76,
+        "cfb36462994ecba833f31ba869f2aba627f6060d",
+        "cfb36462994ecba833f31ba869f2aba627f6060d",
+        (0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
+        10,
+        True,
+    ),
+    ClosedSessionEvidence(
+        10,
+        "b612dffe87e63e46ea88c74e0f858dd72e8a5b36",
+        83,
+        "f16c7ed0598daf3f4627955b52585f253ae1b918",
+        "f16c7ed0598daf3f4627955b52585f253ae1b918",
+        (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+        11,
+        True,
+    ),
 )
 
 OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
     OpenSessionEvidence(
-        9,
-        (
-            "src/money_machine/assets/etsy_preflight.py",
-            "src/money_machine/assets/publishing_ramp_decision.py",
-            "src/money_machine/assets/mutation_receipt.py",
-        ),
-        "No evidence contract. Preflight, ramp, and receipt fixtures do not publish.",
-    ),
-    OpenSessionEvidence(
-        10,
-        (
-            "src/money_machine/assets/metrics_fixture.py",
-            "src/money_machine/assets/maturity_clock.py",
-            "src/money_machine/assets/portfolio_eligibility.py",
-            "src/money_machine/assets/closed_loop_store.py",
-        ),
-        "No evidence contract. The ledger does not run the scheduler or deactivate a listing.",
-    ),
-    OpenSessionEvidence(
         11,
         ("src/money_machine/assets/support_intake.py",),
-        "No evidence contract. Intake is in memory and sends nothing. A16 stays DESIGNED.",
+        (
+            "Every Session 11 key is earned. Session 12 is complete. Session 13 "
+            "is complete. Session 14 is incomplete. The target, the package, and "
+            "the release plan are recorded. A live deploy is not recorded. "
+            "A16 stays DESIGNED."
+        ),
+        True,
+        frozenset(
+            {
+                "control_files_and_checkpoint_current",
+                "draft_reply_implemented",
+                "evidence_closure_commit_recorded",
+                "incident_routing_implemented",
+                "repair_resolution_implemented",
+                "support_intake_implemented",
+            }
+        ),
     ),
     OpenSessionEvidence(
         12,
-        (),
-        "No evidence contract and no session module. The operator console is not built.",
+        (
+            "src/money_machine/assets/operator_console.py",
+            "src/money_machine/assets/operator_views.py",
+            "src/money_machine/assets/telemetry_redaction.py",
+            "src/money_machine/assets/operator_actions.py",
+        ),
+        (
+            "Every Session 12 key is earned. Session 13 is complete. Session 14 "
+            "is incomplete. The target, the package, and the release plan are "
+            "recorded. A live deploy is not recorded. Exit 78 stays HELD."
+        ),
+        True,
+        frozenset(
+            {
+                "console_read_model_implemented",
+                "control_files_and_checkpoint_current",
+                "evidence_closure_commit_recorded",
+                "exception_views_implemented",
+                "operator_actions_fail_closed",
+                "telemetry_redaction_implemented",
+            }
+        ),
     ),
     OpenSessionEvidence(
         13,
-        (),
-        "No evidence contract and no session module. End-to-end hardening is not recorded.",
+        (
+            "src/money_machine/assets/implementation_matrix.py",
+            "src/money_machine/assets/synthetic_paths.py",
+            "src/money_machine/assets/failure_injection.py",
+            "src/money_machine/assets/backup_restore.py",
+        ),
+        (
+            "Every Session 13 key is earned. Session 14 is incomplete. The target, "
+            "the package, and the release plan are recorded. A live deploy is not "
+            "recorded. Exit 78 stays HELD."
+        ),
+        True,
+        frozenset(
+            {
+                "implementation_matrix_recorded",
+                "synthetic_paths_implemented",
+                "failure_injection_implemented",
+                "backup_restore_fixture_implemented",
+                "control_files_and_checkpoint_current",
+                "evidence_closure_commit_recorded",
+            }
+        ),
     ),
     OpenSessionEvidence(
         14,
-        (),
-        "No evidence contract and no session module. Production deployment is not recorded.",
+        (
+            "src/money_machine/deploy/target.py",
+            "src/money_machine/deploy/packaging.py",
+            "src/money_machine/deploy/release.py",
+            "src/money_machine/deploy/controls.py",
+            "src/money_machine/deploy/checkpoint.py",
+        ),
+        ("Session 15 is not activated. A live deploy is not recorded."),
+        True,
+        frozenset(
+            {
+                "deployment_target_recorded",
+                "production_packaging_defined",
+                "release_rollback_implemented",
+                "service_controls_fail_closed",
+                "control_files_and_checkpoint_current",
+                "evidence_closure_commit_recorded",
+            }
+        ),
     ),
     OpenSessionEvidence(
         15,
-        (),
-        "No evidence contract and no session module. Live commissioning is not recorded.",
+        (
+            "src/money_machine/config/settings.py",
+            "src/money_machine/integrations/etsy/fixture_adapter.py",
+            "src/money_machine/integrations/notion/fixture_adapter.py",
+            "src/money_machine/deploy/checkpoint.py",
+            "src/money_machine/deploy/deployed_state.py",
+            "src/money_machine/integrations/provider_connections.py",
+        ),
+        "Fixture adapters are selected. A live account is not connected.",
+        True,
+        frozenset({"deployed_state_checked", "provider_connections_fail_closed"}),
     ),
 )
 
@@ -184,19 +277,37 @@ def _keys(session: int) -> tuple[str, ...]:
     return tuple(sorted(contract))
 
 
+def _open_status(record: OpenSessionEvidence) -> str:
+    """An open row is complete only when every installed key is true."""
+    contract = SESSION_EVIDENCE_KEYS.get(record.session)
+    if not record.activated:
+        return "Status: not activated."
+    if contract is not None and record.true_keys == frozenset(contract):
+        return "Status: complete."
+    return "Status: incomplete."
+
+
 def render_session_evidence() -> str:
     """Return the human index. Key order is alphabetical and stable."""
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 08 at state revision 69.",
-        "`current_session` is 8. `session_status` is complete.",
-        "Every Session 08 evidence key is true.",
+        "The checked-in pointer is Session 15 at state revision 114.",
+        "`current_session` is 15. `session_status` is incomplete.",
+        "Two Session 15 keys are true. A live account is not connected.",
+        "Session 10 is complete and every one of its keys is true.",
+        "Session 09 is complete and every one of its keys is true.",
+        "Session 08 is complete and every one of its keys is true.",
         "Sessions 00-06 closed with every contract key true.",
         "Session 07's close commit keeps every contract key false under D-0032.",
         "D-0036 recorded the twelve Session 07 keys true. The closure commit is",
         "`5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.",
-        "Sessions 09-15 are not activated.",
+        "Session 10 is complete. Every key is true.",
+        "Session 11 is complete. Every key is true.",
+        "Session 12 is complete. Every key is true.",
+        "Session 13 is complete. Every key is true.",
+        "Session 14 is complete. Session 15 is incomplete.",
+        "Two Session 15 keys are true. A live account is not connected.",
         "",
     ]
     for record in CLOSED_SESSION_EVIDENCE:
@@ -231,10 +342,15 @@ def render_session_evidence() -> str:
         lines.append("")
     lines.extend(
         [
-            "## Sessions 09-15",
+            "## Sessions 11-15",
             "",
-            "Sessions 09-15 are not activated. A fixture path is code on the trunk.",
-            "It is not a recorded evidence key.",
+            "Session 10 is complete. Every key is true.",
+            "Session 11 is complete. Every key is true.",
+            "Session 12 is complete. Every key is true.",
+            "Session 13 is complete. Every key is true.",
+            "Session 14 is complete. Session 15 is incomplete.",
+            "Two Session 15 keys are true. A live account is not connected.",
+            "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",
         ]
     )
@@ -244,8 +360,16 @@ def render_session_evidence() -> str:
                 f"## Session {record.session:02d}",
                 "",
                 f"Prompt: `{SESSION_PROMPTS[record.session]}`.",
-                "Status: not activated.",
-                "Evidence contract: absent.",
+                _open_status(record),
+                (
+                    "Evidence contract: installed."
+                    if record.activated
+                    else (
+                        "Evidence contract: installed, not activated."
+                        if record.session in SESSION_EVIDENCE_KEYS
+                        else "Evidence contract: absent."
+                    )
+                ),
                 record.gap,
                 "",
             ]
@@ -263,6 +387,12 @@ def render_session_evidence() -> str:
             lines.append("| Key | Recorded |")
             lines.append("|---|---|")
             for key in _keys(record.session):
-                lines.append(f"| `{key}` | not installed |")
+                if key in record.true_keys:
+                    recorded = "true"
+                elif record.activated:
+                    recorded = "false"
+                else:
+                    recorded = "not installed"
+                lines.append(f"| `{key}` | {recorded} |")
             lines.append("")
     return "\n".join(lines)

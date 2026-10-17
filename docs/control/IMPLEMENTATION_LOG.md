@@ -1,3 +1,209 @@
+## 2026-10-17 — Session 15 provider connections recorded
+
+`record-evidence` advanced `state_revision` from 113 to 114. `updated_at` is `2026-10-17T16:15:00Z`. `deployed_state_checked` and `provider_connections_fail_closed` are true. The other five Session 15 keys stay false. `current_session` stays 15. `session_status` stays incomplete. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. `src/money_machine/integrations/provider_connections.py` selects the Etsy and Notion fixture adapters and refuses a live adapter before it is constructed. No credential is read. No socket is opened. Exit 78 stays HELD. The exit string is not written.
+
+## 2026-10-17 — Session 15 deployed state recorded
+
+`record-evidence` advanced `state_revision` from 112 to 113. `updated_at` is `2026-10-17T16:10:00Z`. `deployed_state_checked` is true. The other six Session 15 keys stay false. `current_session` stays 15. `session_status` stays incomplete. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. `src/money_machine/deploy/deployed_state.py` reads the checkpoint and refuses a live smoke, a docker socket, and a service start. `worker.py` and `scheduler.py` are not edited. No service is started. Exit 78 stays HELD. The exit string is not written.
+
+## 2026-10-17 — Session 15 activated
+
+`activate` advanced `state_revision` from 111 to 112. `updated_at` is `2026-10-17T16:00:00Z`. `current_session` is 15. `session_status` is incomplete. `completed_sessions` stays 0 through 14. `next_session` stays 15. Every Session 15 key is false. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Exit 78 stays HELD. No live provider call is made. No Session 15 key is earned.
+
+## 2026-10-17 — Session 15 evidence contract installed
+
+D-0088 names the seven Session 15 keys. `SESSION_EVIDENCE_KEYS[15]` holds them. Activation is not applied. `IMPLEMENTATION_STATE.json` stays revision 111, Session 14 complete, every Session 14 key true. A live account, a live publish, a purchase, Exit 78, and the exit string are not keys. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-15-prompt-integrity.md`. No live provider call is made.
+
+## 2026-10-17 — Session 14 closure recorded
+
+`apply-completion` advanced `state_revision` from 110 to 111. `updated_at` is `2026-10-17T15:35:00Z`. Every Session 14 key is true. `session_status` is complete. `current_session` stays 14. `completed_sessions` is 0 through 14. `next_session` is 15. `next_prompt` is `18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md`. `head_sha` and `evidence_closure_commit_sha` are `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. That commit contains `def prove_session_14` and the pre-transition state. The pointer commit does not record its own SHA. Session 15 is not activated. No service is started. Exit 78 stays HELD. The exit string is not written.
+
+## 2026-10-17 — Session 14 deployment checkpoint recorded
+
+`record-evidence` advanced `state_revision` from 109 to 110. `updated_at` is `2026-10-17T15:30:00Z`. `deployment_target_recorded`, `production_packaging_defined`, `release_rollback_implemented`, `service_controls_fail_closed`, and `control_files_and_checkpoint_current` are true. The closure key stays false. `current_session` stays 14. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. The checkpoint inspector reads the six continuity files and the four deploy modules. The catalogue matches the renderer. No socket is opened. Exit 78 stays HELD.
+
+## 2026-10-17 — Session 14 service controls recorded
+
+`record-evidence` advanced `state_revision` from 108 to 109. `updated_at` is `2026-10-17T15:25:00Z`. `deployment_target_recorded`, `production_packaging_defined`, `release_rollback_implemented`, and `service_controls_fail_closed` are true. The control-file key and the closure key stay false. `current_session` stays 14. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Start, stop, restart, status, logs, scale, a second scheduler, migrate, and safe update are refused. A status word is not a running service. No docker socket is opened. `worker.py` and `scheduler.py` are not edited. Exit 78 stays HELD.
+
+## 2026-10-17 — Session 14 release plan recorded
+
+`record-evidence` advanced `state_revision` from 107 to 108. `updated_at` is `2026-10-17T15:15:00Z`. `deployment_target_recorded`, `production_packaging_defined`, and `release_rollback_implemented` are true. The other three Session 14 keys stay false. `current_session` stays 14. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. The release plan binds the image tag to the closure commit, plans a fixture backup before the schema check, refuses live postgres, and refuses an incompatible schema. No image is pushed. Exit 78 stays HELD.
+
+## 2026-10-17 — Session 14 production package recorded
+
+`record-evidence` advanced `state_revision` from 106 to 107. `updated_at` is `2026-10-17T15:10:00Z`. `deployment_target_recorded` and `production_packaging_defined` are true. The other four Session 14 keys stay false. `current_session` stays 14. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. The package check reads `compose.prod.yaml` and the six runbooks. Worker and scheduler restart stay `no`. No image is built. Exit 78 stays HELD.
+
+## 2026-10-17 — Session 14 deployment target recorded
+
+`record-evidence` advanced `state_revision` from 105 to 106. `updated_at` is `2026-10-17T15:00:00Z`. `deployment_target_recorded` is true. The other five Session 14 keys stay false. `current_session` stays 14. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. The selector returns `local-wsl` and refuses `new-paid` without an authority record. No host is created. Exit 78 stays HELD. No live provider call is made.
+
+## 2026-10-17 — Session 14 activated
+
+`activate` advanced `state_revision` from 104 to 105. `updated_at` is `2026-10-17T14:55:00Z`. `current_session` is 14. `session_status` is incomplete. `completed_sessions` stays 0 through 13. `next_session` stays 14. Every Session 14 key is false. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. No live provider call is made. No Session 14 key is earned.
+
+## 2026-10-17 — Session 14 evidence contract installed
+
+D-0080 names the six Session 14 keys. `SESSION_EVIDENCE_KEYS[14]` holds them. Activation is not applied. `IMPLEMENTATION_STATE.json` stays revision 104, Session 13 complete, every Session 13 key true. Session 15 still has no contract. A live deploy, a paid host, a production image build, Exit 78, and the exit string are not keys. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-14-prompt-integrity.md`. No live provider call is made.
+
+## 2026-10-17 — Session 13 closure recorded
+
+`apply-completion` advanced `state_revision` from 103 to 104. `updated_at` is `2026-10-17T14:40:00Z`. Every Session 13 key is true. `session_status` is complete. `current_session` stays 13. `completed_sessions` is 0 through 13. `next_session` is 14. `next_prompt` is `17_SESSION_14_DEPLOYMENT.md`. `head_sha` and `evidence_closure_commit_sha` are `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. That commit contains `def prove_session_13` and the pre-transition state. Session 14 is not activated. Exit 78 stays HELD. The exit string is not written.
+
+## 2026-10-17 — Session 13 control files recorded
+
+`record-evidence` advanced `state_revision` from 102 to 103. `updated_at` is `2026-10-17T14:35:00Z`. The matrix, the synthetic paths, the failure injections, the backup fixture, and `control_files_and_checkpoint_current` are true. The closure key stays false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. The five continuity files are present. The catalogue matches the rendered index. Exit 78 stays HELD.
+
+## 2026-10-17 — Session 13 backup fixture recorded
+
+`record-evidence` advanced `state_revision` from 101 to 102. `updated_at` is `2026-10-17T14:30:00Z`. The matrix, the synthetic paths, the failure injections, and `backup_restore_fixture_implemented` are true. The control-file key and the closure key stay false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. The snapshot restores a workflow, a job, a product, a draft listing, and an incident. A second restore does not duplicate them. A PostgreSQL backup is refused. Exit 78 stays HELD.
+
+## 2026-10-17 — Session 13 failure injections recorded
+
+`record-evidence` advanced `state_revision` from 100 to 101. `updated_at` is `2026-10-17T14:25:00Z`. `implementation_matrix_recorded`, `synthetic_paths_implemented`, and `failure_injection_implemented` are true. The other three Session 13 keys stay false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Each named injection ends in recovery or an exact blocked state. A restart returns a due job to READY once. A duplicate publish creates once. A timeout after success does not create again. Exit 78 stays HELD. No live provider call is made.
+
+## 2026-10-17 — Session 13 synthetic paths recorded
+
+`record-evidence` advanced `state_revision` from 99 to 100. `updated_at` is `2026-10-17T14:10:00Z`. `implementation_matrix_recorded` and `synthetic_paths_implemented` are true. The other four Session 13 keys stay false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. The fixture path runs research through a withheld successor build, plus cull, repair, broken link, and dedupe. Publish simulation refuses `live`. Post-publish verification stays blocked. Exit 78 stays HELD. No live provider call is made.
+
+## 2026-10-17 — Session 13 implementation matrix recorded
+
+`record-evidence` advanced `state_revision` from 98 to 99. `updated_at` is `2026-10-17T14:00:00Z`. `implementation_matrix_recorded` is true. The other five Session 13 keys stay false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Publish, purchase, and message jobs stay blocked. A03 through A16 stay missing. Exit 78 stays HELD. No live provider call is made.
+
+## 2026-10-17 — Session 13 activated
+
+`activate` advanced `state_revision` from 97 to 98. `updated_at` is `2026-10-17T13:45:00Z`. `current_session` is 13. `session_status` is incomplete. `completed_sessions` stays 0 through 12. `next_session` stays 13. Every Session 13 key is false. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. No live provider call is made. No Session 13 key is earned.
+
+## 2026-10-17 — Session 13 evidence contract installed
+
+D-0072 installs the six Session 13 keys. Revision 97 is unchanged. Session 12 stays complete. Session 13 is not activated. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-13-prompt-integrity.md`. No live provider call is made.
+
+## 2026-10-17 — Session 12 closure recorded
+
+`apply-completion` advanced `state_revision` from 96 to 97. `updated_at` is `2026-10-17T13:35:00Z`. Every Session 12 key is true. `session_status` is complete. `current_session` stays 12. `completed_sessions` is 0 through 12. `next_session` is 13. `next_prompt` is `16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md`. `head_sha` and `evidence_closure_commit_sha` are `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. The exit string is not written. Session 13 is not activated. No live provider call is made.
+
+## 2026-10-17 — Session 12 exception views recorded
+
+`record-evidence` advanced `state_revision` from 95 to 96. `updated_at` is `2026-10-17T13:30:00Z`. The read-model, exception-view, telemetry, and fail-closed action keys stay true. `control_files_and_checkpoint_current` is true. The closure key stays false. `current_session` stays 12. `session_status` stays incomplete. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. No socket is opened and no cap is written.
+
+`record-evidence` advanced `state_revision` from 94 to 95. `updated_at` is `2026-10-17T13:25:00Z`. `console_read_model_implemented`, `exception_views_implemented`, and `telemetry_redaction_implemented` stay true. `operator_actions_fail_closed` is true. The control-file key and the closure key stay false. `current_session` stays 12. `session_status` stays incomplete. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. No socket is opened and no cap is written.
+
+`record-evidence` advanced `state_revision` from 93 to 94. `updated_at` is `2026-10-17T13:20:00Z`. `console_read_model_implemented` and `exception_views_implemented` stay true. `telemetry_redaction_implemented` is true. The other three Session 12 keys stay false. `current_session` stays 12. `session_status` stays incomplete. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. No socket is opened and no cap is written.
+
+`record-evidence` advanced `state_revision` from 92 to 93. `updated_at` is `2026-10-17T13:15:00Z`. `console_read_model_implemented` stays true. `exception_views_implemented` is true. The other four Session 12 keys stay false. `current_session` stays 12. `session_status` stays incomplete. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. No socket is opened and no cap is written.
+
+## 2026-10-17 — Session 12 read model recorded
+
+`record-evidence` advanced `state_revision` from 91 to 92. `updated_at` is `2026-10-17T13:00:00Z`. `console_read_model_implemented` is true. The other five Session 12 keys stay false. `current_session` stays 12. `session_status` stays incomplete. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. No socket is opened and no cap is written.
+
+## 2026-10-17 — Session 12 activated
+
+`activate` advanced `state_revision` from 90 to 91. `updated_at` is `2026-10-17T12:55:00Z`. `current_session` is 12. `session_status` is incomplete. `completed_sessions` stays 0 through 11. `next_session` stays 12. Every Session 12 key is false. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. No live provider call is made.
+
+## 2026-10-17 — Session 12 evidence contract installed
+
+D-0064 installs the six Session 12 keys. Revision 90 is unchanged. Session 11 stays complete. Session 12 is not activated. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-12-prompt-integrity.md`. No live provider call is made.
+
+## 2026-10-17 — Session 11 closure recorded
+
+`apply-completion` advanced `state_revision` from 89 to 90. `updated_at` is `2026-10-17T12:40:00Z`. Every Session 11 key is true. `session_status` is complete. `current_session` stays 11. `completed_sessions` is 0 through 11. `next_session` is 12. `next_prompt` is `15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md`. `head_sha` and `evidence_closure_commit_sha` are `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. Session 12 is not activated. No live provider call is made.
+
+## 2026-10-17 — Session 11 control-file key recorded
+
+`record-evidence` advanced `state_revision` from 88 to 89. `updated_at` is `2026-10-17T12:35:00Z`. Intake, routing, repair, and the draft stay true. `control_files_and_checkpoint_current` is true. The closure key stays false. `current_session` stays 11. `session_status` stays incomplete. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.
+
+## 2026-10-17 — Session 11 draft key recorded
+
+`record-evidence` advanced `state_revision` from 87 to 88. `updated_at` is `2026-10-17T12:30:00Z`. Intake, routing, and repair stay true. `draft_reply_implemented` is true. The control-file key and the closure key stay false. `current_session` stays 11. `session_status` stays incomplete. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.
+
+## 2026-10-17 — Session 11 repair key recorded
+
+`record-evidence` advanced `state_revision` from 86 to 87. `updated_at` is `2026-10-17T12:25:00Z`. `support_intake_implemented` and `incident_routing_implemented` stay true. `repair_resolution_implemented` is true. The other three Session 11 keys stay false. `current_session` stays 11. `session_status` stays incomplete. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.
+
+## 2026-10-17 — Session 11 routing key recorded
+
+`record-evidence` advanced `state_revision` from 85 to 86. `updated_at` is `2026-10-17T12:20:00Z`. `support_intake_implemented` stays true. `incident_routing_implemented` is true. The other four Session 11 keys stay false. `current_session` stays 11. `session_status` stays incomplete. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.
+
+## 2026-10-17 — Session 11 intake key recorded
+
+`record-evidence` advanced `state_revision` from 84 to 85. `updated_at` is `2026-10-17T12:15:00Z`. `support_intake_implemented` is true. The other five Session 11 keys stay false. `current_session` stays 11. `session_status` stays incomplete. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.
+
+## 2026-10-17 — Session 11 activated
+
+`activate` advanced `state_revision` from 83 to 84. `updated_at` is `2026-10-17T12:10:00Z`. `current_session` is 11. `session_status` is incomplete. `completed_sessions` stays 0 through 10. `next_session` stays 11. Every Session 11 key is false. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No live provider call is made.
+
+## 2026-10-17 — Session 11 evidence contract installed
+
+D-0056 names six Session 11 keys: intake, incident routing, repair resolution, the draft reply, the control files, and the closure key. Live send, A16 commissioning, Exit 78, Notion page rewrite, attachment bytes, inserted jobs, and the exit string are not keys. `IMPLEMENTATION_STATE.json` stays revision 83. Session 10 stays complete. Session 11 is not activated. No live provider call is made.
+
+## 2026-10-17 — Session 10 closure recorded
+
+`apply-completion` advanced `state_revision` from 82 to 83. `updated_at` is `2026-10-17T12:00:00Z`. `evidence_closure_commit_recorded` is true. Every Session 10 key is true. `session_status` is complete. `current_session` stays 10. `completed_sessions` is 0 through 10. `next_session` is 11. `next_prompt` is `14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md`. `head_sha` and `evidence_closure_commit_sha` are `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. Session 11 is not activated. No live provider call is made.
+
+## 2026-10-17 — Session 10 control-file key recorded
+
+`record-evidence` advanced `state_revision` from 81 to 82. `updated_at` is `2026-10-17T11:55:00Z`. `control_files_and_checkpoint_current` is true. The metrics fixture, the maturity clock, portfolio eligibility, and the closed-loop ledger stay true. The closure key stays false. `current_session` stays 10. `session_status` stays incomplete. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. No deactivation is executed. No live provider call is made.
+
+## 2026-10-17 — Session 10 closed-loop ledger key recorded
+
+`record-evidence` advanced `state_revision` from 80 to 81. `updated_at` is `2026-10-17T11:50:00Z`. `closed_loop_store_implemented` is true. The metrics fixture, the maturity clock, and portfolio eligibility stay true. The control-file key and the closure key stay false. `current_session` stays 10. `session_status` stays incomplete. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. No deactivation is executed. No live provider call is made.
+
+## 2026-10-17 — Session 10 portfolio eligibility key recorded
+
+`record-evidence` advanced `state_revision` from 79 to 80. `updated_at` is `2026-10-17T11:45:00Z`. `portfolio_eligibility_implemented` is true. The metrics fixture and the maturity clock stay true. The other three Session 10 keys stay false. `current_session` stays 10. `session_status` stays incomplete. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. No deactivation is executed. No live provider call is made.
+
+## 2026-10-17 — Session 10 maturity clock key recorded
+
+`record-evidence` advanced `state_revision` from 78 to 79. `updated_at` is `2026-10-17T11:40:00Z`. `maturity_clock_implemented` is true. `metrics_fixture_implemented` stays true. The other four Session 10 keys stay false. `current_session` stays 10. `session_status` stays incomplete. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. No scheduler row is inserted. No live provider call is made.
+
+## 2026-10-17 — Session 10 metrics fixture key recorded
+
+`record-evidence` advanced `state_revision` from 77 to 78. `updated_at` is `2026-10-17T11:35:00Z`. `metrics_fixture_implemented` is true. The other five Session 10 keys stay false. `current_session` stays 10. `session_status` stays incomplete. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. No live provider call is made.
+
+## 2026-10-17 — Session 10 activated
+
+`activate` advanced `state_revision` from 76 to 77. `updated_at` is `2026-10-17T11:30:00Z`. `current_session` is 10. `session_status` is incomplete. `completed_sessions` stays 0 through 9. `next_session` stays 10. Every Session 10 key is false. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. No live provider call is made.
+
+## 2026-10-17 — Session 10 evidence contract installed
+
+D-0048 names six Session 10 keys: the metrics fixture, the maturity clock, portfolio eligibility, the closed-loop ledger, the control files, and the closure key. Live stats, live deactivation, commissioning, Exit 78, and the exit string are not keys. `IMPLEMENTATION_STATE.json` stays revision 76. Session 09 stays complete. Session 10 is not activated. No live provider call is made.
+
+## 2026-10-17 — Session 09 closed
+
+`apply-completion` advanced `state_revision` from 75 to 76. `updated_at` is `2026-10-17T11:20:00Z`. `session_status` is complete. `completed_sessions` is 0 through 9. `next_session` is 10. `next_prompt` is `13_SESSION_10_ANALYTICS_CULL_MULTIPLY_CLOSED_LOOP.md`. Every Session 09 key is true, including `evidence_closure_commit_recorded`. `head_sha` and `evidence_closure_commit_sha` are `cfb36462994ecba833f31ba869f2aba627f6060d`. Session 10 is not activated. Exit 78 stays HELD. The exit string is not written. No live Etsy call is made.
+
+## 2026-10-17 — Session 09 continuity directory gate
+
+`docs/control` contains the five continuity files and `SESSION_EVIDENCE.md`. The transition set stays the five files. The catalogue stays the rendered index. `IMPLEMENTATION_STATE.json` stays revision 75. The closure key stays false. No live Etsy call is made.
+
+## 2026-10-17 — Session 09 control-file key recorded
+
+`record-evidence` advanced `state_revision` from 74 to 75. `updated_at` is `2026-10-17T11:05:00Z`. `control_files_and_checkpoint_current` is true. Preflight, the ramp, the receipt, and the fixture draft stay true. The closure key stays false. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. The exit string is not written. No live Etsy call is made.
+
+## 2026-10-17 — Session 09 fixture draft key recorded
+
+`record-evidence` advanced `state_revision` from 73 to 74. `updated_at` is `2026-10-17T11:00:00Z`. `fixture_draft_package_implemented` is true. Preflight, the ramp, and the receipt stay true. The control-file key and the closure key stay false. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. The successor and the dispatcher are unchanged. The exit string is not written. No live Etsy call is made.
+
+## 2026-10-17 — Session 09 receipt key recorded
+
+`record-evidence` advanced `state_revision` from 72 to 73. `updated_at` is `2026-10-17T10:55:00Z`. `mutation_receipt_implemented` is true. Preflight and the ramp stay true. The fixture draft package, the control-file key, and the closure key stay false. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. The exit string is not written. No live Etsy call is made.
+
+## 2026-10-17 — Session 09 ramp key recorded
+
+`record-evidence` advanced `state_revision` from 71 to 72. `updated_at` is `2026-10-17T10:52:00Z`. `publishing_ramp_implemented` is true. `etsy_preflight_implemented` stays true. The other four Session 09 keys stay false. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. The committed ramp file stays `publishing_enabled: false`. The exit string is not written. No live Etsy call is made.
+
+## 2026-10-17 — Session 09 preflight key recorded
+
+`record-evidence` advanced `state_revision` from 70 to 71. `updated_at` is `2026-10-17T10:48:00Z`. `etsy_preflight_implemented` is true. The other five Session 09 keys stay false. `current_session` stays 9. `session_status` stays `incomplete`. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. `commissioned_agents` stays empty. Exit 78 stays HELD. A12 and A13 stay `DESIGNED`. The exit string is not written. No live Etsy call is made.
+
+## 2026-10-17 — Session 09 activated
+
+`activate` advanced `state_revision` from 69 to 70. `updated_at` is `2026-10-17T10:45:00Z`. `current_session` is 9. `session_status` is `incomplete`. The six Session 09 evidence keys are installed and every one is false. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6, 7, 8]`. `next_session` stays 9. `next_prompt` stays `12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md`. `head_sha` and `evidence_closure_commit_sha` stay `01b7dd84ef98442ff26a5239e8c7de742739d844`. `commissioned_agents` stays empty. Exit 78 stays HELD. A12 and A13 stay `DESIGNED`. The exit string is not written. No live Etsy, Notion, or S3 call is made.
+
+## 2026-10-17 — Session 09 evidence contract installed
+
+D-0040 names the six Session 09 keys. `SESSION_EVIDENCE_KEYS[9]` holds them. Activation is not applied. `IMPLEMENTATION_STATE.json` stays revision 69, Session 08 complete, every Session 08 key true. Sessions 10–15 still have no contract. Live publish, commissioning, Exit 78, and the exit string are not keys. No live Etsy, Notion, or S3 call is made.
+
 ## 2026-10-17 — Session 08 close is indexed
 
 `docs/control/SESSION_EVIDENCE.md` records Session 08 as complete. The state commit is `4a07fd69259a7265c5780fb584b2a89cacd9b258`. The closure commit is `01b7dd84ef98442ff26a5239e8c7de742739d844`. `IMPLEMENTATION_STATE.json` is unchanged in this commit. Sessions 09–15 stay unactivated.

@@ -33,8 +33,8 @@ def _state_at(commit: str) -> dict[str, object]:
 def test_every_session_from_00_through_15_is_listed_once() -> None:
     closed = [record.session for record in CLOSED_SESSION_EVIDENCE]
     opened = [record.session for record in OPEN_SESSION_EVIDENCE]
-    assert closed == list(range(9))
-    assert opened == list(range(9, 16))
+    assert closed == list(range(11))
+    assert opened == list(range(11, 16))
     assert set(closed).isdisjoint(opened)
 
 
@@ -57,26 +57,61 @@ def test_closed_snapshots_match_the_commits_that_hold_them() -> None:
         assert all(item is record.all_keys_true for item in values)
 
 
-def test_live_pointer_is_complete_session_08() -> None:
+def test_live_pointer_is_incomplete_session_14() -> None:
     live = json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    assert live["current_session"] == 8
-    assert live["session_status"] == "complete"
-    assert live["state_revision"] == 69
-    assert live["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8]
-    assert live["next_session"] == 9
-    assert live["next_prompt"] == SESSION_PROMPTS[9]
-    assert live["head_sha"] == "01b7dd84ef98442ff26a5239e8c7de742739d844"
+    assert live["current_session"] == 15
+    assert live["session_status"] == "incomplete"
+    assert live["state_revision"] == 114
+    assert live["completed_sessions"] == list(range(15))
+    assert live["next_session"] == 15
+    assert live["next_prompt"] == SESSION_PROMPTS[15]
+    assert live["head_sha"] == "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
     assert live["evidence_closure_commit_sha"] == live["head_sha"]
     evidence = live["required_completion_evidence"]
     assert isinstance(evidence, dict)
-    expected = {key: True for key in sorted(SESSION_EVIDENCE_KEYS[8])}
+    expected = {key: False for key in sorted(SESSION_EVIDENCE_KEYS[15])}
+    expected["deployed_state_checked"] = True
+    expected["provider_connections_fail_closed"] = True
     assert evidence == expected
 
 
 def test_open_sessions_have_no_recorded_true_key() -> None:
     for record in OPEN_SESSION_EVIDENCE:
         assert record.session not in {item.session for item in CLOSED_SESSION_EVIDENCE}
-        assert record.session not in SESSION_EVIDENCE_KEYS
+        if record.session == 11:
+            assert record.session in SESSION_EVIDENCE_KEYS
+            assert record.activated is True
+            assert record.true_keys == frozenset(SESSION_EVIDENCE_KEYS[11])
+        elif record.session == 12:
+            assert record.session in SESSION_EVIDENCE_KEYS
+            assert record.activated is True
+            assert record.true_keys == frozenset(SESSION_EVIDENCE_KEYS[12])
+        elif record.session == 13:
+            assert record.session in SESSION_EVIDENCE_KEYS
+            assert record.activated is True
+            assert record.true_keys == frozenset(SESSION_EVIDENCE_KEYS[13])
+        elif record.session == 14:
+            assert record.session in SESSION_EVIDENCE_KEYS
+            assert record.activated is True
+            assert record.true_keys == frozenset(
+                {
+                    "deployment_target_recorded",
+                    "production_packaging_defined",
+                    "release_rollback_implemented",
+                    "service_controls_fail_closed",
+                    "control_files_and_checkpoint_current",
+                    "evidence_closure_commit_recorded",
+                }
+            )
+        elif record.session == 15:
+            assert record.session in SESSION_EVIDENCE_KEYS
+            assert record.activated is True
+            assert record.true_keys == frozenset(
+                {"deployed_state_checked", "provider_connections_fail_closed"}
+            )
+        else:
+            assert record.session not in SESSION_EVIDENCE_KEYS
+            assert record.true_keys == frozenset()
         for path in record.fixture_paths:
             assert (ROOT / path).is_file(), path
         assert "not" in record.gap.casefold() or "no evidence" in record.gap.casefold()

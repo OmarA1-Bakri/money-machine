@@ -1,13 +1,21 @@
 # Session evidence
 
-The checked-in pointer is Session 08 at state revision 69.
-`current_session` is 8. `session_status` is complete.
-Every Session 08 evidence key is true.
+The checked-in pointer is Session 15 at state revision 114.
+`current_session` is 15. `session_status` is incomplete.
+Two Session 15 keys are true. A live account is not connected.
+Session 10 is complete and every one of its keys is true.
+Session 09 is complete and every one of its keys is true.
+Session 08 is complete and every one of its keys is true.
 Sessions 00-06 closed with every contract key true.
 Session 07's close commit keeps every contract key false under D-0032.
 D-0036 recorded the twelve Session 07 keys true. The closure commit is
 `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.
-Sessions 09-15 are not activated.
+Session 10 is complete. Every key is true.
+Session 11 is complete. Every key is true.
+Session 12 is complete. Every key is true.
+Session 13 is complete. Every key is true.
+Session 14 is complete. Session 15 is incomplete.
+Two Session 15 keys are true. A live account is not connected.
 
 ## Session 00
 
@@ -225,81 +233,166 @@ Head SHA: `01b7dd84ef98442ff26a5239e8c7de742739d844`.
 | `merchandising_workflow_linked` | true |
 | `screenshot_acquisition_implemented` | true |
 
-## Sessions 09-15
-
-Sessions 09-15 are not activated. A fixture path is code on the trunk.
-It is not a recorded evidence key.
-
 ## Session 09
 
 Prompt: `12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md`.
-Status: not activated.
-Evidence contract: absent.
-No evidence contract. Preflight, ramp, and receipt fixtures do not publish.
+State commit: `379446ac8fefa71a4752eb32cc15fd41471060e9`.
+State revision: 76.
+Status: complete. Next session: 10.
+Completed sessions: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].
+Evidence closure commit: `cfb36462994ecba833f31ba869f2aba627f6060d`.
+Head SHA: `cfb36462994ecba833f31ba869f2aba627f6060d`.
 
-Fixture paths:
-
-- `src/money_machine/assets/etsy_preflight.py`
-- `src/money_machine/assets/publishing_ramp_decision.py`
-- `src/money_machine/assets/mutation_receipt.py`
+| Key | Recorded |
+|---|---|
+| `control_files_and_checkpoint_current` | true |
+| `etsy_preflight_implemented` | true |
+| `evidence_closure_commit_recorded` | true |
+| `fixture_draft_package_implemented` | true |
+| `mutation_receipt_implemented` | true |
+| `publishing_ramp_implemented` | true |
 
 ## Session 10
 
 Prompt: `13_SESSION_10_ANALYTICS_CULL_MULTIPLY_CLOSED_LOOP.md`.
-Status: not activated.
-Evidence contract: absent.
-No evidence contract. The ledger does not run the scheduler or deactivate a listing.
+State commit: `b612dffe87e63e46ea88c74e0f858dd72e8a5b36`.
+State revision: 83.
+Status: complete. Next session: 11.
+Completed sessions: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].
+Evidence closure commit: `f16c7ed0598daf3f4627955b52585f253ae1b918`.
+Head SHA: `f16c7ed0598daf3f4627955b52585f253ae1b918`.
 
-Fixture paths:
+| Key | Recorded |
+|---|---|
+| `closed_loop_store_implemented` | true |
+| `control_files_and_checkpoint_current` | true |
+| `evidence_closure_commit_recorded` | true |
+| `maturity_clock_implemented` | true |
+| `metrics_fixture_implemented` | true |
+| `portfolio_eligibility_implemented` | true |
 
-- `src/money_machine/assets/metrics_fixture.py`
-- `src/money_machine/assets/maturity_clock.py`
-- `src/money_machine/assets/portfolio_eligibility.py`
-- `src/money_machine/assets/closed_loop_store.py`
+## Sessions 11-15
+
+Session 10 is complete. Every key is true.
+Session 11 is complete. Every key is true.
+Session 12 is complete. Every key is true.
+Session 13 is complete. Every key is true.
+Session 14 is complete. Session 15 is incomplete.
+Two Session 15 keys are true. A live account is not connected.
+A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
 ## Session 11
 
 Prompt: `14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md`.
-Status: not activated.
-Evidence contract: absent.
-No evidence contract. Intake is in memory and sends nothing. A16 stays DESIGNED.
+Status: complete.
+Evidence contract: installed.
+Every Session 11 key is earned. Session 12 is complete. Session 13 is complete. Session 14 is incomplete. The target, the package, and the release plan are recorded. A live deploy is not recorded. A16 stays DESIGNED.
 
 Fixture paths:
 
 - `src/money_machine/assets/support_intake.py`
 
+| Key | Recorded |
+|---|---|
+| `control_files_and_checkpoint_current` | true |
+| `draft_reply_implemented` | true |
+| `evidence_closure_commit_recorded` | true |
+| `incident_routing_implemented` | true |
+| `repair_resolution_implemented` | true |
+| `support_intake_implemented` | true |
+
 ## Session 12
 
 Prompt: `15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md`.
-Status: not activated.
-Evidence contract: absent.
-No evidence contract and no session module. The operator console is not built.
+Status: complete.
+Evidence contract: installed.
+Every Session 12 key is earned. Session 13 is complete. Session 14 is incomplete. The target, the package, and the release plan are recorded. A live deploy is not recorded. Exit 78 stays HELD.
 
-Fixture paths: none.
+Fixture paths:
+
+- `src/money_machine/assets/operator_console.py`
+- `src/money_machine/assets/operator_views.py`
+- `src/money_machine/assets/telemetry_redaction.py`
+- `src/money_machine/assets/operator_actions.py`
+
+| Key | Recorded |
+|---|---|
+| `console_read_model_implemented` | true |
+| `control_files_and_checkpoint_current` | true |
+| `evidence_closure_commit_recorded` | true |
+| `exception_views_implemented` | true |
+| `operator_actions_fail_closed` | true |
+| `telemetry_redaction_implemented` | true |
 
 ## Session 13
 
 Prompt: `16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md`.
-Status: not activated.
-Evidence contract: absent.
-No evidence contract and no session module. End-to-end hardening is not recorded.
+Status: complete.
+Evidence contract: installed.
+Every Session 13 key is earned. Session 14 is incomplete. The target, the package, and the release plan are recorded. A live deploy is not recorded. Exit 78 stays HELD.
 
-Fixture paths: none.
+Fixture paths:
+
+- `src/money_machine/assets/implementation_matrix.py`
+- `src/money_machine/assets/synthetic_paths.py`
+- `src/money_machine/assets/failure_injection.py`
+- `src/money_machine/assets/backup_restore.py`
+
+| Key | Recorded |
+|---|---|
+| `backup_restore_fixture_implemented` | true |
+| `control_files_and_checkpoint_current` | true |
+| `evidence_closure_commit_recorded` | true |
+| `failure_injection_implemented` | true |
+| `implementation_matrix_recorded` | true |
+| `synthetic_paths_implemented` | true |
 
 ## Session 14
 
 Prompt: `17_SESSION_14_DEPLOYMENT.md`.
-Status: not activated.
-Evidence contract: absent.
-No evidence contract and no session module. Production deployment is not recorded.
+Status: complete.
+Evidence contract: installed.
+Session 15 is not activated. A live deploy is not recorded.
 
-Fixture paths: none.
+Fixture paths:
+
+- `src/money_machine/deploy/target.py`
+- `src/money_machine/deploy/packaging.py`
+- `src/money_machine/deploy/release.py`
+- `src/money_machine/deploy/controls.py`
+- `src/money_machine/deploy/checkpoint.py`
+
+| Key | Recorded |
+|---|---|
+| `control_files_and_checkpoint_current` | true |
+| `deployment_target_recorded` | true |
+| `evidence_closure_commit_recorded` | true |
+| `production_packaging_defined` | true |
+| `release_rollback_implemented` | true |
+| `service_controls_fail_closed` | true |
 
 ## Session 15
 
 Prompt: `18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md`.
-Status: not activated.
-Evidence contract: absent.
-No evidence contract and no session module. Live commissioning is not recorded.
+Status: incomplete.
+Evidence contract: installed.
+Fixture adapters are selected. A live account is not connected.
 
-Fixture paths: none.
+Fixture paths:
+
+- `src/money_machine/config/settings.py`
+- `src/money_machine/integrations/etsy/fixture_adapter.py`
+- `src/money_machine/integrations/notion/fixture_adapter.py`
+- `src/money_machine/deploy/checkpoint.py`
+- `src/money_machine/deploy/deployed_state.py`
+- `src/money_machine/integrations/provider_connections.py`
+
+| Key | Recorded |
+|---|---|
+| `acceptance_matrix_recorded` | false |
+| `control_files_and_checkpoint_current` | false |
+| `deployed_state_checked` | true |
+| `evidence_closure_commit_recorded` | false |
+| `linked_workflow_fixture` | false |
+| `provider_connections_fail_closed` | true |
+| `standing_authority_recorded` | false |

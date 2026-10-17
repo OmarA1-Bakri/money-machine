@@ -1,5 +1,213 @@
 # Next Session
 
+## Session 15 provider connections are recorded (2026-10-17)
+
+Revision 114 is incomplete Session 15. `deployed_state_checked` and `provider_connections_fail_closed` are true. The other five Session 15 keys are false. `completed_sessions` stays 0 through 14. `next_session` stays 15. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Exit 78 stays HELD. The next honest step is `standing_authority_recorded`. A live account stays deferred.
+
+## Session 15 deployed state is recorded (2026-10-17)
+
+Revision 113 is incomplete Session 15. `deployed_state_checked` is true. The other six Session 15 keys are false. `completed_sessions` stays 0 through 14. `next_session` stays 15. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Exit 78 stays HELD. The next honest step is `provider_connections_fail_closed`. A live account stays deferred. A live smoke is not run.
+
+## Session 15 is activated (2026-10-17)
+
+Revision 112 is incomplete Session 15. Every Session 15 key is false. `completed_sessions` stays 0 through 14. `next_session` stays 15. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Exit 78 stays HELD. The next honest step is `deployed_state_checked`: the checkpoint reads the continuity files and refuses a live smoke. A live account stays deferred.
+
+## Session 15 contract is installed (2026-10-17)
+
+D-0088 names seven Session 15 keys. Revision 111 stays complete Session 14. Every Session 14 key stays true. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Session 15 is not activated. Exit 78 stays HELD. The next honest step is activation, which installs every Session 15 key false. A live account stays deferred.
+
+## Session 14 is complete (2026-10-17)
+
+Revision 111 records every Session 14 key true. `completed_sessions` is 0 through 14. `next_session` is 15. `next_prompt` is `18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md`. `head_sha` is `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Exit 78 stays HELD. Session 15 is not activated. The next honest step is the Session 15 evidence contract. A live deploy stays deferred.
+
+## Session 14 deployment checkpoint is recorded (2026-10-17)
+
+Revision 110 is incomplete Session 14. The five earned keys are true. The closure key is false. `completed_sessions` stays 0 through 13. `next_session` stays 14. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. The next honest step is `evidence_closure_commit_recorded` through apply-completion. A live deploy stays deferred.
+
+## Session 14 service controls are recorded (2026-10-17)
+
+Revision 109 is incomplete Session 14. `deployment_target_recorded`, `production_packaging_defined`, `release_rollback_implemented`, and `service_controls_fail_closed` are true. The control-file key and the closure key are false. `completed_sessions` stays 0 through 13. `next_session` stays 14. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. The next honest step is `control_files_and_checkpoint_current`. A live deploy stays deferred.
+
+## Session 14 release plan is recorded (2026-10-17)
+
+Revision 108 is incomplete Session 14. `deployment_target_recorded`, `production_packaging_defined`, and `release_rollback_implemented` are true. The other three Session 14 keys are false. `completed_sessions` stays 0 through 13. `next_session` stays 14. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. The next honest step is `service_controls_fail_closed`: refuse start, stop, restart, status, logs, scale, a second scheduler, migrate, and a safe update. A status word is not a running service. A live deploy stays deferred.
+
+## Session 14 production package is recorded (2026-10-17)
+
+Revision 107 is incomplete Session 14. `deployment_target_recorded` and `production_packaging_defined` are true. The other four Session 14 keys are false. `completed_sessions` stays 0 through 13. `next_session` stays 14. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. The next honest step is `release_rollback_implemented`: bind an image tag to a commit, plan a backup before migration, refuse live postgres, and fail a compatibility check when the schema is incompatible. A live deploy stays deferred.
+
+## Session 14 deployment target is recorded (2026-10-17)
+
+Revision 106 is incomplete Session 14. `deployment_target_recorded` is true. The other five Session 14 keys are false. `completed_sessions` stays 0 through 13. `next_session` stays 14. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. The next honest step is `production_packaging_defined`: the proof checks api, worker, scheduler, web, the postgres volume, and healthchecks, and worker and scheduler restart stay `no`. A live deploy stays deferred.
+
+## Session 14 is activated (2026-10-17)
+
+Revision 105 is incomplete Session 14. Every Session 14 key is false. `completed_sessions` stays 0 through 13. `next_session` stays 14. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. The next honest step is `deployment_target_recorded`: a selector returns `local-wsl` and refuses a new paid host. A live deploy stays deferred.
+
+## Session 14 contract is installed (2026-10-17)
+
+D-0080 names six Session 14 keys. Revision 104 stays complete Session 13. Every Session 13 key stays true. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Session 14 is not activated. Exit 78 stays HELD. The next honest step is activation, which installs every Session 14 key false.
+
+## Session 13 is complete (2026-10-17)
+
+Revision 104 records every Session 13 key true. `completed_sessions` is 0 through 13. `next_session` is 14. `next_prompt` is `17_SESSION_14_DEPLOYMENT.md`. `head_sha` is `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. Session 14 is not activated. The next honest step is the Session 14 evidence contract.
+
+## Session 13 control files are recorded (2026-10-17)
+
+Revision 103 records the matrix, the synthetic paths, the failure injections, the backup fixture, and `control_files_and_checkpoint_current`. The closure key stays false. `completed_sessions` stays 0 through 12. `next_session` stays 13. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. The next honest step is `evidence_closure_commit_recorded`, through `apply-completion`.
+
+## Session 13 backup fixture is recorded (2026-10-17)
+
+Revision 102 records the matrix, the synthetic paths, the failure injections, and `backup_restore_fixture_implemented`. The control-file key and the closure key stay false. `completed_sessions` stays 0 through 12. `next_session` stays 13. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. A live PostgreSQL backup stays deferred. The next honest step is `control_files_and_checkpoint_current`.
+
+## Session 13 failure injections are recorded (2026-10-17)
+
+Revision 101 records `implementation_matrix_recorded`, `synthetic_paths_implemented`, and `failure_injection_implemented`. The other three Session 13 keys stay false. `completed_sessions` stays 0 through 12. `next_session` stays 13. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. The next honest step is `backup_restore_fixture_implemented`: an in-memory snapshot restores a workflow, job, product, listing, and incident once, without duplicating them.
+
+## Session 13 synthetic paths are recorded (2026-10-17)
+
+Revision 100 records `implementation_matrix_recorded` and `synthetic_paths_implemented`. The other four Session 13 keys stay false. `completed_sessions` stays 0 through 12. `next_session` stays 13. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. The next honest step is `failure_injection_implemented`: each named injection ends in recovery or an exact blocked state.
+
+## Session 13 implementation matrix is recorded (2026-10-17)
+
+Revision 99 records `implementation_matrix_recorded`. The other five Session 13 keys stay false. `completed_sessions` stays 0 through 12. `next_session` stays 13. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. The next honest step is `synthetic_paths_implemented`, through a fixture-backed path.
+
+## Session 13 is activated (2026-10-17)
+
+Revision 98 is incomplete Session 13. Every Session 13 key is false. `completed_sessions` stays 0 through 12. `next_session` stays 13. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. The next honest step is `implementation_matrix_recorded`: classify the real rows, and leave a live credential gap blocked.
+
+## Session 13 contract is installed (2026-10-17)
+
+D-0072 installs the six Session 13 keys. Revision 97 is unchanged. Session 12 stays complete. Session 13 is not activated. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. The next honest step is activation, which installs every Session 13 key false.
+
+## Session 12 is complete (2026-10-17)
+
+Revision 97 records every Session 12 key true. `completed_sessions` is 0 through 12. `next_session` is 13. `head_sha` is `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. Session 13 is not activated. The next honest step is the Session 13 evidence contract.
+
+## Session 12 control files are recorded (2026-10-17)
+
+Revision 96 records every Session 12 key except `evidence_closure_commit_recorded`. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. The next honest step is the closure key, through `apply-completion`.
+
+## Session 12 operator actions fail closed (2026-10-17)
+
+Revision 95 records `console_read_model_implemented`, `exception_views_implemented`, `telemetry_redaction_implemented`, and `operator_actions_fail_closed`. The control-file key and the closure key stay false. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. The next honest step is `control_files_and_checkpoint_current`, through its own proof.
+
+## Session 12 telemetry redaction is recorded (2026-10-17)
+
+Revision 94 records `console_read_model_implemented`, `exception_views_implemented`, and `telemetry_redaction_implemented`. The other three Session 12 keys stay false. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. The next honest step is `operator_actions_fail_closed`, through its own proof.
+
+## Session 12 exception views are recorded (2026-10-17)
+
+Revision 93 records `console_read_model_implemented` and `exception_views_implemented`. The other four Session 12 keys stay false. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. The next honest step is `telemetry_redaction_implemented`, through its own proof.
+
+## Session 12 read model is recorded (2026-10-17)
+
+Revision 92 records `console_read_model_implemented`. The other five Session 12 keys stay false. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. The next honest step is `exception_views_implemented`, through its own proof.
+
+## Session 12 is activated (2026-10-17)
+
+Revision 91 is incomplete Session 12. Every Session 12 key is false. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. The next honest step is the first earned key, through its own proof.
+
+## Session 12 contract is installed (2026-10-17)
+
+D-0064 installs the six Session 12 keys. Revision 90 is unchanged. Session 11 stays complete. Session 12 is not activated. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. The next honest step is activation, which installs every Session 12 key false.
+
+## Session 11 is complete (2026-10-17)
+
+Revision 90 records every Session 11 key true. `completed_sessions` is 0 through 11. `next_session` is 12. `head_sha` is `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. A16 stays `DESIGNED`. Session 12 is not activated. The next honest step is the Session 12 evidence contract.
+
+## Session 11 control files are recorded (2026-10-17)
+
+Revision 89 records intake, routing, repair, the draft, and `control_files_and_checkpoint_current`. The closure key stays false. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The next honest step is the closure key, through `apply-completion`.
+
+## Session 11 draft is recorded (2026-10-17)
+
+Revision 88 records intake, routing, repair, and `draft_reply_implemented`. The control-file key and the closure key stay false. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The next honest step is the control-file key, through its own proof.
+
+## Session 11 repair is recorded (2026-10-17)
+
+Revision 87 records `support_intake_implemented`, `incident_routing_implemented`, and `repair_resolution_implemented`. The other three Session 11 keys stay false. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The next honest step is the draft reply, through its own proof.
+
+## Session 11 routing is recorded (2026-10-17)
+
+Revision 86 records `support_intake_implemented` and `incident_routing_implemented`. The other four Session 11 keys stay false. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The next honest step is repair resolution, through its own proof.
+
+## Session 11 intake is recorded (2026-10-17)
+
+Revision 85 records `support_intake_implemented`. The other five Session 11 keys stay false. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The next honest step is incident routing, through its own proof.
+
+## Session 11 is activated (2026-10-17)
+
+Revision 84 is incomplete Session 11. Every Session 11 key is false. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The next honest step is the first earned key, through its own proof.
+
+## Session 11 contract is installed (2026-10-17)
+
+D-0056 installs the six Session 11 keys. Revision 83 is unchanged. Session 10 stays complete. Session 11 is not activated. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The next honest step is activation, which installs every Session 11 key false.
+
+## Session 10 is complete (2026-10-17)
+
+Revision 83 records every Session 10 key true. `completed_sessions` is 0 through 10. `next_session` is 11. `head_sha` is `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. Session 11 is not activated. The next honest step is the Session 11 evidence contract.
+
+## Session 10 control files are recorded (2026-10-17)
+
+Revision 82 records the metrics fixture, the maturity clock, portfolio eligibility, the closed-loop ledger, and `control_files_and_checkpoint_current`. The closure key stays false. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The next honest step is the closure key, through its own proof.
+
+## Session 10 closed-loop ledger is recorded (2026-10-17)
+
+Revision 81 records the metrics fixture, the maturity clock, portfolio eligibility, and `closed_loop_store_implemented`. The control-file key and the closure key stay false. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The next honest step is the control-file key, through its own proof.
+
+## Session 10 portfolio eligibility is recorded (2026-10-17)
+
+Revision 80 records `metrics_fixture_implemented`, `maturity_clock_implemented`, and `portfolio_eligibility_implemented`. The other three Session 10 keys stay false. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The next honest step is the closed-loop ledger, through its own proof.
+
+## Session 10 maturity clock is recorded (2026-10-17)
+
+Revision 79 records `metrics_fixture_implemented` and `maturity_clock_implemented`. The other four Session 10 keys stay false. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The next honest step is portfolio eligibility, through its own proof.
+
+## Session 10 metrics fixture is recorded (2026-10-17)
+
+Revision 78 records `metrics_fixture_implemented`. The other five Session 10 keys stay false. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The next honest step is the maturity clock, through its own proof.
+
+## Session 10 is activated (2026-10-17)
+
+Revision 77 is incomplete Session 10. Every Session 10 key is false. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The next honest step is the first earned key, through its own proof.
+
+## Session 10 contract is installed (2026-10-17)
+
+D-0048 installs the six Session 10 keys. Revision 76 is unchanged. Session 09 stays complete. Session 10 is not activated. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. The next honest step is activation, which installs every Session 10 key false.
+
+## Session 09 is complete (2026-10-17)
+
+Revision 76 records every Session 09 key true. `session_status` is complete. `next_session` is 10. `next_prompt` is `13_SESSION_10_ANALYTICS_CULL_MULTIPLY_CLOSED_LOOP.md`. `head_sha` is `cfb36462994ecba833f31ba869f2aba627f6060d`. Session 10 is not activated. Exit 78 stays HELD. The next honest step is the Session 10 evidence contract, then activation.
+
+## Session 09 continuity directory gate (2026-10-17)
+
+The control directory holds the five continuity files and `SESSION_EVIDENCE.md`. The transition set stays the five files. Revision 75 is unchanged. The closure key stays false. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. The next honest step is the closure key, through `apply-completion` onto a commit that contains `def prove_session_09`.
+
+## Session 09 control-file key is recorded (2026-10-17)
+
+Revision 75 records `control_files_and_checkpoint_current`. Preflight, the ramp, the receipt, and the fixture draft stay true. The closure key stays false. `updated_at` is `2026-10-17T11:05:00Z`. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. The next honest step is the closure key, through a commit that contains this proof.
+
+## Session 09 fixture draft key is recorded (2026-10-17)
+
+Revision 74 records `fixture_draft_package_implemented`. Preflight, the ramp, and the receipt stay true. The control-file key and the closure key stay false. `updated_at` is `2026-10-17T11:00:00Z`. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. The successor and the dispatcher stay unchanged. The next honest step is the control-file key, through its own proof.
+
+## Session 09 receipt key is recorded (2026-10-17)
+
+Revision 73 records `mutation_receipt_implemented`. Preflight and the ramp stay true. The other three keys stay false. `updated_at` is `2026-10-17T10:55:00Z`. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. The next honest step is the fixture-draft key, through an adapter double. The successor and the dispatcher stay unchanged.
+
+## Session 09 ramp key is recorded (2026-10-17)
+
+Revision 72 records `publishing_ramp_implemented`. Preflight stays true. The other four keys stay false. `updated_at` is `2026-10-17T10:52:00Z`. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. The committed ramp stays disabled. The next honest step is the mutation-receipt key, through its own proof.
+
+## Session 09 preflight key is recorded (2026-10-17)
+
+Revision 71 records `etsy_preflight_implemented`. The other five keys stay false. `updated_at` is `2026-10-17T10:48:00Z`. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. A12 and A13 stay `DESIGNED`. The exit string is not written. The next honest step is the publishing-ramp key, through its own proof.
+
+## Session 09 is activated and incomplete (2026-10-17)
+
+Revision 70 installs the six Session 09 keys, and every one is false. `updated_at` is `2026-10-17T10:45:00Z`. `head_sha` and `evidence_closure_commit_sha` stay `01b7dd84ef98442ff26a5239e8c7de742739d844`. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6, 7, 8]`. `next_session` stays 9. Exit 78 stays HELD. A12 and A13 stay `DESIGNED`. `commissioned_agents` stays empty. The exit string is not written. The next honest step is earning the false keys through the fixture proof. Completion of Session 09 is a later transition.
+
 ## Session 08 is complete, Session 09 is not activated (2026-10-17)
 
 Revision 69 marks Session 08 complete. `updated_at` is `2026-10-17T09:49:00Z`. `head_sha` and `evidence_closure_commit_sha` are `01b7dd84ef98442ff26a5239e8c7de742739d844`. `next_session` is 9. `next_prompt` is `12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md`. Session 09 is not activated. Exit 78 stays HELD. A10 and A11 stay `DESIGNED`. `commissioned_agents` stays empty. The exit string is not written. The next honest step is activation of Session 09, which installs that session's evidence keys and is a separate transition.

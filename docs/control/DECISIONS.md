@@ -550,3 +550,871 @@ Session 08 is the only session that may complete from that pair.
 ### Consequences
 
 Completion is a `apply-completion` transition from revision 68. The state-pointer commit that records the completed file is a later commit, and the state file does not name that commit. Sessions 09–15 stay unactivated.
+
+## D-0040 — Session 09 evidence contract is installed and not activated
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 08 is complete at revision 69. `next_session` is 9. Activation refuses while session 9 has no entry in `SESSION_EVIDENCE_KEYS`. The Session 09 prompt-integrity addendum defers live publish, commissioning, and the exit string. The earnable proof is the fixture surface already on the trunk, plus the fixture draft package that wave 2 still owes.
+
+### Decision
+
+Session 09's completion contract is exactly these keys. A later activation installs every one false:
+
+- `etsy_preflight_implemented`
+- `publishing_ramp_implemented`
+- `mutation_receipt_implemented`
+- `fixture_draft_package_implemented`
+- `control_files_and_checkpoint_current`
+- `evidence_closure_commit_recorded`
+
+Live publish, commissioning, Exit 78, and `SESSION_09_ETSY_PUBLISHING_COMPLETE` are not keys. This decision does not activate Session 09 and does not edit `IMPLEMENTATION_STATE.json`.
+
+### Consequences
+
+`validate_activation_transition` accepts a candidate that installs these six keys all false from the revision-69 close. A true key, a missing key, or an extra key is refused. Sessions 10–15 still have no contract. Activation is the next transition and is not this commit.
+
+## D-0041 — Session 09 preflight is the first earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 09 is incomplete at revision 70. All six keys are false. `record-evidence` refuses every pointer except complete Session 07 and incomplete Session 08. The preflight checklist already exists and does not publish.
+
+### Decision
+
+`prove_session_09()` earns only `etsy_preflight_implemented`. It requires a passing row with no repair job, a quantity other than 999 that fails with `repair_quantity`, and an unsupported claim that is blocked with no repair job. `record-evidence` on incomplete Session 09 flips that one key. Any other flip is refused. The closure key stays false. `head_sha` does not move. Exit 78 stays HELD. A12 and A13 stay `DESIGNED`. The exit string is not written.
+
+### Consequences
+
+Revision 71 records the preflight key true. The other five Session 09 keys stay false. The ramp, the receipt, and the fixture draft package are later proofs.
+
+## D-0042 — Session 09 publishing ramp is the second earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Revision 71 has `etsy_preflight_implemented` true and the other Session 09 keys false. The ramp predicate already exists. It does not read the ramp file and it does not enable publishing.
+
+### Decision
+
+`prove_session_09()` also earns `publishing_ramp_implemented`. The proof requires a disabled ramp to wait at count zero, a count at cap 2 to wait seven days, a count one below the cap to publish even with an unreconciled row, a caller cap of 3 to publish at count 2, and a count at the hard cap of 15 to wait. `record-evidence` then requires the true keys to be exactly preflight and the ramp. The closure key stays false. `head_sha` does not move. The committed ramp file stays `publishing_enabled: false`.
+
+### Consequences
+
+Revision 72 records the ramp key true. The receipt, the fixture draft package, the control-file key, and the closure key stay false.
+
+## D-0043 — Session 09 mutation receipt is the third earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Revision 72 has preflight and the ramp true. The other Session 09 keys are false. The receipt book already reconciles a create against an in-memory double. It does not open a socket.
+
+### Decision
+
+`prove_session_09()` also earns `mutation_receipt_implemented`. The proof requires one create per idempotency key, a timeout that keeps a visible listing and creates nothing more, a timeout with an empty read that creates once and confirms, an unknown read that does not create again, a missing response hash refused, a screenshot refused, and a raw response body refused. `record-evidence` then requires the true keys to be exactly preflight, the ramp, and the receipt. The closure key stays false. `head_sha` does not move. No live Etsy call is made.
+
+### Consequences
+
+Revision 73 records the receipt key true. The fixture draft package, the control-file key, and the closure key stay false.
+
+## D-0044 — Session 09 fixture draft package is the fourth earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Revision 73 has preflight, the ramp, and the receipt true. The fixture draft package, the control-file key, and the closure key are false. `EtsyDraftClient` already creates one draft through `FixtureTransport`. It has no publish method. The successor and the dispatcher stay as they are.
+
+### Decision
+
+`prove_session_09()` also earns `fixture_draft_package_implemented`. The proof requires a ready draft receipt whose state is `draft`, one create, a retry that posts nothing more, an active listing with the marker refused before a post, a `PATCH` that would set `state=active` refused before the transport, and a missing transport refused. `record-evidence` then requires the true keys to be exactly preflight, the ramp, the receipt, and the fixture draft. The closure key stays false. `head_sha` does not move. Live publish stays deferred.
+
+### Consequences
+
+Revision 74 records the fixture-draft key true. The control-file key and the closure key stay false.
+
+## D-0045 — Session 09 control files are the fifth earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Revision 74 has preflight, the ramp, the receipt, and the fixture draft true. The control-file key and the closure key are false. The five continuity files and the evidence catalogue are already on the trunk.
+
+### Decision
+
+`prove_session_09()` also earns `control_files_and_checkpoint_current`. The proof requires the five continuity files and the evidence catalogue to be non-empty, the catalogue to match its renderer, and the pointer to be incomplete Session 09 with the four behavioral keys true, the closure key false, and `head_sha` equal to the closure commit. `record-evidence` then requires those five keys true. The closure key stays false. `head_sha` does not move.
+
+### Consequences
+
+Revision 75 records the control-file key true. The closure key stays false. Session 09 stays incomplete.
+
+## D-0046 — The evidence catalogue sits beside the five continuity files
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+`test_control_files_are_exactly_the_five_continuity_files` fails because `docs/control/SESSION_EVIDENCE.md` is a sixth file. The transition still requires the five continuity files in `_CONTROL_FILE_PATHS`. The catalogue is the rendered index. It is not a sixth file that `record-evidence` or `apply-completion` must find in a fixture worktree.
+
+### Decision
+
+The directory may contain the five continuity files and `SESSION_EVIDENCE.md`. The transition set stays those five files. The catalogue must match `render_session_evidence()`.
+
+### Consequences
+
+The directory gate passes. Session 09 stays incomplete at revision 75. The closure key stays false.
+
+## D-0047 — Session 09 closes on the commit that holds the pre-transition state
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Five Session 09 keys are true. `evidence_closure_commit_recorded` is the only false key. `record-evidence` refuses to flip it. The completion transition records it when HEAD is a new commit that contains `def prove_session_09` and the exact pre-transition state, and that commit does not name its own object ID.
+
+### Decision
+
+`apply-completion` is the proof-gated transition for the closure key. The closure commit must contain the Session 09 proof. `head_sha` and `evidence_closure_commit_sha` become that commit. `current_session` stays 9. `next_session` becomes 10 and `next_prompt` becomes the Session 10 prompt. Every Session 09 key is true. Session 10 is not activated. No live Etsy call, purchase, or customer message is made.
+
+### Consequences
+
+The following state commit records revision 76. Session 09 is complete. The closure key is true. Session 10 stays inactive.
+
+## D-0048 — Session 10 evidence contract is installed and not activated
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 09 is complete at revision 76. `next_session` is 10. Activation refuses while session 10 has no entry in `SESSION_EVIDENCE_KEYS`. The Session 10 prompt-integrity addendum defers live stats, live deactivation, commissioning, Exit 78, and the exit string. The earnable proof is the fixture surface already on the trunk: the metrics fixture, the maturity clock, portfolio eligibility, and the closed-loop ledger.
+
+### Decision
+
+Session 10's completion contract is exactly these keys. A later activation installs every one false:
+
+- `metrics_fixture_implemented`
+- `maturity_clock_implemented`
+- `portfolio_eligibility_implemented`
+- `closed_loop_store_implemented`
+- `control_files_and_checkpoint_current`
+- `evidence_closure_commit_recorded`
+
+Live stats, live deactivation, commissioning, Exit 78, and `SESSION_10_CLOSED_LOOP_AUTOMATION_COMPLETE` are not keys. This decision does not activate Session 10 and does not edit `IMPLEMENTATION_STATE.json`.
+
+### Consequences
+
+`validate_activation_transition` accepts a candidate that installs these six keys all false from the revision-76 close. A true key, a missing key, or an extra key is refused. Sessions 11–15 still have no contract. Activation is the next transition and is not this commit.
+
+## D-0049 — Session 10 is activated with every key false
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 09 is complete at revision 76 and D-0048 installed the Session 10 contract. `next_session` is 10. The prompt-integrity addendum keeps live stats, live deactivation, commissioning, Exit 78, and the exit string out of the contract.
+
+### Decision
+
+`activate` moves `current_session` from 9 to 10, sets `session_status` to incomplete, and installs the six Session 10 keys all false. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` does not move. A14 and A15 stay `DESIGNED`. Exit 78 stays HELD. No live provider call is made.
+
+### Consequences
+
+Revision 77 is incomplete Session 10. Every Session 10 key is false. The next honest step is the first earned key, through its own proof.
+
+## D-0050 — Session 10 metrics fixture is the first earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 10 is incomplete at revision 77. All six keys are false. The metrics fixture already maps an injected row into one snapshot, plans one collection and one shop review, refuses a second plan in the same window, and follows the monthly cadence instead of a fourth-week counter.
+
+### Decision
+
+`prove_session_10()` earns only `metrics_fixture_implemented`. It requires one reconciled snapshot, a duplicate window refusal, a weekly plan of one collection then one shop review, an empty second plan in that window, no monthly record on a fourth week when the month is not due, a monthly record when the month is due, a cadence refusal, and a refusal of unmeasured operator minutes. `record-evidence` on incomplete Session 10 flips that one key. Any other flip is refused. The closure key stays false. `head_sha` does not move. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written.
+
+### Consequences
+
+Revision 78 records the metrics key true. The other five Session 10 keys stay false. The maturity clock is the next proof.
+
+## D-0051 — Session 10 maturity clock is the second earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 10 is incomplete at revision 78. `metrics_fixture_implemented` is true. The maturity clock already counts thirty accumulated live UTC periods. Twenty live periods plus ten inactive periods are not mature on calendar day 30. A stored `live_days` of 30 does not override the intervals. A defect inside the window returns repair data. The clock does not call `schedule_maturity_timer`.
+
+### Decision
+
+`prove_session_10()` earns `metrics_fixture_implemented` and `maturity_clock_implemented`. `record-evidence` on incomplete Session 10 flips the maturity key and keeps the metrics key. Any other flip is refused. The closure key stays false. `head_sha` does not move. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. No scheduler row is inserted.
+
+### Consequences
+
+Revision 79 records the metrics key and the maturity key true. The other four Session 10 keys stay false. Portfolio eligibility is the next proof.
+
+## D-0052 — Session 10 portfolio eligibility is the third earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 10 is incomplete at revision 79. The metrics fixture and the maturity clock are true. Portfolio eligibility already returns only `HOLD`, `REPAIR`, `CULL`, and `MULTIPLY`. Cohorts under five, cutoff ties, and identical scores are not culled. `CULL` carries an unexecuted deactivation id and does not emit `LISTING_CULLED`. `MULTIPLY` returns a successor and stops at dedupe. `HOLD` names a future collection time. One eligible new-front experiment is scheduled, and a blocked experiment stays queued. `publishing_enabled` stays false.
+
+### Decision
+
+`prove_session_10()` earns `metrics_fixture_implemented`, `maturity_clock_implemented`, and `portfolio_eligibility_implemented`. `record-evidence` on incomplete Session 10 flips the portfolio key and keeps the earlier keys. Any other flip is refused. The closure key stays false. `head_sha` does not move. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. No deactivation is executed.
+
+### Consequences
+
+Revision 80 records those three keys true. The closed-loop ledger, the control-file key, and the closure key stay false. The closed-loop ledger is the next proof.
+
+## D-0053 — Session 10 closed-loop ledger is the fourth earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 10 is incomplete at revision 80. The metrics fixture, the maturity clock, and portfolio eligibility are true. The ledger already stores one weekly trigger per new plan record, leaves a second write in the same window unchanged, stores one monthly deep-pass trigger, and returns `LISTING_CULLED` only after a fixture status of `CONFIRMED`. An unknown read, a hold, a blank lesson, a premature cull event, and a cull without a job id do not confirm a cull. The deactivation stays unexecuted. The module does not call the scheduler.
+
+### Decision
+
+`prove_session_10()` earns the metrics key, the maturity key, the portfolio key, and `closed_loop_store_implemented`. `record-evidence` on incomplete Session 10 flips the ledger key and keeps the earlier keys. Any other flip is refused. The closure key stays false. `head_sha` does not move. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. No scheduler row is inserted through `scheduler.main`, and no live deactivation runs.
+
+### Consequences
+
+Revision 81 records those four keys true. `control_files_and_checkpoint_current` and the closure key stay false. The control-file key is the next proof.
+
+## D-0054 — Session 10 control files are the fifth earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 10 is incomplete at revision 81. The metrics fixture, the maturity clock, portfolio eligibility, and the closed-loop ledger are true. The five continuity files and the evidence catalogue are present. The catalogue matches its renderer. The pointer is incomplete Session 10, `head_sha` equals the Session 09 closure, and the closure key is false.
+
+### Decision
+
+`prove_session_10()` earns the metrics key, the maturity key, the portfolio key, the ledger key, and `control_files_and_checkpoint_current`. The proof requires those files to be non-empty and the catalogue to match its renderer. `record-evidence` on incomplete Session 10 flips the control-file key and keeps the earlier keys. Any other flip is refused. The closure key stays false. `head_sha` does not move. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. No scheduler row is inserted through `scheduler.main`, and no live deactivation runs.
+
+### Consequences
+
+Revision 82 records those five keys true. The closure key stays false. The closure key is the next proof.
+
+## D-0055 — Session 10 closes on the commit that holds the pre-transition state
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Five Session 10 keys are true. `evidence_closure_commit_recorded` is the only false key. `record-evidence` refuses to flip it. The completion transition records it when HEAD is a new commit that contains `def prove_session_10` and the exact pre-transition state, and that commit does not name its own object ID.
+
+### Decision
+
+`apply-completion` is the proof-gated transition for the closure key. The closure commit must contain the Session 10 proof. `head_sha` and `evidence_closure_commit_sha` become that commit. `current_session` stays 10. `next_session` becomes 11 and `next_prompt` becomes the Session 11 prompt. Every Session 10 key is true. Session 11 is not activated. No live Etsy call, purchase, or customer message is made.
+
+### Consequences
+
+The following state commit records revision 83. Session 10 is complete. The closure key is true. Session 11 stays inactive.
+
+## D-0056 — Session 11 evidence contract is installed and not activated
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 10 is complete at revision 83. `next_session` is 11. Activation refuses while session 11 has no entry in `SESSION_EVIDENCE_KEYS`. The Session 11 prompt-integrity addendum defers live send, commissioning, Exit 78, and the exit string. D-01 deferred the evidence contract until Sessions 08, 09, and 10 were closed. Those sessions are closed. The earnable proof is the fixture surface already on the trunk: intake, incident routing, repair resolution, and the draft reply.
+
+### Decision
+
+Session 11's completion contract is exactly these keys. A later activation installs every one false:
+
+- `support_intake_implemented`
+- `incident_routing_implemented`
+- `repair_resolution_implemented`
+- `draft_reply_implemented`
+- `control_files_and_checkpoint_current`
+- `evidence_closure_commit_recorded`
+
+Live send, A16 commissioning, Exit 78, Notion page rewrite, attachment bytes, inserted jobs, and `SESSION_11_SUPPORT_AND_REPAIR_COMPLETE` are not keys. This decision does not activate Session 11 and does not edit `IMPLEMENTATION_STATE.json`.
+
+### Consequences
+
+`validate_activation_transition` accepts a candidate that installs these six keys all false from the revision-83 close. A true key, a missing key, or an extra key is refused. Sessions 12–15 still have no contract. Activation is the next transition and is not this commit.
+
+## D-0057 — Session 11 is activated with every key false
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 10 is complete at revision 83 and D-0056 installed the Session 11 contract. `next_session` is 11. The prompt-integrity addendum keeps live send, commissioning, Exit 78, and the exit string out of the contract.
+
+### Decision
+
+`activate` moves `current_session` from 10 to 11, sets `session_status` to incomplete, and installs the six Session 11 keys all false. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` does not move. A16 stays `DESIGNED`. Exit 78 stays HELD. No live provider call is made.
+
+### Consequences
+
+Revision 84 is incomplete Session 11. Every Session 11 key is false. The next honest step is the first earned key, through its own proof.
+
+## D-0058 — Session 11 intake is the first earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 11 is incomplete at revision 84. All six keys are false. Intake already stores one incident for a shop, an opaque buyer reference, and a received time, returns that same incident on a second call, refuses an unsafe summary without echoing it, and stores an attachment hash and content type.
+
+### Decision
+
+`prove_session_11()` earns `support_intake_implemented`. `record-evidence` on incomplete Session 11 flips that key and keeps the other five false. Any other flip is refused. The closure key stays false. `head_sha` does not move. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.
+
+### Consequences
+
+Revision 85 records the intake key true. The other five Session 11 keys stay false. The routing key is the next proof.
+
+## D-0059 — Session 11 incident routing is the second earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 11 is incomplete at revision 85. `support_intake_implemented` is true. The other five keys are false. The intake fixture already maps the thirteen issue codes onto existing incident types and existing job types. Summary words do not select the code. A caller integer does not flip `preempts_routine`. No job is inserted.
+
+### Decision
+
+`prove_session_11()` earns `support_intake_implemented` and `incident_routing_implemented`. `record-evidence` on incomplete Session 11 keeps the intake key and flips the routing key. The other four keys stay false. Any other flip is refused. The closure key stays false. `head_sha` does not move. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.
+
+### Consequences
+
+Revision 86 records the intake and routing keys true. The other four Session 11 keys stay false. The repair key is the next proof.
+
+## D-0060 — Session 11 repair resolution is the third earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 11 is incomplete at revision 86. `support_intake_implemented` and `incident_routing_implemented` are true. The other four keys are false. The intake fixture already keeps one repair version per incident and idempotency key, and it closes an issue only after a later matching read from a different job.
+
+### Decision
+
+`prove_session_11()` earns `support_intake_implemented`, `incident_routing_implemented`, and `repair_resolution_implemented`. `record-evidence` on incomplete Session 11 keeps the first two keys and flips the repair key. The other three keys stay false. Any other flip is refused. The closure key stays false. `head_sha` does not move. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.
+
+### Consequences
+
+Revision 87 records the intake, routing, and repair keys true. The other three Session 11 keys stay false. The draft reply is the next proof.
+
+## D-0061 — Session 11 draft reply is the fourth earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 11 is incomplete at revision 87. Intake, routing, and repair are true. The other three keys are false. The intake fixture already drafts from the verification's own fix and path. Auto mode and a failed read produce no body. The send count stays zero.
+
+### Decision
+
+`prove_session_11()` earns the intake, routing, repair, and draft keys. `record-evidence` on incomplete Session 11 keeps the first three keys and flips `draft_reply_implemented`. The control-file key and the closure key stay false. Any other flip is refused. `head_sha` does not move. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.
+
+### Consequences
+
+Revision 88 records the intake, routing, repair, and draft keys true. The other two Session 11 keys stay false. The control-file key is the next proof.
+
+## D-0062 — Session 11 control files are the fifth earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 11 is incomplete at revision 88. Intake, routing, repair, and the draft are true. The control-file key and the closure key are false. The five continuity files and the evidence catalogue are already on the trunk.
+
+### Decision
+
+`prove_session_11()` earns the intake, routing, repair, draft, and control-file keys. `record-evidence` on incomplete Session 11 keeps the first four keys and flips `control_files_and_checkpoint_current`. The closure key stays false. Any other flip is refused. `head_sha` does not move. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.
+
+### Consequences
+
+Revision 89 records every Session 11 key except the closure key. The closure key is the next proof, through `apply-completion`.
+
+## D-0063 — Session 11 closes on the commit that holds the pre-transition state
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Five Session 11 keys are true. `evidence_closure_commit_recorded` is the only false key. `record-evidence` refuses to flip it. The completion transition records it when HEAD is a new commit that contains `def prove_session_11` and the exact pre-transition state, and that commit does not name its own object ID.
+
+### Decision
+
+`apply-completion` is the proof-gated transition for the closure key. The closure commit is `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. It contains the Session 11 proof and the pre-transition state. `head_sha` and `evidence_closure_commit_sha` become that commit. `current_session` stays 11. `next_session` becomes 12 and `next_prompt` becomes the Session 12 prompt. Every Session 11 key is true. Session 12 is not activated. No live call, purchase, or customer message is made.
+
+### Consequences
+
+The following state commit records revision 90. Session 11 is complete. The closure key is true. Session 12 stays inactive.
+
+## D-0064 — Session 12 evidence contract is installed and not activated
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 11 is complete at revision 90. `next_session` is 12. Activation refuses while session 12 has no entry in `SESSION_EVIDENCE_KEYS`. The Session 12 prompt-integrity addendum defers live PostHog, live operator mutations, the deployed console, Exit 78, and the exit string. The offline PostHog client already queues and does not send.
+
+### Decision
+
+Session 12's completion contract is exactly these keys. A later activation installs every one false:
+
+- `console_read_model_implemented`
+- `exception_views_implemented`
+- `telemetry_redaction_implemented`
+- `operator_actions_fail_closed`
+- `control_files_and_checkpoint_current`
+- `evidence_closure_commit_recorded`
+
+Live PostHog capture, a deployed API, a Next.js app, browser end-to-end tests, live operator mutations, Exit 78, and `SESSION_12_OPERATOR_CONSOLE_COMPLETE` are not keys. This decision does not activate Session 12 and does not edit `IMPLEMENTATION_STATE.json`.
+
+### Consequences
+
+`validate_activation_transition` accepts a candidate that installs these six keys all false from the revision-90 close. A true key, a missing key, or an extra key is refused. Sessions 13–15 still have no contract. Activation is the next transition and is not this commit.
+
+## D-0065 — Session 12 is activated with every key false
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 11 is complete at revision 90 and D-0064 installed the Session 12 contract. `next_session` is 12. The prompt-integrity addendum keeps live PostHog, live operator mutations, the deployed console, Exit 78, and the exit string out of the contract.
+
+### Decision
+
+`activate` moves `current_session` from 11 to 12, sets `session_status` to incomplete, and installs the six Session 12 keys all false. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. No live provider call is made.
+
+### Consequences
+
+Revision 91 is incomplete Session 12. Every Session 12 key is false. The next honest step is the first earned key, through its own proof.
+
+## D-0066 — Session 12 records the console read model
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 12 is incomplete at revision 91. D-0065 installed every Session 12 key false. The prompt-integrity addendum keeps the read model typed and in memory. A deployed API, a Next.js console, live PostHog, live operator mutations, Exit 78, and the exit string stay deferred.
+
+### Decision
+
+`record-evidence` sets `console_read_model_implemented` true. The other five Session 12 keys stay false. `current_session` stays 12. `session_status` stays incomplete. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. The read model pages the shop, workflows, pipeline stages, jobs, products, variants, listings, weekly metrics, decisions, incidents, integrations, milestones, autonomy settings, and system health. An empty store returns an empty page. The module does not open a socket and does not write a cap.
+
+### Consequences
+
+Revision 92 is incomplete Session 12. One key is true. The next honest step is `exception_views_implemented`, through its own proof.
+
+## D-0067 — Session 12 records the exception views
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 12 is incomplete at revision 92. D-0066 recorded the in-memory read model. The prompt-integrity addendum earns the exception views only when each named view is derived from that model, including an empty state and an error state. A blank component is not the proof. A routine decision is not an approval request.
+
+### Decision
+
+`record-evidence` sets `exception_views_implemented` true and keeps `console_read_model_implemented` true. The other four Session 12 keys stay false. The seven views are now, pipeline, shop, blocked, decisions, incidents, and settings. Each one is derived from the read model. An empty store renders an empty view. A missing cursor renders an error view. A blocked job is not a blocker. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. No socket is opened and no cap is written.
+
+### Consequences
+
+Revision 93 is incomplete Session 12. Two keys are true. The next honest step is `telemetry_redaction_implemented`, through its own proof.
+
+## D-0068 — Session 12 records telemetry redaction
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 12 is incomplete at revision 93. D-0067 recorded the exception views. The prompt-integrity addendum earns telemetry redaction only when a secret, a cookie, or a raw buyer message is refused. A status word is not the proof. A live PostHog capture stays deferred.
+
+### Decision
+
+`record-evidence` sets `telemetry_redaction_implemented` true and keeps `console_read_model_implemented` and `exception_views_implemented` true. The other three Session 12 keys stay false. The redaction gate keeps the operational property names and refuses a secret, a cookie, or a raw buyer message. The payload stays in memory. `sent` stays false. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. No socket is opened and no cap is written.
+
+### Consequences
+
+Revision 94 is incomplete Session 12. Three keys are true. The next honest step is `operator_actions_fail_closed`, through its own proof.
+
+## D-0069 — Session 12 records fail-closed operator actions
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 12 is incomplete at revision 94. D-0068 recorded telemetry redaction. The prompt-integrity addendum names the operator actions and fails them closed. A live pause, resume, cap change, credential write, or schedule run stays deferred. `worker.py` and `scheduler.py` stay untouched. Exit 78 stays HELD.
+
+### Decision
+
+`record-evidence` sets `operator_actions_fail_closed` true and keeps the read-model, exception-view, and telemetry keys true. The control-file key and the closure key stay false. The nine named actions are inspect, retry an eligible failed job, reconcile an uncertain effect, supply credential status, pause a workflow, resume a workflow, change standing authority, create a customer issue, and trigger a schedule run. Each one is refused. Arbitrary database editing is refused. A status word is not an action. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. No socket is opened and no cap is written.
+
+### Consequences
+
+Revision 95 is incomplete Session 12. Four keys are true. The next honest step is `control_files_and_checkpoint_current`, through its own proof.
+
+## D-0070 — Session 12 records the control files
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 12 is incomplete at revision 95. The read-model, exception-view, telemetry, and fail-closed action keys are true. The control-file key and the closure key are false. The six continuity files and the evidence catalogue are already on the trunk.
+
+### Decision
+
+`prove_session_12()` earns the read-model, exception-view, telemetry, fail-closed action, and control-file keys. `record-evidence` keeps the first four keys and flips `control_files_and_checkpoint_current`. The closure key stays false. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. No socket is opened and no cap is written.
+
+### Consequences
+
+Revision 96 records every Session 12 key except the closure key. The closure key is the next proof, through `apply-completion`.
+
+## D-0071 — Session 12 records the closure commit
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 12 is incomplete at revision 96. Every key except `evidence_closure_commit_recorded` is true. That key is earned only by `apply-completion`.
+
+### Decision
+
+`apply-completion` advances revision 96 to 97. `session_status` becomes complete. `current_session` stays 12. `completed_sessions` is 0 through 12. `next_session` is 13. `next_prompt` is `16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md`. `head_sha` and `evidence_closure_commit_sha` are `d81db61033561bdd40869ff1316f0c935c74cdf4`. That commit contains `prove_session_12` and the pre-transition state, and it does not claim its own object ID. Every Session 12 key is true. Exit 78 stays HELD. Session 13 is not activated. No socket is opened and no cap is written.
+
+### Consequences
+
+Revision 97 is complete Session 12. The next honest step is the Session 13 evidence contract.
+
+## D-0072 — Session 13 evidence contract
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 12 is complete at revision 97. `next_session` is 13. Session 13 has no evidence contract and is not activated. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-13-prompt-integrity.md`. Its verified prompt hash is `d277afd72c2c90c29e0a8d2e4b607bb342b32d84fd485151de7ad6a1b32e21f2`.
+
+### Decision
+
+The Session 13 contract has six keys: `implementation_matrix_recorded`, `synthetic_paths_implemented`, `failure_injection_implemented`, `backup_restore_fixture_implemented`, `control_files_and_checkpoint_current`, and `evidence_closure_commit_recorded`. Live failure injection, a live PostgreSQL backup, a production Docker build, browser end-to-end tests, Exit 78, and `SESSION_13_E2E_AND_HARDENING_COMPLETE` are not keys. This decision does not activate the session. `IMPLEMENTATION_STATE.json` stays revision 97. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD.
+
+### Consequences
+
+The contract is installed and every key is unrecorded. The next honest step is activation, which installs every Session 13 key false.
+
+## D-0073 — Session 13 activation
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 12 is complete at revision 97. The Session 13 contract is installed (D-0072) and the session is not activated. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-13-prompt-integrity.md`.
+
+### Decision
+
+`activate` advances `state_revision` from 97 to 98. `updated_at` is `2026-10-17T13:45:00Z`. `current_session` is 13. `session_status` is incomplete. `completed_sessions` stays 0 through 12. `next_session` stays 13. Every Session 13 key is false. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. This activation does not earn a key and does not write the exit string.
+
+### Consequences
+
+Session 13 is the active incomplete session. The next honest step is `implementation_matrix_recorded`, earned by classifying the real playbook, job, event, agent, and provider rows. A live credential gap stays blocked. A fail-closed raise stays.
+
+## D-0077 — Session 13 backup fixture
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 13 is incomplete at revision 101. The matrix, the synthetic paths, and the failure injections are true. The other three Session 13 keys are false. The prompt asks for a PostgreSQL backup. The prompt-integrity addendum defers that live backup. The fixture snapshot is the evidence key.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 101 to 102. `updated_at` is `2026-10-17T14:30:00Z`. `backup_restore_fixture_implemented` is true. The matrix, the synthetic paths, and the failure injections stay true. `control_files_and_checkpoint_current` and `evidence_closure_commit_recorded` stay false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. `src/money_machine/assets/backup_restore.py` copies a workflow, a job, a product, a draft listing, an incident, the artifact hash, and the simulation config into a snapshot. Clearing the source leaves the snapshot intact. The first restore inserts those rows. A second restore inserts none. A changed row conflicts. `backup(mode="postgres")` is refused. A live publishing mode is refused. Exit 78 stays HELD.
+
+### Consequences
+
+The backup fixture is recorded. A live PostgreSQL backup stays deferred. The next honest step is `control_files_and_checkpoint_current`.
+
+## D-0076 — Session 13 failure injections
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 13 is incomplete at revision 100. `implementation_matrix_recorded` and `synthetic_paths_implemented` are true. The other four Session 13 keys are false. The prompt requires each named failure, including a restart and a duplicate effect, to end in recovery or an exact blocked state. A live process crash, a live credential, and a live provider call stay refused.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 100 to 101. `updated_at` is `2026-10-17T14:25:00Z`. `failure_injection_implemented` is true. `implementation_matrix_recorded` and `synthetic_paths_implemented` stay true. The other three Session 13 keys stay false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. `src/money_machine/assets/failure_injection.py` runs the eighteen named injections. A crashed job returns to READY through the SAFE retry policy. A scheduler restart promotes a due job once and does not queue the duplicate id again. A database reconnect fails once and then connects. An expired lease does not execute. A duplicate event keeps the first body. A duplicate publish creates once. A timeout before a response creates the absent write once. A timeout after success keeps the observed provider id and does not create again. An expired Etsy token, an expired Notion session, malformed model output, an unavailable model, an empty render, a mismatched PDF link, stale product facts, an unknown selector, a full ramp, and a spent cap each stay blocked. Exit 78 stays HELD. `worker.py` and `scheduler.py` are not edited.
+
+### Consequences
+
+The failure injections are recorded. The next honest step is `backup_restore_fixture_implemented`: an in-memory snapshot of a workflow, job, product, listing, and incident, restored once without duplicating them. No live PostgreSQL backup is taken.
+
+## D-0075 — Session 13 synthetic paths
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 13 is incomplete at revision 99. `implementation_matrix_recorded` is true. The other five Session 13 keys are false. The prompt requires a fixture-backed chain from research through a successor build, plus cull, repair, broken link, and too-close dedupe. A live publish, a live Notion write, and a buyer message stay refused.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 99 to 100. `updated_at` is `2026-10-17T14:10:00Z`. `synthetic_paths_implemented` is true. `implementation_matrix_recorded` stays true. The other four Session 13 keys stay false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. The path builds a research report, a product spec, and a passing dedupe, then a Notion fixture build, QA, variants, listing copy, assets, and PDFs. The Etsy draft goes through the fixture draft client. Preflight must pass. Publish simulation refuses `live` and records the send as withheld. Post-publish verification stays `BLOCKED_BY_EXTERNAL_CREDENTIAL`. Weekly metrics, the thirty-day clock, the winner, the successor spec, and the successor build job are recorded. Cull deactivation stays unexecuted. The broken-link reply is a draft with send count zero. A second run returns the same receipts. Exit 78 stays HELD.
+
+### Consequences
+
+The synthetic paths are recorded. The next honest step is `failure_injection_implemented`: each named injection ends in recovery or an exact blocked state. No live provider call is made.
+
+## D-0074 — Session 13 implementation matrix
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 13 is incomplete at revision 98. Every Session 13 key is false. The prompt-integrity addendum requires one of four classifications for each playbook step, job type, event, lifecycle transition, agent, provider action, console view, and runbook. A live credential gap stays blocked. A fail-closed raise stays.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 98 to 99. `updated_at` is `2026-10-17T14:00:00Z`. `implementation_matrix_recorded` is true. The other five Session 13 keys stay false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. The matrix reads the workflow config, the agent registry, the event enums, and the lifecycle tables. Publish, purchase, and message jobs stay `BLOCKED_BY_EXTERNAL_CREDENTIAL`. A03 through A16 stay `MISSING` because the registry raises `AgentNotImplementedError`. The five named runbooks stay `MISSING`. Exit 78 stays HELD.
+
+### Consequences
+
+The matrix is recorded. The next honest step is `synthetic_paths_implemented`, a fixture-backed path. No live provider call is made.
+
+## D-0078 — Session 13 control files
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 13 is incomplete at revision 102. The matrix, the synthetic paths, the failure injections, and the backup fixture are true. `control_files_and_checkpoint_current` and `evidence_closure_commit_recorded` are false. The control-file proof already checks the five continuity files, the rendered catalogue, and the incomplete Session 13 pointer. The closure key stays false.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 102 to 103. `updated_at` is `2026-10-17T14:35:00Z`. `control_files_and_checkpoint_current` is true. The matrix, the synthetic paths, the failure injections, and the backup fixture stay true. `evidence_closure_commit_recorded` stays false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. The catalogue matches `render_session_evidence()`. Exit 78 stays HELD.
+
+### Consequences
+
+The control-file checkpoint is recorded. The closure key is not recorded. The next honest step is `evidence_closure_commit_recorded`, through `apply-completion`. That commit must contain the proof and the pre-transition state. `head_sha` does not move in this decision.
+
+## D-0079 — Session 13 closure
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 13 is incomplete at revision 103. Five keys are true. `evidence_closure_commit_recorded` is false. The closure commit must contain `def prove_session_13` and the exact pre-transition state. The exit string is not a key.
+
+### Decision
+
+`apply-completion` advances `state_revision` from 103 to 104. `updated_at` is `2026-10-17T14:40:00Z`. Every Session 13 key is true. `session_status` is complete. `current_session` stays 13. `completed_sessions` is 0 through 13. `next_session` is 14. `next_prompt` is `17_SESSION_14_DEPLOYMENT.md`. `head_sha` and `evidence_closure_commit_sha` are `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. That commit contains `def prove_session_13` and the pre-transition state. Session 14 is not activated. Exit 78 stays HELD. The exit string is not written.
+
+### Consequences
+
+Session 13 is complete. The next honest step is the Session 14 evidence contract. A live deploy stays deferred until that contract says otherwise.
+
+## D-0080 — Session 14 evidence contract
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 13 is complete at revision 104. `next_session` is 14. Session 14 has no evidence contract and is not activated. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-14-prompt-integrity.md`. Its verified prompt hash is `92d8c9a1b99e523ea227b2a4dc339fd0e32c6d007a9d05a4735b7a163cf7b624`. `docs/architecture/DEPLOYMENT.md` and `compose.prod.yaml` already exist. Exit 78 stays HELD.
+
+### Decision
+
+The Session 14 contract has six keys: `deployment_target_recorded`, `production_packaging_defined`, `release_rollback_implemented`, `service_controls_fail_closed`, `control_files_and_checkpoint_current`, and `evidence_closure_commit_recorded`. A live deploy, a new paid host, a production image build, public HTTPS, a scheduled production backup, Exit 78, and `SESSION_14_PRODUCTION_DEPLOYMENT_COMPLETE` are not keys. This decision does not activate the session. `IMPLEMENTATION_STATE.json` stays revision 104. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD.
+
+### Consequences
+
+The contract is installed and every key is unrecorded. The next honest step is activation, which installs every Session 14 key false. The product modules that earn the four fixture keys come after activation. A live deploy stays deferred.
+
+## D-0081 — Session 14 activation
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 13 is complete at revision 104. The Session 14 contract is installed (D-0080) and the session is not activated. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-14-prompt-integrity.md`.
+
+### Decision
+
+`activate` advances `state_revision` from 104 to 105. `updated_at` is `2026-10-17T14:55:00Z`. `current_session` is 14. `session_status` is incomplete. `completed_sessions` stays 0 through 13. `next_session` stays 14. Every Session 14 key is false. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. This activation does not earn a key and does not write the exit string.
+
+### Consequences
+
+Session 14 is the active incomplete session. The next honest step is `deployment_target_recorded`, earned by a selector that returns `local-wsl` and refuses a new paid host. A live deploy stays deferred.
+
+## D-0082 — Session 14 deployment target
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 14 is incomplete at revision 105. Every key is false (D-0081). `docs/architecture/DEPLOYMENT.md` already selects a local and single-server topology and says Exit 78 is not deployment success.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 105 to 106. `updated_at` is `2026-10-17T15:00:00Z`. `deployment_target_recorded` is true. The other five Session 14 keys stay false. `current_session` stays 14. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. `src/money_machine/deploy/target.py` returns `local-wsl` and raises `unapproved_spend` for `new-paid` without an authority record. An approved authority names a paid host and still creates nothing. A live deploy stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+### Consequences
+
+The next honest step is `production_packaging_defined`. The proof checks api, worker, scheduler, web, the postgres volume, and healthchecks, and worker and scheduler restart stay `no`. A passing docker compose config is not the key. A live deploy stays deferred.
+
+## D-0083 — Session 14 production package
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 14 is incomplete at revision 106. `deployment_target_recorded` is true (D-0082). `compose.prod.yaml` already names postgres, api, web, worker, and scheduler. Worker and scheduler restart are `no`. The six runbooks did not name Exit 78.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 106 to 107. `updated_at` is `2026-10-17T15:10:00Z`. `production_packaging_defined` is true. `deployment_target_recorded` stays true. The other four Session 14 keys stay false. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. `src/money_machine/deploy/packaging.py` reads the compose spec and the six runbooks. It requires the five services, the `postgres-data` volume, the postgres and api healthchecks, and worker and scheduler restart `no`. Each runbook names Exit 78 and contains no secret. A request to accept `docker compose config` raises `compose_config`. No image is built. Exit 78 stays HELD.
+
+### Consequences
+
+The next honest step is `release_rollback_implemented`. The proof binds an image tag to a commit, plans a backup before migration, refuses live postgres, and fails a compatibility check when the schema is incompatible. It does not push an image. A live deploy stays deferred.
+
+## D-0084 — Session 14 release plan
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 14 is incomplete at revision 107. `deployment_target_recorded` and `production_packaging_defined` are true (D-0082, D-0083). The package check does not push an image or open live postgres. `docs/architecture/DEPLOYMENT.md` already requires a backup before a migration that cannot be reversed, schema-compatible code before destructive cleanup, and an image rollback only when schema compatibility is proved.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 107 to 108. `updated_at` is `2026-10-17T15:15:00Z`. `release_rollback_implemented` is true. `deployment_target_recorded` and `production_packaging_defined` stay true. The other three Session 14 keys stay false. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. `src/money_machine/deploy/release.py` binds `money-machine:<commit>` to the 40-hex commit, calls the fixture backup before the schema check, refuses `postgres` with `live_postgres`, refuses `push` with `image_push`, refuses an unbound tag, and refuses an unreachable schema with `incompatible_schema`. A destructive fixture revision stays forward-compatible after the backup and `rollback_image` raises `rollback_refused`. `image_pushed` stays false. No image is pushed. No git tag is created. Exit 78 stays HELD.
+
+### Consequences
+
+The next honest step is `service_controls_fail_closed`. The proof refuses start, stop, restart, status, logs, scale, a second scheduler, migrate, and a safe update. A status word is not a running service. It does not open a docker socket. A live deploy and a scheduled production backup stay deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0085 — Session 14 service controls
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 14 is incomplete at revision 108. The target, the package, and the release plan are recorded (D-0082, D-0083, D-0084). Starting the worker or the scheduler would clear Exit 78. A status word is not a running service.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 108 to 109. `updated_at` is `2026-10-17T15:25:00Z`. `service_controls_fail_closed` is true. The three earlier Session 14 keys stay true. `control_files_and_checkpoint_current` and `evidence_closure_commit_recorded` stay false. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. `src/money_machine/deploy/controls.py` refuses start, stop, restart, status, logs, scale, the scheduler singleton, migrate, and safe update. A status word raises `status_word` and `running` stays false. A docker socket raises `docker_socket`. A second scheduler raises `scheduler_singleton`. `worker.py` and `scheduler.py` are read and not edited. Exit 78 stays HELD.
+
+### Consequences
+
+The next honest step is `control_files_and_checkpoint_current`. The five continuity files stay present and the catalogue matches the rendered index. The closure key stays false. A live deploy stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0086 — Session 14 deployment checkpoint
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 14 is incomplete at revision 109. The target, the package, the release plan, and the service controls are recorded (D-0082, D-0083, D-0084, D-0085). The continuity files and the catalogue are the checkpoint. A live deploy is still deferred.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 109 to 110. `updated_at` is `2026-10-17T15:30:00Z`. `control_files_and_checkpoint_current` is true. The four earlier Session 14 keys stay true. `evidence_closure_commit_recorded` stays false. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. `src/money_machine/deploy/checkpoint.py` reads the six continuity files and the four deploy modules. The catalogue must match the renderer. A closure claim is refused. The state file must not contain the exit string. A decision line that names the exit string must say it is not written. Exit 78 stays HELD.
+
+### Consequences
+
+The next honest step is `evidence_closure_commit_recorded` through apply-completion. That closure is a later increment. A live deploy stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0087 — Session 14 closure
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 14 is incomplete at revision 110. Five keys are true. `evidence_closure_commit_recorded` is false. The closure commit must contain `def prove_session_14` and the exact pre-transition state. The exit string is not a key.
+
+### Decision
+
+`apply-completion` advances `state_revision` from 110 to 111. `updated_at` is `2026-10-17T15:35:00Z`. Every Session 14 key is true. `session_status` is complete. `current_session` stays 14. `completed_sessions` is 0 through 14. `next_session` is 15. `next_prompt` is `18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md`. `head_sha` and `evidence_closure_commit_sha` are `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. That commit contains `def prove_session_14` and the pre-transition state. The pointer commit must not record its own SHA. Session 15 is not activated. Exit 78 stays HELD. The exit string is not written. A live deploy stays deferred.
+
+### Consequences
+
+Session 14 is complete. The next honest step is the Session 15 evidence contract. Session 15 is not activated. A live deploy stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0088 — Session 15 evidence contract
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 14 is complete at revision 111. `next_session` is 15. Session 15 has no evidence contract and is not activated. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-15-prompt-integrity.md`. Its verified prompt hash is `b09859086ad510862f493227c1da075cc0a29d76ebd07ca4cd6f80710c8ce712`. `AutonomyConfig`, the Etsy and Notion fixture adapters, and the deployment checkpoint already exist. Exit 78 stays HELD.
+
+### Decision
+
+The Session 15 contract has seven keys: `deployed_state_checked`, `provider_connections_fail_closed`, `standing_authority_recorded`, `linked_workflow_fixture`, `acceptance_matrix_recorded`, `control_files_and_checkpoint_current`, and `evidence_closure_commit_recorded`. A live account, a live publish, a purchase, a checkout, a live PostHog event, Exit 78, and `HANDS_OFF_MONEY_MACHINE_COMMISSIONED` are not keys. This decision does not activate the session. `IMPLEMENTATION_STATE.json` stays revision 111. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Exit 78 stays HELD.
+
+### Consequences
+
+The next honest step is activation, which installs every Session 15 key false. A live account stays deferred. Exit 78 stays HELD. The exit string is not written. There is no session 16 prompt, so the generic completion transition is not used in this decision.
+
+## D-0089 — Session 15 activation
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 14 is complete at revision 111. The Session 15 contract is installed (D-0088) and the session is not activated. Every Session 14 key is true. A live account is still deferred.
+
+### Decision
+
+`activate` advances `state_revision` from 111 to 112. `updated_at` is `2026-10-17T16:00:00Z`. `current_session` is 15. `session_status` is incomplete. `completed_sessions` stays 0 through 14. `next_session` stays 15. `next_prompt` stays `18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md`. Every Session 15 key is false. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Exit 78 stays HELD. The exit string is not written. No live provider call is made.
+
+### Consequences
+
+The next honest step is `deployed_state_checked`: the checkpoint reads the continuity files and refuses a live smoke. A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0090 — Session 15 deployed state
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 15 is incomplete at revision 112. Every Session 15 key is false. The checkpoint already reads the continuity files. A production smoke would start the held services.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 112 to 113. `updated_at` is `2026-10-17T16:10:00Z`. `deployed_state_checked` is true. The other six Session 15 keys stay false. `session_status` stays incomplete. `current_session` stays 15. `completed_sessions` stays 0 through 14. `next_session` stays 15. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. `src/money_machine/deploy/deployed_state.py` reads the checkpoint and refuses a live smoke, a docker socket, and a service start. `worker.py` and `scheduler.py` are read and not edited. No service is started. Exit 78 stays HELD. The exit string is not written.
+
+### Consequences
+
+The next honest step is `provider_connections_fail_closed`: the Etsy and Notion fixture adapters are selected and a live adapter raises. A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0091 — Session 15 provider connections
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 15 is incomplete at revision 113. `deployed_state_checked` is true. The other six Session 15 keys are false. A live Etsy or Notion adapter would read a credential and can mutate a provider account.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 113 to 114. `updated_at` is `2026-10-17T16:15:00Z`. `deployed_state_checked` and `provider_connections_fail_closed` are true. The other five Session 15 keys stay false. `session_status` stays incomplete. `current_session` stays 15. `completed_sessions` stays 0 through 14. `next_session` stays 15. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. `src/money_machine/integrations/provider_connections.py` constructs `FixtureEtsyAdapter` and `FixtureNotionAdapter`, calls a fixture search and the fixture connection status, and refuses api, browser, combined, and live modes before a live adapter is constructed. No `.env`, token, cookie, or browser profile is read. No socket is opened. Exit 78 stays HELD. The exit string is not written.
+
+### Consequences
+
+The next honest step is `standing_authority_recorded`: `AutonomyConfig` keeps publish, deactivate, multiply, purchase, and checkout false. A live account stays deferred. Exit 78 stays HELD. The exit string is not written.

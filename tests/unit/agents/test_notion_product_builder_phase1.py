@@ -33,8 +33,8 @@ STATE_PATH = ROOT / "docs/control/IMPLEMENTATION_STATE.json"
 MODULE_PATH = ROOT / "src/money_machine/agents/implementations/notion_product_builder.py"
 WHEN = datetime(2026, 10, 3, 0, 30, tzinfo=UTC)
 LATER = datetime(2026, 10, 3, 1, 0, tzinfo=UTC)
-CLOSURE_SHA = "01b7dd84ef98442ff26a5239e8c7de742739d844"
-HEAD_SHA = "01b7dd84ef98442ff26a5239e8c7de742739d844"
+CLOSURE_SHA = "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
+HEAD_SHA = "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
 
 
 def _spec(
@@ -576,20 +576,22 @@ async def test_phase_one_checkpoint_parser_rejects_bad_inputs(tmp_path: Path) ->
     assert len(probe.pages) == 1
 
 
-def test_live_pointer_is_complete_session_eight() -> None:
+def test_live_pointer_is_incomplete_session_ten() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    assert state["current_session"] == 8
-    assert state["session_status"] == "complete"
-    assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8]
-    assert state["next_session"] == 9
-    assert state["next_prompt"] == "12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md"
+    assert state["current_session"] == 15
+    assert state["session_status"] == "incomplete"
+    assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    assert state["next_session"] == 15
+    assert state["next_prompt"] == "18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md"
     assert state["head_sha"] == HEAD_SHA
     assert state["evidence_closure_commit_sha"] == CLOSURE_SHA
     assert state["commissioned_agents"] == []
     evidence = state["required_completion_evidence"]
-    assert evidence.keys() == SESSION_EVIDENCE_KEYS[8]
-    assert all(value is True for value in evidence.values())
-    assert state["state_revision"] == 69
+    assert evidence.keys() == SESSION_EVIDENCE_KEYS[15]
+    assert evidence["deployed_state_checked"] is True
+    assert evidence["provider_connections_fail_closed"] is True
+    assert sum(1 for value in evidence.values() if value) == 2
+    assert state["state_revision"] == 114
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")
     assert "SESSION_08_MERCHANDISING_AND_ASSETS_COMPLETE" not in STATE_PATH.read_text(
         encoding="utf-8"

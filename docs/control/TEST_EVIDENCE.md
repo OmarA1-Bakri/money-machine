@@ -1,5 +1,711 @@
 # Test Evidence
 
+## 2026-10-17 — Session 15 provider connections recorded
+
+**Verification scope**: live `record-evidence` from revision 113 to 114. No live HTTP. No credential read. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 15, `incomplete`, revision 114, `updated_at` `2026-10-17T16:15:00Z` | PASS |
+| Keys | `deployed_state_checked` and `provider_connections_fail_closed` are true. Five keys stay false | PASS |
+| Adapters | Fixture Etsy and Notion adapters are called. api, browser, combined, and live modes raise | PASS |
+| Head | `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e` | PASS |
+| Hold | No credential is read. No socket is opened. Exit 78 stays HELD | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 15, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 114}`. The provider-connection proof, the deployed-state proof, the Session 15 contract, the checkpoint proof, the completion proof, the control proof, the release proof, the packaging proof, the target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, the contiguous-contract check, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 146 passed in 4.52s. `ruff check` and `pyright` on the provider selector and the Session 15 proof were clean.
+
+## 2026-10-17 — Session 15 deployed state recorded
+
+**Verification scope**: live `record-evidence` from revision 112 to 113. No live HTTP. No service start. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 15, `incomplete`, revision 113, `updated_at` `2026-10-17T16:10:00Z` | PASS |
+| Keys | `deployed_state_checked` is true. The other six Session 15 keys are false | PASS |
+| Smoke | A live smoke, a docker socket, and a service start are refused | PASS |
+| Head | `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e` | PASS |
+| Hold | `worker.py` and `scheduler.py` are not edited. No service is started | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 15, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 113}`. The deployed-state proof, the Session 15 contract, the checkpoint proof, the completion proof, the control proof, the release proof, the packaging proof, the target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, the contiguous-contract check, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 134 passed in 4.28s. `ruff check` and `pyright` on the deployed-state check, the Session 14 and 15 proofs, the evidence catalogue, and the state module were clean.
+
+## 2026-10-17 — Session 15 activated
+
+**Verification scope**: live `activate` from revision 111 to 112. No live HTTP. No service start. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 15, `incomplete`, revision 112, `updated_at` `2026-10-17T16:00:00Z` | PASS |
+| Keys | Every Session 15 key is false | PASS |
+| Head | `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e` | PASS |
+| Hold | No service is started. A live account is not connected | PASS |
+
+The command printed `{"applied": true, "command": "activate", "session": 15, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 112}`. The Session 15 contract, the checkpoint proof, the completion proof, the control proof, the release proof, the packaging proof, the target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, the contiguous-contract check, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 127 passed in 14.45s. `ruff check` and `pyright` on the checkpoint, the Session 09 through 14 proofs, and the evidence catalogue were clean.
+
+## 2026-10-17 — Session 15 evidence contract installed
+
+**Verification scope**: contract installation only. `IMPLEMENTATION_STATE.json` stays revision 111. No activation. No live HTTP. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 14, `complete`, revision 111, `updated_at` `2026-10-17T15:35:00Z` | PASS |
+| Contract | Seven Session 15 keys are installed. The exit string and `v1.0.0` are not keys | PASS |
+| Activation | The revision-111 close accepts an all-false Session 15 candidate and does not write it | PASS |
+| Head | `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e` | PASS |
+
+The Session 15 contract, the checkpoint proof, the completion proof, the control proof, the release proof, the packaging proof, the target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, the contiguous-contract check, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 127 passed in 4.14s. `ruff check` and `pyright` on the state module and the evidence catalogue were clean.
+
+## 2026-10-17 — Session 14 closure recorded
+
+**Verification scope**: live `apply-completion` from revision 110 to 111. No live HTTP. No service start. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 14, `complete`, revision 111, `updated_at` `2026-10-17T15:35:00Z` | PASS |
+| Keys | Every Session 14 key is true, including `evidence_closure_commit_recorded` | PASS |
+| Closure | The closure commit contains `def prove_session_14` and the pre-transition state. The pointer does not record its own SHA | PASS |
+| Head | `head_sha` is `02c26f39ac8800db03ae7f5d1d346487a5ce123e` | PASS |
+
+The command printed `{"applied": true, "command": "apply-completion", "session": 14, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 111}`. The checkpoint proof, the completion proof, the control proof, the release proof, the packaging proof, the target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 120 passed in 3.90s. `ruff check` and `pyright` on the checkpoint module, the Session 14 proof, and the evidence catalogue were clean.
+
+## 2026-10-17 — Session 14 deployment checkpoint recorded
+
+**Verification scope**: live `record-evidence` from revision 109 to 110. No live HTTP. No socket. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 14, `incomplete`, revision 110, `updated_at` `2026-10-17T15:30:00Z` | PASS |
+| Keys | The target, the package, the release plan, the service controls, and `control_files_and_checkpoint_current` are true. The closure key is false | PASS |
+| Checkpoint | The inspector reads the six continuity files and the four deploy modules. The catalogue matches the renderer. A closure claim is refused | PASS |
+| Head | `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 14, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 110}`. The checkpoint proof, the control proof, the release proof, the packaging proof, the target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 118 passed in 3.82s. `ruff check` and `pyright` on the checkpoint module, the Session 14 proof, and the evidence catalogue were clean.
+
+## 2026-10-17 — Session 14 service controls recorded
+
+**Verification scope**: live `record-evidence` from revision 108 to 109. No live HTTP. No docker socket. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 14, `incomplete`, revision 109, `updated_at` `2026-10-17T15:25:00Z` | PASS |
+| Keys | The target, the package, the release plan, and `service_controls_fail_closed` are true. The control-file key and the closure key are false | PASS |
+| Controls | Start, stop, restart, status, logs, scale, a second scheduler, migrate, and safe update are refused. A status word keeps `running` false | PASS |
+| Head | `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 14, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 109}`. The control proof, the release proof, the packaging proof, the target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 109 passed in 3.79s. `ruff check` and `pyright` on the control module, the Session 14 proof, and the evidence catalogue were clean.
+
+## 2026-10-17 — Session 14 release plan recorded
+
+**Verification scope**: live `record-evidence` from revision 107 to 108. No live HTTP. No image push. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 14, `incomplete`, revision 108, `updated_at` `2026-10-17T15:15:00Z` | PASS |
+| Keys | `deployment_target_recorded`, `production_packaging_defined`, and `release_rollback_implemented` are true. The other three Session 14 keys are false | PASS |
+| Release | Tag `money-machine:<commit>` binds the closure commit. Fixture backup is planned. Live postgres, an image push, an unbound tag, and an incompatible schema are refused. A destructive path is not an image rollback | PASS |
+| Head | `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 14, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 108}`. The release proof, the packaging proof, the target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 103 passed in 3.72s. `ruff check` and `pyright` on the release module, the Session 14 proof, and the evidence catalogue were clean.
+
+## 2026-10-17 — Session 14 production package recorded
+
+**Verification scope**: live `record-evidence` from revision 106 to 107. No live HTTP. No image build. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 14, `incomplete`, revision 107, `updated_at` `2026-10-17T15:10:00Z` | PASS |
+| Keys | `deployment_target_recorded` and `production_packaging_defined` are true. The other four Session 14 keys are false | PASS |
+| Package | Five services, `postgres-data`, postgres and api healthchecks, worker and scheduler restart `no`, six runbooks name Exit 78 | PASS |
+| Head | `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 14, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 107}`. The packaging proof, the target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 95 passed in 3.61s. `ruff check` and `pyright` on the package module and the Session 14 proof were clean.
+
+## 2026-10-17 — Session 14 deployment target recorded
+
+**Verification scope**: live `record-evidence` from revision 105 to 106. No live HTTP. No host is created. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 14, `incomplete`, revision 106, `updated_at` `2026-10-17T15:00:00Z` | PASS |
+| Keys | `deployment_target_recorded` is true. The other five Session 14 keys are false | PASS |
+| Selector | `select_deployment_target()` returns `local-wsl` and raises `unapproved_spend` for `new-paid` | PASS |
+| Head | `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 14, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 106}`. The target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 88 passed in 3.59s. `ruff check` and `pyright` on the selector, the Session 14 proof, and `state.py` were clean.
+
+## 2026-10-17 — Session 14 activated
+
+**Verification scope**: live `activate` from revision 104 to 105. No live HTTP. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 14, `incomplete`, revision 105, `updated_at` `2026-10-17T14:55:00Z` | PASS |
+| Keys | Every Session 14 key is false | PASS |
+| Head | `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a` | PASS |
+
+The command printed `{"applied": true, "command": "activate", "session": 14, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 105}`. The activation pin, the Session 13 contract, the Session 13 proof, the evidence index, the prompt-integrity gate, the four earlier live pointers, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 37 passed in 3.18s.
+
+## 2026-10-17 — Session 14 evidence contract installed
+
+**Verification scope**: contract installation only. `IMPLEMENTATION_STATE.json` stays revision 104. No live HTTP. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 13, `complete`, revision 104 | PASS |
+| Contract | Six Session 14 keys. The session is not activated | PASS |
+| Activation shape | A revision-105 candidate installs every key false and does not write the state file | PASS |
+| Head | `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a` | PASS |
+
+The contract test, the prompt-integrity gate, the evidence index, the Session 13 proof pin, and the continuity shape printed 17 passed in 0.95s. `ruff check` and `pyright` on `state.py` and `session_evidence.py` were clean.
+
+## 2026-10-17 — Session 13 closure recorded
+
+**Verification scope**: live `apply-completion` from revision 103 to 104. No live HTTP. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 13, `complete`, revision 104, `updated_at` `2026-10-17T14:40:00Z` | PASS |
+| Closure | Every Session 13 key is true. `next_session` is 14. Session 14 is not activated | PASS |
+| Head | `head_sha` is `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`, the commit that holds `def prove_session_13` and the pre-transition state | PASS |
+
+The command printed `{"applied": true, "command": "apply-completion", "session": 13, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 104}`. The backup tests, the failure-injection tests, the synthetic path tests, the matrix proof, the contract pin, the Session 13 completion pin, the prompt-integrity gate, the Session 12 closure pin, the Session 12 contract, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, the telemetry and operator-action unit tests, and the support intake unit tests printed 138 passed in 32.90s. `head_sha` is not the pointer commit.
+
+## 2026-10-17 — Session 13 control files recorded
+
+**Verification scope**: live `record-evidence` from revision 102 to 103. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 13, `incomplete`, revision 103, `updated_at` `2026-10-17T14:35:00Z` | PASS |
+| Control files | `control_files_and_checkpoint_current` is true. The matrix, synthetic paths, failure injections, and backup fixture stay true. The closure key stays false | PASS |
+| Catalogue | `SESSION_EVIDENCE.md` equals `render_session_evidence()` | PASS |
+| Head | `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 13, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 103}`. The backup tests, the failure-injection tests, the synthetic path tests, the matrix proof, the contract pin, the prompt-integrity gate, the Session 12 closure pin, the Session 12 contract, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, the telemetry and operator-action unit tests, and the support intake unit tests printed 137 passed in 3.80s.
+
+## 2026-10-17 — Session 13 backup fixture recorded
+
+**Verification scope**: live `record-evidence` from revision 101 to 102. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 13, `incomplete`, revision 102, `updated_at` `2026-10-17T14:30:00Z` | PASS |
+| Backup | `backup_restore_fixture_implemented` is true. The matrix, synthetic paths, and failure injections stay true. The other two keys stay false | PASS |
+| Restore | The first restore inserts the five rows. A second restore inserts none. `postgres` is refused | PASS |
+| Head | `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 13, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 102}`. The backup tests, the failure-injection tests, the synthetic path tests, the matrix proof, the contract pin, the prompt-integrity gate, the Session 12 closure pin, the Session 12 contract and completion proof, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, the telemetry and operator-action unit tests, and the support intake unit tests printed 143 passed in 3.95s.
+
+## 2026-10-17 — Session 13 failure injections recorded
+
+**Verification scope**: live `record-evidence` from revision 100 to 101. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 13, `incomplete`, revision 101, `updated_at` `2026-10-17T14:25:00Z` | PASS |
+| Injections | `failure_injection_implemented` is true. The matrix and synthetic paths stay true. The other three keys stay false | PASS |
+| Recovery | A restart returns READY once. A duplicate publish creates once. A timeout after success does not create again | PASS |
+| Head | `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 13, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 101}`. The failure-injection tests, the synthetic path tests, the matrix proof, the contract pin, the prompt-integrity gate, the Session 12 closure pin, the Session 12 contract and completion proof, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, the telemetry and operator-action unit tests, and the support intake unit tests printed 138 passed in 4.05s.
+
+## 2026-10-17 — Session 13 synthetic paths recorded
+
+**Verification scope**: live `record-evidence` from revision 99 to 100. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 13, `incomplete`, revision 100, `updated_at` `2026-10-17T14:10:00Z` | PASS |
+| Paths | `synthetic_paths_implemented` is true. The matrix stays true. The other four keys stay false | PASS |
+| Publish | Publish simulation refuses `live`. Post-publish verification stays blocked | PASS |
+| Head | `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 13, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 100}`. The synthetic path tests, the matrix proof, the contract pin, the prompt-integrity gate, the Session 12 closure pin, the Session 12 contract and completion proof, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, the telemetry and operator-action unit tests, and the support intake unit tests printed 127 passed in 3.78s.
+
+## 2026-10-17 — Session 13 implementation matrix recorded
+
+**Verification scope**: live `record-evidence` from revision 98 to 99. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 13, `incomplete`, revision 99, `updated_at` `2026-10-17T14:00:00Z` | PASS |
+| Matrix | `implementation_matrix_recorded` is true. The other five keys stay false | PASS |
+| Gaps | Publish, purchase, and message jobs stay blocked. A03 through A16 stay missing | PASS |
+| Head | `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 13, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 99}`. The matrix proof, the contract pin, the prompt-integrity gate, the Session 12 closure pin, the Session 12 contract and completion proof, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, the telemetry and operator-action unit tests, and the support intake unit tests printed 122 passed in 3.81s.
+
+## 2026-10-17 — Session 13 activated
+
+**Verification scope**: live `activate` from revision 97 to 98. No live HTTP. Exit 78 stays HELD. `head_sha` does not move. No Session 13 key is earned.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 13, `incomplete`, revision 98, `updated_at` `2026-10-17T13:45:00Z` | PASS |
+| Keys | Every Session 13 key is false | PASS |
+| Head | `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4` | PASS |
+| Exit string | `SESSION_13_E2E_AND_HARDENING_COMPLETE` is not in the state file | PASS |
+
+The command printed `{"applied": true, "command": "activate", "session": 13, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 98}`. The contract pin, the prompt-integrity gate, the Session 12 closure pin, the Session 12 contract and completion proof, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, the telemetry and operator-action unit tests, and the support intake unit tests printed 117 passed in 3.46s.
+
+## 2026-10-17 — Session 13 evidence contract installed
+
+**Verification scope**: contract installation only. `IMPLEMENTATION_STATE.json` stays revision 97. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 12, `complete`, revision 97, `next_session` 13 | PASS |
+| Contract | Six Session 13 keys are installed. The session is not activated | PASS |
+| Refusal | One true key, a missing key, and an extra key are refused | PASS |
+| Head | `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4` | PASS |
+| Exit string | `SESSION_13_E2E_AND_HARDENING_COMPLETE` is not a key and is not in the state file | PASS |
+
+The contract pin, the prompt-integrity gate, the Session 12 closure pin, the Session 12 contract and completion proof, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, the telemetry and operator-action unit tests, and the support intake unit tests printed 117 passed in 3.40s.
+
+## 2026-10-17 — Session 12 closure recorded
+
+**Verification scope**: live `apply-completion` from revision 96 to 97. No live HTTP. Exit 78 stays HELD.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 12, `complete`, revision 97, `updated_at` `2026-10-17T13:35:00Z` | PASS |
+| Keys | Every Session 12 key is true | PASS |
+| Head | `head_sha` and `evidence_closure_commit_sha` are `d81db61033561bdd40869ff1316f0c935c74cdf4` | PASS |
+| Proof | The closure commit contains `prove_session_12` and the pre-transition state | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "apply-completion", "session": 12, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 97}`. The closure pin, the Session 12 contract and completion proof, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, the telemetry and operator-action unit tests, and the support intake unit tests printed 107 passed in 3.40s.
+
+## 2026-10-17 — Session 12 control files recorded
+
+**Verification scope**: live `record-evidence` from revision 95 to 96. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 12, `incomplete`, revision 96, `updated_at` `2026-10-17T13:30:00Z` | PASS |
+| Keys | Five Session 12 keys are true. The closure key is false | PASS |
+| Head | `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2` | PASS |
+| Refusal | The closure key and an unknown key are refused | PASS |
+| Catalogue | The six continuity files are present and the catalogue matches the pointer | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 12, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 96}`. The control-file pin, the Session 12 contract, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, the telemetry and operator-action unit tests, and the support intake unit tests printed 105 passed in 3.32s.
+
+## 2026-10-17 — Session 12 fail-closed operator actions recorded
+
+**Verification scope**: live `record-evidence` from revision 94 to 95. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 12, `incomplete`, revision 95, `updated_at` `2026-10-17T13:25:00Z` | PASS |
+| Keys | The read-model, exception-view, telemetry, and fail-closed action keys are true. The control-file key and the closure key are false | PASS |
+| Head | `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2` | PASS |
+| Refusal | A later key, an unknown key, and the closure key are refused | PASS |
+| Actions | Each named action is refused. The worker and the scheduler stay byte-identical | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 12, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 95}`. The action pin, the Session 12 contract, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, the telemetry and operator-action unit tests, and the support intake unit tests printed 105 passed in 3.25s.
+
+## 2026-10-17 — Session 12 telemetry redaction recorded
+
+**Verification scope**: live `record-evidence` from revision 93 to 94. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 12, `incomplete`, revision 94, `updated_at` `2026-10-17T13:20:00Z` | PASS |
+| Keys | The read-model, exception-view, and telemetry-redaction keys are true. The other three Session 12 keys are false | PASS |
+| Head | `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2` | PASS |
+| Refusal | A later key, an unknown key, and the closure key are refused | PASS |
+| Redaction | A secret, a cookie, and a raw buyer message are refused. A status word is not the proof | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 12, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 94}`. The telemetry pin, the Session 12 contract, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, the telemetry redaction unit tests, and the support intake unit tests printed 100 passed in 3.26s.
+
+## 2026-10-17 — Session 12 exception views recorded
+
+**Verification scope**: live `record-evidence` from revision 92 to 93. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 12, `incomplete`, revision 93, `updated_at` `2026-10-17T13:15:00Z` | PASS |
+| Keys | The read-model and exception-view keys are true. The other four Session 12 keys are false | PASS |
+| Head | `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2` | PASS |
+| Refusal | A later key, an unknown key, and the closure key are refused | PASS |
+| Views | Each named view has an empty state and an error state | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 12, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 93}`. The view pin, the Session 12 contract, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, and the support intake unit tests printed 91 passed in 3.18s.
+
+## 2026-10-17 — Session 12 read model recorded
+
+**Verification scope**: live `record-evidence` from revision 91 to 92. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 12, `incomplete`, revision 92, `updated_at` `2026-10-17T13:00:00Z` | PASS |
+| Keys | `console_read_model_implemented` is true. The other five Session 12 keys are false | PASS |
+| Head | `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2` | PASS |
+| Refusal | A later key, an unknown key, and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 12, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 92}`. The read-model pin, the Session 12 contract, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, and the support intake unit tests printed 89 passed in 3.25s.
+
+## 2026-10-17 — Session 12 activated
+
+**Verification scope**: live `activate` from revision 90 to 91. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 12, `incomplete`, revision 91, `updated_at` `2026-10-17T12:55:00Z` | PASS |
+| Keys | Every Session 12 key is false | PASS |
+| Head | `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2` | PASS |
+| Shape | The revision-90 close still validates, and a true key is refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "activate", "session": 12, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 91}`. The activation pin, the Session 12 contract, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, and the support intake unit tests printed 80 passed in 3.10s.
+
+## 2026-10-17 — Session 12 evidence contract installed
+
+**Verification scope**: D-0064 installs the contract. The state file stays revision 90. Session 12 is not activated. No live HTTP. Exit 78 stays HELD.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Contract | Six Session 12 keys, none of them the exit string | PASS |
+| Activation shape | A revision-90 candidate with every key false validates and is not written | PASS |
+| Refusal | One true key, a missing key, and an extra key are refused | PASS |
+| Pointer | Revision 90 stays complete Session 11 | PASS |
+| Prompt | The Session 12 prompt hash matches the workbook appendix | PASS |
+
+The contract test, the evidence index, the prompt-integrity gate, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, and the Session 09 contract and preflight proof printed 48 passed in 0.88s.
+
+## 2026-10-17 — Session 11 closure recorded
+
+**Verification scope**: live `apply-completion` from revision 89 to 90. No live HTTP. Exit 78 stays HELD. The exit string is not written. Session 12 is not activated.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 11, `complete`, revision 90, `updated_at` `2026-10-17T12:40:00Z` | PASS |
+| Keys | Every Session 11 key true | PASS |
+| Head | `head_sha` is `d095501665fbda0f9e6a0e77b57531bc33fda4e2` | PASS |
+| Refusal | A closure commit without `def prove_session_11` is refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "apply-completion", "session": 11, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 90}`. The completion gate, the control-file proof, the Session 11 contract, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, and the support intake unit tests printed 76 passed in 3.17s.
+
+## 2026-10-17 — Session 11 control-file key recorded
+
+**Verification scope**: live `record-evidence` from revision 88 to 89. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move. No message is sent and no job is inserted.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 11, `incomplete`, revision 89, `updated_at` `2026-10-17T12:35:00Z` | PASS |
+| Keys | Intake, routing, repair, the draft, and the control files are true. The closure key is false | PASS |
+| Head | `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918` | PASS |
+| Refusal | The closure key and an unknown key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 11, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 89}`. The control-file proof, the Session 11 contract, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, and the support intake unit tests printed 75 passed in 3.02s.
+
+## 2026-10-17 — Session 11 draft key recorded
+
+**Verification scope**: live `record-evidence` from revision 87 to 88. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move. No message is sent and no job is inserted.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 11, `incomplete`, revision 88, `updated_at` `2026-10-17T12:30:00Z` | PASS |
+| Keys | Intake, routing, repair, and the draft are true. The other two Session 11 keys are false | PASS |
+| Head | `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918` | PASS |
+| Refusal | A later key, an unknown key, and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 11, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 88}`. The draft proof, the Session 11 contract, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, and the support intake unit tests printed 75 passed in 3.01s.
+
+## 2026-10-17 — Session 11 repair key recorded
+
+**Verification scope**: live `record-evidence` from revision 86 to 87. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move. No message is sent and no job is inserted.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 11, `incomplete`, revision 87, `updated_at` `2026-10-17T12:25:00Z` | PASS |
+| Keys | The intake, routing, and repair keys are true. The other three Session 11 keys are false | PASS |
+| Head | `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918` | PASS |
+| Refusal | A later key, an unknown key, and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 11, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 87}`. The repair proof, the Session 11 contract, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, and the support intake unit tests printed 75 passed in 3.07s.
+
+## 2026-10-17 — Session 11 routing key recorded
+
+**Verification scope**: live `record-evidence` from revision 85 to 86. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move. No message is sent and no job is inserted.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 11, `incomplete`, revision 86, `updated_at` `2026-10-17T12:20:00Z` | PASS |
+| Keys | The intake and routing keys are true. The other four Session 11 keys are false | PASS |
+| Head | `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918` | PASS |
+| Refusal | A later key, an unknown key, and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 11, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 86}`. The routing proof, the Session 11 contract, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, and the support intake unit tests printed 75 passed in 3.08s.
+
+## 2026-10-17 — Session 11 intake key recorded
+
+**Verification scope**: live `record-evidence` from revision 84 to 85. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move. No message is sent.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 11, `incomplete`, revision 85, `updated_at` `2026-10-17T12:15:00Z` | PASS |
+| Keys | The intake key is true. The other five Session 11 keys are false | PASS |
+| Head | `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918` | PASS |
+| Refusal | A later key, an unknown key, and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 11, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 85}`. The intake proof, the Session 11 contract, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 49 passed in 2.99s.
+
+## 2026-10-17 — Session 11 activated
+
+**Verification scope**: live `activate` from revision 83 to 84. No live HTTP. Exit 78 stays HELD. The exit string is not written. Every Session 11 key is false.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 11, `incomplete`, revision 84, `updated_at` `2026-10-17T12:10:00Z` | PASS |
+| Keys | The six Session 11 keys are installed and false | PASS |
+| Head | `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918` | PASS |
+| Closed | `completed_sessions` stays 0 through 10 | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "activate", "session": 11, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 84}`. The Session 11 contract, the evidence index, the Session 10 contract and its five proofs, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 63 passed in 3.09s.
+
+## 2026-10-17 — Session 11 evidence contract installed
+
+**Verification scope**: the contract and its activation shape. No state transition. No live HTTP. Revision 83 stays. Session 11 is not activated.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Contract | Six fixture keys, and the exit string is not one of them | PASS |
+| Pointer | `IMPLEMENTATION_STATE.json` stays revision 83, Session 10 complete | PASS |
+| Shape | An all-false Session 11 candidate validates from the revision-83 close | PASS |
+| Refusal | One true key, a missing key, and an extra key are refused | PASS |
+
+The Session 11 contract, the evidence index, the Session 10 contract, and the control-file proof printed 21 passed in 0.71s. No command wrote `IMPLEMENTATION_STATE.json`.
+
+## 2026-10-17 — Session 10 closure recorded
+
+**Verification scope**: live `apply-completion` from revision 82 to 83. No live HTTP. Exit 78 stays HELD. The exit string is not written. Session 11 is not activated.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 10, `complete`, revision 83, `updated_at` `2026-10-17T12:00:00Z` | PASS |
+| Keys | Every Session 10 key true | PASS |
+| Head | `head_sha` is `f16c7ed0598daf3f4627955b52585f253ae1b918` | PASS |
+| Refusal | A closure commit without `def prove_session_10` is refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "apply-completion", "session": 10, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 83}`. The completion gate, the control-file proof, the ledger proof, the portfolio proof, the maturity proof, the metrics proof, the Session 10 contract, the Session 09 proof, the Session 09 contract, the Session 09 completion check, the evidence index, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 61 passed in 33.03s.
+
+## 2026-10-17 — Session 10 control-file key recorded
+
+**Verification scope**: live `record-evidence` from revision 81 to 82. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move. No deactivation is executed.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 10, `incomplete`, revision 82, `updated_at` `2026-10-17T11:55:00Z` | PASS |
+| Keys | Five Session 10 keys true; the closure key false | PASS |
+| Head | `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d` | PASS |
+| Refusal | An unknown key and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 10, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 82}`. The control-file proof, the ledger proof, the portfolio proof, the maturity proof, the metrics proof, the Session 10 contract, the Session 09 proof, the Session 09 contract, the Session 09 completion check, the evidence index, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 59 passed in 3.22s.
+
+## 2026-10-17 — Session 10 closed-loop ledger key recorded
+
+**Verification scope**: live `record-evidence` from revision 80 to 81. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move. No deactivation is executed.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 10, `incomplete`, revision 81, `updated_at` `2026-10-17T11:50:00Z` | PASS |
+| Keys | Four Session 10 keys true; the control-file key and the closure key false | PASS |
+| Head | `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d` | PASS |
+| Refusal | The control-file key and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 10, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 81}`. The ledger proof, the portfolio proof, the maturity proof, the metrics proof, the Session 10 contract, the Session 09 proof, the Session 09 contract, the Session 09 completion check, the evidence index, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 54 passed in 3.20s.
+
+## 2026-10-17 — Session 10 portfolio eligibility key recorded
+
+**Verification scope**: live `record-evidence` from revision 79 to 80. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move. No deactivation is executed.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 10, `incomplete`, revision 80, `updated_at` `2026-10-17T11:45:00Z` | PASS |
+| Keys | Metrics, the maturity clock, and portfolio eligibility true; the other three keys false | PASS |
+| Head | `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d` | PASS |
+| Refusal | The closed-loop ledger and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 10, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 80}`. The portfolio proof, the maturity proof, the metrics proof, the Session 10 contract, the Session 09 proof, the Session 09 contract, the Session 09 completion check, the evidence index, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 49 passed in 3.18s.
+
+## 2026-10-17 — Session 10 maturity clock key recorded
+
+**Verification scope**: live `record-evidence` from revision 78 to 79. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move. No scheduler row is inserted.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 10, `incomplete`, revision 79, `updated_at` `2026-10-17T11:40:00Z` | PASS |
+| Keys | Metrics and the maturity clock true; the other four Session 10 keys false | PASS |
+| Head | `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d` | PASS |
+| Refusal | Portfolio eligibility and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 10, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 79}`. The maturity proof, the metrics proof, the Session 10 contract, the Session 09 proof, the Session 09 contract, the Session 09 completion check, the evidence index, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 44 passed in 3.11s.
+
+## 2026-10-17 — Session 10 metrics fixture key recorded
+
+**Verification scope**: live `record-evidence` from revision 77 to 78. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 10, `incomplete`, revision 78, `updated_at` `2026-10-17T11:35:00Z` | PASS |
+| Keys | `metrics_fixture_implemented` true; the other five Session 10 keys false | PASS |
+| Head | `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d` | PASS |
+| Refusal | A second key and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The applied state is revision 78, incomplete Session 10, with `metrics_fixture_implemented` true. The proof, the Session 10 contract, the Session 09 proof, the Session 09 contract, the Session 09 completion check, the evidence index, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 39 passed in 3.12s.
+
+## 2026-10-17 — Session 10 activated
+
+**Verification scope**: live `activate` from revision 76 to 77. No live HTTP. Exit 78 stays HELD. The exit string is not written. Every Session 10 key is false.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 10, `incomplete`, revision 77, `updated_at` `2026-10-17T11:30:00Z` | PASS |
+| Keys | The six Session 10 keys are installed and false | PASS |
+| Head | `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d` | PASS |
+| Closed | `completed_sessions` stays 0 through 9 | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+## 2026-10-17 — Session 10 evidence contract installed
+
+**Verification scope**: the contract and its activation shape. No state transition. No live HTTP. Revision 76 stays. Session 10 is not activated.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Contract | Six fixture keys, and the exit string is not one of them | PASS |
+| Pointer | `IMPLEMENTATION_STATE.json` stays revision 76, Session 09 complete | PASS |
+| Shape | An all-false Session 10 candidate validates from the revision-76 close | PASS |
+| Refusal | One true key is refused, and a missing key is refused | PASS |
+
+## 2026-10-17 — Session 09 closed
+
+**Verification scope**: live `apply-completion` from revision 75 to 76. No live HTTP. Exit 78 stays HELD. The exit string is not written. Session 10 is not activated.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 9, `complete`, revision 76, `updated_at` `2026-10-17T11:20:00Z` | PASS |
+| Keys | Every Session 09 key true, including the closure key | PASS |
+| Head | `head_sha` is `cfb36462994ecba833f31ba869f2aba627f6060d` | PASS |
+| Next | `next_session` 10 and the Session 10 prompt | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The closure commit is `cfb36462994ecba833f31ba869f2aba627f6060d`. It contains `def prove_session_09` and the exact revision-75 state. A closure commit without that function is refused.
+
+## 2026-10-17 — Session 09 continuity directory gate
+
+**Verification scope**: the control directory. No state transition. No live HTTP. Revision 75 stays. The closure key stays false.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Continuity set | The five files named by `CONTROL_FILES` are present | PASS |
+| Catalogue | The only extra file is `SESSION_EVIDENCE.md` | PASS |
+| Pointer | `IMPLEMENTATION_STATE.json` stays revision 75 | PASS |
+
+`test_continuity_files_stay_five_and_the_catalogue_is_the_only_extra`, the Session 09 proof, and the rendered catalogue check printed 3 passed in 0.69s.
+
+## 2026-10-17 — Session 09 control-file key recorded
+
+**Verification scope**: live `record-evidence` from revision 74 to 75. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 9, `incomplete`, revision 75, `updated_at` `2026-10-17T11:05:00Z` | PASS |
+| Keys | Preflight, the ramp, the receipt, the fixture draft, and `control_files_and_checkpoint_current` true; the closure key false | PASS |
+| Head | `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844` | PASS |
+| Refusal | A missing earned key, an unknown key, and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 9, "state_revision": 75}`. The proof, the contract test, the evidence index, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 27 passed in 2.77s.
+
+## 2026-10-17 — Session 09 fixture draft key recorded
+
+**Verification scope**: live `record-evidence` from revision 73 to 74. No live HTTP. Exit 78 stays HELD. The exit string is not written. The successor and the dispatcher are unchanged.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 9, `incomplete`, revision 74, `updated_at` `2026-10-17T11:00:00Z` | PASS |
+| Keys | Preflight, the ramp, the receipt, and `fixture_draft_package_implemented` true; the control-file key and the closure key false | PASS |
+| Head | `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844` | PASS |
+| Refusal | Preflight without the ramp, the control-file key, and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 9, "state_revision": 74}`. The proof, the contract test, the evidence index, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 27 passed in 2.78s.
+
+## 2026-10-17 — Session 09 receipt key recorded
+
+**Verification scope**: live `record-evidence` from revision 72 to 73. No live HTTP. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 9, `incomplete`, revision 73, `updated_at` `2026-10-17T10:55:00Z` | PASS |
+| Keys | Preflight, the ramp, and `mutation_receipt_implemented` true; the other three Session 09 keys false | PASS |
+| Head | `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844` | PASS |
+| Refusal | Preflight without the ramp, the fixture-draft key, and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 9, "state_revision": 73}`. The proof, the contract test, the evidence index, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 27 passed in 2.74s.
+
+## 2026-10-17 — Session 09 ramp key recorded
+
+**Verification scope**: live `record-evidence` from revision 71 to 72. No live HTTP. The committed ramp stays disabled. Exit 78 stays HELD.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 9, `incomplete`, revision 72, `updated_at` `2026-10-17T10:52:00Z` | PASS |
+| Keys | Preflight and `publishing_ramp_implemented` true; the other four Session 09 keys false | PASS |
+| Head | `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844` | PASS |
+| Refusal | Preflight without the ramp, a third key, and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 9, "state_revision": 72}`. The proof, the contract test, the evidence index, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 27 passed in 2.72s.
+
+## 2026-10-17 — Session 09 preflight key recorded
+
+**Verification scope**: live `record-evidence` from revision 70 to 71. No live HTTP. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 9, `incomplete`, revision 71, `updated_at` `2026-10-17T10:48:00Z` | PASS |
+| Key | `etsy_preflight_implemented` true; the other five Session 09 keys false | PASS |
+| Head | `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844` | PASS |
+| Refusal | A second key and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 9, "state_revision": 71}`. The preflight proof, the contract test, the evidence index, the continuity shape, both Session 08 activation checks, the Session 08 dispatch refusal, the merchandising exit pin, and the seven Notion live-pointer tests printed 27 passed in 2.72s.
+
+## 2026-10-17 — Session 09 activation applied
+
+**Verification scope**: live `activate` from revision 69 to 70. No live HTTP. Exit 78 stays HELD. A12 and A13 stay `DESIGNED`. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 9, `incomplete`, revision 70, `updated_at` `2026-10-17T10:45:00Z` | PASS |
+| Keys | All six Session 09 keys false | PASS |
+| Head | `head_sha` and `evidence_closure_commit_sha` stay `01b7dd84ef98442ff26a5239e8c7de742739d844` | PASS |
+| Completed | `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6, 7, 8]` | PASS |
+| Exit string | `SESSION_09_ETSY_PUBLISHING_COMPLETE` is absent | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "activate", "session": 9, "state_revision": 70}`. The contract test, the evidence index, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 21 passed in 2.70s.
+
 ## 2026-10-17 — Session 08 completion applied
 
 **Verification scope**: live `apply-completion` from revision 68 to 69. No live HTTP. Exit 78 stays HELD. A10 and A11 stay `DESIGNED`. Session 09 is not activated.
