@@ -261,6 +261,8 @@ class ControlStateError(ValueError):
 _REQUIRED_FIELDS = frozenset(ControlState.__required_keys__)
 _IDENTITY_FIELDS = ("programme", "version", "repo_root", "branch", "current_session")
 _CLOSURE_EVIDENCE_KEY = "evidence_closure_commit_recorded"
+_SESSION_08_FROZEN_HEAD = "b782751fdb1b255c436ff7f6fa655e6d783b1e8c"
+_SESSION_08_FROZEN_CLOSURE = "5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb"
 _OUTER_GATES_BLOCKER = "SESSION_00_OUTER_GATES_PENDING"
 _ACTIVATION_MUTABLE_FIELDS = frozenset(
     {
@@ -621,7 +623,15 @@ def validate_completion_transition(previous: ControlState, current: ControlState
             raise ControlStateError(
                 "pre-transition evidence_closure_commit_sha must identify the prior closure commit"
             )
-        if previous["head_sha"] != previous_closure:
+        # D-0039. Session 08 was activated on the D-0032 tip while the prior
+        # closure stayed the Session 07 earned commit. That pair is the only
+        # allowed mismatch.
+        frozen_session_08 = (
+            session == 8
+            and previous["head_sha"] == _SESSION_08_FROZEN_HEAD
+            and previous_closure == _SESSION_08_FROZEN_CLOSURE
+        )
+        if previous["head_sha"] != previous_closure and not frozen_session_08:
             raise ControlStateError(
                 "pre-transition head_sha must identify the prior closure commit"
             )
@@ -669,14 +679,22 @@ def _resolve_commit(repo_root: Path, commit_id: str, label: str) -> str:
     return resolved
 
 
+def _recorded_root_present(current: ControlState) -> bool:
+    return Path(current["repo_root"]).is_dir()
+
+
 def _assert_repo_at_closure(
     repo_root: Path,
     closure: str,
     recorded_branch: str,
+    *,
+    enforce_recorded_branch: bool = True,
 ) -> None:
     head = _git(repo_root, "rev-parse", "--verify", "HEAD^{commit}").stdout.strip()
     if head != closure:
         raise ControlStateError("repository HEAD must equal the evidence-closure commit")
+    if not enforce_recorded_branch:
+        return
     branch = _git(repo_root, "symbolic-ref", "--quiet", "--short", "HEAD").stdout.strip()
     if branch != recorded_branch:
         raise ControlStateError("repository HEAD must be attached to the recorded branch")
@@ -730,7 +748,14 @@ def _validate_git_evidence(
     previous: ControlState,
     current: ControlState,
 ) -> tuple[Path, str]:
-    repo_root, recorded_branch = _validate_repo_identity(state_path, current)
+    # D-0037 and D-0039. The recorded root is the operator machine. When it is
+    # absent, completion uses the canonical worktree and keeps the recorded
+    # branch field unchanged.
+    if _recorded_root_present(current):
+        repo_root, recorded_branch = _validate_repo_identity(state_path, current)
+    else:
+        repo_root = _evidence_worktree(state_path)
+        recorded_branch = current["branch"]
 
     bootstrap = current["bootstrap_commit_sha"]
     closure = current["evidence_closure_commit_sha"]
@@ -762,7 +787,12 @@ def _validate_git_evidence(
         )
 
     state_relative = CANONICAL_STATE_RELATIVE_PATH
-    _assert_repo_at_closure(repo_root, closure, recorded_branch)
+    _assert_repo_at_closure(
+        repo_root,
+        closure,
+        recorded_branch,
+        enforce_recorded_branch=_recorded_root_present(current),
+    )
     closure_document = _git(
         repo_root,
         "show",
@@ -872,13 +902,26 @@ def _apply_transition(
         return current
 
 
+def _require_session_08_closure_proof(root: Path, sha: str) -> None:
+    proof = _git(root, "show", f"{sha}:src/money_machine/control/session_08_proof.py").stdout
+    if "def prove_session_08" not in proof:
+        raise ControlStateError("closure commit does not contain the session 08 proof")
+
+
 def _verify_completion_repository(
     state_path: Path,
     previous: ControlState,
     current: ControlState,
 ) -> None:
     repo_root, closure = _validate_git_evidence(state_path, previous, current)
-    _assert_repo_at_closure(repo_root, closure, current["branch"])
+    _assert_repo_at_closure(
+        repo_root,
+        closure,
+        current["branch"],
+        enforce_recorded_branch=_recorded_root_present(current),
+    )
+    if previous["current_session"] == 8:
+        _require_session_08_closure_proof(repo_root, closure)
 
 
 def _verify_activation_repository(

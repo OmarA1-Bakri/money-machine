@@ -527,3 +527,26 @@ The proof uses fixture inputs only. It does not open a live Notion, Etsy, or S3 
 Session 08 stays incomplete after the keys are recorded. Completion is a later transition and is still refused while `head_sha` differs from the prior closure commit. Sessions 09–15 stay unactivated. The historical Session 07 close stays all false.
 
 Revision 68 records the ten behavioral keys and `control_files_and_checkpoint_current`. `evidence_closure_commit_recorded` stays false. `updated_at` is `2026-10-16T22:00:00Z`.
+
+## D-0039 — Session 08 may complete from the frozen pointer
+
+**Status:** accepted 2026-10-17. Operator instruction: fully authorised.
+
+### Context
+
+D-0038 recorded the eleven Session 08 keys and left the session incomplete. `apply-completion` refuses that state because `head_sha` is `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` and `evidence_closure_commit_sha` is `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. D-0010 requires those two fields to name the same prior closure before a later session can complete. D-0032 tip-synced `head_sha` to Omar's merge and left the closure on the earlier commit. D-0036 and D-0037 kept that pair. A hand edit is not a transition.
+
+The recorded root `/mnt/d/Money Machine` is absent on the machine that applies the transition. The checkout branch is not `build/full-automation`.
+
+### Decision
+
+Session 08 is the only session that may complete from that pair.
+
+- The pre-transition `head_sha` must be `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` and the pre-transition `evidence_closure_commit_sha` must be `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. Any other mismatch is still refused. Session 07 cannot use this pair.
+- The new closure commit must be `HEAD`, must contain the exact pre-transition state, must contain `def prove_session_08`, and must not claim its own object ID. `head_sha` and `evidence_closure_commit_sha` both become that commit. The closure key flips. `session_status` becomes complete. `current_session` stays 8. `completed_sessions` appends 8. `next_session` becomes 9. `next_prompt` becomes `12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md`.
+- When the recorded root is not a directory, completion uses the D-0037 worktree check. `HEAD` does not have to be attached to the recorded branch. The recorded `repo_root` and `branch` fields stay as they are.
+- Exit 78 stays HELD. A10 and A11 stay `DESIGNED`. `commissioned_agents` stays empty. The exit string is not written. No live Etsy, Notion, or S3 call is made. Session 09 is not activated.
+
+### Consequences
+
+Completion is a `apply-completion` transition from revision 68. The state-pointer commit that records the completed file is a later commit, and the state file does not name that commit. Sessions 09–15 stay unactivated.

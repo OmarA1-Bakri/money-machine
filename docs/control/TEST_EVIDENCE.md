@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-17 — Session 08 completion rule
+
+**Verification scope**: the D-0039 validator and the absent-root completion path. The live state file is not changed. No live HTTP.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Frozen pair | `validate_completion_transition` accepts head `b782751` and prior closure `5a48a4c` for Session 08 | PASS |
+| Other mismatch | A different head is refused. Session 07 cannot use the pair. Reusing the prior closure is refused | PASS |
+| Absent root | A fixture repo whose recorded root is missing completes on branch `fixture` when the proof function is present | PASS |
+| Missing proof | The same fixture without `def prove_session_08` writes nothing | PASS |
+| Live pointer | Revision 68, closure key false, is unchanged by these tests | PASS |
+
+`uv run pytest -q -p no:cacheprovider --tb=short` on the completion test, the control-state suite, the Session 08 evidence transition, and the evidence index printed 105 passed, 1 skipped, and 1 failed. The failure is `test_control_files_are_exactly_the_five_continuity_files` because `SESSION_EVIDENCE.md` is already in `docs/control`. That failure is older than this change. `ruff` and `pyright` on the touched control modules were clean.
+
 ## 2026-10-16 — Session 08 evidence keys
 
 **Verification scope**: live `record-evidence` from revision 67 to 68. No live HTTP. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. The closure key stays false. Session 08 stays incomplete. Sessions 09–15 stay unactivated.

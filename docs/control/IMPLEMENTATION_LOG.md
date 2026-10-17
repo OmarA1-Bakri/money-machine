@@ -1,3 +1,9 @@
+## 2026-10-17 — Session 08 completion is authorised from the frozen pointer
+
+D-0039 accepts completion from `head_sha` `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` and prior closure `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. That pair is Session 08 only. The closure commit must be `HEAD`, must contain the exact pre-transition state, and must contain `def prove_session_08`. `apply-completion` has not been run in this commit. `IMPLEMENTATION_STATE.json` stays revision 68. `evidence_closure_commit_recorded` stays false. Exit 78 stays HELD. A10 and A11 stay `DESIGNED`. The exit string is not written. No live Etsy, Notion, or S3 call is made.
+
+`uv run pytest -q -p no:cacheprovider --tb=line tests/bootstrap/test_session_08_completion.py` is included in the control run below. `ruff format`, `ruff check`, and `pyright` on `state.py` and the new test were clean.
+
 ## 2026-10-16 — Session 08 evidence keys recorded
 
 `record-evidence` advanced `state_revision` from 67 to 68. `updated_at` is `2026-10-16T22:00:00Z`. The ten behavioral keys and `control_files_and_checkpoint_current` are true. `evidence_closure_commit_recorded` stays false. `current_session` stays 8. `session_status` stays `incomplete`. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6, 7]`. `next_session` stays 8. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `evidence_closure_commit_sha` stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `commissioned_agents` stays empty. Exit 78 stays HELD. A07, A08, A09, A10, and A11 stay `DESIGNED`. The exit string is not written. Session 08 is incomplete. Sessions 09–15 stay unactivated.

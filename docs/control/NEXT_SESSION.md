@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 08 completion is authorised, and it has not been applied (2026-10-17)
+
+D-0039 lets `apply-completion` start from `head_sha` `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` and prior closure `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. The live file is still revision 68. The closure key is still false. The next command is `apply-completion` against the commit that contains this decision, the eleven true keys, and `def prove_session_08`. That command sets both SHAs to that commit, flips the closure key, and marks Session 08 complete. Session 09 stays unactivated. Exit 78 stays HELD. A10 and A11 stay `DESIGNED`. The exit string is not written.
+
 ## Session 08 has eleven earned keys, the closure key is still false (2026-10-16)
 
 Revision 68 records the ten behavioral keys and `control_files_and_checkpoint_current`. `evidence_closure_commit_recorded` stays false, so Session 08 stays incomplete. `updated_at` is `2026-10-16T22:00:00Z`. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `evidence_closure_commit_sha` stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. Exit 78 stays HELD. A07, A08, A09, A10, and A11 stay `DESIGNED`. `commissioned_agents` stays empty. The exit string is not written. The next honest step is a later completion transition. That transition is still refused while `head_sha` differs from the prior closure commit. Session 09 is not activated.
