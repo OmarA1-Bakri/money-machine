@@ -1,4 +1,4 @@
-"""Earn Session 09 preflight, ramp, receipt, and draft keys from fixtures.
+"""Earn Session 09 keys from in-memory fixtures and the control checkpoint.
 
 The proof does not open a socket, publish a listing, read the ramp file,
 or commission an agent.
@@ -6,6 +6,7 @@ or commission an agent.
 
 from __future__ import annotations
 
+import json
 import tempfile
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
@@ -44,11 +45,32 @@ PREFLIGHT_EVIDENCE_KEY = "etsy_preflight_implemented"
 RAMP_EVIDENCE_KEY = "publishing_ramp_implemented"
 RECEIPT_EVIDENCE_KEY = "mutation_receipt_implemented"
 DRAFT_EVIDENCE_KEY = "fixture_draft_package_implemented"
+CONTROL_EVIDENCE_KEY = "control_files_and_checkpoint_current"
 EARNED_EVIDENCE_KEYS = frozenset(
-    {PREFLIGHT_EVIDENCE_KEY, RAMP_EVIDENCE_KEY, RECEIPT_EVIDENCE_KEY, DRAFT_EVIDENCE_KEY}
+    {
+        PREFLIGHT_EVIDENCE_KEY,
+        RAMP_EVIDENCE_KEY,
+        RECEIPT_EVIDENCE_KEY,
+        DRAFT_EVIDENCE_KEY,
+        CONTROL_EVIDENCE_KEY,
+    }
 )
 _PRODUCT = UUID("00000000-0000-4000-8000-0000000000a8")
 _LISTINGS = "/v3/application/shops/123456/listings"
+_CONTROL_FILES = (
+    Path("docs/control/IMPLEMENTATION_STATE.json"),
+    Path("docs/control/IMPLEMENTATION_LOG.md"),
+    Path("docs/control/DECISIONS.md"),
+    Path("docs/control/TEST_EVIDENCE.md"),
+    Path("docs/control/NEXT_SESSION.md"),
+    Path("docs/control/SESSION_EVIDENCE.md"),
+)
+_BEHAVIORAL_KEYS = (
+    PREFLIGHT_EVIDENCE_KEY,
+    RAMP_EVIDENCE_KEY,
+    RECEIPT_EVIDENCE_KEY,
+    DRAFT_EVIDENCE_KEY,
+)
 _OLDEST = datetime(2026, 10, 9, 15, 30, tzinfo=UTC)
 _TAGS = tuple(f"tag {number}" for number in range(1, 14))
 _IMAGES = (
@@ -91,6 +113,7 @@ def prove_session_09() -> frozenset[str]:
     _prove_ramp()
     _prove_receipt()
     _prove_draft_package()
+    _prove_control_files()
     return EARNED_EVIDENCE_KEYS
 
 
@@ -396,3 +419,35 @@ def _draft(quantity: int, claim: PreflightClaim) -> EtsyPreflightDraft:
         videos=1,
         claims=(claim,),
     )
+
+
+def _prove_control_files() -> None:
+    root = Path(__file__).resolve().parents[3]
+    for relative in _CONTROL_FILES:
+        path = root / relative
+        if not path.is_file() or path.stat().st_size == 0:
+            raise Session09ProofError("control_files")
+    # session_evidence imports state, and state imports this module.
+    from money_machine.control.session_evidence import render_session_evidence
+
+    catalogue = root / "docs/control/SESSION_EVIDENCE.md"
+    if catalogue.read_text(encoding="utf-8") != render_session_evidence():
+        raise Session09ProofError("control_checkpoint")
+    decoded: object = json.loads(
+        (root / "docs/control/IMPLEMENTATION_STATE.json").read_text(encoding="utf-8")
+    )
+    if not isinstance(decoded, dict):
+        raise Session09ProofError("control_checkpoint")
+    evidence = decoded.get("required_completion_evidence")
+    if (
+        decoded.get("current_session") != 9
+        or decoded.get("session_status") != "incomplete"
+        or decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
+        or not isinstance(evidence, dict)
+    ):
+        raise Session09ProofError("control_checkpoint")
+    for key in _BEHAVIORAL_KEYS:
+        if evidence.get(key) is not True:
+            raise Session09ProofError("control_checkpoint")
+    if evidence.get("evidence_closure_commit_recorded") is not False:
+        raise Session09ProofError("control_checkpoint")

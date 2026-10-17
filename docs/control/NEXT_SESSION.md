@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 09 control-file key is recorded (2026-10-17)
+
+Revision 75 records `control_files_and_checkpoint_current`. Preflight, the ramp, the receipt, and the fixture draft stay true. The closure key stays false. `updated_at` is `2026-10-17T11:05:00Z`. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. The next honest step is the closure key, through a commit that contains this proof.
+
 ## Session 09 fixture draft key is recorded (2026-10-17)
 
 Revision 74 records `fixture_draft_package_implemented`. Preflight, the ramp, and the receipt stay true. The control-file key and the closure key stay false. `updated_at` is `2026-10-17T11:00:00Z`. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. The successor and the dispatcher stay unchanged. The next honest step is the control-file key, through its own proof.

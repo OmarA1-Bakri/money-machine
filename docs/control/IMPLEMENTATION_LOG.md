@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 09 control-file key recorded
+
+`record-evidence` advanced `state_revision` from 74 to 75. `updated_at` is `2026-10-17T11:05:00Z`. `control_files_and_checkpoint_current` is true. Preflight, the ramp, the receipt, and the fixture draft stay true. The closure key stays false. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. The exit string is not written. No live Etsy call is made.
+
 ## 2026-10-17 — Session 09 fixture draft key recorded
 
 `record-evidence` advanced `state_revision` from 73 to 74. `updated_at` is `2026-10-17T11:00:00Z`. `fixture_draft_package_implemented` is true. Preflight, the ramp, and the receipt stay true. The control-file key and the closure key stay false. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. The successor and the dispatcher are unchanged. The exit string is not written. No live Etsy call is made.

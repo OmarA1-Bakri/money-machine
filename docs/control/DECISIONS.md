@@ -639,3 +639,19 @@ Revision 73 has preflight, the ramp, and the receipt true. The fixture draft pac
 ### Consequences
 
 Revision 74 records the fixture-draft key true. The control-file key and the closure key stay false.
+
+## D-0045 — Session 09 control files are the fifth earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Revision 74 has preflight, the ramp, the receipt, and the fixture draft true. The control-file key and the closure key are false. The five continuity files and the evidence catalogue are already on the trunk.
+
+### Decision
+
+`prove_session_09()` also earns `control_files_and_checkpoint_current`. The proof requires the five continuity files and the evidence catalogue to be non-empty, the catalogue to match its renderer, and the pointer to be incomplete Session 09 with the four behavioral keys true, the closure key false, and `head_sha` equal to the closure commit. `record-evidence` then requires those five keys true. The closure key stays false. `head_sha` does not move.
+
+### Consequences
+
+Revision 75 records the control-file key true. The closure key stays false. Session 09 stays incomplete.

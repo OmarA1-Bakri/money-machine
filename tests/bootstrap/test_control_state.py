@@ -1570,7 +1570,7 @@ def test_session_eight_activation_rejects_false_session_seven_evidence(tmp_path:
     assert STATE_PATH.read_bytes() == checked_in
     assert load_state()["current_session"] == 9
     assert load_state()["session_status"] == "incomplete"
-    assert load_state()["state_revision"] == 74
+    assert load_state()["state_revision"] == 75
     assert load_state()["next_session"] == 9
 
 
@@ -1597,7 +1597,7 @@ def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: 
     assert live["current_session"] == 9
     assert live["session_status"] == "incomplete"
     assert live["next_session"] == 9
-    assert live["state_revision"] == 74
+    assert live["state_revision"] == 75
     assert live["head_sha"] == "01b7dd84ef98442ff26a5239e8c7de742739d844"
     assert live["evidence_closure_commit_sha"] == live["head_sha"]
     live_evidence = live["required_completion_evidence"]
@@ -1606,7 +1606,8 @@ def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: 
     assert live_evidence["publishing_ramp_implemented"] is True
     assert live_evidence["mutation_receipt_implemented"] is True
     assert live_evidence["fixture_draft_package_implemented"] is True
-    assert sum(1 for value in live_evidence.values() if value) == 4
+    assert live_evidence["control_files_and_checkpoint_current"] is True
+    assert sum(1 for value in live_evidence.values() if value) == 5
 
 
 def test_activation_uses_the_worktree_when_recorded_root_is_absent(tmp_path: Path) -> None:

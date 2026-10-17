@@ -8,7 +8,7 @@
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "evidence_closure_commit_sha": "01b7dd84ef98442ff26a5239e8c7de742739d844",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 74,
+  "state_revision": 75,
   "session_status": "incomplete",
   "current_session": 9,
   "completed_sessions": [
@@ -125,7 +125,7 @@
     "S06 parked nits (non-blocking, not fixed in the S06 close): (1) an int-subclass SystemExit code maps to 1; (2) the False SystemExit row needs an isinstance-style mutant; (3) backtick formatting of __context__ in the #49 PR body; (4) CodeRabbit APPROVED tip lag on #49; (5) connected: true in fake mode (notion.py connect payload); (6) argparse echoing a token passed as an extra argument. Items 5 and 6 are still open from review 5328507848; they were omitted from the first close list, not fixed."
   ],
   "required_completion_evidence": {
-    "control_files_and_checkpoint_current": false,
+    "control_files_and_checkpoint_current": true,
     "etsy_preflight_implemented": true,
     "evidence_closure_commit_recorded": false,
     "fixture_draft_package_implemented": true,
@@ -145,5 +145,5 @@
   },
   "next_session": 9,
   "next_prompt": "12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md",
-  "updated_at": "2026-10-17T11:00:00Z"
+  "updated_at": "2026-10-17T11:05:00Z"
 }

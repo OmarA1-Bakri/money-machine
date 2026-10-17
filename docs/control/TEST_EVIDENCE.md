@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-17 — Session 09 control-file key recorded
+
+**Verification scope**: live `record-evidence` from revision 74 to 75. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 9, `incomplete`, revision 75, `updated_at` `2026-10-17T11:05:00Z` | PASS |
+| Keys | Preflight, the ramp, the receipt, the fixture draft, and `control_files_and_checkpoint_current` true; the closure key false | PASS |
+| Head | `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844` | PASS |
+| Refusal | A missing earned key, an unknown key, and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 9, "state_revision": 75}`. The proof, the contract test, the evidence index, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 27 passed in 2.77s.
+
 ## 2026-10-17 — Session 09 fixture draft key recorded
 
 **Verification scope**: live `record-evidence` from revision 73 to 74. No live HTTP. Exit 78 stays HELD. The exit string is not written. The successor and the dispatcher are unchanged.
