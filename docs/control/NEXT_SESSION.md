@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 09 preflight key is recorded (2026-10-17)
+
+Revision 71 records `etsy_preflight_implemented`. The other five keys stay false. `updated_at` is `2026-10-17T10:48:00Z`. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. A12 and A13 stay `DESIGNED`. The exit string is not written. The next honest step is the publishing-ramp key, through its own proof.
+
 ## Session 09 is activated and incomplete (2026-10-17)
 
 Revision 70 installs the six Session 09 keys, and every one is false. `updated_at` is `2026-10-17T10:45:00Z`. `head_sha` and `evidence_closure_commit_sha` stay `01b7dd84ef98442ff26a5239e8c7de742739d844`. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6, 7, 8]`. `next_session` stays 9. Exit 78 stays HELD. A12 and A13 stay `DESIGNED`. `commissioned_agents` stays empty. The exit string is not written. The next honest step is earning the false keys through the fixture proof. Completion of Session 09 is a later transition.

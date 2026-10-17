@@ -28,6 +28,11 @@ from money_machine.control.session_08_proof import (
     Session08ProofError,
     prove_session_08,
 )
+from money_machine.control.session_09_proof import (
+    PREFLIGHT_EVIDENCE_KEY,
+    Session09ProofError,
+    prove_session_09,
+)
 
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 BOOTSTRAP_COMMIT_SUBJECT = "chore(bootstrap): initialise money machine autonomous monorepo"
@@ -1179,20 +1184,89 @@ def apply_session_08_evidence_record_transition(
     )
 
 
+def validate_session_09_evidence_record(previous: ControlState, current: ControlState) -> None:
+    """Record the Session 09 preflight key. The session stays incomplete.
+
+    The proof earns ``etsy_preflight_implemented`` alone. The other five keys,
+    including the closure key, stay false. The closure commit does not move.
+    """
+    if previous["current_session"] != 9 or current["current_session"] != 9:
+        raise ControlStateError("unsupported evidence record: only session 09 can record this key")
+    if previous["session_status"] != "incomplete" or current["session_status"] != "incomplete":
+        raise ControlStateError("unsupported evidence record: session 09 must stay incomplete")
+    _require_same_fields(previous, current, _SESSION_08_EVIDENCE_MUTABLE_FIELDS, "evidence record")
+    if current["state_revision"] != previous["state_revision"] + 1:
+        raise ControlStateError("state revision must advance exactly once")
+    if current["updated_at"] == previous["updated_at"]:
+        raise ControlStateError("updated_at must change for the evidence record")
+    before = _session_09_evidence(previous)
+    after = _session_09_evidence(current)
+    reverted = sorted(key for key, value in before.items() if value is True and after[key] is False)
+    if reverted:
+        raise ControlStateError("evidence record cannot revoke a key: " + ", ".join(reverted))
+    flipped = {key for key, value in before.items() if value is False and after[key] is True}
+    if flipped != {PREFLIGHT_EVIDENCE_KEY}:
+        raise ControlStateError("evidence record must flip only the earned preflight key")
+    if after[_CLOSURE_EVIDENCE_KEY] is not False:
+        raise ControlStateError("the closure key stays false")
+
+
+def _session_09_evidence(state: ControlState) -> dict[str, bool]:
+    evidence = state["required_completion_evidence"]
+    if set(evidence) != set(SESSION_EVIDENCE_KEYS[9]):
+        raise ControlStateError("session 09 evidence keys are missing or unsupported")
+    return evidence
+
+
+def _require_session_09_proof() -> None:
+    try:
+        earned = prove_session_09()
+    except Session09ProofError as error:
+        raise ControlStateError(f"session 09 evidence proof refused: {error.code}") from error
+    if earned != frozenset({PREFLIGHT_EVIDENCE_KEY}):
+        raise ControlStateError("session 09 evidence proof did not earn the preflight key")
+
+
+def _verify_session_09_evidence_repository(
+    state_path: Path,
+    previous: ControlState,
+    current: ControlState,
+) -> None:
+    del previous, current
+    root = _evidence_worktree(state_path)
+    _require_control_files(root)
+    _require_session_09_proof()
+
+
+def apply_session_09_evidence_record_transition(
+    state_path: Path, candidate_path: Path
+) -> ControlState:
+    """Validate a Session 09 preflight candidate and atomically replace the state file."""
+    return _apply_transition(
+        state_path,
+        candidate_path,
+        validate_session_09_evidence_record,
+        _verify_session_09_evidence_repository,
+    )
+
+
 def apply_active_evidence_record_transition(state_path: Path, candidate_path: Path) -> ControlState:
     """Record evidence for the session the pointer is on.
 
     Session 07 stays on its own transition. Incomplete Session 08 uses the fixture-chain
-    transition. Any other pointer is refused before a file is written.
+    transition. Incomplete Session 09 records the preflight key. Any other pointer is
+    refused before a file is written.
     """
     previous, _raw = _parse_state(state_path, "current state")
     if previous["current_session"] == 7 and previous["session_status"] == "complete":
         return apply_evidence_record_transition(state_path, candidate_path)
     if previous["current_session"] == 8 and previous["session_status"] == "incomplete":
         return apply_session_08_evidence_record_transition(state_path, candidate_path)
+    if previous["current_session"] == 9 and previous["session_status"] == "incomplete":
+        return apply_session_09_evidence_record_transition(state_path, candidate_path)
     raise ControlStateError(
-        "unsupported evidence record: only session 07 or incomplete session 08 "
-        "can record these keys"
+        "unsupported evidence record: only session 07, incomplete session 08, "
+        "or incomplete session 09 can record these keys"
     )
 
 

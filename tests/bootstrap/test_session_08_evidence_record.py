@@ -244,13 +244,13 @@ def test_record_evidence_earns_the_eleven_keys(tmp_path: Path) -> None:
 
 def test_dispatch_refuses_a_session_that_cannot_record(tmp_path: Path) -> None:
     previous = _false_pointer()
-    previous["current_session"] = 9
+    previous["current_session"] = 10
     state_path = tmp_path / "state.json"
     _write(state_path, previous)
     candidate = tmp_path / "candidate.json"
     _write(candidate, _eleven(previous))
 
-    with pytest.raises(ControlStateError, match="only session 07 or incomplete session 08"):
+    with pytest.raises(ControlStateError, match="only session 07, incomplete session 08"):
         apply_active_evidence_record_transition(state_path, candidate)
 
     assert state_path.read_bytes() == json.dumps(previous, indent=2).encode("utf-8") + b"\n"

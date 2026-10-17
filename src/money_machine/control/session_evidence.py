@@ -3,8 +3,9 @@
 Sessions 00-06 closed with every contract key true. Session 07's close
 commit under D-0032 has every contract key false. D-0036 records the live
 pointer separately. Session 08 is complete at revision 69. Session 09 is
-activated and incomplete at revision 70 (D-0040). Sessions 10-15 have no
-contract. This module does not edit ``IMPLEMENTATION_STATE.json``.
+activated and incomplete at revision 71. ``etsy_preflight_implemented`` is
+the one true key (D-0041). Sessions 10-15 have no contract. This module
+does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ class OpenSessionEvidence:
     fixture_paths: tuple[str, ...]
     gap: str
     activated: bool = False
+    true_keys: frozenset[str] = frozenset()
 
 
 CLOSED_SESSION_EVIDENCE: tuple[ClosedSessionEvidence, ...] = (
@@ -139,8 +141,9 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
             "src/money_machine/assets/publishing_ramp_decision.py",
             "src/money_machine/assets/mutation_receipt.py",
         ),
-        "Activated with every key false. Fixtures do not publish.",
+        "Preflight is recorded. The other keys are not. Fixtures do not publish.",
         True,
+        frozenset({"etsy_preflight_implemented"}),
     ),
     OpenSessionEvidence(
         10,
@@ -192,9 +195,9 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 09 at state revision 70.",
+        "The checked-in pointer is Session 09 at state revision 71.",
         "`current_session` is 9. `session_status` is incomplete.",
-        "Every Session 09 evidence key is false.",
+        "`etsy_preflight_implemented` is true. The other Session 09 keys are false.",
         "Session 08 is complete and every one of its keys is true.",
         "Sessions 00-06 closed with every contract key true.",
         "Session 07's close commit keeps every contract key false under D-0032.",
@@ -275,7 +278,12 @@ def render_session_evidence() -> str:
             lines.append("| Key | Recorded |")
             lines.append("|---|---|")
             for key in _keys(record.session):
-                recorded = "false" if record.activated else "not installed"
+                if key in record.true_keys:
+                    recorded = "true"
+                elif record.activated:
+                    recorded = "false"
+                else:
+                    recorded = "not installed"
                 lines.append(f"| `{key}` | {recorded} |")
             lines.append("")
     return "\n".join(lines)

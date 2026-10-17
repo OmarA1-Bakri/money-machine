@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-17 — Session 09 preflight key recorded
+
+**Verification scope**: live `record-evidence` from revision 70 to 71. No live HTTP. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 9, `incomplete`, revision 71, `updated_at` `2026-10-17T10:48:00Z` | PASS |
+| Key | `etsy_preflight_implemented` true; the other five Session 09 keys false | PASS |
+| Head | `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844` | PASS |
+| Refusal | A second key and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 9, "state_revision": 71}`. The preflight proof, the contract test, the evidence index, the continuity shape, both Session 08 activation checks, the Session 08 dispatch refusal, the merchandising exit pin, and the seven Notion live-pointer tests printed 27 passed in 2.72s.
+
 ## 2026-10-17 — Session 09 activation applied
 
 **Verification scope**: live `activate` from revision 69 to 70. No live HTTP. Exit 78 stays HELD. A12 and A13 stay `DESIGNED`. The exit string is not written.

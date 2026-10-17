@@ -67,16 +67,18 @@ def test_session_09_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_is_the_session_09_activation() -> None:
-    """Activation installed the six keys false. It did not write the exit string."""
+    """Activation installed six false keys. Preflight is now the one true key."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 70
+    assert live["state_revision"] == 71
     assert live["current_session"] == 9
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8]
     assert live["next_session"] == 9
     assert live["head_sha"] == "01b7dd84ef98442ff26a5239e8c7de742739d844"
-    assert live["required_completion_evidence"] == dict.fromkeys(sorted(SESSION_09_KEYS), False)
+    evidence = dict.fromkeys(sorted(SESSION_09_KEYS), False)
+    evidence["etsy_preflight_implemented"] = True
+    assert live["required_completion_evidence"] == evidence
     assert "SESSION_09_ETSY_PUBLISHING_COMPLETE" not in text
 
 

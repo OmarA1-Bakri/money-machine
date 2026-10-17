@@ -575,3 +575,19 @@ Live publish, commissioning, Exit 78, and `SESSION_09_ETSY_PUBLISHING_COMPLETE` 
 ### Consequences
 
 `validate_activation_transition` accepts a candidate that installs these six keys all false from the revision-69 close. A true key, a missing key, or an extra key is refused. Sessions 10–15 still have no contract. Activation is the next transition and is not this commit.
+
+## D-0041 — Session 09 preflight is the first earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 09 is incomplete at revision 70. All six keys are false. `record-evidence` refuses every pointer except complete Session 07 and incomplete Session 08. The preflight checklist already exists and does not publish.
+
+### Decision
+
+`prove_session_09()` earns only `etsy_preflight_implemented`. It requires a passing row with no repair job, a quantity other than 999 that fails with `repair_quantity`, and an unsupported claim that is blocked with no repair job. `record-evidence` on incomplete Session 09 flips that one key. Any other flip is refused. The closure key stays false. `head_sha` does not move. Exit 78 stays HELD. A12 and A13 stay `DESIGNED`. The exit string is not written.
+
+### Consequences
+
+Revision 71 records the preflight key true. The other five Session 09 keys stay false. The ramp, the receipt, and the fixture draft package are later proofs.
