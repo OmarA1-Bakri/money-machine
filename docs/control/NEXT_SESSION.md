@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 11 routing is recorded (2026-10-17)
+
+Revision 86 records `support_intake_implemented` and `incident_routing_implemented`. The other four Session 11 keys stay false. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The next honest step is repair resolution, through its own proof.
+
 ## Session 11 intake is recorded (2026-10-17)
 
 Revision 85 records `support_intake_implemented`. The other five Session 11 keys stay false. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The next honest step is incident routing, through its own proof.

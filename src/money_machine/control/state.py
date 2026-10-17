@@ -1360,7 +1360,7 @@ def _verify_session_10_evidence_repository(
 def validate_session_11_evidence_record(previous: ControlState, current: ControlState) -> None:
     """Record the Session 11 keys the fixture proof has earned. The session stays incomplete.
 
-    The proof earns the intake key. The closure key stays false.
+    The proof earns the intake and routing keys. The closure key stays false.
     """
     if previous["current_session"] != 11 or current["current_session"] != 11:
         raise ControlStateError("unsupported evidence record: only session 11 can record this key")

@@ -881,3 +881,19 @@ Session 11 is incomplete at revision 84. All six keys are false. Intake already 
 ### Consequences
 
 Revision 85 records the intake key true. The other five Session 11 keys stay false. The routing key is the next proof.
+
+## D-0059 — Session 11 incident routing is the second earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 11 is incomplete at revision 85. `support_intake_implemented` is true. The other five keys are false. The intake fixture already maps the thirteen issue codes onto existing incident types and existing job types. Summary words do not select the code. A caller integer does not flip `preempts_routine`. No job is inserted.
+
+### Decision
+
+`prove_session_11()` earns `support_intake_implemented` and `incident_routing_implemented`. `record-evidence` on incomplete Session 11 keeps the intake key and flips the routing key. The other four keys stay false. Any other flip is refused. The closure key stays false. `head_sha` does not move. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.
+
+### Consequences
+
+Revision 86 records the intake and routing keys true. The other four Session 11 keys stay false. The repair key is the next proof.

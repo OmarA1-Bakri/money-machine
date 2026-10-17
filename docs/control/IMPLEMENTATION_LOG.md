@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 11 routing key recorded
+
+`record-evidence` advanced `state_revision` from 85 to 86. `updated_at` is `2026-10-17T12:20:00Z`. `support_intake_implemented` stays true. `incident_routing_implemented` is true. The other four Session 11 keys stay false. `current_session` stays 11. `session_status` stays incomplete. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.
+
 ## 2026-10-17 — Session 11 intake key recorded
 
 `record-evidence` advanced `state_revision` from 84 to 85. `updated_at` is `2026-10-17T12:15:00Z`. `support_intake_implemented` is true. The other five Session 11 keys stay false. `current_session` stays 11. `session_status` stays incomplete. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.
