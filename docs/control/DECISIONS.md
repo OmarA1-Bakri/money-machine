@@ -1450,3 +1450,19 @@ Session 15 is incomplete at revision 115. `deployed_state_checked`, `provider_co
 ### Consequences
 
 The next honest step is `acceptance_matrix_recorded`: every definition-of-done item is `PASS`, `FAIL`, or `BLOCKED_EXTERNAL`. A live item with no live call is `BLOCKED_EXTERNAL`. A `FAIL` is not a pass. A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0094 — Session 15 acceptance matrix
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 15 is incomplete at revision 116. `deployed_state_checked`, `provider_connections_fail_closed`, `standing_authority_recorded`, and `linked_workflow_fixture` are true. The other three Session 15 keys are false. A live item with no live call cannot be marked pass. A page is not the evidence key.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 116 to 117. `updated_at` is `2026-10-17T16:35:00Z`. `deployed_state_checked`, `provider_connections_fail_closed`, `standing_authority_recorded`, `linked_workflow_fixture`, and `acceptance_matrix_recorded` are true. `control_files_and_checkpoint_current` and `evidence_closure_commit_recorded` stay false. `session_status` stays incomplete. `current_session` stays 15. `completed_sessions` stays 0 through 14. `next_session` stays 15. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. `src/money_machine/assets/acceptance_matrix.py` scores all 25 definition-of-done items. The nine live items stay `BLOCKED_EXTERNAL`: repository privacy, live postgres, live Notion, live publication, live deactivation, PostHog, live deploy, live credentials, and a live workflow. `local_setup`, `agents_commissioned` (the commissioned list is empty), and `multiplication` (the successor build stays withheld) are `FAIL`. A `FAIL` is not a pass. `accept_page` raises. The handover does not contain the exit string. No live call is made. Exit 78 stays HELD. The exit string is not written.
+
+### Consequences
+
+The next honest step is `control_files_and_checkpoint_current`. A live account stays deferred. Exit 78 stays HELD. The exit string is not written.

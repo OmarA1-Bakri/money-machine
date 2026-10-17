@@ -1,9 +1,9 @@
 """Earn the Session 15 deployed-state, provider, authority, and workflow keys.
 
 The proof calls the deployed-state check, the fixture provider selector, the
-standing-authority check, and the linked workflow. The workflow stops at
-preflight. A true publish, purchase, or checkout flag does not earn a key.
-The closure key stays false.
+standing-authority check, the linked workflow, and the acceptance matrix.
+The workflow stops at preflight. A live matrix item stays blocked. A failure
+is not a pass. The closure key stays false.
 """
 
 from __future__ import annotations
@@ -12,6 +12,14 @@ import ast
 from collections.abc import Callable
 from pathlib import Path
 
+from money_machine.assets.acceptance_matrix import (
+    AcceptanceMatrixRefusal,
+    Verdict,
+    accept_page,
+    counts_as_pass,
+    record_acceptance_matrix,
+    refuse_exit_string,
+)
 from money_machine.assets.linked_workflow import (
     LinkedWorkflowRefusal,
     advance_linked_workflow,
@@ -35,29 +43,33 @@ DEPLOYED_STATE_KEY = "deployed_state_checked"
 PROVIDER_CONNECTIONS_KEY = "provider_connections_fail_closed"
 STANDING_AUTHORITY_KEY = "standing_authority_recorded"
 LINKED_WORKFLOW_KEY = "linked_workflow_fixture"
+ACCEPTANCE_MATRIX_KEY = "acceptance_matrix_recorded"
 EARNED_EVIDENCE_KEYS = frozenset(
     {
         DEPLOYED_STATE_KEY,
         PROVIDER_CONNECTIONS_KEY,
         STANDING_AUTHORITY_KEY,
         LINKED_WORKFLOW_KEY,
+        ACCEPTANCE_MATRIX_KEY,
     }
 )
 _CLOSURE_HEAD = "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
-_POINTER_REVISION = 116
-_UPDATED_AT = "2026-10-17T16:30:00Z"
+_POINTER_REVISION = 117
+_UPDATED_AT = "2026-10-17T16:35:00Z"
 _TRUE_KEYS: frozenset[str] = frozenset(
     {
         DEPLOYED_STATE_KEY,
         PROVIDER_CONNECTIONS_KEY,
         STANDING_AUTHORITY_KEY,
         LINKED_WORKFLOW_KEY,
+        ACCEPTANCE_MATRIX_KEY,
     }
 )
 _MODULE = Path(__file__).resolve().parents[1] / "deploy" / "deployed_state.py"
 _CONNECTIONS = Path(__file__).resolve().parents[1] / "integrations" / "provider_connections.py"
 _AUTHORITY = Path(__file__).resolve().parents[1] / "config" / "standing_authority.py"
 _WORKFLOW = Path(__file__).resolve().parents[1] / "assets" / "linked_workflow.py"
+_MATRIX = Path(__file__).resolve().parents[1] / "assets" / "acceptance_matrix.py"
 _WORKER = Path("src/money_machine/orchestration/worker.py")
 _SCHEDULER = Path("src/money_machine/orchestration/scheduler.py")
 
@@ -76,6 +88,7 @@ def prove_session_15() -> frozenset[str]:
     _prove_provider_connections()
     _prove_standing_authority()
     _prove_linked_workflow()
+    _prove_acceptance_matrix()
     return EARNED_EVIDENCE_KEYS
 
 
@@ -263,6 +276,61 @@ def _prove_linked_workflow() -> None:
     for action in ("publish", "purchase", "checkout"):
         _require_workflow_refusal(action, enabled=True)
         _require_workflow_refusal(action, enabled=False)
+
+
+def _prove_acceptance_matrix() -> None:
+    """Every definition item is marked. A live item stays blocked. A page is not a key."""
+    _refuse_network(_MATRIX)
+    root = Path(__file__).resolve().parents[3]
+    before = {relative: (root / relative).read_bytes() for relative in (_WORKER, _SCHEDULER)}
+    try:
+        recorded = record_acceptance_matrix()
+    except AcceptanceMatrixRefusal as error:
+        raise Session15ProofError(error.code) from error
+    if {relative: (root / relative).read_bytes() for relative in before} != before:
+        raise Session15ProofError("sources_edited")
+    live = {
+        "private_repository",
+        "postgresql_source_of_truth",
+        "notion_product",
+        "live_publication",
+        "automatic_cull",
+        "posthog",
+        "production_deploy_and_backup",
+        "live_credentials",
+        "real_workflow",
+    }
+    names = [item.name for item in recorded.items]
+    if (
+        len(recorded.items) != 25
+        or len(set(names)) != 25
+        or recorded.live_call is not False
+        or any(
+            item.verdict not in {Verdict.PASS, Verdict.FAIL, Verdict.BLOCKED_EXTERNAL}
+            for item in recorded.items
+        )
+        or any(
+            item.verdict is not Verdict.BLOCKED_EXTERNAL
+            for item in recorded.items
+            if item.name in live
+        )
+        or not any(item.verdict is Verdict.FAIL for item in recorded.items)
+        or any(
+            counts_as_pass(item.verdict) for item in recorded.items if item.verdict is Verdict.FAIL
+        )
+    ):
+        raise Session15ProofError("acceptance_matrix")
+    try:
+        refuse_exit_string(recorded.handover)
+    except AcceptanceMatrixRefusal as error:
+        raise Session15ProofError(error.code) from error
+    try:
+        accept_page(recorded.handover)
+    except AcceptanceMatrixRefusal as error:
+        if error.code != "page":
+            raise Session15ProofError("page") from error
+    else:
+        raise Session15ProofError("page")
 
 
 def _require_workflow_refusal(action: str, *, enabled: bool) -> None:

@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 15 acceptance matrix recorded
+
+`record-evidence` advanced `state_revision` from 116 to 117. `updated_at` is `2026-10-17T16:35:00Z`. `deployed_state_checked`, `provider_connections_fail_closed`, `standing_authority_recorded`, `linked_workflow_fixture`, and `acceptance_matrix_recorded` are true. The other two Session 15 keys stay false. `current_session` stays 15. `session_status` stays incomplete. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. `src/money_machine/assets/acceptance_matrix.py` scores all 25 definition-of-done items. Live items stay `BLOCKED_EXTERNAL`. `local_setup`, an empty commissioned list, and a withheld successor build are `FAIL`. A `FAIL` is not a pass. A page does not earn the key. No live call is made. Exit 78 stays HELD. The exit string is not written.
+
 ## 2026-10-17 — Session 15 linked workflow recorded
 
 `record-evidence` advanced `state_revision` from 115 to 116. `updated_at` is `2026-10-17T16:30:00Z`. `deployed_state_checked`, `provider_connections_fail_closed`, `standing_authority_recorded`, and `linked_workflow_fixture` are true. The other three Session 15 keys stay false. `current_session` stays 15. `session_status` stays incomplete. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. `src/money_machine/assets/linked_workflow.py` calls the fixture adapters and stops at preflight. Publish, purchase, and checkout raise even when a flag is true. No socket is opened. Exit 78 stays HELD. The exit string is not written.

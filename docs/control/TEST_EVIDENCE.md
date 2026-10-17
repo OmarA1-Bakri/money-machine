@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-17 — Session 15 acceptance matrix recorded
+
+**Verification scope**: live `record-evidence` from revision 116 to 117. No live HTTP. No publish, purchase, or checkout. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 15, `incomplete`, revision 117, `updated_at` `2026-10-17T16:35:00Z` | PASS |
+| Keys | Five Session 15 keys are true. Two keys stay false | PASS |
+| Matrix | Twenty-five rows. Live items are `BLOCKED_EXTERNAL`. A `FAIL` is not a pass | PASS |
+| Head | `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e` | PASS |
+| Hold | No live call is made. Exit 78 stays HELD | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 15, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 117}`. The acceptance-matrix proof, the linked-workflow proof, the standing-authority proof, the provider-connection proof, the deployed-state proof, the Session 15 contract, the checkpoint proof, the completion proof, the control proof, the release proof, the packaging proof, the target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, the contiguous-contract check, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, and the synthetic-path tests printed 173 passed in 6.09s. `ruff check` and `pyright` on the acceptance matrix and the Session 15 proof were clean.
+
 ## 2026-10-17 — Session 15 linked workflow recorded
 
 **Verification scope**: live `record-evidence` from revision 115 to 116. No live HTTP. No publish, purchase, or checkout. Exit 78 stays HELD. The exit string is not written.

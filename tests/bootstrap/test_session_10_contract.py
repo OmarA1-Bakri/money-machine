@@ -82,7 +82,8 @@ def test_live_pointer_records_the_closure_key() -> None:
     evidence["provider_connections_fail_closed"] = True
     evidence["standing_authority_recorded"] = True
     evidence["linked_workflow_fixture"] = True
-    assert live["state_revision"] == 116
+    evidence["acceptance_matrix_recorded"] = True
+    assert live["state_revision"] == 117
     assert live["current_session"] == 15
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(15))
