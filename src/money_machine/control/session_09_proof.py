@@ -439,15 +439,23 @@ def _prove_control_files() -> None:
     if not isinstance(decoded, dict):
         raise Session09ProofError("control_checkpoint")
     evidence = decoded.get("required_completion_evidence")
+    status = decoded.get("session_status")
     if (
         decoded.get("current_session") != 9
-        or decoded.get("session_status") != "incomplete"
         or decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
         or not isinstance(evidence, dict)
+        or status not in {"incomplete", "complete"}
     ):
         raise Session09ProofError("control_checkpoint")
     for key in _BEHAVIORAL_KEYS:
         if evidence.get(key) is not True:
             raise Session09ProofError("control_checkpoint")
-    if evidence.get("evidence_closure_commit_recorded") is not False:
+    closure_recorded = evidence.get("evidence_closure_commit_recorded")
+    if status == "incomplete":
+        if closure_recorded is not False:
+            raise Session09ProofError("control_checkpoint")
+        return
+    if closure_recorded is not True or evidence.get(CONTROL_EVIDENCE_KEY) is not True:
+        raise Session09ProofError("control_checkpoint")
+    if decoded.get("next_session") != 10 or decoded.get("completed_sessions") != list(range(10)):
         raise Session09ProofError("control_checkpoint")
