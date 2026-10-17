@@ -73,11 +73,11 @@ def test_session_10_contract_is_the_fixture_surface() -> None:
     assert "SESSION_10_CLOSED_LOOP_AUTOMATION_COMPLETE" not in SESSION_EVIDENCE_KEYS[10]
 
 
-def test_live_pointer_records_the_ledger_key() -> None:
-    """Four Session 10 keys are true. The control-file key and the closure key are false."""
+def test_live_pointer_records_the_control_file_key() -> None:
+    """Five Session 10 keys are true. The closure key is false."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 81
+    assert live["state_revision"] == 82
     assert live["current_session"] == 10
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(10))
@@ -89,6 +89,7 @@ def test_live_pointer_records_the_ledger_key() -> None:
     evidence["maturity_clock_implemented"] = True
     evidence["portfolio_eligibility_implemented"] = True
     evidence["closed_loop_store_implemented"] = True
+    evidence["control_files_and_checkpoint_current"] = True
     assert live["required_completion_evidence"] == evidence
     assert "SESSION_10_CLOSED_LOOP_AUTOMATION_COMPLETE" not in text
 

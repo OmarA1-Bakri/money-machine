@@ -1571,7 +1571,7 @@ def test_session_eight_activation_rejects_false_session_seven_evidence(tmp_path:
     assert STATE_PATH.read_bytes() == checked_in
     assert load_state()["current_session"] == 10
     assert load_state()["session_status"] == "incomplete"
-    assert load_state()["state_revision"] == 81
+    assert load_state()["state_revision"] == 82
     assert load_state()["next_session"] == 10
 
 
@@ -1598,7 +1598,7 @@ def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: 
     assert live["current_session"] == 10
     assert live["session_status"] == "incomplete"
     assert live["next_session"] == 10
-    assert live["state_revision"] == 81
+    assert live["state_revision"] == 82
     assert live["head_sha"] == "cfb36462994ecba833f31ba869f2aba627f6060d"
     assert live["evidence_closure_commit_sha"] == live["head_sha"]
     live_evidence = live["required_completion_evidence"]
@@ -1607,7 +1607,8 @@ def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: 
     assert live_evidence["maturity_clock_implemented"] is True
     assert live_evidence["portfolio_eligibility_implemented"] is True
     assert live_evidence["closed_loop_store_implemented"] is True
-    assert sum(1 for value in live_evidence.values() if value) == 4
+    assert live_evidence["control_files_and_checkpoint_current"] is True
+    assert sum(1 for value in live_evidence.values() if value) == 5
 
 
 def test_activation_uses_the_worktree_when_recorded_root_is_absent(tmp_path: Path) -> None:

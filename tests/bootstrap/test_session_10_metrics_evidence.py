@@ -62,6 +62,7 @@ def _earned(previous: ControlState) -> ControlState:
     evidence[MATURITY_EVIDENCE_KEY] = True
     evidence[PORTFOLIO_EVIDENCE_KEY] = True
     evidence[LEDGER_EVIDENCE_KEY] = True
+    evidence["control_files_and_checkpoint_current"] = True
     current["required_completion_evidence"] = evidence
     return current
 
@@ -79,14 +80,14 @@ def test_the_recorded_keys_are_the_accepted_record() -> None:
     validate_session_10_evidence_record(previous, _earned(previous))
 
 
-def test_an_extra_key_is_refused() -> None:
+def test_an_unknown_key_is_refused() -> None:
     previous = _false_pointer()
     current = _earned(previous)
     evidence = dict(current["required_completion_evidence"])
-    evidence["control_files_and_checkpoint_current"] = True
+    evidence["live_publish"] = True
     current["required_completion_evidence"] = evidence
 
-    with pytest.raises(ControlStateError, match="exactly the keys the fixture proof earned"):
+    with pytest.raises(ControlStateError, match="missing or unsupported"):
         validate_session_10_evidence_record(previous, current)
 
 
@@ -144,6 +145,6 @@ def test_apply_records_the_metrics_key_without_touching_the_live_file(tmp_path: 
     assert evidence[MATURITY_EVIDENCE_KEY] is True
     assert evidence[PORTFOLIO_EVIDENCE_KEY] is True
     assert evidence[LEDGER_EVIDENCE_KEY] is True
-    assert evidence["control_files_and_checkpoint_current"] is False
+    assert evidence["control_files_and_checkpoint_current"] is True
     assert evidence["evidence_closure_commit_recorded"] is False
     assert STATE_PATH.read_bytes() == live_bytes

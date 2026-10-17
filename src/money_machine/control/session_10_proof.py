@@ -1,4 +1,4 @@
-"""Earn the Session 10 metrics, maturity, portfolio, and ledger keys from fixtures.
+"""Earn the Session 10 metrics, maturity, portfolio, ledger, and control-file keys.
 
 The proof does not open a socket, read a credential, insert a job, or schedule a timer.
 """
@@ -6,6 +6,7 @@ The proof does not open a socket, read a credential, insert a job, or schedule a
 from __future__ import annotations
 
 import inspect
+import json
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -60,13 +61,29 @@ METRICS_EVIDENCE_KEY = "metrics_fixture_implemented"
 MATURITY_EVIDENCE_KEY = "maturity_clock_implemented"
 PORTFOLIO_EVIDENCE_KEY = "portfolio_eligibility_implemented"
 LEDGER_EVIDENCE_KEY = "closed_loop_store_implemented"
+CONTROL_EVIDENCE_KEY = "control_files_and_checkpoint_current"
 EARNED_EVIDENCE_KEYS = frozenset(
     {
         METRICS_EVIDENCE_KEY,
         MATURITY_EVIDENCE_KEY,
         PORTFOLIO_EVIDENCE_KEY,
         LEDGER_EVIDENCE_KEY,
+        CONTROL_EVIDENCE_KEY,
     }
+)
+_CONTROL_FILES = (
+    Path("docs/control/IMPLEMENTATION_STATE.json"),
+    Path("docs/control/IMPLEMENTATION_LOG.md"),
+    Path("docs/control/DECISIONS.md"),
+    Path("docs/control/TEST_EVIDENCE.md"),
+    Path("docs/control/NEXT_SESSION.md"),
+    Path("docs/control/SESSION_EVIDENCE.md"),
+)
+_BEHAVIORAL_KEYS = (
+    METRICS_EVIDENCE_KEY,
+    MATURITY_EVIDENCE_KEY,
+    PORTFOLIO_EVIDENCE_KEY,
+    LEDGER_EVIDENCE_KEY,
 )
 _DECIDED = datetime(2026, 10, 16, tzinfo=UTC)
 _PUBLISHED = datetime(2026, 3, 1, tzinfo=UTC)
@@ -90,6 +107,7 @@ def prove_session_10() -> frozenset[str]:
     _prove_maturity()
     _prove_portfolio()
     _prove_closed_loop()
+    _prove_control_files()
     return EARNED_EVIDENCE_KEYS
 
 
@@ -625,3 +643,40 @@ def _prove_closed_loop() -> None:
         or "import socket" in source
     ):
         raise Session10ProofError("loop_scheduler")
+
+
+def _prove_control_files() -> None:
+    """The five continuity files and the catalogue match an incomplete Session 10 pointer."""
+    root = Path(__file__).resolve().parents[3]
+    for relative in _CONTROL_FILES:
+        path = root / relative
+        if not path.is_file() or path.stat().st_size == 0:
+            raise Session10ProofError("control_files")
+    # session_evidence imports state, and state imports this module.
+    from money_machine.control.session_evidence import render_session_evidence
+
+    catalogue = root / "docs/control/SESSION_EVIDENCE.md"
+    if catalogue.read_text(encoding="utf-8") != render_session_evidence():
+        raise Session10ProofError("control_checkpoint")
+    decoded: object = json.loads(
+        (root / "docs/control/IMPLEMENTATION_STATE.json").read_text(encoding="utf-8")
+    )
+    if not isinstance(decoded, dict):
+        raise Session10ProofError("control_checkpoint")
+    evidence = decoded.get("required_completion_evidence")
+    if (
+        decoded.get("current_session") != 10
+        or decoded.get("session_status") != "incomplete"
+        or decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
+        or decoded.get("next_session") != 10
+        or decoded.get("completed_sessions") != list(range(10))
+        or not isinstance(evidence, dict)
+    ):
+        raise Session10ProofError("control_checkpoint")
+    for key in _BEHAVIORAL_KEYS:
+        if evidence.get(key) is not True:
+            raise Session10ProofError("control_checkpoint")
+    if evidence.get("evidence_closure_commit_recorded") is not False:
+        raise Session10ProofError("control_checkpoint")
+    if not isinstance(evidence.get(CONTROL_EVIDENCE_KEY), bool):
+        raise Session10ProofError("control_checkpoint")

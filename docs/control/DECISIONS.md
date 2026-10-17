@@ -792,3 +792,19 @@ Session 10 is incomplete at revision 80. The metrics fixture, the maturity clock
 ### Consequences
 
 Revision 81 records those four keys true. `control_files_and_checkpoint_current` and the closure key stay false. The control-file key is the next proof.
+
+## D-0054 — Session 10 control files are the fifth earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 10 is incomplete at revision 81. The metrics fixture, the maturity clock, portfolio eligibility, and the closed-loop ledger are true. The five continuity files and the evidence catalogue are present. The catalogue matches its renderer. The pointer is incomplete Session 10, `head_sha` equals the Session 09 closure, and the closure key is false.
+
+### Decision
+
+`prove_session_10()` earns the metrics key, the maturity key, the portfolio key, the ledger key, and `control_files_and_checkpoint_current`. The proof requires those files to be non-empty and the catalogue to match its renderer. `record-evidence` on incomplete Session 10 flips the control-file key and keeps the earlier keys. Any other flip is refused. The closure key stays false. `head_sha` does not move. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. No scheduler row is inserted through `scheduler.main`, and no live deactivation runs.
+
+### Consequences
+
+Revision 82 records those five keys true. The closure key stays false. The closure key is the next proof.
