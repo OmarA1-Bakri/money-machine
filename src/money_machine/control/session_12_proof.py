@@ -1,7 +1,7 @@
-"""Earn the Session 12 read-model and exception-view keys.
+"""Earn the Session 12 read-model, exception-view, and telemetry-redaction keys.
 
 The proof does not open a socket, read a credential, or write a cap.
-The view key may be either bool: the record flips it after this proof has run.
+The telemetry key may be either bool: the record flips it after this proof has run.
 """
 
 from __future__ import annotations
@@ -30,17 +30,25 @@ from money_machine.assets.operator_console import (
     WorkflowView,
 )
 from money_machine.assets.operator_views import ConsoleViews, render_console
+from money_machine.assets.telemetry_redaction import (
+    TelemetryRefusal,
+    redact_telemetry,
+)
 
 READ_MODEL_EVIDENCE_KEY = "console_read_model_implemented"
 VIEWS_EVIDENCE_KEY = "exception_views_implemented"
-EARNED_EVIDENCE_KEYS = frozenset({READ_MODEL_EVIDENCE_KEY, VIEWS_EVIDENCE_KEY})
+TELEMETRY_EVIDENCE_KEY = "telemetry_redaction_implemented"
+EARNED_EVIDENCE_KEYS = frozenset(
+    {READ_MODEL_EVIDENCE_KEY, VIEWS_EVIDENCE_KEY, TELEMETRY_EVIDENCE_KEY}
+)
 _UNEARNED_KEYS = (
-    "telemetry_redaction_implemented",
     "operator_actions_fail_closed",
     "control_files_and_checkpoint_current",
     "evidence_closure_commit_recorded",
 )
-_SESSION_12_KEYS = frozenset({READ_MODEL_EVIDENCE_KEY, VIEWS_EVIDENCE_KEY, *_UNEARNED_KEYS})
+_SESSION_12_KEYS = frozenset(
+    {READ_MODEL_EVIDENCE_KEY, VIEWS_EVIDENCE_KEY, TELEMETRY_EVIDENCE_KEY, *_UNEARNED_KEYS}
+)
 _CONTROL_FILES = (
     Path("docs/control/IMPLEMENTATION_STATE.json"),
     Path("docs/control/IMPLEMENTATION_LOG.md"),
@@ -67,6 +75,7 @@ def prove_session_12() -> frozenset[str]:
     """Return the earned Session 12 keys. A miss raises instead of returning them."""
     _prove_read_model()
     _prove_views()
+    _prove_telemetry()
     _prove_control_files()
     return EARNED_EVIDENCE_KEYS
 
@@ -496,6 +505,98 @@ def _view_model() -> ConsoleReadModel:
     )
 
 
+def _prove_telemetry() -> None:
+    """A secret, a cookie, or a raw buyer message is refused. Nothing is sent."""
+    module = inspect.getmodule(redact_telemetry)
+    if module is None or module.__file__ is None:
+        raise Session12ProofError("telemetry_socket")
+    source = Path(module.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    imported: list[str] = []
+    calls: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module is not None:
+            imported.append(node.module)
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            calls.append(node.func.id)
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            calls.append(node.func.attr)
+    folded = " ".join(imported)
+    if any(token in folded for token in ("socket", "httpx", "urllib", "requests", "posthog")):
+        raise Session12ProofError("telemetry_socket")
+    if any(name in calls for name in ("capture", "send", "urlopen", "request")):
+        raise Session12ProofError("telemetry_send")
+    safe = redact_telemetry(
+        event="job_completed",
+        distinct_id="fixture-shop",
+        properties={
+            "workflow_id": "w-1",
+            "job_type": "ResearchCollectionJob",
+            "agent_id": "fixture",
+            "product_id": "p-1",
+            "listing_id": "l-1",
+            "duration": "4",
+            "attempt": "1",
+            "status": "recorded",
+            "environment": "fixture",
+            "autonomy_mode": "held",
+            "error_classification": "none",
+        },
+    )
+    recorded = {name for name, _value in safe.properties}
+    if safe.sent is not False or safe.event != "job_completed" or "status" not in recorded:
+        raise Session12ProofError("telemetry_redaction")
+    try:
+        redact_telemetry(
+            event="connected",
+            distinct_id="fixture-shop",
+            properties={"status": "connected"},
+        )
+    except TelemetryRefusal as error:
+        if error.code != "event":
+            raise Session12ProofError("telemetry_status_word") from error
+    else:
+        raise Session12ProofError("telemetry_status_word")
+    refused = (
+        ("secret", "secret"),
+        ("api_key", "secret"),
+        ("cookie", "cookie"),
+        ("cookies", "cookie"),
+        ("buyer_message", "buyer_message"),
+        ("raw_buyer_message", "buyer_message"),
+    )
+    for name, code in refused:
+        try:
+            redact_telemetry(
+                event="job_completed",
+                distinct_id="fixture-shop",
+                properties={name: "value"},
+            )
+        except TelemetryRefusal as error:
+            if error.code != code:
+                raise Session12ProofError("telemetry_redaction") from error
+        else:
+            raise Session12ProofError("telemetry_redaction")
+    hidden = (
+        ("status", "sk_live_example", "secret"),
+        ("status", "cookie=session", "cookie"),
+    )
+    for name, value, code in hidden:
+        try:
+            redact_telemetry(
+                event="job_completed",
+                distinct_id="fixture-shop",
+                properties={name: value},
+            )
+        except TelemetryRefusal as error:
+            if error.code != code:
+                raise Session12ProofError("telemetry_redaction") from error
+        else:
+            raise Session12ProofError("telemetry_redaction")
+
+
 def _prove_control_files() -> None:
     """The continuity files and the catalogue match the checked-in pointer."""
     root = Path(__file__).resolve().parents[3]
@@ -532,7 +633,8 @@ def _prove_control_files() -> None:
         or not isinstance(evidence, dict)
         or len(evidence) != len(recorded)
         or evidence.get(READ_MODEL_EVIDENCE_KEY) is not True
-        or not isinstance(evidence.get(VIEWS_EVIDENCE_KEY), bool)
+        or evidence.get(VIEWS_EVIDENCE_KEY) is not True
+        or not isinstance(evidence.get(TELEMETRY_EVIDENCE_KEY), bool)
         or any(evidence.get(key) is not False for key in _UNEARNED_KEYS)
     ):
         raise Session12ProofError("control_checkpoint")

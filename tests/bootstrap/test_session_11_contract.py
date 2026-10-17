@@ -74,13 +74,14 @@ def test_session_11_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_is_the_session_11_activation() -> None:
-    """Session 11 stays closed. Session 12 records the read model and the exception views."""
+    """Session 11 stays closed. Session 12 records the read model, views, and redaction."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
     expected = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[12]), False)
     expected["console_read_model_implemented"] = True
     expected["exception_views_implemented"] = True
-    assert live["state_revision"] == 93
+    expected["telemetry_redaction_implemented"] = True
+    assert live["state_revision"] == 94
     assert live["current_session"] == 12
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(12))

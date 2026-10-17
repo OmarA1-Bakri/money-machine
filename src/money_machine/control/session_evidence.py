@@ -5,8 +5,9 @@ commit under D-0032 has every contract key false. D-0036 records the live
 pointer separately. Sessions 08, 09, and 10 are complete. Session 10 is
 revision 83 and every one of its keys is true (D-0055). Session 11 is
 complete at revision 90. Every Session 11 key is true (D-0063). Session 12
-is incomplete at revision 93. The read-model and exception-view keys are
-true and the other Session 12 keys are false (D-0067).
+is incomplete at revision 94. The read-model, exception-view, and
+telemetry-redaction keys are true and the other Session 12 keys are false
+(D-0068).
 Sessions 13-15 have no contract.
 This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
@@ -161,8 +162,9 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
         11,
         ("src/money_machine/assets/support_intake.py",),
         (
-            "Every Session 11 key is earned. Session 12 is activated. Its read model "
-            "and exception views are earned. The other keys are not earned. A16 stays DESIGNED."
+            "Every Session 11 key is earned. Session 12 is activated. Its read model, "
+            "exception views, and telemetry redaction are earned. Fail-closed actions "
+            "and the closure key are not earned. A16 stays DESIGNED."
         ),
         True,
         frozenset(
@@ -181,13 +183,20 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
         (
             "src/money_machine/assets/operator_console.py",
             "src/money_machine/assets/operator_views.py",
+            "src/money_machine/assets/telemetry_redaction.py",
         ),
         (
-            "The console read model and the exception views are earned. Telemetry "
-            "redaction, fail-closed actions, and the closure key are not earned."
+            "The console read model, the exception views, and telemetry redaction "
+            "are earned. Fail-closed actions and the closure key are not earned."
         ),
         True,
-        frozenset({"console_read_model_implemented", "exception_views_implemented"}),
+        frozenset(
+            {
+                "console_read_model_implemented",
+                "exception_views_implemented",
+                "telemetry_redaction_implemented",
+            }
+        ),
     ),
     OpenSessionEvidence(
         13,
@@ -229,11 +238,11 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 12 at state revision 93.",
+        "The checked-in pointer is Session 12 at state revision 94.",
         "`current_session` is 12. `session_status` is incomplete.",
         (
-            "`console_read_model_implemented` and `exception_views_implemented` are true. "
-            "The other Session 12 keys are false."
+            "`console_read_model_implemented`, `exception_views_implemented`, and "
+            "`telemetry_redaction_implemented` are true. The other Session 12 keys are false."
         ),
         "Session 10 is complete and every one of its keys is true.",
         "Session 09 is complete and every one of its keys is true.",
@@ -244,7 +253,7 @@ def render_session_evidence() -> str:
         "`5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.",
         "Session 10 is complete. Every key is true.",
         "Session 11 is complete. Every key is true.",
-        "Session 12 is incomplete. Two keys are true.",
+        "Session 12 is incomplete. Three keys are true.",
         "Sessions 13-15 have no contract and are not activated.",
         "",
     ]
@@ -284,7 +293,7 @@ def render_session_evidence() -> str:
             "",
             "Session 10 is complete. Every key is true.",
             "Session 11 is complete. Every key is true.",
-            "Session 12 is incomplete. Two keys are true.",
+            "Session 12 is incomplete. Three keys are true.",
             "Sessions 13-15 have no contract and are not activated.",
             "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",

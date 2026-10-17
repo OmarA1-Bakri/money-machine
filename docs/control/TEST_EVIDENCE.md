@@ -1,5 +1,20 @@
 # Test Evidence
 
+## 2026-10-17 — Session 12 telemetry redaction recorded
+
+**Verification scope**: live `record-evidence` from revision 93 to 94. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 12, `incomplete`, revision 94, `updated_at` `2026-10-17T13:20:00Z` | PASS |
+| Keys | The read-model, exception-view, and telemetry-redaction keys are true. The other three Session 12 keys are false | PASS |
+| Head | `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2` | PASS |
+| Refusal | A later key, an unknown key, and the closure key are refused | PASS |
+| Redaction | A secret, a cookie, and a raw buyer message are refused. A status word is not the proof | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 12, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 94}`. The telemetry pin, the Session 12 contract, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, the telemetry redaction unit tests, and the support intake unit tests printed 100 passed in 3.26s.
+
 ## 2026-10-17 — Session 12 exception views recorded
 
 **Verification scope**: live `record-evidence` from revision 92 to 93. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.

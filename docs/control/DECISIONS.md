@@ -1034,3 +1034,19 @@ Session 12 is incomplete at revision 92. D-0066 recorded the in-memory read mode
 ### Consequences
 
 Revision 93 is incomplete Session 12. Two keys are true. The next honest step is `telemetry_redaction_implemented`, through its own proof.
+
+## D-0068 — Session 12 records telemetry redaction
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 12 is incomplete at revision 93. D-0067 recorded the exception views. The prompt-integrity addendum earns telemetry redaction only when a secret, a cookie, or a raw buyer message is refused. A status word is not the proof. A live PostHog capture stays deferred.
+
+### Decision
+
+`record-evidence` sets `telemetry_redaction_implemented` true and keeps `console_read_model_implemented` and `exception_views_implemented` true. The other three Session 12 keys stay false. The redaction gate keeps the operational property names and refuses a secret, a cookie, or a raw buyer message. The payload stays in memory. `sent` stays false. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. No socket is opened and no cap is written.
+
+### Consequences
+
+Revision 94 is incomplete Session 12. Three keys are true. The next honest step is `operator_actions_fail_closed`, through its own proof.
