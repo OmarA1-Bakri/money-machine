@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 13 implementation matrix is recorded (2026-10-17)
+
+Revision 99 records `implementation_matrix_recorded`. The other five Session 13 keys stay false. `completed_sessions` stays 0 through 12. `next_session` stays 13. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. The next honest step is `synthetic_paths_implemented`, through a fixture-backed path.
+
 ## Session 13 is activated (2026-10-17)
 
 Revision 98 is incomplete Session 13. Every Session 13 key is false. `completed_sessions` stays 0 through 12. `next_session` stays 13. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. The next honest step is `implementation_matrix_recorded`: classify the real rows, and leave a live credential gap blocked.

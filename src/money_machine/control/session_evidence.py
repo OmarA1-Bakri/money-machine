@@ -6,8 +6,8 @@ pointer separately. Sessions 08, 09, and 10 are complete. Session 10 is
 revision 83 and every one of its keys is true (D-0055). Session 11 is
 complete at revision 90. Every Session 11 key is true (D-0063). Session 12
 is complete at revision 97. Every Session 12 key is true (D-0071).
-Session 13 is activated and incomplete at revision 98. Every Session 13 key
-is false (D-0073).
+Session 13 is activated and incomplete at revision 99. The implementation
+matrix is recorded (D-0074). The other five Session 13 keys are false.
 Sessions 14 and 15 have no contract.
 This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
@@ -162,8 +162,8 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
         11,
         ("src/money_machine/assets/support_intake.py",),
         (
-            "Every Session 11 key is earned. Session 12 is complete. Session 13 is "
-            "activated and incomplete. Live failure injection is not recorded. "
+            "Every Session 11 key is earned. Session 12 is complete. Session 13 "
+            "records the implementation matrix. Synthetic paths are not recorded. "
             "A16 stays DESIGNED."
         ),
         True,
@@ -187,8 +187,8 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
             "src/money_machine/assets/operator_actions.py",
         ),
         (
-            "Every Session 12 key is earned. Session 13 is activated and incomplete. "
-            "Live failure injection is not recorded. Exit 78 stays HELD."
+            "Every Session 12 key is earned. Session 13 records the implementation "
+            "matrix. Synthetic paths are not recorded. Exit 78 stays HELD."
         ),
         True,
         frozenset(
@@ -204,12 +204,13 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
     ),
     OpenSessionEvidence(
         13,
-        (),
+        ("src/money_machine/assets/implementation_matrix.py",),
         (
-            "The session is activated. No key is earned. Live failure injection, "
-            "a live backup, and the exit string are not recorded."
+            "The implementation matrix is recorded. Synthetic paths, failure "
+            "injection, and the backup fixture are not recorded."
         ),
         True,
+        frozenset({"implementation_matrix_recorded"}),
     ),
     OpenSessionEvidence(
         14,
@@ -246,9 +247,9 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 13 at state revision 98.",
+        "The checked-in pointer is Session 13 at state revision 99.",
         "`current_session` is 13. `session_status` is incomplete.",
-        "Every Session 13 key is false. `next_session` is 13.",
+        "The implementation matrix is true. The other five Session 13 keys are false.",
         "Session 10 is complete and every one of its keys is true.",
         "Session 09 is complete and every one of its keys is true.",
         "Session 08 is complete and every one of its keys is true.",
@@ -259,7 +260,7 @@ def render_session_evidence() -> str:
         "Session 10 is complete. Every key is true.",
         "Session 11 is complete. Every key is true.",
         "Session 12 is complete. Every key is true.",
-        "Session 13 is activated and incomplete. No key is true.",
+        "Session 13 is activated and incomplete. The implementation matrix is true.",
         "Sessions 14 and 15 have no contract.",
         "",
     ]
@@ -300,7 +301,7 @@ def render_session_evidence() -> str:
             "Session 10 is complete. Every key is true.",
             "Session 11 is complete. Every key is true.",
             "Session 12 is complete. Every key is true.",
-            "Session 13 is activated and incomplete. No key is true.",
+            "Session 13 is activated and incomplete. The implementation matrix is true.",
             "Sessions 14 and 15 have no contract.",
             "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",

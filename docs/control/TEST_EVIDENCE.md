@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-17 — Session 13 implementation matrix recorded
+
+**Verification scope**: live `record-evidence` from revision 98 to 99. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 13, `incomplete`, revision 99, `updated_at` `2026-10-17T14:00:00Z` | PASS |
+| Matrix | `implementation_matrix_recorded` is true. The other five keys stay false | PASS |
+| Gaps | Publish, purchase, and message jobs stay blocked. A03 through A16 stay missing | PASS |
+| Head | `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 13, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 99}`. The matrix proof, the contract pin, the prompt-integrity gate, the Session 12 closure pin, the Session 12 contract and completion proof, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, the telemetry and operator-action unit tests, and the support intake unit tests printed 122 passed in 3.81s.
+
 ## 2026-10-17 — Session 13 activated
 
 **Verification scope**: live `activate` from revision 97 to 98. No live HTTP. Exit 78 stays HELD. `head_sha` does not move. No Session 13 key is earned.

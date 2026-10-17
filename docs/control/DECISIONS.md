@@ -1130,3 +1130,19 @@ Session 12 is complete at revision 97. The Session 13 contract is installed (D-0
 ### Consequences
 
 Session 13 is the active incomplete session. The next honest step is `implementation_matrix_recorded`, earned by classifying the real playbook, job, event, agent, and provider rows. A live credential gap stays blocked. A fail-closed raise stays.
+
+## D-0074 — Session 13 implementation matrix
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 13 is incomplete at revision 98. Every Session 13 key is false. The prompt-integrity addendum requires one of four classifications for each playbook step, job type, event, lifecycle transition, agent, provider action, console view, and runbook. A live credential gap stays blocked. A fail-closed raise stays.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 98 to 99. `updated_at` is `2026-10-17T14:00:00Z`. `implementation_matrix_recorded` is true. The other five Session 13 keys stay false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. The matrix reads the workflow config, the agent registry, the event enums, and the lifecycle tables. Publish, purchase, and message jobs stay `BLOCKED_BY_EXTERNAL_CREDENTIAL`. A03 through A16 stay `MISSING` because the registry raises `AgentNotImplementedError`. The five named runbooks stay `MISSING`. Exit 78 stays HELD.
+
+### Consequences
+
+The matrix is recorded. The next honest step is `synthetic_paths_implemented`, a fixture-backed path. No live provider call is made.

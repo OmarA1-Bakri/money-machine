@@ -78,7 +78,8 @@ def test_live_pointer_records_the_closure_key() -> None:
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
     evidence = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[13]), False)
-    assert live["state_revision"] == 98
+    evidence["implementation_matrix_recorded"] = True
+    assert live["state_revision"] == 99
     assert live["current_session"] == 13
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(13))
