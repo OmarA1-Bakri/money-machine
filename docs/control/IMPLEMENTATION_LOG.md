@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 14 deployment target recorded
+
+`record-evidence` advanced `state_revision` from 105 to 106. `updated_at` is `2026-10-17T15:00:00Z`. `deployment_target_recorded` is true. The other five Session 14 keys stay false. `current_session` stays 14. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. The selector returns `local-wsl` and refuses `new-paid` without an authority record. No host is created. Exit 78 stays HELD. No live provider call is made.
+
 ## 2026-10-17 — Session 14 activated
 
 `activate` advanced `state_revision` from 104 to 105. `updated_at` is `2026-10-17T14:55:00Z`. `current_session` is 14. `session_status` is incomplete. `completed_sessions` stays 0 through 13. `next_session` stays 14. Every Session 14 key is false. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. No live provider call is made. No Session 14 key is earned.

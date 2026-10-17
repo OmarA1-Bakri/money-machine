@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-17 — Session 14 deployment target recorded
+
+**Verification scope**: live `record-evidence` from revision 105 to 106. No live HTTP. No host is created. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 14, `incomplete`, revision 106, `updated_at` `2026-10-17T15:00:00Z` | PASS |
+| Keys | `deployment_target_recorded` is true. The other five Session 14 keys are false | PASS |
+| Selector | `select_deployment_target()` returns `local-wsl` and raises `unapproved_spend` for `new-paid` | PASS |
+| Head | `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 14, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 106}`. The target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 88 passed in 3.59s. `ruff check` and `pyright` on the selector, the Session 14 proof, and `state.py` were clean.
+
 ## 2026-10-17 — Session 14 activated
 
 **Verification scope**: live `activate` from revision 104 to 105. No live HTTP. Exit 78 stays HELD. The exit string is not written.

@@ -1258,3 +1258,19 @@ Session 13 is complete at revision 104. The Session 14 contract is installed (D-
 ### Consequences
 
 Session 14 is the active incomplete session. The next honest step is `deployment_target_recorded`, earned by a selector that returns `local-wsl` and refuses a new paid host. A live deploy stays deferred.
+
+## D-0082 — Session 14 deployment target
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 14 is incomplete at revision 105. Every key is false (D-0081). `docs/architecture/DEPLOYMENT.md` already selects a local and single-server topology and says Exit 78 is not deployment success.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 105 to 106. `updated_at` is `2026-10-17T15:00:00Z`. `deployment_target_recorded` is true. The other five Session 14 keys stay false. `current_session` stays 14. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. `src/money_machine/deploy/target.py` returns `local-wsl` and raises `unapproved_spend` for `new-paid` without an authority record. An approved authority names a paid host and still creates nothing. A live deploy stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+### Consequences
+
+The next honest step is `production_packaging_defined`. The proof checks api, worker, scheduler, web, the postgres volume, and healthchecks, and worker and scheduler restart stay `no`. A passing docker compose config is not the key. A live deploy stays deferred.

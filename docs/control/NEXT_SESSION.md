@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 14 deployment target is recorded (2026-10-17)
+
+Revision 106 is incomplete Session 14. `deployment_target_recorded` is true. The other five Session 14 keys are false. `completed_sessions` stays 0 through 13. `next_session` stays 14. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. The next honest step is `production_packaging_defined`: the proof checks api, worker, scheduler, web, the postgres volume, and healthchecks, and worker and scheduler restart stay `no`. A live deploy stays deferred.
+
 ## Session 14 is activated (2026-10-17)
 
 Revision 105 is incomplete Session 14. Every Session 14 key is false. `completed_sessions` stays 0 through 13. `next_session` stays 14. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. The next honest step is `deployment_target_recorded`: a selector returns `local-wsl` and refuses a new paid host. A live deploy stays deferred.

@@ -548,7 +548,7 @@ def _prove_activated_session_14(
     status: object,
     recorded: set[str],
 ) -> None:
-    """Session 11 stays closed while Session 14 is incomplete and every key is false."""
+    """Session 11 stays closed while Session 14 records only the deployment target."""
     values_are_bool = isinstance(evidence, dict) and all(
         isinstance(value, bool) for value in evidence.values()
     )
@@ -563,6 +563,7 @@ def _prove_activated_session_14(
         or decoded.get("next_session") != 14
         or decoded.get("completed_sessions") != list(range(14))
         or decoded.get("next_prompt") != _SESSION_14_PROMPT
-        or any(value is not False for value in evidence.values())
+        or evidence.get("deployment_target_recorded") is not True
+        or sum(1 for value in evidence.values() if value is True) != 1
     ):
         raise Session11ProofError("control_checkpoint")

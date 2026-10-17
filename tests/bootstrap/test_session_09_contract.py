@@ -74,10 +74,10 @@ def test_session_09_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_is_incomplete_session_10() -> None:
-    """Session 09 stays closed. Session 14 is activated and every key is false."""
+    """Session 09 stays closed. Session 14 records only the deployment target."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 105
+    assert live["state_revision"] == 106
     assert live["current_session"] == 14
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(14))
@@ -86,7 +86,8 @@ def test_live_pointer_is_incomplete_session_10() -> None:
     assert live["head_sha"] == "fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a"
     evidence = live["required_completion_evidence"]
     assert set(evidence) == set(SESSION_EVIDENCE_KEYS[14])
-    assert not any(evidence.values())
+    assert evidence["deployment_target_recorded"] is True
+    assert sum(1 for value in evidence.values() if value is True) == 1
     assert "SESSION_09_ETSY_PUBLISHING_COMPLETE" not in text
 
 
