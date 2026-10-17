@@ -6,10 +6,10 @@ pointer separately. Sessions 08, 09, and 10 are complete. Session 10 is
 revision 83 and every one of its keys is true (D-0055). Session 11 is
 complete at revision 90. Every Session 11 key is true (D-0063). Session 12
 is complete at revision 97. Every Session 12 key is true (D-0071).
-Session 13 is activated and incomplete at revision 102. The implementation
-matrix, the synthetic paths, the failure injections, and the backup fixture
-are recorded (D-0074, D-0075, D-0076, D-0077). The other two Session 13
-keys are false.
+Session 13 is activated and incomplete at revision 103. The implementation
+matrix, the synthetic paths, the failure injections, the backup fixture, and
+the control-file checkpoint are recorded (D-0074, D-0075, D-0076, D-0077,
+D-0078). The closure key is false.
 Sessions 14 and 15 have no contract.
 This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
@@ -214,8 +214,8 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
         ),
         (
             "The implementation matrix, the synthetic paths, the failure "
-            "injections, and the backup fixture are recorded. The control-file "
-            "checkpoint is not recorded."
+            "injections, the backup fixture, and the control-file checkpoint "
+            "are recorded. The closure key is not recorded."
         ),
         True,
         frozenset(
@@ -224,6 +224,7 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
                 "synthetic_paths_implemented",
                 "failure_injection_implemented",
                 "backup_restore_fixture_implemented",
+                "control_files_and_checkpoint_current",
             }
         ),
     ),
@@ -262,10 +263,11 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 13 at state revision 102.",
+        "The checked-in pointer is Session 13 at state revision 103.",
         "`current_session` is 13. `session_status` is incomplete.",
-        "The matrix, synthetic paths, failure injections, and backup fixture are true.",
-        "The other two Session 13 keys are false.",
+        "The matrix, synthetic paths, failure injections, backup fixture, and",
+        "control-file checkpoint are true.",
+        "The closure key is false.",
         "Session 10 is complete and every one of its keys is true.",
         "Session 09 is complete and every one of its keys is true.",
         "Session 08 is complete and every one of its keys is true.",
@@ -277,7 +279,8 @@ def render_session_evidence() -> str:
         "Session 11 is complete. Every key is true.",
         "Session 12 is complete. Every key is true.",
         "Session 13 is activated and incomplete.",
-        "The matrix, synthetic paths, failure injections, and the backup fixture are true.",
+        "The matrix, synthetic paths, failure injections, backup fixture, and",
+        "control-file checkpoint are true.",
         "Sessions 14 and 15 have no contract.",
         "",
     ]
@@ -319,7 +322,8 @@ def render_session_evidence() -> str:
             "Session 11 is complete. Every key is true.",
             "Session 12 is complete. Every key is true.",
             "Session 13 is activated and incomplete.",
-            "The matrix, synthetic paths, failure injections, and the backup fixture are true.",
+            "The matrix, synthetic paths, failure injections, backup fixture, and",
+            "control-file checkpoint are true.",
             "Sessions 14 and 15 have no contract.",
             "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",

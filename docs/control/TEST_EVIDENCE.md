@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-17 — Session 13 control files recorded
+
+**Verification scope**: live `record-evidence` from revision 102 to 103. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 13, `incomplete`, revision 103, `updated_at` `2026-10-17T14:35:00Z` | PASS |
+| Control files | `control_files_and_checkpoint_current` is true. The matrix, synthetic paths, failure injections, and backup fixture stay true. The closure key stays false | PASS |
+| Catalogue | `SESSION_EVIDENCE.md` equals `render_session_evidence()` | PASS |
+| Head | `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 13, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 103}`. The backup tests, the failure-injection tests, the synthetic path tests, the matrix proof, the contract pin, the prompt-integrity gate, the Session 12 closure pin, the Session 12 contract, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, the telemetry and operator-action unit tests, and the support intake unit tests printed 137 passed in 3.80s.
+
 ## 2026-10-17 — Session 13 backup fixture recorded
 
 **Verification scope**: live `record-evidence` from revision 101 to 102. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.

@@ -1194,3 +1194,19 @@ Session 13 is incomplete at revision 98. Every Session 13 key is false. The prom
 ### Consequences
 
 The matrix is recorded. The next honest step is `synthetic_paths_implemented`, a fixture-backed path. No live provider call is made.
+
+## D-0078 — Session 13 control files
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 13 is incomplete at revision 102. The matrix, the synthetic paths, the failure injections, and the backup fixture are true. `control_files_and_checkpoint_current` and `evidence_closure_commit_recorded` are false. The control-file proof already checks the five continuity files, the rendered catalogue, and the incomplete Session 13 pointer. The closure key stays false.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 102 to 103. `updated_at` is `2026-10-17T14:35:00Z`. `control_files_and_checkpoint_current` is true. The matrix, the synthetic paths, the failure injections, and the backup fixture stay true. `evidence_closure_commit_recorded` stays false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. The catalogue matches `render_session_evidence()`. Exit 78 stays HELD.
+
+### Consequences
+
+The control-file checkpoint is recorded. The closure key is not recorded. The next honest step is `evidence_closure_commit_recorded`, through `apply-completion`. That commit must contain the proof and the pre-transition state. `head_sha` does not move in this decision.

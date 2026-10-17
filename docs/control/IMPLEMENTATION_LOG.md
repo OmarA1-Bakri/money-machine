@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 13 control files recorded
+
+`record-evidence` advanced `state_revision` from 102 to 103. `updated_at` is `2026-10-17T14:35:00Z`. The matrix, the synthetic paths, the failure injections, the backup fixture, and `control_files_and_checkpoint_current` are true. The closure key stays false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. The five continuity files are present. The catalogue matches the rendered index. Exit 78 stays HELD.
+
 ## 2026-10-17 — Session 13 backup fixture recorded
 
 `record-evidence` advanced `state_revision` from 101 to 102. `updated_at` is `2026-10-17T14:30:00Z`. The matrix, the synthetic paths, the failure injections, and `backup_restore_fixture_implemented` are true. The control-file key and the closure key stay false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. The snapshot restores a workflow, a job, a product, a draft listing, and an incident. A second restore does not duplicate them. A PostgreSQL backup is refused. Exit 78 stays HELD.

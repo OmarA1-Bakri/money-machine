@@ -1557,7 +1557,8 @@ def validate_session_13_evidence_record(previous: ControlState, current: Control
     """Record the Session 13 keys the fixture proof has earned. The session stays incomplete.
 
     The proof earns the implementation matrix, the synthetic paths, the failure
-    injections, and the backup fixture. The closure key stays false.
+    injections, the backup fixture, and the control-file checkpoint. The closure
+    key stays false.
     """
     if previous["current_session"] != 13 or current["current_session"] != 13:
         raise ControlStateError("unsupported evidence record: only session 13 can record this key")

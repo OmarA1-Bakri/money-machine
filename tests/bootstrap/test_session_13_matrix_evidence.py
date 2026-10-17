@@ -103,13 +103,3 @@ def test_record_accepts_the_matrix_key_and_refuses_the_closure_key() -> None:
     closure["required_completion_evidence"] = evidence
     with pytest.raises(ControlStateError, match="closure key stays false"):
         validate_session_13_evidence_record(previous, closure)
-
-
-def test_record_refuses_a_second_unearned_key() -> None:
-    previous = _previous()
-    current = _earned(previous)
-    evidence = dict(current["required_completion_evidence"])
-    evidence["control_files_and_checkpoint_current"] = True
-    current["required_completion_evidence"] = evidence
-    with pytest.raises(ControlStateError, match="exactly the keys the fixture proof earned"):
-        validate_session_13_evidence_record(previous, current)

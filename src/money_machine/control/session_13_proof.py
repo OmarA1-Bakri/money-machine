@@ -1,8 +1,9 @@
-"""Earn the Session 13 matrix, path, failure, and backup keys.
+"""Earn the Session 13 matrix, path, failure, backup, and control-file keys.
 
 The proof reads the matrix, runs the fixture paths, runs each named failure
-injection, restores the fixture snapshot twice, refuses a live publish, and
-does not open a socket. The other Session 13 keys stay unearned.
+injection, restores the fixture snapshot twice, checks the continuity files,
+refuses a live publish, and does not open a socket. The closure key stays
+unearned.
 """
 
 from __future__ import annotations
@@ -47,6 +48,7 @@ MATRIX_EVIDENCE_KEY = "implementation_matrix_recorded"
 SYNTHETIC_EVIDENCE_KEY = "synthetic_paths_implemented"
 FAILURE_EVIDENCE_KEY = "failure_injection_implemented"
 BACKUP_EVIDENCE_KEY = "backup_restore_fixture_implemented"
+CONTROL_EVIDENCE_KEY = "control_files_and_checkpoint_current"
 _CLOSURE_EVIDENCE_KEY = "evidence_closure_commit_recorded"
 EARNED_EVIDENCE_KEYS = frozenset(
     {
@@ -54,6 +56,7 @@ EARNED_EVIDENCE_KEYS = frozenset(
         SYNTHETIC_EVIDENCE_KEY,
         FAILURE_EVIDENCE_KEY,
         BACKUP_EVIDENCE_KEY,
+        CONTROL_EVIDENCE_KEY,
     }
 )
 _FAILURE_RESULTS = {
@@ -94,7 +97,7 @@ _SESSION_13_KEYS = frozenset(
         "synthetic_paths_implemented",
         "failure_injection_implemented",
         "backup_restore_fixture_implemented",
-        "control_files_and_checkpoint_current",
+        CONTROL_EVIDENCE_KEY,
         _CLOSURE_EVIDENCE_KEY,
     }
 )

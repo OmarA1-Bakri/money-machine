@@ -74,7 +74,8 @@ def test_live_pointer_is_the_session_12_activation() -> None:
     expected["synthetic_paths_implemented"] = True
     expected["failure_injection_implemented"] = True
     expected["backup_restore_fixture_implemented"] = True
-    assert live["state_revision"] == 102
+    expected["control_files_and_checkpoint_current"] = True
+    assert live["state_revision"] == 103
     assert live["current_session"] == 13
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(13))
