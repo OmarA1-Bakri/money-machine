@@ -975,6 +975,12 @@ def _require_session_10_closure_proof(root: Path, sha: str) -> None:
         raise ControlStateError("closure commit does not contain the session 10 proof")
 
 
+def _require_session_11_closure_proof(root: Path, sha: str) -> None:
+    proof = _git(root, "show", f"{sha}:src/money_machine/control/session_11_proof.py").stdout
+    if "def prove_session_11" not in proof:
+        raise ControlStateError("closure commit does not contain the session 11 proof")
+
+
 def _verify_completion_repository(
     state_path: Path,
     previous: ControlState,
@@ -993,6 +999,8 @@ def _verify_completion_repository(
         _require_session_09_closure_proof(repo_root, closure)
     if previous["current_session"] == 10:
         _require_session_10_closure_proof(repo_root, closure)
+    if previous["current_session"] == 11:
+        _require_session_11_closure_proof(repo_root, closure)
 
 
 def _verify_activation_repository(
@@ -1360,7 +1368,8 @@ def _verify_session_10_evidence_repository(
 def validate_session_11_evidence_record(previous: ControlState, current: ControlState) -> None:
     """Record the Session 11 keys the fixture proof has earned. The session stays incomplete.
 
-    The proof earns the intake, routing, repair, draft, and control keys. The closure key stays false.
+    The proof earns the intake, routing, repair, draft, and control keys.
+    The closure key stays false.
     """
     if previous["current_session"] != 11 or current["current_session"] != 11:
         raise ControlStateError("unsupported evidence record: only session 11 can record this key")
