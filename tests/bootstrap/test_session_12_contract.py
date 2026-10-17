@@ -75,7 +75,8 @@ def test_live_pointer_is_the_session_12_activation() -> None:
     expected["standing_authority_recorded"] = True
     expected["linked_workflow_fixture"] = True
     expected["acceptance_matrix_recorded"] = True
-    assert live["state_revision"] == 117
+    expected["control_files_and_checkpoint_current"] = True
+    assert live["state_revision"] == 118
     assert live["current_session"] == 15
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(15))

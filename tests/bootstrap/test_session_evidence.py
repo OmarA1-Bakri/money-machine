@@ -61,7 +61,7 @@ def test_live_pointer_is_incomplete_session_14() -> None:
     live = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert live["current_session"] == 15
     assert live["session_status"] == "incomplete"
-    assert live["state_revision"] == 117
+    assert live["state_revision"] == 118
     assert live["completed_sessions"] == list(range(15))
     assert live["next_session"] == 15
     assert live["next_prompt"] == SESSION_PROMPTS[15]
@@ -75,6 +75,7 @@ def test_live_pointer_is_incomplete_session_14() -> None:
     expected["standing_authority_recorded"] = True
     expected["linked_workflow_fixture"] = True
     expected["acceptance_matrix_recorded"] = True
+    expected["control_files_and_checkpoint_current"] = True
     assert evidence == expected
 
 
@@ -112,6 +113,7 @@ def test_open_sessions_have_no_recorded_true_key() -> None:
             assert record.true_keys == frozenset(
                 {
                     "acceptance_matrix_recorded",
+                    "control_files_and_checkpoint_current",
                     "deployed_state_checked",
                     "linked_workflow_fixture",
                     "provider_connections_fail_closed",

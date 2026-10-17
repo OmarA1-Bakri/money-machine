@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 15 continuity files are recorded (2026-10-17)
+
+Revision 118 is incomplete Session 15. `deployed_state_checked`, `provider_connections_fail_closed`, `standing_authority_recorded`, `linked_workflow_fixture`, `acceptance_matrix_recorded`, and `control_files_and_checkpoint_current` are true. `evidence_closure_commit_recorded` is false. `completed_sessions` stays 0 through 14. `next_session` stays 15. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Exit 78 stays HELD. The next honest step is `evidence_closure_commit_recorded`. A live account stays deferred.
+
 ## Session 15 acceptance matrix is recorded (2026-10-17)
 
 Revision 117 is incomplete Session 15. `deployed_state_checked`, `provider_connections_fail_closed`, `standing_authority_recorded`, `linked_workflow_fixture`, and `acceptance_matrix_recorded` are true. The other two Session 15 keys are false. `completed_sessions` stays 0 through 14. `next_session` stays 15. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Exit 78 stays HELD. The next honest step is `control_files_and_checkpoint_current`. A live account stays deferred.

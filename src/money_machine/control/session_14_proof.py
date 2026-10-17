@@ -47,11 +47,12 @@ EARNED_EVIDENCE_KEYS = frozenset(
     }
 )
 _CLOSURE_HEAD = "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
-_POINTER_REVISION = 117
-_UPDATED_AT = "2026-10-17T16:35:00Z"
+_POINTER_REVISION = 118
+_UPDATED_AT = "2026-10-17T16:45:00Z"
 _TRUE_KEYS: frozenset[str] = frozenset(
     {
         "acceptance_matrix_recorded",
+        "control_files_and_checkpoint_current",
         "deployed_state_checked",
         "linked_workflow_fixture",
         "provider_connections_fail_closed",

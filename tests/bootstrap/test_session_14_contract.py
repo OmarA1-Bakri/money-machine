@@ -73,10 +73,10 @@ def test_live_pointer_is_incomplete_session_14() -> None:
     """Session 14 stays closed. Session 15 is activated and every key is false."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 117
+    assert live["state_revision"] == 118
     assert live["current_session"] == 15
     assert live["session_status"] == "incomplete"
-    assert live["updated_at"] == "2026-10-17T16:35:00Z"
+    assert live["updated_at"] == "2026-10-17T16:45:00Z"
     assert live["next_session"] == 15
     assert live["next_prompt"] == SESSION_PROMPTS[15]
     assert live["head_sha"] == "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
@@ -87,7 +87,8 @@ def test_live_pointer_is_incomplete_session_14() -> None:
     assert evidence["standing_authority_recorded"] is True
     assert evidence["linked_workflow_fixture"] is True
     assert evidence["acceptance_matrix_recorded"] is True
-    assert sum(1 for value in evidence.values() if value) == 5
+    assert evidence["control_files_and_checkpoint_current"] is True
+    assert sum(1 for value in evidence.values() if value) == 6
     assert "SESSION_14_PRODUCTION_DEPLOYMENT_COMPLETE" not in text
 
 

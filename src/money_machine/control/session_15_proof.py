@@ -1,9 +1,9 @@
 """Earn the Session 15 deployed-state, provider, authority, and workflow keys.
 
 The proof calls the deployed-state check, the fixture provider selector, the
-standing-authority check, the linked workflow, and the acceptance matrix.
-The workflow stops at preflight. A live matrix item stays blocked. A failure
-is not a pass. The closure key stays false.
+standing-authority check, the linked workflow, the acceptance matrix, and the
+continuity check. The workflow stops at preflight. A live matrix item stays
+blocked. A failure is not a pass. The closure key stays false.
 """
 
 from __future__ import annotations
@@ -32,6 +32,11 @@ from money_machine.config.standing_authority import (
     record_standing_authority,
 )
 from money_machine.deploy.checkpoint import CheckpointRefusal
+from money_machine.deploy.continuity import (
+    ContinuityRefusal,
+    record_control_checkpoint,
+    refuse_commissioning_page,
+)
 from money_machine.deploy.deployed_state import DeployedStateRefusal, check_deployed_state
 from money_machine.domain.enums import AutonomyMode
 from money_machine.integrations.provider_connections import (
@@ -44,6 +49,7 @@ PROVIDER_CONNECTIONS_KEY = "provider_connections_fail_closed"
 STANDING_AUTHORITY_KEY = "standing_authority_recorded"
 LINKED_WORKFLOW_KEY = "linked_workflow_fixture"
 ACCEPTANCE_MATRIX_KEY = "acceptance_matrix_recorded"
+CONTROL_FILES_KEY = "control_files_and_checkpoint_current"
 EARNED_EVIDENCE_KEYS = frozenset(
     {
         DEPLOYED_STATE_KEY,
@@ -51,11 +57,12 @@ EARNED_EVIDENCE_KEYS = frozenset(
         STANDING_AUTHORITY_KEY,
         LINKED_WORKFLOW_KEY,
         ACCEPTANCE_MATRIX_KEY,
+        CONTROL_FILES_KEY,
     }
 )
 _CLOSURE_HEAD = "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
-_POINTER_REVISION = 117
-_UPDATED_AT = "2026-10-17T16:35:00Z"
+_POINTER_REVISION = 118
+_UPDATED_AT = "2026-10-17T16:45:00Z"
 _TRUE_KEYS: frozenset[str] = frozenset(
     {
         DEPLOYED_STATE_KEY,
@@ -63,6 +70,7 @@ _TRUE_KEYS: frozenset[str] = frozenset(
         STANDING_AUTHORITY_KEY,
         LINKED_WORKFLOW_KEY,
         ACCEPTANCE_MATRIX_KEY,
+        CONTROL_FILES_KEY,
     }
 )
 _MODULE = Path(__file__).resolve().parents[1] / "deploy" / "deployed_state.py"
@@ -70,6 +78,7 @@ _CONNECTIONS = Path(__file__).resolve().parents[1] / "integrations" / "provider_
 _AUTHORITY = Path(__file__).resolve().parents[1] / "config" / "standing_authority.py"
 _WORKFLOW = Path(__file__).resolve().parents[1] / "assets" / "linked_workflow.py"
 _MATRIX = Path(__file__).resolve().parents[1] / "assets" / "acceptance_matrix.py"
+_CONTINUITY = Path(__file__).resolve().parents[1] / "deploy" / "continuity.py"
 _WORKER = Path("src/money_machine/orchestration/worker.py")
 _SCHEDULER = Path("src/money_machine/orchestration/scheduler.py")
 
@@ -89,6 +98,7 @@ def prove_session_15() -> frozenset[str]:
     _prove_standing_authority()
     _prove_linked_workflow()
     _prove_acceptance_matrix()
+    _prove_control_files()
     return EARNED_EVIDENCE_KEYS
 
 
@@ -327,6 +337,42 @@ def _prove_acceptance_matrix() -> None:
     try:
         accept_page(recorded.handover)
     except AcceptanceMatrixRefusal as error:
+        if error.code != "page":
+            raise Session15ProofError("page") from error
+    else:
+        raise Session15ProofError("page")
+
+
+def _prove_control_files() -> None:
+    """The six continuity files cite the pointer. A page does not earn the key."""
+    _refuse_network(_CONTINUITY)
+    root = Path(__file__).resolve().parents[3]
+    before = {relative: (root / relative).read_bytes() for relative in (_WORKER, _SCHEDULER)}
+    try:
+        recorded = record_control_checkpoint(
+            expected_revision=_POINTER_REVISION,
+            expected_updated_at=_UPDATED_AT,
+            expected_true_keys=_TRUE_KEYS,
+            closure_head=_CLOSURE_HEAD,
+        )
+    except ContinuityRefusal as error:
+        raise Session15ProofError(error.code) from error
+    if {relative: (root / relative).read_bytes() for relative in before} != before:
+        raise Session15ProofError("sources_edited")
+    if (
+        recorded.revision != _POINTER_REVISION
+        or recorded.updated_at != _UPDATED_AT
+        or recorded.head_sha != _CLOSURE_HEAD
+        or recorded.true_keys != tuple(sorted(_TRUE_KEYS))
+        or recorded.closure_recorded is not False
+        or recorded.exit_string_present is not False
+        or "evidence_closure_commit_recorded" in recorded.true_keys
+        or len(recorded.files_read) != 6
+    ):
+        raise Session15ProofError("control_checkpoint")
+    try:
+        refuse_commissioning_page(recorded.updated_at)
+    except ContinuityRefusal as error:
         if error.code != "page":
             raise Session15ProofError("page") from error
     else:
