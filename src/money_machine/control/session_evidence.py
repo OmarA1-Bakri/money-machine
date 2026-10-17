@@ -3,9 +3,9 @@
 Sessions 00-06 closed with every contract key true. Session 07's close
 commit under D-0032 has every contract key false. D-0036 records the live
 pointer separately. Session 08 is complete at revision 69. Session 09 is
-activated and incomplete at revision 73. Preflight, the publishing ramp, and
-the mutation receipt are the true keys (D-0041, D-0042, D-0043). Sessions 10-15
-have no contract. This module
+activated and incomplete at revision 74. Preflight, the publishing ramp, the
+mutation receipt, and the fixture draft are the true keys (D-0041 through
+D-0044). Sessions 10-15 have no contract. This module
 does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
@@ -141,14 +141,16 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
             "src/money_machine/assets/etsy_preflight.py",
             "src/money_machine/assets/publishing_ramp_decision.py",
             "src/money_machine/assets/mutation_receipt.py",
+            "src/money_machine/integrations/etsy/draft_client.py",
         ),
-        "Preflight, the ramp, and the receipt are recorded. The other keys are not.",
+        "Preflight, the ramp, the receipt, and the draft are recorded. The other keys are not.",
         True,
         frozenset(
             {
                 "etsy_preflight_implemented",
                 "publishing_ramp_implemented",
                 "mutation_receipt_implemented",
+                "fixture_draft_package_implemented",
             }
         ),
     ),
@@ -202,9 +204,9 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 09 at state revision 73.",
+        "The checked-in pointer is Session 09 at state revision 74.",
         "`current_session` is 9. `session_status` is incomplete.",
-        "Preflight, the ramp, and the receipt are true. The other Session 09 keys are false.",
+        "Preflight, the ramp, the receipt, and the draft are true. The other keys are false.",
         "Session 08 is complete and every one of its keys is true.",
         "Sessions 00-06 closed with every contract key true.",
         "Session 07's close commit keeps every contract key false under D-0032.",

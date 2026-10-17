@@ -61,7 +61,7 @@ def test_live_pointer_is_incomplete_session_09() -> None:
     live = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert live["current_session"] == 9
     assert live["session_status"] == "incomplete"
-    assert live["state_revision"] == 73
+    assert live["state_revision"] == 74
     assert live["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8]
     assert live["next_session"] == 9
     assert live["next_prompt"] == SESSION_PROMPTS[9]
@@ -73,6 +73,7 @@ def test_live_pointer_is_incomplete_session_09() -> None:
     expected["etsy_preflight_implemented"] = True
     expected["publishing_ramp_implemented"] = True
     expected["mutation_receipt_implemented"] = True
+    expected["fixture_draft_package_implemented"] = True
     assert evidence == expected
 
 
@@ -86,6 +87,7 @@ def test_open_sessions_have_no_recorded_true_key() -> None:
                     "etsy_preflight_implemented",
                     "publishing_ramp_implemented",
                     "mutation_receipt_implemented",
+                    "fixture_draft_package_implemented",
                 }
             )
         else:

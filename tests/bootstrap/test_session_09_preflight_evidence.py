@@ -11,6 +11,7 @@ from typing import cast
 import pytest
 
 from money_machine.control.session_09_proof import (
+    DRAFT_EVIDENCE_KEY,
     EARNED_EVIDENCE_KEYS,
     PREFLIGHT_EVIDENCE_KEY,
     RAMP_EVIDENCE_KEY,
@@ -60,6 +61,7 @@ def _earned(previous: ControlState) -> ControlState:
     evidence[PREFLIGHT_EVIDENCE_KEY] = True
     evidence[RAMP_EVIDENCE_KEY] = True
     evidence[RECEIPT_EVIDENCE_KEY] = True
+    evidence[DRAFT_EVIDENCE_KEY] = True
     current["required_completion_evidence"] = evidence
     return current
 
@@ -68,11 +70,11 @@ def _write(path: Path, state: ControlState) -> None:
     path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
 
 
-def test_proof_earns_preflight_ramp_and_receipt() -> None:
+def test_proof_earns_preflight_ramp_receipt_and_draft() -> None:
     assert prove_session_09() == EARNED_EVIDENCE_KEYS
 
 
-def test_preflight_ramp_and_receipt_are_the_accepted_record() -> None:
+def test_preflight_ramp_receipt_and_draft_are_the_accepted_record() -> None:
     previous = _false_pointer()
     validate_session_09_evidence_record(previous, _earned(previous))
 
@@ -88,11 +90,11 @@ def test_preflight_without_the_ramp_is_refused() -> None:
         validate_session_09_evidence_record(previous, current)
 
 
-def test_the_fixture_draft_key_is_refused() -> None:
+def test_the_control_file_key_is_refused() -> None:
     previous = _false_pointer()
     current = _earned(previous)
     evidence = dict(current["required_completion_evidence"])
-    evidence["fixture_draft_package_implemented"] = True
+    evidence["control_files_and_checkpoint_current"] = True
     current["required_completion_evidence"] = evidence
 
     with pytest.raises(ControlStateError, match="exactly the keys the fixture proof earned"):
@@ -152,6 +154,7 @@ def test_apply_records_the_preflight_key_without_touching_the_live_file(tmp_path
     assert evidence[PREFLIGHT_EVIDENCE_KEY] is True
     assert evidence[RAMP_EVIDENCE_KEY] is True
     assert evidence[RECEIPT_EVIDENCE_KEY] is True
+    assert evidence[DRAFT_EVIDENCE_KEY] is True
     assert evidence["evidence_closure_commit_recorded"] is False
-    assert evidence["fixture_draft_package_implemented"] is False
+    assert evidence["control_files_and_checkpoint_current"] is False
     assert STATE_PATH.read_bytes() == live_bytes

@@ -1,8 +1,8 @@
 # Session evidence
 
-The checked-in pointer is Session 09 at state revision 73.
+The checked-in pointer is Session 09 at state revision 74.
 `current_session` is 9. `session_status` is incomplete.
-Preflight, the ramp, and the receipt are true. The other Session 09 keys are false.
+Preflight, the ramp, the receipt, and the draft are true. The other keys are false.
 Session 08 is complete and every one of its keys is true.
 Sessions 00-06 closed with every contract key true.
 Session 07's close commit keeps every contract key false under D-0032.
@@ -236,20 +236,21 @@ A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 Prompt: `12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md`.
 Status: incomplete.
 Evidence contract: installed.
-Preflight, the ramp, and the receipt are recorded. The other keys are not.
+Preflight, the ramp, the receipt, and the draft are recorded. The other keys are not.
 
 Fixture paths:
 
 - `src/money_machine/assets/etsy_preflight.py`
 - `src/money_machine/assets/publishing_ramp_decision.py`
 - `src/money_machine/assets/mutation_receipt.py`
+- `src/money_machine/integrations/etsy/draft_client.py`
 
 | Key | Recorded |
 |---|---|
 | `control_files_and_checkpoint_current` | false |
 | `etsy_preflight_implemented` | true |
 | `evidence_closure_commit_recorded` | false |
-| `fixture_draft_package_implemented` | false |
+| `fixture_draft_package_implemented` | true |
 | `mutation_receipt_implemented` | true |
 | `publishing_ramp_implemented` | true |
 

@@ -1187,9 +1187,9 @@ def apply_session_08_evidence_record_transition(
 def validate_session_09_evidence_record(previous: ControlState, current: ControlState) -> None:
     """Record the Session 09 keys the fixture proof has earned. The session stays incomplete.
 
-    The proof earns preflight, the publishing ramp, and the mutation receipt. Keys it has not
-    earned stay false,
-    including the closure key. The closure commit does not move.
+    The proof earns preflight, the publishing ramp, the mutation receipt, and the fixture
+    draft package. Keys it has not earned stay false, including the closure key. The closure
+    commit does not move.
     """
     if previous["current_session"] != 9 or current["current_session"] != 9:
         raise ControlStateError("unsupported evidence record: only session 09 can record this key")

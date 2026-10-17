@@ -1,4 +1,4 @@
-"""Earn Session 09 preflight, ramp, and receipt keys from in-memory fixtures.
+"""Earn Session 09 preflight, ramp, receipt, and draft keys from fixtures.
 
 The proof does not open a socket, publish a listing, read the ramp file,
 or commission an agent.
@@ -6,7 +6,11 @@ or commission an agent.
 
 from __future__ import annotations
 
+import tempfile
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from uuid import UUID
 
 from money_machine.assets.etsy_preflight import (
     EtsyPreflightDraft,
@@ -26,11 +30,25 @@ from money_machine.assets.mutation_receipt import (
 from money_machine.assets.publishing_ramp_decision import decide_publishing_ramp
 from money_machine.domain.enums import BranchOutcome
 from money_machine.domain.models.listings import PreflightResult
+from money_machine.integrations.etsy.draft_client import (
+    DraftLedger,
+    DraftSpec,
+    EtsyDraftClient,
+    EtsyDraftRefused,
+    FixtureCall,
+    draft_marker,
+    fixture_hash,
+)
 
 PREFLIGHT_EVIDENCE_KEY = "etsy_preflight_implemented"
 RAMP_EVIDENCE_KEY = "publishing_ramp_implemented"
 RECEIPT_EVIDENCE_KEY = "mutation_receipt_implemented"
-EARNED_EVIDENCE_KEYS = frozenset({PREFLIGHT_EVIDENCE_KEY, RAMP_EVIDENCE_KEY, RECEIPT_EVIDENCE_KEY})
+DRAFT_EVIDENCE_KEY = "fixture_draft_package_implemented"
+EARNED_EVIDENCE_KEYS = frozenset(
+    {PREFLIGHT_EVIDENCE_KEY, RAMP_EVIDENCE_KEY, RECEIPT_EVIDENCE_KEY, DRAFT_EVIDENCE_KEY}
+)
+_PRODUCT = UUID("00000000-0000-4000-8000-0000000000a8")
+_LISTINGS = "/v3/application/shops/123456/listings"
 _OLDEST = datetime(2026, 10, 9, 15, 30, tzinfo=UTC)
 _TAGS = tuple(f"tag {number}" for number in range(1, 14))
 _IMAGES = (
@@ -72,6 +90,7 @@ def prove_session_09() -> frozenset[str]:
         raise Session09ProofError("preflight_block")
     _prove_ramp()
     _prove_receipt()
+    _prove_draft_package()
     return EARNED_EVIDENCE_KEYS
 
 
@@ -245,6 +264,127 @@ def _listing_mutation(key: str) -> ListingMutation:
         pre_state="absent",
         expected_post_state="draft",
         idempotency_key=key,
+    )
+
+
+class _DraftShop:
+    """In-memory shop. It records calls and does not open a socket."""
+
+    def __init__(self, listings: list[dict[str, object]] | None = None) -> None:
+        self.listings = [] if listings is None else list(listings)
+        self.calls: list[FixtureCall] = []
+        self.posts = 0
+
+    def exchange(self, call: FixtureCall) -> Mapping[str, object]:
+        self.calls.append(call)
+        if call.method == "GET":
+            state = dict(call.query).get("state", "active")
+            matched = [row for row in self.listings if row.get("state") == state]
+            return {"count": len(matched), "results": matched}
+        if call.method != "POST" or call.body is None:
+            raise Session09ProofError("draft_method")
+        fields = dict(call.body)
+        self.posts += 1
+        row: dict[str, object] = {
+            "listing_id": 5000 + self.posts,
+            "title": fields["title"],
+            "description": fields["description"],
+            "state": "draft",
+        }
+        self.listings.append(row)
+        return row
+
+
+class _ActiveShop:
+    """Returns one active row on every read. A post is a proof failure."""
+
+    def __init__(self, row: dict[str, object]) -> None:
+        self.row = row
+        self.posts = 0
+
+    def exchange(self, call: FixtureCall) -> Mapping[str, object]:
+        if call.method == "GET":
+            return {"count": 1, "results": [self.row]}
+        self.posts += 1
+        raise Session09ProofError("draft_active_post")
+
+
+def _prove_draft_package() -> None:
+    public = {name for name in dir(EtsyDraftClient) if not name.startswith("_")}
+    if {"publish", "activate", "update_listing"} & public or "create_draft" not in public:
+        raise Session09ProofError("draft_publish_method")
+    with tempfile.TemporaryDirectory() as directory:
+        shop = _DraftShop()
+        client = EtsyDraftClient(shop, DraftLedger(Path(directory)))
+        spec = _draft_spec()
+        receipt = client.create_draft(spec)
+        marker = draft_marker(spec.spec_version, fixture_hash(spec))
+        if receipt.state != "draft" or receipt.ready is not True:
+            raise Session09ProofError("draft_package")
+        if receipt.marker != marker or shop.posts != 1:
+            raise Session09ProofError("draft_package")
+        posts = [call for call in shop.calls if call.method == "POST"]
+        gets = [call for call in shop.calls if call.method == "GET"]
+        if len(posts) != 1 or len(gets) != 2 or posts[0].body is None:
+            raise Session09ProofError("draft_package")
+        fields = dict(posts[0].body)
+        if "state" in fields or fields.get("type") != "download":
+            raise Session09ProofError("draft_package")
+        if not str(fields.get("description", "")).endswith(marker):
+            raise Session09ProofError("draft_package")
+        calls = len(shop.calls)
+        again = client.create_draft(spec)
+        if again.listing_id != receipt.listing_id or shop.posts != 1 or len(shop.calls) != calls:
+            raise Session09ProofError("draft_retry")
+        active = _ActiveShop(
+            {
+                "listing_id": 9,
+                "title": spec.title,
+                "description": f"{spec.description}\n{marker}",
+                "state": "active",
+            }
+        )
+        try:
+            EtsyDraftClient(active, DraftLedger(Path(directory) / "active")).create_draft(spec)
+        except EtsyDraftRefused as error:
+            if error.code != "active" or active.posts != 0:
+                raise Session09ProofError("draft_active") from error
+        else:
+            raise Session09ProofError("draft_active")
+        blocked = _DraftShop()
+        try:
+            EtsyDraftClient(blocked, DraftLedger(Path(directory) / "blocked")).exchange(
+                "PATCH",
+                _LISTINGS,
+                (),
+                (("state", "active"),),
+            )
+        except EtsyDraftRefused as error:
+            if error.code != "off_list" or blocked.calls:
+                raise Session09ProofError("draft_off_list") from error
+        else:
+            raise Session09ProofError("draft_off_list")
+        try:
+            EtsyDraftClient(None, DraftLedger(Path(directory) / "bare")).create_draft(spec)
+        except EtsyDraftRefused as error:
+            if error.code != "fixture_transport":
+                raise Session09ProofError("draft_transport") from error
+        else:
+            raise Session09ProofError("draft_transport")
+
+
+def _draft_spec() -> DraftSpec:
+    return DraftSpec(
+        product_id=_PRODUCT,
+        spec_version=2,
+        shop_id=123456,
+        title="Fixture planner",
+        description="A fixture description.",
+        price="11.00",
+        quantity=999,
+        who_made="i_did",
+        when_made="2020_2026",
+        taxonomy_id=1,
     )
 
 

@@ -623,3 +623,19 @@ Revision 72 has preflight and the ramp true. The other Session 09 keys are false
 ### Consequences
 
 Revision 73 records the receipt key true. The fixture draft package, the control-file key, and the closure key stay false.
+
+## D-0044 — Session 09 fixture draft package is the fourth earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Revision 73 has preflight, the ramp, and the receipt true. The fixture draft package, the control-file key, and the closure key are false. `EtsyDraftClient` already creates one draft through `FixtureTransport`. It has no publish method. The successor and the dispatcher stay as they are.
+
+### Decision
+
+`prove_session_09()` also earns `fixture_draft_package_implemented`. The proof requires a ready draft receipt whose state is `draft`, one create, a retry that posts nothing more, an active listing with the marker refused before a post, a `PATCH` that would set `state=active` refused before the transport, and a missing transport refused. `record-evidence` then requires the true keys to be exactly preflight, the ramp, the receipt, and the fixture draft. The closure key stays false. `head_sha` does not move. Live publish stays deferred.
+
+### Consequences
+
+Revision 74 records the fixture-draft key true. The control-file key and the closure key stay false.
