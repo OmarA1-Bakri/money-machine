@@ -1434,3 +1434,19 @@ Session 15 is incomplete at revision 114. `deployed_state_checked` and `provider
 ### Consequences
 
 The next honest step is `linked_workflow_fixture`: a synthetic chain stops at preflight. Publish, purchase, and checkout raise even if a flag is true. A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0093 — Session 15 linked workflow
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 15 is incomplete at revision 115. `deployed_state_checked`, `provider_connections_fail_closed`, and `standing_authority_recorded` are true. The other four Session 15 keys are false. A publish, purchase, or checkout after preflight would leave the fixture boundary.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 115 to 116. `updated_at` is `2026-10-17T16:30:00Z`. `deployed_state_checked`, `provider_connections_fail_closed`, `standing_authority_recorded`, and `linked_workflow_fixture` are true. The other three Session 15 keys stay false. `session_status` stays incomplete. `current_session` stays 15. `completed_sessions` stays 0 through 14. `next_session` stays 15. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. `src/money_machine/assets/linked_workflow.py` calls the fixture adapters and the synthetic chain through preflight. Publish, purchase, and checkout raise when the flag is true and when it is false. No socket is opened. Exit 78 stays HELD. The exit string is not written.
+
+### Consequences
+
+The next honest step is `acceptance_matrix_recorded`: every definition-of-done item is `PASS`, `FAIL`, or `BLOCKED_EXTERNAL`. A live item with no live call is `BLOCKED_EXTERNAL`. A `FAIL` is not a pass. A live account stays deferred. Exit 78 stays HELD. The exit string is not written.

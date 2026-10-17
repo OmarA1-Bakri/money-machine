@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 15 linked workflow recorded
+
+`record-evidence` advanced `state_revision` from 115 to 116. `updated_at` is `2026-10-17T16:30:00Z`. `deployed_state_checked`, `provider_connections_fail_closed`, `standing_authority_recorded`, and `linked_workflow_fixture` are true. The other three Session 15 keys stay false. `current_session` stays 15. `session_status` stays incomplete. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. `src/money_machine/assets/linked_workflow.py` calls the fixture adapters and stops at preflight. Publish, purchase, and checkout raise even when a flag is true. No socket is opened. Exit 78 stays HELD. The exit string is not written.
+
 ## 2026-10-17 — Session 15 standing authority recorded
 
 `record-evidence` advanced `state_revision` from 114 to 115. `updated_at` is `2026-10-17T16:20:00Z`. `deployed_state_checked`, `provider_connections_fail_closed`, and `standing_authority_recorded` are true. The other four Session 15 keys stay false. `current_session` stays 15. `session_status` stays incomplete. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. `src/money_machine/config/standing_authority.py` loads the tracked autonomy template, applies the development reduction, and refuses publish, purchase, and checkout. No cap is invented. `.env` and `autonomy.yaml` are not read. Exit 78 stays HELD. The exit string is not written.

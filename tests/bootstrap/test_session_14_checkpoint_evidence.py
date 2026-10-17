@@ -37,11 +37,12 @@ PREVIOUS_KEYS = frozenset(
         "service_controls_fail_closed",
     }
 )
-LIVE_REVISION = 115
-LIVE_AT = "2026-10-17T16:20:00Z"
+LIVE_REVISION = 116
+LIVE_AT = "2026-10-17T16:30:00Z"
 LIVE_KEYS: frozenset[str] = frozenset(
     {
         "deployed_state_checked",
+        "linked_workflow_fixture",
         "provider_connections_fail_closed",
         "standing_authority_recorded",
     }

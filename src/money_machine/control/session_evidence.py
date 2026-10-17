@@ -8,10 +8,10 @@ complete at revision 90. Every Session 11 key is true (D-0063). Session 12
 is complete at revision 97. Every Session 12 key is true (D-0071).
 Session 13 is complete at revision 104. Every Session 13 key is true
 (D-0079). Session 14 is complete at revision 111. Every Session 14 key
-is true (D-0087). Session 15 is incomplete at revision 115.
-``deployed_state_checked``, ``provider_connections_fail_closed``, and
-``standing_authority_recorded`` are true (D-0090, D-0091, D-0092). A live
-account is not connected.
+is true (D-0087). Session 15 is incomplete at revision 116.
+``deployed_state_checked``, ``provider_connections_fail_closed``,
+``standing_authority_recorded``, and ``linked_workflow_fixture`` are true
+(D-0090, D-0091, D-0092, D-0093). A live account is not connected.
 This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
@@ -260,16 +260,18 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
             "src/money_machine/config/settings.py",
             "src/money_machine/integrations/etsy/fixture_adapter.py",
             "src/money_machine/integrations/notion/fixture_adapter.py",
+            "src/money_machine/assets/linked_workflow.py",
             "src/money_machine/config/standing_authority.py",
             "src/money_machine/deploy/checkpoint.py",
             "src/money_machine/deploy/deployed_state.py",
             "src/money_machine/integrations/provider_connections.py",
         ),
-        "Publish, purchase, and checkout are not enabled.",
+        "The workflow stops at preflight. Publish is not run.",
         True,
         frozenset(
             {
                 "deployed_state_checked",
+                "linked_workflow_fixture",
                 "provider_connections_fail_closed",
                 "standing_authority_recorded",
             }
@@ -300,9 +302,9 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 15 at state revision 115.",
+        "The checked-in pointer is Session 15 at state revision 116.",
         "`current_session` is 15. `session_status` is incomplete.",
-        "Three Session 15 keys are true. A live account is not connected.",
+        "Four Session 15 keys are true. A live account is not connected.",
         "Session 10 is complete and every one of its keys is true.",
         "Session 09 is complete and every one of its keys is true.",
         "Session 08 is complete and every one of its keys is true.",
@@ -315,7 +317,7 @@ def render_session_evidence() -> str:
         "Session 12 is complete. Every key is true.",
         "Session 13 is complete. Every key is true.",
         "Session 14 is complete. Session 15 is incomplete.",
-        "Three Session 15 keys are true. A live account is not connected.",
+        "Four Session 15 keys are true. A live account is not connected.",
         "",
     ]
     for record in CLOSED_SESSION_EVIDENCE:
@@ -357,7 +359,7 @@ def render_session_evidence() -> str:
             "Session 12 is complete. Every key is true.",
             "Session 13 is complete. Every key is true.",
             "Session 14 is complete. Session 15 is incomplete.",
-            "Three Session 15 keys are true. A live account is not connected.",
+            "Four Session 15 keys are true. A live account is not connected.",
             "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",
         ]

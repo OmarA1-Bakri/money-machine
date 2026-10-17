@@ -1,8 +1,9 @@
-"""Earn the Session 15 deployed-state, provider, and authority keys.
+"""Earn the Session 15 deployed-state, provider, authority, and workflow keys.
 
-The proof calls the deployed-state check, the fixture provider selector, and
-the standing-authority check. A config file with a true publish switch does
-not earn a key. The closure key stays false.
+The proof calls the deployed-state check, the fixture provider selector, the
+standing-authority check, and the linked workflow. The workflow stops at
+preflight. A true publish, purchase, or checkout flag does not earn a key.
+The closure key stays false.
 """
 
 from __future__ import annotations
@@ -11,6 +12,11 @@ import ast
 from collections.abc import Callable
 from pathlib import Path
 
+from money_machine.assets.linked_workflow import (
+    LinkedWorkflowRefusal,
+    advance_linked_workflow,
+    run_linked_workflow,
+)
 from money_machine.config.loader import load_yaml_model
 from money_machine.config.settings import AutonomyConfig
 from money_machine.config.standing_authority import (
@@ -28,18 +34,30 @@ from money_machine.integrations.provider_connections import (
 DEPLOYED_STATE_KEY = "deployed_state_checked"
 PROVIDER_CONNECTIONS_KEY = "provider_connections_fail_closed"
 STANDING_AUTHORITY_KEY = "standing_authority_recorded"
+LINKED_WORKFLOW_KEY = "linked_workflow_fixture"
 EARNED_EVIDENCE_KEYS = frozenset(
-    {DEPLOYED_STATE_KEY, PROVIDER_CONNECTIONS_KEY, STANDING_AUTHORITY_KEY}
+    {
+        DEPLOYED_STATE_KEY,
+        PROVIDER_CONNECTIONS_KEY,
+        STANDING_AUTHORITY_KEY,
+        LINKED_WORKFLOW_KEY,
+    }
 )
 _CLOSURE_HEAD = "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
-_POINTER_REVISION = 115
-_UPDATED_AT = "2026-10-17T16:20:00Z"
+_POINTER_REVISION = 116
+_UPDATED_AT = "2026-10-17T16:30:00Z"
 _TRUE_KEYS: frozenset[str] = frozenset(
-    {DEPLOYED_STATE_KEY, PROVIDER_CONNECTIONS_KEY, STANDING_AUTHORITY_KEY}
+    {
+        DEPLOYED_STATE_KEY,
+        PROVIDER_CONNECTIONS_KEY,
+        STANDING_AUTHORITY_KEY,
+        LINKED_WORKFLOW_KEY,
+    }
 )
 _MODULE = Path(__file__).resolve().parents[1] / "deploy" / "deployed_state.py"
 _CONNECTIONS = Path(__file__).resolve().parents[1] / "integrations" / "provider_connections.py"
 _AUTHORITY = Path(__file__).resolve().parents[1] / "config" / "standing_authority.py"
+_WORKFLOW = Path(__file__).resolve().parents[1] / "assets" / "linked_workflow.py"
 _WORKER = Path("src/money_machine/orchestration/worker.py")
 _SCHEDULER = Path("src/money_machine/orchestration/scheduler.py")
 
@@ -57,6 +75,7 @@ def prove_session_15() -> frozenset[str]:
     _prove_deployed_state()
     _prove_provider_connections()
     _prove_standing_authority()
+    _prove_linked_workflow()
     return EARNED_EVIDENCE_KEYS
 
 
@@ -217,6 +236,50 @@ def _live(**overrides: object) -> AutonomyConfig:
     )
     values.update(overrides)
     return AutonomyConfig.model_validate(values)
+
+
+def _prove_linked_workflow() -> None:
+    """The fixture chain stops at preflight. A true flag does not continue."""
+    _refuse_network(_WORKFLOW)
+    root = Path(__file__).resolve().parents[3]
+    before = {relative: (root / relative).read_bytes() for relative in (_WORKER, _SCHEDULER)}
+    try:
+        recorded = run_linked_workflow()
+    except LinkedWorkflowRefusal as error:
+        raise Session15ProofError(error.code) from error
+    if {relative: (root / relative).read_bytes() for relative in before} != before:
+        raise Session15ProofError("sources_edited")
+    if (
+        recorded.stopped_at != "preflight"
+        or recorded.provider != "fixture"
+        or recorded.listing_count < 1
+        or recorded.notion_connected is not True
+        or recorded.preflight_passed is not True
+        or recorded.published is not False
+        or recorded.purchased is not False
+        or recorded.checkout is not False
+    ):
+        raise Session15ProofError("linked_workflow")
+    for action in ("publish", "purchase", "checkout"):
+        _require_workflow_refusal(action, enabled=True)
+        _require_workflow_refusal(action, enabled=False)
+
+
+def _require_workflow_refusal(action: str, *, enabled: bool) -> None:
+    try:
+        if action == "publish":
+            advance_linked_workflow("publish", enabled=enabled)
+        elif action == "purchase":
+            advance_linked_workflow("purchase", enabled=enabled)
+        elif action == "checkout":
+            advance_linked_workflow("checkout", enabled=enabled)
+        else:
+            raise Session15ProofError(action)
+    except LinkedWorkflowRefusal as error:
+        if error.code != action:
+            raise Session15ProofError(action) from error
+    else:
+        raise Session15ProofError(action)
 
 
 def _require_authority_refusal(authority: AutonomyConfig, code: str) -> None:

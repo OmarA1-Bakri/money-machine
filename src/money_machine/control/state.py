@@ -1744,7 +1744,8 @@ def validate_session_15_evidence_record(previous: ControlState, current: Control
     """Record the Session 15 keys the fixture proof has earned. The session stays incomplete.
 
     The proof earns the deployed-state check, the fixture provider connections,
-    and the fail-closed standing authority. The closure key stays false.
+    the fail-closed standing authority, and the workflow that stops at preflight.
+    The closure key stays false.
     """
     if previous["current_session"] != 15 or current["current_session"] != 15:
         raise ControlStateError("unsupported evidence record: only session 15 can record this key")

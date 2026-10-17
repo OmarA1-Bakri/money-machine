@@ -197,6 +197,14 @@ def simulate_publish(
     )
 
 
+def receipts_through_preflight() -> tuple[PathReceipt, ...]:
+    """Run the fixture chain through preflight. Publish is not called."""
+    receipts, _spec = _chain_through_preflight()
+    if not receipts or receipts[-1].step != "preflight":
+        raise SyntheticPathRefusal("preflight")
+    return receipts
+
+
 def run_synthetic_paths() -> SyntheticRun:
     """Run the main chain and the four alternate paths. A second call matches."""
     receipts = (
@@ -214,7 +222,7 @@ def run_synthetic_paths() -> SyntheticRun:
     return SyntheticRun(receipts=receipts, published_live=False)
 
 
-def _main_path() -> tuple[PathReceipt, ...]:
+def _chain_through_preflight() -> tuple[tuple[PathReceipt, ...], ProductSpec]:
     report = _research_report()
     shortlist = _shortlist(report)
     winner_observation = _score(shortlist)
@@ -231,6 +239,27 @@ def _main_path() -> tuple[PathReceipt, ...]:
     pdfs = tuple(asset for asset in assets if asset.kind == "delivery_pdf")
     draft = _etsy_draft(spec, copy, assets)
     preflight = _preflight(copy, assets)
+    receipts = (
+        _receipt("main", "research", report.report_id, "RECORDED"),
+        _receipt("main", "shortlist", shortlist[0].observation_id, f"KEPT:{len(shortlist)}"),
+        _receipt("main", "score", winner_observation.observation_id, "SELECTED"),
+        _receipt("main", "teardown", teardown.report_id, "STRUCTURE_ONLY"),
+        _receipt("main", "product_spec", spec.spec_id, spec.lineage_kind),
+        _receipt("main", "dedupe", spec.spec_id, passed.outcome.value),
+        _receipt("main", "notion_build", build.result_id, "FIXTURE"),
+        _receipt("main", "qa", qa.result_id, qa.outcome.value),
+        _receipt("main", "variants", variants.result_id, f"VARIANTS:{len(spec.colour_variants)}"),
+        _receipt("main", "listing_copy", spec.spec_id, f"TAGS:{len(copy.tags)}"),
+        _receipt("main", "assets", spec.product_id, f"ASSETS:{len(assets)}"),
+        _receipt("main", "pdfs", pdfs[0].product_id, f"PDFS:{len(pdfs)}"),
+        _receipt("main", "etsy_draft", spec.spec_id, f"DRAFT:{draft.listing_id}"),
+        _receipt("main", "preflight", preflight.result_id, preflight.outcome.value),
+    )
+    return receipts, spec
+
+
+def _main_path() -> tuple[PathReceipt, ...]:
+    prefix, spec = _chain_through_preflight()
     publish = simulate_publish(mode="simulation", idempotency_key=f"publish:{spec.spec_id}")
     repeated = simulate_publish(mode="simulation", idempotency_key=publish.idempotency_key)
     if publish != repeated or publish.executed or publish.provider_called:
@@ -255,20 +284,7 @@ def _main_path() -> tuple[PathReceipt, ...]:
         raise SyntheticPathRefusal("successor_dedupe")
     successor_build = _build_result(successor, "successor-build", "PRIMARY", ("build-slot",))
     return (
-        _receipt("main", "research", report.report_id, "RECORDED"),
-        _receipt("main", "shortlist", shortlist[0].observation_id, f"KEPT:{len(shortlist)}"),
-        _receipt("main", "score", winner_observation.observation_id, "SELECTED"),
-        _receipt("main", "teardown", teardown.report_id, "STRUCTURE_ONLY"),
-        _receipt("main", "product_spec", spec.spec_id, spec.lineage_kind),
-        _receipt("main", "dedupe", spec.spec_id, passed.outcome.value),
-        _receipt("main", "notion_build", build.result_id, "FIXTURE"),
-        _receipt("main", "qa", qa.result_id, qa.outcome.value),
-        _receipt("main", "variants", variants.result_id, f"VARIANTS:{len(spec.colour_variants)}"),
-        _receipt("main", "listing_copy", spec.spec_id, f"TAGS:{len(copy.tags)}"),
-        _receipt("main", "assets", spec.product_id, f"ASSETS:{len(assets)}"),
-        _receipt("main", "pdfs", pdfs[0].product_id, f"PDFS:{len(pdfs)}"),
-        _receipt("main", "etsy_draft", spec.spec_id, f"DRAFT:{draft.listing_id}"),
-        _receipt("main", "preflight", preflight.result_id, preflight.outcome.value),
+        *prefix,
         _receipt("main", "publish_simulation", spec.spec_id, "WITHHELD"),
         _receipt(
             "main",
