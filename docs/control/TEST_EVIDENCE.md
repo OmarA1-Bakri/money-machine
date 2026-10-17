@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-17 — Canonical repository identity recorded
+
+**Verification scope**: local origin and documented roots. No GitHub visibility change. No live HTTP. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Remote | The local origin slug is `OmarA1-Bakri/money-machine` | PASS |
+| Privacy | A private-visibility request is refused. D-0008 stays public | PASS |
+| Paths | `D:\Money Machine` and `/mnt/d/Money Machine` are in D-0001 and the source register | PASS |
+| Hold | No credential is stored. Exit 78 stays HELD | PASS |
+
+The identity tests printed 6 passed in 0.05s. The identity tests, the evidence index, the acceptance-matrix proof, and the continuity proof printed 22 passed in 1.53s. `ruff check` and `pyright` on the repository identity module and the evidence catalogue were clean.
+
 ## 2026-10-17 — Session 15 closure recorded
 
 **Verification scope**: live `apply-completion` from revision 118 to 119. No live HTTP. No publish, purchase, or checkout. Exit 78 stays HELD. The exit string is not written.

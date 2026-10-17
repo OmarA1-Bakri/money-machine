@@ -1,3 +1,7 @@
+## 2026-10-17 — Canonical repository identity recorded
+
+`src/money_machine/deploy/repository_identity.py` reads the local origin and records `OmarA1-Bakri/money-machine`. Visibility stays public under D-0008. A request to make the repository private is refused and no GitHub call is made. The Windows root `D:\Money Machine` and the WSL root `/mnt/d/Money Machine` are the paths already written in D-0001 and `docs/source/SOURCE_REGISTER.md`. The state pointer stays revision 119. `updated_at` stays `2026-10-17T16:50:00Z`. No credential is stored. Exit 78 stays HELD. The exit string is not written.
+
 ## 2026-10-17 — Session 15 closure recorded
 
 `apply-completion` advanced `state_revision` from 118 to 119. `updated_at` is `2026-10-17T16:50:00Z`. `session_status` is complete. `current_session` stays 15. `next_session` stays 15. `completed_sessions` is 0 through 15. All seven Session 15 keys are true. `head_sha` and `evidence_closure_commit_sha` are `be74bc1f1dcdbf357499aa0faa9a8fb69a4c5366`. That commit contains `def prove_session_15` and the pre-transition state. `next_session` is not null. The status is not COMMISSIONED. The exit string is not written. No tag is created. No release is pushed. Exit 78 stays HELD.

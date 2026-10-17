@@ -390,6 +390,7 @@ Fixture paths:
 - `src/money_machine/config/standing_authority.py`
 - `src/money_machine/deploy/checkpoint.py`
 - `src/money_machine/deploy/deployed_state.py`
+- `src/money_machine/deploy/repository_identity.py`
 - `src/money_machine/integrations/provider_connections.py`
 
 | Key | Recorded |

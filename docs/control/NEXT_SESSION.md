@@ -1,5 +1,9 @@
 # Next Session
 
+## Canonical repository identity is recorded (2026-10-17)
+
+Revision 119 stays complete Session 15. The canonical remote is `OmarA1-Bakri/money-machine` and stays public under D-0008. The Windows root and the WSL root are the documented paths. The next checklist line is "Private source PDF is excluded from git." Exit 78 stays HELD. A live account stays deferred.
+
 ## Session 15 is complete (2026-10-17)
 
 Revision 119 is complete Session 15. All seven Session 15 keys are true. `completed_sessions` is 0 through 15. `next_session` stays 15. `head_sha` is `be74bc1f1dcdbf357499aa0faa9a8fb69a4c5366`. The status is not COMMISSIONED. The exit string is not written. Exit 78 stays HELD. A live account, publish, purchase, and checkout stay deferred. The remaining finish-line work is the acceptance checklist.

@@ -1467,6 +1467,22 @@ Session 15 is incomplete at revision 116. `deployed_state_checked`, `provider_co
 
 The next honest step is `control_files_and_checkpoint_current`. A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
 
+## D-0095 — Session 15 continuity files
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 15 is incomplete at revision 117. `deployed_state_checked`, `provider_connections_fail_closed`, `standing_authority_recorded`, `linked_workflow_fixture`, and `acceptance_matrix_recorded` are true. The other two Session 15 keys are false. A handover page is not the continuity key.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 117 to 118. `updated_at` is `2026-10-17T16:45:00Z`. `deployed_state_checked`, `provider_connections_fail_closed`, `standing_authority_recorded`, `linked_workflow_fixture`, `acceptance_matrix_recorded`, and `control_files_and_checkpoint_current` are true. `evidence_closure_commit_recorded` stays false. `session_status` stays incomplete. `current_session` stays 15. `completed_sessions` stays 0 through 14. `next_session` stays 15. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. `src/money_machine/deploy/continuity.py` reads the six continuity files and the four deploy modules. The log, the decisions, and the test evidence cite the revision and the timestamp. The next-session note cites the revision. The closure key is refused. A commissioning page is refused. No socket is opened. Exit 78 stays HELD. The exit string is not written.
+
+### Consequences
+
+The next honest step is `evidence_closure_commit_recorded`. That close does not invent a session 16, does not write the exit string, and does not tag a release. A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
+
 ## D-0096 — Session 15 closure
 
 **Status:** accepted 2026-10-17. Standing order: finish the application.
@@ -1483,18 +1499,18 @@ Session 15 is incomplete at revision 118. Six Session 15 keys are true. `evidenc
 
 Session 15 is complete. A live account, publish, purchase, checkout, and Exit 78 removal stay deferred to an operator authority record. The exit string is not written.
 
-## D-0095 — Session 15 continuity files
+## D-0097 — Canonical repository identity
 
 **Status:** accepted 2026-10-17. Standing order: finish the application.
 
 ### Context
 
-Session 15 is incomplete at revision 117. `deployed_state_checked`, `provider_connections_fail_closed`, `standing_authority_recorded`, `linked_workflow_fixture`, and `acceptance_matrix_recorded` are true. The other two Session 15 keys are false. A handover page is not the continuity key.
+Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. The acceptance checklist line "Canonical private repository exists" has no code proof. D-0008 already authorizes `OmarA1-Bakri/money-machine` to stay public. Changing that visibility is a live GitHub mutation.
 
 ### Decision
 
-`record-evidence` advances `state_revision` from 117 to 118. `updated_at` is `2026-10-17T16:45:00Z`. `deployed_state_checked`, `provider_connections_fail_closed`, `standing_authority_recorded`, `linked_workflow_fixture`, `acceptance_matrix_recorded`, and `control_files_and_checkpoint_current` are true. `evidence_closure_commit_recorded` stays false. `session_status` stays incomplete. `current_session` stays 15. `completed_sessions` stays 0 through 14. `next_session` stays 15. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. `src/money_machine/deploy/continuity.py` reads the six continuity files and the four deploy modules. The log, the decisions, and the test evidence cite the revision and the timestamp. The next-session note cites the revision. The closure key is refused. A commissioning page is refused. No socket is opened. Exit 78 stays HELD. The exit string is not written.
+`src/money_machine/deploy/repository_identity.py` reads the local origin and records the slug `OmarA1-Bakri/money-machine`. Userinfo in the URL is discarded. Visibility stays `public`. `refuse_private_visibility` raises on `private` and does not call GitHub. The recorded roots stay `/mnt/d/Money Machine` and `D:\Money Machine`. Both strings are already written in D-0001 and `docs/source/SOURCE_REGISTER.md`. The proof reads those two files. No credential is stored. The state pointer stays revision 119.
 
 ### Consequences
 
-The next honest step is `evidence_closure_commit_recorded`. That close does not invent a session 16, does not write the exit string, and does not tag a release. A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
+The canonical repository exists and the two roots are documented. Privacy stays the public authorization in D-0008. The next checklist line is "Private source PDF is excluded from git." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
