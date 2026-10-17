@@ -1354,3 +1354,19 @@ Session 14 is incomplete at revision 110. Five keys are true. `evidence_closure_
 ### Consequences
 
 Session 14 is complete. The next honest step is the Session 15 evidence contract. Session 15 is not activated. A live deploy stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0088 — Session 15 evidence contract
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 14 is complete at revision 111. `next_session` is 15. Session 15 has no evidence contract and is not activated. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-15-prompt-integrity.md`. Its verified prompt hash is `b09859086ad510862f493227c1da075cc0a29d76ebd07ca4cd6f80710c8ce712`. `AutonomyConfig`, the Etsy and Notion fixture adapters, and the deployment checkpoint already exist. Exit 78 stays HELD.
+
+### Decision
+
+The Session 15 contract has seven keys: `deployed_state_checked`, `provider_connections_fail_closed`, `standing_authority_recorded`, `linked_workflow_fixture`, `acceptance_matrix_recorded`, `control_files_and_checkpoint_current`, and `evidence_closure_commit_recorded`. A live account, a live publish, a purchase, a checkout, a live PostHog event, Exit 78, and `HANDS_OFF_MONEY_MACHINE_COMMISSIONED` are not keys. This decision does not activate the session. `IMPLEMENTATION_STATE.json` stays revision 111. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Exit 78 stays HELD.
+
+### Consequences
+
+The next honest step is activation, which installs every Session 15 key false. A live account stays deferred. Exit 78 stays HELD. The exit string is not written. There is no session 16 prompt, so the generic completion transition is not used in this decision.

@@ -107,6 +107,10 @@ def test_open_sessions_have_no_recorded_true_key() -> None:
                     "evidence_closure_commit_recorded",
                 }
             )
+        elif record.session == 15:
+            assert record.session in SESSION_EVIDENCE_KEYS
+            assert record.activated is False
+            assert record.true_keys == frozenset()
         else:
             assert record.session not in SESSION_EVIDENCE_KEYS
             assert record.true_keys == frozenset()

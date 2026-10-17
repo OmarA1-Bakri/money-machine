@@ -8,7 +8,8 @@ complete at revision 90. Every Session 11 key is true (D-0063). Session 12
 is complete at revision 97. Every Session 12 key is true (D-0071).
 Session 13 is complete at revision 104. Every Session 13 key is true
 (D-0079). Session 14 is complete at revision 111. Every Session 14 key
-is true (D-0087). Session 15 is not activated.
+is true (D-0087). The Session 15 contract is installed (D-0088).
+The session is not activated.
 This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
@@ -253,8 +254,13 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
     ),
     OpenSessionEvidence(
         15,
-        (),
-        "No evidence contract and no session module. Live commissioning is not recorded.",
+        (
+            "src/money_machine/config/settings.py",
+            "src/money_machine/integrations/etsy/fixture_adapter.py",
+            "src/money_machine/integrations/notion/fixture_adapter.py",
+            "src/money_machine/deploy/checkpoint.py",
+        ),
+        "Session 15 is not activated. A live account is not connected.",
     ),
 )
 
@@ -296,7 +302,7 @@ def render_session_evidence() -> str:
         "Session 12 is complete. Every key is true.",
         "Session 13 is complete. Every key is true.",
         "Session 14 is complete. Session 15 is not activated.",
-        "Session 15 has no contract.",
+        "The Session 15 contract is installed. It is not activated.",
         "",
     ]
     for record in CLOSED_SESSION_EVIDENCE:
@@ -338,7 +344,7 @@ def render_session_evidence() -> str:
             "Session 12 is complete. Every key is true.",
             "Session 13 is complete. Every key is true.",
             "Session 14 is complete. Session 15 is not activated.",
-            "Session 15 has no contract.",
+            "The Session 15 contract is installed. It is not activated.",
             "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",
         ]

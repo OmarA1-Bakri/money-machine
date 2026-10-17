@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 15 contract is installed (2026-10-17)
+
+D-0088 names seven Session 15 keys. Revision 111 stays complete Session 14. Every Session 14 key stays true. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Session 15 is not activated. Exit 78 stays HELD. The next honest step is activation, which installs every Session 15 key false. A live account stays deferred.
+
 ## Session 14 is complete (2026-10-17)
 
 Revision 111 records every Session 14 key true. `completed_sessions` is 0 through 14. `next_session` is 15. `next_prompt` is `18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md`. `head_sha` is `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Exit 78 stays HELD. Session 15 is not activated. The next honest step is the Session 15 evidence contract. A live deploy stays deferred.

@@ -15,7 +15,7 @@ Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
 Session 13 is complete. Every key is true.
 Session 14 is complete. Session 15 is not activated.
-Session 15 has no contract.
+The Session 15 contract is installed. It is not activated.
 
 ## Session 00
 
@@ -278,7 +278,7 @@ Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
 Session 13 is complete. Every key is true.
 Session 14 is complete. Session 15 is not activated.
-Session 15 has no contract.
+The Session 15 contract is installed. It is not activated.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
 ## Session 11
@@ -375,7 +375,22 @@ Fixture paths:
 
 Prompt: `18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md`.
 Status: not activated.
-Evidence contract: absent.
-No evidence contract and no session module. Live commissioning is not recorded.
+Evidence contract: installed, not activated.
+Session 15 is not activated. A live account is not connected.
 
-Fixture paths: none.
+Fixture paths:
+
+- `src/money_machine/config/settings.py`
+- `src/money_machine/integrations/etsy/fixture_adapter.py`
+- `src/money_machine/integrations/notion/fixture_adapter.py`
+- `src/money_machine/deploy/checkpoint.py`
+
+| Key | Recorded |
+|---|---|
+| `acceptance_matrix_recorded` | not installed |
+| `control_files_and_checkpoint_current` | not installed |
+| `deployed_state_checked` | not installed |
+| `evidence_closure_commit_recorded` | not installed |
+| `linked_workflow_fixture` | not installed |
+| `provider_connections_fail_closed` | not installed |
+| `standing_authority_recorded` | not installed |

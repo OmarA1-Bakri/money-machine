@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 15 evidence contract installed
+
+D-0088 names the seven Session 15 keys. `SESSION_EVIDENCE_KEYS[15]` holds them. Activation is not applied. `IMPLEMENTATION_STATE.json` stays revision 111, Session 14 complete, every Session 14 key true. A live account, a live publish, a purchase, Exit 78, and the exit string are not keys. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-15-prompt-integrity.md`. No live provider call is made.
+
 ## 2026-10-17 — Session 14 closure recorded
 
 `apply-completion` advanced `state_revision` from 110 to 111. `updated_at` is `2026-10-17T15:35:00Z`. Every Session 14 key is true. `session_status` is complete. `current_session` stays 14. `completed_sessions` is 0 through 14. `next_session` is 15. `next_prompt` is `18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md`. `head_sha` and `evidence_closure_commit_sha` are `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. That commit contains `def prove_session_14` and the pre-transition state. The pointer commit does not record its own SHA. Session 15 is not activated. No service is started. Exit 78 stays HELD. The exit string is not written.
