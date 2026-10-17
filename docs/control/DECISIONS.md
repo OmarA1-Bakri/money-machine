@@ -550,3 +550,28 @@ Session 08 is the only session that may complete from that pair.
 ### Consequences
 
 Completion is a `apply-completion` transition from revision 68. The state-pointer commit that records the completed file is a later commit, and the state file does not name that commit. Sessions 09–15 stay unactivated.
+
+## D-0040 — Session 09 evidence contract is installed and not activated
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 08 is complete at revision 69. `next_session` is 9. Activation refuses while session 9 has no entry in `SESSION_EVIDENCE_KEYS`. The Session 09 prompt-integrity addendum defers live publish, commissioning, and the exit string. The earnable proof is the fixture surface already on the trunk, plus the fixture draft package that wave 2 still owes.
+
+### Decision
+
+Session 09's completion contract is exactly these keys. A later activation installs every one false:
+
+- `etsy_preflight_implemented`
+- `publishing_ramp_implemented`
+- `mutation_receipt_implemented`
+- `fixture_draft_package_implemented`
+- `control_files_and_checkpoint_current`
+- `evidence_closure_commit_recorded`
+
+Live publish, commissioning, Exit 78, and `SESSION_09_ETSY_PUBLISHING_COMPLETE` are not keys. This decision does not activate Session 09 and does not edit `IMPLEMENTATION_STATE.json`.
+
+### Consequences
+
+`validate_activation_transition` accepts a candidate that installs these six keys all false from the revision-69 close. A true key, a missing key, or an extra key is refused. Sessions 10–15 still have no contract. Activation is the next transition and is not this commit.

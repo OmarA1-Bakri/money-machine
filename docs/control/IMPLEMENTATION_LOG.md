@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 09 evidence contract installed
+
+D-0040 names the six Session 09 keys. `SESSION_EVIDENCE_KEYS[9]` holds them. Activation is not applied. `IMPLEMENTATION_STATE.json` stays revision 69, Session 08 complete, every Session 08 key true. Sessions 10–15 still have no contract. Live publish, commissioning, Exit 78, and the exit string are not keys. No live Etsy, Notion, or S3 call is made.
+
 ## 2026-10-17 — Session 08 close is indexed
 
 `docs/control/SESSION_EVIDENCE.md` records Session 08 as complete. The state commit is `4a07fd69259a7265c5780fb584b2a89cacd9b258`. The closure commit is `01b7dd84ef98442ff26a5239e8c7de742739d844`. `IMPLEMENTATION_STATE.json` is unchanged in this commit. Sessions 09–15 stay unactivated.

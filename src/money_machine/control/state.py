@@ -209,6 +209,18 @@ SESSION_EVIDENCE_KEYS: Mapping[int, frozenset[str]] = MappingProxyType(
                 "evidence_closure_commit_recorded",
             }
         ),
+        9: frozenset(
+            {
+                # Session 09 contract (D-0040). Activation installs every key false.
+                # Live publish, commissioning, and the exit string are not keys.
+                "etsy_preflight_implemented",
+                "publishing_ramp_implemented",
+                "mutation_receipt_implemented",
+                "fixture_draft_package_implemented",
+                "control_files_and_checkpoint_current",
+                "evidence_closure_commit_recorded",
+            }
+        ),
     }
 )
 """Each session's completion-evidence contract (D-0010). A session without an entry cannot be

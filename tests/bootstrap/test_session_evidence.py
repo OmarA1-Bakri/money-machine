@@ -76,7 +76,10 @@ def test_live_pointer_is_complete_session_08() -> None:
 def test_open_sessions_have_no_recorded_true_key() -> None:
     for record in OPEN_SESSION_EVIDENCE:
         assert record.session not in {item.session for item in CLOSED_SESSION_EVIDENCE}
-        assert record.session not in SESSION_EVIDENCE_KEYS
+        if record.session == 9:
+            assert record.session in SESSION_EVIDENCE_KEYS
+        else:
+            assert record.session not in SESSION_EVIDENCE_KEYS
         for path in record.fixture_paths:
             assert (ROOT / path).is_file(), path
         assert "not" in record.gap.casefold() or "no evidence" in record.gap.casefold()

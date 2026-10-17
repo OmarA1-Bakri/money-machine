@@ -234,14 +234,23 @@ It is not a recorded evidence key.
 
 Prompt: `12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md`.
 Status: not activated.
-Evidence contract: absent.
-No evidence contract. Preflight, ramp, and receipt fixtures do not publish.
+Evidence contract: installed, not activated.
+Contract is installed and not activated. Fixtures do not publish.
 
 Fixture paths:
 
 - `src/money_machine/assets/etsy_preflight.py`
 - `src/money_machine/assets/publishing_ramp_decision.py`
 - `src/money_machine/assets/mutation_receipt.py`
+
+| Key | Recorded |
+|---|---|
+| `control_files_and_checkpoint_current` | not installed |
+| `etsy_preflight_implemented` | not installed |
+| `evidence_closure_commit_recorded` | not installed |
+| `fixture_draft_package_implemented` | not installed |
+| `mutation_receipt_implemented` | not installed |
+| `publishing_ramp_implemented` | not installed |
 
 ## Session 10
 

@@ -2,8 +2,9 @@
 
 Sessions 00-06 closed with every contract key true. Session 07's close
 commit under D-0032 has every contract key false. D-0036 records the live
-pointer separately. Session 08 is complete at revision 69. Sessions 09-15
-are not activated. This module does not edit ``IMPLEMENTATION_STATE.json``.
+pointer separately. Session 08 is complete at revision 69. Session 09's
+contract is installed and not activated (D-0040). Sessions 10-15 have no
+contract. This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
 from __future__ import annotations
@@ -137,7 +138,7 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
             "src/money_machine/assets/publishing_ramp_decision.py",
             "src/money_machine/assets/mutation_receipt.py",
         ),
-        "No evidence contract. Preflight, ramp, and receipt fixtures do not publish.",
+        "Contract is installed and not activated. Fixtures do not publish.",
     ),
     OpenSessionEvidence(
         10,
@@ -245,7 +246,11 @@ def render_session_evidence() -> str:
                 "",
                 f"Prompt: `{SESSION_PROMPTS[record.session]}`.",
                 "Status: not activated.",
-                "Evidence contract: absent.",
+                (
+                    "Evidence contract: installed, not activated."
+                    if record.session in SESSION_EVIDENCE_KEYS
+                    else "Evidence contract: absent."
+                ),
                 record.gap,
                 "",
             ]
