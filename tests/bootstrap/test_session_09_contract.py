@@ -1,4 +1,4 @@
-"""Session 09's evidence contract is installed. Activation is not applied."""
+"""Session 09's evidence contract is installed and the session is complete."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ import pytest
 
 from money_machine.control.state import (
     SESSION_EVIDENCE_KEYS,
+    SESSION_PROMPTS,
     ControlState,
     ControlStateError,
     validate_activation_transition,
@@ -39,13 +40,19 @@ def _live() -> ControlState:
 
 
 def _session_08_close() -> ControlState:
-    """The revision-69 close, rebuilt after activation replaced the live file."""
+    """The revision-69 close, rebuilt after later transitions replaced the live file."""
     previous = _live()
     previous["state_revision"] = 69
     previous["session_status"] = "complete"
     previous["current_session"] = 8
+    previous["completed_sessions"] = list(range(9))
+    previous["next_session"] = 9
+    previous["next_prompt"] = SESSION_PROMPTS[9]
     previous["updated_at"] = "2026-10-17T09:49:00Z"
     previous["required_completion_evidence"] = {key: True for key in SESSION_EVIDENCE_KEYS[8]}
+    contract = dict(previous["transition_contract"])
+    contract["completion_requires_next_session"] = 9
+    previous["transition_contract"] = contract
     return previous
 
 
@@ -66,23 +73,18 @@ def test_session_09_contract_is_the_fixture_surface() -> None:
     assert "SESSION_09_ETSY_PUBLISHING_COMPLETE" not in SESSION_EVIDENCE_KEYS[9]
 
 
-def test_live_pointer_is_the_session_09_activation() -> None:
-    """Preflight, the ramp, the receipt, the draft, and the control files are true."""
+def test_live_pointer_is_complete_session_09() -> None:
+    """Every Session 09 key is true. Session 10 is not activated."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 75
+    assert live["state_revision"] == 76
     assert live["current_session"] == 9
-    assert live["session_status"] == "incomplete"
-    assert live["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8]
-    assert live["next_session"] == 9
-    assert live["head_sha"] == "01b7dd84ef98442ff26a5239e8c7de742739d844"
-    evidence = dict.fromkeys(sorted(SESSION_09_KEYS), False)
-    evidence["etsy_preflight_implemented"] = True
-    evidence["publishing_ramp_implemented"] = True
-    evidence["mutation_receipt_implemented"] = True
-    evidence["fixture_draft_package_implemented"] = True
-    evidence["control_files_and_checkpoint_current"] = True
-    assert live["required_completion_evidence"] == evidence
+    assert live["session_status"] == "complete"
+    assert live["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert live["next_session"] == 10
+    assert live["next_prompt"] == SESSION_PROMPTS[10]
+    assert live["head_sha"] == "cfb36462994ecba833f31ba869f2aba627f6060d"
+    assert live["required_completion_evidence"] == dict.fromkeys(sorted(SESSION_09_KEYS), True)
     assert "SESSION_09_ETSY_PUBLISHING_COMPLETE" not in text
 
 

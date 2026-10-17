@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-17 — Session 09 closed
+
+**Verification scope**: live `apply-completion` from revision 75 to 76. No live HTTP. Exit 78 stays HELD. The exit string is not written. Session 10 is not activated.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 9, `complete`, revision 76, `updated_at` `2026-10-17T11:20:00Z` | PASS |
+| Keys | Every Session 09 key true, including the closure key | PASS |
+| Head | `head_sha` is `cfb36462994ecba833f31ba869f2aba627f6060d` | PASS |
+| Next | `next_session` 10 and the Session 10 prompt | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The closure commit is `cfb36462994ecba833f31ba869f2aba627f6060d`. It contains `def prove_session_09` and the exact revision-75 state. A closure commit without that function is refused.
+
 ## 2026-10-17 — Session 09 continuity directory gate
 
 **Verification scope**: the control directory. No state transition. No live HTTP. Revision 75 stays. The closure key stays false.

@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 09 is complete (2026-10-17)
+
+Revision 76 records every Session 09 key true. `session_status` is complete. `next_session` is 10. `next_prompt` is `13_SESSION_10_ANALYTICS_CULL_MULTIPLY_CLOSED_LOOP.md`. `head_sha` is `cfb36462994ecba833f31ba869f2aba627f6060d`. Session 10 is not activated. Exit 78 stays HELD. The next honest step is the Session 10 evidence contract, then activation.
+
 ## Session 09 continuity directory gate (2026-10-17)
 
 The control directory holds the five continuity files and `SESSION_EVIDENCE.md`. The transition set stays the five files. Revision 75 is unchanged. The closure key stays false. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. The next honest step is the closure key, through `apply-completion` onto a commit that contains `def prove_session_09`.
