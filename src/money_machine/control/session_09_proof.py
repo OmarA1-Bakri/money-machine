@@ -479,7 +479,7 @@ def _prove_activated_session_10(
     evidence: object,
     status: object,
 ) -> None:
-    """Session 09 stays closed when the pointer moves to an incomplete Session 10."""
+    """Session 09 stays closed while Session 10 is incomplete or complete."""
     recorded: set[str] = set()
     values_are_bool = False
     evidence_count = -1
@@ -489,13 +489,25 @@ def _prove_activated_session_10(
             if isinstance(key, str):
                 recorded.add(key)
         values_are_bool = all(isinstance(value, bool) for value in evidence.values())
+    keys_match = frozenset(recorded) == _SESSION_10_KEYS and len(recorded) == evidence_count
     if (
-        status != "incomplete"
-        or decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
-        or decoded.get("next_session") != 10
-        or decoded.get("completed_sessions") != list(range(10))
-        or frozenset(recorded) != _SESSION_10_KEYS
-        or len(recorded) != evidence_count
+        decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
+        or not keys_match
         or not values_are_bool
+    ):
+        raise Session09ProofError("control_checkpoint")
+    if status == "incomplete":
+        if (
+            decoded.get("next_session") != 10
+            or decoded.get("completed_sessions") != list(range(10))
+        ):
+            raise Session09ProofError("control_checkpoint")
+        return
+    if status != "complete" or not isinstance(evidence, dict):
+        raise Session09ProofError("control_checkpoint")
+    if (
+        decoded.get("next_session") != 11
+        or decoded.get("completed_sessions") != list(range(11))
+        or any(value is not True for value in evidence.values())
     ):
         raise Session09ProofError("control_checkpoint")

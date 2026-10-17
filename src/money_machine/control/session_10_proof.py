@@ -664,19 +664,32 @@ def _prove_control_files() -> None:
     if not isinstance(decoded, dict):
         raise Session10ProofError("control_checkpoint")
     evidence = decoded.get("required_completion_evidence")
+    status = decoded.get("session_status")
     if (
         decoded.get("current_session") != 10
-        or decoded.get("session_status") != "incomplete"
         or decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
-        or decoded.get("next_session") != 10
-        or decoded.get("completed_sessions") != list(range(10))
         or not isinstance(evidence, dict)
+        or status not in {"incomplete", "complete"}
     ):
         raise Session10ProofError("control_checkpoint")
     for key in _BEHAVIORAL_KEYS:
         if evidence.get(key) is not True:
             raise Session10ProofError("control_checkpoint")
-    if evidence.get("evidence_closure_commit_recorded") is not False:
-        raise Session10ProofError("control_checkpoint")
-    if not isinstance(evidence.get(CONTROL_EVIDENCE_KEY), bool):
+    closure_recorded = evidence.get("evidence_closure_commit_recorded")
+    if status == "incomplete":
+        if (
+            closure_recorded is not False
+            or decoded.get("next_session") != 10
+            or decoded.get("completed_sessions") != list(range(10))
+            or not isinstance(evidence.get(CONTROL_EVIDENCE_KEY), bool)
+        ):
+            raise Session10ProofError("control_checkpoint")
+        return
+    if (
+        closure_recorded is not True
+        or evidence.get(CONTROL_EVIDENCE_KEY) is not True
+        or decoded.get("next_session") != 11
+        or decoded.get("completed_sessions") != list(range(11))
+        or decoded.get("next_prompt") != "14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md"
+    ):
         raise Session10ProofError("control_checkpoint")

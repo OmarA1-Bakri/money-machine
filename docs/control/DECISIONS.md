@@ -808,3 +808,19 @@ Session 10 is incomplete at revision 81. The metrics fixture, the maturity clock
 ### Consequences
 
 Revision 82 records those five keys true. The closure key stays false. The closure key is the next proof.
+
+## D-0055 — Session 10 closes on the commit that holds the pre-transition state
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Five Session 10 keys are true. `evidence_closure_commit_recorded` is the only false key. `record-evidence` refuses to flip it. The completion transition records it when HEAD is a new commit that contains `def prove_session_10` and the exact pre-transition state, and that commit does not name its own object ID.
+
+### Decision
+
+`apply-completion` is the proof-gated transition for the closure key. The closure commit must contain the Session 10 proof. `head_sha` and `evidence_closure_commit_sha` become that commit. `current_session` stays 10. `next_session` becomes 11 and `next_prompt` becomes the Session 11 prompt. Every Session 10 key is true. Session 11 is not activated. No live Etsy call, purchase, or customer message is made.
+
+### Consequences
+
+The following state commit records revision 83. Session 10 is complete. The closure key is true. Session 11 stays inactive.
