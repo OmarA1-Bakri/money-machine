@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 09 receipt key recorded
+
+`record-evidence` advanced `state_revision` from 72 to 73. `updated_at` is `2026-10-17T10:55:00Z`. `mutation_receipt_implemented` is true. Preflight and the ramp stay true. The fixture draft package, the control-file key, and the closure key stay false. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. The exit string is not written. No live Etsy call is made.
+
 ## 2026-10-17 — Session 09 ramp key recorded
 
 `record-evidence` advanced `state_revision` from 71 to 72. `updated_at` is `2026-10-17T10:52:00Z`. `publishing_ramp_implemented` is true. `etsy_preflight_implemented` stays true. The other four Session 09 keys stay false. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. The committed ramp file stays `publishing_enabled: false`. The exit string is not written. No live Etsy call is made.

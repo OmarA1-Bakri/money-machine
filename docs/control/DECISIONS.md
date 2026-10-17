@@ -607,3 +607,19 @@ Revision 71 has `etsy_preflight_implemented` true and the other Session 09 keys 
 ### Consequences
 
 Revision 72 records the ramp key true. The receipt, the fixture draft package, the control-file key, and the closure key stay false.
+
+## D-0043 — Session 09 mutation receipt is the third earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Revision 72 has preflight and the ramp true. The other Session 09 keys are false. The receipt book already reconciles a create against an in-memory double. It does not open a socket.
+
+### Decision
+
+`prove_session_09()` also earns `mutation_receipt_implemented`. The proof requires one create per idempotency key, a timeout that keeps a visible listing and creates nothing more, a timeout with an empty read that creates once and confirms, an unknown read that does not create again, a missing response hash refused, a screenshot refused, and a raw response body refused. `record-evidence` then requires the true keys to be exactly preflight, the ramp, and the receipt. The closure key stays false. `head_sha` does not move. No live Etsy call is made.
+
+### Consequences
+
+Revision 73 records the receipt key true. The fixture draft package, the control-file key, and the closure key stay false.

@@ -1187,7 +1187,8 @@ def apply_session_08_evidence_record_transition(
 def validate_session_09_evidence_record(previous: ControlState, current: ControlState) -> None:
     """Record the Session 09 keys the fixture proof has earned. The session stays incomplete.
 
-    The proof earns preflight and the publishing ramp. Keys it has not earned stay false,
+    The proof earns preflight, the publishing ramp, and the mutation receipt. Keys it has not
+    earned stay false,
     including the closure key. The closure commit does not move.
     """
     if previous["current_session"] != 9 or current["current_session"] != 9:
@@ -1246,7 +1247,7 @@ def _verify_session_09_evidence_repository(
 def apply_session_09_evidence_record_transition(
     state_path: Path, candidate_path: Path
 ) -> ControlState:
-    """Validate a Session 09 preflight candidate and atomically replace the state file."""
+    """Validate a Session 09 evidence candidate and atomically replace the state file."""
     return _apply_transition(
         state_path,
         candidate_path,
@@ -1259,8 +1260,8 @@ def apply_active_evidence_record_transition(state_path: Path, candidate_path: Pa
     """Record evidence for the session the pointer is on.
 
     Session 07 stays on its own transition. Incomplete Session 08 uses the fixture-chain
-    transition. Incomplete Session 09 records the preflight key. Any other pointer is
-    refused before a file is written.
+    transition. Incomplete Session 09 records the keys the fixture proof has earned. Any other
+    pointer is refused before a file is written.
     """
     previous, _raw = _parse_state(state_path, "current state")
     if previous["current_session"] == 7 and previous["session_status"] == "complete":
