@@ -1,9 +1,8 @@
 # Session evidence
 
-The checked-in pointer is Session 09 at state revision 75.
-`current_session` is 9. `session_status` is incomplete.
-Preflight, the ramp, the receipt, the draft, and the control files are true.
-The closure key is false.
+The checked-in pointer is Session 09 at state revision 76.
+`current_session` is 9. `session_status` is complete.
+Every Session 09 key is true.
 Session 08 is complete and every one of its keys is true.
 Sessions 00-06 closed with every contract key true.
 Session 07's close commit keeps every contract key false under D-0032.
@@ -227,33 +226,29 @@ Head SHA: `01b7dd84ef98442ff26a5239e8c7de742739d844`.
 | `merchandising_workflow_linked` | true |
 | `screenshot_acquisition_implemented` | true |
 
-## Sessions 09-15
-
-Session 09 is activated and incomplete. Sessions 10-15 are not activated.
-A fixture path is code on the trunk. It is not, by itself, a true evidence key.
-
 ## Session 09
 
 Prompt: `12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md`.
-Status: incomplete.
-Evidence contract: installed.
-Five keys are recorded. Closure is not.
-
-Fixture paths:
-
-- `src/money_machine/assets/etsy_preflight.py`
-- `src/money_machine/assets/publishing_ramp_decision.py`
-- `src/money_machine/assets/mutation_receipt.py`
-- `src/money_machine/integrations/etsy/draft_client.py`
+State commit: `379446ac8fefa71a4752eb32cc15fd41471060e9`.
+State revision: 76.
+Status: complete. Next session: 10.
+Completed sessions: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].
+Evidence closure commit: `cfb36462994ecba833f31ba869f2aba627f6060d`.
+Head SHA: `cfb36462994ecba833f31ba869f2aba627f6060d`.
 
 | Key | Recorded |
 |---|---|
 | `control_files_and_checkpoint_current` | true |
 | `etsy_preflight_implemented` | true |
-| `evidence_closure_commit_recorded` | false |
+| `evidence_closure_commit_recorded` | true |
 | `fixture_draft_package_implemented` | true |
 | `mutation_receipt_implemented` | true |
 | `publishing_ramp_implemented` | true |
+
+## Sessions 10-15
+
+Sessions 10-15 are not activated.
+A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
 ## Session 10
 

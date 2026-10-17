@@ -2,11 +2,9 @@
 
 Sessions 00-06 closed with every contract key true. Session 07's close
 commit under D-0032 has every contract key false. D-0036 records the live
-pointer separately. Session 08 is complete at revision 69. Session 09 is
-activated and incomplete at revision 75. Preflight, the publishing ramp, the
-mutation receipt, the fixture draft, and the control files are the true keys
-(D-0041 through D-0045). Sessions 10-15 have no contract. This module
-does not edit ``IMPLEMENTATION_STATE.json``.
+pointer separately. Sessions 08 and 09 are complete. Session 09 is revision
+76 and every one of its keys is true (D-0047). Sessions 10-15 have no
+contract. This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
 from __future__ import annotations
@@ -132,29 +130,19 @@ CLOSED_SESSION_EVIDENCE: tuple[ClosedSessionEvidence, ...] = (
         9,
         True,
     ),
+    ClosedSessionEvidence(
+        9,
+        "379446ac8fefa71a4752eb32cc15fd41471060e9",
+        76,
+        "cfb36462994ecba833f31ba869f2aba627f6060d",
+        "cfb36462994ecba833f31ba869f2aba627f6060d",
+        (0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
+        10,
+        True,
+    ),
 )
 
 OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
-    OpenSessionEvidence(
-        9,
-        (
-            "src/money_machine/assets/etsy_preflight.py",
-            "src/money_machine/assets/publishing_ramp_decision.py",
-            "src/money_machine/assets/mutation_receipt.py",
-            "src/money_machine/integrations/etsy/draft_client.py",
-        ),
-        "Five keys are recorded. Closure is not.",
-        True,
-        frozenset(
-            {
-                "etsy_preflight_implemented",
-                "publishing_ramp_implemented",
-                "mutation_receipt_implemented",
-                "fixture_draft_package_implemented",
-                "control_files_and_checkpoint_current",
-            }
-        ),
-    ),
     OpenSessionEvidence(
         10,
         (
@@ -205,10 +193,9 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 09 at state revision 75.",
-        "`current_session` is 9. `session_status` is incomplete.",
-        "Preflight, the ramp, the receipt, the draft, and the control files are true.",
-        "The closure key is false.",
+        "The checked-in pointer is Session 09 at state revision 76.",
+        "`current_session` is 9. `session_status` is complete.",
+        "Every Session 09 key is true.",
         "Session 08 is complete and every one of its keys is true.",
         "Sessions 00-06 closed with every contract key true.",
         "Session 07's close commit keeps every contract key false under D-0032.",
@@ -249,9 +236,9 @@ def render_session_evidence() -> str:
         lines.append("")
     lines.extend(
         [
-            "## Sessions 09-15",
+            "## Sessions 10-15",
             "",
-            "Session 09 is activated and incomplete. Sessions 10-15 are not activated.",
+            "Sessions 10-15 are not activated.",
             "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",
         ]
