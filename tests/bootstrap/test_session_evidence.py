@@ -57,24 +57,19 @@ def test_closed_snapshots_match_the_commits_that_hold_them() -> None:
         assert all(item is record.all_keys_true for item in values)
 
 
-def test_live_pointer_is_incomplete_session_10() -> None:
+def test_live_pointer_is_complete_session_10() -> None:
     live = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert live["current_session"] == 10
-    assert live["session_status"] == "incomplete"
-    assert live["state_revision"] == 82
-    assert live["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    assert live["next_session"] == 10
-    assert live["next_prompt"] == SESSION_PROMPTS[10]
-    assert live["head_sha"] == "cfb36462994ecba833f31ba869f2aba627f6060d"
+    assert live["session_status"] == "complete"
+    assert live["state_revision"] == 83
+    assert live["completed_sessions"] == list(range(11))
+    assert live["next_session"] == 11
+    assert live["next_prompt"] == SESSION_PROMPTS[11]
+    assert live["head_sha"] == "f16c7ed0598daf3f4627955b52585f253ae1b918"
     assert live["evidence_closure_commit_sha"] == live["head_sha"]
     evidence = live["required_completion_evidence"]
     assert isinstance(evidence, dict)
-    expected = {key: False for key in sorted(SESSION_EVIDENCE_KEYS[10])}
-    expected["metrics_fixture_implemented"] = True
-    expected["maturity_clock_implemented"] = True
-    expected["portfolio_eligibility_implemented"] = True
-    expected["closed_loop_store_implemented"] = True
-    expected["control_files_and_checkpoint_current"] = True
+    expected = {key: True for key in sorted(SESSION_EVIDENCE_KEYS[10])}
     assert evidence == expected
 
 

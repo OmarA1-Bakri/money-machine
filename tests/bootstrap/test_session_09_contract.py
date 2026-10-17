@@ -74,23 +74,24 @@ def test_session_09_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_is_incomplete_session_10() -> None:
-    """Session 09 stays closed. Session 10 records five keys and leaves the closure key false."""
+    """Session 09 stays closed. Session 10 is complete and every one of its keys is true."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 82
+    assert live["state_revision"] == 83
     assert live["current_session"] == 10
-    assert live["session_status"] == "incomplete"
-    assert live["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    assert live["next_session"] == 10
-    assert live["next_prompt"] == SESSION_PROMPTS[10]
-    assert live["head_sha"] == "cfb36462994ecba833f31ba869f2aba627f6060d"
+    assert live["session_status"] == "complete"
+    assert live["completed_sessions"] == list(range(11))
+    assert live["next_session"] == 11
+    assert live["next_prompt"] == SESSION_PROMPTS[11]
+    assert live["head_sha"] == "f16c7ed0598daf3f4627955b52585f253ae1b918"
     evidence = live["required_completion_evidence"]
     assert evidence["metrics_fixture_implemented"] is True
     assert evidence["maturity_clock_implemented"] is True
     assert evidence["portfolio_eligibility_implemented"] is True
     assert evidence["closed_loop_store_implemented"] is True
     assert evidence["control_files_and_checkpoint_current"] is True
-    assert sum(1 for value in evidence.values() if value) == 5
+    assert evidence["evidence_closure_commit_recorded"] is True
+    assert sum(1 for value in evidence.values() if value) == 6
     assert "SESSION_09_ETSY_PUBLISHING_COMPLETE" not in text
 
 

@@ -73,23 +73,18 @@ def test_session_10_contract_is_the_fixture_surface() -> None:
     assert "SESSION_10_CLOSED_LOOP_AUTOMATION_COMPLETE" not in SESSION_EVIDENCE_KEYS[10]
 
 
-def test_live_pointer_records_the_control_file_key() -> None:
-    """Five Session 10 keys are true. The closure key is false."""
+def test_live_pointer_records_the_closure_key() -> None:
+    """Session 10 is complete. Every Session 10 key is true."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 82
+    assert live["state_revision"] == 83
     assert live["current_session"] == 10
-    assert live["session_status"] == "incomplete"
-    assert live["completed_sessions"] == list(range(10))
-    assert live["next_session"] == 10
-    assert live["next_prompt"] == SESSION_PROMPTS[10]
-    assert live["head_sha"] == "cfb36462994ecba833f31ba869f2aba627f6060d"
-    evidence = dict.fromkeys(sorted(SESSION_10_KEYS), False)
-    evidence["metrics_fixture_implemented"] = True
-    evidence["maturity_clock_implemented"] = True
-    evidence["portfolio_eligibility_implemented"] = True
-    evidence["closed_loop_store_implemented"] = True
-    evidence["control_files_and_checkpoint_current"] = True
+    assert live["session_status"] == "complete"
+    assert live["completed_sessions"] == list(range(11))
+    assert live["next_session"] == 11
+    assert live["next_prompt"] == SESSION_PROMPTS[11]
+    assert live["head_sha"] == "f16c7ed0598daf3f4627955b52585f253ae1b918"
+    evidence = dict.fromkeys(sorted(SESSION_10_KEYS), True)
     assert live["required_completion_evidence"] == evidence
     assert "SESSION_10_CLOSED_LOOP_AUTOMATION_COMPLETE" not in text
 

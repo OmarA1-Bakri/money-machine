@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 10 is complete (2026-10-17)
+
+Revision 83 records every Session 10 key true. `completed_sessions` is 0 through 10. `next_session` is 11. `head_sha` is `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. Session 11 is not activated. The next honest step is the Session 11 evidence contract.
+
 ## Session 10 control files are recorded (2026-10-17)
 
 Revision 82 records the metrics fixture, the maturity clock, portfolio eligibility, the closed-loop ledger, and `control_files_and_checkpoint_current`. The closure key stays false. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The next honest step is the closure key, through its own proof.
