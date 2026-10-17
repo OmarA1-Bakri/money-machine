@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 11 contract is installed (2026-10-17)
+
+D-0056 installs the six Session 11 keys. Revision 83 is unchanged. Session 10 stays complete. Session 11 is not activated. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The next honest step is activation, which installs every Session 11 key false.
+
 ## Session 10 is complete (2026-10-17)
 
 Revision 83 records every Session 10 key true. `completed_sessions` is 0 through 10. `next_session` is 11. `head_sha` is `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. Session 11 is not activated. The next honest step is the Session 11 evidence contract.

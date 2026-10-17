@@ -824,3 +824,28 @@ Five Session 10 keys are true. `evidence_closure_commit_recorded` is the only fa
 ### Consequences
 
 The following state commit records revision 83. Session 10 is complete. The closure key is true. Session 11 stays inactive.
+
+## D-0056 — Session 11 evidence contract is installed and not activated
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 10 is complete at revision 83. `next_session` is 11. Activation refuses while session 11 has no entry in `SESSION_EVIDENCE_KEYS`. The Session 11 prompt-integrity addendum defers live send, commissioning, Exit 78, and the exit string. D-01 deferred the evidence contract until Sessions 08, 09, and 10 were closed. Those sessions are closed. The earnable proof is the fixture surface already on the trunk: intake, incident routing, repair resolution, and the draft reply.
+
+### Decision
+
+Session 11's completion contract is exactly these keys. A later activation installs every one false:
+
+- `support_intake_implemented`
+- `incident_routing_implemented`
+- `repair_resolution_implemented`
+- `draft_reply_implemented`
+- `control_files_and_checkpoint_current`
+- `evidence_closure_commit_recorded`
+
+Live send, A16 commissioning, Exit 78, Notion page rewrite, attachment bytes, inserted jobs, and `SESSION_11_SUPPORT_AND_REPAIR_COMPLETE` are not keys. This decision does not activate Session 11 and does not edit `IMPLEMENTATION_STATE.json`.
+
+### Consequences
+
+`validate_activation_transition` accepts a candidate that installs these six keys all false from the revision-83 close. A true key, a missing key, or an extra key is refused. Sessions 12–15 still have no contract. Activation is the next transition and is not this commit.

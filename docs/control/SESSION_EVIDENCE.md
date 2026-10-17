@@ -10,7 +10,8 @@ Session 07's close commit keeps every contract key false under D-0032.
 D-0036 recorded the twelve Session 07 keys true. The closure commit is
 `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.
 Session 10 is complete. Every key is true.
-Sessions 11-15 have no contract and are not activated.
+Session 11's contract is installed and the session is not activated.
+Sessions 12-15 have no contract and are not activated.
 
 ## Session 00
 
@@ -269,19 +270,29 @@ Head SHA: `f16c7ed0598daf3f4627955b52585f253ae1b918`.
 ## Sessions 11-15
 
 Session 10 is complete. Every key is true.
-Sessions 11-15 have no contract and are not activated.
+Session 11's contract is installed and the session is not activated.
+Sessions 12-15 have no contract and are not activated.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
 ## Session 11
 
 Prompt: `14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md`.
 Status: not activated.
-Evidence contract: absent.
-No evidence contract. Intake is in memory and sends nothing. A16 stays DESIGNED.
+Evidence contract: installed, not activated.
+The evidence contract is installed and the session is not activated. Intake is in memory and sends nothing. A16 stays DESIGNED.
 
 Fixture paths:
 
 - `src/money_machine/assets/support_intake.py`
+
+| Key | Recorded |
+|---|---|
+| `control_files_and_checkpoint_current` | not installed |
+| `draft_reply_implemented` | not installed |
+| `evidence_closure_commit_recorded` | not installed |
+| `incident_routing_implemented` | not installed |
+| `repair_resolution_implemented` | not installed |
+| `support_intake_implemented` | not installed |
 
 ## Session 12
 

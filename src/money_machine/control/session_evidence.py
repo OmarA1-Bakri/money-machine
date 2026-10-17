@@ -3,8 +3,9 @@
 Sessions 00-06 closed with every contract key true. Session 07's close
 commit under D-0032 has every contract key false. D-0036 records the live
 pointer separately. Sessions 08, 09, and 10 are complete. Session 10 is
-revision 83 and every one of its keys is true (D-0055). Sessions 11-15 have
-no contract. This module does not edit ``IMPLEMENTATION_STATE.json``.
+revision 83 and every one of its keys is true (D-0055). Session 11's
+contract is installed and the session is not activated (D-0056). Sessions
+12-15 have no contract. This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
 from __future__ import annotations
@@ -156,7 +157,10 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
     OpenSessionEvidence(
         11,
         ("src/money_machine/assets/support_intake.py",),
-        "No evidence contract. Intake is in memory and sends nothing. A16 stays DESIGNED.",
+        (
+            "The evidence contract is installed and the session is not activated. "
+            "Intake is in memory and sends nothing. A16 stays DESIGNED."
+        ),
     ),
     OpenSessionEvidence(
         12,
@@ -202,10 +206,9 @@ def render_session_evidence() -> str:
         "Session 07's close commit keeps every contract key false under D-0032.",
         "D-0036 recorded the twelve Session 07 keys true. The closure commit is",
         "`5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.",
-        (
-            "Session 10 is complete. Every key is true."
-        ),
-        "Sessions 11-15 have no contract and are not activated.",
+        "Session 10 is complete. Every key is true.",
+        "Session 11's contract is installed and the session is not activated.",
+        "Sessions 12-15 have no contract and are not activated.",
         "",
     ]
     for record in CLOSED_SESSION_EVIDENCE:
@@ -243,7 +246,8 @@ def render_session_evidence() -> str:
             "## Sessions 11-15",
             "",
             "Session 10 is complete. Every key is true.",
-            "Sessions 11-15 have no contract and are not activated.",
+            "Session 11's contract is installed and the session is not activated.",
+            "Sessions 12-15 have no contract and are not activated.",
             "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",
         ]
