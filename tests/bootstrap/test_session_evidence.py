@@ -31,10 +31,11 @@ def _state_at(commit: str) -> dict[str, object]:
 
 
 def test_every_session_from_00_through_15_is_listed_once() -> None:
+    """Sessions 00-08 are closed, sessions 09-15 are open, and neither set overlaps."""
     closed = [record.session for record in CLOSED_SESSION_EVIDENCE]
     opened = [record.session for record in OPEN_SESSION_EVIDENCE]
-    assert closed == list(range(8))
-    assert opened == list(range(8, 16))
+    assert closed == list(range(9))
+    assert opened == list(range(9, 16))
     assert set(closed).isdisjoint(opened)
 
 
@@ -57,24 +58,28 @@ def test_closed_snapshots_match_the_commits_that_hold_them() -> None:
         assert all(item is record.all_keys_true for item in values)
 
 
-def test_live_pointer_still_matches_the_session_07_close() -> None:
+def test_live_pointer_is_complete_session_08() -> None:
+    """The checked-in state pointer is complete Session 08 with every evidence key true."""
     live = json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    record = CLOSED_SESSION_EVIDENCE[7]
-    assert live["current_session"] == 7
+    assert live["current_session"] == 8
     assert live["session_status"] == "complete"
-    assert live["state_revision"] == record.state_revision
-    assert live["head_sha"] == record.head_sha
-    assert live["evidence_closure_commit_sha"] == record.evidence_closure_commit_sha
-    assert live["required_completion_evidence"] == {
-        key: False for key in sorted(SESSION_EVIDENCE_KEYS[7])
-    }
+    assert live["state_revision"] == 69
+    assert live["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    assert live["next_session"] == 9
+    assert live["next_prompt"] == SESSION_PROMPTS[9]
+    assert live["head_sha"] == "01b7dd84ef98442ff26a5239e8c7de742739d844"
+    assert live["evidence_closure_commit_sha"] == live["head_sha"]
+    evidence = live["required_completion_evidence"]
+    assert isinstance(evidence, dict)
+    expected = {key: True for key in sorted(SESSION_EVIDENCE_KEYS[8])}
+    assert evidence == expected
 
 
 def test_open_sessions_have_no_recorded_true_key() -> None:
+    """Open sessions have no evidence contract and a documented gap for each fixture path."""
     for record in OPEN_SESSION_EVIDENCE:
         assert record.session not in {item.session for item in CLOSED_SESSION_EVIDENCE}
-        defined = record.session in SESSION_EVIDENCE_KEYS
-        assert defined is (record.session == 8)
+        assert record.session not in SESSION_EVIDENCE_KEYS
         for path in record.fixture_paths:
             assert (ROOT / path).is_file(), path
         assert "not" in record.gap.casefold() or "no evidence" in record.gap.casefold()

@@ -40,6 +40,8 @@ BOOTSTRAP_COMMIT_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 SESSION_06_PRIOR_WAVE_TIP = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
 # Session 07 close tip-syncs head_sha to Omar's #64 squash, not this state file.
 SESSION_07_CLOSE_TIP = "b782751fdb1b255c436ff7f6fa655e6d783b1e8c"
+# Commit that records the eleven earned keys with the closure key still false.
+SESSION_07_EARNED_COMMIT = "5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb"
 
 
 class ControlState(TypedDict):
@@ -301,6 +303,7 @@ def test_control_files_are_exactly_the_five_continuity_files() -> None:
 
 
 def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
+    """The checked-in state has every required field and a self-consistent session shape."""
     state = load_state()
     required = {
         "programme",
@@ -336,6 +339,15 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
         # or False (work in progress).
         # When True with session incomplete, it signals readiness for Verifier review
         assert isinstance(evidence[CLOSURE_EVIDENCE_KEY], bool)
+        if session == 8:
+            assert evidence[CLOSURE_EVIDENCE_KEY] is False
+            assert all(
+                value is True for key, value in evidence.items() if key != CLOSURE_EVIDENCE_KEY
+            )
+            assert state["head_sha"] == SESSION_07_CLOSE_TIP
+            assert state["evidence_closure_commit_sha"] == SESSION_07_EARNED_COMMIT
+            assert state["state_revision"] == 68
+            assert state["commissioned_agents"] == []
     else:
         assert state["session_status"] == "complete"
         assert state["completed_sessions"] == list(range(session + 1))
@@ -344,8 +356,8 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
         evidence = state["required_completion_evidence"]
         assert evidence.keys() == control_state.SESSION_EVIDENCE_KEYS[session]
         if session == 7:
-            # Omar's merge is the close gate. The twelve keys stay false.
-            assert all(value is False for value in evidence.values())
+            # D-0036 records every key, including the closure key, through record-evidence.
+            assert all(evidence.values())
         else:
             assert all(evidence.values())
     assert state["transition_contract"]["completion_requires_next_session"] == state["next_session"]
@@ -365,7 +377,7 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
         if state["session_status"] == "complete":
             if session == 7:
                 assert state["head_sha"] == SESSION_07_CLOSE_TIP
-                assert closure == SESSION_06_PRIOR_WAVE_TIP
+                assert closure == SESSION_07_EARNED_COMMIT
                 assert state["head_sha"] != closure
             else:
                 assert state["head_sha"] == closure
@@ -1512,16 +1524,17 @@ def session_eight_activation_paths(
     state_path = repo / "docs" / "control" / "IMPLEMENTATION_STATE.json"
     state_path.parent.mkdir(parents=True)
     state = copy.deepcopy(load_state())
-    assert state["current_session"] == 7
-    assert state["session_status"] == "complete"
-    assert state["next_session"] == 8
-    assert set(state["required_completion_evidence"]) == set(SESSION_07_EVIDENCE_KEYS)
+    state["current_session"] = 7
+    state["session_status"] = "complete"
+    state["next_session"] = 8
+    state["next_prompt"] = control_state.SESSION_PROMPTS[8]
+    state["completed_sessions"] = list(range(8))
     assert set(control_state.SESSION_EVIDENCE_KEYS[7]) == set(SESSION_07_EVIDENCE_KEYS)
     assert set(control_state.SESSION_EVIDENCE_KEYS[8]) == set(SESSION_08_EVIDENCE_KEYS)
     if prior_evidence_true:
         state["required_completion_evidence"] = dict.fromkeys(SESSION_07_EVIDENCE_KEYS, True)
     else:
-        assert all(value is False for value in state["required_completion_evidence"].values())
+        state["required_completion_evidence"] = dict.fromkeys(SESSION_07_EVIDENCE_KEYS, False)
     state["repo_root"] = str(repo)
     state["branch"] = BRANCH
     write_state(state_path, state)
@@ -1556,8 +1569,10 @@ def test_session_eight_activation_rejects_false_session_seven_evidence(tmp_path:
         assert key in result.stderr
     assert state_path.read_bytes() == original
     assert STATE_PATH.read_bytes() == checked_in
-    assert load_state()["current_session"] == 7
-    assert load_state()["state_revision"] == 64
+    assert load_state()["current_session"] == 8
+    assert load_state()["session_status"] == "complete"
+    assert load_state()["state_revision"] == 69
+    assert load_state()["next_session"] == 9
 
 
 def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: Path) -> None:
@@ -1580,18 +1595,92 @@ def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: 
     assert not any(after["required_completion_evidence"].values())
     assert STATE_PATH.read_bytes() == checked_in
     live = load_state()
-    assert live["current_session"] == 7
-    assert live["next_session"] == 8
-    assert all(value is False for value in live["required_completion_evidence"].values())
+    assert live["current_session"] == 8
+    assert live["session_status"] == "complete"
+    assert live["next_session"] == 9
+    assert live["state_revision"] == 69
+    assert live["head_sha"] == "01b7dd84ef98442ff26a5239e8c7de742739d844"
+    assert live["evidence_closure_commit_sha"] == live["head_sha"]
+    live_evidence = live["required_completion_evidence"]
+    assert set(live_evidence) == set(SESSION_08_EVIDENCE_KEYS)
+    assert all(live_evidence.values())
+
+
+def test_activation_uses_the_worktree_when_recorded_root_is_absent(tmp_path: Path) -> None:
+    """D-0037. A missing recorded root still activates the canonical state file."""
+    repo = tmp_path / "repository"
+    state_path = repo / "docs" / "control" / "IMPLEMENTATION_STATE.json"
+    state_path.parent.mkdir(parents=True)
+    state = copy.deepcopy(load_state())
+    state["current_session"] = 7
+    state["session_status"] = "complete"
+    state["next_session"] = 8
+    state["next_prompt"] = control_state.SESSION_PROMPTS[8]
+    state["completed_sessions"] = list(range(8))
+    state["required_completion_evidence"] = dict.fromkeys(SESSION_07_EVIDENCE_KEYS, True)
+    state["repo_root"] = "/mnt/d/Money Machine"
+    state["updated_at"] = "2026-10-16T19:10:00Z"
+    write_state(state_path, state)
+    git(repo, "init", "-b", "fixture")
+    git(repo, "config", "user.name", "Control Test")
+    git(repo, "config", "user.email", "control-test@example.invalid")
+    candidate = copy.deepcopy(state)
+    candidate["state_revision"] = state["state_revision"] + 1
+    candidate["session_status"] = "incomplete"
+    candidate["current_session"] = 8
+    candidate["updated_at"] = "2026-10-16T20:00:00Z"
+    candidate["required_completion_evidence"] = dict.fromkeys(SESSION_08_EVIDENCE_KEYS, False)
+    candidate_path = tmp_path / "activation.json"
+    write_state(candidate_path, candidate)
+
+    applied = control_state.apply_activation_transition(state_path, candidate_path)
+
+    assert applied["current_session"] == 8
+    assert applied["session_status"] == "incomplete"
+    assert applied["repo_root"] == "/mnt/d/Money Machine"
+    assert not any(applied["required_completion_evidence"].values())
+
+
+def test_activation_refuses_a_noncanonical_path_when_root_is_absent(tmp_path: Path) -> None:
+    """D-0037. A missing recorded root still requires the canonical state path."""
+    repo = tmp_path / "repository"
+    repo.mkdir()
+    state_path = repo / "elsewhere.json"
+    state = copy.deepcopy(load_state())
+    state["current_session"] = 7
+    state["session_status"] = "complete"
+    state["required_completion_evidence"] = dict.fromkeys(SESSION_07_EVIDENCE_KEYS, True)
+    state["repo_root"] = "/mnt/d/Money Machine"
+    state["updated_at"] = "2026-10-16T19:10:00Z"
+    write_state(state_path, state)
+    git(repo, "init", "-b", "fixture")
+    candidate = copy.deepcopy(state)
+    candidate["state_revision"] = state["state_revision"] + 1
+    candidate["session_status"] = "incomplete"
+    candidate["current_session"] = 8
+    candidate["updated_at"] = "2026-10-16T20:00:00Z"
+    candidate["required_completion_evidence"] = dict.fromkeys(SESSION_08_EVIDENCE_KEYS, False)
+    candidate_path = tmp_path / "activation.json"
+    write_state(candidate_path, candidate)
+
+    with pytest.raises(control_state.ControlStateError, match="canonical implementation state"):
+        control_state.apply_activation_transition(state_path, candidate_path)
 
 
 def _false_key_session_eight_pair() -> tuple[ControlState, ControlState]:
+    """Return a Session 07 to Session 08 activation pair with every evidence key false."""
     previous = copy.deepcopy(load_state())
+    previous["current_session"] = 7
+    previous["session_status"] = "complete"
+    previous["next_session"] = 8
+    previous["next_prompt"] = control_state.SESSION_PROMPTS[8]
+    previous["completed_sessions"] = list(range(8))
+    previous["required_completion_evidence"] = dict.fromkeys(SESSION_07_EVIDENCE_KEYS, False)
     current = copy.deepcopy(previous)
     current["state_revision"] = previous["state_revision"] + 1
     current["session_status"] = "incomplete"
     current["current_session"] = 8
-    current["updated_at"] = "2026-10-10T08:00:00Z"
+    current["updated_at"] = "2026-10-16T21:00:00Z"
     current["required_completion_evidence"] = dict.fromkeys(SESSION_08_EVIDENCE_KEYS, False)
     return previous, current
 
@@ -1677,8 +1766,10 @@ def _completed_session_evidence(previous: ControlState) -> None:
 
 
 def _session_seven_with_evidence(evidence: dict[str, bool]) -> ControlState:
+    """Return the checked-in Session 07 state with its evidence map replaced."""
     state = copy.deepcopy(load_state())
-    assert state["current_session"] == 7
+    state["current_session"] = 7
+    state["session_status"] = "complete"
     state["required_completion_evidence"] = evidence
     return state
 

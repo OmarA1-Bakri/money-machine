@@ -56,8 +56,8 @@ PHASE_TWO_AT = datetime(2026, 10, 5, 20, 0, tzinfo=UTC)
 DASHBOARD_AT = datetime(2026, 10, 5, 22, 30, tzinfo=UTC)
 HUBS_AT = datetime(2026, 10, 5, 23, 45, tzinfo=UTC)
 LATER = datetime(2026, 10, 6, 0, 30, tzinfo=UTC)
-CLOSURE_SHA = "0f94d585f23d79e5ac18479f01e14f67cbaad332"
-HEAD_SHA = "b782751fdb1b255c436ff7f6fa655e6d783b1e8c"
+CLOSURE_SHA = "01b7dd84ef98442ff26a5239e8c7de742739d844"
+HEAD_SHA = "01b7dd84ef98442ff26a5239e8c7de742739d844"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 _PHASES = (
     PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL,
@@ -828,21 +828,24 @@ async def test_adopted_database_rejects_a_text_title(tmp_path: Path) -> None:
     assert database.properties[0].type == "text"
 
 
-def test_session_seven_close_keeps_evidence_false() -> None:
+def test_live_pointer_is_complete_session_eight() -> None:
+    """The checked-in state pointer is complete Session 08 with every evidence key true."""
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    assert state["current_session"] == 7
+    assert state["current_session"] == 8
     assert state["session_status"] == "complete"
-    assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7]
-    assert state["next_session"] == 8
-    assert state["next_prompt"] == "11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md"
+    assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    assert state["next_session"] == 9
+    assert state["next_prompt"] == "12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md"
     assert state["head_sha"] == HEAD_SHA
     assert state["evidence_closure_commit_sha"] == CLOSURE_SHA
-    assert state["head_sha"] != state["evidence_closure_commit_sha"]
+    assert state["head_sha"] == state["evidence_closure_commit_sha"]
     assert state["last_verified_commit"] == BOOTSTRAP_SHA
     assert state["commissioned_agents"] == []
     evidence = state["required_completion_evidence"]
-    assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
-    assert all(value is False for value in evidence.values())
-    assert evidence["notification_dashboard_built"] is False
-    assert state["state_revision"] == 64
+    assert evidence.keys() == SESSION_EVIDENCE_KEYS[8]
+    assert all(value is True for value in evidence.values())
+    assert state["state_revision"] == 69
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")
+    assert "SESSION_08_MERCHANDISING_AND_ASSETS_COMPLETE" not in STATE_PATH.read_text(
+        encoding="utf-8"
+    )

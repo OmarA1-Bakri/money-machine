@@ -1,3 +1,57 @@
+## 2026-10-17 — Session 08 close is indexed
+
+`docs/control/SESSION_EVIDENCE.md` records Session 08 as complete. The state commit is `4a07fd69259a7265c5780fb584b2a89cacd9b258`. The closure commit is `01b7dd84ef98442ff26a5239e8c7de742739d844`. `IMPLEMENTATION_STATE.json` is unchanged in this commit. Sessions 09–15 stay unactivated.
+
+## 2026-10-17 — Session 08 completed from the frozen pointer
+
+`apply-completion` advanced `state_revision` from 68 to 69. `updated_at` is `2026-10-17T09:49:00Z`. `session_status` is complete. `current_session` stays 8. `completed_sessions` is `[0, 1, 2, 3, 4, 5, 6, 7, 8]`. `next_session` is 9. `next_prompt` is `12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md`. Every Session 08 evidence key is true, including `evidence_closure_commit_recorded`. `head_sha` and `evidence_closure_commit_sha` are `01b7dd84ef98442ff26a5239e8c7de742739d844`, the commit that contains D-0039, `def prove_session_08`, and the revision-68 state. This state file does not name the commit that records it. `commissioned_agents` stays empty. Exit 78 stays HELD. A10 and A11 stay `DESIGNED`. The exit string is not written. Session 09 is not activated. No live Etsy, Notion, or S3 call is made.
+
+## 2026-10-17 — Session 08 completion is authorised from the frozen pointer
+
+D-0039 accepts completion from `head_sha` `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` and prior closure `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. That pair is Session 08 only. The closure commit must be `HEAD`, must contain the exact pre-transition state, and must contain `def prove_session_08`. `apply-completion` has not been run in this commit. `IMPLEMENTATION_STATE.json` stays revision 68. `evidence_closure_commit_recorded` stays false. Exit 78 stays HELD. A10 and A11 stay `DESIGNED`. The exit string is not written. No live Etsy, Notion, or S3 call is made.
+
+`uv run pytest -q -p no:cacheprovider --tb=line tests/bootstrap/test_session_08_completion.py` is included in the control run below. `ruff format`, `ruff check`, and `pyright` on `state.py` and the new test were clean.
+
+## 2026-10-16 — Session 08 evidence keys recorded
+
+`record-evidence` advanced `state_revision` from 67 to 68. `updated_at` is `2026-10-16T22:00:00Z`. The ten behavioral keys and `control_files_and_checkpoint_current` are true. `evidence_closure_commit_recorded` stays false. `current_session` stays 8. `session_status` stays `incomplete`. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6, 7]`. `next_session` stays 8. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `evidence_closure_commit_sha` stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `commissioned_agents` stays empty. Exit 78 stays HELD. A07, A08, A09, A10, and A11 stay `DESIGNED`. The exit string is not written. Session 08 is incomplete. Sessions 09–15 stay unactivated.
+
+D-0038 is the only path that flips these keys. `prove_session_08()` runs the fixture chain and returns the ten behavioral keys. A candidate that sets one key, or that sets the closure key, is refused. Completion stays refused while `head_sha` differs from the prior closure commit.
+
+`uv run pytest -q -p no:cacheprovider --tb=line` on the Session 08 evidence transition, the Session 07 evidence transition, the evidence index, prompt integrity, the Session 08 activation checks, the prior-evidence checks, and the live pin tests printed 53 passed in 17.03s. `tests/bootstrap/test_session_08_proof.py` printed 1 passed in 14.45s. `ruff format`, `ruff check`, and `pyright` on the touched control modules were clean. A full repository suite was not run.
+
+## 2026-10-16 — Session 08 activated, every key false
+
+`activate` advanced `state_revision` from 66 to 67. `updated_at` is `2026-10-16T20:00:00Z`. `current_session` is 8. `session_status` is `incomplete`. The twelve Session 08 evidence keys are installed and every one is false. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6, 7]`. `next_session` stays 8. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `evidence_closure_commit_sha` stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `commissioned_agents` stays empty. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. The exit string is not written. Session 08 is incomplete. Sessions 09–15 stay unactivated.
+
+D-0037 covers the machine where the recorded `repo_root` `/mnt/d/Money Machine` is absent. Activation then checks that the state file is the canonical path inside the Git worktree. When that root exists, the branch must still equal the recorded `build/full-automation`. The recorded `repo_root` and `branch` fields are unchanged.
+
+`uv run pytest -q -p no:cacheprovider --tb=line` on the evidence transition, the evidence index, prompt integrity, the Session 08 activation checks, the prior-evidence checks, and the live pin tests printed 42 passed in 3.09s. `ruff format`, `ruff check`, and `pyright` on the touched control modules were clean. A full repository suite was not run.
+
+## 2026-10-16 — Session 07 closure key recorded
+
+`record-evidence` advanced `state_revision` from 65 to 66. `updated_at` is `2026-10-16T19:10:00Z`. `evidence_closure_commit_recorded` is true. `evidence_closure_commit_sha` is `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`, the commit that holds the eleven true keys and `def prove_session_07`. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `current_session` stays 7. `session_status` stays complete. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. The exit string is not written. Session 08 is not activated.
+
+Every Session 07 evidence key is now true. Activation of Session 08 is the next legal command. It is not part of this commit.
+
+`uv run pytest -q -p no:cacheprovider --tb=line` on the evidence transition, the evidence index, the two Session 08 activation checks, and the live pin tests printed 29 passed. `test_checked_in_state_is_a_valid_session_continuity_shape` compares the closure sha with the last commit that touches the state file. That commit is this one, so the closure sha and the state-file commit differ. A full repository suite was not run.
+
+## 2026-10-16 — Session 07 eleven evidence keys recorded
+
+`record-evidence` advanced `state_revision` from 64 to 65. `updated_at` is `2026-10-16T19:00:00Z`. The ten behavioral keys and `control_files_and_checkpoint_current` are true. `evidence_closure_commit_recorded` stays false. `evidence_closure_commit_sha` stays `0f94d585f23d79e5ac18479f01e14f67cbaad332`. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `current_session` stays 7. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. The exit string is not written. Session 08 is not activated.
+
+The historical close `00b952a83bffcec8d442468223d64dd9b2d3e6df` stays all false. The live sandbox was not started.
+
+`uv run pytest -q -p no:cacheprovider --tb=short tests/bootstrap/test_session_07_evidence_record.py tests/bootstrap/test_session_07_proof.py tests/bootstrap/test_session_evidence.py tests/bootstrap/test_control_state.py::test_checked_in_state_is_a_valid_session_continuity_shape tests/bootstrap/test_control_state.py::test_session_eight_activation_rejects_false_session_seven_evidence tests/bootstrap/test_control_state.py::test_session_eight_activation_accepts_true_session_seven_evidence` printed 22 passed in 2.51s. The eight live pin tests in the product-builder modules and `test_state_commissioning_and_exit_78_are_unchanged` passed in the same session. A full repository suite was not run.
+
+## 2026-10-16 — Session 07 evidence transition, keys still false
+
+`current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. No evidence key flips. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. The exit string is not written.
+
+D-0036 amends D-0032's flip ban. `prove_session_07()` runs the mass and business fixture builds. `record-evidence` flips the ten behavioral keys and `control_files_and_checkpoint_current` only when that proof returns them and the five control files exist. The closure key flips later, alone, onto a commit that already holds those eleven as true. The live sandbox is not started. D-0029 and D-0030 stay in force.
+
+`uv run pytest -q -p no:cacheprovider --tb=short tests/bootstrap/test_session_07_evidence_record.py tests/bootstrap/test_session_07_proof.py` printed 14 passed in 1.24s. `ruff format`, `ruff check`, and `pyright` on the proof, the transition, the CLI, and the tests were clean. A full repository suite was not run.
+
 ## 2026-10-16 — Session evidence index for sessions 00-15
 
 `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. No evidence key flips.

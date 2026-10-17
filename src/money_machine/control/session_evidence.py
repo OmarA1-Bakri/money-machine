@@ -1,9 +1,9 @@
 """Pinned completion evidence for sessions 00 through 15.
 
-Sessions 00-06 closed with every contract key true. Session 07 closed under
-D-0032 with every contract key false. Sessions 08-15 are not activated, so
-none of their keys is recorded true. This module does not edit
-``IMPLEMENTATION_STATE.json``.
+Sessions 00-06 closed with every contract key true. Session 07's close
+commit under D-0032 has every contract key false. D-0036 records the live
+pointer separately. Session 08 is complete at revision 69. Sessions 09-15
+are not activated. This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
 from __future__ import annotations
@@ -117,22 +117,19 @@ CLOSED_SESSION_EVIDENCE: tuple[ClosedSessionEvidence, ...] = (
         8,
         False,
     ),
+    ClosedSessionEvidence(
+        8,
+        "4a07fd69259a7265c5780fb584b2a89cacd9b258",
+        69,
+        "01b7dd84ef98442ff26a5239e8c7de742739d844",
+        "01b7dd84ef98442ff26a5239e8c7de742739d844",
+        (0, 1, 2, 3, 4, 5, 6, 7, 8),
+        9,
+        True,
+    ),
 )
 
 OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
-    OpenSessionEvidence(
-        8,
-        (
-            "src/money_machine/agents/implementations/merchandising.py",
-            "src/money_machine/domain/services/claim_validation.py",
-            "src/money_machine/assets/design_tokens.py",
-            "src/money_machine/assets/screenshots.py",
-            "src/money_machine/assets/link_validation.py",
-            "src/money_machine/assets/asset_lineage.py",
-            "src/money_machine/integrations/storage/local.py",
-        ),
-        "Contract exists and is not installed. Fixture modules are not a true key.",
-    ),
     OpenSessionEvidence(
         9,
         (
@@ -192,11 +189,14 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 07 at state revision 64.",
-        "`current_session` stays 7. `IMPLEMENTATION_STATE.json` is not edited by this index.",
+        "The checked-in pointer is Session 08 at state revision 69.",
+        "`current_session` is 8. `session_status` is complete.",
+        "Every Session 08 evidence key is true.",
         "Sessions 00-06 closed with every contract key true.",
-        "Session 07 closed under D-0032 with every contract key false.",
-        "Sessions 08-15 are not activated, so none of their keys is recorded true.",
+        "Session 07's close commit keeps every contract key false under D-0032.",
+        "D-0036 recorded the twelve Session 07 keys true. The closure commit is",
+        "`5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.",
+        "Sessions 09-15 are not activated.",
         "",
     ]
     for record in CLOSED_SESSION_EVIDENCE:
@@ -223,30 +223,29 @@ def render_session_evidence() -> str:
             lines.extend(
                 [
                     "",
-                    "D-0032 keeps these twelve keys false.",
+                    "D-0032 keeps these twelve keys false on this close commit.",
                     "The close is the operator gate. It is not `validate_completion_transition`.",
-                    "Activation of Session 08 stays refused while any of these keys is false.",
+                    "D-0036 records the live keys later. This table is the close commit.",
                 ]
             )
         lines.append("")
     lines.extend(
         [
-            "## Sessions 08-15",
+            "## Sessions 09-15",
             "",
-            "These sessions are not activated. A fixture path is code on the trunk.",
+            "Sessions 09-15 are not activated. A fixture path is code on the trunk.",
             "It is not a recorded evidence key.",
             "",
         ]
     )
     for record in OPEN_SESSION_EVIDENCE:
-        contract = "defined, not installed" if record.session in SESSION_EVIDENCE_KEYS else "absent"
         lines.extend(
             [
                 f"## Session {record.session:02d}",
                 "",
                 f"Prompt: `{SESSION_PROMPTS[record.session]}`.",
                 "Status: not activated.",
-                f"Evidence contract: {contract}.",
+                "Evidence contract: absent.",
                 record.gap,
                 "",
             ]

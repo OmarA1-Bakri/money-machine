@@ -1,5 +1,106 @@
 # Test Evidence
 
+## 2026-10-17 — Session 08 completion applied
+
+**Verification scope**: live `apply-completion` from revision 68 to 69. No live HTTP. Exit 78 stays HELD. A10 and A11 stay `DESIGNED`. Session 09 is not activated.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 8, `complete`, revision 69, `updated_at` `2026-10-17T09:49:00Z` | PASS |
+| Keys | All twelve Session 08 keys true | PASS |
+| Closure | `head_sha` and `evidence_closure_commit_sha` are `01b7dd84ef98442ff26a5239e8c7de742739d844` | PASS |
+| Next | `next_session` 9, prompt `12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md`, not activated | PASS |
+| Exit string | `SESSION_08_MERCHANDISING_AND_ASSETS_COMPLETE` is absent | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "apply-completion", "session": 8, "state_revision": 69}`. The completion test, the evidence index, the Session 08 evidence transition, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 34 passed in 15.80s.
+
+## 2026-10-17 — Session 08 completion rule
+
+**Verification scope**: the D-0039 validator and the absent-root completion path. The live state file is not changed. No live HTTP.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Frozen pair | `validate_completion_transition` accepts head `b782751` and prior closure `5a48a4c` for Session 08 | PASS |
+| Other mismatch | A different head is refused. Session 07 cannot use the pair. Reusing the prior closure is refused | PASS |
+| Absent root | A fixture repo whose recorded root is missing completes on branch `fixture` when the proof function is present | PASS |
+| Missing proof | The same fixture without `def prove_session_08` writes nothing | PASS |
+| Live pointer | Revision 68, closure key false, is unchanged by these tests | PASS |
+
+`uv run pytest -q -p no:cacheprovider --tb=short` on the completion test, the control-state suite, the Session 08 evidence transition, and the evidence index printed 105 passed, 1 skipped, and 1 failed. The failure is `test_control_files_are_exactly_the_five_continuity_files` because `SESSION_EVIDENCE.md` is already in `docs/control`. That failure is older than this change. `ruff` and `pyright` on the touched control modules were clean.
+
+## 2026-10-16 — Session 08 evidence keys
+
+**Verification scope**: live `record-evidence` from revision 67 to 68. No live HTTP. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. The closure key stays false. Session 08 stays incomplete. Sessions 09–15 stay unactivated.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 8, `incomplete`, revision 68, `updated_at` `2026-10-16T22:00:00Z` | PASS |
+| Keys | Ten behavioral keys and `control_files_and_checkpoint_current` true; closure key false | PASS |
+| Head | Stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` | PASS |
+| Closure | Stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb` | PASS |
+| Proof | `prove_session_08()` returns the ten behavioral keys | PASS |
+| Exit string | `SESSION_08_MERCHANDISING_AND_ASSETS_COMPLETE` is absent | PASS |
+
+The focused pytest printed 53 passed in 17.03s. The proof test printed 1 passed in 14.45s. A full repository suite was not run.
+
+## 2026-10-16 — Session 08 activation
+
+**Verification scope**: live `activate` from revision 66 to 67. No live HTTP. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. Session 08 keys are all false. Sessions 09–15 stay unactivated.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 8, `incomplete`, revision 67, `updated_at` `2026-10-16T20:00:00Z` | PASS |
+| Keys | Twelve Session 08 keys installed, every value false | PASS |
+| Head | Stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` | PASS |
+| Closure | Stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb` | PASS |
+| Absent root | Canonical worktree check accepts; a noncanonical path is refused | PASS |
+| Exit string | `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE` is absent | PASS |
+
+The focused pytest printed 42 passed in 3.09s. A full repository suite was not run.
+
+## 2026-10-16 — Session 07 closure key
+
+**Verification scope**: live `record-evidence` from revision 65 to 66. No live HTTP. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. Session 08 is not activated.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Closure key | True at revision 66 | PASS |
+| Closure commit | `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb` contains the proof and the eleven true keys | PASS |
+| Head | Stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` | PASS |
+| Historical close | `00b952a8` still has all twelve keys false | PASS |
+| Exit string | `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE` is absent | PASS |
+
+The focused pytest printed 29 passed before this commit. The continuity shape test requires this commit to be the state-file pointer, distinct from the closure sha. A full repository suite was not run.
+
+## 2026-10-16 — Session 07 eleven keys
+
+**Verification scope**: live `record-evidence` to revision 65, the pin tests, and the evidence index. No live HTTP. Closure key stays false. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Eleven keys | CLI `record-evidence` set revision 65 and the eleven keys true | PASS |
+| Closure key | Stays false. Closure SHA stays `0f94d585f23d79e5ac18479f01e14f67cbaad332` | PASS |
+| Historical close | `00b952a8` still has all twelve keys false | PASS |
+| Live pins | Continuity, activation, and the product-builder state tests match revision 65 | PASS |
+| Exit string | `SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE` is absent | PASS |
+
+`uv run pytest -q -p no:cacheprovider --tb=short tests/bootstrap/test_session_07_evidence_record.py tests/bootstrap/test_session_07_proof.py tests/bootstrap/test_session_evidence.py tests/bootstrap/test_control_state.py::test_checked_in_state_is_a_valid_session_continuity_shape tests/bootstrap/test_control_state.py::test_session_eight_activation_rejects_false_session_seven_evidence tests/bootstrap/test_control_state.py::test_session_eight_activation_accepts_true_session_seven_evidence` printed `22 passed in 2.51s`. A full repository suite was not run.
+
+## 2026-10-16 — Session 07 evidence transition
+
+**Verification scope**: `session_07_proof.py`, `state.py` evidence transition, `cli.py` `record-evidence`, and the two bootstrap tests. No `IMPLEMENTATION_STATE.json` change. No live HTTP. No key flip. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Behavioral keys | `prove_session_07()` returns the ten keys for mass and business | PASS |
+| One key, early closure, revocation, revision, session, head | `validate_evidence_record_transition` refuses | PASS |
+| Eleven keys | Temp-repo `apply_evidence_record_transition` after the proof | PASS |
+| Closure | Refused when the named commit is still all false; accepted when that commit has the eleven true and `def prove_session_07` | PASS |
+| Live file | Bytes unchanged. Revision stays 64 | PASS |
+
+`uv run pytest -q -p no:cacheprovider --tb=short tests/bootstrap/test_session_07_evidence_record.py tests/bootstrap/test_session_07_proof.py` printed `14 passed in 1.24s`. A full repository suite was not run.
+
 ## 2026-10-16 — Session evidence index
 
 **Verification scope**: `session_evidence.py`, `SESSION_EVIDENCE.md`, and `test_session_evidence.py`. No `IMPLEMENTATION_STATE.json` change. No live HTTP. No key flip.

@@ -1,5 +1,33 @@
 # Next Session
 
+## Session 08 is complete, Session 09 is not activated (2026-10-17)
+
+Revision 69 marks Session 08 complete. `updated_at` is `2026-10-17T09:49:00Z`. `head_sha` and `evidence_closure_commit_sha` are `01b7dd84ef98442ff26a5239e8c7de742739d844`. `next_session` is 9. `next_prompt` is `12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md`. Session 09 is not activated. Exit 78 stays HELD. A10 and A11 stay `DESIGNED`. `commissioned_agents` stays empty. The exit string is not written. The next honest step is activation of Session 09, which installs that session's evidence keys and is a separate transition.
+
+## Session 08 completion is authorised, and it has not been applied (2026-10-17)
+
+D-0039 lets `apply-completion` start from `head_sha` `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` and prior closure `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. The live file is still revision 68. The closure key is still false. The next command is `apply-completion` against the commit that contains this decision, the eleven true keys, and `def prove_session_08`. That command sets both SHAs to that commit, flips the closure key, and marks Session 08 complete. Session 09 stays unactivated. Exit 78 stays HELD. A10 and A11 stay `DESIGNED`. The exit string is not written.
+
+## Session 08 has eleven earned keys, the closure key is still false (2026-10-16)
+
+Revision 68 records the ten behavioral keys and `control_files_and_checkpoint_current`. `evidence_closure_commit_recorded` stays false, so Session 08 stays incomplete. `updated_at` is `2026-10-16T22:00:00Z`. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `evidence_closure_commit_sha` stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. Exit 78 stays HELD. A07, A08, A09, A10, and A11 stay `DESIGNED`. `commissioned_agents` stays empty. The exit string is not written. The next honest step is a later completion transition. That transition is still refused while `head_sha` differs from the prior closure commit. Session 09 is not activated.
+
+## Session 08 is activated and incomplete (2026-10-16)
+
+Revision 67 installs the twelve Session 08 keys, and every one is false. `updated_at` is `2026-10-16T20:00:00Z`. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `evidence_closure_commit_sha` stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. `commissioned_agents` stays empty. The exit string is not written. The next honest step is Session 08 work under `11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md`. Completion of Session 08, and activation of Session 09, are later transitions.
+
+## Session 07 evidence is complete, Session 08 is not activated (2026-10-16)
+
+Revision 66 has every Session 07 evidence key true. `evidence_closure_commit_sha` is `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `current_session` stays 7. `session_status` stays complete. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. The next legal command is activation of Session 08. That command installs Session 08's keys all false and leaves Session 08 incomplete. It has not been run.
+
+## Session 07 has eleven earned keys, the closure key is still false (2026-10-16)
+
+Revision 65 records the ten behavioral keys and `control_files_and_checkpoint_current`. `evidence_closure_commit_recorded` stays false, so Session 08 activation is still refused. `current_session` stays 7. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. The next honest step is the closure transition onto this commit, then activation of Session 08.
+
+## Session 07 evidence can be recorded, the pointer is still Session 07 (2026-10-16)
+
+D-0036 adds `record-evidence`. The fixture proof earns the ten behavioral keys. The control-file key flips with them. The closure key flips only after that commit exists. `current_session` stays 7. `state_revision` stays 64. The twelve keys are still false. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. Session 08 is not activated.
+
 ## Session evidence is indexed, the pointer is still Session 07 (2026-10-16)
 
 `docs/control/SESSION_EVIDENCE.md` names the completion commit and every evidence key for sessions 00-07, and the missing contract for sessions 08-15. Sessions 00-06 are true. Session 07's twelve keys are false. Sessions 08-15 are not activated. `current_session` stays 7. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. The next honest step for the pointer is still Session 07 evidence that D-0032 does not yet record, then activation of Session 08.

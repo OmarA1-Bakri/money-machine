@@ -4,13 +4,13 @@
   "repo_root": "/mnt/d/Money Machine",
   "windows_repo_root": "D:\\Money Machine",
   "branch": "build/full-automation",
-  "head_sha": "b782751fdb1b255c436ff7f6fa655e6d783b1e8c",
+  "head_sha": "01b7dd84ef98442ff26a5239e8c7de742739d844",
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "evidence_closure_commit_sha": "0f94d585f23d79e5ac18479f01e14f67cbaad332",
+  "evidence_closure_commit_sha": "01b7dd84ef98442ff26a5239e8c7de742739d844",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 64,
+  "state_revision": 69,
   "session_status": "complete",
-  "current_session": 7,
+  "current_session": 8,
   "completed_sessions": [
     0,
     1,
@@ -19,7 +19,8 @@
     4,
     5,
     6,
-    7
+    7,
+    8
   ],
   "services": {
     "api": "container_healthy_readiness_true_migrated_2026-09-07",
@@ -124,23 +125,23 @@
     "S06 parked nits (non-blocking, not fixed in the S06 close): (1) an int-subclass SystemExit code maps to 1; (2) the False SystemExit row needs an isinstance-style mutant; (3) backtick formatting of __context__ in the #49 PR body; (4) CodeRabbit APPROVED tip lag on #49; (5) connected: true in fake mode (notion.py connect payload); (6) argparse echoing a token passed as an extra argument. Items 5 and 6 are still open from review 5328507848; they were omitted from the first close list, not fixed."
   ],
   "required_completion_evidence": {
-    "notion_product_builder_implemented": false,
-    "shared_databases_built": false,
-    "home_dashboard_built": false,
-    "notification_dashboard_built": false,
-    "identity_hubs_built": false,
-    "variant_builder_implemented": false,
-    "product_qa_implemented": false,
-    "product_fact_ledger_persisted": false,
-    "build_workflow_linked": false,
-    "product_build_tests_pass": false,
-    "control_files_and_checkpoint_current": false,
-    "evidence_closure_commit_recorded": false
+    "merchandising_agent_implemented": true,
+    "claim_validation_implemented": true,
+    "design_tokens_implemented": true,
+    "creative_asset_agent_implemented": true,
+    "screenshot_acquisition_implemented": true,
+    "link_validation_implemented": true,
+    "asset_lineage_recorded": true,
+    "asset_storage_implemented": true,
+    "merchandising_workflow_linked": true,
+    "merchandising_asset_tests_pass": true,
+    "control_files_and_checkpoint_current": true,
+    "evidence_closure_commit_recorded": true
   },
   "transition_contract": {
     "completion_requires_all_evidence_true": true,
     "completion_requires_current_session_in_completed_sessions": true,
-    "completion_requires_next_session": 8,
+    "completion_requires_next_session": 9,
     "completion_requires_distinct_commit_shas": true,
     "completion_requires_existing_git_commits": true,
     "completion_requires_bootstrap_ancestor_of_closure": true,
@@ -148,7 +149,7 @@
     "completion_requires_later_state_pointer_commit": true,
     "unsupported_completion_is_rejected": true
   },
-  "next_session": 8,
-  "next_prompt": "11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md",
-  "updated_at": "2026-10-10T05:36:46Z"
+  "next_session": 9,
+  "next_prompt": "12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md",
+  "updated_at": "2026-10-17T09:49:00Z"
 }

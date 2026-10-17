@@ -456,3 +456,97 @@ A migration that rewrote `dedupe_key` was the other option. It was not taken. Th
 ### Consequences
 
 A seeded legacy row beside a `PENDING` `DraftListingJob` stays one event, keeps the legacy key, does not gain the product key, and the job moves to `READY`. The global key for every other event is unchanged. No migration is added. Exit 78 stays HELD. Session 08 stays inactive.
+
+## D-0036 — Session 07 keys are earned by the fixture proof
+
+**Status:** accepted 2026-10-16. Operator instruction: earn the keys.
+
+### Context
+
+D-0032 closed Session 07 at `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` and left the twelve evidence keys false. `session_status` is already `complete`, so `apply-completion` cannot flip them. `activate` refuses Session 08 while any Session 07 key is false. A hand edit of `IMPLEMENTATION_STATE.json` is not a transition.
+
+The fixture product build already runs phase 1 through the test matrix for the mass tier and the business tier. That run is the proof. The live Notion sandbox stays unauthorized. A07, A08, and A09 stay `DESIGNED`. D-0029 still records `ListingCopyJob` as a ready name and does not insert the job. D-0030 still leaves the three section-11 fixture defects blocked. This proof does not repair them in place.
+
+### Decision
+
+D-0032's pointer stays. `current_session` stays 7. `session_status` stays complete. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `commissioned_agents` stays empty. Exit 78 stays HELD. The exit string is not written.
+
+Keys change only through `record-evidence` (`apply_evidence_record_transition`):
+
+- The ten behavioral keys flip together, and only when `prove_session_07()` returns that exact set. The control-file key flips in the same transition when the five control files exist. `evidence_closure_commit_sha` stays the Session 06 tip for that transition.
+- `evidence_closure_commit_recorded` flips alone, later. `evidence_closure_commit_sha` then becomes a commit that contains `def prove_session_07` and a state file where the other eleven keys are true and the closure key is still false. `head_sha` does not move.
+- A key that is already true cannot become false. A candidate that sets one key, or that sets the closure key early, is refused.
+
+The worktree is the Git root that contains the state file. The recorded `repo_root` is not required to exist on the machine that applies the transition.
+
+### Consequences
+
+Session 08 stays inactive until a later activation, and that activation still requires every Session 07 key to be true. The historical close at `00b952a83bffcec8d442468223d64dd9b2d3e6df` stays all false. The live sandbox is not started. No live Etsy, Notion, or S3 call is made.
+
+## D-0037 — Session 08 activates when the recorded root is absent
+
+**Status:** accepted 2026-10-16. Operator instruction: open pull 120 and activate Session 08.
+
+### Context
+
+D-0036 left Session 08 inactive until a later activation, and that activation still requires every Session 07 key to be true. Those twelve keys are true at revision 66. `activate` calls `_validate_repo_identity` when `repo_root` is a directory. The recorded root is `/mnt/d/Money Machine`. That directory is the operator machine. It is absent on the machine that applies this transition, and the checkout branch is `cursor/s07-earn-evidence-7da5` while the recorded `branch` field stays `build/full-automation`.
+
+### Decision
+
+When `Path(repo_root)` is a directory, `_validate_repo_identity` still requires that directory, the same inode as the Git toplevel, and `symbolic-ref` equal to the recorded branch `build/full-automation`.
+
+When the recorded root is not a directory, activation uses the D-0036 worktree check. The state file must be `docs/control/IMPLEMENTATION_STATE.json` inside the Git toplevel that contains it. The recorded `repo_root` and `branch` fields stay as they are.
+
+The activation is the D-0010 transition. `current_session` becomes 8. `session_status` becomes `incomplete`. `state_revision` advances by one. `updated_at` changes. Session 08's twelve evidence keys are installed and every one is false. `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6, 7]`. `next_session` stays 8. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. `evidence_closure_commit_sha` stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `commissioned_agents` stays empty. Exit 78 stays HELD. A07, A08, and A09 stay `DESIGNED`. The exit string is not written. Session 08 is not complete. Sessions 09–15 are not activated.
+
+### Consequences
+
+Revision 67 is the activated, incomplete Session 08 pointer. The next honest step is Session 08 work under `11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md`. Completion of Session 08 is a later transition and requires its own earned keys. The historical Session 07 close at `00b952a83bffcec8d442468223d64dd9b2d3e6df` stays all false.
+
+## D-0038 — Session 08 keys are earned by the fixture chain
+
+**Status:** accepted 2026-10-16. Operator instruction: continue after Session 08 activation.
+
+### Context
+
+D-0037 activated Session 08. The twelve Session 08 evidence keys were installed false. The fixture modules for merchandising, claims, tokens, screenshots, images, video, delivery PDFs, links, lineage, local storage, and the ready draft are already in the tree. `apply-completion` cannot flip those keys: completion requires them to be true already, except the closure key, and it also requires `head_sha` to equal the prior closure commit. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. The prior closure is `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. A hand edit is not a transition.
+
+### Decision
+
+`record-evidence` on an incomplete Session 08 (`apply_session_08_evidence_record_transition`) is the only way these keys change:
+
+- The ten behavioral keys flip together, and only when `prove_session_08()` returns that exact set. `control_files_and_checkpoint_current` flips in the same transition when the five control files exist.
+- `evidence_closure_commit_recorded` stays false. `evidence_closure_commit_sha` stays `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`.
+- `current_session` stays 8. `session_status` stays `incomplete`. A key that is already true cannot become false. A candidate that sets one key, or that sets the closure key, is refused.
+- The worktree check is the D-0036 check. The recorded `repo_root` and `branch` stay as they are.
+
+The proof uses fixture inputs only. It does not open a live Notion, Etsy, or S3 client. A10 and A11 stay `DESIGNED`. Exit 78 stays HELD. The exit string is not written.
+
+### Consequences
+
+Session 08 stays incomplete after the keys are recorded. Completion is a later transition and is still refused while `head_sha` differs from the prior closure commit. Sessions 09–15 stay unactivated. The historical Session 07 close stays all false.
+
+Revision 68 records the ten behavioral keys and `control_files_and_checkpoint_current`. `evidence_closure_commit_recorded` stays false. `updated_at` is `2026-10-16T22:00:00Z`.
+
+## D-0039 — Session 08 may complete from the frozen pointer
+
+**Status:** accepted 2026-10-17. Operator instruction: fully authorised.
+
+### Context
+
+D-0038 recorded the eleven Session 08 keys and left the session incomplete. `apply-completion` refuses that state because `head_sha` is `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` and `evidence_closure_commit_sha` is `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. D-0010 requires those two fields to name the same prior closure before a later session can complete. D-0032 tip-synced `head_sha` to Omar's merge and left the closure on the earlier commit. D-0036 and D-0037 kept that pair. A hand edit is not a transition.
+
+The recorded root `/mnt/d/Money Machine` is absent on the machine that applies the transition. The checkout branch is not `build/full-automation`.
+
+### Decision
+
+Session 08 is the only session that may complete from that pair.
+
+- The pre-transition `head_sha` must be `b782751fdb1b255c436ff7f6fa655e6d783b1e8c` and the pre-transition `evidence_closure_commit_sha` must be `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. Any other mismatch is still refused. Session 07 cannot use this pair.
+- The new closure commit must be `HEAD`, must contain the exact pre-transition state, must contain `def prove_session_08`, and must not claim its own object ID. `head_sha` and `evidence_closure_commit_sha` both become that commit. The closure key flips. `session_status` becomes complete. `current_session` stays 8. `completed_sessions` appends 8. `next_session` becomes 9. `next_prompt` becomes `12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md`.
+- When the recorded root is not a directory, completion uses the D-0037 worktree check. `HEAD` does not have to be attached to the recorded branch. The recorded `repo_root` and `branch` fields stay as they are.
+- Exit 78 stays HELD. A10 and A11 stay `DESIGNED`. `commissioned_agents` stays empty. The exit string is not written. No live Etsy, Notion, or S3 call is made. Session 09 is not activated.
+
+### Consequences
+
+Completion is a `apply-completion` transition from revision 68. The state-pointer commit that records the completed file is a later commit, and the state file does not name that commit. Sessions 09–15 stay unactivated.

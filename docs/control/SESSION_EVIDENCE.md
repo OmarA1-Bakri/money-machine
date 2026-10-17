@@ -1,10 +1,13 @@
 # Session evidence
 
-The checked-in pointer is Session 07 at state revision 64.
-`current_session` stays 7. `IMPLEMENTATION_STATE.json` is not edited by this index.
+The checked-in pointer is Session 08 at state revision 69.
+`current_session` is 8. `session_status` is complete.
+Every Session 08 evidence key is true.
 Sessions 00-06 closed with every contract key true.
-Session 07 closed under D-0032 with every contract key false.
-Sessions 08-15 are not activated, so none of their keys is recorded true.
+Session 07's close commit keeps every contract key false under D-0032.
+D-0036 recorded the twelve Session 07 keys true. The closure commit is
+`5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.
+Sessions 09-15 are not activated.
 
 ## Session 00
 
@@ -193,46 +196,39 @@ Head SHA: `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`.
 | `shared_databases_built` | false |
 | `variant_builder_implemented` | false |
 
-D-0032 keeps these twelve keys false.
+D-0032 keeps these twelve keys false on this close commit.
 The close is the operator gate. It is not `validate_completion_transition`.
-Activation of Session 08 stays refused while any of these keys is false.
-
-## Sessions 08-15
-
-These sessions are not activated. A fixture path is code on the trunk.
-It is not a recorded evidence key.
+D-0036 records the live keys later. This table is the close commit.
 
 ## Session 08
 
 Prompt: `11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md`.
-Status: not activated.
-Evidence contract: defined, not installed.
-Contract exists and is not installed. Fixture modules are not a true key.
-
-Fixture paths:
-
-- `src/money_machine/agents/implementations/merchandising.py`
-- `src/money_machine/domain/services/claim_validation.py`
-- `src/money_machine/assets/design_tokens.py`
-- `src/money_machine/assets/screenshots.py`
-- `src/money_machine/assets/link_validation.py`
-- `src/money_machine/assets/asset_lineage.py`
-- `src/money_machine/integrations/storage/local.py`
+State commit: `4a07fd69259a7265c5780fb584b2a89cacd9b258`.
+State revision: 69.
+Status: complete. Next session: 9.
+Completed sessions: [0, 1, 2, 3, 4, 5, 6, 7, 8].
+Evidence closure commit: `01b7dd84ef98442ff26a5239e8c7de742739d844`.
+Head SHA: `01b7dd84ef98442ff26a5239e8c7de742739d844`.
 
 | Key | Recorded |
 |---|---|
-| `asset_lineage_recorded` | not installed |
-| `asset_storage_implemented` | not installed |
-| `claim_validation_implemented` | not installed |
-| `control_files_and_checkpoint_current` | not installed |
-| `creative_asset_agent_implemented` | not installed |
-| `design_tokens_implemented` | not installed |
-| `evidence_closure_commit_recorded` | not installed |
-| `link_validation_implemented` | not installed |
-| `merchandising_agent_implemented` | not installed |
-| `merchandising_asset_tests_pass` | not installed |
-| `merchandising_workflow_linked` | not installed |
-| `screenshot_acquisition_implemented` | not installed |
+| `asset_lineage_recorded` | true |
+| `asset_storage_implemented` | true |
+| `claim_validation_implemented` | true |
+| `control_files_and_checkpoint_current` | true |
+| `creative_asset_agent_implemented` | true |
+| `design_tokens_implemented` | true |
+| `evidence_closure_commit_recorded` | true |
+| `link_validation_implemented` | true |
+| `merchandising_agent_implemented` | true |
+| `merchandising_asset_tests_pass` | true |
+| `merchandising_workflow_linked` | true |
+| `screenshot_acquisition_implemented` | true |
+
+## Sessions 09-15
+
+Sessions 09-15 are not activated. A fixture path is code on the trunk.
+It is not a recorded evidence key.
 
 ## Session 09
 
