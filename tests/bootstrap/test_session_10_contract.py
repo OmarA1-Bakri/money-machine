@@ -84,13 +84,14 @@ def test_live_pointer_records_the_closure_key() -> None:
     evidence["linked_workflow_fixture"] = True
     evidence["acceptance_matrix_recorded"] = True
     evidence["control_files_and_checkpoint_current"] = True
-    assert live["state_revision"] == 118
+    evidence["evidence_closure_commit_recorded"] = True
+    assert live["state_revision"] == 119
     assert live["current_session"] == 15
-    assert live["session_status"] == "incomplete"
-    assert live["completed_sessions"] == list(range(15))
+    assert live["session_status"] == "complete"
+    assert live["completed_sessions"] == list(range(16))
     assert live["next_session"] == 15
     assert live["next_prompt"] == SESSION_PROMPTS[15]
-    assert live["head_sha"] == "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
+    assert live["head_sha"] == "be74bc1f1dcdbf357499aa0faa9a8fb69a4c5366"
     assert live["required_completion_evidence"] == evidence
     assert "SESSION_10_CLOSED_LOOP_AUTOMATION_COMPLETE" not in text
 

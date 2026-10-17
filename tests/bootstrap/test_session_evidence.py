@@ -60,12 +60,12 @@ def test_closed_snapshots_match_the_commits_that_hold_them() -> None:
 def test_live_pointer_is_incomplete_session_14() -> None:
     live = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert live["current_session"] == 15
-    assert live["session_status"] == "incomplete"
-    assert live["state_revision"] == 118
-    assert live["completed_sessions"] == list(range(15))
+    assert live["session_status"] == "complete"
+    assert live["state_revision"] == 119
+    assert live["completed_sessions"] == list(range(16))
     assert live["next_session"] == 15
     assert live["next_prompt"] == SESSION_PROMPTS[15]
-    assert live["head_sha"] == "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
+    assert live["head_sha"] == "be74bc1f1dcdbf357499aa0faa9a8fb69a4c5366"
     assert live["evidence_closure_commit_sha"] == live["head_sha"]
     evidence = live["required_completion_evidence"]
     assert isinstance(evidence, dict)
@@ -76,6 +76,7 @@ def test_live_pointer_is_incomplete_session_14() -> None:
     expected["linked_workflow_fixture"] = True
     expected["acceptance_matrix_recorded"] = True
     expected["control_files_and_checkpoint_current"] = True
+    expected["evidence_closure_commit_recorded"] = True
     assert evidence == expected
 
 
@@ -115,6 +116,7 @@ def test_open_sessions_have_no_recorded_true_key() -> None:
                     "acceptance_matrix_recorded",
                     "control_files_and_checkpoint_current",
                     "deployed_state_checked",
+                    "evidence_closure_commit_recorded",
                     "linked_workflow_fixture",
                     "provider_connections_fail_closed",
                     "standing_authority_recorded",

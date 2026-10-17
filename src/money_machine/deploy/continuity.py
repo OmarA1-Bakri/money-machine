@@ -1,12 +1,13 @@
 """Read the continuity files and refuse a commissioning claim.
 
 The six control files and the four deploy modules must match the pointer.
-The closure key stays false. A handover page does not earn the key.
-No socket is opened.
+The closure key is accepted only for a complete Session 15. A handover
+page does not earn the key. No socket is opened.
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -42,7 +43,7 @@ class ContinuityRefusal(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class ControlCheckpoint:
-    """The files that were read. The closure key is not among the true keys."""
+    """The files that were read. A complete Session 15 may record the closure key."""
 
     revision: int
     updated_at: str
@@ -61,9 +62,7 @@ def record_control_checkpoint(
     expected_true_keys: frozenset[str],
     closure_head: str,
 ) -> ControlCheckpoint:
-    """Read the continuity files. A closure key or a handover page is refused."""
-    if _CLOSURE_KEY in expected_true_keys:
-        raise ContinuityRefusal("closure")
+    """Read the continuity files. A handover page is refused."""
     repo = Path(__file__).resolve().parents[3] if root is None else root
     try:
         checkpoint = inspect_deployment_checkpoint(
@@ -75,7 +74,10 @@ def record_control_checkpoint(
         )
     except CheckpointRefusal as error:
         raise ContinuityRefusal(error.code) from error
-    if checkpoint.closure_recorded:
+    terminal = _terminal_session_15(repo)
+    if _CLOSURE_KEY in expected_true_keys and not terminal:
+        raise ContinuityRefusal("closure")
+    if checkpoint.closure_recorded and not terminal:
         raise ContinuityRefusal("closure")
     if checkpoint.exit_string_present:
         raise ContinuityRefusal("exit_string")
@@ -85,9 +87,24 @@ def record_control_checkpoint(
         updated_at=checkpoint.updated_at,
         head_sha=checkpoint.head_sha,
         true_keys=checkpoint.true_keys,
-        closure_recorded=False,
+        closure_recorded=checkpoint.closure_recorded,
         exit_string_present=False,
         files_read=tuple(path.as_posix() for path in CONTROL_FILES),
+    )
+
+
+def _terminal_session_15(repo: Path) -> bool:
+    """Session 15 is complete and stays the next session."""
+    decoded: object = json.loads(
+        (repo / "docs/control/IMPLEMENTATION_STATE.json").read_text(encoding="utf-8")
+    )
+    if not isinstance(decoded, dict):
+        return False
+    return (
+        decoded.get("current_session") == 15
+        and decoded.get("session_status") == "complete"
+        and decoded.get("next_session") == 15
+        and decoded.get("completed_sessions") == list(range(16))
     )
 
 

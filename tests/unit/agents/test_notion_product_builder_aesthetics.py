@@ -51,8 +51,8 @@ DASHBOARD_AT = datetime(2026, 10, 5, 22, 30, tzinfo=UTC)
 HUBS_AT = datetime(2026, 10, 5, 23, 45, tzinfo=UTC)
 NOTIFICATION_AT = datetime(2026, 10, 6, 0, 30, tzinfo=UTC)
 LATER = datetime(2026, 10, 6, 1, 30, tzinfo=UTC)
-CLOSURE_SHA = "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
-HEAD_SHA = "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
+CLOSURE_SHA = "be74bc1f1dcdbf357499aa0faa9a8fb69a4c5366"
+HEAD_SHA = "be74bc1f1dcdbf357499aa0faa9a8fb69a4c5366"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 
 
@@ -574,8 +574,8 @@ def test_aesthetics_module_does_not_name_a_live_client() -> None:
 def test_live_pointer_is_incomplete_session_ten() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert state["current_session"] == 15
-    assert state["session_status"] == "incomplete"
-    assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    assert state["session_status"] == "complete"
+    assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     assert state["next_session"] == 15
     assert state["next_prompt"] == "18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md"
     assert state["head_sha"] == HEAD_SHA
@@ -591,8 +591,9 @@ def test_live_pointer_is_incomplete_session_ten() -> None:
     assert evidence["linked_workflow_fixture"] is True
     assert evidence["acceptance_matrix_recorded"] is True
     assert evidence["control_files_and_checkpoint_current"] is True
-    assert sum(1 for value in evidence.values() if value) == 6
-    assert state["state_revision"] == 118
+    assert evidence["evidence_closure_commit_recorded"] is True
+    assert sum(1 for value in evidence.values() if value) == 7
+    assert state["state_revision"] == 119
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")
     assert "SESSION_08_MERCHANDISING_AND_ASSETS_COMPLETE" not in STATE_PATH.read_text(
         encoding="utf-8"

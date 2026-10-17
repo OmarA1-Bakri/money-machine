@@ -26,7 +26,7 @@ from money_machine.deploy.checkpoint import (
 ROOT = Path(__file__).parents[2]
 STATE_PATH = ROOT / "docs/control/IMPLEMENTATION_STATE.json"
 EARNED_AT = "2026-10-17T15:30:00Z"
-CLOSURE_HEAD = "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
+CLOSURE_HEAD = "be74bc1f1dcdbf357499aa0faa9a8fb69a4c5366"
 PREVIOUS_REVISION = 109
 PREVIOUS_AT = "2026-10-17T15:25:00Z"
 PREVIOUS_KEYS = frozenset(
@@ -37,13 +37,14 @@ PREVIOUS_KEYS = frozenset(
         "service_controls_fail_closed",
     }
 )
-LIVE_REVISION = 118
-LIVE_AT = "2026-10-17T16:45:00Z"
+LIVE_REVISION = 119
+LIVE_AT = "2026-10-17T16:50:00Z"
 LIVE_KEYS: frozenset[str] = frozenset(
     {
         "acceptance_matrix_recorded",
         "control_files_and_checkpoint_current",
         "deployed_state_checked",
+        "evidence_closure_commit_recorded",
         "linked_workflow_fixture",
         "provider_connections_fail_closed",
         "standing_authority_recorded",
@@ -96,7 +97,7 @@ def test_checkpoint_matches_the_continuity_files() -> None:
     assert checkpoint.head_sha == CLOSURE_HEAD
     assert checkpoint.true_keys == tuple(sorted(LIVE_KEYS))
     assert checkpoint.catalogue_matches is True
-    assert checkpoint.closure_recorded is False
+    assert checkpoint.closure_recorded is True
     assert checkpoint.exit_string_present is False
 
 

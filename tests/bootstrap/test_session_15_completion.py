@@ -26,10 +26,22 @@ _RELEASE_SUBJECT = "chore(release): commission hands-off money machine"
 
 
 def _live() -> ControlState:
+    """Revision 118, rebuilt after the pointer commit replaces the live file."""
     loaded = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     if not isinstance(loaded, dict):
         raise AssertionError("state file must be an object")
-    return cast(ControlState, copy.deepcopy(loaded))
+    state = cast(ControlState, copy.deepcopy(loaded))
+    state["state_revision"] = 118
+    state["session_status"] = "incomplete"
+    state["current_session"] = 15
+    state["completed_sessions"] = list(range(15))
+    state["next_session"] = 15
+    state["next_prompt"] = SESSION_PROMPTS[15]
+    state["updated_at"] = "2026-10-17T16:45:00Z"
+    evidence = dict(state["required_completion_evidence"])
+    evidence["evidence_closure_commit_recorded"] = False
+    state["required_completion_evidence"] = evidence
+    return state
 
 
 def _completed(previous: ControlState, closure: str) -> ControlState:

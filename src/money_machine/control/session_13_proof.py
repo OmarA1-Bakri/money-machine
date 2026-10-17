@@ -43,7 +43,7 @@ from money_machine.assets.synthetic_paths import (
     run_synthetic_paths,
     simulate_publish,
 )
-from money_machine.control.session_15_proof import session_15_pointer_holds
+from money_machine.control.session_15_proof import session_15_shape_holds
 
 MATRIX_EVIDENCE_KEY = "implementation_matrix_recorded"
 SYNTHETIC_EVIDENCE_KEY = "synthetic_paths_implemented"
@@ -328,18 +328,15 @@ def _prove_control_files() -> None:
         isinstance(value, bool) for value in evidence.values()
     )
     if decoded.get("current_session") == 15:
-        if (
-            decoded.get("session_status") != "incomplete"
-            or decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
-            or decoded.get("head_sha") != _SESSION_14_CLOSURE
-            or recorded != set(_SESSION_15_KEYS)
-            or not values_are_bool
-            or not isinstance(evidence, dict)
-            or len(evidence) != len(recorded)
-            or decoded.get("next_session") != 15
-            or decoded.get("completed_sessions") != list(range(15))
-            or decoded.get("next_prompt") != _SESSION_15_PROMPT
-            or not session_15_pointer_holds(evidence)
+        keys_match = recorded == set(_SESSION_15_KEYS) and (
+            isinstance(evidence, dict) and len(evidence) == len(recorded)
+        )
+        if not session_15_shape_holds(
+            decoded,
+            evidence,
+            decoded.get("session_status"),
+            keys_match=keys_match,
+            values_are_bool=values_are_bool,
         ):
             raise Session13ProofError("control_checkpoint")
         return

@@ -46,14 +46,15 @@ EARNED_EVIDENCE_KEYS = frozenset(
         CHECKPOINT_EVIDENCE_KEY,
     }
 )
-_CLOSURE_HEAD = "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
-_POINTER_REVISION = 118
-_UPDATED_AT = "2026-10-17T16:45:00Z"
+_CLOSURE_HEAD = "be74bc1f1dcdbf357499aa0faa9a8fb69a4c5366"
+_POINTER_REVISION = 119
+_UPDATED_AT = "2026-10-17T16:50:00Z"
 _TRUE_KEYS: frozenset[str] = frozenset(
     {
         "acceptance_matrix_recorded",
         "control_files_and_checkpoint_current",
         "deployed_state_checked",
+        "evidence_closure_commit_recorded",
         "linked_workflow_fixture",
         "provider_connections_fail_closed",
         "standing_authority_recorded",
@@ -343,7 +344,7 @@ def _prove_control_files() -> None:
         or checkpoint.head_sha != _CLOSURE_HEAD
         or checkpoint.true_keys != tuple(sorted(_TRUE_KEYS))
         or checkpoint.catalogue_matches is not True
-        or checkpoint.closure_recorded is not False
+        or checkpoint.closure_recorded is not True
         or checkpoint.exit_string_present is not False
     ):
         raise Session14ProofError("control_checkpoint")

@@ -15,14 +15,15 @@ from money_machine.deploy.continuity import (
 )
 
 ROOT = Path(__file__).parents[2]
-CLOSURE_HEAD = "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
-POINTER_REVISION = 118
-UPDATED_AT = "2026-10-17T16:45:00Z"
+CLOSURE_HEAD = "be74bc1f1dcdbf357499aa0faa9a8fb69a4c5366"
+POINTER_REVISION = 119
+UPDATED_AT = "2026-10-17T16:50:00Z"
 TRUE_KEYS = frozenset(
     {
         "acceptance_matrix_recorded",
         "control_files_and_checkpoint_current",
         "deployed_state_checked",
+        "evidence_closure_commit_recorded",
         "linked_workflow_fixture",
         "provider_connections_fail_closed",
         "standing_authority_recorded",
@@ -39,20 +40,20 @@ def test_the_continuity_files_match_the_pointer() -> None:
     )
     assert recorded.revision == POINTER_REVISION
     assert recorded.updated_at == UPDATED_AT
-    assert recorded.closure_recorded is False
+    assert recorded.closure_recorded is True
     assert recorded.exit_string_present is False
     assert recorded.true_keys == tuple(sorted(TRUE_KEYS))
-    assert "evidence_closure_commit_recorded" not in recorded.true_keys
+    assert "evidence_closure_commit_recorded" in recorded.true_keys
     assert len(recorded.files_read) == 6
 
 
-def test_the_closure_key_is_refused() -> None:
-    with pytest.raises(ContinuityRefusal, match="closure"):
+def test_a_stale_closure_claim_is_refused() -> None:
+    with pytest.raises(ContinuityRefusal, match="pointer"):
         record_control_checkpoint(
-            expected_revision=POINTER_REVISION,
-            expected_updated_at=UPDATED_AT,
-            expected_true_keys=TRUE_KEYS | {"evidence_closure_commit_recorded"},
-            closure_head=CLOSURE_HEAD,
+            expected_revision=118,
+            expected_updated_at="2026-10-17T16:45:00Z",
+            expected_true_keys=TRUE_KEYS,
+            closure_head="02c26f39ac8800db03ae7f5d1d346487a5ce123e",
         )
 
 

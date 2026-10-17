@@ -29,7 +29,7 @@ from money_machine.assets.mutation_receipt import (
     commit_listing_mutation,
 )
 from money_machine.assets.publishing_ramp_decision import decide_publishing_ramp
-from money_machine.control.session_15_proof import session_15_pointer_holds
+from money_machine.control.session_15_proof import session_15_shape_holds
 from money_machine.domain.enums import BranchOutcome
 from money_machine.domain.models.listings import PreflightResult
 from money_machine.integrations.etsy.draft_client import (
@@ -712,17 +712,12 @@ def _prove_activated_session_15(
                 recorded.add(key)
         values_are_bool = all(isinstance(value, bool) for value in evidence.values())
     keys_match = frozenset(recorded) == _SESSION_15_KEYS and len(recorded) == evidence_count
-    if (
-        decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
-        or decoded.get("head_sha") != _SESSION_14_CLOSURE
-        or not keys_match
-        or not values_are_bool
-        or not isinstance(evidence, dict)
-        or status != "incomplete"
-        or decoded.get("next_session") != 15
-        or decoded.get("completed_sessions") != list(range(15))
-        or decoded.get("next_prompt") != _SESSION_15_PROMPT
-        or not session_15_pointer_holds(evidence)
+    if not session_15_shape_holds(
+        decoded,
+        evidence,
+        status,
+        keys_match=keys_match,
+        values_are_bool=values_are_bool,
     ):
         raise Session09ProofError("control_checkpoint")
 

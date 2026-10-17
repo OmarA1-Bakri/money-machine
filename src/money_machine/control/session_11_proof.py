@@ -23,7 +23,7 @@ from money_machine.assets.support_intake import (
     record_repair,
     resolve_issue,
 )
-from money_machine.control.session_15_proof import session_15_pointer_holds
+from money_machine.control.session_15_proof import session_15_shape_holds
 from money_machine.domain.enums import IncidentType
 
 INTAKE_EVIDENCE_KEY = "support_intake_implemented"
@@ -569,18 +569,15 @@ def _prove_activated_session_15(
     values_are_bool = isinstance(evidence, dict) and all(
         isinstance(value, bool) for value in evidence.values()
     )
-    if (
-        decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
-        or decoded.get("head_sha") != _SESSION_14_CLOSURE
-        or recorded != set(_SESSION_15_KEYS)
-        or not values_are_bool
-        or not isinstance(evidence, dict)
-        or len(evidence) != len(recorded)
-        or status != "incomplete"
-        or decoded.get("next_session") != 15
-        or decoded.get("completed_sessions") != list(range(15))
-        or decoded.get("next_prompt") != _SESSION_15_PROMPT
-        or not session_15_pointer_holds(evidence)
+    keys_match = recorded == set(_SESSION_15_KEYS) and (
+        isinstance(evidence, dict) and len(evidence) == len(recorded)
+    )
+    if not session_15_shape_holds(
+        decoded,
+        evidence,
+        status,
+        keys_match=keys_match,
+        values_are_bool=values_are_bool,
     ):
         raise Session11ProofError("control_checkpoint")
 

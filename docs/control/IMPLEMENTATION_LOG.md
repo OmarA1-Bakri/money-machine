@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 15 closure recorded
+
+`apply-completion` advanced `state_revision` from 118 to 119. `updated_at` is `2026-10-17T16:50:00Z`. `session_status` is complete. `current_session` stays 15. `next_session` stays 15. `completed_sessions` is 0 through 15. All seven Session 15 keys are true. `head_sha` and `evidence_closure_commit_sha` are `be74bc1f1dcdbf357499aa0faa9a8fb69a4c5366`. That commit contains `def prove_session_15` and the pre-transition state. `next_session` is not null. The status is not COMMISSIONED. The exit string is not written. No tag is created. No release is pushed. Exit 78 stays HELD.
+
 ## 2026-10-17 — Session 15 continuity files recorded
 
 `record-evidence` advanced `state_revision` from 117 to 118. `updated_at` is `2026-10-17T16:45:00Z`. `deployed_state_checked`, `provider_connections_fail_closed`, `standing_authority_recorded`, `linked_workflow_fixture`, `acceptance_matrix_recorded`, and `control_files_and_checkpoint_current` are true. `evidence_closure_commit_recorded` stays false. `current_session` stays 15. `session_status` stays incomplete. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. `src/money_machine/deploy/continuity.py` reads the six continuity files and the four deploy modules. A commissioning page does not earn the key. No socket is opened. Exit 78 stays HELD. The exit string is not written.

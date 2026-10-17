@@ -1,8 +1,8 @@
 """Inspect the deployment checkpoint against the continuity files.
 
 The catalogue must match the renderer. A completed Session 14 records the
-closure key. An activated Session 15 records every key false. The exit
-string is not a current checkpoint. No socket is opened.
+closure key. A completed Session 15 records it and stays session 15. The
+exit string is not a current checkpoint. No socket is opened.
 """
 
 from __future__ import annotations

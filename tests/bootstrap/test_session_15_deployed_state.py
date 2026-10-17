@@ -62,21 +62,22 @@ def _earned(previous: ControlState) -> ControlState:
 def test_the_checkpoint_refuses_a_live_smoke() -> None:
     checked = check_deployed_state(
         ROOT,
-        expected_revision=118,
-        expected_updated_at="2026-10-17T16:45:00Z",
+        expected_revision=119,
+        expected_updated_at="2026-10-17T16:50:00Z",
         expected_true_keys=frozenset(
             {
                 "acceptance_matrix_recorded",
                 "control_files_and_checkpoint_current",
                 "deployed_state_checked",
+                "evidence_closure_commit_recorded",
                 "linked_workflow_fixture",
                 "provider_connections_fail_closed",
                 "standing_authority_recorded",
             }
         ),
-        closure_head=CLOSURE_HEAD,
+        closure_head="be74bc1f1dcdbf357499aa0faa9a8fb69a4c5366",
     )
-    assert checked.revision == 118
+    assert checked.revision == 119
     assert checked.smoke_ran is False
     assert checked.services_started is False
     assert checked.exit_78_held is True
@@ -84,6 +85,7 @@ def test_the_checkpoint_refuses_a_live_smoke() -> None:
         "acceptance_matrix_recorded",
         "control_files_and_checkpoint_current",
         "deployed_state_checked",
+        "evidence_closure_commit_recorded",
         "linked_workflow_fixture",
         "provider_connections_fail_closed",
         "standing_authority_recorded",

@@ -76,13 +76,14 @@ def test_live_pointer_is_the_session_12_activation() -> None:
     expected["linked_workflow_fixture"] = True
     expected["acceptance_matrix_recorded"] = True
     expected["control_files_and_checkpoint_current"] = True
-    assert live["state_revision"] == 118
+    expected["evidence_closure_commit_recorded"] = True
+    assert live["state_revision"] == 119
     assert live["current_session"] == 15
-    assert live["session_status"] == "incomplete"
-    assert live["completed_sessions"] == list(range(15))
+    assert live["session_status"] == "complete"
+    assert live["completed_sessions"] == list(range(16))
     assert live["next_session"] == 15
     assert live["next_prompt"] == "18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md"
-    assert live["head_sha"] == "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
+    assert live["head_sha"] == "be74bc1f1dcdbf357499aa0faa9a8fb69a4c5366"
     assert live["evidence_closure_commit_sha"] == live["head_sha"]
     assert live["required_completion_evidence"] == expected
     assert "SESSION_12_OPERATOR_CONSOLE_COMPLETE" not in text

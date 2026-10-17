@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-17 — Session 15 closure recorded
+
+**Verification scope**: live `apply-completion` from revision 118 to 119. No live HTTP. No publish, purchase, or checkout. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 15, `complete`, revision 119, `updated_at` `2026-10-17T16:50:00Z` | PASS |
+| Keys | All seven Session 15 keys are true | PASS |
+| Closure | `next_session` stays 15. The status is not COMMISSIONED | PASS |
+| Head | `head_sha` is `be74bc1f1dcdbf357499aa0faa9a8fb69a4c5366` | PASS |
+| Hold | No release is tagged. Exit 78 stays HELD | PASS |
+
+The command printed `{"applied": true, "command": "apply-completion", "session": 15, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 119}`. The closure proof, the continuity proof, the acceptance-matrix proof, the linked-workflow proof, the standing-authority proof, the provider-connection proof, the deployed-state proof, the Session 15 contract, the checkpoint proof, the completion proof, the control proof, the release proof, the packaging proof, the target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, the contiguous-contract check, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, and the synthetic-path tests printed 183 passed in 34.34s. `ruff check` and `pyright` on the closure check and the Session 15 proof were clean.
+
 ## 2026-10-17 — Session 15 continuity files recorded
 
 **Verification scope**: live `record-evidence` from revision 117 to 118. No live HTTP. No publish, purchase, or checkout. Exit 78 stays HELD. The exit string is not written.
