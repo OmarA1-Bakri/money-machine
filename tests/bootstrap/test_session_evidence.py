@@ -57,11 +57,11 @@ def test_closed_snapshots_match_the_commits_that_hold_them() -> None:
         assert all(item is record.all_keys_true for item in values)
 
 
-def test_live_pointer_is_complete_session_09() -> None:
+def test_live_pointer_is_incomplete_session_10() -> None:
     live = json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    assert live["current_session"] == 9
-    assert live["session_status"] == "complete"
-    assert live["state_revision"] == 76
+    assert live["current_session"] == 10
+    assert live["session_status"] == "incomplete"
+    assert live["state_revision"] == 77
     assert live["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     assert live["next_session"] == 10
     assert live["next_prompt"] == SESSION_PROMPTS[10]
@@ -69,7 +69,7 @@ def test_live_pointer_is_complete_session_09() -> None:
     assert live["evidence_closure_commit_sha"] == live["head_sha"]
     evidence = live["required_completion_evidence"]
     assert isinstance(evidence, dict)
-    assert evidence == {key: True for key in sorted(SESSION_EVIDENCE_KEYS[9])}
+    assert evidence == {key: False for key in sorted(SESSION_EVIDENCE_KEYS[10])}
 
 
 def test_open_sessions_have_no_recorded_true_key() -> None:
@@ -77,7 +77,7 @@ def test_open_sessions_have_no_recorded_true_key() -> None:
         assert record.session not in {item.session for item in CLOSED_SESSION_EVIDENCE}
         if record.session == 10:
             assert record.session in SESSION_EVIDENCE_KEYS
-            assert record.activated is False
+            assert record.activated is True
         else:
             assert record.session not in SESSION_EVIDENCE_KEYS
         assert record.true_keys == frozenset()

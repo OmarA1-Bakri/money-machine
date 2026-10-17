@@ -1,5 +1,17 @@
 # Test Evidence
 
+## 2026-10-17 — Session 10 activated
+
+**Verification scope**: live `activate` from revision 76 to 77. No live HTTP. Exit 78 stays HELD. The exit string is not written. Every Session 10 key is false.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 10, `incomplete`, revision 77, `updated_at` `2026-10-17T11:30:00Z` | PASS |
+| Keys | The six Session 10 keys are installed and false | PASS |
+| Head | `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d` | PASS |
+| Closed | `completed_sessions` stays 0 through 9 | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
 ## 2026-10-17 — Session 10 evidence contract installed
 
 **Verification scope**: the contract and its activation shape. No state transition. No live HTTP. Revision 76 stays. Session 10 is not activated.

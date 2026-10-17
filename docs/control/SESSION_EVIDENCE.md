@@ -1,14 +1,15 @@
 # Session evidence
 
-The checked-in pointer is Session 09 at state revision 76.
-`current_session` is 9. `session_status` is complete.
-Every Session 09 key is true.
+The checked-in pointer is Session 10 at state revision 77.
+`current_session` is 10. `session_status` is incomplete.
+Every Session 10 key is false.
+Session 09 is complete and every one of its keys is true.
 Session 08 is complete and every one of its keys is true.
 Sessions 00-06 closed with every contract key true.
 Session 07's close commit keeps every contract key false under D-0032.
 D-0036 recorded the twelve Session 07 keys true. The closure commit is
 `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.
-Session 10's contract is installed. Session 10 is not activated.
+Session 10 is activated and incomplete. Every Session 10 key is false.
 Sessions 11-15 have no contract and are not activated.
 
 ## Session 00
@@ -248,16 +249,16 @@ Head SHA: `cfb36462994ecba833f31ba869f2aba627f6060d`.
 
 ## Sessions 10-15
 
-Session 10's contract is installed. Session 10 is not activated.
+Session 10 is activated and incomplete. Every Session 10 key is false.
 Sessions 11-15 have no contract and are not activated.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
 ## Session 10
 
 Prompt: `13_SESSION_10_ANALYTICS_CULL_MULTIPLY_CLOSED_LOOP.md`.
-Status: not activated.
-Evidence contract: installed, not activated.
-The contract is installed. Session 10 is not activated. The ledger does not run the scheduler or deactivate a listing.
+Status: incomplete.
+Evidence contract: installed.
+No Session 10 key is earned. The ledger does not run the scheduler or deactivate a listing.
 
 Fixture paths:
 
@@ -268,12 +269,12 @@ Fixture paths:
 
 | Key | Recorded |
 |---|---|
-| `closed_loop_store_implemented` | not installed |
-| `control_files_and_checkpoint_current` | not installed |
-| `evidence_closure_commit_recorded` | not installed |
-| `maturity_clock_implemented` | not installed |
-| `metrics_fixture_implemented` | not installed |
-| `portfolio_eligibility_implemented` | not installed |
+| `closed_loop_store_implemented` | false |
+| `control_files_and_checkpoint_current` | false |
+| `evidence_closure_commit_recorded` | false |
+| `maturity_clock_implemented` | false |
+| `metrics_fixture_implemented` | false |
+| `portfolio_eligibility_implemented` | false |
 
 ## Session 11
 

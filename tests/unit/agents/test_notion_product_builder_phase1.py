@@ -576,10 +576,10 @@ async def test_phase_one_checkpoint_parser_rejects_bad_inputs(tmp_path: Path) ->
     assert len(probe.pages) == 1
 
 
-def test_live_pointer_is_complete_session_nine() -> None:
+def test_live_pointer_is_incomplete_session_ten() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    assert state["current_session"] == 9
-    assert state["session_status"] == "complete"
+    assert state["current_session"] == 10
+    assert state["session_status"] == "incomplete"
     assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     assert state["next_session"] == 10
     assert state["next_prompt"] == "13_SESSION_10_ANALYTICS_CULL_MULTIPLY_CLOSED_LOOP.md"
@@ -587,9 +587,9 @@ def test_live_pointer_is_complete_session_nine() -> None:
     assert state["evidence_closure_commit_sha"] == CLOSURE_SHA
     assert state["commissioned_agents"] == []
     evidence = state["required_completion_evidence"]
-    assert evidence.keys() == SESSION_EVIDENCE_KEYS[9]
-    assert all(value is True for value in evidence.values())
-    assert state["state_revision"] == 76
+    assert evidence.keys() == SESSION_EVIDENCE_KEYS[10]
+    assert not any(evidence.values())
+    assert state["state_revision"] == 77
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")
     assert "SESSION_08_MERCHANDISING_AND_ASSETS_COMPLETE" not in STATE_PATH.read_text(
         encoding="utf-8"

@@ -712,3 +712,19 @@ Live stats, live deactivation, commissioning, Exit 78, and `SESSION_10_CLOSED_LO
 ### Consequences
 
 `validate_activation_transition` accepts a candidate that installs these six keys all false from the revision-76 close. A true key, a missing key, or an extra key is refused. Sessions 11–15 still have no contract. Activation is the next transition and is not this commit.
+
+## D-0049 — Session 10 is activated with every key false
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 09 is complete at revision 76 and D-0048 installed the Session 10 contract. `next_session` is 10. The prompt-integrity addendum keeps live stats, live deactivation, commissioning, Exit 78, and the exit string out of the contract.
+
+### Decision
+
+`activate` moves `current_session` from 9 to 10, sets `session_status` to incomplete, and installs the six Session 10 keys all false. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` does not move. A14 and A15 stay `DESIGNED`. Exit 78 stays HELD. No live provider call is made.
+
+### Consequences
+
+Revision 77 is incomplete Session 10. Every Session 10 key is false. The next honest step is the first earned key, through its own proof.
