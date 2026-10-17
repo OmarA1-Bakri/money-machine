@@ -1131,6 +1131,22 @@ Session 12 is complete at revision 97. The Session 13 contract is installed (D-0
 
 Session 13 is the active incomplete session. The next honest step is `implementation_matrix_recorded`, earned by classifying the real playbook, job, event, agent, and provider rows. A live credential gap stays blocked. A fail-closed raise stays.
 
+## D-0076 — Session 13 failure injections
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 13 is incomplete at revision 100. `implementation_matrix_recorded` and `synthetic_paths_implemented` are true. The other four Session 13 keys are false. The prompt requires each named failure, including a restart and a duplicate effect, to end in recovery or an exact blocked state. A live process crash, a live credential, and a live provider call stay refused.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 100 to 101. `updated_at` is `2026-10-17T14:25:00Z`. `failure_injection_implemented` is true. `implementation_matrix_recorded` and `synthetic_paths_implemented` stay true. The other three Session 13 keys stay false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. `src/money_machine/assets/failure_injection.py` runs the eighteen named injections. A crashed job returns to READY through the SAFE retry policy. A scheduler restart promotes a due job once and does not queue the duplicate id again. A database reconnect fails once and then connects. An expired lease does not execute. A duplicate event keeps the first body. A duplicate publish creates once. A timeout before a response creates the absent write once. A timeout after success keeps the observed provider id and does not create again. An expired Etsy token, an expired Notion session, malformed model output, an unavailable model, an empty render, a mismatched PDF link, stale product facts, an unknown selector, a full ramp, and a spent cap each stay blocked. Exit 78 stays HELD. `worker.py` and `scheduler.py` are not edited.
+
+### Consequences
+
+The failure injections are recorded. The next honest step is `backup_restore_fixture_implemented`: an in-memory snapshot of a workflow, job, product, listing, and incident, restored once without duplicating them. No live PostgreSQL backup is taken.
+
 ## D-0075 — Session 13 synthetic paths
 
 **Status:** accepted 2026-10-17. Standing order: finish the application.

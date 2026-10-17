@@ -72,7 +72,8 @@ def test_live_pointer_is_the_session_12_activation() -> None:
     expected = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[13]), False)
     expected["implementation_matrix_recorded"] = True
     expected["synthetic_paths_implemented"] = True
-    assert live["state_revision"] == 100
+    expected["failure_injection_implemented"] = True
+    assert live["state_revision"] == 101
     assert live["current_session"] == 13
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(13))

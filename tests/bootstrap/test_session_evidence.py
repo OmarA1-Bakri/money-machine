@@ -61,7 +61,7 @@ def test_live_pointer_is_incomplete_session_13() -> None:
     live = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert live["current_session"] == 13
     assert live["session_status"] == "incomplete"
-    assert live["state_revision"] == 100
+    assert live["state_revision"] == 101
     assert live["completed_sessions"] == list(range(13))
     assert live["next_session"] == 13
     assert live["next_prompt"] == SESSION_PROMPTS[13]
@@ -72,6 +72,7 @@ def test_live_pointer_is_incomplete_session_13() -> None:
     expected = {key: False for key in sorted(SESSION_EVIDENCE_KEYS[13])}
     expected["implementation_matrix_recorded"] = True
     expected["synthetic_paths_implemented"] = True
+    expected["failure_injection_implemented"] = True
     assert evidence == expected
 
 
@@ -90,7 +91,11 @@ def test_open_sessions_have_no_recorded_true_key() -> None:
             assert record.session in SESSION_EVIDENCE_KEYS
             assert record.activated is True
             assert record.true_keys == frozenset(
-                {"implementation_matrix_recorded", "synthetic_paths_implemented"}
+                {
+                    "implementation_matrix_recorded",
+                    "synthetic_paths_implemented",
+                    "failure_injection_implemented",
+                }
             )
         else:
             assert record.session not in SESSION_EVIDENCE_KEYS

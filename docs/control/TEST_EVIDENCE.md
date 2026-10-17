@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-17 — Session 13 failure injections recorded
+
+**Verification scope**: live `record-evidence` from revision 100 to 101. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 13, `incomplete`, revision 101, `updated_at` `2026-10-17T14:25:00Z` | PASS |
+| Injections | `failure_injection_implemented` is true. The matrix and synthetic paths stay true. The other three keys stay false | PASS |
+| Recovery | A restart returns READY once. A duplicate publish creates once. A timeout after success does not create again | PASS |
+| Head | `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 13, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 101}`. The failure-injection tests, the synthetic path tests, the matrix proof, the contract pin, the prompt-integrity gate, the Session 12 closure pin, the Session 12 contract and completion proof, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, the telemetry and operator-action unit tests, and the support intake unit tests printed 138 passed in 4.05s.
+
 ## 2026-10-17 — Session 13 synthetic paths recorded
 
 **Verification scope**: live `record-evidence` from revision 99 to 100. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.

@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 13 failure injections recorded
+
+`record-evidence` advanced `state_revision` from 100 to 101. `updated_at` is `2026-10-17T14:25:00Z`. `implementation_matrix_recorded`, `synthetic_paths_implemented`, and `failure_injection_implemented` are true. The other three Session 13 keys stay false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Each named injection ends in recovery or an exact blocked state. A restart returns a due job to READY once. A duplicate publish creates once. A timeout after success does not create again. Exit 78 stays HELD. No live provider call is made.
+
 ## 2026-10-17 — Session 13 synthetic paths recorded
 
 `record-evidence` advanced `state_revision` from 99 to 100. `updated_at` is `2026-10-17T14:10:00Z`. `implementation_matrix_recorded` and `synthetic_paths_implemented` are true. The other four Session 13 keys stay false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. The fixture path runs research through a withheld successor build, plus cull, repair, broken link, and dedupe. Publish simulation refuses `live`. Post-publish verification stays blocked. Exit 78 stays HELD. No live provider call is made.

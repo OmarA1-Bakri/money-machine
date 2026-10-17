@@ -1,7 +1,8 @@
-"""Earn the Session 13 matrix and synthetic-path keys.
+"""Earn the Session 13 matrix, synthetic-path, and failure-injection keys.
 
-The proof reads the matrix, runs the fixture paths, refuses a live publish,
-and does not open a socket. The other Session 13 keys stay unearned.
+The proof reads the matrix, runs the fixture paths, runs each named failure
+injection, refuses a live publish, and does not open a socket. The other
+Session 13 keys stay unearned.
 """
 
 from __future__ import annotations
@@ -10,6 +11,11 @@ import ast
 import json
 from pathlib import Path
 
+from money_machine.assets.failure_injection import (
+    INJECTIONS,
+    FailureInjectionError,
+    run_failure_injections,
+)
 from money_machine.assets.implementation_matrix import (
     MatrixRefusal,
     MatrixStatus,
@@ -29,8 +35,43 @@ from money_machine.assets.synthetic_paths import (
 
 MATRIX_EVIDENCE_KEY = "implementation_matrix_recorded"
 SYNTHETIC_EVIDENCE_KEY = "synthetic_paths_implemented"
+FAILURE_EVIDENCE_KEY = "failure_injection_implemented"
 _CLOSURE_EVIDENCE_KEY = "evidence_closure_commit_recorded"
-EARNED_EVIDENCE_KEYS = frozenset({MATRIX_EVIDENCE_KEY, SYNTHETIC_EVIDENCE_KEY})
+EARNED_EVIDENCE_KEYS = frozenset(
+    {MATRIX_EVIDENCE_KEY, SYNTHETIC_EVIDENCE_KEY, FAILURE_EVIDENCE_KEY}
+)
+_FAILURE_RESULTS = {
+    "worker_crash": ("RECOVERED", "READY", "can_retry=true;next_attempt=1;status=READY"),
+    "scheduler_restart": ("RECOVERED", "READY", "ready=1;count=2"),
+    "database_reconnect": ("RECOVERED", "CONNECTED", "attempts=2;status=CONNECTED"),
+    "expired_lease": ("BLOCKED", "LEASE_EXPIRED", "executed=false"),
+    "duplicate_event": ("RECOVERED", "DEDUPED", "length=1"),
+    "duplicate_publish_request": ("RECOVERED", "CONFIRMED", "creates=1;effect=CONFIRMED"),
+    "provider_timeout_before_response": ("RECOVERED", "CONFIRMED", "creates=2;effect=CONFIRMED"),
+    "provider_timeout_after_success": (
+        "RECOVERED",
+        "CONFIRMED",
+        "creates=1;effect=CONFIRMED;provider=provider-observed",
+    ),
+    "expired_etsy_token": (
+        "BLOCKED",
+        "CREDENTIAL_EXPIRED",
+        "read_env=false;state=CREDENTIAL_EXPIRED",
+    ),
+    "expired_notion_session": (
+        "BLOCKED",
+        "SESSION_EXPIRED",
+        "read_env=false;state=SESSION_EXPIRED",
+    ),
+    "malformed_llm_output": ("BLOCKED", "MALFORMED_OUTPUT", "parsed=false"),
+    "unavailable_llm_provider": ("BLOCKED", "PROVIDER_UNAVAILABLE", "calls=0"),
+    "asset_render_failure": ("BLOCKED", "RENDER_FAILED", "uri="),
+    "wrong_pdf_link": ("BLOCKED", "LINK_MISMATCH", "reason=link_mismatch"),
+    "stale_product_facts": ("BLOCKED", "STALE_FACTS", "copy="),
+    "browser_selector_change": ("BLOCKED", "SELECTOR_UNKNOWN", "known=false"),
+    "ramp_full": ("BLOCKED", "RAMP_FULL", "may_publish=false"),
+    "spend_cap_reached": ("BLOCKED", "SPEND_CAP", "spent=0"),
+}
 _SESSION_13_KEYS = frozenset(
     {
         MATRIX_EVIDENCE_KEY,
@@ -65,6 +106,7 @@ def prove_session_13() -> frozenset[str]:
     """Return the earned Session 13 keys. A miss raises instead of returning them."""
     _prove_matrix()
     _prove_synthetic()
+    _prove_failure()
     _prove_control_files()
     return EARNED_EVIDENCE_KEYS
 
@@ -87,9 +129,7 @@ def _prove_matrix() -> None:
         raise Session13ProofError(error.code) from error
     if not rows:
         raise Session13ProofError("matrix_empty")
-    blocked = [
-        row for row in rows if row.status is MatrixStatus.BLOCKED_BY_EXTERNAL_CREDENTIAL
-    ]
+    blocked = [row for row in rows if row.status is MatrixStatus.BLOCKED_BY_EXTERNAL_CREDENTIAL]
     missing = [row for row in rows if row.status is MatrixStatus.MISSING]
     if not blocked or not missing:
         raise Session13ProofError("matrix_gap")
@@ -125,6 +165,26 @@ def _prove_synthetic() -> None:
     withheld = [item for item in run.receipts if item.outcome == "WITHHELD"]
     if len(withheld) != 2:
         raise Session13ProofError("synthetic_publish")
+
+
+def _prove_failure() -> None:
+    module = Path(__file__).resolve().parents[1] / "assets" / "failure_injection.py"
+    _refuse_network(module, "failure_socket")
+    try:
+        outcomes = run_failure_injections()
+    except FailureInjectionError as error:
+        raise Session13ProofError(error.code) from error
+    if tuple(item.name for item in outcomes) != INJECTIONS or run_failure_injections() != outcomes:
+        raise Session13ProofError("failure_names")
+    if set(_FAILURE_RESULTS) != set(INJECTIONS):
+        raise Session13ProofError("failure_names")
+    for item in outcomes:
+        if (item.disposition, item.state, item.detail) != _FAILURE_RESULTS[item.name]:
+            raise Session13ProofError("failure_disposition")
+    recovered = [item for item in outcomes if item.disposition == "RECOVERED"]
+    blocked = [item for item in outcomes if item.disposition == "BLOCKED"]
+    if len(recovered) < 2 or len(blocked) < 2:
+        raise Session13ProofError("failure_disposition")
 
 
 def _refuse_network(module: Path, code: str) -> None:
