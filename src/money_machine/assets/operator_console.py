@@ -15,11 +15,27 @@ type JobStatus = Literal["ready", "running", "blocked"]
 type ListingState = Literal["active", "draft", "deactivated"]
 type DecisionKind = Literal["hold", "repair", "cull", "multiply", "successor_created"]
 type IntegrationState = Literal["offline", "held"]
+type BlockerKind = Literal[
+    "credentials",
+    "account_verification",
+    "provider_challenge",
+    "spend_limit",
+    "uncertain_effect",
+]
 
 _JOB_STATUSES = frozenset({"ready", "running", "blocked"})
 _LISTING_STATES = frozenset({"active", "draft", "deactivated"})
 _DECISION_KINDS = frozenset({"hold", "repair", "cull", "multiply", "successor_created"})
 _INTEGRATION_STATES = frozenset({"offline", "held"})
+_BLOCKER_KINDS = frozenset(
+    {
+        "credentials",
+        "account_verification",
+        "provider_challenge",
+        "spend_limit",
+        "uncertain_effect",
+    }
+)
 _MAX_LIMIT = 50
 
 
@@ -135,13 +151,33 @@ class DecisionView:
 
 @dataclass(frozen=True, slots=True)
 class IncidentView:
-    """One incident row."""
+    """One incident row. Resolution evidence stays empty until a repair is verified."""
 
     incident_id: str
     summary: str
     severity: str
     repair_step: str
     response_status: str
+    resolution_evidence: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class CompletionView:
+    """One finished job. It is not a ready, running, or blocked row."""
+
+    job_id: str
+    workflow_id: str
+    job_type: str
+    finished_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class BlockerView:
+    """A real blocker. A blocked job is not one of these by itself."""
+
+    blocker_id: str
+    kind: BlockerKind
+    detail: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,6 +288,8 @@ class ConsoleReadModel:
     incidents: tuple[IncidentView, ...] = ()
     integrations: tuple[IntegrationView, ...] = ()
     milestones: tuple[MilestoneView, ...] = ()
+    completions: tuple[CompletionView, ...] = ()
+    blockers: tuple[BlockerView, ...] = ()
     autonomy: AutonomySettings = AutonomySettings(
         mode="held",
         publication_cap=0,
@@ -333,6 +371,20 @@ class ConsoleReadModel:
         """Return milestone progress in name order."""
         return _page(self.milestones, cursor=cursor, limit=limit, identity=lambda item: item.name)
 
+    def completion_page(
+        self, *, cursor: str | None = None, limit: int = 20
+    ) -> Page[CompletionView]:
+        """Return finished jobs in id order."""
+        return _page(
+            self.completions, cursor=cursor, limit=limit, identity=lambda item: item.job_id
+        )
+
+    def blocker_page(self, *, cursor: str | None = None, limit: int = 20) -> Page[BlockerView]:
+        """Return real blockers in id order."""
+        return _page(
+            self.blockers, cursor=cursor, limit=limit, identity=lambda item: item.blocker_id
+        )
+
     def autonomy_settings(self) -> AutonomySettings:
         """Return the cap read. The values are not written here."""
         return self.autonomy
@@ -412,6 +464,8 @@ class ConsoleReadModel:
             _text(item.severity, "incident")
             _text(item.repair_step, "incident")
             _text(item.response_status, "incident")
+            if item.resolution_evidence != "":
+                _text(item.resolution_evidence, "incident")
         _unique(tuple(item.name for item in self.integrations), "integration")
         for item in self.integrations:
             _text(item.name, "integration")
@@ -424,6 +478,19 @@ class ConsoleReadModel:
             _count(item.total, "milestone")
             if item.completed > item.total:
                 raise ConsoleRefusal("milestone")
+        _unique(tuple(item.job_id for item in self.completions), "completion")
+        for item in self.completions:
+            _text(item.job_id, "completion")
+            _text(item.job_type, "completion")
+            _text(item.finished_at, "completion")
+            if item.workflow_id not in workflow_ids:
+                raise ConsoleRefusal("completion")
+        _unique(tuple(item.blocker_id for item in self.blockers), "blocker")
+        for item in self.blockers:
+            _text(item.blocker_id, "blocker")
+            _text(item.detail, "blocker")
+            if item.kind not in _BLOCKER_KINDS:
+                raise ConsoleRefusal("blocker")
         settings = self.autonomy
         _text(settings.mode, "autonomy")
         _count(settings.publication_cap, "autonomy")

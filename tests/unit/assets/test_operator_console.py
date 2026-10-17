@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from money_machine.assets.operator_console import ConsoleReadModel, ConsoleRefusal, WorkflowView
+from money_machine.assets.operator_views import render_console
 
 
 def test_an_empty_store_returns_empty_pages() -> None:
@@ -36,6 +37,25 @@ def test_pages_continue_from_the_cursor() -> None:
     second = model.workflow_page(cursor=first.next_cursor, limit=2)
     assert tuple(item.workflow_id for item in first.items) == ("w-1", "w-2")
     assert tuple(item.workflow_id for item in second.items) == ("w-3",)
+
+
+def test_an_empty_model_renders_empty_views() -> None:
+    views = render_console(ConsoleReadModel())
+    assert views.now.status == "empty"
+    assert views.pipeline.status == "empty"
+    assert views.shop.status == "empty"
+    assert views.blocked.status == "empty"
+    assert views.decisions.status == "empty"
+    assert views.incidents.status == "empty"
+    assert views.settings.status == "empty"
+    assert views.settings.posthog == "offline"
+
+
+def test_a_missing_cursor_is_an_error_view() -> None:
+    views = render_console(ConsoleReadModel(), cursor="missing")
+    assert views.now.status == "error"
+    assert views.now.error == "cursor"
+    assert views.settings.mode == ""
 
 
 def test_a_status_word_is_not_a_job_status() -> None:

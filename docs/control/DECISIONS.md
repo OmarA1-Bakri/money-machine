@@ -1018,3 +1018,19 @@ Session 12 is incomplete at revision 91. D-0065 installed every Session 12 key f
 ### Consequences
 
 Revision 92 is incomplete Session 12. One key is true. The next honest step is `exception_views_implemented`, through its own proof.
+
+## D-0067 — Session 12 records the exception views
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 12 is incomplete at revision 92. D-0066 recorded the in-memory read model. The prompt-integrity addendum earns the exception views only when each named view is derived from that model, including an empty state and an error state. A blank component is not the proof. A routine decision is not an approval request.
+
+### Decision
+
+`record-evidence` sets `exception_views_implemented` true and keeps `console_read_model_implemented` true. The other four Session 12 keys stay false. The seven views are now, pipeline, shop, blocked, decisions, incidents, and settings. Each one is derived from the read model. An empty store renders an empty view. A missing cursor renders an error view. A blocked job is not a blocker. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. No socket is opened and no cap is written.
+
+### Consequences
+
+Revision 93 is incomplete Session 12. Two keys are true. The next honest step is `telemetry_redaction_implemented`, through its own proof.

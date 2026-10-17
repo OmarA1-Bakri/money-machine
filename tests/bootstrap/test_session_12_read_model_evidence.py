@@ -13,6 +13,7 @@ import pytest
 from money_machine.control.session_12_proof import (
     EARNED_EVIDENCE_KEYS,
     READ_MODEL_EVIDENCE_KEY,
+    VIEWS_EVIDENCE_KEY,
     prove_session_12,
 )
 from money_machine.control.state import (
@@ -25,7 +26,7 @@ from money_machine.control.state import (
 
 ROOT = Path(__file__).parents[2]
 STATE_PATH = ROOT / "docs/control/IMPLEMENTATION_STATE.json"
-EARNED_AT = "2026-10-17T13:00:00Z"
+EARNED_AT = "2026-10-17T13:15:00Z"
 _CONTROL_NAMES = (
     "IMPLEMENTATION_LOG.md",
     "DECISIONS.md",
@@ -42,13 +43,15 @@ def _live() -> ControlState:
 
 
 def _false_pointer() -> ControlState:
-    """The revision-91 activation, rebuilt after the read-model record replaces it."""
+    """Revision 92, rebuilt after the view record replaces the live file."""
     state = _live()
-    state["state_revision"] = 91
+    state["state_revision"] = 92
     state["current_session"] = 12
     state["session_status"] = "incomplete"
-    state["updated_at"] = "2026-10-17T12:55:00Z"
-    state["required_completion_evidence"] = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[12]), False)
+    state["updated_at"] = "2026-10-17T13:00:00Z"
+    evidence = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[12]), False)
+    evidence[READ_MODEL_EVIDENCE_KEY] = True
+    state["required_completion_evidence"] = evidence
     return state
 
 
@@ -70,6 +73,7 @@ def _write(path: Path, state: ControlState) -> None:
 def test_proof_earns_the_read_model_key() -> None:
     assert prove_session_12() == EARNED_EVIDENCE_KEYS
     assert READ_MODEL_EVIDENCE_KEY in EARNED_EVIDENCE_KEYS
+    assert VIEWS_EVIDENCE_KEY in EARNED_EVIDENCE_KEYS
 
 
 def test_the_read_model_key_is_the_accepted_record() -> None:
@@ -81,7 +85,7 @@ def test_a_later_key_is_refused() -> None:
     previous = _false_pointer()
     current = _earned(previous)
     evidence = dict(current["required_completion_evidence"])
-    evidence["exception_views_implemented"] = True
+    evidence["telemetry_redaction_implemented"] = True
     current["required_completion_evidence"] = evidence
 
     with pytest.raises(ControlStateError, match="exactly the keys the fixture proof earned"):
@@ -150,7 +154,7 @@ def test_apply_records_the_read_model_key_without_touching_the_live_file(tmp_pat
     assert applied["state_revision"] == previous["state_revision"] + 1
     assert applied["head_sha"] == previous["head_sha"]
     assert evidence[READ_MODEL_EVIDENCE_KEY] is True
-    assert evidence["exception_views_implemented"] is False
+    assert evidence[VIEWS_EVIDENCE_KEY] is True
     assert evidence["telemetry_redaction_implemented"] is False
     assert evidence["operator_actions_fail_closed"] is False
     assert evidence["control_files_and_checkpoint_current"] is False

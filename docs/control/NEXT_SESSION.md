@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 12 exception views are recorded (2026-10-17)
+
+Revision 93 records `console_read_model_implemented` and `exception_views_implemented`. The other four Session 12 keys stay false. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. The next honest step is `telemetry_redaction_implemented`, through its own proof.
+
 ## Session 12 read model is recorded (2026-10-17)
 
 Revision 92 records `console_read_model_implemented`. The other five Session 12 keys stay false. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. The next honest step is `exception_views_implemented`, through its own proof.

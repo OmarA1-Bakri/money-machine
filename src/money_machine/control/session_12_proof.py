@@ -1,8 +1,7 @@
-"""Earn the Session 12 console read-model key.
+"""Earn the Session 12 read-model and exception-view keys.
 
 The proof does not open a socket, read a credential, or write a cap.
-The other Session 12 keys stay false. The read-model key may be either bool:
-the record flips it after this proof has already run.
+The view key may be either bool: the record flips it after this proof has run.
 """
 
 from __future__ import annotations
@@ -13,6 +12,8 @@ import json
 from pathlib import Path
 
 from money_machine.assets.operator_console import (
+    BlockerView,
+    CompletionView,
     ConsoleReadModel,
     ConsoleRefusal,
     DecisionView,
@@ -28,17 +29,18 @@ from money_machine.assets.operator_console import (
     WeeklyMetricView,
     WorkflowView,
 )
+from money_machine.assets.operator_views import ConsoleViews, render_console
 
 READ_MODEL_EVIDENCE_KEY = "console_read_model_implemented"
-EARNED_EVIDENCE_KEYS = frozenset({READ_MODEL_EVIDENCE_KEY})
+VIEWS_EVIDENCE_KEY = "exception_views_implemented"
+EARNED_EVIDENCE_KEYS = frozenset({READ_MODEL_EVIDENCE_KEY, VIEWS_EVIDENCE_KEY})
 _UNEARNED_KEYS = (
-    "exception_views_implemented",
     "telemetry_redaction_implemented",
     "operator_actions_fail_closed",
     "control_files_and_checkpoint_current",
     "evidence_closure_commit_recorded",
 )
-_SESSION_12_KEYS = frozenset({READ_MODEL_EVIDENCE_KEY, *_UNEARNED_KEYS})
+_SESSION_12_KEYS = frozenset({READ_MODEL_EVIDENCE_KEY, VIEWS_EVIDENCE_KEY, *_UNEARNED_KEYS})
 _CONTROL_FILES = (
     Path("docs/control/IMPLEMENTATION_STATE.json"),
     Path("docs/control/IMPLEMENTATION_LOG.md"),
@@ -62,8 +64,9 @@ class Session12ProofError(ValueError):
 
 
 def prove_session_12() -> frozenset[str]:
-    """Return the earned Session 12 key. A miss raises instead of returning it."""
+    """Return the earned Session 12 keys. A miss raises instead of returning them."""
     _prove_read_model()
+    _prove_views()
     _prove_control_files()
     return EARNED_EVIDENCE_KEYS
 
@@ -253,6 +256,246 @@ def _seeded() -> ConsoleReadModel:
     )
 
 
+def _prove_views() -> None:
+    module = inspect.getmodule(render_console)
+    if module is None or module.__file__ is None:
+        raise Session12ProofError("views_socket")
+    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+    imported: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module is not None:
+            imported.append(node.module)
+    if "money_machine.assets.operator_console" not in imported:
+        raise Session12ProofError("views_source")
+    if any(token in " ".join(imported) for token in ("socket", "httpx", "urllib", "requests")):
+        raise Session12ProofError("views_socket")
+    names = tuple(field for field in ConsoleViews.__dataclass_fields__)
+    if names != ("now", "pipeline", "shop", "blocked", "decisions", "incidents", "settings"):
+        raise Session12ProofError("views_names")
+    empty = render_console(ConsoleReadModel())
+    if any(
+        view.status != "empty" or view.error is not None
+        for view in (
+            empty.now,
+            empty.pipeline,
+            empty.shop,
+            empty.blocked,
+            empty.decisions,
+            empty.incidents,
+            empty.settings,
+        )
+    ):
+        raise Session12ProofError("views_empty")
+    if empty.now.running or empty.shop.active or empty.decisions.rows or empty.blocked.blockers:
+        raise Session12ProofError("views_empty")
+    if empty.settings.publication_cap != 0 or empty.settings.posthog != "offline":
+        raise Session12ProofError("views_empty")
+    failed = render_console(ConsoleReadModel(), cursor="missing")
+    if any(
+        view.status != "error" or view.error != "cursor"
+        for view in (
+            failed.now,
+            failed.pipeline,
+            failed.shop,
+            failed.blocked,
+            failed.decisions,
+            failed.incidents,
+            failed.settings,
+        )
+    ):
+        raise Session12ProofError("views_error")
+    if failed.now.running or failed.decisions.rows or failed.settings.mode != "":
+        raise Session12ProofError("views_error")
+    _prove_seeded_views()
+
+
+def _prove_seeded_views() -> None:
+    shown = render_console(_view_model())
+    if shown.now.status != "ready" or shown.now.running[0].job_id != "j-running":
+        raise Session12ProofError("views_now")
+    if shown.now.next_scheduled[0].job_id != "j-ready" or shown.now.action_required is not True:
+        raise Session12ProofError("views_now")
+    if shown.now.recent_completions[0].job_id != "j-done":
+        raise Session12ProofError("views_now")
+    row = shown.pipeline.rows[0]
+    if (
+        shown.pipeline.status != "ready"
+        or row.stage != "build"
+        or row.owning_agent != "fixture"
+        or row.elapsed_seconds != 4
+        or row.next_transition != "review"
+        or row.blocked_dependency != "credential"
+    ):
+        raise Session12ProofError("views_pipeline")
+    if (
+        shown.shop.active[0].state != "active"
+        or shown.shop.draft[0].age_days != 2
+        or shown.shop.deactivated[0].sales != 1
+        or shown.shop.active[0].next_review_at != "2026-10-24"
+    ):
+        raise Session12ProofError("views_shop")
+    if shown.blocked.blockers != (
+        BlockerView(blocker_id="b-1", kind="credentials", detail="credential missing"),
+    ):
+        raise Session12ProofError("views_blocked")
+    jobs_only = render_console(
+        ConsoleReadModel(
+            workflows=_view_model().workflows,
+            jobs=(
+                JobView(
+                    job_id="j-blocked",
+                    workflow_id="w-1",
+                    job_type="IncidentRepairJob",
+                    status="blocked",
+                    attempt=1,
+                ),
+            ),
+        )
+    )
+    if jobs_only.blocked.status != "empty" or jobs_only.blocked.blockers:
+        raise Session12ProofError("views_blocked")
+    kinds = tuple(item.kind for item in shown.decisions.rows)
+    if kinds != _DECISION_KINDS:
+        raise Session12ProofError("views_decisions")
+    routine = shown.decisions.rows[0]
+    if (
+        routine.kind != "hold"
+        or routine.approval_request is not False
+        or routine.evidence != "fixture"
+    ):
+        raise Session12ProofError("views_decisions")
+    incident = shown.incidents.rows[0]
+    if (
+        incident.buyer_issue != "the file could not be opened"
+        or incident.severity != "normal"
+        or incident.repair_step != "verify"
+        or incident.response_status != "draft"
+        or incident.resolution_evidence != "hash-aaaa"
+    ):
+        raise Session12ProofError("views_incidents")
+    if (
+        shown.settings.status != "ready"
+        or shown.settings.mode != "held"
+        or shown.settings.publication_cap != 0
+        or shown.settings.loop_day != 0
+        or shown.settings.posthog != "offline"
+        or shown.settings.provider != "unread"
+    ):
+        raise Session12ProofError("views_settings")
+
+
+def _view_model() -> ConsoleReadModel:
+    workflows = (
+        WorkflowView(
+            workflow_id="w-1",
+            name="Workflow 1",
+            stage="build",
+            owning_agent="fixture",
+            elapsed_seconds=4,
+            next_transition="review",
+            blocked_dependency="credential",
+        ),
+    )
+    decisions = tuple(
+        DecisionView(
+            decision_id=f"d-{index}",
+            kind=kind,
+            evidence="fixture",
+            status="recorded",
+            routine=kind == "hold",
+        )
+        for index, kind in enumerate(_DECISION_KINDS, start=1)
+    )
+    listings = (
+        ListingView(
+            listing_id="l-active",
+            product_id="p-1",
+            state="active",
+            age_days=3,
+            views=4,
+            favourites=1,
+            sales=0,
+            decision="hold",
+            next_review_at="2026-10-24",
+        ),
+        ListingView(
+            listing_id="l-draft",
+            product_id="p-1",
+            state="draft",
+            age_days=2,
+            views=4,
+            favourites=1,
+            sales=0,
+            decision="hold",
+            next_review_at="2026-10-24",
+        ),
+        ListingView(
+            listing_id="l-off",
+            product_id="p-1",
+            state="deactivated",
+            age_days=9,
+            views=4,
+            favourites=1,
+            sales=1,
+            decision="hold",
+            next_review_at="2026-10-24",
+        ),
+    )
+    return ConsoleReadModel(
+        shop=ShopView(shop_id="shop-1", name="Fixture Shop", currency="USD"),
+        workflows=workflows,
+        stages=(PipelineStageView(stage="build", experiment_count=1),),
+        jobs=(
+            JobView(
+                job_id="j-ready",
+                workflow_id="w-1",
+                job_type="ResearchCollectionJob",
+                status="ready",
+                attempt=0,
+            ),
+            JobView(
+                job_id="j-running",
+                workflow_id="w-1",
+                job_type="ListingRepairJob",
+                status="running",
+                attempt=1,
+            ),
+            JobView(
+                job_id="j-blocked",
+                workflow_id="w-1",
+                job_type="IncidentRepairJob",
+                status="blocked",
+                attempt=2,
+            ),
+        ),
+        products=(ProductView(product_id="p-1", name="Fixture"),),
+        listings=listings,
+        decisions=decisions,
+        incidents=(
+            IncidentView(
+                incident_id="i-1",
+                summary="the file could not be opened",
+                severity="normal",
+                repair_step="verify",
+                response_status="draft",
+                resolution_evidence="hash-aaaa",
+            ),
+        ),
+        integrations=(IntegrationView(name="posthog", status="offline"),),
+        completions=(
+            CompletionView(
+                job_id="j-done",
+                workflow_id="w-1",
+                job_type="ResearchCollectionJob",
+                finished_at="2026-10-17T12:00:00Z",
+            ),
+        ),
+        blockers=(BlockerView(blocker_id="b-1", kind="credentials", detail="credential missing"),),
+    )
+
+
 def _prove_control_files() -> None:
     """The continuity files and the catalogue match the checked-in pointer."""
     root = Path(__file__).resolve().parents[3]
@@ -288,7 +531,8 @@ def _prove_control_files() -> None:
         or not values_are_bool
         or not isinstance(evidence, dict)
         or len(evidence) != len(recorded)
-        or not isinstance(evidence.get(READ_MODEL_EVIDENCE_KEY), bool)
+        or evidence.get(READ_MODEL_EVIDENCE_KEY) is not True
+        or not isinstance(evidence.get(VIEWS_EVIDENCE_KEY), bool)
         or any(evidence.get(key) is not False for key in _UNEARNED_KEYS)
     ):
         raise Session12ProofError("control_checkpoint")
