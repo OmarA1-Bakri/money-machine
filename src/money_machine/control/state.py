@@ -1025,6 +1025,12 @@ def _require_session_12_closure_proof(root: Path, sha: str) -> None:
         raise ControlStateError("closure commit does not contain the session 12 proof")
 
 
+def _require_session_13_closure_proof(root: Path, sha: str) -> None:
+    proof = _git(root, "show", f"{sha}:src/money_machine/control/session_13_proof.py").stdout
+    if "def prove_session_13" not in proof:
+        raise ControlStateError("closure commit does not contain the session 13 proof")
+
+
 def _verify_completion_repository(
     state_path: Path,
     previous: ControlState,
@@ -1047,6 +1053,8 @@ def _verify_completion_repository(
         _require_session_11_closure_proof(repo_root, closure)
     if previous["current_session"] == 12:
         _require_session_12_closure_proof(repo_root, closure)
+    if previous["current_session"] == 13:
+        _require_session_13_closure_proof(repo_root, closure)
 
 
 def _verify_activation_repository(
