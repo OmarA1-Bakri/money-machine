@@ -945,3 +945,19 @@ Session 11 is incomplete at revision 88. Intake, routing, repair, and the draft 
 ### Consequences
 
 Revision 89 records every Session 11 key except the closure key. The closure key is the next proof, through `apply-completion`.
+
+## D-0063 — Session 11 closes on the commit that holds the pre-transition state
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Five Session 11 keys are true. `evidence_closure_commit_recorded` is the only false key. `record-evidence` refuses to flip it. The completion transition records it when HEAD is a new commit that contains `def prove_session_11` and the exact pre-transition state, and that commit does not name its own object ID.
+
+### Decision
+
+`apply-completion` is the proof-gated transition for the closure key. The closure commit is `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. It contains the Session 11 proof and the pre-transition state. `head_sha` and `evidence_closure_commit_sha` become that commit. `current_session` stays 11. `next_session` becomes 12 and `next_prompt` becomes the Session 12 prompt. Every Session 11 key is true. Session 12 is not activated. No live call, purchase, or customer message is made.
+
+### Consequences
+
+The following state commit records revision 90. Session 11 is complete. The closure key is true. Session 12 stays inactive.

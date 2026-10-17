@@ -4,8 +4,8 @@ Sessions 00-06 closed with every contract key true. Session 07's close
 commit under D-0032 has every contract key false. D-0036 records the live
 pointer separately. Sessions 08, 09, and 10 are complete. Session 10 is
 revision 83 and every one of its keys is true (D-0055). Session 11 is
-incomplete at revision 89. The intake, routing, repair, draft, and
-control keys are true and the closure key is false (D-0062). Sessions 12-15 have no contract.
+complete at revision 90. Every Session 11 key is true (D-0063). Session 12
+is not activated. Sessions 13-15 have no contract.
 This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
@@ -158,15 +158,13 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
     OpenSessionEvidence(
         11,
         ("src/money_machine/assets/support_intake.py",),
-        (
-            "The intake, routing, repair, draft, and control keys are earned. The "
-            "closure key is not earned. The catalogue matches the pointer. A16 stays DESIGNED."
-        ),
+        ("Every Session 11 key is earned. Session 12 is not activated. A16 stays DESIGNED."),
         True,
         frozenset(
             {
                 "control_files_and_checkpoint_current",
                 "draft_reply_implemented",
+                "evidence_closure_commit_recorded",
                 "incident_routing_implemented",
                 "repair_resolution_implemented",
                 "support_intake_implemented",
@@ -203,17 +201,24 @@ def _keys(session: int) -> tuple[str, ...]:
     return tuple(sorted(contract))
 
 
+def _open_status(record: OpenSessionEvidence) -> str:
+    """An open row is complete only when every installed key is true."""
+    contract = SESSION_EVIDENCE_KEYS.get(record.session)
+    if not record.activated:
+        return "Status: not activated."
+    if contract is not None and record.true_keys == frozenset(contract):
+        return "Status: complete."
+    return "Status: incomplete."
+
+
 def render_session_evidence() -> str:
     """Return the human index. Key order is alphabetical and stable."""
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 11 at state revision 89.",
-        "`current_session` is 11. `session_status` is incomplete.",
-        (
-            "The intake, routing, repair, draft, and control keys are true. "
-            "The closure key is false."
-        ),
+        "The checked-in pointer is Session 11 at state revision 90.",
+        "`current_session` is 11. `session_status` is complete.",
+        "Every Session 11 key is true.",
         "Session 10 is complete and every one of its keys is true.",
         "Session 09 is complete and every one of its keys is true.",
         "Session 08 is complete and every one of its keys is true.",
@@ -222,10 +227,7 @@ def render_session_evidence() -> str:
         "D-0036 recorded the twelve Session 07 keys true. The closure commit is",
         "`5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.",
         "Session 10 is complete. Every key is true.",
-        (
-            "Session 11 is incomplete. Intake, routing, repair, draft, and control "
-            "are true. The closure key is false."
-        ),
+        "Session 11 is complete. Every key is true.",
         "Sessions 12-15 have no contract and are not activated.",
         "",
     ]
@@ -264,10 +266,7 @@ def render_session_evidence() -> str:
             "## Sessions 11-15",
             "",
             "Session 10 is complete. Every key is true.",
-            (
-                "Session 11 is incomplete. Intake, routing, repair, draft, and control "
-                "are true. The closure key is false."
-            ),
+            "Session 11 is complete. Every key is true.",
             "Sessions 12-15 have no contract and are not activated.",
             "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",
@@ -279,7 +278,7 @@ def render_session_evidence() -> str:
                 f"## Session {record.session:02d}",
                 "",
                 f"Prompt: `{SESSION_PROMPTS[record.session]}`.",
-                "Status: incomplete." if record.activated else "Status: not activated.",
+                _open_status(record),
                 (
                     "Evidence contract: installed."
                     if record.activated

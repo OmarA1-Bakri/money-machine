@@ -57,24 +57,19 @@ def test_closed_snapshots_match_the_commits_that_hold_them() -> None:
         assert all(item is record.all_keys_true for item in values)
 
 
-def test_live_pointer_is_incomplete_session_11() -> None:
+def test_live_pointer_is_complete_session_11() -> None:
     live = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert live["current_session"] == 11
-    assert live["session_status"] == "incomplete"
-    assert live["state_revision"] == 89
-    assert live["completed_sessions"] == list(range(11))
-    assert live["next_session"] == 11
-    assert live["next_prompt"] == SESSION_PROMPTS[11]
-    assert live["head_sha"] == "f16c7ed0598daf3f4627955b52585f253ae1b918"
+    assert live["session_status"] == "complete"
+    assert live["state_revision"] == 90
+    assert live["completed_sessions"] == list(range(12))
+    assert live["next_session"] == 12
+    assert live["next_prompt"] == SESSION_PROMPTS[12]
+    assert live["head_sha"] == "d095501665fbda0f9e6a0e77b57531bc33fda4e2"
     assert live["evidence_closure_commit_sha"] == live["head_sha"]
     evidence = live["required_completion_evidence"]
     assert isinstance(evidence, dict)
-    expected = {key: False for key in sorted(SESSION_EVIDENCE_KEYS[11])}
-    expected["incident_routing_implemented"] = True
-    expected["control_files_and_checkpoint_current"] = True
-    expected["draft_reply_implemented"] = True
-    expected["repair_resolution_implemented"] = True
-    expected["support_intake_implemented"] = True
+    expected = {key: True for key in sorted(SESSION_EVIDENCE_KEYS[11])}
     assert evidence == expected
 
 
@@ -84,15 +79,7 @@ def test_open_sessions_have_no_recorded_true_key() -> None:
         if record.session == 11:
             assert record.session in SESSION_EVIDENCE_KEYS
             assert record.activated is True
-            assert record.true_keys == frozenset(
-                {
-                    "control_files_and_checkpoint_current",
-                    "draft_reply_implemented",
-                    "incident_routing_implemented",
-                    "repair_resolution_implemented",
-                    "support_intake_implemented",
-                }
-            )
+            assert record.true_keys == frozenset(SESSION_EVIDENCE_KEYS[11])
         else:
             assert record.session not in SESSION_EVIDENCE_KEYS
             assert record.true_keys == frozenset()

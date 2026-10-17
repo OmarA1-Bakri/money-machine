@@ -1,8 +1,8 @@
 # Session evidence
 
-The checked-in pointer is Session 11 at state revision 89.
-`current_session` is 11. `session_status` is incomplete.
-The intake, routing, repair, draft, and control keys are true. The closure key is false.
+The checked-in pointer is Session 11 at state revision 90.
+`current_session` is 11. `session_status` is complete.
+Every Session 11 key is true.
 Session 10 is complete and every one of its keys is true.
 Session 09 is complete and every one of its keys is true.
 Session 08 is complete and every one of its keys is true.
@@ -11,7 +11,7 @@ Session 07's close commit keeps every contract key false under D-0032.
 D-0036 recorded the twelve Session 07 keys true. The closure commit is
 `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.
 Session 10 is complete. Every key is true.
-Session 11 is incomplete. Intake, routing, repair, draft, and control are true. The closure key is false.
+Session 11 is complete. Every key is true.
 Sessions 12-15 have no contract and are not activated.
 
 ## Session 00
@@ -271,16 +271,16 @@ Head SHA: `f16c7ed0598daf3f4627955b52585f253ae1b918`.
 ## Sessions 11-15
 
 Session 10 is complete. Every key is true.
-Session 11 is incomplete. Intake, routing, repair, draft, and control are true. The closure key is false.
+Session 11 is complete. Every key is true.
 Sessions 12-15 have no contract and are not activated.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
 ## Session 11
 
 Prompt: `14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md`.
-Status: incomplete.
+Status: complete.
 Evidence contract: installed.
-The intake, routing, repair, draft, and control keys are earned. The closure key is not earned. The catalogue matches the pointer. A16 stays DESIGNED.
+Every Session 11 key is earned. Session 12 is not activated. A16 stays DESIGNED.
 
 Fixture paths:
 
@@ -290,7 +290,7 @@ Fixture paths:
 |---|---|
 | `control_files_and_checkpoint_current` | true |
 | `draft_reply_implemented` | true |
-| `evidence_closure_commit_recorded` | false |
+| `evidence_closure_commit_recorded` | true |
 | `incident_routing_implemented` | true |
 | `repair_resolution_implemented` | true |
 | `support_intake_implemented` | true |

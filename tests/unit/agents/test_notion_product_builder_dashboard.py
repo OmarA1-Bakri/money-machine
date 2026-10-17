@@ -51,8 +51,8 @@ MODULE_PATH = ROOT / "src/money_machine/agents/implementations/notion_dashboard.
 WHEN = datetime(2026, 10, 3, 0, 30, tzinfo=UTC)
 PHASE_TWO_AT = datetime(2026, 10, 5, 20, 0, tzinfo=UTC)
 LATER = datetime(2026, 10, 5, 22, 30, tzinfo=UTC)
-CLOSURE_SHA = "f16c7ed0598daf3f4627955b52585f253ae1b918"
-HEAD_SHA = "f16c7ed0598daf3f4627955b52585f253ae1b918"
+CLOSURE_SHA = "d095501665fbda0f9e6a0e77b57531bc33fda4e2"
+HEAD_SHA = "d095501665fbda0f9e6a0e77b57531bc33fda4e2"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 _PHASES = (
     PHASE_TOP_LEVEL_PAGE_AND_DESIGN_SHELL,
@@ -687,10 +687,10 @@ async def test_dashboard_piece_parser_rejects_bad_inputs(tmp_path: Path) -> None
 def test_live_pointer_is_incomplete_session_ten() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert state["current_session"] == 11
-    assert state["session_status"] == "incomplete"
-    assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    assert state["next_session"] == 11
-    assert state["next_prompt"] == "14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md"
+    assert state["session_status"] == "complete"
+    assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    assert state["next_session"] == 12
+    assert state["next_prompt"] == "15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md"
     assert state["head_sha"] == HEAD_SHA
     assert state["evidence_closure_commit_sha"] == CLOSURE_SHA
     assert state["head_sha"] == state["evidence_closure_commit_sha"]
@@ -703,9 +703,9 @@ def test_live_pointer_is_incomplete_session_ten() -> None:
     assert evidence["repair_resolution_implemented"] is True
     assert evidence["draft_reply_implemented"] is True
     assert evidence["control_files_and_checkpoint_current"] is True
-    assert evidence["evidence_closure_commit_recorded"] is False
-    assert sum(1 for value in evidence.values() if value) == 5
-    assert state["state_revision"] == 89
+    assert evidence["evidence_closure_commit_recorded"] is True
+    assert sum(1 for value in evidence.values() if value) == 6
+    assert state["state_revision"] == 90
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")
     assert "SESSION_08_MERCHANDISING_AND_ASSETS_COMPLETE" not in STATE_PATH.read_text(
         encoding="utf-8"

@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-17 — Session 11 closure recorded
+
+**Verification scope**: live `apply-completion` from revision 89 to 90. No live HTTP. Exit 78 stays HELD. The exit string is not written. Session 12 is not activated.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 11, `complete`, revision 90, `updated_at` `2026-10-17T12:40:00Z` | PASS |
+| Keys | Every Session 11 key true | PASS |
+| Head | `head_sha` is `d095501665fbda0f9e6a0e77b57531bc33fda4e2` | PASS |
+| Refusal | A closure commit without `def prove_session_11` is refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "apply-completion", "session": 11, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 90}`. The completion gate, the control-file proof, the Session 11 contract, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, and the support intake unit tests printed 76 passed in 3.17s.
+
 ## 2026-10-17 — Session 11 control-file key recorded
 
 **Verification scope**: live `record-evidence` from revision 88 to 89. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move. No message is sent and no job is inserted.

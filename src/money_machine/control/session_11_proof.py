@@ -54,7 +54,10 @@ _CONTROL_FILES = (
     Path("docs/control/NEXT_SESSION.md"),
     Path("docs/control/SESSION_EVIDENCE.md"),
 )
-_HEAD = "f16c7ed0598daf3f4627955b52585f253ae1b918"
+_PRIOR_HEAD = "f16c7ed0598daf3f4627955b52585f253ae1b918"
+_CLOSURE_HEAD = "d095501665fbda0f9e6a0e77b57531bc33fda4e2"
+_SESSION_11_PROMPT = "14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md"
+_SESSION_12_PROMPT = "15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md"
 _DRAFT_BODY = (
     "We received this once. the file hash is aaaa path-token-1 Reply if the issue remains."
 )
@@ -398,22 +401,35 @@ def _prove_control_files() -> None:
         raise Session11ProofError("control_checkpoint")
     evidence = decoded.get("required_completion_evidence")
     recorded = set(evidence) if isinstance(evidence, dict) else set()
+    status = decoded.get("session_status")
     if (
         decoded.get("current_session") != 11
-        or decoded.get("session_status") != "incomplete"
-        or decoded.get("head_sha") != _HEAD
-        or decoded.get("evidence_closure_commit_sha") != _HEAD
-        or decoded.get("next_session") != 11
-        or decoded.get("completed_sessions") != list(range(11))
-        or decoded.get("next_prompt") != "14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md"
+        or decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
         or recorded != set(_BEHAVIORAL_KEYS) | {CONTROL_EVIDENCE_KEY, _CLOSURE_EVIDENCE_KEY}
         or not isinstance(evidence, dict)
+        or status not in {"incomplete", "complete"}
     ):
         raise Session11ProofError("control_checkpoint")
     for key in _BEHAVIORAL_KEYS:
         if evidence.get(key) is not True:
             raise Session11ProofError("control_checkpoint")
-    if evidence.get(_CLOSURE_EVIDENCE_KEY) is not False or not isinstance(
-        evidence.get(CONTROL_EVIDENCE_KEY), bool
+    if status == "incomplete":
+        if (
+            decoded.get("head_sha") != _PRIOR_HEAD
+            or decoded.get("next_session") != 11
+            or decoded.get("completed_sessions") != list(range(11))
+            or decoded.get("next_prompt") != _SESSION_11_PROMPT
+            or evidence.get(_CLOSURE_EVIDENCE_KEY) is not False
+            or not isinstance(evidence.get(CONTROL_EVIDENCE_KEY), bool)
+        ):
+            raise Session11ProofError("control_checkpoint")
+        return
+    if (
+        decoded.get("head_sha") != _CLOSURE_HEAD
+        or decoded.get("next_session") != 12
+        or decoded.get("completed_sessions") != list(range(12))
+        or decoded.get("next_prompt") != _SESSION_12_PROMPT
+        or evidence.get(_CLOSURE_EVIDENCE_KEY) is not True
+        or evidence.get(CONTROL_EVIDENCE_KEY) is not True
     ):
         raise Session11ProofError("control_checkpoint")

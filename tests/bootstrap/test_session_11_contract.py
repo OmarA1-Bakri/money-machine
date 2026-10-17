@@ -74,21 +74,16 @@ def test_session_11_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_is_the_session_11_activation() -> None:
-    """Intake, routing, repair, draft, and control are true. The closure key stays false."""
+    """Session 11 is complete. Every Session 11 key is true."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    evidence = dict.fromkeys(sorted(SESSION_11_KEYS), False)
-    evidence["control_files_and_checkpoint_current"] = True
-    evidence["draft_reply_implemented"] = True
-    evidence["incident_routing_implemented"] = True
-    evidence["repair_resolution_implemented"] = True
-    evidence["support_intake_implemented"] = True
-    assert live["state_revision"] == 89
+    evidence = dict.fromkeys(sorted(SESSION_11_KEYS), True)
+    assert live["state_revision"] == 90
     assert live["current_session"] == 11
-    assert live["session_status"] == "incomplete"
-    assert live["completed_sessions"] == list(range(11))
-    assert live["next_session"] == 11
-    assert live["head_sha"] == "f16c7ed0598daf3f4627955b52585f253ae1b918"
+    assert live["session_status"] == "complete"
+    assert live["completed_sessions"] == list(range(12))
+    assert live["next_session"] == 12
+    assert live["head_sha"] == "d095501665fbda0f9e6a0e77b57531bc33fda4e2"
     assert live["required_completion_evidence"] == evidence
     assert "SESSION_11_SUPPORT_AND_REPAIR_COMPLETE" not in text
 

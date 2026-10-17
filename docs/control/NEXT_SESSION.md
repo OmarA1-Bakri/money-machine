@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 11 is complete (2026-10-17)
+
+Revision 90 records every Session 11 key true. `completed_sessions` is 0 through 11. `next_session` is 12. `head_sha` is `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. A16 stays `DESIGNED`. Session 12 is not activated. The next honest step is the Session 12 evidence contract.
+
 ## Session 11 control files are recorded (2026-10-17)
 
 Revision 89 records intake, routing, repair, the draft, and `control_files_and_checkpoint_current`. The closure key stays false. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The next honest step is the closure key, through `apply-completion`.
