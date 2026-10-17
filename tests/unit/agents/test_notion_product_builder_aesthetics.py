@@ -51,8 +51,8 @@ DASHBOARD_AT = datetime(2026, 10, 5, 22, 30, tzinfo=UTC)
 HUBS_AT = datetime(2026, 10, 5, 23, 45, tzinfo=UTC)
 NOTIFICATION_AT = datetime(2026, 10, 6, 0, 30, tzinfo=UTC)
 LATER = datetime(2026, 10, 6, 1, 30, tzinfo=UTC)
-CLOSURE_SHA = "5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb"
-HEAD_SHA = "b782751fdb1b255c436ff7f6fa655e6d783b1e8c"
+CLOSURE_SHA = "01b7dd84ef98442ff26a5239e8c7de742739d844"
+HEAD_SHA = "01b7dd84ef98442ff26a5239e8c7de742739d844"
 BOOTSTRAP_SHA = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 
 
@@ -571,27 +571,22 @@ def test_aesthetics_module_does_not_name_a_live_client() -> None:
         assert token.casefold() not in source.casefold()
 
 
-def test_live_pointer_is_incomplete_session_eight() -> None:
+def test_live_pointer_is_complete_session_eight() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert state["current_session"] == 8
-    assert state["session_status"] == "incomplete"
-    assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7]
-    assert state["next_session"] == 8
-    assert state["next_prompt"] == "11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md"
+    assert state["session_status"] == "complete"
+    assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    assert state["next_session"] == 9
+    assert state["next_prompt"] == "12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md"
     assert state["head_sha"] == HEAD_SHA
     assert state["evidence_closure_commit_sha"] == CLOSURE_SHA
-    assert state["head_sha"] != state["evidence_closure_commit_sha"]
+    assert state["head_sha"] == state["evidence_closure_commit_sha"]
     assert state["last_verified_commit"] == BOOTSTRAP_SHA
     assert state["commissioned_agents"] == []
     evidence = state["required_completion_evidence"]
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[8]
-    assert evidence["evidence_closure_commit_recorded"] is False
-    assert all(
-        value is True
-        for key, value in evidence.items()
-        if key != "evidence_closure_commit_recorded"
-    )
-    assert state["state_revision"] == 68
+    assert all(value is True for value in evidence.values())
+    assert state["state_revision"] == 69
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")
     assert "SESSION_08_MERCHANDISING_AND_ASSETS_COMPLETE" not in STATE_PATH.read_text(
         encoding="utf-8"

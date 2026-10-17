@@ -1,5 +1,20 @@
 # Test Evidence
 
+## 2026-10-17 — Session 08 completion applied
+
+**Verification scope**: live `apply-completion` from revision 68 to 69. No live HTTP. Exit 78 stays HELD. A10 and A11 stay `DESIGNED`. Session 09 is not activated.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 8, `complete`, revision 69, `updated_at` `2026-10-17T09:49:00Z` | PASS |
+| Keys | All twelve Session 08 keys true | PASS |
+| Closure | `head_sha` and `evidence_closure_commit_sha` are `01b7dd84ef98442ff26a5239e8c7de742739d844` | PASS |
+| Next | `next_session` 9, prompt `12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md`, not activated | PASS |
+| Exit string | `SESSION_08_MERCHANDISING_AND_ASSETS_COMPLETE` is absent | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "apply-completion", "session": 8, "state_revision": 69}`.
+
 ## 2026-10-17 — Session 08 completion rule
 
 **Verification scope**: the D-0039 validator and the absent-root completion path. The live state file is not changed. No live HTTP.

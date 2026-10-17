@@ -1,8 +1,8 @@
 # Session evidence
 
-The checked-in pointer is Session 08 at state revision 68.
-`current_session` is 8. `session_status` is incomplete.
-Eleven Session 08 evidence keys are true. The closure key is false.
+The checked-in pointer is Session 08 at state revision 69.
+`current_session` is 8. `session_status` is complete.
+Every Session 08 evidence key is true.
 Sessions 00-06 closed with every contract key true.
 Session 07's close commit keeps every contract key false under D-0032.
 D-0036 recorded the twelve Session 07 keys true. The closure commit is
@@ -202,17 +202,17 @@ D-0036 records the live keys later. This table is the close commit.
 
 ## Sessions 08-15
 
-Session 08 is activated and incomplete. Eleven keys are true.
-The closure key is false. The session is not complete.
+Session 08 is complete. Every contract key is true.
+The closure commit is `01b7dd84ef98442ff26a5239e8c7de742739d844`.
 Sessions 09-15 are not activated. A fixture path is code on the trunk.
 It is not a recorded evidence key.
 
 ## Session 08
 
 Prompt: `11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md`.
-Status: incomplete.
+Status: complete.
 Evidence contract: installed.
-Activated and incomplete. The closure key is not recorded. The session is not complete.
+Complete at revision 69. Session 09 is not activated.
 
 Fixture paths:
 
@@ -232,7 +232,7 @@ Fixture paths:
 | `control_files_and_checkpoint_current` | true |
 | `creative_asset_agent_implemented` | true |
 | `design_tokens_implemented` | true |
-| `evidence_closure_commit_recorded` | false |
+| `evidence_closure_commit_recorded` | true |
 | `link_validation_implemented` | true |
 | `merchandising_agent_implemented` | true |
 | `merchandising_asset_tests_pass` | true |

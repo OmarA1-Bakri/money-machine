@@ -57,20 +57,19 @@ def test_closed_snapshots_match_the_commits_that_hold_them() -> None:
         assert all(item is record.all_keys_true for item in values)
 
 
-def test_live_pointer_is_incomplete_session_08() -> None:
+def test_live_pointer_is_complete_session_08() -> None:
     live = json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    record = CLOSED_SESSION_EVIDENCE[7]
     assert live["current_session"] == 8
-    assert live["session_status"] == "incomplete"
-    assert live["state_revision"] == 68
-    assert live["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7]
-    assert live["next_session"] == 8
-    assert live["head_sha"] == record.head_sha
-    assert live["evidence_closure_commit_sha"] == "5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb"
+    assert live["session_status"] == "complete"
+    assert live["state_revision"] == 69
+    assert live["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    assert live["next_session"] == 9
+    assert live["next_prompt"] == SESSION_PROMPTS[9]
+    assert live["head_sha"] == "01b7dd84ef98442ff26a5239e8c7de742739d844"
+    assert live["evidence_closure_commit_sha"] == live["head_sha"]
     evidence = live["required_completion_evidence"]
     assert isinstance(evidence, dict)
     expected = {key: True for key in sorted(SESSION_EVIDENCE_KEYS[8])}
-    expected["evidence_closure_commit_recorded"] = False
     assert evidence == expected
 
 

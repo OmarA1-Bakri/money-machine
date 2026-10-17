@@ -2,8 +2,8 @@
 
 Sessions 00-06 closed with every contract key true. Session 07's close
 commit under D-0032 has every contract key false. D-0036 records the live
-pointer separately. Sessions 08-15 are not activated, so none of their
-keys is recorded true. This module does not edit ``IMPLEMENTATION_STATE.json``.
+pointer separately. Session 08 is complete at revision 69. Sessions 09-15
+are not activated. This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
 from __future__ import annotations
@@ -131,7 +131,7 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
             "src/money_machine/assets/asset_lineage.py",
             "src/money_machine/integrations/storage/local.py",
         ),
-        "Activated and incomplete. The closure key is not recorded. The session is not complete.",
+        "Complete at revision 69. Session 09 is not activated.",
     ),
     OpenSessionEvidence(
         9,
@@ -192,9 +192,9 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 08 at state revision 68.",
-        "`current_session` is 8. `session_status` is incomplete.",
-        "Eleven Session 08 evidence keys are true. The closure key is false.",
+        "The checked-in pointer is Session 08 at state revision 69.",
+        "`current_session` is 8. `session_status` is complete.",
+        "Every Session 08 evidence key is true.",
         "Sessions 00-06 closed with every contract key true.",
         "Session 07's close commit keeps every contract key false under D-0032.",
         "D-0036 recorded the twelve Session 07 keys true. The closure commit is",
@@ -236,8 +236,8 @@ def render_session_evidence() -> str:
         [
             "## Sessions 08-15",
             "",
-            "Session 08 is activated and incomplete. Eleven keys are true.",
-            "The closure key is false. The session is not complete.",
+            "Session 08 is complete. Every contract key is true.",
+            "The closure commit is `01b7dd84ef98442ff26a5239e8c7de742739d844`.",
             "Sessions 09-15 are not activated. A fixture path is code on the trunk.",
             "It is not a recorded evidence key.",
             "",
@@ -250,7 +250,7 @@ def render_session_evidence() -> str:
                 f"## Session {record.session:02d}",
                 "",
                 f"Prompt: `{SESSION_PROMPTS[record.session]}`.",
-                "Status: incomplete." if record.session == 8 else "Status: not activated.",
+                "Status: complete." if record.session == 8 else "Status: not activated.",
                 f"Evidence contract: {contract}.",
                 record.gap,
                 "",
@@ -269,12 +269,7 @@ def render_session_evidence() -> str:
             lines.append("| Key | Recorded |")
             lines.append("|---|---|")
             for key in _keys(record.session):
-                if record.session != 8:
-                    recorded = "not installed"
-                elif key == "evidence_closure_commit_recorded":
-                    recorded = "false"
-                else:
-                    recorded = "true"
+                recorded = "true" if record.session == 8 else "not installed"
                 lines.append(f"| `{key}` | {recorded} |")
             lines.append("")
     return "\n".join(lines)
