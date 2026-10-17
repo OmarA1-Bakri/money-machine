@@ -1131,6 +1131,22 @@ Session 12 is complete at revision 97. The Session 13 contract is installed (D-0
 
 Session 13 is the active incomplete session. The next honest step is `implementation_matrix_recorded`, earned by classifying the real playbook, job, event, agent, and provider rows. A live credential gap stays blocked. A fail-closed raise stays.
 
+## D-0077 — Session 13 backup fixture
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 13 is incomplete at revision 101. The matrix, the synthetic paths, and the failure injections are true. The other three Session 13 keys are false. The prompt asks for a PostgreSQL backup. The prompt-integrity addendum defers that live backup. The fixture snapshot is the evidence key.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 101 to 102. `updated_at` is `2026-10-17T14:30:00Z`. `backup_restore_fixture_implemented` is true. The matrix, the synthetic paths, and the failure injections stay true. `control_files_and_checkpoint_current` and `evidence_closure_commit_recorded` stay false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. `src/money_machine/assets/backup_restore.py` copies a workflow, a job, a product, a draft listing, an incident, the artifact hash, and the simulation config into a snapshot. Clearing the source leaves the snapshot intact. The first restore inserts those rows. A second restore inserts none. A changed row conflicts. `backup(mode="postgres")` is refused. A live publishing mode is refused. Exit 78 stays HELD.
+
+### Consequences
+
+The backup fixture is recorded. A live PostgreSQL backup stays deferred. The next honest step is `control_files_and_checkpoint_current`.
+
 ## D-0076 — Session 13 failure injections
 
 **Status:** accepted 2026-10-17. Standing order: finish the application.

@@ -398,7 +398,7 @@ def test_modules_do_not_import_a_network_provider() -> None:
 def test_state_commissioning_and_exit_78_are_unchanged() -> None:
     state = json.loads(Path("docs/control/IMPLEMENTATION_STATE.json").read_text(encoding="utf-8"))
     assert state["current_session"] == 13
-    assert state["state_revision"] == 101
+    assert state["state_revision"] == 102
     assert state["session_status"] == "incomplete"
     assert state["next_session"] == 13
     assert state["commissioned_agents"] == []
@@ -414,7 +414,8 @@ def test_state_commissioning_and_exit_78_are_unchanged() -> None:
     assert evidence["implementation_matrix_recorded"] is True
     assert evidence["synthetic_paths_implemented"] is True
     assert evidence["failure_injection_implemented"] is True
-    assert sum(value is True for value in evidence.values()) == 3
+    assert evidence["backup_restore_fixture_implemented"] is True
+    assert sum(value is True for value in evidence.values()) == 4
     worker = Path("src/money_machine/orchestration/worker.py").read_text(encoding="utf-8")
     assert "Exit 78 held" in worker
 

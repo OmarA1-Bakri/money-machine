@@ -109,7 +109,7 @@ def test_record_refuses_a_second_unearned_key() -> None:
     previous = _previous()
     current = _earned(previous)
     evidence = dict(current["required_completion_evidence"])
-    evidence["backup_restore_fixture_implemented"] = True
+    evidence["control_files_and_checkpoint_current"] = True
     current["required_completion_evidence"] = evidence
     with pytest.raises(ControlStateError, match="exactly the keys the fixture proof earned"):
         validate_session_13_evidence_record(previous, current)

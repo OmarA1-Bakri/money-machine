@@ -61,7 +61,7 @@ def test_live_pointer_is_incomplete_session_13() -> None:
     live = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert live["current_session"] == 13
     assert live["session_status"] == "incomplete"
-    assert live["state_revision"] == 101
+    assert live["state_revision"] == 102
     assert live["completed_sessions"] == list(range(13))
     assert live["next_session"] == 13
     assert live["next_prompt"] == SESSION_PROMPTS[13]
@@ -73,6 +73,7 @@ def test_live_pointer_is_incomplete_session_13() -> None:
     expected["implementation_matrix_recorded"] = True
     expected["synthetic_paths_implemented"] = True
     expected["failure_injection_implemented"] = True
+    expected["backup_restore_fixture_implemented"] = True
     assert evidence == expected
 
 
@@ -95,6 +96,7 @@ def test_open_sessions_have_no_recorded_true_key() -> None:
                     "implementation_matrix_recorded",
                     "synthetic_paths_implemented",
                     "failure_injection_implemented",
+                    "backup_restore_fixture_implemented",
                 }
             )
         else:

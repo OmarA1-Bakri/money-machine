@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 13 backup fixture is recorded (2026-10-17)
+
+Revision 102 records the matrix, the synthetic paths, the failure injections, and `backup_restore_fixture_implemented`. The control-file key and the closure key stay false. `completed_sessions` stays 0 through 12. `next_session` stays 13. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. A live PostgreSQL backup stays deferred. The next honest step is `control_files_and_checkpoint_current`.
+
 ## Session 13 failure injections are recorded (2026-10-17)
 
 Revision 101 records `implementation_matrix_recorded`, `synthetic_paths_implemented`, and `failure_injection_implemented`. The other three Session 13 keys stay false. `completed_sessions` stays 0 through 12. `next_session` stays 13. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. The next honest step is `backup_restore_fixture_implemented`: an in-memory snapshot restores a workflow, job, product, listing, and incident once, without duplicating them.

@@ -1,9 +1,9 @@
 # Session evidence
 
-The checked-in pointer is Session 13 at state revision 101.
+The checked-in pointer is Session 13 at state revision 102.
 `current_session` is 13. `session_status` is incomplete.
-The implementation matrix, the synthetic paths, and the failure injections are true.
-The other three Session 13 keys are false.
+The matrix, synthetic paths, failure injections, and backup fixture are true.
+The other two Session 13 keys are false.
 Session 10 is complete and every one of its keys is true.
 Session 09 is complete and every one of its keys is true.
 Session 08 is complete and every one of its keys is true.
@@ -15,7 +15,7 @@ Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
 Session 13 is activated and incomplete.
-The matrix, synthetic paths, and failure injections are true.
+The matrix, synthetic paths, failure injections, and the backup fixture are true.
 Sessions 14 and 15 have no contract.
 
 ## Session 00
@@ -278,7 +278,7 @@ Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
 Session 13 is activated and incomplete.
-The matrix, synthetic paths, and failure injections are true.
+The matrix, synthetic paths, failure injections, and the backup fixture are true.
 Sessions 14 and 15 have no contract.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
@@ -330,17 +330,18 @@ Fixture paths:
 Prompt: `16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md`.
 Status: incomplete.
 Evidence contract: installed.
-The implementation matrix, the synthetic paths, and the failure injections are recorded. The backup fixture is not recorded.
+The implementation matrix, the synthetic paths, the failure injections, and the backup fixture are recorded. The control-file checkpoint is not recorded.
 
 Fixture paths:
 
 - `src/money_machine/assets/implementation_matrix.py`
 - `src/money_machine/assets/synthetic_paths.py`
 - `src/money_machine/assets/failure_injection.py`
+- `src/money_machine/assets/backup_restore.py`
 
 | Key | Recorded |
 |---|---|
-| `backup_restore_fixture_implemented` | false |
+| `backup_restore_fixture_implemented` | true |
 | `control_files_and_checkpoint_current` | false |
 | `evidence_closure_commit_recorded` | false |
 | `failure_injection_implemented` | true |

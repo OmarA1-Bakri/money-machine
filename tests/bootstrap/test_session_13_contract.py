@@ -70,10 +70,10 @@ def test_live_pointer_is_incomplete_session_13() -> None:
     """Session 13 is activated. Every Session 13 key is false."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 101
+    assert live["state_revision"] == 102
     assert live["current_session"] == 13
     assert live["session_status"] == "incomplete"
-    assert live["updated_at"] == "2026-10-17T14:25:00Z"
+    assert live["updated_at"] == "2026-10-17T14:30:00Z"
     assert live["completed_sessions"] == list(range(13))
     assert live["next_session"] == 13
     assert live["head_sha"] == CLOSURE_HEAD
@@ -83,7 +83,8 @@ def test_live_pointer_is_incomplete_session_13() -> None:
     assert evidence["implementation_matrix_recorded"] is True
     assert evidence["synthetic_paths_implemented"] is True
     assert evidence["failure_injection_implemented"] is True
-    assert sum(value is True for value in evidence.values()) == 3
+    assert evidence["backup_restore_fixture_implemented"] is True
+    assert sum(value is True for value in evidence.values()) == 4
     assert "SESSION_13_E2E_AND_HARDENING_COMPLETE" not in text
 
 

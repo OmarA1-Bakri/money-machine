@@ -1,16 +1,26 @@
-"""Earn the Session 13 matrix, synthetic-path, and failure-injection keys.
+"""Earn the Session 13 matrix, path, failure, and backup keys.
 
 The proof reads the matrix, runs the fixture paths, runs each named failure
-injection, refuses a live publish, and does not open a socket. The other
-Session 13 keys stay unearned.
+injection, restores the fixture snapshot twice, refuses a live publish, and
+does not open a socket. The other Session 13 keys stay unearned.
 """
 
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 from pathlib import Path
 
+from money_machine.assets.backup_restore import (
+    BackupRefusal,
+    FixtureStore,
+    artifact_sha256,
+    backup,
+    restore_snapshot,
+    sample_store,
+    take_snapshot,
+)
 from money_machine.assets.failure_injection import (
     INJECTIONS,
     FailureInjectionError,
@@ -36,9 +46,15 @@ from money_machine.assets.synthetic_paths import (
 MATRIX_EVIDENCE_KEY = "implementation_matrix_recorded"
 SYNTHETIC_EVIDENCE_KEY = "synthetic_paths_implemented"
 FAILURE_EVIDENCE_KEY = "failure_injection_implemented"
+BACKUP_EVIDENCE_KEY = "backup_restore_fixture_implemented"
 _CLOSURE_EVIDENCE_KEY = "evidence_closure_commit_recorded"
 EARNED_EVIDENCE_KEYS = frozenset(
-    {MATRIX_EVIDENCE_KEY, SYNTHETIC_EVIDENCE_KEY, FAILURE_EVIDENCE_KEY}
+    {
+        MATRIX_EVIDENCE_KEY,
+        SYNTHETIC_EVIDENCE_KEY,
+        FAILURE_EVIDENCE_KEY,
+        BACKUP_EVIDENCE_KEY,
+    }
 )
 _FAILURE_RESULTS = {
     "worker_crash": ("RECOVERED", "READY", "can_retry=true;next_attempt=1;status=READY"),
@@ -107,6 +123,7 @@ def prove_session_13() -> frozenset[str]:
     _prove_matrix()
     _prove_synthetic()
     _prove_failure()
+    _prove_backup()
     _prove_control_files()
     return EARNED_EVIDENCE_KEYS
 
@@ -167,6 +184,60 @@ def _prove_synthetic() -> None:
         raise Session13ProofError("synthetic_publish")
 
 
+def _prove_backup() -> None:
+    module = Path(__file__).resolve().parents[1] / "assets" / "backup_restore.py"
+    _refuse_network(module, "backup_socket")
+    try:
+        backup(mode="postgres")
+    except BackupRefusal as error:
+        if error.code != "live_postgres":
+            raise Session13ProofError("live_postgres") from error
+    else:
+        raise Session13ProofError("live_postgres")
+    source = sample_store()
+    snapshot = take_snapshot(source)
+    source.clear()
+    if source.workflows or source.jobs or source.products or source.listings or source.incidents:
+        raise Session13ProofError("backup_copy")
+    target = FixtureStore()
+    try:
+        first = restore_snapshot(target, snapshot)
+        second = restore_snapshot(target, snapshot)
+    except BackupRefusal as error:
+        raise Session13ProofError(error.code) from error
+    if first.inserted != 7 or second.inserted != 0:
+        raise Session13ProofError("backup_duplicate")
+    counts = (
+        first.workflow_count,
+        first.job_count,
+        first.product_count,
+        first.listing_count,
+        first.incident_count,
+    )
+    if counts != (1, 1, 1, 1, 1) or second.workflow_count != 1:
+        raise Session13ProofError("backup_rows")
+    workflow = snapshot.workflows[0]
+    job = snapshot.jobs[0]
+    product = snapshot.products[0]
+    listing = snapshot.listings[0]
+    incident = snapshot.incidents[0]
+    artifact = snapshot.artifacts[0]
+    expected_sha = hashlib.sha256(b"Household reset planner delivery").hexdigest()
+    if (
+        target.workflows.get(workflow.workflow_id) != workflow
+        or target.jobs.get(job.job_id) != job
+        or target.products.get(product.product_id) != product
+        or target.listings.get(listing.listing_id) != listing
+        or target.incidents.get(incident.incident_id) != incident
+        or listing.listing_state != "DRAFT"
+        or artifact.sha256 != expected_sha
+        or artifact.sha256 != artifact_sha256(b"Household reset planner delivery")
+        or target.config != snapshot.config
+        or snapshot.config.publishing_mode != "simulation"
+    ):
+        raise Session13ProofError("backup_rows")
+
+
 def _prove_failure() -> None:
     module = Path(__file__).resolve().parents[1] / "assets" / "failure_injection.py"
     _refuse_network(module, "failure_socket")
@@ -196,7 +267,8 @@ def _refuse_network(module: Path, code: str) -> None:
         elif isinstance(node, ast.ImportFrom) and node.module is not None:
             imported.append(node.module)
     folded = " ".join(imported)
-    if any(token in folded for token in ("socket", "httpx", "urllib", "requests")):
+    banned = ("socket", "httpx", "urllib", "requests", "psycopg", "asyncpg", "sqlalchemy")
+    if any(token in folded for token in banned):
         raise Session13ProofError(code)
 
 
