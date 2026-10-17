@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 12 read model is recorded (2026-10-17)
+
+Revision 92 records `console_read_model_implemented`. The other five Session 12 keys stay false. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. The next honest step is `exception_views_implemented`, through its own proof.
+
 ## Session 12 is activated (2026-10-17)
 
 Revision 91 is incomplete Session 12. Every Session 12 key is false. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. The next honest step is the first earned key, through its own proof.

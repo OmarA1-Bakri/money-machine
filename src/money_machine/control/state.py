@@ -47,6 +47,13 @@ from money_machine.control.session_11_proof import (
     Session11ProofError,
     prove_session_11,
 )
+from money_machine.control.session_12_proof import (
+    EARNED_EVIDENCE_KEYS as SESSION_12_EARNED_KEYS,
+)
+from money_machine.control.session_12_proof import (
+    Session12ProofError,
+    prove_session_12,
+)
 
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 BOOTSTRAP_COMMIT_SUBJECT = "chore(bootstrap): initialise money machine autonomous monorepo"
@@ -1448,6 +1455,76 @@ def apply_session_11_evidence_record_transition(
     )
 
 
+def validate_session_12_evidence_record(previous: ControlState, current: ControlState) -> None:
+    """Record the Session 12 keys the fixture proof has earned. The session stays incomplete.
+
+    The proof earns the console read-model key. The closure key stays false.
+    """
+    if previous["current_session"] != 12 or current["current_session"] != 12:
+        raise ControlStateError("unsupported evidence record: only session 12 can record this key")
+    if previous["session_status"] != "incomplete" or current["session_status"] != "incomplete":
+        raise ControlStateError("unsupported evidence record: session 12 must stay incomplete")
+    _require_same_fields(previous, current, _SESSION_08_EVIDENCE_MUTABLE_FIELDS, "evidence record")
+    if current["state_revision"] != previous["state_revision"] + 1:
+        raise ControlStateError("state revision must advance exactly once")
+    if current["updated_at"] == previous["updated_at"]:
+        raise ControlStateError("updated_at must change for the evidence record")
+    before = _session_12_evidence(previous)
+    after = _session_12_evidence(current)
+    reverted = sorted(key for key, value in before.items() if value is True and after[key] is False)
+    if reverted:
+        raise ControlStateError("evidence record cannot revoke a key: " + ", ".join(reverted))
+    flipped = {key for key, value in before.items() if value is False and after[key] is True}
+    if not flipped:
+        raise ControlStateError("evidence record must change at least one key")
+    if after[_CLOSURE_EVIDENCE_KEY] is not False:
+        raise ControlStateError("the closure key stays false")
+    true_after = {key for key, value in after.items() if value is True}
+    if true_after != set(SESSION_12_EARNED_KEYS):
+        raise ControlStateError(
+            "evidence record must set exactly the keys the fixture proof earned"
+        )
+
+
+def _session_12_evidence(state: ControlState) -> dict[str, bool]:
+    evidence = state["required_completion_evidence"]
+    if set(evidence) != set(SESSION_EVIDENCE_KEYS[12]):
+        raise ControlStateError("session 12 evidence keys are missing or unsupported")
+    return evidence
+
+
+def _require_session_12_proof() -> None:
+    try:
+        earned = prove_session_12()
+    except Session12ProofError as error:
+        raise ControlStateError(f"session 12 evidence proof refused: {error.code}") from error
+    if earned != SESSION_12_EARNED_KEYS:
+        raise ControlStateError("session 12 evidence proof did not earn the recorded keys")
+
+
+def _verify_session_12_evidence_repository(
+    state_path: Path,
+    previous: ControlState,
+    current: ControlState,
+) -> None:
+    del previous, current
+    root = _evidence_worktree(state_path)
+    _require_control_files(root)
+    _require_session_12_proof()
+
+
+def apply_session_12_evidence_record_transition(
+    state_path: Path, candidate_path: Path
+) -> ControlState:
+    """Validate a Session 12 evidence candidate and atomically replace the state file."""
+    return _apply_transition(
+        state_path,
+        candidate_path,
+        validate_session_12_evidence_record,
+        _verify_session_12_evidence_repository,
+    )
+
+
 def apply_session_10_evidence_record_transition(
     state_path: Path, candidate_path: Path
 ) -> ControlState:
@@ -1478,7 +1555,8 @@ def apply_active_evidence_record_transition(state_path: Path, candidate_path: Pa
     Session 07 stays on its own transition. Incomplete Session 08 uses the fixture-chain
     transition.     Incomplete Session 09 records the keys its proof has earned. Incomplete
     Session 10 records the keys its proof has earned. Incomplete Session 11 records
-    the keys its proof has earned. Any other pointer is refused before a file is written.
+    the keys its proof has earned. Incomplete Session 12 records the keys its proof
+    has earned. Any other pointer is refused before a file is written.
     """
     previous, _raw = _parse_state(state_path, "current state")
     if previous["current_session"] == 7 and previous["session_status"] == "complete":
@@ -1491,10 +1569,12 @@ def apply_active_evidence_record_transition(state_path: Path, candidate_path: Pa
         return apply_session_10_evidence_record_transition(state_path, candidate_path)
     if previous["current_session"] == 11 and previous["session_status"] == "incomplete":
         return apply_session_11_evidence_record_transition(state_path, candidate_path)
+    if previous["current_session"] == 12 and previous["session_status"] == "incomplete":
+        return apply_session_12_evidence_record_transition(state_path, candidate_path)
     raise ControlStateError(
         "unsupported evidence record: only session 07, incomplete session 08, "
-        "incomplete session 09, incomplete session 10, or incomplete session 11 "
-        "can record these keys"
+        "incomplete session 09, incomplete session 10, incomplete session 11, "
+        "or incomplete session 12 can record these keys"
     )
 
 

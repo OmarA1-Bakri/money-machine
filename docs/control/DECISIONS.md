@@ -1002,3 +1002,19 @@ Session 11 is complete at revision 90 and D-0064 installed the Session 12 contra
 ### Consequences
 
 Revision 91 is incomplete Session 12. Every Session 12 key is false. The next honest step is the first earned key, through its own proof.
+
+## D-0066 — Session 12 records the console read model
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 12 is incomplete at revision 91. D-0065 installed every Session 12 key false. The prompt-integrity addendum keeps the read model typed and in memory. A deployed API, a Next.js console, live PostHog, live operator mutations, Exit 78, and the exit string stay deferred.
+
+### Decision
+
+`record-evidence` sets `console_read_model_implemented` true. The other five Session 12 keys stay false. `current_session` stays 12. `session_status` stays incomplete. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. The read model pages the shop, workflows, pipeline stages, jobs, products, variants, listings, weekly metrics, decisions, incidents, integrations, milestones, autonomy settings, and system health. An empty store returns an empty page. The module does not open a socket and does not write a cap.
+
+### Consequences
+
+Revision 92 is incomplete Session 12. One key is true. The next honest step is `exception_views_implemented`, through its own proof.

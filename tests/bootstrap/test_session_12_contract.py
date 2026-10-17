@@ -62,15 +62,17 @@ def test_session_12_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_is_the_session_12_activation() -> None:
-    """Session 12 is incomplete. Every Session 12 key is false."""
+    """Session 12 is incomplete. The read-model key is true."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 91
+    expected = dict.fromkeys(sorted(SESSION_12_KEYS), False)
+    expected["console_read_model_implemented"] = True
+    assert live["state_revision"] == 92
     assert live["current_session"] == 12
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(12))
     assert live["next_session"] == 12
-    assert live["required_completion_evidence"] == dict.fromkeys(sorted(SESSION_12_KEYS), False)
+    assert live["required_completion_evidence"] == expected
     assert "SESSION_12_OPERATOR_CONSOLE_COMPLETE" not in text
 
 

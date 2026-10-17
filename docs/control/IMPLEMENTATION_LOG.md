@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 12 read model recorded
+
+`record-evidence` advanced `state_revision` from 91 to 92. `updated_at` is `2026-10-17T13:00:00Z`. `console_read_model_implemented` is true. The other five Session 12 keys stay false. `current_session` stays 12. `session_status` stays incomplete. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. No socket is opened and no cap is written.
+
 ## 2026-10-17 — Session 12 activated
 
 `activate` advanced `state_revision` from 90 to 91. `updated_at` is `2026-10-17T12:55:00Z`. `current_session` is 12. `session_status` is incomplete. `completed_sessions` stays 0 through 11. `next_session` stays 12. Every Session 12 key is false. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. No live provider call is made.

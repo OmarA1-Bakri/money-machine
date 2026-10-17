@@ -1,0 +1,294 @@
+"""Earn the Session 12 console read-model key.
+
+The proof does not open a socket, read a credential, or write a cap.
+The other Session 12 keys stay false. The read-model key may be either bool:
+the record flips it after this proof has already run.
+"""
+
+from __future__ import annotations
+
+import ast
+import inspect
+import json
+from pathlib import Path
+
+from money_machine.assets.operator_console import (
+    ConsoleReadModel,
+    ConsoleRefusal,
+    DecisionView,
+    IncidentView,
+    IntegrationView,
+    JobView,
+    ListingView,
+    MilestoneView,
+    PipelineStageView,
+    ProductView,
+    ShopView,
+    VariantView,
+    WeeklyMetricView,
+    WorkflowView,
+)
+
+READ_MODEL_EVIDENCE_KEY = "console_read_model_implemented"
+EARNED_EVIDENCE_KEYS = frozenset({READ_MODEL_EVIDENCE_KEY})
+_UNEARNED_KEYS = (
+    "exception_views_implemented",
+    "telemetry_redaction_implemented",
+    "operator_actions_fail_closed",
+    "control_files_and_checkpoint_current",
+    "evidence_closure_commit_recorded",
+)
+_SESSION_12_KEYS = frozenset({READ_MODEL_EVIDENCE_KEY, *_UNEARNED_KEYS})
+_CONTROL_FILES = (
+    Path("docs/control/IMPLEMENTATION_STATE.json"),
+    Path("docs/control/IMPLEMENTATION_LOG.md"),
+    Path("docs/control/DECISIONS.md"),
+    Path("docs/control/TEST_EVIDENCE.md"),
+    Path("docs/control/NEXT_SESSION.md"),
+    Path("docs/control/SESSION_EVIDENCE.md"),
+)
+_CLOSURE_HEAD = "d095501665fbda0f9e6a0e77b57531bc33fda4e2"
+_SESSION_12_PROMPT = "15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md"
+_DECISION_KINDS = ("hold", "repair", "cull", "multiply", "successor_created")
+_WRITERS = ("set_", "pause", "resume", "send", "capture", "publish", "write")
+
+
+class Session12ProofError(ValueError):
+    """The Session 12 fixture did not earn its evidence key."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
+def prove_session_12() -> frozenset[str]:
+    """Return the earned Session 12 key. A miss raises instead of returning it."""
+    _prove_read_model()
+    _prove_control_files()
+    return EARNED_EVIDENCE_KEYS
+
+
+def _prove_read_model() -> None:
+    module = inspect.getmodule(ConsoleReadModel)
+    if module is None or module.__file__ is None:
+        raise Session12ProofError("read_model_socket")
+    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+    imported: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module is not None:
+            imported.append(node.module)
+    folded = " ".join(imported)
+    if any(token in folded for token in ("socket", "httpx", "urllib", "requests")):
+        raise Session12ProofError("read_model_socket")
+    names = [name for name in dir(ConsoleReadModel) if not name.startswith("_")]
+    if any(name.startswith(_WRITERS) for name in names):
+        raise Session12ProofError("read_model_writer")
+    empty = ConsoleReadModel()
+    if empty.current_shop() is not None:
+        raise Session12ProofError("read_model_empty")
+    empty_pages = (
+        empty.workflow_page(limit=1),
+        empty.pipeline_stages(limit=1),
+        empty.job_page(status="ready", limit=1),
+        empty.job_page(status="running", limit=1),
+        empty.job_page(status="blocked", limit=1),
+        empty.product_page(limit=1),
+        empty.variant_page(limit=1),
+        empty.listing_page(limit=1),
+        empty.metric_page(limit=1),
+        empty.decision_page(limit=1),
+        empty.incident_page(limit=1),
+        empty.integration_page(limit=1),
+        empty.milestone_page(limit=1),
+    )
+    if any(page.items != () or page.next_cursor is not None for page in empty_pages):
+        raise Session12ProofError("read_model_empty")
+    health = empty.system_health()
+    settings = empty.autonomy_settings()
+    if (
+        health.running != 0
+        or health.blocked != 0
+        or health.action_required is not False
+        or settings.publication_cap != 0
+        or settings.posthog != "offline"
+    ):
+        raise Session12ProofError("read_model_empty")
+    for limit in (0, 51):
+        try:
+            empty.workflow_page(limit=limit)
+        except ConsoleRefusal as error:
+            if error.code != "limit":
+                raise Session12ProofError("read_model_limit") from error
+        else:
+            raise Session12ProofError("read_model_limit")
+    try:
+        empty.job_page(status="connected")
+    except ConsoleRefusal as error:
+        if error.code != "status":
+            raise Session12ProofError("read_model_status") from error
+    else:
+        raise Session12ProofError("read_model_status")
+    _prove_seeded_pages()
+
+
+def _prove_seeded_pages() -> None:
+    model = _seeded()
+    first = model.workflow_page(limit=2)
+    if (
+        tuple(item.workflow_id for item in first.items) != ("w-1", "w-2")
+        or first.next_cursor != "w-2"
+    ):
+        raise Session12ProofError("read_model_page")
+    second = model.workflow_page(cursor=first.next_cursor, limit=2)
+    if (
+        tuple(item.workflow_id for item in second.items) != ("w-3",)
+        or second.next_cursor is not None
+    ):
+        raise Session12ProofError("read_model_page")
+    shop = model.current_shop()
+    if shop is None or shop.shop_id != "shop-1":
+        raise Session12ProofError("read_model_shop")
+    for status, job_id in (
+        ("ready", "j-ready"),
+        ("running", "j-running"),
+        ("blocked", "j-blocked"),
+    ):
+        page = model.job_page(status=status, limit=5)
+        if tuple(item.job_id for item in page.items) != (job_id,):
+            raise Session12ProofError("read_model_jobs")
+    kinds = tuple(item.kind for item in model.decision_page(limit=5).items)
+    if kinds != _DECISION_KINDS:
+        raise Session12ProofError("read_model_decisions")
+    health = model.system_health()
+    if health.running != 1 or health.blocked != 1 or health.action_required is not True:
+        raise Session12ProofError("read_model_health")
+    if model.integration_page(limit=5).items[0].status != "offline":
+        raise Session12ProofError("read_model_integration")
+    if model.listing_page(limit=5).items[0].state != "active":
+        raise Session12ProofError("read_model_listing")
+
+
+def _seeded() -> ConsoleReadModel:
+    shop = ShopView(shop_id="shop-1", name="Fixture Shop", currency="USD")
+    workflows = tuple(
+        WorkflowView(
+            workflow_id=f"w-{index}",
+            name=f"Workflow {index}",
+            stage="build",
+            owning_agent="fixture",
+            elapsed_seconds=index,
+            next_transition="review",
+            blocked_dependency=None,
+        )
+        for index in (1, 2, 3)
+    )
+    jobs = (
+        JobView(
+            job_id="j-ready",
+            workflow_id="w-1",
+            job_type="ResearchCollectionJob",
+            status="ready",
+            attempt=0,
+        ),
+        JobView(
+            job_id="j-running",
+            workflow_id="w-1",
+            job_type="ListingRepairJob",
+            status="running",
+            attempt=1,
+        ),
+        JobView(
+            job_id="j-blocked",
+            workflow_id="w-2",
+            job_type="IncidentRepairJob",
+            status="blocked",
+            attempt=2,
+        ),
+    )
+    decisions = tuple(
+        DecisionView(
+            decision_id=f"d-{index}",
+            kind=kind,
+            evidence="fixture",
+            status="recorded",
+            routine=kind == "hold",
+        )
+        for index, kind in enumerate(_DECISION_KINDS, start=1)
+    )
+    return ConsoleReadModel(
+        shop=shop,
+        workflows=workflows,
+        stages=(PipelineStageView(stage="build", experiment_count=1),),
+        jobs=jobs,
+        products=(ProductView(product_id="p-1", name="Fixture"),),
+        variants=(VariantView(variant_id="v-1", product_id="p-1", name="Blue"),),
+        listings=(
+            ListingView(
+                listing_id="l-1",
+                product_id="p-1",
+                state="active",
+                age_days=3,
+                views=4,
+                favourites=1,
+                sales=0,
+                decision="hold",
+                next_review_at="2026-10-24",
+            ),
+        ),
+        weekly_metrics=(WeeklyMetricView(week_start="2026-10-12", views=4, favourites=1, sales=0),),
+        decisions=decisions,
+        incidents=(
+            IncidentView(
+                incident_id="i-1",
+                summary="the file could not be opened",
+                severity="normal",
+                repair_step="verify",
+                response_status="draft",
+            ),
+        ),
+        integrations=(IntegrationView(name="posthog", status="offline"),),
+        milestones=(MilestoneView(name="read-model", completed=1, total=1),),
+    )
+
+
+def _prove_control_files() -> None:
+    """The continuity files and the catalogue match the checked-in pointer."""
+    root = Path(__file__).resolve().parents[3]
+    for relative in _CONTROL_FILES:
+        path = root / relative
+        if not path.is_file() or path.stat().st_size == 0:
+            raise Session12ProofError("control_files")
+    # session_evidence imports state, and state imports this module.
+    from money_machine.control.session_evidence import render_session_evidence
+
+    catalogue = root / "docs/control/SESSION_EVIDENCE.md"
+    if catalogue.read_text(encoding="utf-8") != render_session_evidence():
+        raise Session12ProofError("control_checkpoint")
+    decoded: object = json.loads(
+        (root / "docs/control/IMPLEMENTATION_STATE.json").read_text(encoding="utf-8")
+    )
+    if not isinstance(decoded, dict):
+        raise Session12ProofError("control_checkpoint")
+    evidence = decoded.get("required_completion_evidence")
+    recorded = set(evidence) if isinstance(evidence, dict) else set()
+    values_are_bool = isinstance(evidence, dict) and all(
+        isinstance(value, bool) for value in evidence.values()
+    )
+    if (
+        decoded.get("current_session") != 12
+        or decoded.get("session_status") != "incomplete"
+        or decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
+        or decoded.get("head_sha") != _CLOSURE_HEAD
+        or decoded.get("next_session") != 12
+        or decoded.get("completed_sessions") != list(range(12))
+        or decoded.get("next_prompt") != _SESSION_12_PROMPT
+        or recorded != set(_SESSION_12_KEYS)
+        or not values_are_bool
+        or not isinstance(evidence, dict)
+        or len(evidence) != len(recorded)
+        or not isinstance(evidence.get(READ_MODEL_EVIDENCE_KEY), bool)
+        or any(evidence.get(key) is not False for key in _UNEARNED_KEYS)
+    ):
+        raise Session12ProofError("control_checkpoint")
