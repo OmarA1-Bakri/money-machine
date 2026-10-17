@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 14 contract is installed (2026-10-17)
+
+D-0080 names six Session 14 keys. Revision 104 stays complete Session 13. Every Session 13 key stays true. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Session 14 is not activated. Exit 78 stays HELD. The next honest step is activation, which installs every Session 14 key false.
+
 ## Session 13 is complete (2026-10-17)
 
 Revision 104 records every Session 13 key true. `completed_sessions` is 0 through 13. `next_session` is 14. `next_prompt` is `17_SESSION_14_DEPLOYMENT.md`. `head_sha` is `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. Session 14 is not activated. The next honest step is the Session 14 evidence contract.

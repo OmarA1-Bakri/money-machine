@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-17 — Session 14 evidence contract installed
+
+**Verification scope**: contract installation only. `IMPLEMENTATION_STATE.json` stays revision 104. No live HTTP. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 13, `complete`, revision 104 | PASS |
+| Contract | Six Session 14 keys. The session is not activated | PASS |
+| Activation shape | A revision-105 candidate installs every key false and does not write the state file | PASS |
+| Head | `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a` | PASS |
+
+The contract test, the prompt-integrity gate, the evidence index, the Session 13 proof pin, and the continuity shape printed 17 passed in 0.95s. `ruff check` and `pyright` on `state.py` and `session_evidence.py` were clean.
+
 ## 2026-10-17 — Session 13 closure recorded
 
 **Verification scope**: live `apply-completion` from revision 103 to 104. No live HTTP. Exit 78 stays HELD. The exit string is not written.

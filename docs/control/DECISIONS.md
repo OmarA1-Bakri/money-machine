@@ -1226,3 +1226,19 @@ Session 13 is incomplete at revision 103. Five keys are true. `evidence_closure_
 ### Consequences
 
 Session 13 is complete. The next honest step is the Session 14 evidence contract. A live deploy stays deferred until that contract says otherwise.
+
+## D-0080 — Session 14 evidence contract
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 13 is complete at revision 104. `next_session` is 14. Session 14 has no evidence contract and is not activated. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-14-prompt-integrity.md`. Its verified prompt hash is `92d8c9a1b99e523ea227b2a4dc339fd0e32c6d007a9d05a4735b7a163cf7b624`. `docs/architecture/DEPLOYMENT.md` and `compose.prod.yaml` already exist. Exit 78 stays HELD.
+
+### Decision
+
+The Session 14 contract has six keys: `deployment_target_recorded`, `production_packaging_defined`, `release_rollback_implemented`, `service_controls_fail_closed`, `control_files_and_checkpoint_current`, and `evidence_closure_commit_recorded`. A live deploy, a new paid host, a production image build, public HTTPS, a scheduled production backup, Exit 78, and `SESSION_14_PRODUCTION_DEPLOYMENT_COMPLETE` are not keys. This decision does not activate the session. `IMPLEMENTATION_STATE.json` stays revision 104. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD.
+
+### Consequences
+
+The contract is installed and every key is unrecorded. The next honest step is activation, which installs every Session 14 key false. The product modules that earn the four fixture keys come after activation. A live deploy stays deferred.

@@ -15,8 +15,8 @@ Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
 Session 13 is complete. Every key is true.
-Session 14 is not activated.
-Sessions 14 and 15 have no contract.
+Session 14 contract is installed. Session 14 is not activated.
+Session 15 has no contract.
 
 ## Session 00
 
@@ -278,8 +278,8 @@ Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
 Session 13 is complete. Every key is true.
-Session 14 is not activated.
-Sessions 14 and 15 have no contract.
+Session 14 contract is installed. Session 14 is not activated.
+Session 15 has no contract.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
 ## Session 11
@@ -352,10 +352,19 @@ Fixture paths:
 
 Prompt: `17_SESSION_14_DEPLOYMENT.md`.
 Status: not activated.
-Evidence contract: absent.
-No evidence contract and no session module. Production deployment is not recorded.
+Evidence contract: installed, not activated.
+The contract is installed. Session 14 is not activated. A live deploy is not recorded.
 
 Fixture paths: none.
+
+| Key | Recorded |
+|---|---|
+| `control_files_and_checkpoint_current` | not installed |
+| `deployment_target_recorded` | not installed |
+| `evidence_closure_commit_recorded` | not installed |
+| `production_packaging_defined` | not installed |
+| `release_rollback_implemented` | not installed |
+| `service_controls_fail_closed` | not installed |
 
 ## Session 15
 

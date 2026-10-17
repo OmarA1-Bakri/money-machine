@@ -88,6 +88,10 @@ def test_open_sessions_have_no_recorded_true_key() -> None:
             assert record.session in SESSION_EVIDENCE_KEYS
             assert record.activated is True
             assert record.true_keys == frozenset(SESSION_EVIDENCE_KEYS[13])
+        elif record.session == 14:
+            assert record.session in SESSION_EVIDENCE_KEYS
+            assert record.activated is False
+            assert record.true_keys == frozenset()
         else:
             assert record.session not in SESSION_EVIDENCE_KEYS
             assert record.true_keys == frozenset()

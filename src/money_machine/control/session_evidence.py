@@ -7,8 +7,8 @@ revision 83 and every one of its keys is true (D-0055). Session 11 is
 complete at revision 90. Every Session 11 key is true (D-0063). Session 12
 is complete at revision 97. Every Session 12 key is true (D-0071).
 Session 13 is complete at revision 104. Every Session 13 key is true
-(D-0079). Session 14 is not activated.
-Sessions 14 and 15 have no contract.
+(D-0079). The Session 14 contract is installed (D-0080). Session 14 is
+not activated. Session 15 has no contract.
 This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
@@ -225,7 +225,7 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
     OpenSessionEvidence(
         14,
         (),
-        "No evidence contract and no session module. Production deployment is not recorded.",
+        ("The contract is installed. Session 14 is not activated. A live deploy is not recorded."),
     ),
     OpenSessionEvidence(
         15,
@@ -272,8 +272,8 @@ def render_session_evidence() -> str:
         "Session 11 is complete. Every key is true.",
         "Session 12 is complete. Every key is true.",
         "Session 13 is complete. Every key is true.",
-        "Session 14 is not activated.",
-        "Sessions 14 and 15 have no contract.",
+        "Session 14 contract is installed. Session 14 is not activated.",
+        "Session 15 has no contract.",
         "",
     ]
     for record in CLOSED_SESSION_EVIDENCE:
@@ -314,8 +314,8 @@ def render_session_evidence() -> str:
             "Session 11 is complete. Every key is true.",
             "Session 12 is complete. Every key is true.",
             "Session 13 is complete. Every key is true.",
-            "Session 14 is not activated.",
-            "Sessions 14 and 15 have no contract.",
+            "Session 14 contract is installed. Session 14 is not activated.",
+            "Session 15 has no contract.",
             "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",
         ]
