@@ -33,8 +33,8 @@ def _state_at(commit: str) -> dict[str, object]:
 def test_every_session_from_00_through_15_is_listed_once() -> None:
     closed = [record.session for record in CLOSED_SESSION_EVIDENCE]
     opened = [record.session for record in OPEN_SESSION_EVIDENCE]
-    assert closed == list(range(10))
-    assert opened == list(range(10, 16))
+    assert closed == list(range(11))
+    assert opened == list(range(11, 16))
     assert set(closed).isdisjoint(opened)
 
 
@@ -76,21 +76,8 @@ def test_live_pointer_is_complete_session_10() -> None:
 def test_open_sessions_have_no_recorded_true_key() -> None:
     for record in OPEN_SESSION_EVIDENCE:
         assert record.session not in {item.session for item in CLOSED_SESSION_EVIDENCE}
-        if record.session == 10:
-            assert record.session in SESSION_EVIDENCE_KEYS
-            assert record.activated is True
-            assert record.true_keys == frozenset(
-                {
-                    "metrics_fixture_implemented",
-                    "maturity_clock_implemented",
-                    "portfolio_eligibility_implemented",
-                    "closed_loop_store_implemented",
-                    "control_files_and_checkpoint_current",
-                }
-            )
-        else:
-            assert record.session not in SESSION_EVIDENCE_KEYS
-            assert record.true_keys == frozenset()
+        assert record.session not in SESSION_EVIDENCE_KEYS
+        assert record.true_keys == frozenset()
         for path in record.fixture_paths:
             assert (ROOT / path).is_file(), path
         assert "not" in record.gap.casefold() or "no evidence" in record.gap.casefold()

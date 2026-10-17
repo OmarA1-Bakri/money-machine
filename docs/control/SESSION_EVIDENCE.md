@@ -1,16 +1,15 @@
 # Session evidence
 
-The checked-in pointer is Session 10 at state revision 82.
-`current_session` is 10. `session_status` is incomplete.
-Metrics, the maturity clock, portfolio eligibility, the closed-loop ledger, and the control-file key are true.
-The closure key is false.
+The checked-in pointer is Session 10 at state revision 83.
+`current_session` is 10. `session_status` is complete.
+Every Session 10 key is true.
 Session 09 is complete and every one of its keys is true.
 Session 08 is complete and every one of its keys is true.
 Sessions 00-06 closed with every contract key true.
 Session 07's close commit keeps every contract key false under D-0032.
 D-0036 recorded the twelve Session 07 keys true. The closure commit is
 `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.
-Session 10 is incomplete. Five keys are true. The closure key is not.
+Session 10 is complete. Every key is true.
 Sessions 11-15 have no contract and are not activated.
 
 ## Session 00
@@ -248,34 +247,30 @@ Head SHA: `cfb36462994ecba833f31ba869f2aba627f6060d`.
 | `mutation_receipt_implemented` | true |
 | `publishing_ramp_implemented` | true |
 
-## Sessions 10-15
-
-Session 10 is incomplete. Five keys are true. The closure key is not.
-Sessions 11-15 have no contract and are not activated.
-A fixture path is code on the trunk. It is not, by itself, a true evidence key.
-
 ## Session 10
 
 Prompt: `13_SESSION_10_ANALYTICS_CULL_MULTIPLY_CLOSED_LOOP.md`.
-Status: incomplete.
-Evidence contract: installed.
-Metrics, the maturity clock, portfolio eligibility, the ledger, and the control files are recorded. The closure key is not.
-
-Fixture paths:
-
-- `src/money_machine/assets/metrics_fixture.py`
-- `src/money_machine/assets/maturity_clock.py`
-- `src/money_machine/assets/portfolio_eligibility.py`
-- `src/money_machine/assets/closed_loop_store.py`
+State commit: `b612dffe87e63e46ea88c74e0f858dd72e8a5b36`.
+State revision: 83.
+Status: complete. Next session: 11.
+Completed sessions: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].
+Evidence closure commit: `f16c7ed0598daf3f4627955b52585f253ae1b918`.
+Head SHA: `f16c7ed0598daf3f4627955b52585f253ae1b918`.
 
 | Key | Recorded |
 |---|---|
 | `closed_loop_store_implemented` | true |
 | `control_files_and_checkpoint_current` | true |
-| `evidence_closure_commit_recorded` | false |
+| `evidence_closure_commit_recorded` | true |
 | `maturity_clock_implemented` | true |
 | `metrics_fixture_implemented` | true |
 | `portfolio_eligibility_implemented` | true |
+
+## Sessions 11-15
+
+Session 10 is complete. Every key is true.
+Sessions 11-15 have no contract and are not activated.
+A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
 ## Session 11
 
