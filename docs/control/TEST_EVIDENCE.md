@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-17 — Session 11 repair key recorded
+
+**Verification scope**: live `record-evidence` from revision 86 to 87. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move. No message is sent and no job is inserted.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 11, `incomplete`, revision 87, `updated_at` `2026-10-17T12:25:00Z` | PASS |
+| Keys | The intake, routing, and repair keys are true. The other three Session 11 keys are false | PASS |
+| Head | `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918` | PASS |
+| Refusal | A later key, an unknown key, and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 11, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 87}`. The repair proof, the Session 11 contract, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, and the support intake unit tests printed 75 passed in 3.07s.
+
 ## 2026-10-17 — Session 11 routing key recorded
 
 **Verification scope**: live `record-evidence` from revision 85 to 86. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move. No message is sent and no job is inserted.

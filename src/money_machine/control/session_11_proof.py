@@ -1,4 +1,4 @@
-"""Earn the Session 11 intake and routing keys.
+"""Earn the Session 11 intake, routing, and repair keys.
 
 The proof does not open a socket, read a credential, insert a job, or send a message.
 """
@@ -16,13 +16,17 @@ from money_machine.assets.support_intake import (
     IntakeRecord,
     IssueCode,
     SupportRefusal,
+    VerificationRead,
     open_issue,
+    record_repair,
+    resolve_issue,
 )
 from money_machine.domain.enums import IncidentType
 
 INTAKE_EVIDENCE_KEY = "support_intake_implemented"
 ROUTING_EVIDENCE_KEY = "incident_routing_implemented"
-EARNED_EVIDENCE_KEYS = frozenset({INTAKE_EVIDENCE_KEY, ROUTING_EVIDENCE_KEY})
+REPAIR_EVIDENCE_KEY = "repair_resolution_implemented"
+EARNED_EVIDENCE_KEYS = frozenset({INTAKE_EVIDENCE_KEY, ROUTING_EVIDENCE_KEY, REPAIR_EVIDENCE_KEY})
 _WHEN = datetime(2026, 10, 16, 12, tzinfo=UTC)
 _LATER = datetime(2026, 10, 16, 12, 5, tzinfo=UTC)
 _SHOP = UUID("00000000-0000-4000-8000-000000000011")
@@ -31,8 +35,11 @@ _PRODUCT = UUID("00000000-0000-4000-8000-000000000013")
 _VARIANT = UUID("00000000-0000-4000-8000-000000000014")
 _HASH = "ab" * 32
 _NOTICE = "cd" * 32
+_OTHER = "ef" * 32
 _SECRET = "sk_exampletoken"
 _RESUME = UUID("00000000-0000-4000-8000-000000000018")
+_REPAIR = UUID("00000000-0000-4000-8000-000000000017")
+_VERIFY = UUID("00000000-0000-4000-8000-000000000019")
 _ROUTES: tuple[tuple[IssueCode, IncidentType, str | None, bool], ...] = (
     ("BROKEN_DELIVERY_LINK", IncidentType.BROKEN_LINK, "IncidentRepairJob", True),
     ("NOTION_PAGE_UNPUBLISHED", IncidentType.BUILD_DEFECT, "IncidentRepairJob", True),
@@ -62,6 +69,7 @@ def prove_session_11() -> frozenset[str]:
     """Return the earned Session 11 keys. A miss raises instead of returning them."""
     _prove_intake()
     _prove_routing()
+    _prove_repair()
     return EARNED_EVIDENCE_KEYS
 
 
@@ -211,3 +219,86 @@ def _prove_routing() -> None:
             raise Session11ProofError("route_phase") from error
     else:
         raise Session11ProofError("route_phase")
+
+
+def _verification(
+    *,
+    fresh: str = _HASH,
+    verification: UUID = _VERIFY,
+    read_at: datetime = _LATER,
+) -> VerificationRead:
+    return VerificationRead(
+        repair_job_id=_REPAIR,
+        verification_job_id=verification,
+        repaired_hash=_HASH,
+        fresh_hash=fresh,
+        repaired_at=_WHEN,
+        read_at=read_at,
+        fix="the file hash is aaaa",
+        access_path="path-token-1",
+    )
+
+
+def _prove_repair() -> None:
+    """One idempotency key keeps one version. A close needs a later matching read."""
+    ledger = IntakeLedger()
+    incident = _open(ledger)
+    first = record_repair(
+        ledger,
+        incident_id=incident.incident_id,
+        idempotency_key="repair-1",
+        artifact_hash=_HASH,
+    )
+    second = record_repair(
+        ledger,
+        incident_id=incident.incident_id,
+        idempotency_key="repair-1",
+        artifact_hash=_OTHER,
+    )
+    other = record_repair(
+        ledger,
+        incident_id=incident.incident_id,
+        idempotency_key="repair-2",
+        artifact_hash=_OTHER,
+    )
+    if (
+        second.version_id != first.version_id
+        or second.artifact_hash != _HASH
+        or other.version_id == first.version_id
+        or ledger.repair_count(incident.incident_id) != 2
+    ):
+        raise Session11ProofError("repair_version")
+    try:
+        record_repair(
+            ledger,
+            incident_id=incident.incident_id,
+            idempotency_key=" ",
+            artifact_hash=_HASH,
+        )
+    except SupportRefusal as error:
+        if error.code != "idempotency_key":
+            raise Session11ProofError("repair_key") from error
+    else:
+        raise Session11ProofError("repair_key")
+    closed = resolve_issue(_verification())
+    mismatch = resolve_issue(_verification(fresh=_OTHER))
+    same_job = resolve_issue(_verification(verification=_REPAIR))
+    same_time = resolve_issue(_verification(read_at=_WHEN))
+    if (
+        closed.status != "RESOLVED"
+        or closed.verification_job_id != _VERIFY
+        or closed.resolution_reference != _HASH
+        or closed.resolved_at != _LATER
+        or closed.send_count != 0
+    ):
+        raise Session11ProofError("repair_close")
+    if (
+        mismatch.status != "OPEN"
+        or mismatch.verification_job_id is not None
+        or mismatch.resolution_reference is not None
+        or same_job.status != "OPEN"
+        or same_time.status != "OPEN"
+        or incident.jobs_inserted != 0
+        or incident.send_count != 0
+    ):
+        raise Session11ProofError("repair_open")

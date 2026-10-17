@@ -897,3 +897,19 @@ Session 11 is incomplete at revision 85. `support_intake_implemented` is true. T
 ### Consequences
 
 Revision 86 records the intake and routing keys true. The other four Session 11 keys stay false. The repair key is the next proof.
+
+## D-0060 — Session 11 repair resolution is the third earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 11 is incomplete at revision 86. `support_intake_implemented` and `incident_routing_implemented` are true. The other four keys are false. The intake fixture already keeps one repair version per incident and idempotency key, and it closes an issue only after a later matching read from a different job.
+
+### Decision
+
+`prove_session_11()` earns `support_intake_implemented`, `incident_routing_implemented`, and `repair_resolution_implemented`. `record-evidence` on incomplete Session 11 keeps the first two keys and flips the repair key. The other three keys stay false. Any other flip is refused. The closure key stays false. `head_sha` does not move. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.
+
+### Consequences
+
+Revision 87 records the intake, routing, and repair keys true. The other three Session 11 keys stay false. The draft reply is the next proof.

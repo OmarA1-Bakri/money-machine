@@ -4,8 +4,8 @@ Sessions 00-06 closed with every contract key true. Session 07's close
 commit under D-0032 has every contract key false. D-0036 records the live
 pointer separately. Sessions 08, 09, and 10 are complete. Session 10 is
 revision 83 and every one of its keys is true (D-0055). Session 11 is
-incomplete at revision 86. The intake and routing keys are true and the
-other Session 11 keys are false (D-0059). Sessions 12-15 have no contract.
+incomplete at revision 87. The intake, routing, and repair keys are true
+and the other Session 11 keys are false (D-0060). Sessions 12-15 have no contract.
 This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
@@ -159,11 +159,17 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
         11,
         ("src/money_machine/assets/support_intake.py",),
         (
-            "The intake and routing keys are earned. Repair, the draft, and the "
-            "closure key are not earned. Routing inserts nothing. A16 stays DESIGNED."
+            "The intake, routing, and repair keys are earned. The draft and the "
+            "closure key are not earned. Repair sends nothing. A16 stays DESIGNED."
         ),
         True,
-        frozenset({"incident_routing_implemented", "support_intake_implemented"}),
+        frozenset(
+            {
+                "incident_routing_implemented",
+                "repair_resolution_implemented",
+                "support_intake_implemented",
+            }
+        ),
     ),
     OpenSessionEvidence(
         12,
@@ -200,9 +206,9 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 11 at state revision 86.",
+        "The checked-in pointer is Session 11 at state revision 87.",
         "`current_session` is 11. `session_status` is incomplete.",
-        "The intake and routing keys are true. The other Session 11 keys are false.",
+        "The intake, routing, and repair keys are true. The other Session 11 keys are false.",
         "Session 10 is complete and every one of its keys is true.",
         "Session 09 is complete and every one of its keys is true.",
         "Session 08 is complete and every one of its keys is true.",
@@ -211,7 +217,10 @@ def render_session_evidence() -> str:
         "D-0036 recorded the twelve Session 07 keys true. The closure commit is",
         "`5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.",
         "Session 10 is complete. Every key is true.",
-        "Session 11 is incomplete. The intake and routing keys are true. The other keys are false.",
+        (
+            "Session 11 is incomplete. The intake, routing, and repair keys are true. "
+            "The other keys are false."
+        ),
         "Sessions 12-15 have no contract and are not activated.",
         "",
     ]
@@ -251,7 +260,7 @@ def render_session_evidence() -> str:
             "",
             "Session 10 is complete. Every key is true.",
             (
-                "Session 11 is incomplete. The intake and routing keys are true. "
+                "Session 11 is incomplete. The intake, routing, and repair keys are true. "
                 "The other keys are false."
             ),
             "Sessions 12-15 have no contract and are not activated.",
