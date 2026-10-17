@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-17 — Session 11 intake key recorded
+
+**Verification scope**: live `record-evidence` from revision 84 to 85. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move. No message is sent.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 11, `incomplete`, revision 85, `updated_at` `2026-10-17T12:15:00Z` | PASS |
+| Keys | The intake key is true. The other five Session 11 keys are false | PASS |
+| Head | `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918` | PASS |
+| Refusal | A later key, an unknown key, and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 11, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 85}`. The intake proof, the Session 11 contract, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 49 passed in 2.99s.
+
 ## 2026-10-17 — Session 11 activated
 
 **Verification scope**: live `activate` from revision 83 to 84. No live HTTP. Exit 78 stays HELD. The exit string is not written. Every Session 11 key is false.

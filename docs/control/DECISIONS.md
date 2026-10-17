@@ -865,3 +865,19 @@ Session 10 is complete at revision 83 and D-0056 installed the Session 11 contra
 ### Consequences
 
 Revision 84 is incomplete Session 11. Every Session 11 key is false. The next honest step is the first earned key, through its own proof.
+
+## D-0058 — Session 11 intake is the first earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 11 is incomplete at revision 84. All six keys are false. Intake already stores one incident for a shop, an opaque buyer reference, and a received time, returns that same incident on a second call, refuses an unsafe summary without echoing it, and stores an attachment hash and content type.
+
+### Decision
+
+`prove_session_11()` earns `support_intake_implemented`. `record-evidence` on incomplete Session 11 flips that key and keeps the other five false. Any other flip is refused. The closure key stays false. `head_sha` does not move. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.
+
+### Consequences
+
+Revision 85 records the intake key true. The other five Session 11 keys stay false. The routing key is the next proof.

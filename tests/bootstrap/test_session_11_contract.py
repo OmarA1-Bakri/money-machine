@@ -74,16 +74,18 @@ def test_session_11_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_is_the_session_11_activation() -> None:
-    """Activation installs every Session 11 key false."""
+    """The intake key is true. The other Session 11 keys stay false."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 84
+    evidence = dict.fromkeys(sorted(SESSION_11_KEYS), False)
+    evidence["support_intake_implemented"] = True
+    assert live["state_revision"] == 85
     assert live["current_session"] == 11
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(11))
     assert live["next_session"] == 11
     assert live["head_sha"] == "f16c7ed0598daf3f4627955b52585f253ae1b918"
-    assert live["required_completion_evidence"] == dict.fromkeys(sorted(SESSION_11_KEYS), False)
+    assert live["required_completion_evidence"] == evidence
     assert "SESSION_11_SUPPORT_AND_REPAIR_COMPLETE" not in text
 
 
