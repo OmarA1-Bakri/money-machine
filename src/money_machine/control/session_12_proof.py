@@ -1,7 +1,7 @@
-"""Earn the Session 12 read-model, view, telemetry, and fail-closed action keys.
+"""Earn the Session 12 read-model, view, telemetry, action, and control-file keys.
 
 The proof does not open a socket, read a credential, or write a cap.
-The action key may be either bool: the record flips it after this proof has run.
+The control-file key may be either bool: the record flips it after this proof has run.
 """
 
 from __future__ import annotations
@@ -44,24 +44,25 @@ READ_MODEL_EVIDENCE_KEY = "console_read_model_implemented"
 VIEWS_EVIDENCE_KEY = "exception_views_implemented"
 TELEMETRY_EVIDENCE_KEY = "telemetry_redaction_implemented"
 ACTIONS_EVIDENCE_KEY = "operator_actions_fail_closed"
+CONTROL_EVIDENCE_KEY = "control_files_and_checkpoint_current"
+_CLOSURE_EVIDENCE_KEY = "evidence_closure_commit_recorded"
 EARNED_EVIDENCE_KEYS = frozenset(
     {
         READ_MODEL_EVIDENCE_KEY,
         VIEWS_EVIDENCE_KEY,
         TELEMETRY_EVIDENCE_KEY,
         ACTIONS_EVIDENCE_KEY,
+        CONTROL_EVIDENCE_KEY,
     }
 )
-_UNEARNED_KEYS = (
-    "control_files_and_checkpoint_current",
-    "evidence_closure_commit_recorded",
-)
+_UNEARNED_KEYS = (_CLOSURE_EVIDENCE_KEY,)
 _SESSION_12_KEYS = frozenset(
     {
         READ_MODEL_EVIDENCE_KEY,
         VIEWS_EVIDENCE_KEY,
         TELEMETRY_EVIDENCE_KEY,
         ACTIONS_EVIDENCE_KEY,
+        CONTROL_EVIDENCE_KEY,
         *_UNEARNED_KEYS,
     }
 )
@@ -715,7 +716,8 @@ def _prove_control_files() -> None:
         or evidence.get(READ_MODEL_EVIDENCE_KEY) is not True
         or evidence.get(VIEWS_EVIDENCE_KEY) is not True
         or evidence.get(TELEMETRY_EVIDENCE_KEY) is not True
-        or not isinstance(evidence.get(ACTIONS_EVIDENCE_KEY), bool)
-        or any(evidence.get(key) is not False for key in _UNEARNED_KEYS)
+        or evidence.get(ACTIONS_EVIDENCE_KEY) is not True
+        or not isinstance(evidence.get(CONTROL_EVIDENCE_KEY), bool)
+        or evidence.get(_CLOSURE_EVIDENCE_KEY) is not False
     ):
         raise Session12ProofError("control_checkpoint")

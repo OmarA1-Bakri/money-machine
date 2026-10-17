@@ -61,7 +61,7 @@ def test_live_pointer_is_incomplete_session_12() -> None:
     live = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert live["current_session"] == 12
     assert live["session_status"] == "incomplete"
-    assert live["state_revision"] == 95
+    assert live["state_revision"] == 96
     assert live["completed_sessions"] == list(range(12))
     assert live["next_session"] == 12
     assert live["next_prompt"] == SESSION_PROMPTS[12]
@@ -74,6 +74,7 @@ def test_live_pointer_is_incomplete_session_12() -> None:
     expected["exception_views_implemented"] = True
     expected["telemetry_redaction_implemented"] = True
     expected["operator_actions_fail_closed"] = True
+    expected["control_files_and_checkpoint_current"] = True
     assert evidence == expected
 
 
@@ -90,6 +91,7 @@ def test_open_sessions_have_no_recorded_true_key() -> None:
             assert record.true_keys == frozenset(
                 {
                     "console_read_model_implemented",
+                    "control_files_and_checkpoint_current",
                     "exception_views_implemented",
                     "operator_actions_fail_closed",
                     "telemetry_redaction_implemented",

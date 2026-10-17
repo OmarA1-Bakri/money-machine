@@ -1066,8 +1066,9 @@ def test_live_pointer_is_incomplete_session_ten() -> None:
     assert evidence["exception_views_implemented"] is True
     assert evidence["telemetry_redaction_implemented"] is True
     assert evidence["operator_actions_fail_closed"] is True
-    assert sum(value is True for value in evidence.values()) == 4
-    assert state["state_revision"] == 95
+    assert evidence["control_files_and_checkpoint_current"] is True
+    assert sum(value is True for value in evidence.values()) == 5
+    assert state["state_revision"] == 96
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")
     assert "SESSION_08_MERCHANDISING_AND_ASSETS_COMPLETE" not in STATE_PATH.read_text(
         encoding="utf-8"

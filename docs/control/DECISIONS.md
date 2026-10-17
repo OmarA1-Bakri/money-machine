@@ -1066,3 +1066,19 @@ Session 12 is incomplete at revision 94. D-0068 recorded telemetry redaction. Th
 ### Consequences
 
 Revision 95 is incomplete Session 12. Four keys are true. The next honest step is `control_files_and_checkpoint_current`, through its own proof.
+
+## D-0070 — Session 12 records the control files
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 12 is incomplete at revision 95. The read-model, exception-view, telemetry, and fail-closed action keys are true. The control-file key and the closure key are false. The six continuity files and the evidence catalogue are already on the trunk.
+
+### Decision
+
+`prove_session_12()` earns the read-model, exception-view, telemetry, fail-closed action, and control-file keys. `record-evidence` keeps the first four keys and flips `control_files_and_checkpoint_current`. The closure key stays false. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. No socket is opened and no cap is written.
+
+### Consequences
+
+Revision 96 records every Session 12 key except the closure key. The closure key is the next proof, through `apply-completion`.

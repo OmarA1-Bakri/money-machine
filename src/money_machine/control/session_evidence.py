@@ -5,9 +5,9 @@ commit under D-0032 has every contract key false. D-0036 records the live
 pointer separately. Sessions 08, 09, and 10 are complete. Session 10 is
 revision 83 and every one of its keys is true (D-0055). Session 11 is
 complete at revision 90. Every Session 11 key is true (D-0063). Session 12
-is incomplete at revision 95. The read-model, exception-view,
-telemetry-redaction, and fail-closed action keys are true and the other
-Session 12 keys are false (D-0069).
+is incomplete at revision 96. The read-model, exception-view,
+telemetry-redaction, fail-closed action, and control-file keys are true.
+The closure key is false (D-0070).
 Sessions 13-15 have no contract.
 This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
@@ -163,8 +163,8 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
         ("src/money_machine/assets/support_intake.py",),
         (
             "Every Session 11 key is earned. Session 12 is activated. Its read model, "
-            "exception views, telemetry redaction, and fail-closed actions are earned. "
-            "The control-file key and the closure key are not earned. A16 stays DESIGNED."
+            "exception views, telemetry redaction, fail-closed actions, and control "
+            "files are earned. The closure key is not earned. A16 stays DESIGNED."
         ),
         True,
         frozenset(
@@ -187,14 +187,15 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
             "src/money_machine/assets/operator_actions.py",
         ),
         (
-            "The console read model, the exception views, telemetry redaction, and "
-            "fail-closed actions are earned. The control-file key and the closure key "
-            "are not earned."
+            "The console read model, the exception views, telemetry redaction, "
+            "fail-closed actions, and the control files are earned. The closure key "
+            "is not earned."
         ),
         True,
         frozenset(
             {
                 "console_read_model_implemented",
+                "control_files_and_checkpoint_current",
                 "exception_views_implemented",
                 "operator_actions_fail_closed",
                 "telemetry_redaction_implemented",
@@ -241,12 +242,12 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 12 at state revision 95.",
+        "The checked-in pointer is Session 12 at state revision 96.",
         "`current_session` is 12. `session_status` is incomplete.",
         (
             "`console_read_model_implemented`, `exception_views_implemented`, "
-            "`telemetry_redaction_implemented`, and `operator_actions_fail_closed` are true. "
-            "The other Session 12 keys are false."
+            "`telemetry_redaction_implemented`, `operator_actions_fail_closed`, and "
+            "`control_files_and_checkpoint_current` are true. The closure key is false."
         ),
         "Session 10 is complete and every one of its keys is true.",
         "Session 09 is complete and every one of its keys is true.",
@@ -257,7 +258,7 @@ def render_session_evidence() -> str:
         "`5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.",
         "Session 10 is complete. Every key is true.",
         "Session 11 is complete. Every key is true.",
-        "Session 12 is incomplete. Four keys are true.",
+        "Session 12 is incomplete. Five keys are true.",
         "Sessions 13-15 have no contract and are not activated.",
         "",
     ]
@@ -297,7 +298,7 @@ def render_session_evidence() -> str:
             "",
             "Session 10 is complete. Every key is true.",
             "Session 11 is complete. Every key is true.",
-            "Session 12 is incomplete. Four keys are true.",
+            "Session 12 is incomplete. Five keys are true.",
             "Sessions 13-15 have no contract and are not activated.",
             "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",

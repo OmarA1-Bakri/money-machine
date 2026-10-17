@@ -8,7 +8,7 @@
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "evidence_closure_commit_sha": "d095501665fbda0f9e6a0e77b57531bc33fda4e2",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 95,
+  "state_revision": 96,
   "session_status": "incomplete",
   "current_session": 12,
   "completed_sessions": [
@@ -129,7 +129,7 @@
   ],
   "required_completion_evidence": {
     "console_read_model_implemented": true,
-    "control_files_and_checkpoint_current": false,
+    "control_files_and_checkpoint_current": true,
     "evidence_closure_commit_recorded": false,
     "exception_views_implemented": true,
     "operator_actions_fail_closed": true,
@@ -148,5 +148,5 @@
   },
   "next_session": 12,
   "next_prompt": "15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md",
-  "updated_at": "2026-10-17T13:25:00Z"
+  "updated_at": "2026-10-17T13:30:00Z"
 }

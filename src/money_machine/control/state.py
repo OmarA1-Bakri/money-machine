@@ -1458,7 +1458,8 @@ def apply_session_11_evidence_record_transition(
 def validate_session_12_evidence_record(previous: ControlState, current: ControlState) -> None:
     """Record the Session 12 keys the fixture proof has earned. The session stays incomplete.
 
-    The proof earns the read-model, view, telemetry, and action keys. The closure key stays false.
+    The proof earns the read-model, view, telemetry, action, and control-file keys.
+    The closure key stays false.
     """
     if previous["current_session"] != 12 or current["current_session"] != 12:
         raise ControlStateError("unsupported evidence record: only session 12 can record this key")

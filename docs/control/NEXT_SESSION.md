@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 12 control files are recorded (2026-10-17)
+
+Revision 96 records every Session 12 key except `evidence_closure_commit_recorded`. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. The next honest step is the closure key, through `apply-completion`.
+
 ## Session 12 operator actions fail closed (2026-10-17)
 
 Revision 95 records `console_read_model_implemented`, `exception_views_implemented`, `telemetry_redaction_implemented`, and `operator_actions_fail_closed`. The control-file key and the closure key stay false. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. The next honest step is `control_files_and_checkpoint_current`, through its own proof.
