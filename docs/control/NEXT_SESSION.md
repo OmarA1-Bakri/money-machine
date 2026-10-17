@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 09 ramp key is recorded (2026-10-17)
+
+Revision 72 records `publishing_ramp_implemented`. Preflight stays true. The other four keys stay false. `updated_at` is `2026-10-17T10:52:00Z`. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. The committed ramp stays disabled. The next honest step is the mutation-receipt key, through its own proof.
+
 ## Session 09 preflight key is recorded (2026-10-17)
 
 Revision 71 records `etsy_preflight_implemented`. The other five keys stay false. `updated_at` is `2026-10-17T10:48:00Z`. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. A12 and A13 stay `DESIGNED`. The exit string is not written. The next honest step is the publishing-ramp key, through its own proof.

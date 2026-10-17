@@ -10,7 +10,12 @@ from typing import cast
 
 import pytest
 
-from money_machine.control.session_09_proof import PREFLIGHT_EVIDENCE_KEY, prove_session_09
+from money_machine.control.session_09_proof import (
+    EARNED_EVIDENCE_KEYS,
+    PREFLIGHT_EVIDENCE_KEY,
+    RAMP_EVIDENCE_KEY,
+    prove_session_09,
+)
 from money_machine.control.state import (
     SESSION_EVIDENCE_KEYS,
     ControlState,
@@ -21,7 +26,7 @@ from money_machine.control.state import (
 
 ROOT = Path(__file__).parents[2]
 STATE_PATH = ROOT / "docs/control/IMPLEMENTATION_STATE.json"
-EARNED_AT = "2026-10-17T10:48:00Z"
+EARNED_AT = "2026-10-17T10:52:00Z"
 _CONTROL_NAMES = (
     "IMPLEMENTATION_LOG.md",
     "DECISIONS.md",
@@ -52,6 +57,7 @@ def _earned(previous: ControlState) -> ControlState:
     current["updated_at"] = EARNED_AT
     evidence = dict(current["required_completion_evidence"])
     evidence[PREFLIGHT_EVIDENCE_KEY] = True
+    evidence[RAMP_EVIDENCE_KEY] = True
     current["required_completion_evidence"] = evidence
     return current
 
@@ -60,23 +66,34 @@ def _write(path: Path, state: ControlState) -> None:
     path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
 
 
-def test_proof_earns_only_the_preflight_key() -> None:
-    assert prove_session_09() == frozenset({PREFLIGHT_EVIDENCE_KEY})
+def test_proof_earns_preflight_and_the_ramp() -> None:
+    assert prove_session_09() == EARNED_EVIDENCE_KEYS
 
 
-def test_preflight_key_is_the_only_accepted_flip() -> None:
+def test_preflight_and_ramp_are_the_accepted_record() -> None:
     previous = _false_pointer()
     validate_session_09_evidence_record(previous, _earned(previous))
 
 
-def test_a_second_key_is_refused() -> None:
+def test_preflight_without_the_ramp_is_refused() -> None:
     previous = _false_pointer()
     current = _earned(previous)
     evidence = dict(current["required_completion_evidence"])
-    evidence["publishing_ramp_implemented"] = True
+    evidence[RAMP_EVIDENCE_KEY] = False
     current["required_completion_evidence"] = evidence
 
-    with pytest.raises(ControlStateError, match="only the earned preflight key"):
+    with pytest.raises(ControlStateError, match="exactly the keys the fixture proof earned"):
+        validate_session_09_evidence_record(previous, current)
+
+
+def test_a_third_key_is_refused() -> None:
+    previous = _false_pointer()
+    current = _earned(previous)
+    evidence = dict(current["required_completion_evidence"])
+    evidence["mutation_receipt_implemented"] = True
+    current["required_completion_evidence"] = evidence
+
+    with pytest.raises(ControlStateError, match="exactly the keys the fixture proof earned"):
         validate_session_09_evidence_record(previous, current)
 
 
@@ -87,7 +104,7 @@ def test_the_closure_key_is_refused() -> None:
     evidence["evidence_closure_commit_recorded"] = True
     current["required_completion_evidence"] = evidence
 
-    with pytest.raises(ControlStateError, match="only the earned preflight key"):
+    with pytest.raises(ControlStateError, match="the closure key stays false"):
         validate_session_09_evidence_record(previous, current)
 
 
@@ -131,6 +148,7 @@ def test_apply_records_the_preflight_key_without_touching_the_live_file(tmp_path
     assert applied["state_revision"] == previous["state_revision"] + 1
     assert applied["head_sha"] == previous["head_sha"]
     assert evidence[PREFLIGHT_EVIDENCE_KEY] is True
+    assert evidence[RAMP_EVIDENCE_KEY] is True
     assert evidence["evidence_closure_commit_recorded"] is False
-    assert evidence["publishing_ramp_implemented"] is False
+    assert evidence["mutation_receipt_implemented"] is False
     assert STATE_PATH.read_bytes() == live_bytes

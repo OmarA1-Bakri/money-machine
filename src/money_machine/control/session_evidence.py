@@ -3,8 +3,8 @@
 Sessions 00-06 closed with every contract key true. Session 07's close
 commit under D-0032 has every contract key false. D-0036 records the live
 pointer separately. Session 08 is complete at revision 69. Session 09 is
-activated and incomplete at revision 71. ``etsy_preflight_implemented`` is
-the one true key (D-0041). Sessions 10-15 have no contract. This module
+activated and incomplete at revision 72. Preflight and the publishing ramp
+are the true keys (D-0041, D-0042). Sessions 10-15 have no contract. This module
 does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
@@ -141,9 +141,9 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
             "src/money_machine/assets/publishing_ramp_decision.py",
             "src/money_machine/assets/mutation_receipt.py",
         ),
-        "Preflight is recorded. The other keys are not. Fixtures do not publish.",
+        "Preflight and the ramp are recorded. The other keys are not.",
         True,
-        frozenset({"etsy_preflight_implemented"}),
+        frozenset({"etsy_preflight_implemented", "publishing_ramp_implemented"}),
     ),
     OpenSessionEvidence(
         10,
@@ -195,9 +195,9 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 09 at state revision 71.",
+        "The checked-in pointer is Session 09 at state revision 72.",
         "`current_session` is 9. `session_status` is incomplete.",
-        "`etsy_preflight_implemented` is true. The other Session 09 keys are false.",
+        "Preflight and the publishing ramp are true. The other Session 09 keys are false.",
         "Session 08 is complete and every one of its keys is true.",
         "Sessions 00-06 closed with every contract key true.",
         "Session 07's close commit keeps every contract key false under D-0032.",

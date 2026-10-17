@@ -591,3 +591,19 @@ Session 09 is incomplete at revision 70. All six keys are false. `record-evidenc
 ### Consequences
 
 Revision 71 records the preflight key true. The other five Session 09 keys stay false. The ramp, the receipt, and the fixture draft package are later proofs.
+
+## D-0042 — Session 09 publishing ramp is the second earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Revision 71 has `etsy_preflight_implemented` true and the other Session 09 keys false. The ramp predicate already exists. It does not read the ramp file and it does not enable publishing.
+
+### Decision
+
+`prove_session_09()` also earns `publishing_ramp_implemented`. The proof requires a disabled ramp to wait at count zero, a count at cap 2 to wait seven days, a count one below the cap to publish even with an unreconciled row, a caller cap of 3 to publish at count 2, and a count at the hard cap of 15 to wait. `record-evidence` then requires the true keys to be exactly preflight and the ramp. The closure key stays false. `head_sha` does not move. The committed ramp file stays `publishing_enabled: false`.
+
+### Consequences
+
+Revision 72 records the ramp key true. The receipt, the fixture draft package, the control-file key, and the closure key stay false.

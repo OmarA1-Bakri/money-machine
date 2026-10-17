@@ -573,8 +573,9 @@ def test_live_pointer_is_incomplete_session_nine() -> None:
     evidence = state["required_completion_evidence"]
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[9]
     assert evidence["etsy_preflight_implemented"] is True
-    assert sum(1 for value in evidence.values() if value) == 1
-    assert state["state_revision"] == 71
+    assert evidence["publishing_ramp_implemented"] is True
+    assert sum(1 for value in evidence.values() if value) == 2
+    assert state["state_revision"] == 72
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")
     assert "SESSION_08_MERCHANDISING_AND_ASSETS_COMPLETE" not in STATE_PATH.read_text(
         encoding="utf-8"

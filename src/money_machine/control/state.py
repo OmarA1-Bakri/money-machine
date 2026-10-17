@@ -29,7 +29,7 @@ from money_machine.control.session_08_proof import (
     prove_session_08,
 )
 from money_machine.control.session_09_proof import (
-    PREFLIGHT_EVIDENCE_KEY,
+    EARNED_EVIDENCE_KEYS,
     Session09ProofError,
     prove_session_09,
 )
@@ -1185,10 +1185,10 @@ def apply_session_08_evidence_record_transition(
 
 
 def validate_session_09_evidence_record(previous: ControlState, current: ControlState) -> None:
-    """Record the Session 09 preflight key. The session stays incomplete.
+    """Record the Session 09 keys the fixture proof has earned. The session stays incomplete.
 
-    The proof earns ``etsy_preflight_implemented`` alone. The other five keys,
-    including the closure key, stay false. The closure commit does not move.
+    The proof earns preflight and the publishing ramp. Keys it has not earned stay false,
+    including the closure key. The closure commit does not move.
     """
     if previous["current_session"] != 9 or current["current_session"] != 9:
         raise ControlStateError("unsupported evidence record: only session 09 can record this key")
@@ -1205,10 +1205,15 @@ def validate_session_09_evidence_record(previous: ControlState, current: Control
     if reverted:
         raise ControlStateError("evidence record cannot revoke a key: " + ", ".join(reverted))
     flipped = {key for key, value in before.items() if value is False and after[key] is True}
-    if flipped != {PREFLIGHT_EVIDENCE_KEY}:
-        raise ControlStateError("evidence record must flip only the earned preflight key")
+    if not flipped:
+        raise ControlStateError("evidence record must change at least one key")
     if after[_CLOSURE_EVIDENCE_KEY] is not False:
         raise ControlStateError("the closure key stays false")
+    true_after = {key for key, value in after.items() if value is True}
+    if true_after != set(EARNED_EVIDENCE_KEYS):
+        raise ControlStateError(
+            "evidence record must set exactly the keys the fixture proof earned"
+        )
 
 
 def _session_09_evidence(state: ControlState) -> dict[str, bool]:
@@ -1223,8 +1228,8 @@ def _require_session_09_proof() -> None:
         earned = prove_session_09()
     except Session09ProofError as error:
         raise ControlStateError(f"session 09 evidence proof refused: {error.code}") from error
-    if earned != frozenset({PREFLIGHT_EVIDENCE_KEY}):
-        raise ControlStateError("session 09 evidence proof did not earn the preflight key")
+    if earned != EARNED_EVIDENCE_KEYS:
+        raise ControlStateError("session 09 evidence proof did not earn the recorded keys")
 
 
 def _verify_session_09_evidence_repository(

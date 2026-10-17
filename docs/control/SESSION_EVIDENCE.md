@@ -1,8 +1,8 @@
 # Session evidence
 
-The checked-in pointer is Session 09 at state revision 71.
+The checked-in pointer is Session 09 at state revision 72.
 `current_session` is 9. `session_status` is incomplete.
-`etsy_preflight_implemented` is true. The other Session 09 keys are false.
+Preflight and the publishing ramp are true. The other Session 09 keys are false.
 Session 08 is complete and every one of its keys is true.
 Sessions 00-06 closed with every contract key true.
 Session 07's close commit keeps every contract key false under D-0032.
@@ -236,7 +236,7 @@ A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 Prompt: `12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md`.
 Status: incomplete.
 Evidence contract: installed.
-Preflight is recorded. The other keys are not. Fixtures do not publish.
+Preflight and the ramp are recorded. The other keys are not.
 
 Fixture paths:
 
@@ -251,7 +251,7 @@ Fixture paths:
 | `evidence_closure_commit_recorded` | false |
 | `fixture_draft_package_implemented` | false |
 | `mutation_receipt_implemented` | false |
-| `publishing_ramp_implemented` | false |
+| `publishing_ramp_implemented` | true |
 
 ## Session 10
 
