@@ -7,9 +7,9 @@ revision 83 and every one of its keys is true (D-0055). Session 11 is
 complete at revision 90. Every Session 11 key is true (D-0063). Session 12
 is complete at revision 97. Every Session 12 key is true (D-0071).
 Session 13 is complete at revision 104. Every Session 13 key is true
-(D-0079). Session 14 is activated and incomplete at revision 106.
-`deployment_target_recorded` is true. The other five Session 14 keys are
-false (D-0082). Session 15 has no contract.
+(D-0079). Session 14 is activated and incomplete at revision 107.
+`deployment_target_recorded` and `production_packaging_defined` are true.
+The other four Session 14 keys are false (D-0083). Session 15 has no contract.
 This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
@@ -165,7 +165,8 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
         (
             "Every Session 11 key is earned. Session 12 is complete. Session 13 "
             "is complete. Session 14 is activated and incomplete. The deployment "
-            "target is recorded. A live deploy is not recorded. A16 stays DESIGNED."
+            "target and the production package are recorded. A live deploy is "
+            "not recorded. A16 stays DESIGNED."
         ),
         True,
         frozenset(
@@ -189,8 +190,8 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
         ),
         (
             "Every Session 12 key is earned. Session 13 is complete. Session 14 "
-            "is activated and incomplete. The deployment target is recorded. A "
-            "live deploy is not recorded. Exit 78 stays HELD."
+            "is activated and incomplete. The deployment target and the production "
+            "package are recorded. A live deploy is not recorded. Exit 78 stays HELD."
         ),
         True,
         frozenset(
@@ -214,8 +215,8 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
         ),
         (
             "Every Session 13 key is earned. Session 14 is activated and incomplete. "
-            "The deployment target is recorded. A live deploy is not recorded. "
-            "Exit 78 stays HELD."
+            "The deployment target and the production package are recorded. A live "
+            "deploy is not recorded. Exit 78 stays HELD."
         ),
         True,
         frozenset(
@@ -231,13 +232,16 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
     ),
     OpenSessionEvidence(
         14,
-        ("src/money_machine/deploy/target.py",),
         (
-            "The deployment target is recorded. The other keys are not earned. "
-            "A live deploy is not recorded."
+            "src/money_machine/deploy/target.py",
+            "src/money_machine/deploy/packaging.py",
+        ),
+        (
+            "The deployment target and the production package are recorded. "
+            "The other keys are not earned. A live deploy is not recorded."
         ),
         True,
-        frozenset({"deployment_target_recorded"}),
+        frozenset({"deployment_target_recorded", "production_packaging_defined"}),
     ),
     OpenSessionEvidence(
         15,
@@ -269,9 +273,10 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 14 at state revision 106.",
+        "The checked-in pointer is Session 14 at state revision 107.",
         "`current_session` is 14. `session_status` is incomplete.",
-        "`deployment_target_recorded` is true. The other five Session 14 keys are false.",
+        "`deployment_target_recorded` and `production_packaging_defined` are true.",
+        "The other four Session 14 keys are false.",
         "Session 10 is complete and every one of its keys is true.",
         "Session 09 is complete and every one of its keys is true.",
         "Session 08 is complete and every one of its keys is true.",
@@ -283,7 +288,7 @@ def render_session_evidence() -> str:
         "Session 11 is complete. Every key is true.",
         "Session 12 is complete. Every key is true.",
         "Session 13 is complete. Every key is true.",
-        "Session 14 is activated and incomplete. The deployment target is recorded.",
+        "Session 14 is incomplete. The target and the package are recorded.",
         "Session 15 has no contract.",
         "",
     ]
@@ -325,7 +330,7 @@ def render_session_evidence() -> str:
             "Session 11 is complete. Every key is true.",
             "Session 12 is complete. Every key is true.",
             "Session 13 is complete. Every key is true.",
-            "Session 14 is activated and incomplete. The deployment target is recorded.",
+            "Session 14 is incomplete. The target and the package are recorded.",
             "Session 15 has no contract.",
             "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",

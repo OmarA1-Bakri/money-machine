@@ -1,7 +1,8 @@
-"""Earn the Session 14 deployment-target key.
+"""Earn the Session 14 deployment-target and packaging keys.
 
-The proof calls the selector. A paragraph that says the host is deployed does
-not earn the key. The closure key stays false.
+The proof calls the selector and the package check. A paragraph that says the
+host is deployed does not earn a key. A passing docker compose config does
+not earn the package. The closure key stays false.
 """
 
 from __future__ import annotations
@@ -10,6 +11,13 @@ import ast
 import json
 from pathlib import Path
 
+from money_machine.deploy.packaging import (
+    HEALTHCHECKED_SERVICES,
+    REQUIRED_SERVICES,
+    RUNBOOKS,
+    PackagingRefusal,
+    define_production_package,
+)
 from money_machine.deploy.target import (
     DeploymentTargetRefusal,
     PaidHostAuthority,
@@ -17,8 +25,9 @@ from money_machine.deploy.target import (
 )
 
 TARGET_EVIDENCE_KEY = "deployment_target_recorded"
+PACKAGING_EVIDENCE_KEY = "production_packaging_defined"
 _CLOSURE_EVIDENCE_KEY = "evidence_closure_commit_recorded"
-EARNED_EVIDENCE_KEYS = frozenset({TARGET_EVIDENCE_KEY})
+EARNED_EVIDENCE_KEYS = frozenset({TARGET_EVIDENCE_KEY, PACKAGING_EVIDENCE_KEY})
 _SESSION_14_KEYS = frozenset(
     {
         TARGET_EVIDENCE_KEY,
@@ -39,9 +48,9 @@ _CONTROL_FILES = (
 )
 _CLOSURE_HEAD = "fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a"
 _SESSION_14_PROMPT = "17_SESSION_14_DEPLOYMENT.md"
-_POINTER_REVISION = 106
-_UPDATED_AT = "2026-10-17T15:00:00Z"
-_TARGET_IS_TRUE = True
+_POINTER_REVISION = 107
+_UPDATED_AT = "2026-10-17T15:10:00Z"
+_TRUE_KEYS = frozenset({TARGET_EVIDENCE_KEY, PACKAGING_EVIDENCE_KEY})
 
 
 class Session14ProofError(ValueError):
@@ -55,6 +64,7 @@ class Session14ProofError(ValueError):
 def prove_session_14() -> frozenset[str]:
     """Return the earned Session 14 keys. A miss raises instead of returning them."""
     _prove_target()
+    _prove_packaging()
     _prove_control_files()
     return EARNED_EVIDENCE_KEYS
 
@@ -89,6 +99,30 @@ def _prove_target() -> None:
         raise Session14ProofError("host_created")
 
 
+def _prove_packaging() -> None:
+    module = Path(__file__).resolve().parents[1] / "deploy" / "packaging.py"
+    _refuse_network(module)
+    _refuse_print(module)
+    package = define_production_package()
+    if (
+        package.services != REQUIRED_SERVICES
+        or package.postgres_volume != "postgres-data"
+        or package.healthchecks != HEALTHCHECKED_SERVICES
+        or package.worker_restart != "no"
+        or package.scheduler_restart != "no"
+        or package.runbooks != RUNBOOKS
+        or package.docker_compose_config_ran is not False
+    ):
+        raise Session14ProofError("package")
+    try:
+        define_production_package(accept_compose_config=True)
+    except PackagingRefusal as error:
+        if error.code != "compose_config":
+            raise Session14ProofError("compose_config") from error
+    else:
+        raise Session14ProofError("compose_config")
+
+
 def _require_refusal(
     requested: str,
     authority: PaidHostAuthority | None,
@@ -116,6 +150,15 @@ def _refuse_network(module: Path) -> None:
     banned = ("socket", "httpx", "urllib", "requests", "dotenv", "subprocess")
     if any(token in folded for token in banned):
         raise Session14ProofError("target_socket")
+
+
+def _refuse_print(module: Path) -> None:
+    tree = ast.parse(module.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+            continue
+        if node.func.id == "print":
+            raise Session14ProofError("printed_secret")
 
 
 def _prove_control_files() -> None:
@@ -162,8 +205,6 @@ def _prove_control_files() -> None:
 
 
 def _target_matches(evidence: dict[str, object]) -> bool:
-    target = evidence.get(TARGET_EVIDENCE_KEY)
-    others = [value for key, value in evidence.items() if key != TARGET_EVIDENCE_KEY]
-    if _TARGET_IS_TRUE:
-        return target is True and all(value is False for value in others)
-    return target is False and all(value is False for value in others)
+    true = {key for key, value in evidence.items() if value is True}
+    rest = [value for key, value in evidence.items() if key not in _TRUE_KEYS]
+    return true == set(_TRUE_KEYS) and all(value is False for value in rest)

@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-17 — Session 14 production package recorded
+
+**Verification scope**: live `record-evidence` from revision 106 to 107. No live HTTP. No image build. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 14, `incomplete`, revision 107, `updated_at` `2026-10-17T15:10:00Z` | PASS |
+| Keys | `deployment_target_recorded` and `production_packaging_defined` are true. The other four Session 14 keys are false | PASS |
+| Package | Five services, `postgres-data`, postgres and api healthchecks, worker and scheduler restart `no`, six runbooks name Exit 78 | PASS |
+| Head | `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 14, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 107}`. The packaging proof, the target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 95 passed in 3.61s. `ruff check` and `pyright` on the package module and the Session 14 proof were clean.
+
 ## 2026-10-17 — Session 14 deployment target recorded
 
 **Verification scope**: live `record-evidence` from revision 105 to 106. No live HTTP. No host is created. Exit 78 stays HELD. The exit string is not written.

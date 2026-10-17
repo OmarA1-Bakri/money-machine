@@ -1274,3 +1274,19 @@ Session 14 is incomplete at revision 105. Every key is false (D-0081). `docs/arc
 ### Consequences
 
 The next honest step is `production_packaging_defined`. The proof checks api, worker, scheduler, web, the postgres volume, and healthchecks, and worker and scheduler restart stay `no`. A passing docker compose config is not the key. A live deploy stays deferred.
+
+## D-0083 — Session 14 production package
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 14 is incomplete at revision 106. `deployment_target_recorded` is true (D-0082). `compose.prod.yaml` already names postgres, api, web, worker, and scheduler. Worker and scheduler restart are `no`. The six runbooks did not name Exit 78.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 106 to 107. `updated_at` is `2026-10-17T15:10:00Z`. `production_packaging_defined` is true. `deployment_target_recorded` stays true. The other four Session 14 keys stay false. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. `src/money_machine/deploy/packaging.py` reads the compose spec and the six runbooks. It requires the five services, the `postgres-data` volume, the postgres and api healthchecks, and worker and scheduler restart `no`. Each runbook names Exit 78 and contains no secret. A request to accept `docker compose config` raises `compose_config`. No image is built. Exit 78 stays HELD.
+
+### Consequences
+
+The next honest step is `release_rollback_implemented`. The proof binds an image tag to a commit, plans a backup before migration, refuses live postgres, and fails a compatibility check when the schema is incompatible. It does not push an image. A live deploy stays deferred.
