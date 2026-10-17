@@ -1,4 +1,4 @@
-"""Earn the Session 11 intake, routing, and repair keys.
+"""Earn the Session 11 intake, routing, repair, and draft keys.
 
 The proof does not open a socket, read a credential, insert a job, or send a message.
 """
@@ -17,6 +17,7 @@ from money_machine.assets.support_intake import (
     IssueCode,
     SupportRefusal,
     VerificationRead,
+    draft_reply,
     open_issue,
     record_repair,
     resolve_issue,
@@ -26,7 +27,13 @@ from money_machine.domain.enums import IncidentType
 INTAKE_EVIDENCE_KEY = "support_intake_implemented"
 ROUTING_EVIDENCE_KEY = "incident_routing_implemented"
 REPAIR_EVIDENCE_KEY = "repair_resolution_implemented"
-EARNED_EVIDENCE_KEYS = frozenset({INTAKE_EVIDENCE_KEY, ROUTING_EVIDENCE_KEY, REPAIR_EVIDENCE_KEY})
+DRAFT_EVIDENCE_KEY = "draft_reply_implemented"
+EARNED_EVIDENCE_KEYS = frozenset(
+    {INTAKE_EVIDENCE_KEY, ROUTING_EVIDENCE_KEY, REPAIR_EVIDENCE_KEY, DRAFT_EVIDENCE_KEY}
+)
+_DRAFT_BODY = (
+    "We received this once. the file hash is aaaa path-token-1 Reply if the issue remains."
+)
 _WHEN = datetime(2026, 10, 16, 12, tzinfo=UTC)
 _LATER = datetime(2026, 10, 16, 12, 5, tzinfo=UTC)
 _SHOP = UUID("00000000-0000-4000-8000-000000000011")
@@ -70,6 +77,7 @@ def prove_session_11() -> frozenset[str]:
     _prove_intake()
     _prove_routing()
     _prove_repair()
+    _prove_draft()
     return EARNED_EVIDENCE_KEYS
 
 
@@ -226,6 +234,8 @@ def _verification(
     fresh: str = _HASH,
     verification: UUID = _VERIFY,
     read_at: datetime = _LATER,
+    fix: str = "the file hash is aaaa",
+    access_path: str = "path-token-1",
 ) -> VerificationRead:
     return VerificationRead(
         repair_job_id=_REPAIR,
@@ -234,8 +244,8 @@ def _verification(
         fresh_hash=fresh,
         repaired_at=_WHEN,
         read_at=read_at,
-        fix="the file hash is aaaa",
-        access_path="path-token-1",
+        fix=fix,
+        access_path=access_path,
     )
 
 
@@ -302,3 +312,42 @@ def _prove_repair() -> None:
         or incident.send_count != 0
     ):
         raise Session11ProofError("repair_open")
+
+
+def _prove_draft() -> None:
+    """A draft uses the verification's own words. Auto and a failed read send nothing."""
+    ledger = IntakeLedger()
+    drafted = draft_reply(ledger, _verification(), mode="draft")
+    body = drafted.body
+    if (
+        body != _DRAFT_BODY
+        or drafted.send_count != 0
+        or ledger.sends != 0
+        or body.count("We received this once.") != 1
+        or body.count("Reply if the issue remains.") != 1
+    ):
+        raise Session11ProofError("draft_body")
+    silent = draft_reply(ledger, _verification(fresh=_OTHER), mode="draft")
+    auto = draft_reply(ledger, _verification(), mode="auto")
+    if (
+        silent.body is not None
+        or silent.send_count != 0
+        or auto.body is not None
+        or auto.send_count != 0
+        or ledger.sends != 0
+    ):
+        raise Session11ProofError("draft_silent")
+    try:
+        draft_reply(ledger, _verification(fix=f"see {_SECRET}"), mode="draft")
+    except SupportRefusal as error:
+        if error.code != "reply" or _SECRET in str(error):
+            raise Session11ProofError("draft_secret") from error
+    else:
+        raise Session11ProofError("draft_secret")
+    try:
+        draft_reply(ledger, _verification(fix=" "), mode="draft")
+    except SupportRefusal as error:
+        if error.code != "reply":
+            raise Session11ProofError("draft_blank") from error
+    else:
+        raise Session11ProofError("draft_blank")

@@ -74,14 +74,15 @@ def test_session_11_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_is_the_session_11_activation() -> None:
-    """The intake, routing, and repair keys are true. The other Session 11 keys stay false."""
+    """The intake, routing, repair, and draft keys are true. The other keys stay false."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
     evidence = dict.fromkeys(sorted(SESSION_11_KEYS), False)
+    evidence["draft_reply_implemented"] = True
     evidence["incident_routing_implemented"] = True
     evidence["repair_resolution_implemented"] = True
     evidence["support_intake_implemented"] = True
-    assert live["state_revision"] == 87
+    assert live["state_revision"] == 88
     assert live["current_session"] == 11
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(11))

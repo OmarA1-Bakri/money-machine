@@ -913,3 +913,19 @@ Session 11 is incomplete at revision 86. `support_intake_implemented` and `incid
 ### Consequences
 
 Revision 87 records the intake, routing, and repair keys true. The other three Session 11 keys stay false. The draft reply is the next proof.
+
+## D-0061 — Session 11 draft reply is the fourth earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 11 is incomplete at revision 87. Intake, routing, and repair are true. The other three keys are false. The intake fixture already drafts from the verification's own fix and path. Auto mode and a failed read produce no body. The send count stays zero.
+
+### Decision
+
+`prove_session_11()` earns the intake, routing, repair, and draft keys. `record-evidence` on incomplete Session 11 keeps the first three keys and flips `draft_reply_implemented`. The control-file key and the closure key stay false. Any other flip is refused. `head_sha` does not move. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.
+
+### Consequences
+
+Revision 88 records the intake, routing, repair, and draft keys true. The other two Session 11 keys stay false. The control-file key is the next proof.

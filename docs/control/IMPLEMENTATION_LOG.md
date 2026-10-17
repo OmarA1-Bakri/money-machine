@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 11 draft key recorded
+
+`record-evidence` advanced `state_revision` from 87 to 88. `updated_at` is `2026-10-17T12:30:00Z`. Intake, routing, and repair stay true. `draft_reply_implemented` is true. The control-file key and the closure key stay false. `current_session` stays 11. `session_status` stays incomplete. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.
+
 ## 2026-10-17 — Session 11 repair key recorded
 
 `record-evidence` advanced `state_revision` from 86 to 87. `updated_at` is `2026-10-17T12:25:00Z`. `support_intake_implemented` and `incident_routing_implemented` stay true. `repair_resolution_implemented` is true. The other three Session 11 keys stay false. `current_session` stays 11. `session_status` stays incomplete. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.

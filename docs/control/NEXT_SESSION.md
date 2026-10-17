@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 11 draft is recorded (2026-10-17)
+
+Revision 88 records intake, routing, repair, and `draft_reply_implemented`. The control-file key and the closure key stay false. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The next honest step is the control-file key, through its own proof.
+
 ## Session 11 repair is recorded (2026-10-17)
 
 Revision 87 records `support_intake_implemented`, `incident_routing_implemented`, and `repair_resolution_implemented`. The other three Session 11 keys stay false. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The next honest step is the draft reply, through its own proof.
