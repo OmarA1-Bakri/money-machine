@@ -112,6 +112,7 @@ class Session08ProofError(ValueError):
     """The fixture chain did not earn a Session 08 key."""
 
     def __init__(self, code: str) -> None:
+        """Store the failing-step code on the error."""
         super().__init__(code)
         self.code = code
 
@@ -120,10 +121,12 @@ class _FixtureShop:
     """In-memory draft shop. It does not open a socket."""
 
     def __init__(self) -> None:
+        """Initialise an empty in-memory listing store."""
         self._listings: list[dict[str, object]] = []
         self.posts = 0
 
     def exchange(self, call: FixtureCall) -> Mapping[str, object]:
+        """Serve a GET listing query or a POST draft creation against the in-memory store."""
         if call.method == "GET":
             query = dict(call.query)
             state = query.get("state", "active")
@@ -146,11 +149,13 @@ class _FixtureShop:
 
 
 def _require(condition: bool, code: str) -> None:
+    """Raise ``Session08ProofError`` with ``code`` when ``condition`` is false."""
     if not condition:
         raise Session08ProofError(code)
 
 
 def _spec() -> ProductSpec:
+    """Build the fixture product spec for the Session 08 proof."""
     evidence = (
         EvidenceReference(
             evidence_id=_SPEC,
@@ -198,6 +203,7 @@ def _spec() -> ProductSpec:
 
 
 def _request(spec: ProductSpec) -> MerchandisingInput:
+    """Build the merchandising input fixture for the given product spec."""
     dashboard = NotificationDashboardBehaviour(
         present=True,
         outputs=("Today panel", "Reminder list"),
@@ -251,14 +257,17 @@ def _request(spec: ProductSpec) -> MerchandisingInput:
 
 
 def _checker(uri: str, variant: str) -> LinkObservation:
+    """Return a fixture link observation treating every URI as a valid public duplicate button."""
     return LinkObservation(variant=variant, public=True, duplicate_button=True, chain=(uri,))
 
 
 def _clock() -> str:
+    """Return a fixed fixture timestamp."""
     return "2026-10-16T12:00:00Z"
 
 
 def _uris(pdf: bytes) -> tuple[str, ...]:
+    """Extract the accepted delivery-link URIs from the PDF, refusing unexpected ones."""
     try:
         return delivery_link_uris(pdf, accepted=frozenset({_SECRET}))
     except EmbeddedUriRefusal as error:
@@ -315,6 +324,7 @@ def prove_session_08() -> frozenset[str]:
 
 
 def _role_paths(directory: Path, shots: tuple[CapturedScreenshot, ...]) -> dict[str, Path]:
+    """Write each image-role screenshot to disk and return its path by role."""
     directory.mkdir()
     paths: dict[str, Path] = {}
     roles = set(IMAGE_ROLES)
@@ -329,6 +339,7 @@ def _role_paths(directory: Path, shots: tuple[CapturedScreenshot, ...]) -> dict[
 
 
 def _screenshots(spec: ProductSpec) -> tuple[CapturedScreenshot, ...]:
+    """Capture the fixture screenshots and require the colour variants to pass QA."""
     pages = tuple(VariantPage(name=name) for name in (*IMAGE_ROLES, *_COLOURS))
     captured = capture_variant_screenshots(
         pages,
@@ -344,6 +355,7 @@ def _screenshots(spec: ProductSpec) -> tuple[CapturedScreenshot, ...]:
 
 
 def _links(pdf: bytes, asset: str, variants: tuple[str, ...]) -> None:
+    """Validate the delivery links embedded in a rendered PDF against the known variants."""
     uris = _uris(pdf)
     if not uris:
         _require(asset == "free_gift", "links")
@@ -361,6 +373,7 @@ def _links(pdf: bytes, asset: str, variants: tuple[str, ...]) -> None:
 
 
 def _store(root: Path, payload: bytes, digest: str, spec: ProductSpec) -> None:
+    """Publish the payload to the local asset store and require it to read back unchanged."""
     root.mkdir()
     store = LocalAssetStore(root, mode="simulation")
     stored = store.publish(
@@ -373,6 +386,7 @@ def _store(root: Path, payload: bytes, digest: str, spec: ProductSpec) -> None:
 
 
 def _draft(copy: ListingCopy, spec: ProductSpec, assets: tuple[BoundAsset, ...]) -> None:
+    """Prepare an Etsy draft against the fixture shop and require it to post exactly once."""
     shop = _FixtureShop()
     with tempfile.TemporaryDirectory(prefix="mm-s08-ledger-") as directory:
         receipt = prepare_etsy_draft(

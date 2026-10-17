@@ -29,6 +29,7 @@ COMPLETED_AT = "2026-10-17T09:49:00Z"
 
 
 def _live() -> ControlState:
+    """Return a deep copy of the checked-in implementation state."""
     loaded = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     if not isinstance(loaded, dict):
         raise AssertionError("state file must be an object")
@@ -57,6 +58,7 @@ def _pre_completion() -> ControlState:
 
 
 def _completed(previous: ControlState, closure: str) -> ControlState:
+    """Return the Session 08 completion candidate that advances past ``previous`` to session 9."""
     current = copy.deepcopy(previous)
     current["state_revision"] = previous["state_revision"] + 1
     current["session_status"] = "complete"
@@ -76,11 +78,13 @@ def _completed(previous: ControlState, closure: str) -> ControlState:
 
 
 def test_frozen_pair_completion_shape_is_accepted() -> None:
+    """Completion validates when the frozen D-0032 head/closure mismatch is session 08's."""
     previous = _pre_completion()
     validate_completion_transition(previous, _completed(previous, NEW_CLOSURE))
 
 
 def test_a_different_head_is_still_refused() -> None:
+    """A head_sha that is neither the prior closure nor the frozen pair is refused."""
     previous = _pre_completion()
     previous["head_sha"] = "a" * 40
 
@@ -89,6 +93,7 @@ def test_a_different_head_is_still_refused() -> None:
 
 
 def test_session_07_cannot_use_the_frozen_pair() -> None:
+    """The frozen head/closure mismatch exception does not apply to session 07."""
     previous = _pre_completion()
     previous["current_session"] = 7
     previous["completed_sessions"] = [0, 1, 2, 3, 4, 5, 6]
@@ -110,6 +115,7 @@ def test_session_07_cannot_use_the_frozen_pair() -> None:
 
 
 def test_reusing_the_prior_closure_is_refused() -> None:
+    """Completion requires a new evidence-closure commit, not the prior one reused."""
     previous = _pre_completion()
 
     with pytest.raises(ControlStateError, match="new evidence-closure commit"):
@@ -117,6 +123,7 @@ def test_reusing_the_prior_closure_is_refused() -> None:
 
 
 def _git(repo: Path, *arguments: str) -> str:
+    """Run a Git command in ``repo`` and return its trimmed stdout."""
     return subprocess.run(
         ["git", "-C", str(repo), *arguments],
         check=True,
@@ -128,10 +135,12 @@ def _git(repo: Path, *arguments: str) -> str:
 
 
 def _write(path: Path, state: ControlState) -> None:
+    """Write ``state`` as indented JSON to ``path``."""
     path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
 
 
 def _closure_repo(tmp_path: Path, *, proof: str) -> tuple[Path, ControlState, str]:
+    """Build a fixture repository with a bootstrap, prior closure, and new closure commit."""
     repo = tmp_path / "repository"
     control = repo / "docs" / "control"
     control.mkdir(parents=True)
@@ -166,6 +175,7 @@ def _closure_repo(tmp_path: Path, *, proof: str) -> tuple[Path, ControlState, st
 
 
 def test_absent_root_completion_records_the_closure(tmp_path: Path) -> None:
+    """Completion succeeds against the canonical worktree when the recorded root is absent."""
     state_path, previous, closure = _closure_repo(
         tmp_path,
         proof="def prove_session_08() -> None:\n    return None\n",
@@ -186,6 +196,7 @@ def test_absent_root_completion_records_the_closure(tmp_path: Path) -> None:
 
 
 def test_closure_without_the_session_08_proof_is_refused(tmp_path: Path) -> None:
+    """A closure commit without the session 08 proof module is refused; state is untouched."""
     state_path, previous, closure = _closure_repo(
         tmp_path, proof="def unrelated() -> None:\n    return None\n"
     )

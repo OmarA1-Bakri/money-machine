@@ -680,6 +680,7 @@ def _resolve_commit(repo_root: Path, commit_id: str, label: str) -> str:
 
 
 def _recorded_root_present(current: ControlState) -> bool:
+    """Return whether the recorded repo_root directory exists on this machine."""
     return Path(current["repo_root"]).is_dir()
 
 
@@ -690,6 +691,7 @@ def _assert_repo_at_closure(
     *,
     enforce_recorded_branch: bool = True,
 ) -> None:
+    """Require HEAD to equal the closure commit, and optionally the recorded branch to be clean."""
     head = _git(repo_root, "rev-parse", "--verify", "HEAD^{commit}").stdout.strip()
     if head != closure:
         raise ControlStateError("repository HEAD must equal the evidence-closure commit")
@@ -748,6 +750,7 @@ def _validate_git_evidence(
     previous: ControlState,
     current: ControlState,
 ) -> tuple[Path, str]:
+    """Resolve the repo root and verify the closure commit's ancestry and recorded content."""
     # D-0037 and D-0039. The recorded root is the operator machine. When it is
     # absent, completion uses the canonical worktree and keeps the recorded
     # branch field unchanged.
@@ -903,6 +906,7 @@ def _apply_transition(
 
 
 def _require_session_08_closure_proof(root: Path, sha: str) -> None:
+    """Require the closure commit to contain the Session 08 fixture proof module."""
     proof = _git(root, "show", f"{sha}:src/money_machine/control/session_08_proof.py").stdout
     if "def prove_session_08" not in proof:
         raise ControlStateError("closure commit does not contain the session 08 proof")
@@ -913,6 +917,7 @@ def _verify_completion_repository(
     previous: ControlState,
     current: ControlState,
 ) -> None:
+    """Verify the repository is clean at the closure commit, with proof for Session 08 closes."""
     repo_root, closure = _validate_git_evidence(state_path, previous, current)
     _assert_repo_at_closure(
         repo_root,
@@ -929,6 +934,7 @@ def _verify_activation_repository(
     previous: ControlState,
     current: ControlState,
 ) -> None:
+    """Verify the recorded repo root, falling back to the canonical worktree if absent."""
     del previous
     if Path(current["repo_root"]).is_dir():
         _validate_repo_identity(state_path, current)
@@ -939,6 +945,7 @@ def _verify_activation_repository(
 
 
 def _evidence_values(state: ControlState) -> dict[str, bool]:
+    """Return the Session 07 evidence map, requiring exactly the expected keys."""
     evidence = state["required_completion_evidence"]
     if set(evidence) != set(BEHAVIORAL_EVIDENCE_KEYS) | {
         CONTROL_EVIDENCE_KEY,
@@ -949,6 +956,7 @@ def _evidence_values(state: ControlState) -> dict[str, bool]:
 
 
 def _flipped_evidence(previous: ControlState, current: ControlState) -> set[str]:
+    """Return the Session 07 keys flipped from false to true, refusing any revocation."""
     before = _evidence_values(previous)
     after = _evidence_values(current)
     reverted = sorted(key for key, value in before.items() if value is True and after[key] is False)
@@ -1012,6 +1020,7 @@ def validate_evidence_record_transition(previous: ControlState, current: Control
 
 
 def _evidence_worktree(state_path: Path) -> Path:
+    """Return the Git worktree root, requiring the state file to be the canonical one."""
     root = Path(_git(state_path.parent, "rev-parse", "--show-toplevel").stdout.strip())
     expected = (root / CANONICAL_STATE_RELATIVE_PATH).resolve()
     if state_path.resolve() != expected:
@@ -1020,12 +1029,14 @@ def _evidence_worktree(state_path: Path) -> Path:
 
 
 def _require_control_files(root: Path) -> None:
+    """Require every tracked control file in ``_CONTROL_FILE_PATHS`` to exist."""
     missing = [str(path) for path in _CONTROL_FILE_PATHS if not (root / path).is_file()]
     if missing:
         raise ControlStateError("control files are missing: " + ", ".join(missing))
 
 
 def _require_earned_proof() -> None:
+    """Require the Session 07 fixture proof to earn every behavioral evidence key."""
     try:
         earned = asyncio.run(prove_session_07())
     except Session07ProofError as error:
@@ -1035,6 +1046,7 @@ def _require_earned_proof() -> None:
 
 
 def _require_closure_commit(root: Path, sha: str) -> None:
+    """Require the closure commit to contain the Session 07 proof with every key earned."""
     _git(root, "cat-file", "-e", f"{sha}^{{commit}}")
     _git(root, "merge-base", "--is-ancestor", sha, "HEAD")
     proof = _git(root, "show", f"{sha}:src/money_machine/control/session_07_proof.py").stdout
@@ -1060,6 +1072,7 @@ def _verify_evidence_repository(
     previous: ControlState,
     current: ControlState,
 ) -> None:
+    """Verify control files and the earned proof, and the closure commit when it is claimed."""
     del previous
     root = _evidence_worktree(state_path)
     _require_control_files(root)
@@ -1082,6 +1095,7 @@ def apply_evidence_record_transition(state_path: Path, candidate_path: Path) -> 
 
 
 def _session_08_evidence_values(state: ControlState) -> dict[str, bool]:
+    """Return the Session 08 evidence map, requiring exactly the expected keys."""
     evidence = state["required_completion_evidence"]
     expected = set(SESSION_08_BEHAVIORAL_KEYS) | {CONTROL_EVIDENCE_KEY, _CLOSURE_EVIDENCE_KEY}
     if set(evidence) != expected:
@@ -1090,6 +1104,7 @@ def _session_08_evidence_values(state: ControlState) -> dict[str, bool]:
 
 
 def _session_08_flipped(previous: ControlState, current: ControlState) -> set[str]:
+    """Return the Session 08 keys flipped from false to true, refusing any revocation."""
     before = _session_08_evidence_values(previous)
     after = _session_08_evidence_values(current)
     reverted = sorted(key for key, value in before.items() if value is True and after[key] is False)
@@ -1136,6 +1151,7 @@ def validate_session_08_evidence_record(previous: ControlState, current: Control
 
 
 def _require_session_08_proof() -> None:
+    """Require the Session 08 fixture proof to earn every behavioral evidence key."""
     try:
         earned = prove_session_08()
     except Session08ProofError as error:
@@ -1149,6 +1165,7 @@ def _verify_session_08_evidence_repository(
     previous: ControlState,
     current: ControlState,
 ) -> None:
+    """Verify control files are present and the Session 08 fixture proof is earned."""
     del previous, current
     root = _evidence_worktree(state_path)
     _require_control_files(root)

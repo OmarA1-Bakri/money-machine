@@ -35,6 +35,7 @@ _CONTROL_NAMES = (
 
 
 def _live() -> ControlState:
+    """Return a deep copy of the checked-in implementation state."""
     loaded = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     if not isinstance(loaded, dict):
         raise AssertionError("state file must be an object")
@@ -59,6 +60,7 @@ def _false_pointer() -> ControlState:
 
 
 def _advance(previous: ControlState, updated_at: str) -> ControlState:
+    """Return a copy of ``previous`` with the revision bumped and ``updated_at`` set."""
     current = copy.deepcopy(previous)
     current["state_revision"] = previous["state_revision"] + 1
     current["updated_at"] = updated_at
@@ -66,6 +68,7 @@ def _advance(previous: ControlState, updated_at: str) -> ControlState:
 
 
 def _eleven(previous: ControlState) -> ControlState:
+    """Return ``previous`` advanced with every behavioral and control key set true."""
     current = _advance(previous, EARNED_AT)
     evidence = dict(current["required_completion_evidence"])
     for key in BEHAVIORAL_EVIDENCE_KEYS | {CONTROL_EVIDENCE_KEY}:
@@ -76,10 +79,12 @@ def _eleven(previous: ControlState) -> ControlState:
 
 
 def _write(path: Path, state: ControlState) -> None:
+    """Write ``state`` as indented JSON to ``path``."""
     path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
 
 
 def _git(repo: Path, *arguments: str) -> str:
+    """Run a Git command in ``repo`` and return its trimmed stdout."""
     return subprocess.run(
         ["git", "-C", str(repo), *arguments],
         check=True,
@@ -91,6 +96,7 @@ def _git(repo: Path, *arguments: str) -> str:
 
 
 def _repo(tmp_path: Path, state: ControlState) -> Path:
+    """Create a fixture Git repository with the state and control files committed."""
     repo = tmp_path / "repository"
     control = repo / "docs" / "control"
     control.mkdir(parents=True)
@@ -107,6 +113,7 @@ def _repo(tmp_path: Path, state: ControlState) -> Path:
 
 
 def test_one_behavioral_key_is_refused() -> None:
+    """Setting a single behavioral key without the rest of the earned set is refused."""
     previous = _false_pointer()
     current = _advance(previous, EARNED_AT)
     evidence = dict(current["required_completion_evidence"])
@@ -118,6 +125,7 @@ def test_one_behavioral_key_is_refused() -> None:
 
 
 def test_the_closure_key_is_refused() -> None:
+    """Session 08's evidence record never sets the closure key true."""
     previous = _false_pointer()
     current = _eleven(previous)
     evidence = dict(current["required_completion_evidence"])
@@ -129,6 +137,7 @@ def test_the_closure_key_is_refused() -> None:
 
 
 def test_a_true_key_cannot_be_revoked() -> None:
+    """Flipping an already-true key back to false is refused."""
     previous = _false_pointer()
     evidence = dict(previous["required_completion_evidence"])
     evidence["claim_validation_implemented"] = True
@@ -143,6 +152,7 @@ def test_a_true_key_cannot_be_revoked() -> None:
 
 
 def test_already_true_keys_must_flip_together() -> None:
+    """Every earned key must flip in the same transition, not a subset of them."""
     previous = _false_pointer()
     evidence = dict(previous["required_completion_evidence"])
     evidence["design_tokens_implemented"] = True
@@ -153,6 +163,7 @@ def test_already_true_keys_must_flip_together() -> None:
 
 
 def test_revision_must_advance_once() -> None:
+    """The state revision must advance by exactly one across the transition."""
     previous = _false_pointer()
     current = copy.deepcopy(previous)
     current["updated_at"] = EARNED_AT
@@ -162,6 +173,7 @@ def test_revision_must_advance_once() -> None:
 
 
 def test_updated_at_must_change() -> None:
+    """The ``updated_at`` timestamp must change across the transition."""
     previous = _false_pointer()
     current = _eleven(previous)
     current["updated_at"] = previous["updated_at"]
@@ -171,6 +183,7 @@ def test_updated_at_must_change() -> None:
 
 
 def test_session_must_stay_eight_and_incomplete() -> None:
+    """The transition is refused when the pointer moves off session 08 or leaves incomplete."""
     previous = _false_pointer()
     moved = _eleven(previous)
     moved["current_session"] = 7
@@ -184,6 +197,7 @@ def test_session_must_stay_eight_and_incomplete() -> None:
 
 
 def test_head_sha_and_closure_sha_stay_put() -> None:
+    """Neither ``head_sha`` nor ``evidence_closure_commit_sha`` may change for session 08."""
     previous = _false_pointer()
     moved_head = _eleven(previous)
     moved_head["head_sha"] = "c" * 40
@@ -197,6 +211,7 @@ def test_head_sha_and_closure_sha_stay_put() -> None:
 
 
 def test_eleven_key_shape_is_accepted_and_an_empty_flip_is_not() -> None:
+    """Flipping the earned keys together validates, but flipping nothing is refused."""
     previous = _false_pointer()
     validate_session_08_evidence_record(previous, _eleven(previous))
     empty = _advance(previous, EARNED_AT)
@@ -206,6 +221,7 @@ def test_eleven_key_shape_is_accepted_and_an_empty_flip_is_not() -> None:
 
 
 def test_missing_control_file_is_refused_before_the_proof(tmp_path: Path) -> None:
+    """A missing control file refuses the transition and leaves the state file untouched."""
     live_bytes = STATE_PATH.read_bytes()
     previous = _false_pointer()
     state_path = _repo(tmp_path, previous)
@@ -222,6 +238,7 @@ def test_missing_control_file_is_refused_before_the_proof(tmp_path: Path) -> Non
 
 
 def test_record_evidence_earns_the_eleven_keys(tmp_path: Path) -> None:
+    """The active-session dispatch routes incomplete session 08 to its own evidence transition."""
     live_bytes = STATE_PATH.read_bytes()
     previous = _false_pointer()
     state_path = _repo(tmp_path, previous)
@@ -243,6 +260,7 @@ def test_record_evidence_earns_the_eleven_keys(tmp_path: Path) -> None:
 
 
 def test_dispatch_refuses_a_session_that_cannot_record(tmp_path: Path) -> None:
+    """The active-session dispatch refuses a pointer that is neither session 07 nor 08."""
     previous = _false_pointer()
     previous["current_session"] = 9
     state_path = tmp_path / "state.json"

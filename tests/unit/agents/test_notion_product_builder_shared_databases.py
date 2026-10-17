@@ -559,6 +559,7 @@ async def test_shared_checkpoint_parser_rejects_bad_inputs(tmp_path: Path) -> No
 
 
 def test_live_pointer_is_complete_session_eight() -> None:
+    """The checked-in state pointer is complete Session 08 with every evidence key true."""
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert state["current_session"] == 8
     assert state["session_status"] == "complete"

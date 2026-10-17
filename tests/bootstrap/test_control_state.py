@@ -303,6 +303,7 @@ def test_control_files_are_exactly_the_five_continuity_files() -> None:
 
 
 def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
+    """The checked-in state has every required field and a self-consistent session shape."""
     state = load_state()
     required = {
         "programme",
@@ -1641,6 +1642,7 @@ def test_activation_uses_the_worktree_when_recorded_root_is_absent(tmp_path: Pat
 
 
 def test_activation_refuses_a_noncanonical_path_when_root_is_absent(tmp_path: Path) -> None:
+    """D-0037. A missing recorded root still requires the canonical state path."""
     repo = tmp_path / "repository"
     repo.mkdir()
     state_path = repo / "elsewhere.json"
@@ -1666,6 +1668,7 @@ def test_activation_refuses_a_noncanonical_path_when_root_is_absent(tmp_path: Pa
 
 
 def _false_key_session_eight_pair() -> tuple[ControlState, ControlState]:
+    """Return a Session 07 to Session 08 activation pair with every evidence key false."""
     previous = copy.deepcopy(load_state())
     previous["current_session"] = 7
     previous["session_status"] = "complete"
@@ -1763,6 +1766,7 @@ def _completed_session_evidence(previous: ControlState) -> None:
 
 
 def _session_seven_with_evidence(evidence: dict[str, bool]) -> ControlState:
+    """Return the checked-in Session 07 state with its evidence map replaced."""
     state = copy.deepcopy(load_state())
     state["current_session"] = 7
     state["session_status"] = "complete"

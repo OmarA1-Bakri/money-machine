@@ -11,6 +11,7 @@ from money_machine.control.session_07_proof import (
 
 
 async def test_fixture_proof_earns_the_behavioral_keys() -> None:
+    """The fixture proof earns every behavioral key, but neither the control nor closure key."""
     earned = await prove_session_07()
 
     assert earned == BEHAVIORAL_EVIDENCE_KEYS

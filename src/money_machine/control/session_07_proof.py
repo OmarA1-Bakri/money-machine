@@ -73,11 +73,13 @@ class Session07ProofError(ValueError):
     """The fixture build did not earn a Session 07 key."""
 
     def __init__(self, code: str) -> None:
+        """Store the failing-step code on the error."""
         super().__init__(code)
         self.code = code
 
 
 def _spec(tier: str, identity: str, title: str, hub_name: str) -> ProductSpec:
+    """Build a fixture product spec for one tier of the Session 07 proof."""
     return ProductSpec(
         spec_id=uuid4(),
         product_id=uuid4(),
@@ -125,6 +127,7 @@ def _spec(tier: str, identity: str, title: str, hub_name: str) -> ProductSpec:
 
 
 async def _build(spec: ProductSpec, root: Path) -> ProductBuildCheckpoint:
+    """Run every build phase against the fixture adapter and return the final checkpoint."""
     probe = FixtureNotionAdapter()
     path = root / "build.json"
     await build_top_level_page_and_design_shell(spec, probe, path, recorded_at=_PHASE_ONE)
@@ -140,11 +143,13 @@ async def _build(spec: ProductSpec, root: Path) -> ProductBuildCheckpoint:
 
 
 def _require(condition: bool, code: str) -> None:
+    """Raise ``Session07ProofError`` with ``code`` when ``condition`` is false."""
     if not condition:
         raise Session07ProofError(code)
 
 
 def _earned(spec: ProductSpec, checkpoint: ProductBuildCheckpoint) -> frozenset[str]:
+    """Check the checkpoint proves every behavioral key and return the keys it earned."""
     kinds = shared_database_kinds(spec)
     matrix = checkpoint.test_matrix
     ledger = checkpoint.fact_ledger
