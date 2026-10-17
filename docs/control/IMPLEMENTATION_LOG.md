@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 10 evidence contract installed
+
+D-0048 names six Session 10 keys: the metrics fixture, the maturity clock, portfolio eligibility, the closed-loop ledger, the control files, and the closure key. Live stats, live deactivation, commissioning, Exit 78, and the exit string are not keys. `IMPLEMENTATION_STATE.json` stays revision 76. Session 09 stays complete. Session 10 is not activated. No live provider call is made.
+
 ## 2026-10-17 — Session 09 closed
 
 `apply-completion` advanced `state_revision` from 75 to 76. `updated_at` is `2026-10-17T11:20:00Z`. `session_status` is complete. `completed_sessions` is 0 through 9. `next_session` is 10. `next_prompt` is `13_SESSION_10_ANALYTICS_CULL_MULTIPLY_CLOSED_LOOP.md`. Every Session 09 key is true, including `evidence_closure_commit_recorded`. `head_sha` and `evidence_closure_commit_sha` are `cfb36462994ecba833f31ba869f2aba627f6060d`. Session 10 is not activated. Exit 78 stays HELD. The exit string is not written. No live Etsy call is made.

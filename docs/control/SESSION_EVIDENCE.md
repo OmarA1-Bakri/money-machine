@@ -8,7 +8,8 @@ Sessions 00-06 closed with every contract key true.
 Session 07's close commit keeps every contract key false under D-0032.
 D-0036 recorded the twelve Session 07 keys true. The closure commit is
 `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.
-Sessions 10-15 are not activated.
+Session 10's contract is installed. Session 10 is not activated.
+Sessions 11-15 have no contract and are not activated.
 
 ## Session 00
 
@@ -247,15 +248,16 @@ Head SHA: `cfb36462994ecba833f31ba869f2aba627f6060d`.
 
 ## Sessions 10-15
 
-Sessions 10-15 are not activated.
+Session 10's contract is installed. Session 10 is not activated.
+Sessions 11-15 have no contract and are not activated.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
 ## Session 10
 
 Prompt: `13_SESSION_10_ANALYTICS_CULL_MULTIPLY_CLOSED_LOOP.md`.
 Status: not activated.
-Evidence contract: absent.
-No evidence contract. The ledger does not run the scheduler or deactivate a listing.
+Evidence contract: installed, not activated.
+The contract is installed. Session 10 is not activated. The ledger does not run the scheduler or deactivate a listing.
 
 Fixture paths:
 
@@ -263,6 +265,15 @@ Fixture paths:
 - `src/money_machine/assets/maturity_clock.py`
 - `src/money_machine/assets/portfolio_eligibility.py`
 - `src/money_machine/assets/closed_loop_store.py`
+
+| Key | Recorded |
+|---|---|
+| `closed_loop_store_implemented` | not installed |
+| `control_files_and_checkpoint_current` | not installed |
+| `evidence_closure_commit_recorded` | not installed |
+| `maturity_clock_implemented` | not installed |
+| `metrics_fixture_implemented` | not installed |
+| `portfolio_eligibility_implemented` | not installed |
 
 ## Session 11
 

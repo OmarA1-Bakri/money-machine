@@ -1,5 +1,16 @@
 # Test Evidence
 
+## 2026-10-17 — Session 10 evidence contract installed
+
+**Verification scope**: the contract and its activation shape. No state transition. No live HTTP. Revision 76 stays. Session 10 is not activated.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Contract | Six fixture keys, and the exit string is not one of them | PASS |
+| Pointer | `IMPLEMENTATION_STATE.json` stays revision 76, Session 09 complete | PASS |
+| Shape | An all-false Session 10 candidate validates from the revision-76 close | PASS |
+| Refusal | One true key is refused, and a missing key is refused | PASS |
+
 ## 2026-10-17 — Session 09 closed
 
 **Verification scope**: live `apply-completion` from revision 75 to 76. No live HTTP. Exit 78 stays HELD. The exit string is not written. Session 10 is not activated.

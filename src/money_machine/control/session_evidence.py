@@ -3,7 +3,8 @@
 Sessions 00-06 closed with every contract key true. Session 07's close
 commit under D-0032 has every contract key false. D-0036 records the live
 pointer separately. Sessions 08 and 09 are complete. Session 09 is revision
-76 and every one of its keys is true (D-0047). Sessions 10-15 have no
+76 and every one of its keys is true (D-0047). Session 10's contract is
+installed and the session is not activated (D-0048). Sessions 11-15 have no
 contract. This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
@@ -151,7 +152,8 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
             "src/money_machine/assets/portfolio_eligibility.py",
             "src/money_machine/assets/closed_loop_store.py",
         ),
-        "No evidence contract. The ledger does not run the scheduler or deactivate a listing.",
+        "The contract is installed. Session 10 is not activated. The ledger does not "
+        "run the scheduler or deactivate a listing.",
     ),
     OpenSessionEvidence(
         11,
@@ -201,7 +203,8 @@ def render_session_evidence() -> str:
         "Session 07's close commit keeps every contract key false under D-0032.",
         "D-0036 recorded the twelve Session 07 keys true. The closure commit is",
         "`5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.",
-        "Sessions 10-15 are not activated.",
+        "Session 10's contract is installed. Session 10 is not activated.",
+        "Sessions 11-15 have no contract and are not activated.",
         "",
     ]
     for record in CLOSED_SESSION_EVIDENCE:
@@ -238,7 +241,8 @@ def render_session_evidence() -> str:
         [
             "## Sessions 10-15",
             "",
-            "Sessions 10-15 are not activated.",
+            "Session 10's contract is installed. Session 10 is not activated.",
+            "Sessions 11-15 have no contract and are not activated.",
             "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",
         ]

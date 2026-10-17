@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 10 contract is installed (2026-10-17)
+
+D-0048 installs the six Session 10 keys. Revision 76 is unchanged. Session 09 stays complete. Session 10 is not activated. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. The next honest step is activation, which installs every Session 10 key false.
+
 ## Session 09 is complete (2026-10-17)
 
 Revision 76 records every Session 09 key true. `session_status` is complete. `next_session` is 10. `next_prompt` is `13_SESSION_10_ANALYTICS_CULL_MULTIPLY_CLOSED_LOOP.md`. `head_sha` is `cfb36462994ecba833f31ba869f2aba627f6060d`. Session 10 is not activated. Exit 78 stays HELD. The next honest step is the Session 10 evidence contract, then activation.

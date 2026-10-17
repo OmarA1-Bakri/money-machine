@@ -687,3 +687,28 @@ Five Session 09 keys are true. `evidence_closure_commit_recorded` is the only fa
 ### Consequences
 
 The following state commit records revision 76. Session 09 is complete. The closure key is true. Session 10 stays inactive.
+
+## D-0048 — Session 10 evidence contract is installed and not activated
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 09 is complete at revision 76. `next_session` is 10. Activation refuses while session 10 has no entry in `SESSION_EVIDENCE_KEYS`. The Session 10 prompt-integrity addendum defers live stats, live deactivation, commissioning, Exit 78, and the exit string. The earnable proof is the fixture surface already on the trunk: the metrics fixture, the maturity clock, portfolio eligibility, and the closed-loop ledger.
+
+### Decision
+
+Session 10's completion contract is exactly these keys. A later activation installs every one false:
+
+- `metrics_fixture_implemented`
+- `maturity_clock_implemented`
+- `portfolio_eligibility_implemented`
+- `closed_loop_store_implemented`
+- `control_files_and_checkpoint_current`
+- `evidence_closure_commit_recorded`
+
+Live stats, live deactivation, commissioning, Exit 78, and `SESSION_10_CLOSED_LOOP_AUTOMATION_COMPLETE` are not keys. This decision does not activate Session 10 and does not edit `IMPLEMENTATION_STATE.json`.
+
+### Consequences
+
+`validate_activation_transition` accepts a candidate that installs these six keys all false from the revision-76 close. A true key, a missing key, or an extra key is refused. Sessions 11–15 still have no contract. Activation is the next transition and is not this commit.
