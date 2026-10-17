@@ -26,7 +26,7 @@ from money_machine.deploy.checkpoint import (
 ROOT = Path(__file__).parents[2]
 STATE_PATH = ROOT / "docs/control/IMPLEMENTATION_STATE.json"
 EARNED_AT = "2026-10-17T15:30:00Z"
-CLOSURE_HEAD = "fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a"
+CLOSURE_HEAD = "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
 PREVIOUS_REVISION = 109
 PREVIOUS_AT = "2026-10-17T15:25:00Z"
 PREVIOUS_KEYS = frozenset(
@@ -37,9 +37,12 @@ PREVIOUS_KEYS = frozenset(
         "service_controls_fail_closed",
     }
 )
-LIVE_REVISION = 110
-LIVE_AT = "2026-10-17T15:30:00Z"
-LIVE_KEYS = PREVIOUS_KEYS | {"control_files_and_checkpoint_current"}
+LIVE_REVISION = 111
+LIVE_AT = "2026-10-17T15:35:00Z"
+LIVE_KEYS = PREVIOUS_KEYS | {
+    "control_files_and_checkpoint_current",
+    "evidence_closure_commit_recorded",
+}
 
 
 def _live() -> ControlState:
@@ -87,17 +90,17 @@ def test_checkpoint_matches_the_continuity_files() -> None:
     assert checkpoint.head_sha == CLOSURE_HEAD
     assert checkpoint.true_keys == tuple(sorted(LIVE_KEYS))
     assert checkpoint.catalogue_matches is True
-    assert checkpoint.closure_recorded is False
+    assert checkpoint.closure_recorded is True
     assert checkpoint.exit_string_present is False
 
 
-def test_a_closure_claim_is_refused() -> None:
-    claimed = LIVE_KEYS | {"evidence_closure_commit_recorded"}
-    with pytest.raises(CheckpointRefusal, match="closure"):
+def test_a_partial_closure_claim_is_refused() -> None:
+    claimed = PREVIOUS_KEYS | {"evidence_closure_commit_recorded"}
+    with pytest.raises(CheckpointRefusal, match="keys"):
         inspect_deployment_checkpoint(
             ROOT,
-            expected_revision=LIVE_REVISION,
-            expected_updated_at=LIVE_AT,
+            expected_revision=PREVIOUS_REVISION,
+            expected_updated_at=PREVIOUS_AT,
             expected_true_keys=claimed,
             closure_head=CLOSURE_HEAD,
         )

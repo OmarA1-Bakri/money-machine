@@ -74,7 +74,7 @@ def test_session_10_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_records_the_closure_key() -> None:
-    """Session 10 stays closed. Session 14 records the release plan."""
+    """Session 10 stays closed. Session 14 is complete."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
     evidence = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[14]), False)
@@ -83,13 +83,14 @@ def test_live_pointer_records_the_closure_key() -> None:
     evidence["release_rollback_implemented"] = True
     evidence["service_controls_fail_closed"] = True
     evidence["control_files_and_checkpoint_current"] = True
-    assert live["state_revision"] == 110
+    evidence["evidence_closure_commit_recorded"] = True
+    assert live["state_revision"] == 111
     assert live["current_session"] == 14
-    assert live["session_status"] == "incomplete"
-    assert live["completed_sessions"] == list(range(14))
-    assert live["next_session"] == 14
-    assert live["next_prompt"] == SESSION_PROMPTS[14]
-    assert live["head_sha"] == "fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a"
+    assert live["session_status"] == "complete"
+    assert live["completed_sessions"] == list(range(15))
+    assert live["next_session"] == 15
+    assert live["next_prompt"] == SESSION_PROMPTS[15]
+    assert live["head_sha"] == "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
     assert live["required_completion_evidence"] == evidence
     assert "SESSION_10_CLOSED_LOOP_AUTOMATION_COMPLETE" not in text
 

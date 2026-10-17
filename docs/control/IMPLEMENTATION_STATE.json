@@ -4,12 +4,12 @@
   "repo_root": "/mnt/d/Money Machine",
   "windows_repo_root": "D:\\Money Machine",
   "branch": "build/full-automation",
-  "head_sha": "fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a",
+  "head_sha": "02c26f39ac8800db03ae7f5d1d346487a5ce123e",
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "evidence_closure_commit_sha": "fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a",
+  "evidence_closure_commit_sha": "02c26f39ac8800db03ae7f5d1d346487a5ce123e",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 110,
-  "session_status": "incomplete",
+  "state_revision": 111,
+  "session_status": "complete",
   "current_session": 14,
   "completed_sessions": [
     0,
@@ -25,7 +25,8 @@
     10,
     11,
     12,
-    13
+    13,
+    14
   ],
   "services": {
     "api": "container_healthy_readiness_true_migrated_2026-09-07",
@@ -132,7 +133,7 @@
   "required_completion_evidence": {
     "control_files_and_checkpoint_current": true,
     "deployment_target_recorded": true,
-    "evidence_closure_commit_recorded": false,
+    "evidence_closure_commit_recorded": true,
     "production_packaging_defined": true,
     "release_rollback_implemented": true,
     "service_controls_fail_closed": true
@@ -140,7 +141,7 @@
   "transition_contract": {
     "completion_requires_all_evidence_true": true,
     "completion_requires_current_session_in_completed_sessions": true,
-    "completion_requires_next_session": 14,
+    "completion_requires_next_session": 15,
     "completion_requires_distinct_commit_shas": true,
     "completion_requires_existing_git_commits": true,
     "completion_requires_bootstrap_ancestor_of_closure": true,
@@ -148,7 +149,7 @@
     "completion_requires_later_state_pointer_commit": true,
     "unsupported_completion_is_rejected": true
   },
-  "next_session": 14,
-  "next_prompt": "17_SESSION_14_DEPLOYMENT.md",
-  "updated_at": "2026-10-17T15:30:00Z"
+  "next_session": 15,
+  "next_prompt": "18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md",
+  "updated_at": "2026-10-17T15:35:00Z"
 }

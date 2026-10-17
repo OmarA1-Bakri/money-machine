@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-17 — Session 14 closure recorded
+
+**Verification scope**: live `apply-completion` from revision 110 to 111. No live HTTP. No service start. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 14, `complete`, revision 111, `updated_at` `2026-10-17T15:35:00Z` | PASS |
+| Keys | Every Session 14 key is true, including `evidence_closure_commit_recorded` | PASS |
+| Closure | The closure commit contains `def prove_session_14` and the pre-transition state. The pointer does not record its own SHA | PASS |
+| Head | `head_sha` is `02c26f39ac8800db03ae7f5d1d346487a5ce123e` | PASS |
+
+The command printed `{"applied": true, "command": "apply-completion", "session": 14, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 111}`. The checkpoint proof, the completion proof, the control proof, the release proof, the packaging proof, the target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 120 passed in 3.90s. `ruff check` and `pyright` on the checkpoint module, the Session 14 proof, and the evidence catalogue were clean.
+
 ## 2026-10-17 — Session 14 deployment checkpoint recorded
 
 **Verification scope**: live `record-evidence` from revision 109 to 110. No live HTTP. No socket. Exit 78 stays HELD. The exit string is not written.

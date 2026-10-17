@@ -119,6 +119,8 @@ _SESSION_12_CLOSURE = "d81db61033561bdd40869ff1316f0c935c74cdf4"
 _SESSION_13_CLOSURE = "fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a"
 _SESSION_13_PROMPT = "16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md"
 _SESSION_14_PROMPT = "17_SESSION_14_DEPLOYMENT.md"
+_SESSION_14_CLOSURE = "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
+_SESSION_15_PROMPT = "18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md"
 _SESSION_14_KEYS = frozenset(
     {
         "deployment_target_recorded",
@@ -867,7 +869,7 @@ def _prove_activated_session_14(
     evidence: object,
     status: object,
 ) -> None:
-    """Session 10 stays closed while Session 14 records the checkpoint."""
+    """Session 10 stays closed while Session 14 is complete."""
     recorded: set[str] = set()
     values_are_bool = False
     evidence_count = -1
@@ -880,19 +882,14 @@ def _prove_activated_session_14(
     keys_match = frozenset(recorded) == _SESSION_14_KEYS and len(recorded) == evidence_count
     if (
         decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
-        or decoded.get("head_sha") != _SESSION_13_CLOSURE
+        or decoded.get("head_sha") != _SESSION_14_CLOSURE
         or not keys_match
         or not values_are_bool
         or not isinstance(evidence, dict)
-        or status != "incomplete"
-        or decoded.get("next_session") != 14
-        or decoded.get("completed_sessions") != list(range(14))
-        or decoded.get("next_prompt") != _SESSION_14_PROMPT
-        or evidence.get("deployment_target_recorded") is not True
-        or evidence.get("production_packaging_defined") is not True
-        or evidence.get("release_rollback_implemented") is not True
-        or evidence.get("service_controls_fail_closed") is not True
-        or evidence.get("control_files_and_checkpoint_current") is not True
-        or sum(1 for value in evidence.values() if value is True) != 5
+        or status != "complete"
+        or decoded.get("next_session") != 15
+        or decoded.get("completed_sessions") != list(range(15))
+        or decoded.get("next_prompt") != _SESSION_15_PROMPT
+        or any(value is not True for value in evidence.values())
     ):
         raise Session10ProofError("control_checkpoint")

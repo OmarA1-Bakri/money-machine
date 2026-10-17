@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 14 is complete (2026-10-17)
+
+Revision 111 records every Session 14 key true. `completed_sessions` is 0 through 14. `next_session` is 15. `next_prompt` is `18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md`. `head_sha` is `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Exit 78 stays HELD. Session 15 is not activated. The next honest step is the Session 15 evidence contract. A live deploy stays deferred.
+
 ## Session 14 deployment checkpoint is recorded (2026-10-17)
 
 Revision 110 is incomplete Session 14. The five earned keys are true. The closure key is false. `completed_sessions` stays 0 through 13. `next_session` stays 14. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. The next honest step is `evidence_closure_commit_recorded` through apply-completion. A live deploy stays deferred.

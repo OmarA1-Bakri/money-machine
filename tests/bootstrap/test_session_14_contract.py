@@ -70,15 +70,16 @@ def test_session_14_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_is_incomplete_session_14() -> None:
-    """Session 14 is incomplete. The checkpoint is current."""
+    """Session 14 is complete. Session 15 is not activated."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 110
+    assert live["state_revision"] == 111
     assert live["current_session"] == 14
-    assert live["session_status"] == "incomplete"
-    assert live["updated_at"] == "2026-10-17T15:30:00Z"
-    assert live["next_session"] == 14
-    assert live["head_sha"] == CLOSURE_HEAD
+    assert live["session_status"] == "complete"
+    assert live["updated_at"] == "2026-10-17T15:35:00Z"
+    assert live["next_session"] == 15
+    assert live["next_prompt"] == SESSION_PROMPTS[15]
+    assert live["head_sha"] == "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
     evidence = live["required_completion_evidence"]
     assert set(evidence) == set(SESSION_14_KEYS)
     assert evidence["deployment_target_recorded"] is True
@@ -86,7 +87,8 @@ def test_live_pointer_is_incomplete_session_14() -> None:
     assert evidence["release_rollback_implemented"] is True
     assert evidence["service_controls_fail_closed"] is True
     assert evidence["control_files_and_checkpoint_current"] is True
-    assert sum(1 for value in evidence.values() if value is True) == 5
+    assert evidence["evidence_closure_commit_recorded"] is True
+    assert sum(1 for value in evidence.values() if value is True) == 6
     assert "SESSION_14_PRODUCTION_DEPLOYMENT_COMPLETE" not in text
 
 

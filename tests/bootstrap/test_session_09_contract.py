@@ -74,16 +74,16 @@ def test_session_09_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_is_incomplete_session_10() -> None:
-    """Session 09 stays closed. Session 14 records the release plan."""
+    """Session 09 stays closed. Session 14 is complete."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 110
+    assert live["state_revision"] == 111
     assert live["current_session"] == 14
-    assert live["session_status"] == "incomplete"
-    assert live["completed_sessions"] == list(range(14))
-    assert live["next_session"] == 14
-    assert live["next_prompt"] == SESSION_PROMPTS[14]
-    assert live["head_sha"] == "fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a"
+    assert live["session_status"] == "complete"
+    assert live["completed_sessions"] == list(range(15))
+    assert live["next_session"] == 15
+    assert live["next_prompt"] == SESSION_PROMPTS[15]
+    assert live["head_sha"] == "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
     evidence = live["required_completion_evidence"]
     assert set(evidence) == set(SESSION_EVIDENCE_KEYS[14])
     assert evidence["deployment_target_recorded"] is True
@@ -91,7 +91,8 @@ def test_live_pointer_is_incomplete_session_10() -> None:
     assert evidence["release_rollback_implemented"] is True
     assert evidence["service_controls_fail_closed"] is True
     assert evidence["control_files_and_checkpoint_current"] is True
-    assert sum(1 for value in evidence.values() if value is True) == 5
+    assert evidence["evidence_closure_commit_recorded"] is True
+    assert sum(1 for value in evidence.values() if value is True) == 6
     assert "SESSION_09_ETSY_PUBLISHING_COMPLETE" not in text
 
 

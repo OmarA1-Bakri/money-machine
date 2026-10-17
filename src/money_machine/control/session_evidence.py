@@ -7,11 +7,8 @@ revision 83 and every one of its keys is true (D-0055). Session 11 is
 complete at revision 90. Every Session 11 key is true (D-0063). Session 12
 is complete at revision 97. Every Session 12 key is true (D-0071).
 Session 13 is complete at revision 104. Every Session 13 key is true
-(D-0079). Session 14 is activated and incomplete at revision 110.
-`deployment_target_recorded`, `production_packaging_defined`,
-`release_rollback_implemented`, `service_controls_fail_closed`, and
-`control_files_and_checkpoint_current` are true. The closure key is
-false (D-0086). Session 15 has no contract.
+(D-0079). Session 14 is complete at revision 111. Every Session 14 key
+is true (D-0087). Session 15 is not activated.
 This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
@@ -241,7 +238,7 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
             "src/money_machine/deploy/controls.py",
             "src/money_machine/deploy/checkpoint.py",
         ),
-        ("The checkpoint is current. The closure key is not earned."),
+        ("Session 15 is not activated. A live deploy is not recorded."),
         True,
         frozenset(
             {
@@ -250,6 +247,7 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
                 "release_rollback_implemented",
                 "service_controls_fail_closed",
                 "control_files_and_checkpoint_current",
+                "evidence_closure_commit_recorded",
             }
         ),
     ),
@@ -283,11 +281,9 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 14 at state revision 110.",
-        "`current_session` is 14. `session_status` is incomplete.",
-        "`deployment_target_recorded` and `production_packaging_defined` are true.",
-        "`release_rollback_implemented` and `service_controls_fail_closed` are true.",
-        "`control_files_and_checkpoint_current` is true. The closure key is false.",
+        "The checked-in pointer is Session 14 at state revision 111.",
+        "`current_session` is 14. `session_status` is complete.",
+        "Every Session 14 key is true. Session 15 is not activated.",
         "Session 10 is complete and every one of its keys is true.",
         "Session 09 is complete and every one of its keys is true.",
         "Session 08 is complete and every one of its keys is true.",
@@ -299,7 +295,7 @@ def render_session_evidence() -> str:
         "Session 11 is complete. Every key is true.",
         "Session 12 is complete. Every key is true.",
         "Session 13 is complete. Every key is true.",
-        "Session 14 is incomplete. The checkpoint is current.",
+        "Session 14 is complete. Session 15 is not activated.",
         "Session 15 has no contract.",
         "",
     ]
@@ -341,7 +337,7 @@ def render_session_evidence() -> str:
             "Session 11 is complete. Every key is true.",
             "Session 12 is complete. Every key is true.",
             "Session 13 is complete. Every key is true.",
-            "Session 14 is incomplete. The checkpoint is current.",
+            "Session 14 is complete. Session 15 is not activated.",
             "Session 15 has no contract.",
             "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",

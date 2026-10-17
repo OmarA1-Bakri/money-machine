@@ -28,6 +28,7 @@ _CLOSURE_KEY = "evidence_closure_commit_recorded"
 _EXIT_STRING = "SESSION_14_PRODUCTION_DEPLOYMENT_COMPLETE"
 _BOOTSTRAP = "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d"
 _PROMPT = "17_SESSION_14_DEPLOYMENT.md"
+_CLOSED_PROMPT = "18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md"
 _WORKER = Path("src/money_machine/orchestration/worker.py")
 _DECISION = "D-0085"
 
@@ -63,12 +64,11 @@ def inspect_deployment_checkpoint(
 ) -> DeploymentCheckpoint:
     """Read the six continuity files and the four deploy modules.
 
-    ``expected_true_keys`` must not include the closure key. The state file
-    must not contain the exit string. A decision line that names it must
-    also say it is not written.
+    ``expected_true_keys`` includes the closure key only when Session 14 is
+    complete. The state file must not contain the exit string. A decision
+    line that names it must also say it is not written.
     """
-    if _CLOSURE_KEY in expected_true_keys:
-        raise CheckpointRefusal("closure")
+    closed = _CLOSURE_KEY in expected_true_keys
     repo = Path(__file__).resolve().parents[3] if root is None else root
     _require_files(repo)
     _refuse_exit_string(repo)
@@ -82,9 +82,15 @@ def inspect_deployment_checkpoint(
     true_keys = tuple(sorted(key for key, value in evidence.items() if value is True))
     if set(true_keys) != set(expected_true_keys):
         raise CheckpointRefusal("keys")
-    if evidence[_CLOSURE_KEY] is not False:
+    if evidence[_CLOSURE_KEY] is not closed:
         raise CheckpointRefusal("closure")
-    if not _pointer_matches(state, expected_revision, expected_updated_at, closure_head):
+    if not _pointer_matches(
+        state,
+        expected_revision,
+        expected_updated_at,
+        closure_head,
+        closed=closed,
+    ):
         raise CheckpointRefusal("pointer")
     return DeploymentCheckpoint(
         revision=expected_revision,
@@ -92,7 +98,7 @@ def inspect_deployment_checkpoint(
         head_sha=closure_head,
         true_keys=true_keys,
         catalogue_matches=catalogue_matches,
-        closure_recorded=False,
+        closure_recorded=closed,
         exit_string_present=False,
     )
 
@@ -151,19 +157,31 @@ def _pointer_matches(
     expected_revision: int,
     expected_updated_at: str,
     closure_head: str,
+    *,
+    closed: bool,
 ) -> bool:
     completed = state.get("completed_sessions")
     commissioned = state.get("commissioned_agents")
+    if closed:
+        status = "complete"
+        nxt = 15
+        prompt = _CLOSED_PROMPT
+        finished = list(range(15))
+    else:
+        status = "incomplete"
+        nxt = 14
+        prompt = _PROMPT
+        finished = list(range(14))
     return (
         state.get("current_session") == 14
-        and state.get("session_status") == "incomplete"
+        and state.get("session_status") == status
         and state.get("state_revision") == expected_revision
         and state.get("updated_at") == expected_updated_at
         and state.get("head_sha") == closure_head
         and state.get("evidence_closure_commit_sha") == closure_head
         and state.get("last_verified_commit") == _BOOTSTRAP
-        and state.get("next_session") == 14
-        and state.get("next_prompt") == _PROMPT
-        and completed == list(range(14))
+        and state.get("next_session") == nxt
+        and state.get("next_prompt") == prompt
+        and completed == finished
         and commissioned == []
     )

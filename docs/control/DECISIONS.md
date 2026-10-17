@@ -1338,3 +1338,19 @@ Session 14 is incomplete at revision 109. The target, the package, the release p
 ### Consequences
 
 The next honest step is `evidence_closure_commit_recorded` through apply-completion. That closure is a later increment. A live deploy stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0087 — Session 14 closure
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 14 is incomplete at revision 110. Five keys are true. `evidence_closure_commit_recorded` is false. The closure commit must contain `def prove_session_14` and the exact pre-transition state. The exit string is not a key.
+
+### Decision
+
+`apply-completion` advances `state_revision` from 110 to 111. `updated_at` is `2026-10-17T15:35:00Z`. Every Session 14 key is true. `session_status` is complete. `current_session` stays 14. `completed_sessions` is 0 through 14. `next_session` is 15. `next_prompt` is `18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md`. `head_sha` and `evidence_closure_commit_sha` are `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. That commit contains `def prove_session_14` and the pre-transition state. The pointer commit must not record its own SHA. Session 15 is not activated. Exit 78 stays HELD. The exit string is not written. A live deploy stays deferred.
+
+### Consequences
+
+Session 14 is complete. The next honest step is the Session 15 evidence contract. Session 15 is not activated. A live deploy stays deferred. Exit 78 stays HELD. The exit string is not written.

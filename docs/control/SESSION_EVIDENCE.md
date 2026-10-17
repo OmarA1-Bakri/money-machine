@@ -1,10 +1,8 @@
 # Session evidence
 
-The checked-in pointer is Session 14 at state revision 110.
-`current_session` is 14. `session_status` is incomplete.
-`deployment_target_recorded` and `production_packaging_defined` are true.
-`release_rollback_implemented` and `service_controls_fail_closed` are true.
-`control_files_and_checkpoint_current` is true. The closure key is false.
+The checked-in pointer is Session 14 at state revision 111.
+`current_session` is 14. `session_status` is complete.
+Every Session 14 key is true. Session 15 is not activated.
 Session 10 is complete and every one of its keys is true.
 Session 09 is complete and every one of its keys is true.
 Session 08 is complete and every one of its keys is true.
@@ -16,7 +14,7 @@ Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
 Session 13 is complete. Every key is true.
-Session 14 is incomplete. The checkpoint is current.
+Session 14 is complete. Session 15 is not activated.
 Session 15 has no contract.
 
 ## Session 00
@@ -279,7 +277,7 @@ Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
 Session 13 is complete. Every key is true.
-Session 14 is incomplete. The checkpoint is current.
+Session 14 is complete. Session 15 is not activated.
 Session 15 has no contract.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
@@ -352,9 +350,9 @@ Fixture paths:
 ## Session 14
 
 Prompt: `17_SESSION_14_DEPLOYMENT.md`.
-Status: incomplete.
+Status: complete.
 Evidence contract: installed.
-The checkpoint is current. The closure key is not earned.
+Session 15 is not activated. A live deploy is not recorded.
 
 Fixture paths:
 
@@ -368,7 +366,7 @@ Fixture paths:
 |---|---|
 | `control_files_and_checkpoint_current` | true |
 | `deployment_target_recorded` | true |
-| `evidence_closure_commit_recorded` | false |
+| `evidence_closure_commit_recorded` | true |
 | `production_packaging_defined` | true |
 | `release_rollback_implemented` | true |
 | `service_controls_fail_closed` | true |
