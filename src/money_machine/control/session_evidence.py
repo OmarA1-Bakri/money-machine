@@ -7,10 +7,11 @@ revision 83 and every one of its keys is true (D-0055). Session 11 is
 complete at revision 90. Every Session 11 key is true (D-0063). Session 12
 is complete at revision 97. Every Session 12 key is true (D-0071).
 Session 13 is complete at revision 104. Every Session 13 key is true
-(D-0079). Session 14 is activated and incomplete at revision 108.
-`deployment_target_recorded`, `production_packaging_defined`, and
-`release_rollback_implemented` are true. The other three Session 14 keys
-are false (D-0084). Session 15 has no contract.
+(D-0079). Session 14 is activated and incomplete at revision 109.
+`deployment_target_recorded`, `production_packaging_defined`,
+`release_rollback_implemented`, and `service_controls_fail_closed` are
+true. The other two Session 14 keys are false (D-0085). Session 15 has
+no contract.
 This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
@@ -237,17 +238,16 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
             "src/money_machine/deploy/target.py",
             "src/money_machine/deploy/packaging.py",
             "src/money_machine/deploy/release.py",
+            "src/money_machine/deploy/controls.py",
         ),
-        (
-            "The target, the package, and the release plan are recorded. "
-            "The other keys are not earned."
-        ),
+        ("The controls stay fail-closed. The other keys are not earned."),
         True,
         frozenset(
             {
                 "deployment_target_recorded",
                 "production_packaging_defined",
                 "release_rollback_implemented",
+                "service_controls_fail_closed",
             }
         ),
     ),
@@ -281,11 +281,11 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 14 at state revision 108.",
+        "The checked-in pointer is Session 14 at state revision 109.",
         "`current_session` is 14. `session_status` is incomplete.",
         "`deployment_target_recorded` and `production_packaging_defined` are true.",
-        "`release_rollback_implemented` is true.",
-        "The other three Session 14 keys are false.",
+        "`release_rollback_implemented` and `service_controls_fail_closed` are true.",
+        "The other two Session 14 keys are false.",
         "Session 10 is complete and every one of its keys is true.",
         "Session 09 is complete and every one of its keys is true.",
         "Session 08 is complete and every one of its keys is true.",
@@ -297,7 +297,7 @@ def render_session_evidence() -> str:
         "Session 11 is complete. Every key is true.",
         "Session 12 is complete. Every key is true.",
         "Session 13 is complete. Every key is true.",
-        "Session 14 is incomplete. The target, the package, and the release plan are recorded.",
+        "Session 14 is incomplete. The controls stay fail-closed.",
         "Session 15 has no contract.",
         "",
     ]
@@ -339,7 +339,7 @@ def render_session_evidence() -> str:
             "Session 11 is complete. Every key is true.",
             "Session 12 is complete. Every key is true.",
             "Session 13 is complete. Every key is true.",
-            "Session 14 is incomplete. The target, the package, and the release plan are recorded.",
+            "Session 14 is incomplete. The controls stay fail-closed.",
             "Session 15 has no contract.",
             "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",

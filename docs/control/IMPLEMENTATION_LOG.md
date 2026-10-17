@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 14 service controls recorded
+
+`record-evidence` advanced `state_revision` from 108 to 109. `updated_at` is `2026-10-17T15:25:00Z`. `deployment_target_recorded`, `production_packaging_defined`, `release_rollback_implemented`, and `service_controls_fail_closed` are true. The control-file key and the closure key stay false. `current_session` stays 14. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Start, stop, restart, status, logs, scale, a second scheduler, migrate, and safe update are refused. A status word is not a running service. No docker socket is opened. `worker.py` and `scheduler.py` are not edited. Exit 78 stays HELD.
+
 ## 2026-10-17 — Session 14 release plan recorded
 
 `record-evidence` advanced `state_revision` from 107 to 108. `updated_at` is `2026-10-17T15:15:00Z`. `deployment_target_recorded`, `production_packaging_defined`, and `release_rollback_implemented` are true. The other three Session 14 keys stay false. `current_session` stays 14. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. The release plan binds the image tag to the closure commit, plans a fixture backup before the schema check, refuses live postgres, and refuses an incompatible schema. No image is pushed. Exit 78 stays HELD.

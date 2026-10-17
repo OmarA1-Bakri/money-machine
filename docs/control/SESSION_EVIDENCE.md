@@ -1,10 +1,10 @@
 # Session evidence
 
-The checked-in pointer is Session 14 at state revision 108.
+The checked-in pointer is Session 14 at state revision 109.
 `current_session` is 14. `session_status` is incomplete.
 `deployment_target_recorded` and `production_packaging_defined` are true.
-`release_rollback_implemented` is true.
-The other three Session 14 keys are false.
+`release_rollback_implemented` and `service_controls_fail_closed` are true.
+The other two Session 14 keys are false.
 Session 10 is complete and every one of its keys is true.
 Session 09 is complete and every one of its keys is true.
 Session 08 is complete and every one of its keys is true.
@@ -16,7 +16,7 @@ Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
 Session 13 is complete. Every key is true.
-Session 14 is incomplete. The target, the package, and the release plan are recorded.
+Session 14 is incomplete. The controls stay fail-closed.
 Session 15 has no contract.
 
 ## Session 00
@@ -279,7 +279,7 @@ Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
 Session 13 is complete. Every key is true.
-Session 14 is incomplete. The target, the package, and the release plan are recorded.
+Session 14 is incomplete. The controls stay fail-closed.
 Session 15 has no contract.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
@@ -354,13 +354,14 @@ Fixture paths:
 Prompt: `17_SESSION_14_DEPLOYMENT.md`.
 Status: incomplete.
 Evidence contract: installed.
-The target, the package, and the release plan are recorded. The other keys are not earned.
+The controls stay fail-closed. The other keys are not earned.
 
 Fixture paths:
 
 - `src/money_machine/deploy/target.py`
 - `src/money_machine/deploy/packaging.py`
 - `src/money_machine/deploy/release.py`
+- `src/money_machine/deploy/controls.py`
 
 | Key | Recorded |
 |---|---|
@@ -369,7 +370,7 @@ Fixture paths:
 | `evidence_closure_commit_recorded` | false |
 | `production_packaging_defined` | true |
 | `release_rollback_implemented` | true |
-| `service_controls_fail_closed` | false |
+| `service_controls_fail_closed` | true |
 
 ## Session 15
 

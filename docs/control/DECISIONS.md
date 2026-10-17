@@ -1306,3 +1306,19 @@ Session 14 is incomplete at revision 107. `deployment_target_recorded` and `prod
 ### Consequences
 
 The next honest step is `service_controls_fail_closed`. The proof refuses start, stop, restart, status, logs, scale, a second scheduler, migrate, and a safe update. A status word is not a running service. It does not open a docker socket. A live deploy and a scheduled production backup stay deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0085 — Session 14 service controls
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 14 is incomplete at revision 108. The target, the package, and the release plan are recorded (D-0082, D-0083, D-0084). Starting the worker or the scheduler would clear Exit 78. A status word is not a running service.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 108 to 109. `updated_at` is `2026-10-17T15:25:00Z`. `service_controls_fail_closed` is true. The three earlier Session 14 keys stay true. `control_files_and_checkpoint_current` and `evidence_closure_commit_recorded` stay false. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. `src/money_machine/deploy/controls.py` refuses start, stop, restart, status, logs, scale, the scheduler singleton, migrate, and safe update. A status word raises `status_word` and `running` stays false. A docker socket raises `docker_socket`. A second scheduler raises `scheduler_singleton`. `worker.py` and `scheduler.py` are read and not edited. Exit 78 stays HELD.
+
+### Consequences
+
+The next honest step is `control_files_and_checkpoint_current`. The five continuity files stay present and the catalogue matches the rendered index. The closure key stays false. A live deploy stays deferred. Exit 78 stays HELD. The exit string is not written.

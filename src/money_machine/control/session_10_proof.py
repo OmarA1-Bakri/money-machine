@@ -891,6 +891,7 @@ def _prove_activated_session_14(
         or evidence.get("deployment_target_recorded") is not True
         or evidence.get("production_packaging_defined") is not True
         or evidence.get("release_rollback_implemented") is not True
-        or sum(1 for value in evidence.values() if value is True) != 3
+        or evidence.get("service_controls_fail_closed") is not True
+        or sum(1 for value in evidence.values() if value is True) != 4
     ):
         raise Session10ProofError("control_checkpoint")

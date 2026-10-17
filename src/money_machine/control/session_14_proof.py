@@ -1,9 +1,8 @@
-"""Earn the Session 14 deployment, packaging, and release keys.
+"""Earn the Session 14 deployment, packaging, release, and control keys.
 
-The proof calls the selector, the package check, and the release planner.
-A paragraph that says the host is deployed does not earn a key. A passing
-docker compose config does not earn the package. A tag that is not bound to
-a commit does not earn the release. The closure key stays false.
+The proof calls the selector, the package check, the release planner, and the
+service controls. A paragraph that says the host is deployed does not earn a
+key. A status word is not a running service. The closure key stays false.
 """
 
 from __future__ import annotations
@@ -13,6 +12,12 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 
+from money_machine.deploy.controls import (
+    SERVICE_CONTROLS,
+    ServiceControlRefusal,
+    confirm_exit_78_held,
+    control_service,
+)
 from money_machine.deploy.packaging import (
     HEALTHCHECKED_SERVICES,
     REQUIRED_SERVICES,
@@ -30,9 +35,15 @@ from money_machine.deploy.target import (
 TARGET_EVIDENCE_KEY = "deployment_target_recorded"
 PACKAGING_EVIDENCE_KEY = "production_packaging_defined"
 RELEASE_EVIDENCE_KEY = "release_rollback_implemented"
+CONTROLS_EVIDENCE_KEY = "service_controls_fail_closed"
 _CLOSURE_EVIDENCE_KEY = "evidence_closure_commit_recorded"
 EARNED_EVIDENCE_KEYS = frozenset(
-    {TARGET_EVIDENCE_KEY, PACKAGING_EVIDENCE_KEY, RELEASE_EVIDENCE_KEY}
+    {
+        TARGET_EVIDENCE_KEY,
+        PACKAGING_EVIDENCE_KEY,
+        RELEASE_EVIDENCE_KEY,
+        CONTROLS_EVIDENCE_KEY,
+    }
 )
 _SESSION_14_KEYS = frozenset(
     {
@@ -54,9 +65,16 @@ _CONTROL_FILES = (
 )
 _CLOSURE_HEAD = "fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a"
 _SESSION_14_PROMPT = "17_SESSION_14_DEPLOYMENT.md"
-_POINTER_REVISION = 108
-_UPDATED_AT = "2026-10-17T15:15:00Z"
-_TRUE_KEYS = frozenset({TARGET_EVIDENCE_KEY, PACKAGING_EVIDENCE_KEY, RELEASE_EVIDENCE_KEY})
+_POINTER_REVISION = 109
+_UPDATED_AT = "2026-10-17T15:25:00Z"
+_TRUE_KEYS = frozenset(
+    {
+        TARGET_EVIDENCE_KEY,
+        PACKAGING_EVIDENCE_KEY,
+        RELEASE_EVIDENCE_KEY,
+        CONTROLS_EVIDENCE_KEY,
+    }
+)
 
 
 class Session14ProofError(ValueError):
@@ -72,6 +90,7 @@ def prove_session_14() -> frozenset[str]:
     _prove_target()
     _prove_packaging()
     _prove_release()
+    _prove_controls()
     _prove_control_files()
     return EARNED_EVIDENCE_KEYS
 
@@ -227,6 +246,49 @@ def _prove_release() -> None:
     ):
         raise Session14ProofError("destructive")
     _require_release(lambda: rollback_image(cleanup), "rollback_refused", "rollback_refused")
+
+
+def _prove_controls() -> None:
+    module = Path(__file__).resolve().parents[1] / "deploy" / "controls.py"
+    _refuse_network(module, ("docker", "psycopg", "asyncpg", "sqlalchemy"))
+    _refuse_print(module)
+    held = confirm_exit_78_held()
+    if held.worker_held is not True or held.scheduler_held is not True or held.running is not False:
+        raise Session14ProofError("exit_78")
+    for action in SERVICE_CONTROLS:
+        expected = "scheduler_singleton" if action == "scheduler_singleton" else "closed"
+        _require_control(lambda action=action: control_service(action), expected, action)
+    _require_control(
+        lambda: control_service("status", status_word="running"),
+        "status_word",
+        "status_word",
+    )
+    _require_control(
+        lambda: control_service("start", docker_socket=True),
+        "docker_socket",
+        "docker_socket",
+    )
+    _require_control(
+        lambda: control_service("start", service="scheduler", scheduler_count=1),
+        "scheduler_singleton",
+        "scheduler_singleton",
+    )
+    _require_control(
+        lambda: control_service("scale", service="scheduler", replicas=2),
+        "scheduler_singleton",
+        "scheduler_scale",
+    )
+    _require_control(lambda: control_service("commission"), "unknown", "unknown")
+
+
+def _require_control(call: Callable[[], object], code: str, proof_code: str) -> None:
+    try:
+        call()
+    except ServiceControlRefusal as error:
+        if error.code != code or error.running is not False:
+            raise Session14ProofError(proof_code) from error
+    else:
+        raise Session14ProofError(proof_code)
 
 
 def _require_release(call: Callable[[], object], code: str, proof_code: str) -> None:

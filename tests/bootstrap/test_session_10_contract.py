@@ -81,7 +81,8 @@ def test_live_pointer_records_the_closure_key() -> None:
     evidence["deployment_target_recorded"] = True
     evidence["production_packaging_defined"] = True
     evidence["release_rollback_implemented"] = True
-    assert live["state_revision"] == 108
+    evidence["service_controls_fail_closed"] = True
+    assert live["state_revision"] == 109
     assert live["current_session"] == 14
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(14))
