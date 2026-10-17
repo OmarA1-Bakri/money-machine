@@ -53,6 +53,7 @@ from money_machine.assets.portfolio_eligibility import (
     is_successful_result,
     schedule_new_front,
 )
+from money_machine.control.session_15_proof import session_15_pointer_holds
 from money_machine.domain.enums import DecisionType
 from money_machine.domain.events import EventName
 from money_machine.domain.models.common import EvidenceReference
@@ -904,7 +905,7 @@ def _prove_activated_session_15(
         or decoded.get("next_session") != 15
         or decoded.get("completed_sessions") != list(range(15))
         or decoded.get("next_prompt") != _SESSION_15_PROMPT
-        or any(value is not False for value in evidence.values())
+        or not session_15_pointer_holds(evidence)
     ):
         raise Session10ProofError("control_checkpoint")
 

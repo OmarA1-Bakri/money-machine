@@ -23,6 +23,7 @@ from money_machine.assets.support_intake import (
     record_repair,
     resolve_issue,
 )
+from money_machine.control.session_15_proof import session_15_pointer_holds
 from money_machine.domain.enums import IncidentType
 
 INTAKE_EVIDENCE_KEY = "support_intake_implemented"
@@ -579,7 +580,7 @@ def _prove_activated_session_15(
         or decoded.get("next_session") != 15
         or decoded.get("completed_sessions") != list(range(15))
         or decoded.get("next_prompt") != _SESSION_15_PROMPT
-        or any(value is not False for value in evidence.values())
+        or not session_15_pointer_holds(evidence)
     ):
         raise Session11ProofError("control_checkpoint")
 

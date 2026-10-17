@@ -78,7 +78,8 @@ def test_live_pointer_is_the_session_11_activation() -> None:
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
     expected = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[15]), False)
-    assert live["state_revision"] == 112
+    expected["deployed_state_checked"] = True
+    assert live["state_revision"] == 113
     assert live["current_session"] == 15
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(15))

@@ -43,6 +43,7 @@ from money_machine.assets.synthetic_paths import (
     run_synthetic_paths,
     simulate_publish,
 )
+from money_machine.control.session_15_proof import session_15_pointer_holds
 
 MATRIX_EVIDENCE_KEY = "implementation_matrix_recorded"
 SYNTHETIC_EVIDENCE_KEY = "synthetic_paths_implemented"
@@ -338,7 +339,7 @@ def _prove_control_files() -> None:
             or decoded.get("next_session") != 15
             or decoded.get("completed_sessions") != list(range(15))
             or decoded.get("next_prompt") != _SESSION_15_PROMPT
-            or any(value is not False for value in evidence.values())
+            or not session_15_pointer_holds(evidence)
         ):
             raise Session13ProofError("control_checkpoint")
         return

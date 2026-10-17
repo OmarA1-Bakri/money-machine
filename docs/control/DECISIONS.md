@@ -1386,3 +1386,19 @@ Session 14 is complete at revision 111. The Session 15 contract is installed (D-
 ### Consequences
 
 The next honest step is `deployed_state_checked`: the checkpoint reads the continuity files and refuses a live smoke. A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0090 — Session 15 deployed state
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 15 is incomplete at revision 112. Every Session 15 key is false. The checkpoint already reads the continuity files. A production smoke would start the held services.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 112 to 113. `updated_at` is `2026-10-17T16:10:00Z`. `deployed_state_checked` is true. The other six Session 15 keys stay false. `session_status` stays incomplete. `current_session` stays 15. `completed_sessions` stays 0 through 14. `next_session` stays 15. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. `src/money_machine/deploy/deployed_state.py` reads the checkpoint and refuses a live smoke, a docker socket, and a service start. `worker.py` and `scheduler.py` are read and not edited. No service is started. Exit 78 stays HELD. The exit string is not written.
+
+### Consequences
+
+The next honest step is `provider_connections_fail_closed`: the Etsy and Notion fixture adapters are selected and a live adapter raises. A live account stays deferred. Exit 78 stays HELD. The exit string is not written.

@@ -29,6 +29,7 @@ from money_machine.assets.mutation_receipt import (
     commit_listing_mutation,
 )
 from money_machine.assets.publishing_ramp_decision import decide_publishing_ramp
+from money_machine.control.session_15_proof import session_15_pointer_holds
 from money_machine.domain.enums import BranchOutcome
 from money_machine.domain.models.listings import PreflightResult
 from money_machine.integrations.etsy.draft_client import (
@@ -721,7 +722,7 @@ def _prove_activated_session_15(
         or decoded.get("next_session") != 15
         or decoded.get("completed_sessions") != list(range(15))
         or decoded.get("next_prompt") != _SESSION_15_PROMPT
-        or any(value is not False for value in evidence.values())
+        or not session_15_pointer_holds(evidence)
     ):
         raise Session09ProofError("control_checkpoint")
 

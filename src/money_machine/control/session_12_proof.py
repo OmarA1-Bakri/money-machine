@@ -39,6 +39,7 @@ from money_machine.assets.telemetry_redaction import (
     TelemetryRefusal,
     redact_telemetry,
 )
+from money_machine.control.session_15_proof import session_15_pointer_holds
 
 READ_MODEL_EVIDENCE_KEY = "console_read_model_implemented"
 VIEWS_EVIDENCE_KEY = "exception_views_implemented"
@@ -831,7 +832,7 @@ def _prove_activated_session_15(
         or decoded.get("next_session") != 15
         or decoded.get("completed_sessions") != list(range(15))
         or decoded.get("next_prompt") != _SESSION_15_PROMPT
-        or any(value is not False for value in evidence.values())
+        or not session_15_pointer_holds(evidence)
     ):
         raise Session12ProofError("control_checkpoint")
 

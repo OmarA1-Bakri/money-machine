@@ -1,8 +1,8 @@
 # Session evidence
 
-The checked-in pointer is Session 15 at state revision 112.
+The checked-in pointer is Session 15 at state revision 113.
 `current_session` is 15. `session_status` is incomplete.
-Every Session 15 key is false. A live account is not connected.
+deployed_state_checked is true. A live smoke is not run.
 Session 10 is complete and every one of its keys is true.
 Session 09 is complete and every one of its keys is true.
 Session 08 is complete and every one of its keys is true.
@@ -14,8 +14,8 @@ Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
 Session 13 is complete. Every key is true.
-Session 14 is complete. Session 15 is activated.
-Every Session 15 key is false. A live account is not connected.
+Session 14 is complete. Session 15 is incomplete.
+deployed_state_checked is true. A live smoke is not run.
 
 ## Session 00
 
@@ -277,8 +277,8 @@ Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
 Session 13 is complete. Every key is true.
-Session 14 is complete. Session 15 is activated.
-Every Session 15 key is false. A live account is not connected.
+Session 14 is complete. Session 15 is incomplete.
+deployed_state_checked is true. A live smoke is not run.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
 ## Session 11
@@ -376,7 +376,7 @@ Fixture paths:
 Prompt: `18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md`.
 Status: incomplete.
 Evidence contract: installed.
-Every Session 15 key is false. A live account is not connected.
+deployed_state_checked is true. A live smoke is not run.
 
 Fixture paths:
 
@@ -384,12 +384,13 @@ Fixture paths:
 - `src/money_machine/integrations/etsy/fixture_adapter.py`
 - `src/money_machine/integrations/notion/fixture_adapter.py`
 - `src/money_machine/deploy/checkpoint.py`
+- `src/money_machine/deploy/deployed_state.py`
 
 | Key | Recorded |
 |---|---|
 | `acceptance_matrix_recorded` | false |
 | `control_files_and_checkpoint_current` | false |
-| `deployed_state_checked` | false |
+| `deployed_state_checked` | true |
 | `evidence_closure_commit_recorded` | false |
 | `linked_workflow_fixture` | false |
 | `provider_connections_fail_closed` | false |

@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-17 — Session 15 deployed state recorded
+
+**Verification scope**: live `record-evidence` from revision 112 to 113. No live HTTP. No service start. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 15, `incomplete`, revision 113, `updated_at` `2026-10-17T16:10:00Z` | PASS |
+| Keys | `deployed_state_checked` is true. The other six Session 15 keys are false | PASS |
+| Smoke | A live smoke, a docker socket, and a service start are refused | PASS |
+| Head | `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e` | PASS |
+| Hold | `worker.py` and `scheduler.py` are not edited. No service is started | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 15, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 113}`. The deployed-state proof, the Session 15 contract, the checkpoint proof, the completion proof, the control proof, the release proof, the packaging proof, the target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, the contiguous-contract check, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 134 passed in 4.28s. `ruff check` and `pyright` on the deployed-state check, the Session 14 and 15 proofs, the evidence catalogue, and the state module were clean.
+
 ## 2026-10-17 — Session 15 activated
 
 **Verification scope**: live `activate` from revision 111 to 112. No live HTTP. No service start. Exit 78 stays HELD. The exit string is not written.

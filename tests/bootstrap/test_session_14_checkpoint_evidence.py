@@ -37,9 +37,9 @@ PREVIOUS_KEYS = frozenset(
         "service_controls_fail_closed",
     }
 )
-LIVE_REVISION = 112
-LIVE_AT = "2026-10-17T16:00:00Z"
-LIVE_KEYS: frozenset[str] = frozenset()
+LIVE_REVISION = 113
+LIVE_AT = "2026-10-17T16:10:00Z"
+LIVE_KEYS: frozenset[str] = frozenset({"deployed_state_checked"})
 
 
 def _live() -> ControlState:
