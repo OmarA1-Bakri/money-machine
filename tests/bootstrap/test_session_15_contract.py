@@ -73,10 +73,10 @@ def test_live_pointer_stays_complete_session_14() -> None:
     """Session 14 stays closed. Session 15 is activated and every key is false."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 114
+    assert live["state_revision"] == 115
     assert live["current_session"] == 15
     assert live["session_status"] == "incomplete"
-    assert live["updated_at"] == "2026-10-17T16:15:00Z"
+    assert live["updated_at"] == "2026-10-17T16:20:00Z"
     assert live["completed_sessions"] == list(range(15))
     assert live["next_session"] == 15
     assert live["head_sha"] == CLOSURE_HEAD
@@ -84,7 +84,8 @@ def test_live_pointer_stays_complete_session_14() -> None:
     assert set(evidence) == set(SESSION_15_KEYS)
     assert evidence["deployed_state_checked"] is True
     assert evidence["provider_connections_fail_closed"] is True
-    assert sum(1 for value in evidence.values() if value) == 2
+    assert evidence["standing_authority_recorded"] is True
+    assert sum(1 for value in evidence.values() if value) == 3
     assert "HANDS_OFF_MONEY_MACHINE_COMMISSIONED" not in text
 
 

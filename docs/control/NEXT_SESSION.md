@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 15 standing authority is recorded (2026-10-17)
+
+Revision 115 is incomplete Session 15. `deployed_state_checked`, `provider_connections_fail_closed`, and `standing_authority_recorded` are true. The other four Session 15 keys are false. `completed_sessions` stays 0 through 14. `next_session` stays 15. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Exit 78 stays HELD. The next honest step is `linked_workflow_fixture`. A live account stays deferred.
+
 ## Session 15 provider connections are recorded (2026-10-17)
 
 Revision 114 is incomplete Session 15. `deployed_state_checked` and `provider_connections_fail_closed` are true. The other five Session 15 keys are false. `completed_sessions` stays 0 through 14. `next_session` stays 15. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Exit 78 stays HELD. The next honest step is `standing_authority_recorded`. A live account stays deferred.

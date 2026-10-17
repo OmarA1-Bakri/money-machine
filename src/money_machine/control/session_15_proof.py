@@ -1,8 +1,8 @@
-"""Earn the Session 15 deployed-state and provider-connection keys.
+"""Earn the Session 15 deployed-state, provider, and authority keys.
 
-The proof calls the deployed-state check and the fixture provider selector.
-A paragraph that says the accounts are connected does not earn a key.
-The closure key stays false.
+The proof calls the deployed-state check, the fixture provider selector, and
+the standing-authority check. A config file with a true publish switch does
+not earn a key. The closure key stays false.
 """
 
 from __future__ import annotations
@@ -11,8 +11,15 @@ import ast
 from collections.abc import Callable
 from pathlib import Path
 
+from money_machine.config.loader import load_yaml_model
+from money_machine.config.settings import AutonomyConfig
+from money_machine.config.standing_authority import (
+    StandingAuthorityRefusal,
+    record_standing_authority,
+)
 from money_machine.deploy.checkpoint import CheckpointRefusal
 from money_machine.deploy.deployed_state import DeployedStateRefusal, check_deployed_state
+from money_machine.domain.enums import AutonomyMode
 from money_machine.integrations.provider_connections import (
     ProviderConnectionRefusal,
     select_provider_connections,
@@ -20,13 +27,19 @@ from money_machine.integrations.provider_connections import (
 
 DEPLOYED_STATE_KEY = "deployed_state_checked"
 PROVIDER_CONNECTIONS_KEY = "provider_connections_fail_closed"
-EARNED_EVIDENCE_KEYS = frozenset({DEPLOYED_STATE_KEY, PROVIDER_CONNECTIONS_KEY})
+STANDING_AUTHORITY_KEY = "standing_authority_recorded"
+EARNED_EVIDENCE_KEYS = frozenset(
+    {DEPLOYED_STATE_KEY, PROVIDER_CONNECTIONS_KEY, STANDING_AUTHORITY_KEY}
+)
 _CLOSURE_HEAD = "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
-_POINTER_REVISION = 114
-_UPDATED_AT = "2026-10-17T16:15:00Z"
-_TRUE_KEYS: frozenset[str] = frozenset({DEPLOYED_STATE_KEY, PROVIDER_CONNECTIONS_KEY})
+_POINTER_REVISION = 115
+_UPDATED_AT = "2026-10-17T16:20:00Z"
+_TRUE_KEYS: frozenset[str] = frozenset(
+    {DEPLOYED_STATE_KEY, PROVIDER_CONNECTIONS_KEY, STANDING_AUTHORITY_KEY}
+)
 _MODULE = Path(__file__).resolve().parents[1] / "deploy" / "deployed_state.py"
 _CONNECTIONS = Path(__file__).resolve().parents[1] / "integrations" / "provider_connections.py"
+_AUTHORITY = Path(__file__).resolve().parents[1] / "config" / "standing_authority.py"
 _WORKER = Path("src/money_machine/orchestration/worker.py")
 _SCHEDULER = Path("src/money_machine/orchestration/scheduler.py")
 
@@ -43,6 +56,7 @@ def prove_session_15() -> frozenset[str]:
     """Return the earned Session 15 keys. A miss raises instead of returning them."""
     _prove_deployed_state()
     _prove_provider_connections()
+    _prove_standing_authority()
     return EARNED_EVIDENCE_KEYS
 
 
@@ -145,6 +159,74 @@ def _prove_provider_connections() -> None:
             lambda mode=mode: select_provider_connections(notion_mode=mode),
             "live_notion",
         )
+
+
+def _prove_standing_authority() -> None:
+    """The template keeps publish, purchase, and checkout false."""
+    _refuse_network(_AUTHORITY)
+    root = Path(__file__).resolve().parents[3]
+    before = {relative: (root / relative).read_bytes() for relative in (_WORKER, _SCHEDULER)}
+    try:
+        recorded = record_standing_authority()
+    except StandingAuthorityRefusal as error:
+        raise Session15ProofError(error.code) from error
+    if {relative: (root / relative).read_bytes() for relative in before} != before:
+        raise Session15ProofError("sources_edited")
+    if (
+        recorded.auto_publish is not False
+        or recorded.auto_deactivate is not False
+        or recorded.auto_multiply is not False
+        or recorded.competitor_purchase_enabled is not False
+        or recorded.live_checkout_test_enabled is not False
+        or any(cap > 0 for cap in recorded.purchase_caps)
+        or recorded.checkout_cap > 0
+    ):
+        raise Session15ProofError("standing_authority")
+    _require_authority_refusal(_live(auto_publish=True), "publish")
+    _require_authority_refusal(_live(auto_deactivate=True), "deactivate")
+    _require_authority_refusal(_live(auto_multiply=True), "multiply")
+    _require_authority_refusal(
+        _live(
+            competitor_purchase_enabled=True,
+            competitor_purchase_max_each="1.00",
+            competitor_purchase_monthly_cap="5.00",
+            external_spend_enabled=True,
+        ),
+        "purchase",
+    )
+    _require_authority_refusal(
+        _live(
+            live_checkout_test_enabled=True,
+            live_checkout_test_cap="1.00",
+            external_spend_enabled=True,
+        ),
+        "checkout",
+    )
+    _require_authority_refusal(_live(), "live_authority")
+
+
+def _live(**overrides: object) -> AutonomyConfig:
+    root = Path(__file__).resolve().parents[3]
+    template = load_yaml_model(root / "config" / "autonomy.example.yaml", AutonomyConfig)
+    values = template.model_dump()
+    values.update(
+        {
+            "mode": AutonomyMode.LIVE,
+            "external_mutations_enabled": True,
+        }
+    )
+    values.update(overrides)
+    return AutonomyConfig.model_validate(values)
+
+
+def _require_authority_refusal(authority: AutonomyConfig, code: str) -> None:
+    try:
+        record_standing_authority(authority)
+    except StandingAuthorityRefusal as error:
+        if error.code != code:
+            raise Session15ProofError(code) from error
+    else:
+        raise Session15ProofError(code)
 
 
 def _require_provider_refusal(call: Callable[[], object], code: str) -> None:

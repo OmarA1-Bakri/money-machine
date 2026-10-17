@@ -47,10 +47,14 @@ EARNED_EVIDENCE_KEYS = frozenset(
     }
 )
 _CLOSURE_HEAD = "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
-_POINTER_REVISION = 114
-_UPDATED_AT = "2026-10-17T16:15:00Z"
+_POINTER_REVISION = 115
+_UPDATED_AT = "2026-10-17T16:20:00Z"
 _TRUE_KEYS: frozenset[str] = frozenset(
-    {"deployed_state_checked", "provider_connections_fail_closed"}
+    {
+        "deployed_state_checked",
+        "provider_connections_fail_closed",
+        "standing_authority_recorded",
+    }
 )
 
 

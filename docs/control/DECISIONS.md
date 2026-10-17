@@ -1418,3 +1418,19 @@ Session 15 is incomplete at revision 113. `deployed_state_checked` is true. The 
 ### Consequences
 
 The next honest step is `standing_authority_recorded`: `AutonomyConfig` keeps publish, deactivate, multiply, purchase, and checkout false. A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0092 — Session 15 standing authority
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 15 is incomplete at revision 114. `deployed_state_checked` and `provider_connections_fail_closed` are true. The other five Session 15 keys are false. A true publish switch would publish. A true purchase or checkout switch would spend.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 114 to 115. `updated_at` is `2026-10-17T16:20:00Z`. `deployed_state_checked`, `provider_connections_fail_closed`, and `standing_authority_recorded` are true. The other four Session 15 keys stay false. `session_status` stays incomplete. `current_session` stays 15. `completed_sessions` stays 0 through 14. `next_session` stays 15. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. `src/money_machine/config/standing_authority.py` loads `config/autonomy.example.yaml`, applies development safety, and refuses publish, deactivate, multiply, purchase, checkout, and live authority. It does not invent a cap. It does not read `.env` or `autonomy.yaml`. Exit 78 stays HELD. The exit string is not written.
+
+### Consequences
+
+The next honest step is `linked_workflow_fixture`: a synthetic chain stops at preflight. Publish, purchase, and checkout raise even if a flag is true. A live account stays deferred. Exit 78 stays HELD. The exit string is not written.

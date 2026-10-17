@@ -80,7 +80,8 @@ def test_live_pointer_records_the_closure_key() -> None:
     evidence = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[15]), False)
     evidence["deployed_state_checked"] = True
     evidence["provider_connections_fail_closed"] = True
-    assert live["state_revision"] == 114
+    evidence["standing_authority_recorded"] = True
+    assert live["state_revision"] == 115
     assert live["current_session"] == 15
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(15))

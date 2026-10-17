@@ -1743,8 +1743,8 @@ def _verify_session_14_evidence_repository(
 def validate_session_15_evidence_record(previous: ControlState, current: ControlState) -> None:
     """Record the Session 15 keys the fixture proof has earned. The session stays incomplete.
 
-    The proof earns the deployed-state check and the fixture provider connections.
-    The closure key stays false.
+    The proof earns the deployed-state check, the fixture provider connections,
+    and the fail-closed standing authority. The closure key stays false.
     """
     if previous["current_session"] != 15 or current["current_session"] != 15:
         raise ControlStateError("unsupported evidence record: only session 15 can record this key")

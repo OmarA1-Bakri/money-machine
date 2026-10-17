@@ -72,7 +72,8 @@ def test_live_pointer_is_the_session_12_activation() -> None:
     expected = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[15]), False)
     expected["deployed_state_checked"] = True
     expected["provider_connections_fail_closed"] = True
-    assert live["state_revision"] == 114
+    expected["standing_authority_recorded"] = True
+    assert live["state_revision"] == 115
     assert live["current_session"] == 15
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(15))

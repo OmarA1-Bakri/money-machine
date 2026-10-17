@@ -8,7 +8,7 @@
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "evidence_closure_commit_sha": "02c26f39ac8800db03ae7f5d1d346487a5ce123e",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 114,
+  "state_revision": 115,
   "session_status": "incomplete",
   "current_session": 15,
   "completed_sessions": [
@@ -137,7 +137,7 @@
     "evidence_closure_commit_recorded": false,
     "linked_workflow_fixture": false,
     "provider_connections_fail_closed": true,
-    "standing_authority_recorded": false
+    "standing_authority_recorded": true
   },
   "transition_contract": {
     "completion_requires_all_evidence_true": true,
@@ -152,5 +152,5 @@
   },
   "next_session": 15,
   "next_prompt": "18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md",
-  "updated_at": "2026-10-17T16:15:00Z"
+  "updated_at": "2026-10-17T16:20:00Z"
 }

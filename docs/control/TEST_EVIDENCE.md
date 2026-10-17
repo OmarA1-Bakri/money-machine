@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-17 — Session 15 standing authority recorded
+
+**Verification scope**: live `record-evidence` from revision 114 to 115. No live HTTP. No publish, purchase, or checkout. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 15, `incomplete`, revision 115, `updated_at` `2026-10-17T16:20:00Z` | PASS |
+| Keys | Three Session 15 keys are true. Four keys stay false | PASS |
+| Authority | The template keeps publish, purchase, and checkout false. An enabled switch raises | PASS |
+| Head | `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e` | PASS |
+| Hold | No `.env` or `autonomy.yaml` is read. Exit 78 stays HELD | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 15, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 115}`. The standing-authority proof, the provider-connection proof, the deployed-state proof, the Session 15 contract, the checkpoint proof, the completion proof, the control proof, the release proof, the packaging proof, the target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, the contiguous-contract check, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 154 passed in 4.33s. `ruff check` and `pyright` on the standing-authority module and the Session 15 proof were clean.
+
 ## 2026-10-17 — Session 15 provider connections recorded
 
 **Verification scope**: live `record-evidence` from revision 113 to 114. No live HTTP. No credential read. Exit 78 stays HELD. The exit string is not written.
