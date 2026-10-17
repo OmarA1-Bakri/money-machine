@@ -200,29 +200,15 @@ D-0032 keeps these twelve keys false on this close commit.
 The close is the operator gate. It is not `validate_completion_transition`.
 D-0036 records the live keys later. This table is the close commit.
 
-## Sessions 08-15
-
-Session 08 is complete. Every contract key is true.
-The closure commit is `01b7dd84ef98442ff26a5239e8c7de742739d844`.
-Sessions 09-15 are not activated. A fixture path is code on the trunk.
-It is not a recorded evidence key.
-
 ## Session 08
 
 Prompt: `11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md`.
-Status: complete.
-Evidence contract: installed.
-Complete at revision 69. Session 09 is not activated.
-
-Fixture paths:
-
-- `src/money_machine/agents/implementations/merchandising.py`
-- `src/money_machine/domain/services/claim_validation.py`
-- `src/money_machine/assets/design_tokens.py`
-- `src/money_machine/assets/screenshots.py`
-- `src/money_machine/assets/link_validation.py`
-- `src/money_machine/assets/asset_lineage.py`
-- `src/money_machine/integrations/storage/local.py`
+State commit: `4a07fd69259a7265c5780fb584b2a89cacd9b258`.
+State revision: 69.
+Status: complete. Next session: 9.
+Completed sessions: [0, 1, 2, 3, 4, 5, 6, 7, 8].
+Evidence closure commit: `01b7dd84ef98442ff26a5239e8c7de742739d844`.
+Head SHA: `01b7dd84ef98442ff26a5239e8c7de742739d844`.
 
 | Key | Recorded |
 |---|---|
@@ -238,6 +224,11 @@ Fixture paths:
 | `merchandising_asset_tests_pass` | true |
 | `merchandising_workflow_linked` | true |
 | `screenshot_acquisition_implemented` | true |
+
+## Sessions 09-15
+
+Sessions 09-15 are not activated. A fixture path is code on the trunk.
+It is not a recorded evidence key.
 
 ## Session 09
 

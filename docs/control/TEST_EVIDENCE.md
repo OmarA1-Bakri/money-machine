@@ -13,7 +13,7 @@
 | Exit string | `SESSION_08_MERCHANDISING_AND_ASSETS_COMPLETE` is absent | PASS |
 | Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
 
-The command printed `{"applied": true, "command": "apply-completion", "session": 8, "state_revision": 69}`.
+The command printed `{"applied": true, "command": "apply-completion", "session": 8, "state_revision": 69}`. The completion test, the evidence index, the Session 08 evidence transition, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 34 passed in 15.80s.
 
 ## 2026-10-17 — Session 08 completion rule
 
