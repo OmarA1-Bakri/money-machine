@@ -165,7 +165,13 @@ def _pointer_matches(
     completed = state.get("completed_sessions")
     commissioned = state.get("commissioned_agents")
     session = state.get("current_session")
-    if closed:
+    if session == 15 and closed:
+        expected_session = 15
+        status = "complete"
+        nxt = 15
+        prompt = _CLOSED_PROMPT
+        finished = list(range(16))
+    elif closed:
         expected_session = 14
         status = "complete"
         nxt = 15

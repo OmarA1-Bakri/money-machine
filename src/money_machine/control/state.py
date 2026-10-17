@@ -75,6 +75,11 @@ from money_machine.control.session_15_proof import (
     Session15ProofError,
     prove_session_15,
 )
+from money_machine.deploy.closure import (
+    ClosureRefusal,
+    record_terminal_closure,
+    refuse_release_claim,
+)
 
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 BOOTSTRAP_COMMIT_SUBJECT = "chore(bootstrap): initialise money machine autonomous monorepo"
@@ -1078,6 +1083,17 @@ def _require_session_14_closure_proof(root: Path, sha: str) -> None:
         raise ControlStateError("closure commit does not contain the session 14 proof")
 
 
+def _require_session_15_closure_proof(root: Path, sha: str) -> None:
+    proof = _git(root, "show", f"{sha}:src/money_machine/control/session_15_proof.py").stdout
+    if "def prove_session_15" not in proof:
+        raise ControlStateError("closure commit does not contain the session 15 proof")
+    subject = _git(root, "show", "-s", "--format=%s", sha).stdout.rstrip("\n")
+    try:
+        refuse_release_claim(subject)
+    except ClosureRefusal as error:
+        raise ControlStateError(error.code) from error
+
+
 def _verify_completion_repository(
     state_path: Path,
     previous: ControlState,
@@ -1104,6 +1120,8 @@ def _verify_completion_repository(
         _require_session_13_closure_proof(repo_root, closure)
     if previous["current_session"] == 14:
         _require_session_14_closure_proof(repo_root, closure)
+    if previous["current_session"] == 15:
+        _require_session_15_closure_proof(repo_root, closure)
 
 
 def _verify_activation_repository(
@@ -1887,8 +1905,108 @@ def apply_active_evidence_record_transition(state_path: Path, candidate_path: Pa
     )
 
 
+def validate_session_15_completion_transition(
+    previous: ControlState, current: ControlState
+) -> None:
+    """Close Session 15 in place. There is no session 16. The exit string is not written."""
+    if 16 in SESSION_PROMPTS:
+        raise ControlStateError("unsupported completion: session 16 is not a prompt")
+    if previous["current_session"] != 15 or current["current_session"] != 15:
+        raise ControlStateError("unsupported completion: session 15 stays the current session")
+    if previous["session_status"] != "incomplete" or current["session_status"] != "complete":
+        raise ControlStateError("unsupported completion: expected incomplete-to-complete")
+    for field in _IDENTITY_FIELDS:
+        if previous[field] != current[field]:
+            raise ControlStateError(f"unsupported completion: {field} cannot change")
+    _require_same_fields(previous, current, _COMPLETION_MUTABLE_FIELDS, "completion")
+    if current["state_revision"] != previous["state_revision"] + 1:
+        raise ControlStateError("state revision must advance exactly once")
+    if previous["completed_sessions"] != list(range(15)):
+        raise ControlStateError("previous completed_sessions are not contiguous")
+    if current["completed_sessions"] != list(range(16)):
+        raise ControlStateError("completed_sessions must append session 15 exactly once")
+    if previous["next_session"] != 15 or current["next_session"] != 15:
+        raise ControlStateError("session 15 has no successor")
+    if (
+        previous["next_prompt"] != SESSION_PROMPTS[15]
+        or current["next_prompt"] != SESSION_PROMPTS[15]
+    ):
+        raise ControlStateError("next prompt stays the Session 15 prompt")
+    if current["updated_at"] == previous["updated_at"]:
+        raise ControlStateError("updated_at must change for the completion transition")
+    if previous["transition_contract"] != current["transition_contract"]:
+        raise ControlStateError("unsupported completion: transition_contract cannot change")
+    if current["transition_contract"].get(_NEXT_SESSION_CONTRACT_KEY) != 15:
+        raise ControlStateError("session 15 does not advance the next session")
+    previous_evidence = previous["required_completion_evidence"]
+    current_evidence = current["required_completion_evidence"]
+    if (
+        previous_evidence.keys() != SESSION_EVIDENCE_KEYS[15]
+        or current_evidence.keys() != previous_evidence.keys()
+    ):
+        raise ControlStateError("completion evidence keys are missing or unsupported")
+    missing_previous_evidence = sorted(key for key, value in previous_evidence.items() if not value)
+    if missing_previous_evidence != [_CLOSURE_EVIDENCE_KEY]:
+        raise ControlStateError(
+            "pre-transition evidence must be complete except for the evidence-closure commit"
+        )
+    for key, value in previous_evidence.items():
+        expected = True if key == _CLOSURE_EVIDENCE_KEY else value
+        if current_evidence[key] != expected:
+            raise ControlStateError(
+                "completion evidence cannot change except for the evidence-closure commit"
+            )
+    if current["blockers"] != previous["blockers"]:
+        raise ControlStateError("completion may only remove existing blockers, never add or edit")
+    closure = current["evidence_closure_commit_sha"]
+    previous_closure = previous["evidence_closure_commit_sha"]
+    if not SHA_PATTERN.fullmatch(previous_closure or ""):
+        raise ControlStateError(
+            "pre-transition evidence_closure_commit_sha must identify the prior closure commit"
+        )
+    if previous["head_sha"] != previous_closure:
+        raise ControlStateError("pre-transition head_sha must identify the prior closure commit")
+    if not SHA_PATTERN.fullmatch(closure or ""):
+        raise ControlStateError("evidence_closure_commit_sha must be a lowercase 40-character hash")
+    if closure == previous_closure:
+        raise ControlStateError("each session requires a new evidence-closure commit")
+    if previous["bootstrap_commit_sha"] == closure:
+        raise ControlStateError("bootstrap and evidence-closure commit SHAs must be distinct")
+    if current["head_sha"] != closure:
+        raise ControlStateError("head_sha must identify the pre-transition evidence-closure commit")
+    try:
+        recorded = record_terminal_closure(
+            status=current["session_status"],
+            next_session=current["next_session"],
+            next_prompt=current["next_prompt"],
+            closure_recorded=current_evidence[_CLOSURE_EVIDENCE_KEY],
+        )
+    except ClosureRefusal as error:
+        raise ControlStateError(error.code) from error
+    if recorded.release_tagged or recorded.exit_string_present or recorded.next_session != 15:
+        raise ControlStateError("terminal_closure")
+    rendered = json.dumps(current)
+    if (
+        "HANDS_OFF_MONEY_MACHINE_COMMISSIONED" in rendered
+        or "SESSION_14_PRODUCTION_DEPLOYMENT_COMPLETE" in rendered
+    ):
+        raise ControlStateError("the exit string is not written")
+
+
 def apply_completion_transition(state_path: Path, candidate_path: Path) -> ControlState:
-    """Validate a completion candidate and atomically replace the current state file."""
+    """Validate a completion candidate and atomically replace the current state file.
+
+    Session 15 closes in place. There is no session 16 prompt, so the generic
+    advance does not apply.
+    """
+    previous, _raw = _parse_state(state_path, "current state")
+    if previous["current_session"] == 15 and previous["session_status"] == "incomplete":
+        return _apply_transition(
+            state_path,
+            candidate_path,
+            validate_session_15_completion_transition,
+            _verify_completion_repository,
+        )
     return _apply_transition(
         state_path,
         candidate_path,
