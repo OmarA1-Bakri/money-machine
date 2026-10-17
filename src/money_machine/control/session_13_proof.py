@@ -123,6 +123,17 @@ _SESSION_14_KEYS = frozenset(
         _CLOSURE_EVIDENCE_KEY,
     }
 )
+_SESSION_15_KEYS = frozenset(
+    {
+        "acceptance_matrix_recorded",
+        "control_files_and_checkpoint_current",
+        "deployed_state_checked",
+        "evidence_closure_commit_recorded",
+        "linked_workflow_fixture",
+        "provider_connections_fail_closed",
+        "standing_authority_recorded",
+    }
+)
 
 
 class Session13ProofError(ValueError):
@@ -315,6 +326,22 @@ def _prove_control_files() -> None:
     values_are_bool = isinstance(evidence, dict) and all(
         isinstance(value, bool) for value in evidence.values()
     )
+    if decoded.get("current_session") == 15:
+        if (
+            decoded.get("session_status") != "incomplete"
+            or decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
+            or decoded.get("head_sha") != _SESSION_14_CLOSURE
+            or recorded != set(_SESSION_15_KEYS)
+            or not values_are_bool
+            or not isinstance(evidence, dict)
+            or len(evidence) != len(recorded)
+            or decoded.get("next_session") != 15
+            or decoded.get("completed_sessions") != list(range(15))
+            or decoded.get("next_prompt") != _SESSION_15_PROMPT
+            or any(value is not False for value in evidence.values())
+        ):
+            raise Session13ProofError("control_checkpoint")
+        return
     if decoded.get("current_session") == 14:
         if (
             decoded.get("session_status") != "complete"

@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-17 — Session 15 activated
+
+**Verification scope**: live `activate` from revision 111 to 112. No live HTTP. No service start. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 15, `incomplete`, revision 112, `updated_at` `2026-10-17T16:00:00Z` | PASS |
+| Keys | Every Session 15 key is false | PASS |
+| Head | `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e` | PASS |
+| Hold | No service is started. A live account is not connected | PASS |
+
+The command printed `{"applied": true, "command": "activate", "session": 15, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 112}`. The Session 15 contract, the checkpoint proof, the completion proof, the control proof, the release proof, the packaging proof, the target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, the contiguous-contract check, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 127 passed in 14.45s. `ruff check` and `pyright` on the checkpoint, the Session 09 through 14 proofs, and the evidence catalogue were clean.
+
 ## 2026-10-17 — Session 15 evidence contract installed
 
 **Verification scope**: contract installation only. `IMPLEMENTATION_STATE.json` stays revision 111. No activation. No live HTTP. Exit 78 stays HELD. The exit string is not written.

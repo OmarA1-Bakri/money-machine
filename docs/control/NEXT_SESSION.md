@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 15 is activated (2026-10-17)
+
+Revision 112 is incomplete Session 15. Every Session 15 key is false. `completed_sessions` stays 0 through 14. `next_session` stays 15. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Exit 78 stays HELD. The next honest step is `deployed_state_checked`: the checkpoint reads the continuity files and refuses a live smoke. A live account stays deferred.
+
 ## Session 15 contract is installed (2026-10-17)
 
 D-0088 names seven Session 15 keys. Revision 111 stays complete Session 14. Every Session 14 key stays true. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Session 15 is not activated. Exit 78 stays HELD. The next honest step is activation, which installs every Session 15 key false. A live account stays deferred.

@@ -67,27 +67,21 @@ def test_session_13_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_is_incomplete_session_13() -> None:
-    """Session 13 stays closed. Session 14 is complete."""
+    """Session 13 stays closed. Session 15 is activated and every key is false."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 111
-    assert live["current_session"] == 14
-    assert live["session_status"] == "complete"
-    assert live["updated_at"] == "2026-10-17T15:35:00Z"
+    assert live["state_revision"] == 112
+    assert live["current_session"] == 15
+    assert live["session_status"] == "incomplete"
+    assert live["updated_at"] == "2026-10-17T16:00:00Z"
     assert live["completed_sessions"] == list(range(15))
     assert live["next_session"] == 15
     assert live["next_prompt"] == SESSION_PROMPTS[15]
     assert live["head_sha"] == CLOSURE_HEAD
     assert live["evidence_closure_commit_sha"] == CLOSURE_HEAD
     evidence = live["required_completion_evidence"]
-    assert set(evidence) == set(SESSION_EVIDENCE_KEYS[14])
-    assert evidence["deployment_target_recorded"] is True
-    assert evidence["production_packaging_defined"] is True
-    assert evidence["release_rollback_implemented"] is True
-    assert evidence["service_controls_fail_closed"] is True
-    assert evidence["control_files_and_checkpoint_current"] is True
-    assert evidence["evidence_closure_commit_recorded"] is True
-    assert sum(1 for value in evidence.values() if value is True) == 6
+    assert set(evidence) == set(SESSION_EVIDENCE_KEYS[15])
+    assert not any(evidence.values())
     assert "SESSION_13_E2E_AND_HARDENING_COMPLETE" not in text
 
 

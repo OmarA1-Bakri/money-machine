@@ -830,8 +830,8 @@ async def test_adopted_database_rejects_a_text_title(tmp_path: Path) -> None:
 
 def test_live_pointer_is_incomplete_session_ten() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    assert state["current_session"] == 14
-    assert state["session_status"] == "complete"
+    assert state["current_session"] == 15
+    assert state["session_status"] == "incomplete"
     assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
     assert state["next_session"] == 15
     assert state["next_prompt"] == "18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md"
@@ -841,15 +841,9 @@ def test_live_pointer_is_incomplete_session_ten() -> None:
     assert state["last_verified_commit"] == BOOTSTRAP_SHA
     assert state["commissioned_agents"] == []
     evidence = state["required_completion_evidence"]
-    assert evidence.keys() == SESSION_EVIDENCE_KEYS[14]
-    assert evidence["deployment_target_recorded"] is True
-    assert evidence["production_packaging_defined"] is True
-    assert evidence["release_rollback_implemented"] is True
-    assert evidence["service_controls_fail_closed"] is True
-    assert evidence["control_files_and_checkpoint_current"] is True
-    assert evidence["evidence_closure_commit_recorded"] is True
-    assert sum(1 for value in evidence.values() if value is True) == 6
-    assert state["state_revision"] == 111
+    assert evidence.keys() == SESSION_EVIDENCE_KEYS[15]
+    assert not any(evidence.values())
+    assert state["state_revision"] == 112
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")
     assert "SESSION_08_MERCHANDISING_AND_ASSETS_COMPLETE" not in STATE_PATH.read_text(
         encoding="utf-8"

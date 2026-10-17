@@ -77,16 +77,10 @@ def test_live_pointer_records_the_closure_key() -> None:
     """Session 10 stays closed. Session 14 is complete."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    evidence = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[14]), False)
-    evidence["deployment_target_recorded"] = True
-    evidence["production_packaging_defined"] = True
-    evidence["release_rollback_implemented"] = True
-    evidence["service_controls_fail_closed"] = True
-    evidence["control_files_and_checkpoint_current"] = True
-    evidence["evidence_closure_commit_recorded"] = True
-    assert live["state_revision"] == 111
-    assert live["current_session"] == 14
-    assert live["session_status"] == "complete"
+    evidence = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[15]), False)
+    assert live["state_revision"] == 112
+    assert live["current_session"] == 15
+    assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(15))
     assert live["next_session"] == 15
     assert live["next_prompt"] == SESSION_PROMPTS[15]

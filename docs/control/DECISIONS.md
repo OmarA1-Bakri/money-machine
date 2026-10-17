@@ -1370,3 +1370,19 @@ The Session 15 contract has seven keys: `deployed_state_checked`, `provider_conn
 ### Consequences
 
 The next honest step is activation, which installs every Session 15 key false. A live account stays deferred. Exit 78 stays HELD. The exit string is not written. There is no session 16 prompt, so the generic completion transition is not used in this decision.
+
+## D-0089 — Session 15 activation
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 14 is complete at revision 111. The Session 15 contract is installed (D-0088) and the session is not activated. Every Session 14 key is true. A live account is still deferred.
+
+### Decision
+
+`activate` advances `state_revision` from 111 to 112. `updated_at` is `2026-10-17T16:00:00Z`. `current_session` is 15. `session_status` is incomplete. `completed_sessions` stays 0 through 14. `next_session` stays 15. `next_prompt` stays `18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md`. Every Session 15 key is false. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Exit 78 stays HELD. The exit string is not written. No live provider call is made.
+
+### Consequences
+
+The next honest step is `deployed_state_checked`: the checkpoint reads the continuity files and refuses a live smoke. A live account stays deferred. Exit 78 stays HELD. The exit string is not written.

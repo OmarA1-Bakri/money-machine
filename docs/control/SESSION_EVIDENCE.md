@@ -1,8 +1,8 @@
 # Session evidence
 
-The checked-in pointer is Session 14 at state revision 111.
-`current_session` is 14. `session_status` is complete.
-Every Session 14 key is true. Session 15 is not activated.
+The checked-in pointer is Session 15 at state revision 112.
+`current_session` is 15. `session_status` is incomplete.
+Every Session 15 key is false. A live account is not connected.
 Session 10 is complete and every one of its keys is true.
 Session 09 is complete and every one of its keys is true.
 Session 08 is complete and every one of its keys is true.
@@ -14,8 +14,8 @@ Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
 Session 13 is complete. Every key is true.
-Session 14 is complete. Session 15 is not activated.
-The Session 15 contract is installed. It is not activated.
+Session 14 is complete. Session 15 is activated.
+Every Session 15 key is false. A live account is not connected.
 
 ## Session 00
 
@@ -277,8 +277,8 @@ Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
 Session 13 is complete. Every key is true.
-Session 14 is complete. Session 15 is not activated.
-The Session 15 contract is installed. It is not activated.
+Session 14 is complete. Session 15 is activated.
+Every Session 15 key is false. A live account is not connected.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
 ## Session 11
@@ -374,9 +374,9 @@ Fixture paths:
 ## Session 15
 
 Prompt: `18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md`.
-Status: not activated.
-Evidence contract: installed, not activated.
-Session 15 is not activated. A live account is not connected.
+Status: incomplete.
+Evidence contract: installed.
+Every Session 15 key is false. A live account is not connected.
 
 Fixture paths:
 
@@ -387,10 +387,10 @@ Fixture paths:
 
 | Key | Recorded |
 |---|---|
-| `acceptance_matrix_recorded` | not installed |
-| `control_files_and_checkpoint_current` | not installed |
-| `deployed_state_checked` | not installed |
-| `evidence_closure_commit_recorded` | not installed |
-| `linked_workflow_fixture` | not installed |
-| `provider_connections_fail_closed` | not installed |
-| `standing_authority_recorded` | not installed |
+| `acceptance_matrix_recorded` | false |
+| `control_files_and_checkpoint_current` | false |
+| `deployed_state_checked` | false |
+| `evidence_closure_commit_recorded` | false |
+| `linked_workflow_fixture` | false |
+| `provider_connections_fail_closed` | false |
+| `standing_authority_recorded` | false |

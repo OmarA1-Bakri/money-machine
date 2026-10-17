@@ -1,7 +1,8 @@
 """Inspect the deployment checkpoint against the continuity files.
 
-The catalogue must match the renderer. The closure key stays false. The
-exit string is not a current checkpoint. No socket is opened.
+The catalogue must match the renderer. A completed Session 14 records the
+closure key. An activated Session 15 records every key false. The exit
+string is not a current checkpoint. No socket is opened.
 """
 
 from __future__ import annotations
@@ -43,7 +44,7 @@ class CheckpointRefusal(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class DeploymentCheckpoint:
-    """A current incomplete Session 14 checkpoint. The closure key stays false."""
+    """The current deployment pointer. Session 15 starts with every key false."""
 
     revision: int
     updated_at: str
@@ -65,7 +66,8 @@ def inspect_deployment_checkpoint(
     """Read the six continuity files and the four deploy modules.
 
     ``expected_true_keys`` includes the closure key only when Session 14 is
-    complete. The state file must not contain the exit string. A decision
+    complete. An empty set matches activated Session 15, whose keys are
+    false. The state file must not contain the exit string. A decision
     line that names it must also say it is not written.
     """
     closed = _CLOSURE_KEY in expected_true_keys
@@ -162,18 +164,27 @@ def _pointer_matches(
 ) -> bool:
     completed = state.get("completed_sessions")
     commissioned = state.get("commissioned_agents")
+    session = state.get("current_session")
     if closed:
+        expected_session = 14
         status = "complete"
         nxt = 15
         prompt = _CLOSED_PROMPT
         finished = list(range(15))
+    elif session == 15:
+        expected_session = 15
+        status = "incomplete"
+        nxt = 15
+        prompt = _CLOSED_PROMPT
+        finished = list(range(15))
     else:
+        expected_session = 14
         status = "incomplete"
         nxt = 14
         prompt = _PROMPT
         finished = list(range(14))
     return (
-        state.get("current_session") == 14
+        session == expected_session
         and state.get("session_status") == status
         and state.get("state_revision") == expected_revision
         and state.get("updated_at") == expected_updated_at

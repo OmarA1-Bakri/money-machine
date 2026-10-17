@@ -77,22 +77,16 @@ def test_live_pointer_is_incomplete_session_10() -> None:
     """Session 09 stays closed. Session 14 is complete."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 111
-    assert live["current_session"] == 14
-    assert live["session_status"] == "complete"
+    assert live["state_revision"] == 112
+    assert live["current_session"] == 15
+    assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(15))
     assert live["next_session"] == 15
     assert live["next_prompt"] == SESSION_PROMPTS[15]
     assert live["head_sha"] == "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
     evidence = live["required_completion_evidence"]
-    assert set(evidence) == set(SESSION_EVIDENCE_KEYS[14])
-    assert evidence["deployment_target_recorded"] is True
-    assert evidence["production_packaging_defined"] is True
-    assert evidence["release_rollback_implemented"] is True
-    assert evidence["service_controls_fail_closed"] is True
-    assert evidence["control_files_and_checkpoint_current"] is True
-    assert evidence["evidence_closure_commit_recorded"] is True
-    assert sum(1 for value in evidence.values() if value is True) == 6
+    assert set(evidence) == set(SESSION_EVIDENCE_KEYS[15])
+    assert not any(evidence.values())
     assert "SESSION_09_ETSY_PUBLISHING_COMPLETE" not in text
 
 

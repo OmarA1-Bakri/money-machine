@@ -71,6 +71,17 @@ _SESSION_14_KEYS = frozenset(
         "evidence_closure_commit_recorded",
     }
 )
+_SESSION_15_KEYS = frozenset(
+    {
+        "acceptance_matrix_recorded",
+        "control_files_and_checkpoint_current",
+        "deployed_state_checked",
+        "evidence_closure_commit_recorded",
+        "linked_workflow_fixture",
+        "provider_connections_fail_closed",
+        "standing_authority_recorded",
+    }
+)
 _SESSION_11_PROMPT = "14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md"
 _SESSION_12_PROMPT = "15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md"
 _SESSION_13_PROMPT = "16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md"
@@ -438,6 +449,9 @@ def _prove_control_files() -> None:
     evidence = decoded.get("required_completion_evidence")
     recorded = set(evidence) if isinstance(evidence, dict) else set()
     status = decoded.get("session_status")
+    if decoded.get("current_session") == 15:
+        _prove_activated_session_15(decoded, evidence, status, recorded)
+        return
     if decoded.get("current_session") == 14:
         _prove_activated_session_14(decoded, evidence, status, recorded)
         return
@@ -540,6 +554,32 @@ def _prove_activated_session_13(
         or decoded.get("completed_sessions") != list(range(14))
         or decoded.get("next_prompt") != _SESSION_14_PROMPT
         or any(value is not True for value in evidence.values())
+    ):
+        raise Session11ProofError("control_checkpoint")
+
+
+def _prove_activated_session_15(
+    decoded: dict[str, object],
+    evidence: object,
+    status: object,
+    recorded: set[str],
+) -> None:
+    """Session 11 stays closed while Session 15 is activated."""
+    values_are_bool = isinstance(evidence, dict) and all(
+        isinstance(value, bool) for value in evidence.values()
+    )
+    if (
+        decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
+        or decoded.get("head_sha") != _SESSION_14_CLOSURE
+        or recorded != set(_SESSION_15_KEYS)
+        or not values_are_bool
+        or not isinstance(evidence, dict)
+        or len(evidence) != len(recorded)
+        or status != "incomplete"
+        or decoded.get("next_session") != 15
+        or decoded.get("completed_sessions") != list(range(15))
+        or decoded.get("next_prompt") != _SESSION_15_PROMPT
+        or any(value is not False for value in evidence.values())
     ):
         raise Session11ProofError("control_checkpoint")
 

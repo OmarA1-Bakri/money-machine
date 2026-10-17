@@ -77,16 +77,10 @@ def test_live_pointer_is_the_session_11_activation() -> None:
     """Session 11 stays closed. Session 14 is complete."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    expected = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[14]), False)
-    expected["deployment_target_recorded"] = True
-    expected["production_packaging_defined"] = True
-    expected["release_rollback_implemented"] = True
-    expected["service_controls_fail_closed"] = True
-    expected["control_files_and_checkpoint_current"] = True
-    expected["evidence_closure_commit_recorded"] = True
-    assert live["state_revision"] == 111
-    assert live["current_session"] == 14
-    assert live["session_status"] == "complete"
+    expected = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[15]), False)
+    assert live["state_revision"] == 112
+    assert live["current_session"] == 15
+    assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(15))
     assert live["next_session"] == 15
     assert live["next_prompt"] == "18_SESSION_15_LIVE_COMMISSIONING_AND_HANDOVER.md"

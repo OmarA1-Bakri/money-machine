@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 15 activated
+
+`activate` advanced `state_revision` from 111 to 112. `updated_at` is `2026-10-17T16:00:00Z`. `current_session` is 15. `session_status` is incomplete. `completed_sessions` stays 0 through 14. `next_session` stays 15. Every Session 15 key is false. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. Exit 78 stays HELD. No live provider call is made. No Session 15 key is earned.
+
 ## 2026-10-17 — Session 15 evidence contract installed
 
 D-0088 names the seven Session 15 keys. `SESSION_EVIDENCE_KEYS[15]` holds them. Activation is not applied. `IMPLEMENTATION_STATE.json` stays revision 111, Session 14 complete, every Session 14 key true. A live account, a live publish, a purchase, Exit 78, and the exit string are not keys. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-15-prompt-integrity.md`. No live provider call is made.

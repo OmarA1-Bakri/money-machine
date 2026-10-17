@@ -37,12 +37,9 @@ PREVIOUS_KEYS = frozenset(
         "service_controls_fail_closed",
     }
 )
-LIVE_REVISION = 111
-LIVE_AT = "2026-10-17T15:35:00Z"
-LIVE_KEYS = PREVIOUS_KEYS | {
-    "control_files_and_checkpoint_current",
-    "evidence_closure_commit_recorded",
-}
+LIVE_REVISION = 112
+LIVE_AT = "2026-10-17T16:00:00Z"
+LIVE_KEYS: frozenset[str] = frozenset()
 
 
 def _live() -> ControlState:
@@ -90,7 +87,7 @@ def test_checkpoint_matches_the_continuity_files() -> None:
     assert checkpoint.head_sha == CLOSURE_HEAD
     assert checkpoint.true_keys == tuple(sorted(LIVE_KEYS))
     assert checkpoint.catalogue_matches is True
-    assert checkpoint.closure_recorded is True
+    assert checkpoint.closure_recorded is False
     assert checkpoint.exit_string_present is False
 
 
