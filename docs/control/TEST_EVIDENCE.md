@@ -1,5 +1,17 @@
 # Test Evidence
 
+## 2026-10-17 — Session 13 closure recorded
+
+**Verification scope**: live `apply-completion` from revision 103 to 104. No live HTTP. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 13, `complete`, revision 104, `updated_at` `2026-10-17T14:40:00Z` | PASS |
+| Closure | Every Session 13 key is true. `next_session` is 14. Session 14 is not activated | PASS |
+| Head | `head_sha` is `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`, the commit that holds `def prove_session_13` and the pre-transition state | PASS |
+
+The command printed `{"applied": true, "command": "apply-completion", "session": 13, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 104}`. The backup tests, the failure-injection tests, the synthetic path tests, the matrix proof, the contract pin, the Session 13 completion pin, the prompt-integrity gate, the Session 12 closure pin, the Session 12 contract, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, the telemetry and operator-action unit tests, and the support intake unit tests printed 137 passed in 32.98s. The continuity-shape test compares `head_sha` with this pointer commit, so it runs after the commit.
+
 ## 2026-10-17 — Session 13 control files recorded
 
 **Verification scope**: live `record-evidence` from revision 102 to 103. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.

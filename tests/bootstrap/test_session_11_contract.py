@@ -74,21 +74,16 @@ def test_session_11_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_is_the_session_11_activation() -> None:
-    """Session 11 stays closed. Session 13 is activated and every key is false."""
+    """Session 11 stays closed. Session 13 is complete and every key is true."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    expected = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[13]), False)
-    expected["implementation_matrix_recorded"] = True
-    expected["synthetic_paths_implemented"] = True
-    expected["failure_injection_implemented"] = True
-    expected["backup_restore_fixture_implemented"] = True
-    expected["control_files_and_checkpoint_current"] = True
-    assert live["state_revision"] == 103
+    expected = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[13]), True)
+    assert live["state_revision"] == 104
     assert live["current_session"] == 13
-    assert live["session_status"] == "incomplete"
-    assert live["completed_sessions"] == list(range(13))
-    assert live["next_session"] == 13
-    assert live["head_sha"] == "d81db61033561bdd40869ff1316f0c935c74cdf4"
+    assert live["session_status"] == "complete"
+    assert live["completed_sessions"] == list(range(14))
+    assert live["next_session"] == 14
+    assert live["head_sha"] == "fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a"
     assert live["required_completion_evidence"] == expected
     assert "SESSION_11_SUPPORT_AND_REPAIR_COMPLETE" not in text
 

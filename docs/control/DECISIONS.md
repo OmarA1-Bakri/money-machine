@@ -1210,3 +1210,19 @@ Session 13 is incomplete at revision 102. The matrix, the synthetic paths, the f
 ### Consequences
 
 The control-file checkpoint is recorded. The closure key is not recorded. The next honest step is `evidence_closure_commit_recorded`, through `apply-completion`. That commit must contain the proof and the pre-transition state. `head_sha` does not move in this decision.
+
+## D-0079 — Session 13 closure
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 13 is incomplete at revision 103. Five keys are true. `evidence_closure_commit_recorded` is false. The closure commit must contain `def prove_session_13` and the exact pre-transition state. The exit string is not a key.
+
+### Decision
+
+`apply-completion` advances `state_revision` from 103 to 104. `updated_at` is `2026-10-17T14:40:00Z`. Every Session 13 key is true. `session_status` is complete. `current_session` stays 13. `completed_sessions` is 0 through 13. `next_session` is 14. `next_prompt` is `17_SESSION_14_DEPLOYMENT.md`. `head_sha` and `evidence_closure_commit_sha` are `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. That commit contains `def prove_session_13` and the pre-transition state. Session 14 is not activated. Exit 78 stays HELD. The exit string is not written.
+
+### Consequences
+
+Session 13 is complete. The next honest step is the Session 14 evidence contract. A live deploy stays deferred until that contract says otherwise.

@@ -57,6 +57,8 @@ _CONTROL_FILES = (
 _PRIOR_HEAD = "f16c7ed0598daf3f4627955b52585f253ae1b918"
 _CLOSURE_HEAD = "d095501665fbda0f9e6a0e77b57531bc33fda4e2"
 _SESSION_12_CLOSURE = "d81db61033561bdd40869ff1316f0c935c74cdf4"
+_SESSION_13_CLOSURE = "fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a"
+_SESSION_14_PROMPT = "17_SESSION_14_DEPLOYMENT.md"
 _SESSION_11_PROMPT = "14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md"
 _SESSION_12_PROMPT = "15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md"
 _SESSION_13_PROMPT = "16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md"
@@ -507,20 +509,21 @@ def _prove_activated_session_13(
     status: object,
     recorded: set[str],
 ) -> None:
-    """Session 11 stays closed while Session 13 is incomplete."""
+    """Session 11 stays closed while Session 13 is complete."""
     values_are_bool = isinstance(evidence, dict) and all(
         isinstance(value, bool) for value in evidence.values()
     )
     if (
         decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
-        or decoded.get("head_sha") != _SESSION_12_CLOSURE
+        or decoded.get("head_sha") != _SESSION_13_CLOSURE
         or recorded != set(_SESSION_13_KEYS)
         or not values_are_bool
         or not isinstance(evidence, dict)
         or len(evidence) != len(recorded)
-        or status != "incomplete"
-        or decoded.get("next_session") != 13
-        or decoded.get("completed_sessions") != list(range(13))
-        or decoded.get("next_prompt") != _SESSION_13_PROMPT
+        or status != "complete"
+        or decoded.get("next_session") != 14
+        or decoded.get("completed_sessions") != list(range(14))
+        or decoded.get("next_prompt") != _SESSION_14_PROMPT
+        or any(value is not True for value in evidence.values())
     ):
         raise Session11ProofError("control_checkpoint")

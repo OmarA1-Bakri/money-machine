@@ -1,10 +1,9 @@
 # Session evidence
 
-The checked-in pointer is Session 13 at state revision 103.
-`current_session` is 13. `session_status` is incomplete.
-The matrix, synthetic paths, failure injections, backup fixture, and
-control-file checkpoint are true.
-The closure key is false.
+The checked-in pointer is Session 13 at state revision 104.
+`current_session` is 13. `session_status` is complete.
+Every Session 13 key is true.
+Session 14 is not activated.
 Session 10 is complete and every one of its keys is true.
 Session 09 is complete and every one of its keys is true.
 Session 08 is complete and every one of its keys is true.
@@ -15,9 +14,8 @@ D-0036 recorded the twelve Session 07 keys true. The closure commit is
 Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
-Session 13 is activated and incomplete.
-The matrix, synthetic paths, failure injections, backup fixture, and
-control-file checkpoint are true.
+Session 13 is complete. Every key is true.
+Session 14 is not activated.
 Sessions 14 and 15 have no contract.
 
 ## Session 00
@@ -279,9 +277,8 @@ Head SHA: `f16c7ed0598daf3f4627955b52585f253ae1b918`.
 Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
-Session 13 is activated and incomplete.
-The matrix, synthetic paths, failure injections, backup fixture, and
-control-file checkpoint are true.
+Session 13 is complete. Every key is true.
+Session 14 is not activated.
 Sessions 14 and 15 have no contract.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
@@ -290,7 +287,7 @@ A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 Prompt: `14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md`.
 Status: complete.
 Evidence contract: installed.
-Every Session 11 key is earned. Session 12 is complete. Session 13 records the implementation matrix. Synthetic paths are not recorded. A16 stays DESIGNED.
+Every Session 11 key is earned. Session 12 is complete. Session 13 is complete. Session 14 is not activated. A16 stays DESIGNED.
 
 Fixture paths:
 
@@ -310,7 +307,7 @@ Fixture paths:
 Prompt: `15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md`.
 Status: complete.
 Evidence contract: installed.
-Every Session 12 key is earned. Session 13 records the implementation matrix. Synthetic paths are not recorded. Exit 78 stays HELD.
+Every Session 12 key is earned. Session 13 is complete. Session 14 is not activated. Exit 78 stays HELD.
 
 Fixture paths:
 
@@ -331,9 +328,9 @@ Fixture paths:
 ## Session 13
 
 Prompt: `16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md`.
-Status: incomplete.
+Status: complete.
 Evidence contract: installed.
-The implementation matrix, the synthetic paths, the failure injections, the backup fixture, and the control-file checkpoint are recorded. The closure key is not recorded.
+Every Session 13 key is earned. Session 14 is not activated. Exit 78 stays HELD.
 
 Fixture paths:
 
@@ -346,7 +343,7 @@ Fixture paths:
 |---|---|
 | `backup_restore_fixture_implemented` | true |
 | `control_files_and_checkpoint_current` | true |
-| `evidence_closure_commit_recorded` | false |
+| `evidence_closure_commit_recorded` | true |
 | `failure_injection_implemented` | true |
 | `implementation_matrix_recorded` | true |
 | `synthetic_paths_implemented` | true |

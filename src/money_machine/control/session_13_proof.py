@@ -2,8 +2,8 @@
 
 The proof reads the matrix, runs the fixture paths, runs each named failure
 injection, restores the fixture snapshot twice, checks the continuity files,
-refuses a live publish, and does not open a socket. The closure key stays
-unearned.
+refuses a live publish, and does not open a socket. Completion records the
+closure key. This proof requires that completed pointer.
 """
 
 from __future__ import annotations
@@ -109,8 +109,8 @@ _CONTROL_FILES = (
     Path("docs/control/NEXT_SESSION.md"),
     Path("docs/control/SESSION_EVIDENCE.md"),
 )
-_CLOSURE_HEAD = "d81db61033561bdd40869ff1316f0c935c74cdf4"
-_SESSION_13_PROMPT = "16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md"
+_CLOSURE_HEAD = "fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a"
+_SESSION_14_PROMPT = "17_SESSION_14_DEPLOYMENT.md"
 
 
 class Session13ProofError(ValueError):
@@ -305,16 +305,16 @@ def _prove_control_files() -> None:
     )
     if (
         decoded.get("current_session") != 13
-        or decoded.get("session_status") != "incomplete"
+        or decoded.get("session_status") != "complete"
         or decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
         or decoded.get("head_sha") != _CLOSURE_HEAD
         or recorded != set(_SESSION_13_KEYS)
         or not values_are_bool
         or not isinstance(evidence, dict)
         or len(evidence) != len(recorded)
-        or decoded.get("next_session") != 13
-        or decoded.get("completed_sessions") != list(range(13))
-        or decoded.get("next_prompt") != _SESSION_13_PROMPT
-        or evidence.get(_CLOSURE_EVIDENCE_KEY) is not False
+        or decoded.get("next_session") != 14
+        or decoded.get("completed_sessions") != list(range(14))
+        or decoded.get("next_prompt") != _SESSION_14_PROMPT
+        or any(value is not True for value in evidence.values())
     ):
         raise Session13ProofError("control_checkpoint")

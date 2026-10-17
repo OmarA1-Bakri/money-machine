@@ -60,21 +60,16 @@ def test_closed_snapshots_match_the_commits_that_hold_them() -> None:
 def test_live_pointer_is_incomplete_session_13() -> None:
     live = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert live["current_session"] == 13
-    assert live["session_status"] == "incomplete"
-    assert live["state_revision"] == 103
-    assert live["completed_sessions"] == list(range(13))
-    assert live["next_session"] == 13
-    assert live["next_prompt"] == SESSION_PROMPTS[13]
-    assert live["head_sha"] == "d81db61033561bdd40869ff1316f0c935c74cdf4"
+    assert live["session_status"] == "complete"
+    assert live["state_revision"] == 104
+    assert live["completed_sessions"] == list(range(14))
+    assert live["next_session"] == 14
+    assert live["next_prompt"] == SESSION_PROMPTS[14]
+    assert live["head_sha"] == "fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a"
     assert live["evidence_closure_commit_sha"] == live["head_sha"]
     evidence = live["required_completion_evidence"]
     assert isinstance(evidence, dict)
-    expected = {key: False for key in sorted(SESSION_EVIDENCE_KEYS[13])}
-    expected["implementation_matrix_recorded"] = True
-    expected["synthetic_paths_implemented"] = True
-    expected["failure_injection_implemented"] = True
-    expected["backup_restore_fixture_implemented"] = True
-    expected["control_files_and_checkpoint_current"] = True
+    expected = {key: True for key in sorted(SESSION_EVIDENCE_KEYS[13])}
     assert evidence == expected
 
 
@@ -92,15 +87,7 @@ def test_open_sessions_have_no_recorded_true_key() -> None:
         elif record.session == 13:
             assert record.session in SESSION_EVIDENCE_KEYS
             assert record.activated is True
-            assert record.true_keys == frozenset(
-                {
-                    "implementation_matrix_recorded",
-                    "synthetic_paths_implemented",
-                    "failure_injection_implemented",
-                    "backup_restore_fixture_implemented",
-                    "control_files_and_checkpoint_current",
-                }
-            )
+            assert record.true_keys == frozenset(SESSION_EVIDENCE_KEYS[13])
         else:
             assert record.session not in SESSION_EVIDENCE_KEYS
             assert record.true_keys == frozenset()

@@ -30,7 +30,7 @@ SESSION_13_KEYS = frozenset(
     }
 )
 ACTIVATED_AT = "2026-10-17T13:45:00Z"
-CLOSURE_HEAD = "d81db61033561bdd40869ff1316f0c935c74cdf4"
+CLOSURE_HEAD = "fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a"
 
 
 def _live() -> ControlState:
@@ -70,12 +70,12 @@ def test_live_pointer_is_incomplete_session_13() -> None:
     """Session 13 is activated. Every Session 13 key is false."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 103
+    assert live["state_revision"] == 104
     assert live["current_session"] == 13
-    assert live["session_status"] == "incomplete"
-    assert live["updated_at"] == "2026-10-17T14:35:00Z"
-    assert live["completed_sessions"] == list(range(13))
-    assert live["next_session"] == 13
+    assert live["session_status"] == "complete"
+    assert live["updated_at"] == "2026-10-17T14:40:00Z"
+    assert live["completed_sessions"] == list(range(14))
+    assert live["next_session"] == 14
     assert live["head_sha"] == CLOSURE_HEAD
     assert live["evidence_closure_commit_sha"] == CLOSURE_HEAD
     evidence = live["required_completion_evidence"]
@@ -85,7 +85,8 @@ def test_live_pointer_is_incomplete_session_13() -> None:
     assert evidence["failure_injection_implemented"] is True
     assert evidence["backup_restore_fixture_implemented"] is True
     assert evidence["control_files_and_checkpoint_current"] is True
-    assert sum(value is True for value in evidence.values()) == 5
+    assert evidence["evidence_closure_commit_recorded"] is True
+    assert sum(value is True for value in evidence.values()) == 6
     assert "SESSION_13_E2E_AND_HARDENING_COMPLETE" not in text
 
 

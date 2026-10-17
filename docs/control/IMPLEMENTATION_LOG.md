@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 13 closure recorded
+
+`apply-completion` advanced `state_revision` from 103 to 104. `updated_at` is `2026-10-17T14:40:00Z`. Every Session 13 key is true. `session_status` is complete. `current_session` stays 13. `completed_sessions` is 0 through 13. `next_session` is 14. `next_prompt` is `17_SESSION_14_DEPLOYMENT.md`. `head_sha` and `evidence_closure_commit_sha` are `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. That commit contains `def prove_session_13` and the pre-transition state. Session 14 is not activated. Exit 78 stays HELD. The exit string is not written.
+
 ## 2026-10-17 — Session 13 control files recorded
 
 `record-evidence` advanced `state_revision` from 102 to 103. `updated_at` is `2026-10-17T14:35:00Z`. The matrix, the synthetic paths, the failure injections, the backup fixture, and `control_files_and_checkpoint_current` are true. The closure key stays false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. The five continuity files are present. The catalogue matches the rendered index. Exit 78 stays HELD.
