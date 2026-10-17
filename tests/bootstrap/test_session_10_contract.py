@@ -79,7 +79,8 @@ def test_live_pointer_records_the_closure_key() -> None:
     text = STATE_PATH.read_text(encoding="utf-8")
     evidence = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[15]), False)
     evidence["deployed_state_checked"] = True
-    assert live["state_revision"] == 113
+    evidence["provider_connections_fail_closed"] = True
+    assert live["state_revision"] == 114
     assert live["current_session"] == 15
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(15))

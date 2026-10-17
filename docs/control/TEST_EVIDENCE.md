@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-17 — Session 15 provider connections recorded
+
+**Verification scope**: live `record-evidence` from revision 113 to 114. No live HTTP. No credential read. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 15, `incomplete`, revision 114, `updated_at` `2026-10-17T16:15:00Z` | PASS |
+| Keys | `deployed_state_checked` and `provider_connections_fail_closed` are true. Five keys stay false | PASS |
+| Adapters | Fixture Etsy and Notion adapters are called. api, browser, combined, and live modes raise | PASS |
+| Head | `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e` | PASS |
+| Hold | No credential is read. No socket is opened. Exit 78 stays HELD | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 15, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 114}`. The provider-connection proof, the deployed-state proof, the Session 15 contract, the checkpoint proof, the completion proof, the control proof, the release proof, the packaging proof, the target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, the contiguous-contract check, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 146 passed in 4.52s. `ruff check` and `pyright` on the provider selector and the Session 15 proof were clean.
+
 ## 2026-10-17 — Session 15 deployed state recorded
 
 **Verification scope**: live `record-evidence` from revision 112 to 113. No live HTTP. No service start. Exit 78 stays HELD. The exit string is not written.

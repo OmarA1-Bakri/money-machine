@@ -1,7 +1,8 @@
-"""Earn the Session 15 deployed-state key.
+"""Earn the Session 15 deployed-state and provider-connection keys.
 
-The proof calls the deployed-state check. A paragraph that says the smoke
-passed does not earn a key. The closure key stays false.
+The proof calls the deployed-state check and the fixture provider selector.
+A paragraph that says the accounts are connected does not earn a key.
+The closure key stays false.
 """
 
 from __future__ import annotations
@@ -12,14 +13,20 @@ from pathlib import Path
 
 from money_machine.deploy.checkpoint import CheckpointRefusal
 from money_machine.deploy.deployed_state import DeployedStateRefusal, check_deployed_state
+from money_machine.integrations.provider_connections import (
+    ProviderConnectionRefusal,
+    select_provider_connections,
+)
 
 DEPLOYED_STATE_KEY = "deployed_state_checked"
-EARNED_EVIDENCE_KEYS = frozenset({DEPLOYED_STATE_KEY})
+PROVIDER_CONNECTIONS_KEY = "provider_connections_fail_closed"
+EARNED_EVIDENCE_KEYS = frozenset({DEPLOYED_STATE_KEY, PROVIDER_CONNECTIONS_KEY})
 _CLOSURE_HEAD = "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
-_POINTER_REVISION = 113
-_UPDATED_AT = "2026-10-17T16:10:00Z"
-_TRUE_KEYS: frozenset[str] = frozenset({DEPLOYED_STATE_KEY})
+_POINTER_REVISION = 114
+_UPDATED_AT = "2026-10-17T16:15:00Z"
+_TRUE_KEYS: frozenset[str] = frozenset({DEPLOYED_STATE_KEY, PROVIDER_CONNECTIONS_KEY})
 _MODULE = Path(__file__).resolve().parents[1] / "deploy" / "deployed_state.py"
+_CONNECTIONS = Path(__file__).resolve().parents[1] / "integrations" / "provider_connections.py"
 _WORKER = Path("src/money_machine/orchestration/worker.py")
 _SCHEDULER = Path("src/money_machine/orchestration/scheduler.py")
 
@@ -35,6 +42,7 @@ class Session15ProofError(ValueError):
 def prove_session_15() -> frozenset[str]:
     """Return the earned Session 15 keys. A miss raises instead of returning them."""
     _prove_deployed_state()
+    _prove_provider_connections()
     return EARNED_EVIDENCE_KEYS
 
 
@@ -106,6 +114,47 @@ def _prove_deployed_state() -> None:
         ),
         "service_start",
     )
+
+
+def _prove_provider_connections() -> None:
+    """The fixture adapters are selected. A live adapter raises and is not constructed."""
+    _refuse_network(_CONNECTIONS)
+    root = Path(__file__).resolve().parents[3]
+    before = {relative: (root / relative).read_bytes() for relative in (_WORKER, _SCHEDULER)}
+    try:
+        selected = select_provider_connections()
+    except ProviderConnectionRefusal as error:
+        raise Session15ProofError(error.code) from error
+    if {relative: (root / relative).read_bytes() for relative in before} != before:
+        raise Session15ProofError("sources_edited")
+    if (
+        selected.etsy != "fixture"
+        or selected.notion != "fixture"
+        or selected.listing_count < 1
+        or selected.notion_connected is not True
+        or selected.live_call is not False
+        or selected.credential_read is not False
+    ):
+        raise Session15ProofError("provider_connections")
+    for mode in ("api", "browser", "combined", "live", ""):
+        _require_provider_refusal(
+            lambda mode=mode: select_provider_connections(etsy_mode=mode),
+            "live_etsy",
+        )
+        _require_provider_refusal(
+            lambda mode=mode: select_provider_connections(notion_mode=mode),
+            "live_notion",
+        )
+
+
+def _require_provider_refusal(call: Callable[[], object], code: str) -> None:
+    try:
+        call()
+    except ProviderConnectionRefusal as error:
+        if error.code != code:
+            raise Session15ProofError(code) from error
+    else:
+        raise Session15ProofError(code)
 
 
 def _require_refusal(call: Callable[[], object], code: str) -> None:

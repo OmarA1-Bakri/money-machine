@@ -1402,3 +1402,19 @@ Session 15 is incomplete at revision 112. Every Session 15 key is false. The che
 ### Consequences
 
 The next honest step is `provider_connections_fail_closed`: the Etsy and Notion fixture adapters are selected and a live adapter raises. A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0091 — Session 15 provider connections
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 15 is incomplete at revision 113. `deployed_state_checked` is true. The other six Session 15 keys are false. A live Etsy or Notion adapter would read a credential and can mutate a provider account.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 113 to 114. `updated_at` is `2026-10-17T16:15:00Z`. `deployed_state_checked` and `provider_connections_fail_closed` are true. The other five Session 15 keys stay false. `session_status` stays incomplete. `current_session` stays 15. `completed_sessions` stays 0 through 14. `next_session` stays 15. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. `src/money_machine/integrations/provider_connections.py` constructs `FixtureEtsyAdapter` and `FixtureNotionAdapter`, calls a fixture search and the fixture connection status, and refuses api, browser, combined, and live modes before a live adapter is constructed. No `.env`, token, cookie, or browser profile is read. No socket is opened. Exit 78 stays HELD. The exit string is not written.
+
+### Consequences
+
+The next honest step is `standing_authority_recorded`: `AutonomyConfig` keeps publish, deactivate, multiply, purchase, and checkout false. A live account stays deferred. Exit 78 stays HELD. The exit string is not written.

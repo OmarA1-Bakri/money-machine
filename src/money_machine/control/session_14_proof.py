@@ -47,9 +47,11 @@ EARNED_EVIDENCE_KEYS = frozenset(
     }
 )
 _CLOSURE_HEAD = "02c26f39ac8800db03ae7f5d1d346487a5ce123e"
-_POINTER_REVISION = 113
-_UPDATED_AT = "2026-10-17T16:10:00Z"
-_TRUE_KEYS: frozenset[str] = frozenset({"deployed_state_checked"})
+_POINTER_REVISION = 114
+_UPDATED_AT = "2026-10-17T16:15:00Z"
+_TRUE_KEYS: frozenset[str] = frozenset(
+    {"deployed_state_checked", "provider_connections_fail_closed"}
+)
 
 
 class Session14ProofError(ValueError):

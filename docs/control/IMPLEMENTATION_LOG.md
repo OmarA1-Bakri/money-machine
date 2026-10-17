@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 15 provider connections recorded
+
+`record-evidence` advanced `state_revision` from 113 to 114. `updated_at` is `2026-10-17T16:15:00Z`. `deployed_state_checked` and `provider_connections_fail_closed` are true. The other five Session 15 keys stay false. `current_session` stays 15. `session_status` stays incomplete. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. `src/money_machine/integrations/provider_connections.py` selects the Etsy and Notion fixture adapters and refuses a live adapter before it is constructed. No credential is read. No socket is opened. Exit 78 stays HELD. The exit string is not written.
+
 ## 2026-10-17 — Session 15 deployed state recorded
 
 `record-evidence` advanced `state_revision` from 112 to 113. `updated_at` is `2026-10-17T16:10:00Z`. `deployed_state_checked` is true. The other six Session 15 keys stay false. `current_session` stays 15. `session_status` stays incomplete. `head_sha` stays `02c26f39ac8800db03ae7f5d1d346487a5ce123e`. `src/money_machine/deploy/deployed_state.py` reads the checkpoint and refuses a live smoke, a docker socket, and a service start. `worker.py` and `scheduler.py` are not edited. No service is started. Exit 78 stays HELD. The exit string is not written.
