@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-17 — Session 14 deployment checkpoint recorded
+
+**Verification scope**: live `record-evidence` from revision 109 to 110. No live HTTP. No socket. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 14, `incomplete`, revision 110, `updated_at` `2026-10-17T15:30:00Z` | PASS |
+| Keys | The target, the package, the release plan, the service controls, and `control_files_and_checkpoint_current` are true. The closure key is false | PASS |
+| Checkpoint | The inspector reads the six continuity files and the four deploy modules. The catalogue matches the renderer. A closure claim is refused | PASS |
+| Head | `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 14, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 110}`. The checkpoint proof, the control proof, the release proof, the packaging proof, the target proof, the Session 14 contract, the Session 13 contract and matrix proof, the Session 12 contract and read-model proof, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the evidence index, the prompt-integrity gate, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 118 passed in 3.82s. `ruff check` and `pyright` on the checkpoint module, the Session 14 proof, and the evidence catalogue were clean.
+
 ## 2026-10-17 — Session 14 service controls recorded
 
 **Verification scope**: live `record-evidence` from revision 108 to 109. No live HTTP. No docker socket. Exit 78 stays HELD. The exit string is not written.

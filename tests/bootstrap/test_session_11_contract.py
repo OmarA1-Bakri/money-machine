@@ -82,7 +82,8 @@ def test_live_pointer_is_the_session_11_activation() -> None:
     expected["production_packaging_defined"] = True
     expected["release_rollback_implemented"] = True
     expected["service_controls_fail_closed"] = True
-    assert live["state_revision"] == 109
+    expected["control_files_and_checkpoint_current"] = True
+    assert live["state_revision"] == 110
     assert live["current_session"] == 14
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(14))

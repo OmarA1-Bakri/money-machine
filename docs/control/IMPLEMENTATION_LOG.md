@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 14 deployment checkpoint recorded
+
+`record-evidence` advanced `state_revision` from 109 to 110. `updated_at` is `2026-10-17T15:30:00Z`. `deployment_target_recorded`, `production_packaging_defined`, `release_rollback_implemented`, `service_controls_fail_closed`, and `control_files_and_checkpoint_current` are true. The closure key stays false. `current_session` stays 14. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. The checkpoint inspector reads the six continuity files and the four deploy modules. The catalogue matches the renderer. No socket is opened. Exit 78 stays HELD.
+
 ## 2026-10-17 — Session 14 service controls recorded
 
 `record-evidence` advanced `state_revision` from 108 to 109. `updated_at` is `2026-10-17T15:25:00Z`. `deployment_target_recorded`, `production_packaging_defined`, `release_rollback_implemented`, and `service_controls_fail_closed` are true. The control-file key and the closure key stay false. `current_session` stays 14. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Start, stop, restart, status, logs, scale, a second scheduler, migrate, and safe update are refused. A status word is not a running service. No docker socket is opened. `worker.py` and `scheduler.py` are not edited. Exit 78 stays HELD.

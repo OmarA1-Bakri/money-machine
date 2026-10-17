@@ -1,17 +1,17 @@
-"""Earn the Session 14 deployment, packaging, release, and control keys.
+"""Earn the Session 14 deployment, packaging, release, control, and checkpoint keys.
 
-The proof calls the selector, the package check, the release planner, and the
-service controls. A paragraph that says the host is deployed does not earn a
-key. A status word is not a running service. The closure key stays false.
+The proof calls the selector, the package check, the release planner, the
+service controls, and the checkpoint inspector. A paragraph that says the host
+is deployed does not earn a key. The closure key stays false.
 """
 
 from __future__ import annotations
 
 import ast
-import json
 from collections.abc import Callable
 from pathlib import Path
 
+from money_machine.deploy.checkpoint import CheckpointRefusal, inspect_deployment_checkpoint
 from money_machine.deploy.controls import (
     SERVICE_CONTROLS,
     ServiceControlRefusal,
@@ -36,43 +36,26 @@ TARGET_EVIDENCE_KEY = "deployment_target_recorded"
 PACKAGING_EVIDENCE_KEY = "production_packaging_defined"
 RELEASE_EVIDENCE_KEY = "release_rollback_implemented"
 CONTROLS_EVIDENCE_KEY = "service_controls_fail_closed"
-_CLOSURE_EVIDENCE_KEY = "evidence_closure_commit_recorded"
+CHECKPOINT_EVIDENCE_KEY = "control_files_and_checkpoint_current"
 EARNED_EVIDENCE_KEYS = frozenset(
     {
         TARGET_EVIDENCE_KEY,
         PACKAGING_EVIDENCE_KEY,
         RELEASE_EVIDENCE_KEY,
         CONTROLS_EVIDENCE_KEY,
+        CHECKPOINT_EVIDENCE_KEY,
     }
-)
-_SESSION_14_KEYS = frozenset(
-    {
-        TARGET_EVIDENCE_KEY,
-        "production_packaging_defined",
-        "release_rollback_implemented",
-        "service_controls_fail_closed",
-        "control_files_and_checkpoint_current",
-        _CLOSURE_EVIDENCE_KEY,
-    }
-)
-_CONTROL_FILES = (
-    Path("docs/control/IMPLEMENTATION_STATE.json"),
-    Path("docs/control/IMPLEMENTATION_LOG.md"),
-    Path("docs/control/DECISIONS.md"),
-    Path("docs/control/TEST_EVIDENCE.md"),
-    Path("docs/control/NEXT_SESSION.md"),
-    Path("docs/control/SESSION_EVIDENCE.md"),
 )
 _CLOSURE_HEAD = "fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a"
-_SESSION_14_PROMPT = "17_SESSION_14_DEPLOYMENT.md"
-_POINTER_REVISION = 109
-_UPDATED_AT = "2026-10-17T15:25:00Z"
+_POINTER_REVISION = 110
+_UPDATED_AT = "2026-10-17T15:30:00Z"
 _TRUE_KEYS = frozenset(
     {
         TARGET_EVIDENCE_KEY,
         PACKAGING_EVIDENCE_KEY,
         RELEASE_EVIDENCE_KEY,
         CONTROLS_EVIDENCE_KEY,
+        CHECKPOINT_EVIDENCE_KEY,
     }
 )
 
@@ -340,49 +323,26 @@ def _refuse_print(module: Path) -> None:
 
 
 def _prove_control_files() -> None:
-    """The continuity files and the catalogue match the checked-in pointer."""
-    root = Path(__file__).resolve().parents[3]
-    for relative in _CONTROL_FILES:
-        path = root / relative
-        if not path.is_file() or path.stat().st_size == 0:
-            raise Session14ProofError("control_files")
-    # Imported here because session_evidence imports state, and state imports this proof.
-    from money_machine.control.session_evidence import render_session_evidence
-
-    catalogue = root / "docs/control/SESSION_EVIDENCE.md"
-    if catalogue.read_text(encoding="utf-8") != render_session_evidence():
-        raise Session14ProofError("control_checkpoint")
-    decoded: object = json.loads(
-        (root / "docs/control/IMPLEMENTATION_STATE.json").read_text(encoding="utf-8")
-    )
-    if not isinstance(decoded, dict):
-        raise Session14ProofError("control_checkpoint")
-    evidence = decoded.get("required_completion_evidence")
-    recorded = set(evidence) if isinstance(evidence, dict) else set()
-    values_are_bool = isinstance(evidence, dict) and all(
-        isinstance(value, bool) for value in evidence.values()
-    )
-    target_matches = isinstance(evidence, dict) and _target_matches(evidence)
+    """The checkpoint inspector matches the continuity files to the pointer."""
+    module = Path(__file__).resolve().parents[1] / "deploy" / "checkpoint.py"
+    _refuse_network(module, ("docker", "psycopg", "asyncpg", "sqlalchemy"))
+    _refuse_print(module)
+    try:
+        checkpoint = inspect_deployment_checkpoint(
+            expected_revision=_POINTER_REVISION,
+            expected_updated_at=_UPDATED_AT,
+            expected_true_keys=_TRUE_KEYS,
+            closure_head=_CLOSURE_HEAD,
+        )
+    except CheckpointRefusal as error:
+        raise Session14ProofError(error.code) from error
     if (
-        decoded.get("current_session") != 14
-        or decoded.get("session_status") != "incomplete"
-        or decoded.get("state_revision") != _POINTER_REVISION
-        or decoded.get("updated_at") != _UPDATED_AT
-        or decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
-        or decoded.get("head_sha") != _CLOSURE_HEAD
-        or recorded != set(_SESSION_14_KEYS)
-        or not values_are_bool
-        or not isinstance(evidence, dict)
-        or len(evidence) != len(recorded)
-        or decoded.get("next_session") != 14
-        or decoded.get("completed_sessions") != list(range(14))
-        or decoded.get("next_prompt") != _SESSION_14_PROMPT
-        or not target_matches
+        checkpoint.revision != _POINTER_REVISION
+        or checkpoint.updated_at != _UPDATED_AT
+        or checkpoint.head_sha != _CLOSURE_HEAD
+        or checkpoint.true_keys != tuple(sorted(_TRUE_KEYS))
+        or checkpoint.catalogue_matches is not True
+        or checkpoint.closure_recorded is not False
+        or checkpoint.exit_string_present is not False
     ):
         raise Session14ProofError("control_checkpoint")
-
-
-def _target_matches(evidence: dict[str, object]) -> bool:
-    true = {key for key, value in evidence.items() if value is True}
-    rest = [value for key, value in evidence.items() if key not in _TRUE_KEYS]
-    return true == set(_TRUE_KEYS) and all(value is False for value in rest)

@@ -548,7 +548,7 @@ def _prove_activated_session_14(
     status: object,
     recorded: set[str],
 ) -> None:
-    """Session 11 stays closed while Session 14 records the release plan."""
+    """Session 11 stays closed while Session 14 records the checkpoint."""
     values_are_bool = isinstance(evidence, dict) and all(
         isinstance(value, bool) for value in evidence.values()
     )
@@ -567,6 +567,7 @@ def _prove_activated_session_14(
         or evidence.get("production_packaging_defined") is not True
         or evidence.get("release_rollback_implemented") is not True
         or evidence.get("service_controls_fail_closed") is not True
-        or sum(1 for value in evidence.values() if value is True) != 4
+        or evidence.get("control_files_and_checkpoint_current") is not True
+        or sum(1 for value in evidence.values() if value is True) != 5
     ):
         raise Session11ProofError("control_checkpoint")

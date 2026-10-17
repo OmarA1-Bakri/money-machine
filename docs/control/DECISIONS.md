@@ -1322,3 +1322,19 @@ Session 14 is incomplete at revision 108. The target, the package, and the relea
 ### Consequences
 
 The next honest step is `control_files_and_checkpoint_current`. The five continuity files stay present and the catalogue matches the rendered index. The closure key stays false. A live deploy stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0086 — Session 14 deployment checkpoint
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 14 is incomplete at revision 109. The target, the package, the release plan, and the service controls are recorded (D-0082, D-0083, D-0084, D-0085). The continuity files and the catalogue are the checkpoint. A live deploy is still deferred.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 109 to 110. `updated_at` is `2026-10-17T15:30:00Z`. `control_files_and_checkpoint_current` is true. The four earlier Session 14 keys stay true. `evidence_closure_commit_recorded` stays false. `session_status` stays incomplete. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. `src/money_machine/deploy/checkpoint.py` reads the six continuity files and the four deploy modules. The catalogue must match the renderer. A closure claim is refused. The state file must not contain the exit string. A decision line that names the exit string must say it is not written. Exit 78 stays HELD.
+
+### Consequences
+
+The next honest step is `evidence_closure_commit_recorded` through apply-completion. That closure is a later increment. A live deploy stays deferred. Exit 78 stays HELD. The exit string is not written.

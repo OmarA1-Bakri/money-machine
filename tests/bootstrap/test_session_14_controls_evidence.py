@@ -112,7 +112,7 @@ def test_record_refuses_the_control_file_key() -> None:
     previous = _previous()
     current = _earned(previous)
     evidence = dict(current["required_completion_evidence"])
-    evidence["control_files_and_checkpoint_current"] = True
+    evidence["control_files_and_checkpoint_current"] = False
     current["required_completion_evidence"] = evidence
     with pytest.raises(ControlStateError, match="exactly the keys"):
         validate_session_14_evidence_record(previous, current)

@@ -329,7 +329,8 @@ def _prove_control_files() -> None:
             or evidence.get("production_packaging_defined") is not True
             or evidence.get("release_rollback_implemented") is not True
             or evidence.get("service_controls_fail_closed") is not True
-            or sum(1 for value in evidence.values() if value is True) != 4
+            or evidence.get("control_files_and_checkpoint_current") is not True
+            or sum(1 for value in evidence.values() if value is True) != 5
         ):
             raise Session13ProofError("control_checkpoint")
         return

@@ -77,7 +77,7 @@ def test_live_pointer_is_incomplete_session_10() -> None:
     """Session 09 stays closed. Session 14 records the release plan."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 109
+    assert live["state_revision"] == 110
     assert live["current_session"] == 14
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(14))
@@ -90,7 +90,8 @@ def test_live_pointer_is_incomplete_session_10() -> None:
     assert evidence["production_packaging_defined"] is True
     assert evidence["release_rollback_implemented"] is True
     assert evidence["service_controls_fail_closed"] is True
-    assert sum(1 for value in evidence.values() if value is True) == 4
+    assert evidence["control_files_and_checkpoint_current"] is True
+    assert sum(1 for value in evidence.values() if value is True) == 5
     assert "SESSION_09_ETSY_PUBLISHING_COMPLETE" not in text
 
 

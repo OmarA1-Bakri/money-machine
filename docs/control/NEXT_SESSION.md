@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 14 deployment checkpoint is recorded (2026-10-17)
+
+Revision 110 is incomplete Session 14. The five earned keys are true. The closure key is false. `completed_sessions` stays 0 through 13. `next_session` stays 14. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. The next honest step is `evidence_closure_commit_recorded` through apply-completion. A live deploy stays deferred.
+
 ## Session 14 service controls are recorded (2026-10-17)
 
 Revision 109 is incomplete Session 14. `deployment_target_recorded`, `production_packaging_defined`, `release_rollback_implemented`, and `service_controls_fail_closed` are true. The control-file key and the closure key are false. `completed_sessions` stays 0 through 13. `next_session` stays 14. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. The next honest step is `control_files_and_checkpoint_current`. A live deploy stays deferred.
