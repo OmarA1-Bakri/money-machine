@@ -77,14 +77,16 @@ def test_live_pointer_is_incomplete_session_10() -> None:
     """Session 09 stays closed. Session 10 is activated with every key false."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 77
+    assert live["state_revision"] == 78
     assert live["current_session"] == 10
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     assert live["next_session"] == 10
     assert live["next_prompt"] == SESSION_PROMPTS[10]
     assert live["head_sha"] == "cfb36462994ecba833f31ba869f2aba627f6060d"
-    assert not any(live["required_completion_evidence"].values())
+    evidence = live["required_completion_evidence"]
+    assert evidence["metrics_fixture_implemented"] is True
+    assert sum(1 for value in evidence.values() if value) == 1
     assert "SESSION_09_ETSY_PUBLISHING_COMPLETE" not in text
 
 

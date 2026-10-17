@@ -73,18 +73,20 @@ def test_session_10_contract_is_the_fixture_surface() -> None:
     assert "SESSION_10_CLOSED_LOOP_AUTOMATION_COMPLETE" not in SESSION_EVIDENCE_KEYS[10]
 
 
-def test_live_pointer_is_the_session_10_activation() -> None:
-    """Activation installs every Session 10 key false."""
+def test_live_pointer_records_the_metrics_key() -> None:
+    """The metrics fixture is true. The other Session 10 keys stay false."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 77
+    assert live["state_revision"] == 78
     assert live["current_session"] == 10
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(10))
     assert live["next_session"] == 10
     assert live["next_prompt"] == SESSION_PROMPTS[10]
     assert live["head_sha"] == "cfb36462994ecba833f31ba869f2aba627f6060d"
-    assert live["required_completion_evidence"] == dict.fromkeys(sorted(SESSION_10_KEYS), False)
+    evidence = dict.fromkeys(sorted(SESSION_10_KEYS), False)
+    evidence["metrics_fixture_implemented"] = True
+    assert live["required_completion_evidence"] == evidence
     assert "SESSION_10_CLOSED_LOOP_AUTOMATION_COMPLETE" not in text
 
 

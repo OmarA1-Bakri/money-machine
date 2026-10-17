@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-17 — Session 10 metrics fixture key recorded
+
+**Verification scope**: live `record-evidence` from revision 77 to 78. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 10, `incomplete`, revision 78, `updated_at` `2026-10-17T11:35:00Z` | PASS |
+| Keys | `metrics_fixture_implemented` true; the other five Session 10 keys false | PASS |
+| Head | `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d` | PASS |
+| Refusal | A second key and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The applied state is revision 78, incomplete Session 10, with `metrics_fixture_implemented` true. The proof, the Session 10 contract, the Session 09 proof, the Session 09 contract, the Session 09 completion check, the evidence index, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 39 passed in 3.12s.
+
 ## 2026-10-17 — Session 10 activated
 
 **Verification scope**: live `activate` from revision 76 to 77. No live HTTP. Exit 78 stays HELD. The exit string is not written. Every Session 10 key is false.

@@ -728,3 +728,19 @@ Session 09 is complete at revision 76 and D-0048 installed the Session 10 contra
 ### Consequences
 
 Revision 77 is incomplete Session 10. Every Session 10 key is false. The next honest step is the first earned key, through its own proof.
+
+## D-0050 — Session 10 metrics fixture is the first earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 10 is incomplete at revision 77. All six keys are false. The metrics fixture already maps an injected row into one snapshot, plans one collection and one shop review, refuses a second plan in the same window, and follows the monthly cadence instead of a fourth-week counter.
+
+### Decision
+
+`prove_session_10()` earns only `metrics_fixture_implemented`. It requires one reconciled snapshot, a duplicate window refusal, a weekly plan of one collection then one shop review, an empty second plan in that window, no monthly record on a fourth week when the month is not due, a monthly record when the month is due, a cadence refusal, and a refusal of unmeasured operator minutes. `record-evidence` on incomplete Session 10 flips that one key. Any other flip is refused. The closure key stays false. `head_sha` does not move. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written.
+
+### Consequences
+
+Revision 78 records the metrics key true. The other five Session 10 keys stay false. The maturity clock is the next proof.

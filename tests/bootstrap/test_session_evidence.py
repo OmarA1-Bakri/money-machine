@@ -61,7 +61,7 @@ def test_live_pointer_is_incomplete_session_10() -> None:
     live = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert live["current_session"] == 10
     assert live["session_status"] == "incomplete"
-    assert live["state_revision"] == 77
+    assert live["state_revision"] == 78
     assert live["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     assert live["next_session"] == 10
     assert live["next_prompt"] == SESSION_PROMPTS[10]
@@ -69,7 +69,9 @@ def test_live_pointer_is_incomplete_session_10() -> None:
     assert live["evidence_closure_commit_sha"] == live["head_sha"]
     evidence = live["required_completion_evidence"]
     assert isinstance(evidence, dict)
-    assert evidence == {key: False for key in sorted(SESSION_EVIDENCE_KEYS[10])}
+    expected = {key: False for key in sorted(SESSION_EVIDENCE_KEYS[10])}
+    expected["metrics_fixture_implemented"] = True
+    assert evidence == expected
 
 
 def test_open_sessions_have_no_recorded_true_key() -> None:
@@ -78,9 +80,10 @@ def test_open_sessions_have_no_recorded_true_key() -> None:
         if record.session == 10:
             assert record.session in SESSION_EVIDENCE_KEYS
             assert record.activated is True
+            assert record.true_keys == frozenset({"metrics_fixture_implemented"})
         else:
             assert record.session not in SESSION_EVIDENCE_KEYS
-        assert record.true_keys == frozenset()
+            assert record.true_keys == frozenset()
         for path in record.fixture_paths:
             assert (ROOT / path).is_file(), path
         assert "not" in record.gap.casefold() or "no evidence" in record.gap.casefold()
