@@ -1570,9 +1570,9 @@ def test_session_eight_activation_rejects_false_session_seven_evidence(tmp_path:
     assert state_path.read_bytes() == original
     assert STATE_PATH.read_bytes() == checked_in
     assert load_state()["current_session"] == 12
-    assert load_state()["session_status"] == "incomplete"
-    assert load_state()["state_revision"] == 96
-    assert load_state()["next_session"] == 12
+    assert load_state()["session_status"] == "complete"
+    assert load_state()["state_revision"] == 97
+    assert load_state()["next_session"] == 13
 
 
 def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: Path) -> None:
@@ -1596,10 +1596,10 @@ def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: 
     assert STATE_PATH.read_bytes() == checked_in
     live = load_state()
     assert live["current_session"] == 12
-    assert live["session_status"] == "incomplete"
-    assert live["next_session"] == 12
-    assert live["state_revision"] == 96
-    assert live["head_sha"] == "d095501665fbda0f9e6a0e77b57531bc33fda4e2"
+    assert live["session_status"] == "complete"
+    assert live["next_session"] == 13
+    assert live["state_revision"] == 97
+    assert live["head_sha"] == "d81db61033561bdd40869ff1316f0c935c74cdf4"
     assert live["evidence_closure_commit_sha"] == live["head_sha"]
     live_evidence = live["required_completion_evidence"]
     assert set(live_evidence) == set(control_state.SESSION_EVIDENCE_KEYS[12])
@@ -1608,7 +1608,8 @@ def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: 
     assert live_evidence["telemetry_redaction_implemented"] is True
     assert live_evidence["operator_actions_fail_closed"] is True
     assert live_evidence["control_files_and_checkpoint_current"] is True
-    assert sum(value is True for value in live_evidence.values()) == 5
+    assert live_evidence["evidence_closure_commit_recorded"] is True
+    assert sum(value is True for value in live_evidence.values()) == 6
 
 
 def test_activation_uses_the_worktree_when_recorded_root_is_absent(tmp_path: Path) -> None:

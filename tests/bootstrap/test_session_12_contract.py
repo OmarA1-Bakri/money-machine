@@ -11,6 +11,7 @@ import pytest
 
 from money_machine.control.state import (
     SESSION_EVIDENCE_KEYS,
+    SESSION_PROMPTS,
     ControlState,
     ControlStateError,
     validate_activation_transition,
@@ -44,6 +45,9 @@ def _activation_candidate(evidence: dict[str, bool]) -> tuple[ControlState, Cont
     previous["state_revision"] = 90
     previous["session_status"] = "complete"
     previous["current_session"] = 11
+    previous["completed_sessions"] = list(range(12))
+    previous["next_session"] = 12
+    previous["next_prompt"] = SESSION_PROMPTS[12]
     previous["updated_at"] = "2026-10-17T12:40:00Z"
     previous["required_completion_evidence"] = {key: True for key in SESSION_EVIDENCE_KEYS[11]}
     current = copy.deepcopy(previous)
@@ -62,20 +66,18 @@ def test_session_12_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_is_the_session_12_activation() -> None:
-    """Session 12 is incomplete. The read-model, view, and telemetry keys are true."""
+    """Session 12 is complete. Every Session 12 key is true. Session 13 is not activated."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    expected = dict.fromkeys(sorted(SESSION_12_KEYS), False)
-    expected["console_read_model_implemented"] = True
-    expected["exception_views_implemented"] = True
-    expected["telemetry_redaction_implemented"] = True
-    expected["operator_actions_fail_closed"] = True
-    expected["control_files_and_checkpoint_current"] = True
-    assert live["state_revision"] == 96
+    expected = dict.fromkeys(sorted(SESSION_12_KEYS), True)
+    assert live["state_revision"] == 97
     assert live["current_session"] == 12
-    assert live["session_status"] == "incomplete"
-    assert live["completed_sessions"] == list(range(12))
-    assert live["next_session"] == 12
+    assert live["session_status"] == "complete"
+    assert live["completed_sessions"] == list(range(13))
+    assert live["next_session"] == 13
+    assert live["next_prompt"] == "16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md"
+    assert live["head_sha"] == "d81db61033561bdd40869ff1316f0c935c74cdf4"
+    assert live["evidence_closure_commit_sha"] == live["head_sha"]
     assert live["required_completion_evidence"] == expected
     assert "SESSION_12_OPERATOR_CONSOLE_COMPLETE" not in text
 

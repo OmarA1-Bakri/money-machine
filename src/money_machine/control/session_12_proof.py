@@ -1,7 +1,7 @@
 """Earn the Session 12 read-model, view, telemetry, action, and control-file keys.
 
 The proof does not open a socket, read a credential, or write a cap.
-The control-file key may be either bool: the record flips it after this proof has run.
+The completed pointer keeps every Session 12 key true, including the closure key.
 """
 
 from __future__ import annotations
@@ -74,8 +74,10 @@ _CONTROL_FILES = (
     Path("docs/control/NEXT_SESSION.md"),
     Path("docs/control/SESSION_EVIDENCE.md"),
 )
-_CLOSURE_HEAD = "d095501665fbda0f9e6a0e77b57531bc33fda4e2"
+_PRIOR_HEAD = "d095501665fbda0f9e6a0e77b57531bc33fda4e2"
+_CLOSURE_HEAD = "d81db61033561bdd40869ff1316f0c935c74cdf4"
 _SESSION_12_PROMPT = "15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md"
+_SESSION_13_PROMPT = "16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md"
 _DECISION_KINDS = ("hold", "repair", "cull", "multiply", "successor_created")
 _WRITERS = ("set_", "pause", "resume", "send", "capture", "publish", "write")
 
@@ -701,14 +703,10 @@ def _prove_control_files() -> None:
     values_are_bool = isinstance(evidence, dict) and all(
         isinstance(value, bool) for value in evidence.values()
     )
+    status = decoded.get("session_status")
     if (
         decoded.get("current_session") != 12
-        or decoded.get("session_status") != "incomplete"
         or decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
-        or decoded.get("head_sha") != _CLOSURE_HEAD
-        or decoded.get("next_session") != 12
-        or decoded.get("completed_sessions") != list(range(12))
-        or decoded.get("next_prompt") != _SESSION_12_PROMPT
         or recorded != set(_SESSION_12_KEYS)
         or not values_are_bool
         or not isinstance(evidence, dict)
@@ -717,7 +715,26 @@ def _prove_control_files() -> None:
         or evidence.get(VIEWS_EVIDENCE_KEY) is not True
         or evidence.get(TELEMETRY_EVIDENCE_KEY) is not True
         or evidence.get(ACTIONS_EVIDENCE_KEY) is not True
-        or not isinstance(evidence.get(CONTROL_EVIDENCE_KEY), bool)
-        or evidence.get(_CLOSURE_EVIDENCE_KEY) is not False
+        or status not in {"incomplete", "complete"}
+    ):
+        raise Session12ProofError("control_checkpoint")
+    if status == "incomplete":
+        if (
+            decoded.get("head_sha") != _PRIOR_HEAD
+            or decoded.get("next_session") != 12
+            or decoded.get("completed_sessions") != list(range(12))
+            or decoded.get("next_prompt") != _SESSION_12_PROMPT
+            or not isinstance(evidence.get(CONTROL_EVIDENCE_KEY), bool)
+            or evidence.get(_CLOSURE_EVIDENCE_KEY) is not False
+        ):
+            raise Session12ProofError("control_checkpoint")
+        return
+    if (
+        decoded.get("head_sha") != _CLOSURE_HEAD
+        or decoded.get("next_session") != 13
+        or decoded.get("completed_sessions") != list(range(13))
+        or decoded.get("next_prompt") != _SESSION_13_PROMPT
+        or evidence.get(CONTROL_EVIDENCE_KEY) is not True
+        or evidence.get(_CLOSURE_EVIDENCE_KEY) is not True
     ):
         raise Session12ProofError("control_checkpoint")

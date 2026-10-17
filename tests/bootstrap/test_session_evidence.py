@@ -57,24 +57,19 @@ def test_closed_snapshots_match_the_commits_that_hold_them() -> None:
         assert all(item is record.all_keys_true for item in values)
 
 
-def test_live_pointer_is_incomplete_session_12() -> None:
+def test_live_pointer_is_complete_session_12() -> None:
     live = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert live["current_session"] == 12
-    assert live["session_status"] == "incomplete"
-    assert live["state_revision"] == 96
-    assert live["completed_sessions"] == list(range(12))
-    assert live["next_session"] == 12
-    assert live["next_prompt"] == SESSION_PROMPTS[12]
-    assert live["head_sha"] == "d095501665fbda0f9e6a0e77b57531bc33fda4e2"
+    assert live["session_status"] == "complete"
+    assert live["state_revision"] == 97
+    assert live["completed_sessions"] == list(range(13))
+    assert live["next_session"] == 13
+    assert live["next_prompt"] == SESSION_PROMPTS[13]
+    assert live["head_sha"] == "d81db61033561bdd40869ff1316f0c935c74cdf4"
     assert live["evidence_closure_commit_sha"] == live["head_sha"]
     evidence = live["required_completion_evidence"]
     assert isinstance(evidence, dict)
-    expected = {key: False for key in sorted(SESSION_EVIDENCE_KEYS[12])}
-    expected["console_read_model_implemented"] = True
-    expected["exception_views_implemented"] = True
-    expected["telemetry_redaction_implemented"] = True
-    expected["operator_actions_fail_closed"] = True
-    expected["control_files_and_checkpoint_current"] = True
+    expected = {key: True for key in sorted(SESSION_EVIDENCE_KEYS[12])}
     assert evidence == expected
 
 
@@ -88,15 +83,7 @@ def test_open_sessions_have_no_recorded_true_key() -> None:
         elif record.session == 12:
             assert record.session in SESSION_EVIDENCE_KEYS
             assert record.activated is True
-            assert record.true_keys == frozenset(
-                {
-                    "console_read_model_implemented",
-                    "control_files_and_checkpoint_current",
-                    "exception_views_implemented",
-                    "operator_actions_fail_closed",
-                    "telemetry_redaction_implemented",
-                }
-            )
+            assert record.true_keys == frozenset(SESSION_EVIDENCE_KEYS[12])
         else:
             assert record.session not in SESSION_EVIDENCE_KEYS
             assert record.true_keys == frozenset()

@@ -765,7 +765,7 @@ def _prove_activated_session_12(
     evidence: object,
     status: object,
 ) -> None:
-    """Session 10 stays closed while Session 12 is incomplete."""
+    """Session 10 stays closed while Session 12 is incomplete or complete."""
     recorded: set[str] = set()
     values_are_bool = False
     evidence_count = -1
@@ -775,14 +775,27 @@ def _prove_activated_session_12(
             if isinstance(key, str):
                 recorded.add(key)
         values_are_bool = all(isinstance(value, bool) for value in evidence.values())
+    keys_match = frozenset(recorded) == _SESSION_12_KEYS and len(recorded) == evidence_count
     if (
-        status != "incomplete"
-        or decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
-        or decoded.get("next_session") != 12
-        or decoded.get("completed_sessions") != list(range(12))
-        or decoded.get("next_prompt") != "15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md"
-        or frozenset(recorded) != _SESSION_12_KEYS
-        or len(recorded) != evidence_count
+        decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
+        or not keys_match
         or not values_are_bool
+    ):
+        raise Session10ProofError("control_checkpoint")
+    if status == "incomplete":
+        if (
+            decoded.get("next_session") != 12
+            or decoded.get("completed_sessions") != list(range(12))
+            or decoded.get("next_prompt") != "15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md"
+        ):
+            raise Session10ProofError("control_checkpoint")
+        return
+    if status != "complete" or not isinstance(evidence, dict):
+        raise Session10ProofError("control_checkpoint")
+    if (
+        decoded.get("next_session") != 13
+        or decoded.get("completed_sessions") != list(range(13))
+        or decoded.get("next_prompt") != "16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md"
+        or any(value is not True for value in evidence.values())
     ):
         raise Session10ProofError("control_checkpoint")

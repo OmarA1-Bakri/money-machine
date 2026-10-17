@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 12 is complete (2026-10-17)
+
+Revision 97 records every Session 12 key true. `completed_sessions` is 0 through 12. `next_session` is 13. `head_sha` is `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. Session 13 is not activated. The next honest step is the Session 13 evidence contract.
+
 ## Session 12 control files are recorded (2026-10-17)
 
 Revision 96 records every Session 12 key except `evidence_closure_commit_recorded`. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. The next honest step is the closure key, through `apply-completion`.

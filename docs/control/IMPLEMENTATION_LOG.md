@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 12 closure recorded
+
+`apply-completion` advanced `state_revision` from 96 to 97. `updated_at` is `2026-10-17T13:35:00Z`. Every Session 12 key is true. `session_status` is complete. `current_session` stays 12. `completed_sessions` is 0 through 12. `next_session` is 13. `next_prompt` is `16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md`. `head_sha` and `evidence_closure_commit_sha` are `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. The exit string is not written. Session 13 is not activated. No live provider call is made.
+
 ## 2026-10-17 — Session 12 exception views recorded
 
 `record-evidence` advanced `state_revision` from 95 to 96. `updated_at` is `2026-10-17T13:30:00Z`. The read-model, exception-view, telemetry, and fail-closed action keys stay true. `control_files_and_checkpoint_current` is true. The closure key stays false. `current_session` stays 12. `session_status` stays incomplete. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. No socket is opened and no cap is written.

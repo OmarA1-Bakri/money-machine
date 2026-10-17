@@ -1082,3 +1082,19 @@ Session 12 is incomplete at revision 95. The read-model, exception-view, telemet
 ### Consequences
 
 Revision 96 records every Session 12 key except the closure key. The closure key is the next proof, through `apply-completion`.
+
+## D-0071 — Session 12 records the closure commit
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 12 is incomplete at revision 96. Every key except `evidence_closure_commit_recorded` is true. That key is earned only by `apply-completion`.
+
+### Decision
+
+`apply-completion` advances revision 96 to 97. `session_status` becomes complete. `current_session` stays 12. `completed_sessions` is 0 through 12. `next_session` is 13. `next_prompt` is `16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md`. `head_sha` and `evidence_closure_commit_sha` are `d81db61033561bdd40869ff1316f0c935c74cdf4`. That commit contains `prove_session_12` and the pre-transition state, and it does not claim its own object ID. Every Session 12 key is true. Exit 78 stays HELD. Session 13 is not activated. No socket is opened and no cap is written.
+
+### Consequences
+
+Revision 97 is complete Session 12. The next honest step is the Session 13 evidence contract.
