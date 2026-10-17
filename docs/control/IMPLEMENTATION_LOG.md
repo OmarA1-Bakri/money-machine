@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 08 close is indexed
+
+`docs/control/SESSION_EVIDENCE.md` records Session 08 as complete. The state commit is `4a07fd69259a7265c5780fb584b2a89cacd9b258`. The closure commit is `01b7dd84ef98442ff26a5239e8c7de742739d844`. `IMPLEMENTATION_STATE.json` is unchanged in this commit. Sessions 09–15 stay unactivated.
+
 ## 2026-10-17 — Session 08 completed from the frozen pointer
 
 `apply-completion` advanced `state_revision` from 68 to 69. `updated_at` is `2026-10-17T09:49:00Z`. `session_status` is complete. `current_session` stays 8. `completed_sessions` is `[0, 1, 2, 3, 4, 5, 6, 7, 8]`. `next_session` is 9. `next_prompt` is `12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md`. Every Session 08 evidence key is true, including `evidence_closure_commit_recorded`. `head_sha` and `evidence_closure_commit_sha` are `01b7dd84ef98442ff26a5239e8c7de742739d844`, the commit that contains D-0039, `def prove_session_08`, and the revision-68 state. This state file does not name the commit that records it. `commissioned_agents` stays empty. Exit 78 stays HELD. A10 and A11 stay `DESIGNED`. The exit string is not written. Session 09 is not activated. No live Etsy, Notion, or S3 call is made.
