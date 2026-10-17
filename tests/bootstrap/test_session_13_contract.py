@@ -1,4 +1,4 @@
-"""Session 13's evidence contract is installed. Activation is not applied."""
+"""Session 13 is activated. Every Session 13 key is false."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ import pytest
 
 from money_machine.control.state import (
     SESSION_EVIDENCE_KEYS,
+    SESSION_PROMPTS,
     ControlState,
     ControlStateError,
     validate_activation_transition,
@@ -40,10 +41,18 @@ def _live() -> ControlState:
 
 
 def _activation_candidate(evidence: dict[str, bool]) -> tuple[ControlState, ControlState]:
-    """The revision-97 close, rebuilt so this test does not write the state file."""
+    """The revision-97 close, rebuilt after activation replaces the live file."""
     previous = _live()
+    previous["state_revision"] = 97
+    previous["session_status"] = "complete"
+    previous["current_session"] = 12
+    previous["completed_sessions"] = list(range(13))
+    previous["next_session"] = 13
+    previous["next_prompt"] = SESSION_PROMPTS[13]
+    previous["updated_at"] = "2026-10-17T13:35:00Z"
+    previous["required_completion_evidence"] = {key: True for key in SESSION_EVIDENCE_KEYS[12]}
     current = copy.deepcopy(previous)
-    current["state_revision"] = previous["state_revision"] + 1
+    current["state_revision"] = 98
     current["session_status"] = "incomplete"
     current["current_session"] = 13
     current["updated_at"] = ACTIVATED_AT
@@ -57,19 +66,20 @@ def test_session_13_contract_is_the_fixture_surface() -> None:
     assert "SESSION_13_E2E_AND_HARDENING_COMPLETE" not in SESSION_EVIDENCE_KEYS[13]
 
 
-def test_live_pointer_stays_complete_session_12() -> None:
-    """The contract does not activate Session 13."""
+def test_live_pointer_is_incomplete_session_13() -> None:
+    """Session 13 is activated. Every Session 13 key is false."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 97
-    assert live["current_session"] == 12
-    assert live["session_status"] == "complete"
+    assert live["state_revision"] == 98
+    assert live["current_session"] == 13
+    assert live["session_status"] == "incomplete"
+    assert live["updated_at"] == ACTIVATED_AT
     assert live["completed_sessions"] == list(range(13))
     assert live["next_session"] == 13
     assert live["head_sha"] == CLOSURE_HEAD
     assert live["evidence_closure_commit_sha"] == CLOSURE_HEAD
-    assert set(live["required_completion_evidence"]) == set(SESSION_EVIDENCE_KEYS[12])
-    assert all(value is True for value in live["required_completion_evidence"].values())
+    assert set(live["required_completion_evidence"]) == set(SESSION_EVIDENCE_KEYS[13])
+    assert all(value is False for value in live["required_completion_evidence"].values())
     assert "SESSION_13_E2E_AND_HARDENING_COMPLETE" not in text
 
 

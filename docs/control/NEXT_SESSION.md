@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 13 is activated (2026-10-17)
+
+Revision 98 is incomplete Session 13. Every Session 13 key is false. `completed_sessions` stays 0 through 12. `next_session` stays 13. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. The next honest step is `implementation_matrix_recorded`: classify the real rows, and leave a live credential gap blocked.
+
 ## Session 13 contract is installed (2026-10-17)
 
 D-0072 installs the six Session 13 keys. Revision 97 is unchanged. Session 12 stays complete. Session 13 is not activated. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. The next honest step is activation, which installs every Session 13 key false.

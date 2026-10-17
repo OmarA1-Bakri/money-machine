@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 13 activated
+
+`activate` advanced `state_revision` from 97 to 98. `updated_at` is `2026-10-17T13:45:00Z`. `current_session` is 13. `session_status` is incomplete. `completed_sessions` stays 0 through 12. `next_session` stays 13. Every Session 13 key is false. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. No live provider call is made. No Session 13 key is earned.
+
 ## 2026-10-17 — Session 13 evidence contract installed
 
 D-0072 installs the six Session 13 keys. Revision 97 is unchanged. Session 12 stays complete. Session 13 is not activated. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-13-prompt-integrity.md`. No live provider call is made.

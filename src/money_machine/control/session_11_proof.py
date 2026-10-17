@@ -70,6 +70,16 @@ _SESSION_12_KEYS = frozenset(
         "evidence_closure_commit_recorded",
     }
 )
+_SESSION_13_KEYS = frozenset(
+    {
+        "implementation_matrix_recorded",
+        "synthetic_paths_implemented",
+        "failure_injection_implemented",
+        "backup_restore_fixture_implemented",
+        "control_files_and_checkpoint_current",
+        "evidence_closure_commit_recorded",
+    }
+)
 _DRAFT_BODY = (
     "We received this once. the file hash is aaaa path-token-1 Reply if the issue remains."
 )
@@ -414,6 +424,9 @@ def _prove_control_files() -> None:
     evidence = decoded.get("required_completion_evidence")
     recorded = set(evidence) if isinstance(evidence, dict) else set()
     status = decoded.get("session_status")
+    if decoded.get("current_session") == 13:
+        _prove_activated_session_13(decoded, evidence, status, recorded)
+        return
     if decoded.get("current_session") == 12:
         _prove_activated_session_12(decoded, evidence, status, recorded)
         return
@@ -484,5 +497,30 @@ def _prove_activated_session_12(
         or decoded.get("completed_sessions") != list(range(13))
         or decoded.get("next_prompt") != _SESSION_13_PROMPT
         or any(value is not True for value in evidence.values())
+    ):
+        raise Session11ProofError("control_checkpoint")
+
+
+def _prove_activated_session_13(
+    decoded: dict[str, object],
+    evidence: object,
+    status: object,
+    recorded: set[str],
+) -> None:
+    """Session 11 stays closed while Session 13 is incomplete."""
+    values_are_bool = isinstance(evidence, dict) and all(
+        isinstance(value, bool) for value in evidence.values()
+    )
+    if (
+        decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
+        or decoded.get("head_sha") != _SESSION_12_CLOSURE
+        or recorded != set(_SESSION_13_KEYS)
+        or not values_are_bool
+        or not isinstance(evidence, dict)
+        or len(evidence) != len(recorded)
+        or status != "incomplete"
+        or decoded.get("next_session") != 13
+        or decoded.get("completed_sessions") != list(range(13))
+        or decoded.get("next_prompt") != _SESSION_13_PROMPT
     ):
         raise Session11ProofError("control_checkpoint")

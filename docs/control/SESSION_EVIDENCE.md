@@ -1,8 +1,8 @@
 # Session evidence
 
-The checked-in pointer is Session 12 at state revision 97.
-`current_session` is 12. `session_status` is complete.
-Every Session 12 key is true. `next_session` is 13.
+The checked-in pointer is Session 13 at state revision 98.
+`current_session` is 13. `session_status` is incomplete.
+Every Session 13 key is false. `next_session` is 13.
 Session 10 is complete and every one of its keys is true.
 Session 09 is complete and every one of its keys is true.
 Session 08 is complete and every one of its keys is true.
@@ -13,7 +13,7 @@ D-0036 recorded the twelve Session 07 keys true. The closure commit is
 Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
-Session 13's contract is installed. The session is not activated.
+Session 13 is activated and incomplete. No key is true.
 Sessions 14 and 15 have no contract.
 
 ## Session 00
@@ -275,7 +275,7 @@ Head SHA: `f16c7ed0598daf3f4627955b52585f253ae1b918`.
 Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
-Session 13's contract is installed. The session is not activated.
+Session 13 is activated and incomplete. No key is true.
 Sessions 14 and 15 have no contract.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
@@ -284,7 +284,7 @@ A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 Prompt: `14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md`.
 Status: complete.
 Evidence contract: installed.
-Every Session 11 key is earned. Session 12 is complete. Session 13 is not activated. A16 stays DESIGNED.
+Every Session 11 key is earned. Session 12 is complete. Session 13 is activated and incomplete. Live failure injection is not recorded. A16 stays DESIGNED.
 
 Fixture paths:
 
@@ -304,7 +304,7 @@ Fixture paths:
 Prompt: `15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md`.
 Status: complete.
 Evidence contract: installed.
-Every Session 12 key is earned. Session 13 is not activated. Exit 78 stays HELD.
+Every Session 12 key is earned. Session 13 is activated and incomplete. Live failure injection is not recorded. Exit 78 stays HELD.
 
 Fixture paths:
 
@@ -325,20 +325,20 @@ Fixture paths:
 ## Session 13
 
 Prompt: `16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md`.
-Status: not activated.
-Evidence contract: installed, not activated.
-The contract is installed. The session is not activated. Live failure injection, a live backup, and the exit string are not recorded.
+Status: incomplete.
+Evidence contract: installed.
+The session is activated. No key is earned. Live failure injection, a live backup, and the exit string are not recorded.
 
 Fixture paths: none.
 
 | Key | Recorded |
 |---|---|
-| `backup_restore_fixture_implemented` | not installed |
-| `control_files_and_checkpoint_current` | not installed |
-| `evidence_closure_commit_recorded` | not installed |
-| `failure_injection_implemented` | not installed |
-| `implementation_matrix_recorded` | not installed |
-| `synthetic_paths_implemented` | not installed |
+| `backup_restore_fixture_implemented` | false |
+| `control_files_and_checkpoint_current` | false |
+| `evidence_closure_commit_recorded` | false |
+| `failure_injection_implemented` | false |
+| `implementation_matrix_recorded` | false |
+| `synthetic_paths_implemented` | false |
 
 ## Session 14
 

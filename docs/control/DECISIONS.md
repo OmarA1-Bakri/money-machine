@@ -1114,3 +1114,19 @@ The Session 13 contract has six keys: `implementation_matrix_recorded`, `synthet
 ### Consequences
 
 The contract is installed and every key is unrecorded. The next honest step is activation, which installs every Session 13 key false.
+
+## D-0073 — Session 13 activation
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 12 is complete at revision 97. The Session 13 contract is installed (D-0072) and the session is not activated. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-13-prompt-integrity.md`.
+
+### Decision
+
+`activate` advances `state_revision` from 97 to 98. `updated_at` is `2026-10-17T13:45:00Z`. `current_session` is 13. `session_status` is incomplete. `completed_sessions` stays 0 through 12. `next_session` stays 13. Every Session 13 key is false. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. This activation does not earn a key and does not write the exit string.
+
+### Consequences
+
+Session 13 is the active incomplete session. The next honest step is `implementation_matrix_recorded`, earned by classifying the real playbook, job, event, agent, and provider rows. A live credential gap stays blocked. A fail-closed raise stays.

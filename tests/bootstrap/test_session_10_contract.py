@@ -74,13 +74,13 @@ def test_session_10_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_records_the_closure_key() -> None:
-    """Session 10 stays closed. Session 12 is complete and Session 13 is not activated."""
+    """Session 10 stays closed. Session 13 is activated and every key is false."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    evidence = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[12]), True)
-    assert live["state_revision"] == 97
-    assert live["current_session"] == 12
-    assert live["session_status"] == "complete"
+    evidence = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[13]), False)
+    assert live["state_revision"] == 98
+    assert live["current_session"] == 13
+    assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(13))
     assert live["next_session"] == 13
     assert live["next_prompt"] == SESSION_PROMPTS[13]

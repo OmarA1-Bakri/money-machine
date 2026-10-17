@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-17 — Session 13 activated
+
+**Verification scope**: live `activate` from revision 97 to 98. No live HTTP. Exit 78 stays HELD. `head_sha` does not move. No Session 13 key is earned.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 13, `incomplete`, revision 98, `updated_at` `2026-10-17T13:45:00Z` | PASS |
+| Keys | Every Session 13 key is false | PASS |
+| Head | `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4` | PASS |
+| Exit string | `SESSION_13_E2E_AND_HARDENING_COMPLETE` is not in the state file | PASS |
+
+The command printed `{"applied": true, "command": "activate", "session": 13, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 98}`. The contract pin, the prompt-integrity gate, the Session 12 closure pin, the Session 12 contract and completion proof, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, the operator console unit tests, the telemetry and operator-action unit tests, and the support intake unit tests printed 117 passed in 3.46s.
+
 ## 2026-10-17 — Session 13 evidence contract installed
 
 **Verification scope**: contract installation only. `IMPLEMENTATION_STATE.json` stays revision 97. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.
