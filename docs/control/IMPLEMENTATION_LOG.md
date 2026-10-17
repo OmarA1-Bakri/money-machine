@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 10 portfolio eligibility key recorded
+
+`record-evidence` advanced `state_revision` from 79 to 80. `updated_at` is `2026-10-17T11:45:00Z`. `portfolio_eligibility_implemented` is true. The metrics fixture and the maturity clock stay true. The other three Session 10 keys stay false. `current_session` stays 10. `session_status` stays incomplete. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. No deactivation is executed. No live provider call is made.
+
 ## 2026-10-17 — Session 10 maturity clock key recorded
 
 `record-evidence` advanced `state_revision` from 78 to 79. `updated_at` is `2026-10-17T11:40:00Z`. `maturity_clock_implemented` is true. `metrics_fixture_implemented` stays true. The other four Session 10 keys stay false. `current_session` stays 10. `session_status` stays incomplete. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. No scheduler row is inserted. No live provider call is made.

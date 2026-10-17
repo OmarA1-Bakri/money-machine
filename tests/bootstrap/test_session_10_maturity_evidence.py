@@ -14,6 +14,7 @@ from money_machine.control.session_10_proof import (
     EARNED_EVIDENCE_KEYS,
     MATURITY_EVIDENCE_KEY,
     METRICS_EVIDENCE_KEY,
+    PORTFOLIO_EVIDENCE_KEY,
     prove_session_10,
 )
 from money_machine.control.state import (
@@ -60,6 +61,7 @@ def _earned(previous: ControlState) -> ControlState:
     current["updated_at"] = EARNED_AT
     evidence = dict(current["required_completion_evidence"])
     evidence[MATURITY_EVIDENCE_KEY] = True
+    evidence[PORTFOLIO_EVIDENCE_KEY] = True
     current["required_completion_evidence"] = evidence
     return current
 
@@ -83,14 +85,14 @@ def test_the_maturity_key_is_the_accepted_record() -> None:
     evidence = current["required_completion_evidence"]
     assert evidence[METRICS_EVIDENCE_KEY] is True
     assert evidence[MATURITY_EVIDENCE_KEY] is True
-    assert evidence["portfolio_eligibility_implemented"] is False
+    assert evidence[PORTFOLIO_EVIDENCE_KEY] is True
 
 
-def test_portfolio_eligibility_is_refused() -> None:
+def test_the_closed_loop_key_is_refused() -> None:
     previous = _metrics_pointer()
     current = _earned(previous)
     evidence = dict(current["required_completion_evidence"])
-    evidence["portfolio_eligibility_implemented"] = True
+    evidence["closed_loop_store_implemented"] = True
     current["required_completion_evidence"] = evidence
 
     with pytest.raises(ControlStateError, match="exactly the keys the fixture proof earned"):
@@ -149,6 +151,7 @@ def test_apply_records_the_maturity_key_without_touching_the_live_file(tmp_path:
     assert applied["head_sha"] == previous["head_sha"]
     assert evidence[METRICS_EVIDENCE_KEY] is True
     assert evidence[MATURITY_EVIDENCE_KEY] is True
-    assert evidence["portfolio_eligibility_implemented"] is False
+    assert evidence[PORTFOLIO_EVIDENCE_KEY] is True
+    assert evidence["closed_loop_store_implemented"] is False
     assert evidence["evidence_closure_commit_recorded"] is False
     assert STATE_PATH.read_bytes() == live_bytes

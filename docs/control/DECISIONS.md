@@ -760,3 +760,19 @@ Session 10 is incomplete at revision 78. `metrics_fixture_implemented` is true. 
 ### Consequences
 
 Revision 79 records the metrics key and the maturity key true. The other four Session 10 keys stay false. Portfolio eligibility is the next proof.
+
+## D-0052 — Session 10 portfolio eligibility is the third earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 10 is incomplete at revision 79. The metrics fixture and the maturity clock are true. Portfolio eligibility already returns only `HOLD`, `REPAIR`, `CULL`, and `MULTIPLY`. Cohorts under five, cutoff ties, and identical scores are not culled. `CULL` carries an unexecuted deactivation id and does not emit `LISTING_CULLED`. `MULTIPLY` returns a successor and stops at dedupe. `HOLD` names a future collection time. One eligible new-front experiment is scheduled, and a blocked experiment stays queued. `publishing_enabled` stays false.
+
+### Decision
+
+`prove_session_10()` earns `metrics_fixture_implemented`, `maturity_clock_implemented`, and `portfolio_eligibility_implemented`. `record-evidence` on incomplete Session 10 flips the portfolio key and keeps the earlier keys. Any other flip is refused. The closure key stays false. `head_sha` does not move. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. No deactivation is executed.
+
+### Consequences
+
+Revision 80 records those three keys true. The closed-loop ledger, the control-file key, and the closure key stay false. The closed-loop ledger is the next proof.

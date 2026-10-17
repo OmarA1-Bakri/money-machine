@@ -8,7 +8,7 @@
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "evidence_closure_commit_sha": "cfb36462994ecba833f31ba869f2aba627f6060d",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 79,
+  "state_revision": 80,
   "session_status": "incomplete",
   "current_session": 10,
   "completed_sessions": [
@@ -131,7 +131,7 @@
     "evidence_closure_commit_recorded": false,
     "maturity_clock_implemented": true,
     "metrics_fixture_implemented": true,
-    "portfolio_eligibility_implemented": false
+    "portfolio_eligibility_implemented": true
   },
   "transition_contract": {
     "completion_requires_all_evidence_true": true,
@@ -146,5 +146,5 @@
   },
   "next_session": 10,
   "next_prompt": "13_SESSION_10_ANALYTICS_CULL_MULTIPLY_CLOSED_LOOP.md",
-  "updated_at": "2026-10-17T11:40:00Z"
+  "updated_at": "2026-10-17T11:45:00Z"
 }
