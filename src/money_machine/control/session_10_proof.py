@@ -1,4 +1,4 @@
-"""Earn the Session 10 metrics, maturity, and portfolio keys from injected fixtures.
+"""Earn the Session 10 metrics, maturity, portfolio, and ledger keys from fixtures.
 
 The proof does not open a socket, read a credential, insert a job, or schedule a timer.
 """
@@ -13,6 +13,13 @@ from pathlib import Path
 from typing import Literal
 from uuid import UUID, uuid4
 
+from money_machine.assets.closed_loop_store import (
+    ClosedLoopRefusal,
+    TriggerLedger,
+    confirm_fixture_cull,
+    persist_monthly_record,
+    persist_weekly_plan,
+)
 from money_machine.assets.maturity_clock import (
     ACCUMULATED_LIVE_RULE,
     MATURITY_LIVE_DAYS,
@@ -25,6 +32,8 @@ from money_machine.assets.metrics_fixture import (
     ActiveListing,
     MetricsFixtureRefusal,
     MilestoneInput,
+    MonthlyRecord,
+    PlannedJob,
     derive_milestones,
     plan_monthly,
     plan_weekly,
@@ -50,8 +59,14 @@ from money_machine.domain.models.common import EvidenceReference
 METRICS_EVIDENCE_KEY = "metrics_fixture_implemented"
 MATURITY_EVIDENCE_KEY = "maturity_clock_implemented"
 PORTFOLIO_EVIDENCE_KEY = "portfolio_eligibility_implemented"
+LEDGER_EVIDENCE_KEY = "closed_loop_store_implemented"
 EARNED_EVIDENCE_KEYS = frozenset(
-    {METRICS_EVIDENCE_KEY, MATURITY_EVIDENCE_KEY, PORTFOLIO_EVIDENCE_KEY}
+    {
+        METRICS_EVIDENCE_KEY,
+        MATURITY_EVIDENCE_KEY,
+        PORTFOLIO_EVIDENCE_KEY,
+        LEDGER_EVIDENCE_KEY,
+    }
 )
 _DECIDED = datetime(2026, 10, 16, tzinfo=UTC)
 _PUBLISHED = datetime(2026, 3, 1, tzinfo=UTC)
@@ -74,6 +89,7 @@ def prove_session_10() -> frozenset[str]:
     _prove_metrics()
     _prove_maturity()
     _prove_portfolio()
+    _prove_closed_loop()
     return EARNED_EVIDENCE_KEYS
 
 
@@ -445,3 +461,167 @@ def _prove_portfolio() -> None:
     source = Path(evaluate_portfolio.__code__.co_filename).read_text(encoding="utf-8")
     if "deactivate_listing" in source or "httpx" in source:
         raise Session10ProofError("portfolio_live")
+
+
+def _cull_result(
+    *,
+    decision_id: UUID,
+    listing_id: UUID,
+    job_id: UUID | None,
+    events: tuple[EventName, ...],
+    decision: DecisionType = DecisionType.CULL,
+) -> PortfolioResult:
+    return PortfolioResult(
+        listing_id=listing_id,
+        decision_id=decision_id,
+        decision=decision,
+        decided_at=_DECIDED,
+        snapshot_id=UUID("00000000-0000-4000-8000-0000000000b8"),
+        event_names=events,
+        deactivation_job_id=job_id,
+        deactivation_executed=False,
+    )
+
+
+def _prove_closed_loop() -> None:
+    shop_id = UUID("00000000-0000-4000-8000-0000000000b7")
+    listing_id = UUID("00000000-0000-4000-8000-0000000000b1")
+    plan = plan_weekly(
+        (
+            ActiveListing(listing_id=listing_id, listing_version=1, active=True),
+            ActiveListing(listing_id=uuid4(), listing_version=1, active=False),
+        ),
+        window_start=_START,
+        window_end=_END,
+        prior_snapshots=(),
+    )
+    ledger = TriggerLedger()
+    inserted = persist_weekly_plan(ledger, shop_id=shop_id, plan=plan, next_fire_at=_OBSERVED)
+    if [row.trigger_kind for row in inserted] != ["WEEKLY_REVIEW", "WEEKLY_REVIEW"]:
+        raise Session10ProofError("loop_weekly")
+    if any(row.next_fire_at != _OBSERVED or row.cron_expression != "0 9 * * 1" for row in inserted):
+        raise Session10ProofError("loop_weekly")
+    again = persist_weekly_plan(
+        ledger,
+        shop_id=shop_id,
+        plan=plan,
+        next_fire_at=_OBSERVED + timedelta(days=7),
+    )
+    if again or any(row.next_fire_at != _OBSERVED for row in ledger.rows()):
+        raise Session10ProofError("loop_second")
+    record = MonthlyRecord(
+        cadence="monthly",
+        window_start=_START,
+        window_end=_END,
+        jobs=(
+            PlannedJob(
+                job_type="ResearchCollectionJob",
+                role="research",
+                shop_id=shop_id,
+                window_start=_START,
+                window_end=_END,
+                admitted_event=EventName.RESEARCH_COMPLETED,
+            ),
+        ),
+    )
+    monthly = persist_monthly_record(ledger, record)
+    if (
+        monthly is None
+        or monthly.trigger_kind != "MONTHLY_DEEP_PASS"
+        or monthly.cron_expression != "0 9 1 * *"
+        or persist_monthly_record(ledger, record) is not None
+        or persist_monthly_record(ledger, None) is not None
+    ):
+        raise Session10ProofError("loop_monthly")
+    job_id = UUID("00000000-0000-4000-8000-0000000000b6")
+    cull = _cull_result(
+        decision_id=UUID("00000000-0000-4000-8000-0000000000b9"),
+        listing_id=listing_id,
+        job_id=job_id,
+        events=(EventName.LISTING_CULL_REQUESTED,),
+    )
+    confirmed = confirm_fixture_cull(
+        cull,
+        fixture_status="CONFIRMED",
+        lesson="bottom of the cohort after thirty live periods",
+        artifact_ids=(UUID("00000000-0000-4000-8000-0000000000b4"),),
+    )
+    if (
+        confirmed.event_names != (EventName.LISTING_CULLED,)
+        or confirmed.lesson is None
+        or not confirmed.lesson.retained
+        or confirmed.lesson.deactivation_job_id != job_id
+        or confirmed.deactivation_executed
+    ):
+        raise Session10ProofError("loop_confirmed")
+    unknown = confirm_fixture_cull(
+        cull,
+        fixture_status="UNKNOWN",
+        lesson="bottom of the cohort after thirty live periods",
+        artifact_ids=(),
+    )
+    if unknown.event_names or unknown.lesson is not None:
+        raise Session10ProofError("loop_unknown")
+    held = confirm_fixture_cull(
+        _cull_result(
+            decision_id=UUID("00000000-0000-4000-8000-0000000000ba"),
+            listing_id=listing_id,
+            job_id=None,
+            events=(EventName.LISTING_HELD,),
+            decision=DecisionType.HOLD,
+        ),
+        fixture_status="CONFIRMED",
+        lesson="bottom of the cohort after thirty live periods",
+        artifact_ids=(),
+    )
+    if held.event_names or held.lesson is not None:
+        raise Session10ProofError("loop_hold")
+    try:
+        confirm_fixture_cull(cull, fixture_status="CONFIRMED", lesson="  ", artifact_ids=())
+    except ClosedLoopRefusal as error:
+        if error.code != "lesson":
+            raise Session10ProofError("loop_lesson") from error
+    else:
+        raise Session10ProofError("loop_lesson")
+    try:
+        confirm_fixture_cull(
+            _cull_result(
+                decision_id=UUID("00000000-0000-4000-8000-0000000000bb"),
+                listing_id=listing_id,
+                job_id=job_id,
+                events=(EventName.LISTING_CULLED,),
+            ),
+            fixture_status="CONFIRMED",
+            lesson="bottom of the cohort after thirty live periods",
+            artifact_ids=(),
+        )
+    except ClosedLoopRefusal as error:
+        if error.code != "listing_culled":
+            raise Session10ProofError("loop_early") from error
+    else:
+        raise Session10ProofError("loop_early")
+    try:
+        confirm_fixture_cull(
+            _cull_result(
+                decision_id=UUID("00000000-0000-4000-8000-0000000000bc"),
+                listing_id=listing_id,
+                job_id=None,
+                events=(EventName.LISTING_CULL_REQUESTED,),
+            ),
+            fixture_status="CONFIRMED",
+            lesson="bottom of the cohort after thirty live periods",
+            artifact_ids=(),
+        )
+    except ClosedLoopRefusal as error:
+        if error.code != "deactivation_job":
+            raise Session10ProofError("loop_job") from error
+    else:
+        raise Session10ProofError("loop_job")
+    source = Path(confirm_fixture_cull.__code__.co_filename).read_text(encoding="utf-8")
+    if (
+        "schedule_maturity_timer" in source
+        or "orchestration.scheduler" in source
+        or "import httpx" in source
+        or "import socket" in source
+    ):
+        raise Session10ProofError("loop_scheduler")

@@ -4,8 +4,8 @@ Sessions 00-06 closed with every contract key true. Session 07's close
 commit under D-0032 has every contract key false. D-0036 records the live
 pointer separately. Sessions 08 and 09 are complete. Session 09 is revision
 76 and every one of its keys is true (D-0047). Session 10 is incomplete at
-revision 80. The metrics fixture, the maturity clock, and portfolio eligibility are
-true (D-0052). Sessions
+revision 81. Metrics, the maturity clock, portfolio eligibility, and the
+closed-loop ledger are true (D-0053). Sessions
 11-15 have no contract. This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
@@ -153,11 +153,12 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
             "src/money_machine/assets/portfolio_eligibility.py",
             "src/money_machine/assets/closed_loop_store.py",
         ),
-        "The metrics fixture, the maturity clock, and portfolio eligibility are recorded. "
-        "The closed-loop ledger is not.",
+        "Metrics, the maturity clock, portfolio eligibility, and the ledger are recorded. "
+        "The control-file key is not.",
         True,
         frozenset(
             {
+                "closed_loop_store_implemented",
                 "maturity_clock_implemented",
                 "metrics_fixture_implemented",
                 "portfolio_eligibility_implemented",
@@ -204,10 +205,10 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 10 at state revision 80.",
+        "The checked-in pointer is Session 10 at state revision 81.",
         "`current_session` is 10. `session_status` is incomplete.",
-        "The metrics fixture, the maturity clock, and portfolio eligibility are true.",
-        "The other Session 10 keys are false.",
+        "Metrics, the maturity clock, portfolio eligibility, and the closed-loop ledger are true.",
+        "The control-file key and the closure key are false.",
         "Session 09 is complete and every one of its keys is true.",
         "Session 08 is complete and every one of its keys is true.",
         "Sessions 00-06 closed with every contract key true.",
@@ -215,8 +216,7 @@ def render_session_evidence() -> str:
         "D-0036 recorded the twelve Session 07 keys true. The closure commit is",
         "`5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.",
         (
-            "Session 10 is incomplete. Metrics, the maturity clock, "
-            "and portfolio eligibility are true."
+            "Session 10 is incomplete. Four keys are true. The control-file key is not."
         ),
         "Sessions 11-15 have no contract and are not activated.",
         "",
@@ -256,8 +256,7 @@ def render_session_evidence() -> str:
             "## Sessions 10-15",
             "",
             (
-                "Session 10 is incomplete. Metrics, the maturity clock, "
-                "and portfolio eligibility are true."
+                "Session 10 is incomplete. Four keys are true. The control-file key is not."
             ),
             "Sessions 11-15 have no contract and are not activated.",
             "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",

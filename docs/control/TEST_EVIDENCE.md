@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-17 — Session 10 closed-loop ledger key recorded
+
+**Verification scope**: live `record-evidence` from revision 80 to 81. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move. No deactivation is executed.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 10, `incomplete`, revision 81, `updated_at` `2026-10-17T11:50:00Z` | PASS |
+| Keys | Four Session 10 keys true; the control-file key and the closure key false | PASS |
+| Head | `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d` | PASS |
+| Refusal | The control-file key and the closure key are refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "record-evidence", "session": 10, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 81}`. The ledger proof, the portfolio proof, the maturity proof, the metrics proof, the Session 10 contract, the Session 09 proof, the Session 09 contract, the Session 09 completion check, the evidence index, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 54 passed in 3.20s.
+
 ## 2026-10-17 — Session 10 portfolio eligibility key recorded
 
 **Verification scope**: live `record-evidence` from revision 79 to 80. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move. No deactivation is executed.

@@ -776,3 +776,19 @@ Session 10 is incomplete at revision 79. The metrics fixture and the maturity cl
 ### Consequences
 
 Revision 80 records those three keys true. The closed-loop ledger, the control-file key, and the closure key stay false. The closed-loop ledger is the next proof.
+
+## D-0053 — Session 10 closed-loop ledger is the fourth earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 10 is incomplete at revision 80. The metrics fixture, the maturity clock, and portfolio eligibility are true. The ledger already stores one weekly trigger per new plan record, leaves a second write in the same window unchanged, stores one monthly deep-pass trigger, and returns `LISTING_CULLED` only after a fixture status of `CONFIRMED`. An unknown read, a hold, a blank lesson, a premature cull event, and a cull without a job id do not confirm a cull. The deactivation stays unexecuted. The module does not call the scheduler.
+
+### Decision
+
+`prove_session_10()` earns the metrics key, the maturity key, the portfolio key, and `closed_loop_store_implemented`. `record-evidence` on incomplete Session 10 flips the ledger key and keeps the earlier keys. Any other flip is refused. The closure key stays false. `head_sha` does not move. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. No scheduler row is inserted through `scheduler.main`, and no live deactivation runs.
+
+### Consequences
+
+Revision 81 records those four keys true. `control_files_and_checkpoint_current` and the closure key stay false. The control-file key is the next proof.

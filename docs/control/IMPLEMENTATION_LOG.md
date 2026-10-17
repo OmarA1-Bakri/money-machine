@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 10 closed-loop ledger key recorded
+
+`record-evidence` advanced `state_revision` from 80 to 81. `updated_at` is `2026-10-17T11:50:00Z`. `closed_loop_store_implemented` is true. The metrics fixture, the maturity clock, and portfolio eligibility stay true. The control-file key and the closure key stay false. `current_session` stays 10. `session_status` stays incomplete. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. No deactivation is executed. No live provider call is made.
+
 ## 2026-10-17 — Session 10 portfolio eligibility key recorded
 
 `record-evidence` advanced `state_revision` from 79 to 80. `updated_at` is `2026-10-17T11:45:00Z`. `portfolio_eligibility_implemented` is true. The metrics fixture and the maturity clock stay true. The other three Session 10 keys stay false. `current_session` stays 10. `session_status` stays incomplete. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. No deactivation is executed. No live provider call is made.

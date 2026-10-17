@@ -12,6 +12,7 @@ import pytest
 
 from money_machine.control.session_10_proof import (
     EARNED_EVIDENCE_KEYS,
+    LEDGER_EVIDENCE_KEY,
     MATURITY_EVIDENCE_KEY,
     METRICS_EVIDENCE_KEY,
     PORTFOLIO_EVIDENCE_KEY,
@@ -60,6 +61,7 @@ def _earned(previous: ControlState) -> ControlState:
     evidence[METRICS_EVIDENCE_KEY] = True
     evidence[MATURITY_EVIDENCE_KEY] = True
     evidence[PORTFOLIO_EVIDENCE_KEY] = True
+    evidence[LEDGER_EVIDENCE_KEY] = True
     current["required_completion_evidence"] = evidence
     return current
 
@@ -81,7 +83,7 @@ def test_an_extra_key_is_refused() -> None:
     previous = _false_pointer()
     current = _earned(previous)
     evidence = dict(current["required_completion_evidence"])
-    evidence["closed_loop_store_implemented"] = True
+    evidence["control_files_and_checkpoint_current"] = True
     current["required_completion_evidence"] = evidence
 
     with pytest.raises(ControlStateError, match="exactly the keys the fixture proof earned"):
@@ -141,6 +143,7 @@ def test_apply_records_the_metrics_key_without_touching_the_live_file(tmp_path: 
     assert evidence[METRICS_EVIDENCE_KEY] is True
     assert evidence[MATURITY_EVIDENCE_KEY] is True
     assert evidence[PORTFOLIO_EVIDENCE_KEY] is True
-    assert evidence["closed_loop_store_implemented"] is False
+    assert evidence[LEDGER_EVIDENCE_KEY] is True
+    assert evidence["control_files_and_checkpoint_current"] is False
     assert evidence["evidence_closure_commit_recorded"] is False
     assert STATE_PATH.read_bytes() == live_bytes

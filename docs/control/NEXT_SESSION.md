@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 10 closed-loop ledger is recorded (2026-10-17)
+
+Revision 81 records the metrics fixture, the maturity clock, portfolio eligibility, and `closed_loop_store_implemented`. The control-file key and the closure key stay false. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The next honest step is the control-file key, through its own proof.
+
 ## Session 10 portfolio eligibility is recorded (2026-10-17)
 
 Revision 80 records `metrics_fixture_implemented`, `maturity_clock_implemented`, and `portfolio_eligibility_implemented`. The other three Session 10 keys stay false. `completed_sessions` stays 0 through 9. `next_session` stays 10. `head_sha` stays `cfb36462994ecba833f31ba869f2aba627f6060d`. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The next honest step is the closed-loop ledger, through its own proof.

@@ -61,7 +61,7 @@ def test_live_pointer_is_incomplete_session_10() -> None:
     live = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert live["current_session"] == 10
     assert live["session_status"] == "incomplete"
-    assert live["state_revision"] == 80
+    assert live["state_revision"] == 81
     assert live["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     assert live["next_session"] == 10
     assert live["next_prompt"] == SESSION_PROMPTS[10]
@@ -73,6 +73,7 @@ def test_live_pointer_is_incomplete_session_10() -> None:
     expected["metrics_fixture_implemented"] = True
     expected["maturity_clock_implemented"] = True
     expected["portfolio_eligibility_implemented"] = True
+    expected["closed_loop_store_implemented"] = True
     assert evidence == expected
 
 
@@ -87,6 +88,7 @@ def test_open_sessions_have_no_recorded_true_key() -> None:
                     "metrics_fixture_implemented",
                     "maturity_clock_implemented",
                     "portfolio_eligibility_implemented",
+                    "closed_loop_store_implemented",
                 }
             )
         else:
