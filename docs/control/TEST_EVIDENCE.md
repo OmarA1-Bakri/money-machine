@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-17 — Session 12 evidence contract installed
+
+**Verification scope**: D-0064 installs the contract. The state file stays revision 90. Session 12 is not activated. No live HTTP. Exit 78 stays HELD.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Contract | Six Session 12 keys, none of them the exit string | PASS |
+| Activation shape | A revision-90 candidate with every key false validates and is not written | PASS |
+| Refusal | One true key, a missing key, and an extra key are refused | PASS |
+| Pointer | Revision 90 stays complete Session 11 | PASS |
+| Prompt | The Session 12 prompt hash matches the workbook appendix | PASS |
+
+The contract test, the evidence index, the prompt-integrity gate, the Session 11 contract and intake proof, the Session 10 contract and control-file proof, and the Session 09 contract and preflight proof printed 48 passed in 0.88s.
+
 ## 2026-10-17 — Session 11 closure recorded
 
 **Verification scope**: live `apply-completion` from revision 89 to 90. No live HTTP. Exit 78 stays HELD. The exit string is not written. Session 12 is not activated.

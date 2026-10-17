@@ -12,7 +12,8 @@ D-0036 recorded the twelve Session 07 keys true. The closure commit is
 `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.
 Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
-Sessions 12-15 have no contract and are not activated.
+Session 12's contract is installed and the session is not activated.
+Sessions 13-15 have no contract and are not activated.
 
 ## Session 00
 
@@ -272,7 +273,8 @@ Head SHA: `f16c7ed0598daf3f4627955b52585f253ae1b918`.
 
 Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
-Sessions 12-15 have no contract and are not activated.
+Session 12's contract is installed and the session is not activated.
+Sessions 13-15 have no contract and are not activated.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
 ## Session 11
@@ -299,10 +301,19 @@ Fixture paths:
 
 Prompt: `15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md`.
 Status: not activated.
-Evidence contract: absent.
-No evidence contract and no session module. The operator console is not built.
+Evidence contract: installed, not activated.
+The evidence contract is installed and the session is not activated. The operator console is not built.
 
 Fixture paths: none.
+
+| Key | Recorded |
+|---|---|
+| `console_read_model_implemented` | not installed |
+| `control_files_and_checkpoint_current` | not installed |
+| `evidence_closure_commit_recorded` | not installed |
+| `exception_views_implemented` | not installed |
+| `operator_actions_fail_closed` | not installed |
+| `telemetry_redaction_implemented` | not installed |
 
 ## Session 13
 

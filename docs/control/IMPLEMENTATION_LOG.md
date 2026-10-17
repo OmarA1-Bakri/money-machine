@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 12 evidence contract installed
+
+D-0064 installs the six Session 12 keys. Revision 90 is unchanged. Session 11 stays complete. Session 12 is not activated. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-12-prompt-integrity.md`. No live provider call is made.
+
 ## 2026-10-17 — Session 11 closure recorded
 
 `apply-completion` advanced `state_revision` from 89 to 90. `updated_at` is `2026-10-17T12:40:00Z`. Every Session 11 key is true. `session_status` is complete. `current_session` stays 11. `completed_sessions` is 0 through 11. `next_session` is 12. `next_prompt` is `15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md`. `head_sha` and `evidence_closure_commit_sha` are `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. Session 12 is not activated. No live provider call is made.

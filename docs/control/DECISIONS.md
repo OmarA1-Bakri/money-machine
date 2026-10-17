@@ -961,3 +961,28 @@ Five Session 11 keys are true. `evidence_closure_commit_recorded` is the only fa
 ### Consequences
 
 The following state commit records revision 90. Session 11 is complete. The closure key is true. Session 12 stays inactive.
+
+## D-0064 — Session 12 evidence contract is installed and not activated
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 11 is complete at revision 90. `next_session` is 12. Activation refuses while session 12 has no entry in `SESSION_EVIDENCE_KEYS`. The Session 12 prompt-integrity addendum defers live PostHog, live operator mutations, the deployed console, Exit 78, and the exit string. The offline PostHog client already queues and does not send.
+
+### Decision
+
+Session 12's completion contract is exactly these keys. A later activation installs every one false:
+
+- `console_read_model_implemented`
+- `exception_views_implemented`
+- `telemetry_redaction_implemented`
+- `operator_actions_fail_closed`
+- `control_files_and_checkpoint_current`
+- `evidence_closure_commit_recorded`
+
+Live PostHog capture, a deployed API, a Next.js app, browser end-to-end tests, live operator mutations, Exit 78, and `SESSION_12_OPERATOR_CONSOLE_COMPLETE` are not keys. This decision does not activate Session 12 and does not edit `IMPLEMENTATION_STATE.json`.
+
+### Consequences
+
+`validate_activation_transition` accepts a candidate that installs these six keys all false from the revision-90 close. A true key, a missing key, or an extra key is refused. Sessions 13–15 still have no contract. Activation is the next transition and is not this commit.
