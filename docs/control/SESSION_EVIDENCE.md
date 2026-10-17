@@ -1,13 +1,14 @@
 # Session evidence
 
-The checked-in pointer is Session 08 at state revision 69.
-`current_session` is 8. `session_status` is complete.
-Every Session 08 evidence key is true.
+The checked-in pointer is Session 09 at state revision 70.
+`current_session` is 9. `session_status` is incomplete.
+Every Session 09 evidence key is false.
+Session 08 is complete and every one of its keys is true.
 Sessions 00-06 closed with every contract key true.
 Session 07's close commit keeps every contract key false under D-0032.
 D-0036 recorded the twelve Session 07 keys true. The closure commit is
 `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.
-Sessions 09-15 are not activated.
+Sessions 10-15 are not activated.
 
 ## Session 00
 
@@ -227,15 +228,15 @@ Head SHA: `01b7dd84ef98442ff26a5239e8c7de742739d844`.
 
 ## Sessions 09-15
 
-Sessions 09-15 are not activated. A fixture path is code on the trunk.
-It is not a recorded evidence key.
+Session 09 is activated and incomplete. Sessions 10-15 are not activated.
+A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
 ## Session 09
 
 Prompt: `12_SESSION_09_ETSY_DRAFT_PUBLISH_AND_PREFLIGHT.md`.
-Status: not activated.
-Evidence contract: installed, not activated.
-Contract is installed and not activated. Fixtures do not publish.
+Status: incomplete.
+Evidence contract: installed.
+Activated with every key false. Fixtures do not publish.
 
 Fixture paths:
 
@@ -245,12 +246,12 @@ Fixture paths:
 
 | Key | Recorded |
 |---|---|
-| `control_files_and_checkpoint_current` | not installed |
-| `etsy_preflight_implemented` | not installed |
-| `evidence_closure_commit_recorded` | not installed |
-| `fixture_draft_package_implemented` | not installed |
-| `mutation_receipt_implemented` | not installed |
-| `publishing_ramp_implemented` | not installed |
+| `control_files_and_checkpoint_current` | false |
+| `etsy_preflight_implemented` | false |
+| `evidence_closure_commit_recorded` | false |
+| `fixture_draft_package_implemented` | false |
+| `mutation_receipt_implemented` | false |
+| `publishing_ramp_implemented` | false |
 
 ## Session 10
 

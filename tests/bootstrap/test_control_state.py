@@ -1568,9 +1568,9 @@ def test_session_eight_activation_rejects_false_session_seven_evidence(tmp_path:
         assert key in result.stderr
     assert state_path.read_bytes() == original
     assert STATE_PATH.read_bytes() == checked_in
-    assert load_state()["current_session"] == 8
-    assert load_state()["session_status"] == "complete"
-    assert load_state()["state_revision"] == 69
+    assert load_state()["current_session"] == 9
+    assert load_state()["session_status"] == "incomplete"
+    assert load_state()["state_revision"] == 70
     assert load_state()["next_session"] == 9
 
 
@@ -1594,15 +1594,15 @@ def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: 
     assert not any(after["required_completion_evidence"].values())
     assert STATE_PATH.read_bytes() == checked_in
     live = load_state()
-    assert live["current_session"] == 8
-    assert live["session_status"] == "complete"
+    assert live["current_session"] == 9
+    assert live["session_status"] == "incomplete"
     assert live["next_session"] == 9
-    assert live["state_revision"] == 69
+    assert live["state_revision"] == 70
     assert live["head_sha"] == "01b7dd84ef98442ff26a5239e8c7de742739d844"
     assert live["evidence_closure_commit_sha"] == live["head_sha"]
     live_evidence = live["required_completion_evidence"]
-    assert set(live_evidence) == set(SESSION_08_EVIDENCE_KEYS)
-    assert all(live_evidence.values())
+    assert set(live_evidence) == set(control_state.SESSION_EVIDENCE_KEYS[9])
+    assert not any(live_evidence.values())
 
 
 def test_activation_uses_the_worktree_when_recorded_root_is_absent(tmp_path: Path) -> None:

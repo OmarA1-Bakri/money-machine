@@ -2,8 +2,8 @@
 
 Sessions 00-06 closed with every contract key true. Session 07's close
 commit under D-0032 has every contract key false. D-0036 records the live
-pointer separately. Session 08 is complete at revision 69. Session 09's
-contract is installed and not activated (D-0040). Sessions 10-15 have no
+pointer separately. Session 08 is complete at revision 69. Session 09 is
+activated and incomplete at revision 70 (D-0040). Sessions 10-15 have no
 contract. This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
@@ -30,11 +30,12 @@ class ClosedSessionEvidence:
 
 @dataclass(frozen=True, slots=True)
 class OpenSessionEvidence:
-    """A session that has not been activated."""
+    """A session that is not complete. ``activated`` means its keys are installed."""
 
     session: int
     fixture_paths: tuple[str, ...]
     gap: str
+    activated: bool = False
 
 
 CLOSED_SESSION_EVIDENCE: tuple[ClosedSessionEvidence, ...] = (
@@ -138,7 +139,8 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
             "src/money_machine/assets/publishing_ramp_decision.py",
             "src/money_machine/assets/mutation_receipt.py",
         ),
-        "Contract is installed and not activated. Fixtures do not publish.",
+        "Activated with every key false. Fixtures do not publish.",
+        True,
     ),
     OpenSessionEvidence(
         10,
@@ -190,14 +192,15 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 08 at state revision 69.",
-        "`current_session` is 8. `session_status` is complete.",
-        "Every Session 08 evidence key is true.",
+        "The checked-in pointer is Session 09 at state revision 70.",
+        "`current_session` is 9. `session_status` is incomplete.",
+        "Every Session 09 evidence key is false.",
+        "Session 08 is complete and every one of its keys is true.",
         "Sessions 00-06 closed with every contract key true.",
         "Session 07's close commit keeps every contract key false under D-0032.",
         "D-0036 recorded the twelve Session 07 keys true. The closure commit is",
         "`5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.",
-        "Sessions 09-15 are not activated.",
+        "Sessions 10-15 are not activated.",
         "",
     ]
     for record in CLOSED_SESSION_EVIDENCE:
@@ -234,8 +237,8 @@ def render_session_evidence() -> str:
         [
             "## Sessions 09-15",
             "",
-            "Sessions 09-15 are not activated. A fixture path is code on the trunk.",
-            "It is not a recorded evidence key.",
+            "Session 09 is activated and incomplete. Sessions 10-15 are not activated.",
+            "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",
         ]
     )
@@ -245,11 +248,15 @@ def render_session_evidence() -> str:
                 f"## Session {record.session:02d}",
                 "",
                 f"Prompt: `{SESSION_PROMPTS[record.session]}`.",
-                "Status: not activated.",
+                "Status: incomplete." if record.activated else "Status: not activated.",
                 (
-                    "Evidence contract: installed, not activated."
-                    if record.session in SESSION_EVIDENCE_KEYS
-                    else "Evidence contract: absent."
+                    "Evidence contract: installed."
+                    if record.activated
+                    else (
+                        "Evidence contract: installed, not activated."
+                        if record.session in SESSION_EVIDENCE_KEYS
+                        else "Evidence contract: absent."
+                    )
                 ),
                 record.gap,
                 "",
@@ -268,6 +275,7 @@ def render_session_evidence() -> str:
             lines.append("| Key | Recorded |")
             lines.append("|---|---|")
             for key in _keys(record.session):
-                lines.append(f"| `{key}` | not installed |")
+                recorded = "false" if record.activated else "not installed"
+                lines.append(f"| `{key}` | {recorded} |")
             lines.append("")
     return "\n".join(lines)

@@ -38,8 +38,19 @@ def _live() -> ControlState:
     return cast(ControlState, copy.deepcopy(loaded))
 
 
-def _activation_candidate(evidence: dict[str, bool]) -> tuple[ControlState, ControlState]:
+def _session_08_close() -> ControlState:
+    """The revision-69 close, rebuilt after activation replaced the live file."""
     previous = _live()
+    previous["state_revision"] = 69
+    previous["session_status"] = "complete"
+    previous["current_session"] = 8
+    previous["updated_at"] = "2026-10-17T09:49:00Z"
+    previous["required_completion_evidence"] = {key: True for key in SESSION_EVIDENCE_KEYS[8]}
+    return previous
+
+
+def _activation_candidate(evidence: dict[str, bool]) -> tuple[ControlState, ControlState]:
+    previous = _session_08_close()
     current = copy.deepcopy(previous)
     current["state_revision"] = previous["state_revision"] + 1
     current["session_status"] = "incomplete"
@@ -55,8 +66,22 @@ def test_session_09_contract_is_the_fixture_surface() -> None:
     assert "SESSION_09_ETSY_PUBLISHING_COMPLETE" not in SESSION_EVIDENCE_KEYS[9]
 
 
-def test_session_09_activation_shape_is_accepted_and_the_live_file_stays() -> None:
-    """The revision-69 close can install the six keys all false. This test does not write it."""
+def test_live_pointer_is_the_session_09_activation() -> None:
+    """Activation installed the six keys false. It did not write the exit string."""
+    live = _live()
+    text = STATE_PATH.read_text(encoding="utf-8")
+    assert live["state_revision"] == 70
+    assert live["current_session"] == 9
+    assert live["session_status"] == "incomplete"
+    assert live["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    assert live["next_session"] == 9
+    assert live["head_sha"] == "01b7dd84ef98442ff26a5239e8c7de742739d844"
+    assert live["required_completion_evidence"] == dict.fromkeys(sorted(SESSION_09_KEYS), False)
+    assert "SESSION_09_ETSY_PUBLISHING_COMPLETE" not in text
+
+
+def test_session_09_activation_shape_is_accepted() -> None:
+    """The revision-69 close still validates. This test does not write the state file."""
     before = STATE_PATH.read_bytes()
     previous, current = _activation_candidate(dict.fromkeys(SESSION_09_KEYS, False))
 

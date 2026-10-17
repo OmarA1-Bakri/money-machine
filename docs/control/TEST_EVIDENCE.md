@@ -1,5 +1,20 @@
 # Test Evidence
 
+## 2026-10-17 — Session 09 activation applied
+
+**Verification scope**: live `activate` from revision 69 to 70. No live HTTP. Exit 78 stays HELD. A12 and A13 stay `DESIGNED`. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 9, `incomplete`, revision 70, `updated_at` `2026-10-17T10:45:00Z` | PASS |
+| Keys | All six Session 09 keys false | PASS |
+| Head | `head_sha` and `evidence_closure_commit_sha` stay `01b7dd84ef98442ff26a5239e8c7de742739d844` | PASS |
+| Completed | `completed_sessions` stays `[0, 1, 2, 3, 4, 5, 6, 7, 8]` | PASS |
+| Exit string | `SESSION_09_ETSY_PUBLISHING_COMPLETE` is absent | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "activate", "session": 9, "state_revision": 70}`. The contract test, the evidence index, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 21 passed in 2.70s.
+
 ## 2026-10-17 — Session 08 completion applied
 
 **Verification scope**: live `apply-completion` from revision 68 to 69. No live HTTP. Exit 78 stays HELD. A10 and A11 stay `DESIGNED`. Session 09 is not activated.
