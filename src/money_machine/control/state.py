@@ -841,7 +841,18 @@ def _verify_completion_repository(
     state_path: Path,
     previous: ControlState,
     current: ControlState,
+    replay_anchor: str | None = None,
 ) -> None:
+    if previous["current_session"] == 8:
+        # Local import keeps st:1-598 byte-identical (no new top-level import).
+        from money_machine.control.s07_evidence import REPLAY_ANCHOR_SHA, replay_state_history
+
+        anchor = REPLAY_ANCHOR_SHA if replay_anchor is None else replay_anchor
+        replay_state_history(
+            Path(previous["repo_root"]),
+            anchor,
+            require_closed_window=True,
+        )
     repo_root, closure = _validate_git_evidence(state_path, previous, current)
     _assert_repo_at_closure(repo_root, closure, current["branch"])
 
@@ -850,30 +861,132 @@ def _verify_activation_repository(
     state_path: Path,
     previous: ControlState,
     current: ControlState,
+    replay_anchor: str | None = None,
 ) -> None:
-    del previous
+    next_session = previous["next_session"]
+    if next_session in (8, 9):
+        # Replay before identity so a shallow clone is refused before any other git check.
+        from money_machine.control.s07_evidence import replay_for_activation
+
+        replay_for_activation(
+            current,
+            replay_anchor,
+            require_closed_window=next_session == 9,
+        )
     _validate_repo_identity(state_path, current)
 
 
-def apply_completion_transition(state_path: Path, candidate_path: Path) -> ControlState:
-    """Validate a completion candidate and atomically replace the current state file."""
+def _apply_completion_transition(
+    state_path: Path,
+    candidate_path: Path,
+    *,
+    replay_anchor: str | None = None,
+) -> ControlState:
+    """Apply a completion. In-process tests may inject ``replay_anchor``; the CLI does not."""
+
+    def verify(path: Path, previous: ControlState, current: ControlState) -> None:
+        _verify_completion_repository(path, previous, current, replay_anchor)
+
     return _apply_transition(
         state_path,
         candidate_path,
         validate_completion_transition,
-        _verify_completion_repository,
+        verify,
     )
+
+
+def _apply_activation_transition(
+    state_path: Path,
+    candidate_path: Path,
+    *,
+    replay_anchor: str | None = None,
+) -> ControlState:
+    """Apply an activation. In-process tests may inject ``replay_anchor``; the CLI does not."""
+
+    def verify(path: Path, previous: ControlState, current: ControlState) -> None:
+        _verify_activation_repository(path, previous, current, replay_anchor)
+
+    return _apply_transition(
+        state_path,
+        candidate_path,
+        validate_activation_transition,
+        verify,
+    )
+
+
+def apply_completion_transition(state_path: Path, candidate_path: Path) -> ControlState:
+    """Validate a completion candidate and atomically replace the current state file."""
+    return _apply_completion_transition(state_path, candidate_path)
 
 
 def apply_activation_transition(state_path: Path, candidate_path: Path) -> ControlState:
     """Validate an activation candidate and atomically replace the current state file.
 
     Activation does not require a clean worktree: it is the first recorded act of a session
-    and is itself checkpointed by a later commit.
+    and is itself checkpointed by a later commit. The public entry always replays from the
+    hardcoded Session 07 anchor when the activation enters or leaves that window.
     """
-    return _apply_transition(
-        state_path,
-        candidate_path,
-        validate_activation_transition,
-        _verify_activation_repository,
+    return _apply_activation_transition(state_path, candidate_path)
+
+
+def apply_record_evidence_transition(state_path: Path, candidate_path: Path) -> ControlState:
+    """Record one or more Session 07 evidence keys false→true. Does not close the session."""
+    from money_machine.control.s07_evidence import apply_record_evidence_transition as apply
+
+    return apply(state_path, candidate_path)
+
+
+def apply_record_closure_transition(state_path: Path, candidate_path: Path) -> ControlState:
+    """Record the Session 07 closure commit and align both commit fields to it."""
+    from money_machine.control.s07_evidence import apply_record_closure_transition as apply
+
+    return apply(state_path, candidate_path)
+
+
+def apply_revoke_evidence_transition(state_path: Path, candidate_path: Path) -> ControlState:
+    """Revoke cited Session 07 evidence keys. Refused after closure."""
+    from money_machine.control.s07_evidence import apply_revoke_evidence_transition as apply
+
+    return apply(state_path, candidate_path)
+
+
+def validate_record_evidence_transition(previous: ControlState, current: ControlState) -> None:
+    """Structural rules for ``record-evidence``. Git manifest checks run at apply time."""
+    from money_machine.control.s07_evidence import validate_record_evidence_transition as validate
+
+    validate(previous, current)
+
+
+def validate_record_closure_transition(previous: ControlState, current: ControlState) -> None:
+    """Structural rules for ``record-closure``. History checks run at apply time."""
+    from money_machine.control.s07_evidence import validate_record_closure_transition as validate
+
+    validate(previous, current)
+
+
+def validate_revoke_evidence_transition(previous: ControlState, current: ControlState) -> None:
+    """Structural rules for ``revoke-evidence``."""
+    from money_machine.control.s07_evidence import validate_revoke_evidence_transition as validate
+
+    validate(previous, current)
+
+
+def replay_state_history(
+    repo_root: Path,
+    anchor: str,
+    *,
+    require_closed_window: bool = False,
+) -> None:
+    """Replay Session 07 state history from ``anchor``. The CLI passes the hardcoded anchor."""
+    from money_machine.control.s07_evidence import replay_state_history as replay
+
+    replay(repo_root, anchor, require_closed_window=require_closed_window)
+
+
+def assert_session_seven_continuity(repo_root: Path) -> None:
+    """Replay the real Session 07 history and pin the tip's commit fields."""
+    from money_machine.control.s07_evidence import (
+        assert_session_seven_continuity as assert_continuity,
     )
+
+    assert_continuity(repo_root)
