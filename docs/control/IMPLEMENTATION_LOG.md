@@ -1,3 +1,7 @@
+## 2026-10-17 — Private source PDF excluded
+
+`src/money_machine/deploy/source_exclusion.py` records that `The-Hands-Off-Money-Machine-Playbook.pdf` is `ignored_private_source`. Git ignores the root name and the `private/source` copy. No tracked path ends in `.pdf`. A stage request raises and does not call `git add`. The PDF bytes are not opened. The state pointer stays revision 119. `updated_at` stays `2026-10-17T16:50:00Z`. Exit 78 stays HELD. The exit string is not written.
+
 ## 2026-10-17 — Canonical repository identity recorded
 
 `src/money_machine/deploy/repository_identity.py` reads the local origin and records `OmarA1-Bakri/money-machine`. Visibility stays public under D-0008. A request to make the repository private is refused and no GitHub call is made. The Windows root `D:\Money Machine` and the WSL root `/mnt/d/Money Machine` are the paths already written in D-0001 and `docs/source/SOURCE_REGISTER.md`. The state pointer stays revision 119. `updated_at` stays `2026-10-17T16:50:00Z`. No credential is stored. Exit 78 stays HELD. The exit string is not written.

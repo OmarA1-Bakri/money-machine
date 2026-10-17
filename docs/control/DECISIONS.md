@@ -1514,3 +1514,19 @@ Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. 
 ### Consequences
 
 The canonical repository exists and the two roots are documented. Privacy stays the public authorization in D-0008. The next checklist line is "Private source PDF is excluded from git." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0098 — Private source PDF stays out of git
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. The acceptance checklist line "Private source PDF is excluded from git." has no typed proof. D-0002 already names the playbook as strict-deny Git content. Reading or committing that PDF is refused.
+
+### Decision
+
+`src/money_machine/deploy/source_exclusion.py` reads `docs/source/CANONICAL_SOURCE_REGISTER.json`. The playbook entry must stay `ignored_private_source` and must not be required in a clean clone. `git check-ignore` must ignore `The-Hands-Off-Money-Machine-Playbook.pdf` and `private/source/The-Hands-Off-Money-Machine-Playbook.pdf`. `git ls-files` must list no PDF. `refuse_pdf_stage` raises on a PDF path and does not call `git add`. The PDF bytes are not opened. The state pointer stays revision 119.
+
+### Consequences
+
+The private source PDF is excluded from git. The next checklist line is "Prompt pack is stored in the repo." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.

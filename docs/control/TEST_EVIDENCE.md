@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-17 — Private source PDF excluded
+
+**Verification scope**: git ignore and the source register. The PDF bytes are not opened. No `git add`. No live HTTP. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Ignore | `The-Hands-Off-Money-Machine-Playbook.pdf` and its `private/source` copy are ignored | PASS |
+| Index | `git ls-files` lists no PDF | PASS |
+| Policy | The register policy is `ignored_private_source` and the file is not required in a clean clone | PASS |
+| Hold | A stage request raises. Exit 78 stays HELD | PASS |
+
+The exclusion tests printed 6 passed in 0.05s. The exclusion tests, the evidence index, and the continuity proof printed 16 passed in 1.03s. `ruff check` and `pyright` on the exclusion module and the evidence catalogue were clean.
+
 ## 2026-10-17 — Canonical repository identity recorded
 
 **Verification scope**: local origin and documented roots. No GitHub visibility change. No live HTTP. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.

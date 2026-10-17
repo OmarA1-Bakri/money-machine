@@ -270,6 +270,7 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
             "src/money_machine/deploy/checkpoint.py",
             "src/money_machine/deploy/deployed_state.py",
             "src/money_machine/deploy/repository_identity.py",
+            "src/money_machine/deploy/source_exclusion.py",
             "src/money_machine/integrations/provider_connections.py",
         ),
         "The exit string is not written. A live account is not connected.",
