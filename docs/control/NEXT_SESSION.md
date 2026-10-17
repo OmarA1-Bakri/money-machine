@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 11 is activated (2026-10-17)
+
+Revision 84 is incomplete Session 11. Every Session 11 key is false. `completed_sessions` stays 0 through 10. `next_session` stays 11. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The next honest step is the first earned key, through its own proof.
+
 ## Session 11 contract is installed (2026-10-17)
 
 D-0056 installs the six Session 11 keys. Revision 83 is unchanged. Session 10 stays complete. Session 11 is not activated. `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918`. Exit 78 stays HELD. A16 stays `DESIGNED`. The next honest step is activation, which installs every Session 11 key false.

@@ -397,19 +397,19 @@ def test_modules_do_not_import_a_network_provider() -> None:
 
 def test_state_commissioning_and_exit_78_are_unchanged() -> None:
     state = json.loads(Path("docs/control/IMPLEMENTATION_STATE.json").read_text(encoding="utf-8"))
-    assert state["current_session"] == 10
-    assert state["state_revision"] == 83
-    assert state["session_status"] == "complete"
+    assert state["current_session"] == 11
+    assert state["state_revision"] == 84
+    assert state["session_status"] == "incomplete"
     assert state["next_session"] == 11
     assert state["commissioned_agents"] == []
     evidence = state["required_completion_evidence"]
-    assert evidence["metrics_fixture_implemented"] is True
-    assert evidence["maturity_clock_implemented"] is True
-    assert evidence["portfolio_eligibility_implemented"] is True
-    assert evidence["closed_loop_store_implemented"] is True
-    assert evidence["control_files_and_checkpoint_current"] is True
-    assert evidence["evidence_closure_commit_recorded"] is True
-    assert sum(1 for value in evidence.values() if value) == 6
+    assert evidence["support_intake_implemented"] is False
+    assert evidence["incident_routing_implemented"] is False
+    assert evidence["repair_resolution_implemented"] is False
+    assert evidence["draft_reply_implemented"] is False
+    assert evidence["control_files_and_checkpoint_current"] is False
+    assert evidence["evidence_closure_commit_recorded"] is False
+    assert sum(1 for value in evidence.values() if value) == 0
     worker = Path("src/money_machine/orchestration/worker.py").read_text(encoding="utf-8")
     assert "Exit 78 held" in worker
 

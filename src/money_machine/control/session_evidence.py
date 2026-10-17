@@ -3,9 +3,10 @@
 Sessions 00-06 closed with every contract key true. Session 07's close
 commit under D-0032 has every contract key false. D-0036 records the live
 pointer separately. Sessions 08, 09, and 10 are complete. Session 10 is
-revision 83 and every one of its keys is true (D-0055). Session 11's
-contract is installed and the session is not activated (D-0056). Sessions
-12-15 have no contract. This module does not edit ``IMPLEMENTATION_STATE.json``.
+revision 83 and every one of its keys is true (D-0055). Session 11 is
+activated and incomplete at revision 84. Every Session 11 key is false
+(D-0057). Sessions 12-15 have no contract. This module does not edit
+``IMPLEMENTATION_STATE.json``.
 """
 
 from __future__ import annotations
@@ -157,10 +158,8 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
     OpenSessionEvidence(
         11,
         ("src/money_machine/assets/support_intake.py",),
-        (
-            "The evidence contract is installed and the session is not activated. "
-            "Intake is in memory and sends nothing. A16 stays DESIGNED."
-        ),
+        ("No Session 11 key is earned. Intake is in memory and sends nothing. A16 stays DESIGNED."),
+        True,
     ),
     OpenSessionEvidence(
         12,
@@ -197,9 +196,10 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 10 at state revision 83.",
-        "`current_session` is 10. `session_status` is complete.",
-        "Every Session 10 key is true.",
+        "The checked-in pointer is Session 11 at state revision 84.",
+        "`current_session` is 11. `session_status` is incomplete.",
+        "Every Session 11 key is false.",
+        "Session 10 is complete and every one of its keys is true.",
         "Session 09 is complete and every one of its keys is true.",
         "Session 08 is complete and every one of its keys is true.",
         "Sessions 00-06 closed with every contract key true.",
@@ -207,7 +207,7 @@ def render_session_evidence() -> str:
         "D-0036 recorded the twelve Session 07 keys true. The closure commit is",
         "`5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.",
         "Session 10 is complete. Every key is true.",
-        "Session 11's contract is installed and the session is not activated.",
+        "Session 11 is activated and incomplete. Every Session 11 key is false.",
         "Sessions 12-15 have no contract and are not activated.",
         "",
     ]
@@ -246,7 +246,7 @@ def render_session_evidence() -> str:
             "## Sessions 11-15",
             "",
             "Session 10 is complete. Every key is true.",
-            "Session 11's contract is installed and the session is not activated.",
+            "Session 11 is activated and incomplete. Every Session 11 key is false.",
             "Sessions 12-15 have no contract and are not activated.",
             "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",

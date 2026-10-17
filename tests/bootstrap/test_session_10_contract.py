@@ -74,17 +74,20 @@ def test_session_10_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_records_the_closure_key() -> None:
-    """Session 10 is complete. Every Session 10 key is true."""
+    """Session 10 stays closed. Session 11 is activated and every key is false."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 83
-    assert live["current_session"] == 10
-    assert live["session_status"] == "complete"
+    assert live["state_revision"] == 84
+    assert live["current_session"] == 11
+    assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(11))
     assert live["next_session"] == 11
     assert live["next_prompt"] == SESSION_PROMPTS[11]
     assert live["head_sha"] == "f16c7ed0598daf3f4627955b52585f253ae1b918"
-    evidence = dict.fromkeys(sorted(SESSION_10_KEYS), True)
+    evidence = dict.fromkeys(
+        sorted(SESSION_EVIDENCE_KEYS[11]),
+        False,
+    )
     assert live["required_completion_evidence"] == evidence
     assert "SESSION_10_CLOSED_LOOP_AUTOMATION_COMPLETE" not in text
 

@@ -11,6 +11,7 @@ import pytest
 
 from money_machine.control.state import (
     SESSION_EVIDENCE_KEYS,
+    SESSION_PROMPTS,
     ControlState,
     ControlStateError,
     validate_activation_transition,
@@ -38,8 +39,25 @@ def _live() -> ControlState:
     return cast(ControlState, copy.deepcopy(loaded))
 
 
-def _activation_candidate(evidence: dict[str, bool]) -> tuple[ControlState, ControlState]:
+def _session_10_close() -> ControlState:
+    """The revision-83 close, rebuilt after activation replaces the live file."""
     previous = _live()
+    previous["state_revision"] = 83
+    previous["session_status"] = "complete"
+    previous["current_session"] = 10
+    previous["completed_sessions"] = list(range(11))
+    previous["next_session"] = 11
+    previous["next_prompt"] = SESSION_PROMPTS[11]
+    previous["updated_at"] = "2026-10-17T12:00:00Z"
+    previous["required_completion_evidence"] = {key: True for key in SESSION_EVIDENCE_KEYS[10]}
+    contract = dict(previous["transition_contract"])
+    contract["completion_requires_next_session"] = 11
+    previous["transition_contract"] = contract
+    return previous
+
+
+def _activation_candidate(evidence: dict[str, bool]) -> tuple[ControlState, ControlState]:
+    previous = _session_10_close()
     current = copy.deepcopy(previous)
     current["state_revision"] = previous["state_revision"] + 1
     current["session_status"] = "incomplete"
@@ -55,14 +73,17 @@ def test_session_11_contract_is_the_fixture_surface() -> None:
     assert "SESSION_11_SUPPORT_AND_REPAIR_COMPLETE" not in SESSION_EVIDENCE_KEYS[11]
 
 
-def test_live_pointer_stays_complete_session_10() -> None:
-    """Installing the contract does not edit the state file."""
+def test_live_pointer_is_the_session_11_activation() -> None:
+    """Activation installs every Session 11 key false."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 83
-    assert live["current_session"] == 10
-    assert live["session_status"] == "complete"
+    assert live["state_revision"] == 84
+    assert live["current_session"] == 11
+    assert live["session_status"] == "incomplete"
+    assert live["completed_sessions"] == list(range(11))
     assert live["next_session"] == 11
+    assert live["head_sha"] == "f16c7ed0598daf3f4627955b52585f253ae1b918"
+    assert live["required_completion_evidence"] == dict.fromkeys(sorted(SESSION_11_KEYS), False)
     assert "SESSION_11_SUPPORT_AND_REPAIR_COMPLETE" not in text
 
 

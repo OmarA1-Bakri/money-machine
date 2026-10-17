@@ -1569,9 +1569,9 @@ def test_session_eight_activation_rejects_false_session_seven_evidence(tmp_path:
         assert key in result.stderr
     assert state_path.read_bytes() == original
     assert STATE_PATH.read_bytes() == checked_in
-    assert load_state()["current_session"] == 10
-    assert load_state()["session_status"] == "complete"
-    assert load_state()["state_revision"] == 83
+    assert load_state()["current_session"] == 11
+    assert load_state()["session_status"] == "incomplete"
+    assert load_state()["state_revision"] == 84
     assert load_state()["next_session"] == 11
 
 
@@ -1595,21 +1595,21 @@ def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: 
     assert not any(after["required_completion_evidence"].values())
     assert STATE_PATH.read_bytes() == checked_in
     live = load_state()
-    assert live["current_session"] == 10
-    assert live["session_status"] == "complete"
+    assert live["current_session"] == 11
+    assert live["session_status"] == "incomplete"
     assert live["next_session"] == 11
-    assert live["state_revision"] == 83
+    assert live["state_revision"] == 84
     assert live["head_sha"] == "f16c7ed0598daf3f4627955b52585f253ae1b918"
     assert live["evidence_closure_commit_sha"] == live["head_sha"]
     live_evidence = live["required_completion_evidence"]
-    assert set(live_evidence) == set(control_state.SESSION_EVIDENCE_KEYS[10])
-    assert live_evidence["metrics_fixture_implemented"] is True
-    assert live_evidence["maturity_clock_implemented"] is True
-    assert live_evidence["portfolio_eligibility_implemented"] is True
-    assert live_evidence["closed_loop_store_implemented"] is True
-    assert live_evidence["control_files_and_checkpoint_current"] is True
-    assert live_evidence["evidence_closure_commit_recorded"] is True
-    assert sum(1 for value in live_evidence.values() if value) == 6
+    assert set(live_evidence) == set(control_state.SESSION_EVIDENCE_KEYS[11])
+    assert live_evidence["support_intake_implemented"] is False
+    assert live_evidence["incident_routing_implemented"] is False
+    assert live_evidence["repair_resolution_implemented"] is False
+    assert live_evidence["draft_reply_implemented"] is False
+    assert live_evidence["control_files_and_checkpoint_current"] is False
+    assert live_evidence["evidence_closure_commit_recorded"] is False
+    assert sum(1 for value in live_evidence.values() if value) == 0
 
 
 def test_activation_uses_the_worktree_when_recorded_root_is_absent(tmp_path: Path) -> None:

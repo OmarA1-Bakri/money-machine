@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-17 — Session 11 activated
+
+**Verification scope**: live `activate` from revision 83 to 84. No live HTTP. Exit 78 stays HELD. The exit string is not written. Every Session 11 key is false.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 11, `incomplete`, revision 84, `updated_at` `2026-10-17T12:10:00Z` | PASS |
+| Keys | The six Session 11 keys are installed and false | PASS |
+| Head | `head_sha` stays `f16c7ed0598daf3f4627955b52585f253ae1b918` | PASS |
+| Closed | `completed_sessions` stays 0 through 10 | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "activate", "session": 11, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 84}`. The Session 11 contract, the evidence index, the Session 10 contract and its five proofs, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 63 passed in 3.09s.
+
 ## 2026-10-17 — Session 11 evidence contract installed
 
 **Verification scope**: the contract and its activation shape. No state transition. No live HTTP. Revision 83 stays. Session 11 is not activated.

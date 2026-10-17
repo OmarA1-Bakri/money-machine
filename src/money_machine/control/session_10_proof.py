@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import inspect
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -84,6 +84,16 @@ _BEHAVIORAL_KEYS = (
     MATURITY_EVIDENCE_KEY,
     PORTFOLIO_EVIDENCE_KEY,
     LEDGER_EVIDENCE_KEY,
+)
+_SESSION_11_KEYS = frozenset(
+    {
+        "support_intake_implemented",
+        "incident_routing_implemented",
+        "repair_resolution_implemented",
+        "draft_reply_implemented",
+        "control_files_and_checkpoint_current",
+        "evidence_closure_commit_recorded",
+    }
 )
 _DECIDED = datetime(2026, 10, 16, tzinfo=UTC)
 _PUBLISHED = datetime(2026, 3, 1, tzinfo=UTC)
@@ -646,7 +656,7 @@ def _prove_closed_loop() -> None:
 
 
 def _prove_control_files() -> None:
-    """The five continuity files and the catalogue match an incomplete Session 10 pointer."""
+    """The continuity files and the catalogue match the checked-in pointer."""
     root = Path(__file__).resolve().parents[3]
     for relative in _CONTROL_FILES:
         path = root / relative
@@ -665,6 +675,9 @@ def _prove_control_files() -> None:
         raise Session10ProofError("control_checkpoint")
     evidence = decoded.get("required_completion_evidence")
     status = decoded.get("session_status")
+    if decoded.get("current_session") == 11:
+        _prove_activated_session_11(decoded, evidence, status)
+        return
     if (
         decoded.get("current_session") != 10
         or decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
@@ -691,5 +704,32 @@ def _prove_control_files() -> None:
         or decoded.get("next_session") != 11
         or decoded.get("completed_sessions") != list(range(11))
         or decoded.get("next_prompt") != "14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md"
+    ):
+        raise Session10ProofError("control_checkpoint")
+
+
+def _prove_activated_session_11(
+    decoded: Mapping[str, object],
+    evidence: object,
+    status: object,
+) -> None:
+    """Session 10 stays closed while Session 11 is incomplete."""
+    recorded: set[str] = set()
+    values_are_bool = False
+    evidence_count = -1
+    if isinstance(evidence, dict):
+        evidence_count = len(evidence)
+        for key in evidence:
+            if isinstance(key, str):
+                recorded.add(key)
+        values_are_bool = all(isinstance(value, bool) for value in evidence.values())
+    if (
+        status != "incomplete"
+        or decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
+        or decoded.get("next_session") != 11
+        or decoded.get("completed_sessions") != list(range(11))
+        or frozenset(recorded) != _SESSION_11_KEYS
+        or len(recorded) != evidence_count
+        or not values_are_bool
     ):
         raise Session10ProofError("control_checkpoint")

@@ -81,6 +81,16 @@ _SESSION_10_KEYS = frozenset(
         "evidence_closure_commit_recorded",
     }
 )
+_SESSION_11_KEYS = frozenset(
+    {
+        "support_intake_implemented",
+        "incident_routing_implemented",
+        "repair_resolution_implemented",
+        "draft_reply_implemented",
+        "control_files_and_checkpoint_current",
+        "evidence_closure_commit_recorded",
+    }
+)
 _OLDEST = datetime(2026, 10, 9, 15, 30, tzinfo=UTC)
 _TAGS = tuple(f"tag {number}" for number in range(1, 14))
 _IMAGES = (
@@ -450,6 +460,9 @@ def _prove_control_files() -> None:
         raise Session09ProofError("control_checkpoint")
     evidence = decoded.get("required_completion_evidence")
     status = decoded.get("session_status")
+    if decoded.get("current_session") == 11:
+        _prove_activated_session_11(decoded, evidence, status)
+        return
     if decoded.get("current_session") == 10:
         _prove_activated_session_10(decoded, evidence, status)
         return
@@ -497,9 +510,8 @@ def _prove_activated_session_10(
     ):
         raise Session09ProofError("control_checkpoint")
     if status == "incomplete":
-        if (
-            decoded.get("next_session") != 10
-            or decoded.get("completed_sessions") != list(range(10))
+        if decoded.get("next_session") != 10 or decoded.get("completed_sessions") != list(
+            range(10)
         ):
             raise Session09ProofError("control_checkpoint")
         return
@@ -509,5 +521,32 @@ def _prove_activated_session_10(
         decoded.get("next_session") != 11
         or decoded.get("completed_sessions") != list(range(11))
         or any(value is not True for value in evidence.values())
+    ):
+        raise Session09ProofError("control_checkpoint")
+
+
+def _prove_activated_session_11(
+    decoded: Mapping[str, object],
+    evidence: object,
+    status: object,
+) -> None:
+    """Session 09 stays closed while Session 11 is incomplete."""
+    recorded: set[str] = set()
+    values_are_bool = False
+    evidence_count = -1
+    if isinstance(evidence, dict):
+        evidence_count = len(evidence)
+        for key in evidence:
+            if isinstance(key, str):
+                recorded.add(key)
+        values_are_bool = all(isinstance(value, bool) for value in evidence.values())
+    if (
+        status != "incomplete"
+        or decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
+        or decoded.get("next_session") != 11
+        or decoded.get("completed_sessions") != list(range(11))
+        or frozenset(recorded) != _SESSION_11_KEYS
+        or len(recorded) != evidence_count
+        or not values_are_bool
     ):
         raise Session09ProofError("control_checkpoint")

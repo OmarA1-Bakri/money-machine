@@ -560,8 +560,8 @@ async def test_shared_checkpoint_parser_rejects_bad_inputs(tmp_path: Path) -> No
 
 def test_live_pointer_is_incomplete_session_ten() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    assert state["current_session"] == 10
-    assert state["session_status"] == "complete"
+    assert state["current_session"] == 11
+    assert state["session_status"] == "incomplete"
     assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     assert state["next_session"] == 11
     assert state["next_prompt"] == "14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md"
@@ -571,15 +571,15 @@ def test_live_pointer_is_incomplete_session_ten() -> None:
     assert state["last_verified_commit"] == BOOTSTRAP_SHA
     assert state["commissioned_agents"] == []
     evidence = state["required_completion_evidence"]
-    assert evidence.keys() == SESSION_EVIDENCE_KEYS[10]
-    assert evidence["metrics_fixture_implemented"] is True
-    assert evidence["maturity_clock_implemented"] is True
-    assert evidence["portfolio_eligibility_implemented"] is True
-    assert evidence["closed_loop_store_implemented"] is True
-    assert evidence["control_files_and_checkpoint_current"] is True
-    assert evidence["evidence_closure_commit_recorded"] is True
-    assert sum(1 for value in evidence.values() if value) == 6
-    assert state["state_revision"] == 83
+    assert evidence.keys() == SESSION_EVIDENCE_KEYS[11]
+    assert evidence["support_intake_implemented"] is False
+    assert evidence["incident_routing_implemented"] is False
+    assert evidence["repair_resolution_implemented"] is False
+    assert evidence["draft_reply_implemented"] is False
+    assert evidence["control_files_and_checkpoint_current"] is False
+    assert evidence["evidence_closure_commit_recorded"] is False
+    assert sum(1 for value in evidence.values() if value) == 0
+    assert state["state_revision"] == 84
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")
     assert "SESSION_08_MERCHANDISING_AND_ASSETS_COMPLETE" not in STATE_PATH.read_text(
         encoding="utf-8"
