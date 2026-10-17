@@ -744,3 +744,19 @@ Session 10 is incomplete at revision 77. All six keys are false. The metrics fix
 ### Consequences
 
 Revision 78 records the metrics key true. The other five Session 10 keys stay false. The maturity clock is the next proof.
+
+## D-0051 — Session 10 maturity clock is the second earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 10 is incomplete at revision 78. `metrics_fixture_implemented` is true. The maturity clock already counts thirty accumulated live UTC periods. Twenty live periods plus ten inactive periods are not mature on calendar day 30. A stored `live_days` of 30 does not override the intervals. A defect inside the window returns repair data. The clock does not call `schedule_maturity_timer`.
+
+### Decision
+
+`prove_session_10()` earns `metrics_fixture_implemented` and `maturity_clock_implemented`. `record-evidence` on incomplete Session 10 flips the maturity key and keeps the metrics key. Any other flip is refused. The closure key stays false. `head_sha` does not move. Exit 78 stays HELD. A14 and A15 stay `DESIGNED`. The exit string is not written. No scheduler row is inserted.
+
+### Consequences
+
+Revision 79 records the metrics key and the maturity key true. The other four Session 10 keys stay false. Portfolio eligibility is the next proof.

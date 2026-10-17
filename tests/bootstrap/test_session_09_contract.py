@@ -74,10 +74,10 @@ def test_session_09_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_is_incomplete_session_10() -> None:
-    """Session 09 stays closed. Session 10 is activated with every key false."""
+    """Session 09 stays closed. Session 10 records the metrics fixture and the maturity clock."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 78
+    assert live["state_revision"] == 79
     assert live["current_session"] == 10
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -86,7 +86,8 @@ def test_live_pointer_is_incomplete_session_10() -> None:
     assert live["head_sha"] == "cfb36462994ecba833f31ba869f2aba627f6060d"
     evidence = live["required_completion_evidence"]
     assert evidence["metrics_fixture_implemented"] is True
-    assert sum(1 for value in evidence.values() if value) == 1
+    assert evidence["maturity_clock_implemented"] is True
+    assert sum(1 for value in evidence.values() if value) == 2
     assert "SESSION_09_ETSY_PUBLISHING_COMPLETE" not in text
 
 

@@ -1,14 +1,24 @@
-"""Earn the Session 10 metrics key from the injected fixture.
+"""Earn the Session 10 metrics and maturity keys from injected fixtures.
 
-The proof does not open a socket, read a credential, or insert a job.
+The proof does not open a socket, read a credential, insert a job, or schedule a timer.
 """
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from uuid import uuid4
+from pathlib import Path
+from typing import Literal
+from uuid import UUID, uuid4
 
+from money_machine.assets.maturity_clock import (
+    ACCUMULATED_LIVE_RULE,
+    MATURITY_LIVE_DAYS,
+    ListingDefect,
+    LiveInterval,
+    evaluate_maturity,
+    repair_work_id,
+)
 from money_machine.assets.metrics_fixture import (
     ActiveListing,
     MetricsFixtureRefusal,
@@ -21,7 +31,10 @@ from money_machine.assets.metrics_fixture import (
 from money_machine.domain.models.common import EvidenceReference
 
 METRICS_EVIDENCE_KEY = "metrics_fixture_implemented"
-EARNED_EVIDENCE_KEYS = frozenset({METRICS_EVIDENCE_KEY})
+MATURITY_EVIDENCE_KEY = "maturity_clock_implemented"
+EARNED_EVIDENCE_KEYS = frozenset({METRICS_EVIDENCE_KEY, MATURITY_EVIDENCE_KEY})
+_PUBLISHED = datetime(2026, 3, 1, tzinfo=UTC)
+_LISTING = UUID("00000000-0000-4000-8000-0000000000a1")
 _START = datetime(2026, 10, 5, tzinfo=UTC)
 _END = datetime(2026, 10, 12, tzinfo=UTC)
 _OBSERVED = datetime(2026, 10, 12, 9, tzinfo=UTC)
@@ -36,9 +49,99 @@ class Session10ProofError(ValueError):
 
 
 def prove_session_10() -> frozenset[str]:
-    """Return the metrics key. A miss raises instead of returning it."""
+    """Return the metrics and maturity keys. A miss raises instead of returning them."""
     _prove_metrics()
+    _prove_maturity()
     return EARNED_EVIDENCE_KEYS
+
+
+def _at_hours(hours: int) -> datetime:
+    return _PUBLISHED + timedelta(hours=hours)
+
+
+def _span(
+    status: Literal["ACTIVE", "INACTIVE"],
+    start_hour: int,
+    end_hour: int,
+) -> LiveInterval:
+    return LiveInterval(
+        status=status,
+        started_at=_at_hours(start_hour),
+        ended_at=_at_hours(end_hour),
+    )
+
+
+def _paused_listing() -> tuple[LiveInterval, ...]:
+    """Twenty live periods, then ten inactive periods. Calendar length is 30 days."""
+    return (
+        _span("ACTIVE", 0, 24 * 20),
+        _span("INACTIVE", 24 * 20, 24 * 30),
+    )
+
+
+def _prove_maturity() -> None:
+    paused = _paused_listing()
+    calendar_day = evaluate_maturity(
+        listing_id=_LISTING,
+        published_at=_PUBLISHED,
+        intervals=paused,
+        evaluated_at=_at_hours(24 * 30),
+    )
+    if (
+        calendar_day.accumulated_live_periods != 20
+        or calendar_day.mature
+        or calendar_day.portfolio_decision_due
+        or calendar_day.repair is not None
+        or calendar_day.idempotency_key is not None
+    ):
+        raise Session10ProofError("maturity_paused")
+    stored = evaluate_maturity(
+        listing_id=_LISTING,
+        published_at=_PUBLISHED,
+        intervals=paused,
+        evaluated_at=_at_hours(24 * 30),
+        live_days=30,
+    )
+    if stored.mature or stored.accumulated_live_periods != 20 or stored.idempotency_key is not None:
+        raise Session10ProofError("maturity_stored_days")
+    detected_at = _at_hours(24)
+    defect = ListingDefect(code="broken_link", detected_at=detected_at)
+    repair = evaluate_maturity(
+        listing_id=_LISTING,
+        published_at=_PUBLISHED,
+        intervals=(_span("ACTIVE", 0, 24 * 5),),
+        evaluated_at=_at_hours(24 * 5),
+        defect=defect,
+    )
+    if (
+        repair.mature
+        or repair.portfolio_decision_due
+        or repair.idempotency_key is not None
+        or repair.repair is None
+        or repair.repair.repair_job_id != repair_work_id(_LISTING, "broken_link")
+        or repair.repair.detected_at != detected_at
+    ):
+        raise Session10ProofError("maturity_repair")
+    after_pause = 24 * 30
+    due = evaluate_maturity(
+        listing_id=_LISTING,
+        published_at=_PUBLISHED,
+        intervals=(*paused, _span("ACTIVE", after_pause, after_pause + 24 * 10)),
+        evaluated_at=_at_hours(after_pause + 24 * 10),
+    )
+    expected = f"{_LISTING}:{ACCUMULATED_LIVE_RULE}:{MATURITY_LIVE_DAYS}"
+    calendar_name = (_PUBLISHED + timedelta(days=30)).isoformat()
+    if (
+        due.accumulated_live_periods != 30
+        or not due.mature
+        or not due.portfolio_decision_due
+        or due.idempotency_key != expected
+        or calendar_name in expected
+    ):
+        raise Session10ProofError("maturity_due")
+    source = Path(evaluate_maturity.__code__.co_filename).read_text(encoding="utf-8")
+    if "schedule_maturity_timer" in source or "orchestration.scheduler" in source:
+        raise Session10ProofError("maturity_scheduler")
 
 
 def _prove_metrics() -> None:

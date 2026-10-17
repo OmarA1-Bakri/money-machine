@@ -1,15 +1,15 @@
 # Session evidence
 
-The checked-in pointer is Session 10 at state revision 78.
+The checked-in pointer is Session 10 at state revision 79.
 `current_session` is 10. `session_status` is incomplete.
-The metrics fixture is true. The other Session 10 keys are false.
+The metrics fixture and the maturity clock are true. The other Session 10 keys are false.
 Session 09 is complete and every one of its keys is true.
 Session 08 is complete and every one of its keys is true.
 Sessions 00-06 closed with every contract key true.
 Session 07's close commit keeps every contract key false under D-0032.
 D-0036 recorded the twelve Session 07 keys true. The closure commit is
 `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.
-Session 10 is incomplete. The metrics fixture is the one true key.
+Session 10 is incomplete. The metrics fixture and the maturity clock are true.
 Sessions 11-15 have no contract and are not activated.
 
 ## Session 00
@@ -249,7 +249,7 @@ Head SHA: `cfb36462994ecba833f31ba869f2aba627f6060d`.
 
 ## Sessions 10-15
 
-Session 10 is incomplete. The metrics fixture is the one true key.
+Session 10 is incomplete. The metrics fixture and the maturity clock are true.
 Sessions 11-15 have no contract and are not activated.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
@@ -258,7 +258,7 @@ A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 Prompt: `13_SESSION_10_ANALYTICS_CULL_MULTIPLY_CLOSED_LOOP.md`.
 Status: incomplete.
 Evidence contract: installed.
-The metrics fixture is recorded. The maturity clock is not.
+The metrics fixture and the maturity clock are recorded. Portfolio eligibility is not.
 
 Fixture paths:
 
@@ -272,7 +272,7 @@ Fixture paths:
 | `closed_loop_store_implemented` | false |
 | `control_files_and_checkpoint_current` | false |
 | `evidence_closure_commit_recorded` | false |
-| `maturity_clock_implemented` | false |
+| `maturity_clock_implemented` | true |
 | `metrics_fixture_implemented` | true |
 | `portfolio_eligibility_implemented` | false |
 

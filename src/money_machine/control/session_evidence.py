@@ -4,7 +4,7 @@ Sessions 00-06 closed with every contract key true. Session 07's close
 commit under D-0032 has every contract key false. D-0036 records the live
 pointer separately. Sessions 08 and 09 are complete. Session 09 is revision
 76 and every one of its keys is true (D-0047). Session 10 is incomplete at
-revision 78. The metrics fixture is the one true key (D-0050). Sessions
+revision 79. The metrics fixture and the maturity clock are true (D-0051). Sessions
 11-15 have no contract. This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
@@ -152,9 +152,9 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
             "src/money_machine/assets/portfolio_eligibility.py",
             "src/money_machine/assets/closed_loop_store.py",
         ),
-        "The metrics fixture is recorded. The maturity clock is not.",
+        "The metrics fixture and the maturity clock are recorded. Portfolio eligibility is not.",
         True,
-        frozenset({"metrics_fixture_implemented"}),
+        frozenset({"maturity_clock_implemented", "metrics_fixture_implemented"}),
     ),
     OpenSessionEvidence(
         11,
@@ -196,16 +196,16 @@ def render_session_evidence() -> str:
     lines = [
         "# Session evidence",
         "",
-        "The checked-in pointer is Session 10 at state revision 78.",
+        "The checked-in pointer is Session 10 at state revision 79.",
         "`current_session` is 10. `session_status` is incomplete.",
-        "The metrics fixture is true. The other Session 10 keys are false.",
+        "The metrics fixture and the maturity clock are true. The other Session 10 keys are false.",
         "Session 09 is complete and every one of its keys is true.",
         "Session 08 is complete and every one of its keys is true.",
         "Sessions 00-06 closed with every contract key true.",
         "Session 07's close commit keeps every contract key false under D-0032.",
         "D-0036 recorded the twelve Session 07 keys true. The closure commit is",
         "`5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.",
-        "Session 10 is incomplete. The metrics fixture is the one true key.",
+        "Session 10 is incomplete. The metrics fixture and the maturity clock are true.",
         "Sessions 11-15 have no contract and are not activated.",
         "",
     ]
@@ -243,7 +243,7 @@ def render_session_evidence() -> str:
         [
             "## Sessions 10-15",
             "",
-            "Session 10 is incomplete. The metrics fixture is the one true key.",
+            "Session 10 is incomplete. The metrics fixture and the maturity clock are true.",
             "Sessions 11-15 have no contract and are not activated.",
             "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",

@@ -1272,10 +1272,10 @@ def _verify_session_09_evidence_repository(
 
 
 def validate_session_10_evidence_record(previous: ControlState, current: ControlState) -> None:
-    """Record the Session 10 metrics key. The session stays incomplete.
+    """Record the Session 10 keys the fixture proof has earned. The session stays incomplete.
 
-    The proof earns only ``metrics_fixture_implemented``. The other five keys stay false.
-    The closure commit does not move.
+    The proof earns the metrics fixture and the maturity clock. The other four keys stay
+    false. The closure commit does not move.
     """
     if previous["current_session"] != 10 or current["current_session"] != 10:
         raise ControlStateError("unsupported evidence record: only session 10 can record this key")
@@ -1359,7 +1359,8 @@ def apply_active_evidence_record_transition(state_path: Path, candidate_path: Pa
 
     Session 07 stays on its own transition. Incomplete Session 08 uses the fixture-chain
     transition. Incomplete Session 09 records the keys its proof has earned. Incomplete
-    Session 10 records the metrics key. Any other pointer is refused before a file is written.
+    Session 10 records the keys its proof has earned. Any other pointer is refused before a
+    file is written.
     """
     previous, _raw = _parse_state(state_path, "current state")
     if previous["current_session"] == 7 and previous["session_status"] == "complete":

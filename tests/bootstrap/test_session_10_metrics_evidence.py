@@ -12,6 +12,7 @@ import pytest
 
 from money_machine.control.session_10_proof import (
     EARNED_EVIDENCE_KEYS,
+    MATURITY_EVIDENCE_KEY,
     METRICS_EVIDENCE_KEY,
     prove_session_10,
 )
@@ -56,6 +57,7 @@ def _earned(previous: ControlState) -> ControlState:
     current["updated_at"] = EARNED_AT
     evidence = dict(current["required_completion_evidence"])
     evidence[METRICS_EVIDENCE_KEY] = True
+    evidence[MATURITY_EVIDENCE_KEY] = True
     current["required_completion_evidence"] = evidence
     return current
 
@@ -64,20 +66,20 @@ def _write(path: Path, state: ControlState) -> None:
     path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
 
 
-def test_proof_earns_only_the_metrics_key() -> None:
+def test_proof_earns_the_recorded_keys() -> None:
     assert prove_session_10() == EARNED_EVIDENCE_KEYS
 
 
-def test_the_metrics_key_is_the_accepted_record() -> None:
+def test_the_recorded_keys_are_the_accepted_record() -> None:
     previous = _false_pointer()
     validate_session_10_evidence_record(previous, _earned(previous))
 
 
-def test_a_second_key_is_refused() -> None:
+def test_an_extra_key_is_refused() -> None:
     previous = _false_pointer()
     current = _earned(previous)
     evidence = dict(current["required_completion_evidence"])
-    evidence["maturity_clock_implemented"] = True
+    evidence["portfolio_eligibility_implemented"] = True
     current["required_completion_evidence"] = evidence
 
     with pytest.raises(ControlStateError, match="exactly the keys the fixture proof earned"):
@@ -135,6 +137,7 @@ def test_apply_records_the_metrics_key_without_touching_the_live_file(tmp_path: 
     assert applied["state_revision"] == previous["state_revision"] + 1
     assert applied["head_sha"] == previous["head_sha"]
     assert evidence[METRICS_EVIDENCE_KEY] is True
-    assert evidence["maturity_clock_implemented"] is False
+    assert evidence[MATURITY_EVIDENCE_KEY] is True
+    assert evidence["portfolio_eligibility_implemented"] is False
     assert evidence["evidence_closure_commit_recorded"] is False
     assert STATE_PATH.read_bytes() == live_bytes
