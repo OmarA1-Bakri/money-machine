@@ -1571,7 +1571,7 @@ def test_session_eight_activation_rejects_false_session_seven_evidence(tmp_path:
     assert STATE_PATH.read_bytes() == checked_in
     assert load_state()["current_session"] == 13
     assert load_state()["session_status"] == "incomplete"
-    assert load_state()["state_revision"] == 99
+    assert load_state()["state_revision"] == 100
     assert load_state()["next_session"] == 13
 
 
@@ -1598,13 +1598,14 @@ def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: 
     assert live["current_session"] == 13
     assert live["session_status"] == "incomplete"
     assert live["next_session"] == 13
-    assert live["state_revision"] == 99
+    assert live["state_revision"] == 100
     assert live["head_sha"] == "d81db61033561bdd40869ff1316f0c935c74cdf4"
     assert live["evidence_closure_commit_sha"] == live["head_sha"]
     live_evidence = live["required_completion_evidence"]
     assert set(live_evidence) == set(control_state.SESSION_EVIDENCE_KEYS[13])
     assert live_evidence["implementation_matrix_recorded"] is True
-    assert sum(value is True for value in live_evidence.values()) == 1
+    assert live_evidence["synthetic_paths_implemented"] is True
+    assert sum(value is True for value in live_evidence.values()) == 2
 
 
 def test_activation_uses_the_worktree_when_recorded_root_is_absent(tmp_path: Path) -> None:

@@ -1,7 +1,7 @@
-"""Earn the Session 13 implementation-matrix key.
+"""Earn the Session 13 matrix and synthetic-path keys.
 
-The proof reads the matrix, refuses a live gap marked tested, and does not
-open a socket. The other Session 13 keys stay unearned.
+The proof reads the matrix, runs the fixture paths, refuses a live publish,
+and does not open a socket. The other Session 13 keys stay unearned.
 """
 
 from __future__ import annotations
@@ -15,10 +15,22 @@ from money_machine.assets.implementation_matrix import (
     MatrixStatus,
     build_matrix,
 )
+from money_machine.assets.synthetic_paths import (
+    BROKEN_LINK_STEPS,
+    CULL_STEPS,
+    DEDUPE_STEPS,
+    MAIN_STEPS,
+    REPAIR_STEPS,
+    PathReceipt,
+    SyntheticPathRefusal,
+    run_synthetic_paths,
+    simulate_publish,
+)
 
 MATRIX_EVIDENCE_KEY = "implementation_matrix_recorded"
+SYNTHETIC_EVIDENCE_KEY = "synthetic_paths_implemented"
 _CLOSURE_EVIDENCE_KEY = "evidence_closure_commit_recorded"
-EARNED_EVIDENCE_KEYS = frozenset({MATRIX_EVIDENCE_KEY})
+EARNED_EVIDENCE_KEYS = frozenset({MATRIX_EVIDENCE_KEY, SYNTHETIC_EVIDENCE_KEY})
 _SESSION_13_KEYS = frozenset(
     {
         MATRIX_EVIDENCE_KEY,
@@ -52,6 +64,7 @@ class Session13ProofError(ValueError):
 def prove_session_13() -> frozenset[str]:
     """Return the earned Session 13 keys. A miss raises instead of returning them."""
     _prove_matrix()
+    _prove_synthetic()
     _prove_control_files()
     return EARNED_EVIDENCE_KEYS
 
@@ -82,6 +95,55 @@ def _prove_matrix() -> None:
         raise Session13ProofError("matrix_gap")
     if any(row.status is MatrixStatus.IMPLEMENTED_AND_TESTED for row in blocked):
         raise Session13ProofError("matrix_relabel")
+
+
+def _prove_synthetic() -> None:
+    module = Path(__file__).resolve().parents[1] / "assets" / "synthetic_paths.py"
+    _refuse_network(module, "synthetic_socket")
+    try:
+        simulate_publish(mode="live", idempotency_key="proof")
+    except SyntheticPathRefusal as error:
+        if error.code != "live_publish":
+            raise Session13ProofError("live_publish") from error
+    else:
+        raise Session13ProofError("live_publish")
+    run = run_synthetic_paths()
+    if run.published_live or run_synthetic_paths() != run:
+        raise Session13ProofError("synthetic_duplicate")
+    _require_steps(run.receipts, "main", MAIN_STEPS)
+    _require_steps(run.receipts, "cull", CULL_STEPS)
+    _require_steps(run.receipts, "repair", REPAIR_STEPS)
+    _require_steps(run.receipts, "broken_link", BROKEN_LINK_STEPS)
+    _require_steps(run.receipts, "dedupe", DEDUPE_STEPS)
+    blocked = [
+        item
+        for item in run.receipts
+        if item.path == "main" and item.step == "post_publish_verification"
+    ]
+    if len(blocked) != 1 or blocked[0].outcome != "BLOCKED_BY_EXTERNAL_CREDENTIAL":
+        raise Session13ProofError("synthetic_verification")
+    withheld = [item for item in run.receipts if item.outcome == "WITHHELD"]
+    if len(withheld) != 2:
+        raise Session13ProofError("synthetic_publish")
+
+
+def _refuse_network(module: Path, code: str) -> None:
+    tree = ast.parse(module.read_text(encoding="utf-8"))
+    imported: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module is not None:
+            imported.append(node.module)
+    folded = " ".join(imported)
+    if any(token in folded for token in ("socket", "httpx", "urllib", "requests")):
+        raise Session13ProofError(code)
+
+
+def _require_steps(receipts: tuple[PathReceipt, ...], path: str, steps: tuple[str, ...]) -> None:
+    found = tuple(item.step for item in receipts if item.path == path)
+    if found != steps:
+        raise Session13ProofError("synthetic_step")
 
 
 def _prove_control_files() -> None:

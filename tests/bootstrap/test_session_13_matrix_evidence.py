@@ -90,7 +90,7 @@ def test_matrix_refuses_a_live_job_marked_tested() -> None:
         validate_matrix(relabeled, ROOT)
 
 
-def test_proof_earns_only_the_matrix_key() -> None:
+def test_proof_earns_the_recorded_keys() -> None:
     assert prove_session_13() == EARNED_EVIDENCE_KEYS
 
 
@@ -109,7 +109,7 @@ def test_record_refuses_a_second_unearned_key() -> None:
     previous = _previous()
     current = _earned(previous)
     evidence = dict(current["required_completion_evidence"])
-    evidence["synthetic_paths_implemented"] = True
+    evidence["failure_injection_implemented"] = True
     current["required_completion_evidence"] = evidence
     with pytest.raises(ControlStateError, match="exactly the keys the fixture proof earned"):
         validate_session_13_evidence_record(previous, current)

@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 13 synthetic paths are recorded (2026-10-17)
+
+Revision 100 records `implementation_matrix_recorded` and `synthetic_paths_implemented`. The other four Session 13 keys stay false. `completed_sessions` stays 0 through 12. `next_session` stays 13. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. The next honest step is `failure_injection_implemented`: each named injection ends in recovery or an exact blocked state.
+
 ## Session 13 implementation matrix is recorded (2026-10-17)
 
 Revision 99 records `implementation_matrix_recorded`. The other five Session 13 keys stay false. `completed_sessions` stays 0 through 12. `next_session` stays 13. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. The next honest step is `synthetic_paths_implemented`, through a fixture-backed path.

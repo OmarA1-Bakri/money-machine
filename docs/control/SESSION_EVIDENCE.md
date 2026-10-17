@@ -1,8 +1,9 @@
 # Session evidence
 
-The checked-in pointer is Session 13 at state revision 99.
+The checked-in pointer is Session 13 at state revision 100.
 `current_session` is 13. `session_status` is incomplete.
-The implementation matrix is true. The other five Session 13 keys are false.
+The implementation matrix and the synthetic paths are true.
+The other four Session 13 keys are false.
 Session 10 is complete and every one of its keys is true.
 Session 09 is complete and every one of its keys is true.
 Session 08 is complete and every one of its keys is true.
@@ -13,7 +14,7 @@ D-0036 recorded the twelve Session 07 keys true. The closure commit is
 Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
-Session 13 is activated and incomplete. The implementation matrix is true.
+Session 13 is activated and incomplete. The matrix and synthetic paths are true.
 Sessions 14 and 15 have no contract.
 
 ## Session 00
@@ -275,7 +276,7 @@ Head SHA: `f16c7ed0598daf3f4627955b52585f253ae1b918`.
 Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
-Session 13 is activated and incomplete. The implementation matrix is true.
+Session 13 is activated and incomplete. The matrix and synthetic paths are true.
 Sessions 14 and 15 have no contract.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
@@ -327,11 +328,12 @@ Fixture paths:
 Prompt: `16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md`.
 Status: incomplete.
 Evidence contract: installed.
-The implementation matrix is recorded. Synthetic paths, failure injection, and the backup fixture are not recorded.
+The implementation matrix and the synthetic paths are recorded. Failure injection and the backup fixture are not recorded.
 
 Fixture paths:
 
 - `src/money_machine/assets/implementation_matrix.py`
+- `src/money_machine/assets/synthetic_paths.py`
 
 | Key | Recorded |
 |---|---|
@@ -340,7 +342,7 @@ Fixture paths:
 | `evidence_closure_commit_recorded` | false |
 | `failure_injection_implemented` | false |
 | `implementation_matrix_recorded` | true |
-| `synthetic_paths_implemented` | false |
+| `synthetic_paths_implemented` | true |
 
 ## Session 14
 

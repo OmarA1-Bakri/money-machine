@@ -79,7 +79,8 @@ def test_live_pointer_is_the_session_11_activation() -> None:
     text = STATE_PATH.read_text(encoding="utf-8")
     expected = dict.fromkeys(sorted(SESSION_EVIDENCE_KEYS[13]), False)
     expected["implementation_matrix_recorded"] = True
-    assert live["state_revision"] == 99
+    expected["synthetic_paths_implemented"] = True
+    assert live["state_revision"] == 100
     assert live["current_session"] == 13
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(13))

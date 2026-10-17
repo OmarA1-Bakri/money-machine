@@ -1131,6 +1131,22 @@ Session 12 is complete at revision 97. The Session 13 contract is installed (D-0
 
 Session 13 is the active incomplete session. The next honest step is `implementation_matrix_recorded`, earned by classifying the real playbook, job, event, agent, and provider rows. A live credential gap stays blocked. A fail-closed raise stays.
 
+## D-0075 — Session 13 synthetic paths
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 13 is incomplete at revision 99. `implementation_matrix_recorded` is true. The other five Session 13 keys are false. The prompt requires a fixture-backed chain from research through a successor build, plus cull, repair, broken link, and too-close dedupe. A live publish, a live Notion write, and a buyer message stay refused.
+
+### Decision
+
+`record-evidence` advances `state_revision` from 99 to 100. `updated_at` is `2026-10-17T14:10:00Z`. `synthetic_paths_implemented` is true. `implementation_matrix_recorded` stays true. The other four Session 13 keys stay false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. The path builds a research report, a product spec, and a passing dedupe, then a Notion fixture build, QA, variants, listing copy, assets, and PDFs. The Etsy draft goes through the fixture draft client. Preflight must pass. Publish simulation refuses `live` and records the send as withheld. Post-publish verification stays `BLOCKED_BY_EXTERNAL_CREDENTIAL`. Weekly metrics, the thirty-day clock, the winner, the successor spec, and the successor build job are recorded. Cull deactivation stays unexecuted. The broken-link reply is a draft with send count zero. A second run returns the same receipts. Exit 78 stays HELD.
+
+### Consequences
+
+The synthetic paths are recorded. The next honest step is `failure_injection_implemented`: each named injection ends in recovery or an exact blocked state. No live provider call is made.
+
 ## D-0074 — Session 13 implementation matrix
 
 **Status:** accepted 2026-10-17. Standing order: finish the application.

@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 13 synthetic paths recorded
+
+`record-evidence` advanced `state_revision` from 99 to 100. `updated_at` is `2026-10-17T14:10:00Z`. `implementation_matrix_recorded` and `synthetic_paths_implemented` are true. The other four Session 13 keys stay false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. The fixture path runs research through a withheld successor build, plus cull, repair, broken link, and dedupe. Publish simulation refuses `live`. Post-publish verification stays blocked. Exit 78 stays HELD. No live provider call is made.
+
 ## 2026-10-17 — Session 13 implementation matrix recorded
 
 `record-evidence` advanced `state_revision` from 98 to 99. `updated_at` is `2026-10-17T14:00:00Z`. `implementation_matrix_recorded` is true. The other five Session 13 keys stay false. `current_session` stays 13. `session_status` stays incomplete. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Publish, purchase, and message jobs stay blocked. A03 through A16 stay missing. Exit 78 stays HELD. No live provider call is made.
