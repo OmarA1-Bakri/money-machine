@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 13 contract is installed (2026-10-17)
+
+D-0072 installs the six Session 13 keys. Revision 97 is unchanged. Session 12 stays complete. Session 13 is not activated. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. The next honest step is activation, which installs every Session 13 key false.
+
 ## Session 12 is complete (2026-10-17)
 
 Revision 97 records every Session 12 key true. `completed_sessions` is 0 through 12. `next_session` is 13. `head_sha` is `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD. Session 13 is not activated. The next honest step is the Session 13 evidence contract.

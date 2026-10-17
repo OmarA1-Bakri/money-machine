@@ -1098,3 +1098,19 @@ Session 12 is incomplete at revision 96. Every key except `evidence_closure_comm
 ### Consequences
 
 Revision 97 is complete Session 12. The next honest step is the Session 13 evidence contract.
+
+## D-0072 — Session 13 evidence contract
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 12 is complete at revision 97. `next_session` is 13. Session 13 has no evidence contract and is not activated. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-13-prompt-integrity.md`. Its verified prompt hash is `d277afd72c2c90c29e0a8d2e4b607bb342b32d84fd485151de7ad6a1b32e21f2`.
+
+### Decision
+
+The Session 13 contract has six keys: `implementation_matrix_recorded`, `synthetic_paths_implemented`, `failure_injection_implemented`, `backup_restore_fixture_implemented`, `control_files_and_checkpoint_current`, and `evidence_closure_commit_recorded`. Live failure injection, a live PostgreSQL backup, a production Docker build, browser end-to-end tests, Exit 78, and `SESSION_13_E2E_AND_HARDENING_COMPLETE` are not keys. This decision does not activate the session. `IMPLEMENTATION_STATE.json` stays revision 97. `head_sha` stays `d81db61033561bdd40869ff1316f0c935c74cdf4`. Exit 78 stays HELD.
+
+### Consequences
+
+The contract is installed and every key is unrecorded. The next honest step is activation, which installs every Session 13 key false.

@@ -13,8 +13,8 @@ D-0036 recorded the twelve Session 07 keys true. The closure commit is
 Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
-Session 13 is not activated.
-Sessions 13-15 have no contract and are not activated.
+Session 13's contract is installed. The session is not activated.
+Sessions 14 and 15 have no contract.
 
 ## Session 00
 
@@ -275,8 +275,8 @@ Head SHA: `f16c7ed0598daf3f4627955b52585f253ae1b918`.
 Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
-Session 13 is not activated.
-Sessions 13-15 have no contract and are not activated.
+Session 13's contract is installed. The session is not activated.
+Sessions 14 and 15 have no contract.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
 ## Session 11
@@ -326,10 +326,19 @@ Fixture paths:
 
 Prompt: `16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md`.
 Status: not activated.
-Evidence contract: absent.
-No evidence contract and no session module. End-to-end hardening is not recorded.
+Evidence contract: installed, not activated.
+The contract is installed. The session is not activated. Live failure injection, a live backup, and the exit string are not recorded.
 
 Fixture paths: none.
+
+| Key | Recorded |
+|---|---|
+| `backup_restore_fixture_implemented` | not installed |
+| `control_files_and_checkpoint_current` | not installed |
+| `evidence_closure_commit_recorded` | not installed |
+| `failure_injection_implemented` | not installed |
+| `implementation_matrix_recorded` | not installed |
+| `synthetic_paths_implemented` | not installed |
 
 ## Session 14
 

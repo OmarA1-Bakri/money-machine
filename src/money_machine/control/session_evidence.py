@@ -6,8 +6,8 @@ pointer separately. Sessions 08, 09, and 10 are complete. Session 10 is
 revision 83 and every one of its keys is true (D-0055). Session 11 is
 complete at revision 90. Every Session 11 key is true (D-0063). Session 12
 is complete at revision 97. Every Session 12 key is true (D-0071).
-Session 13 is not activated.
-Sessions 13-15 have no contract.
+Session 13's contract is installed and the session is not activated.
+Sessions 14 and 15 have no contract.
 This module does not edit ``IMPLEMENTATION_STATE.json``.
 """
 
@@ -203,7 +203,10 @@ OPEN_SESSION_EVIDENCE: tuple[OpenSessionEvidence, ...] = (
     OpenSessionEvidence(
         13,
         (),
-        "No evidence contract and no session module. End-to-end hardening is not recorded.",
+        (
+            "The contract is installed. The session is not activated. Live failure "
+            "injection, a live backup, and the exit string are not recorded."
+        ),
     ),
     OpenSessionEvidence(
         14,
@@ -253,8 +256,8 @@ def render_session_evidence() -> str:
         "Session 10 is complete. Every key is true.",
         "Session 11 is complete. Every key is true.",
         "Session 12 is complete. Every key is true.",
-        "Session 13 is not activated.",
-        "Sessions 13-15 have no contract and are not activated.",
+        "Session 13's contract is installed. The session is not activated.",
+        "Sessions 14 and 15 have no contract.",
         "",
     ]
     for record in CLOSED_SESSION_EVIDENCE:
@@ -294,8 +297,8 @@ def render_session_evidence() -> str:
             "Session 10 is complete. Every key is true.",
             "Session 11 is complete. Every key is true.",
             "Session 12 is complete. Every key is true.",
-            "Session 13 is not activated.",
-            "Sessions 13-15 have no contract and are not activated.",
+            "Session 13's contract is installed. The session is not activated.",
+            "Sessions 14 and 15 have no contract.",
             "A fixture path is code on the trunk. It is not, by itself, a true evidence key.",
             "",
         ]
