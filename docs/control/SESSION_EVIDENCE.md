@@ -1,9 +1,8 @@
 # Session evidence
 
-The checked-in pointer is Session 13 at state revision 104.
-`current_session` is 13. `session_status` is complete.
-Every Session 13 key is true.
-Session 14 is not activated.
+The checked-in pointer is Session 14 at state revision 105.
+`current_session` is 14. `session_status` is incomplete.
+Every Session 14 key is false.
 Session 10 is complete and every one of its keys is true.
 Session 09 is complete and every one of its keys is true.
 Session 08 is complete and every one of its keys is true.
@@ -15,7 +14,7 @@ Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
 Session 13 is complete. Every key is true.
-Session 14 contract is installed. Session 14 is not activated.
+Session 14 is activated and incomplete. No key is true.
 Session 15 has no contract.
 
 ## Session 00
@@ -278,7 +277,7 @@ Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
 Session 12 is complete. Every key is true.
 Session 13 is complete. Every key is true.
-Session 14 contract is installed. Session 14 is not activated.
+Session 14 is activated and incomplete. No key is true.
 Session 15 has no contract.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
@@ -287,7 +286,7 @@ A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 Prompt: `14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md`.
 Status: complete.
 Evidence contract: installed.
-Every Session 11 key is earned. Session 12 is complete. Session 13 is complete. Session 14 is not activated. A16 stays DESIGNED.
+Every Session 11 key is earned. Session 12 is complete. Session 13 is complete. Session 14 is activated and incomplete. A live deploy is not recorded. A16 stays DESIGNED.
 
 Fixture paths:
 
@@ -307,7 +306,7 @@ Fixture paths:
 Prompt: `15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md`.
 Status: complete.
 Evidence contract: installed.
-Every Session 12 key is earned. Session 13 is complete. Session 14 is not activated. Exit 78 stays HELD.
+Every Session 12 key is earned. Session 13 is complete. Session 14 is activated and incomplete. A live deploy is not recorded. Exit 78 stays HELD.
 
 Fixture paths:
 
@@ -330,7 +329,7 @@ Fixture paths:
 Prompt: `16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md`.
 Status: complete.
 Evidence contract: installed.
-Every Session 13 key is earned. Session 14 is not activated. Exit 78 stays HELD.
+Every Session 13 key is earned. Session 14 is activated and incomplete. A live deploy is not recorded. Exit 78 stays HELD.
 
 Fixture paths:
 
@@ -351,20 +350,20 @@ Fixture paths:
 ## Session 14
 
 Prompt: `17_SESSION_14_DEPLOYMENT.md`.
-Status: not activated.
-Evidence contract: installed, not activated.
-The contract is installed. Session 14 is not activated. A live deploy is not recorded.
+Status: incomplete.
+Evidence contract: installed.
+The session is activated. No key is earned. A live deploy is not recorded.
 
 Fixture paths: none.
 
 | Key | Recorded |
 |---|---|
-| `control_files_and_checkpoint_current` | not installed |
-| `deployment_target_recorded` | not installed |
-| `evidence_closure_commit_recorded` | not installed |
-| `production_packaging_defined` | not installed |
-| `release_rollback_implemented` | not installed |
-| `service_controls_fail_closed` | not installed |
+| `control_files_and_checkpoint_current` | false |
+| `deployment_target_recorded` | false |
+| `evidence_closure_commit_recorded` | false |
+| `production_packaging_defined` | false |
+| `release_rollback_implemented` | false |
+| `service_controls_fail_closed` | false |
 
 ## Session 15
 

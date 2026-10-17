@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 14 activated
+
+`activate` advanced `state_revision` from 104 to 105. `updated_at` is `2026-10-17T14:55:00Z`. `current_session` is 14. `session_status` is incomplete. `completed_sessions` stays 0 through 13. `next_session` stays 14. Every Session 14 key is false. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. No live provider call is made. No Session 14 key is earned.
+
 ## 2026-10-17 — Session 14 evidence contract installed
 
 D-0080 names the six Session 14 keys. `SESSION_EVIDENCE_KEYS[14]` holds them. Activation is not applied. `IMPLEMENTATION_STATE.json` stays revision 104, Session 13 complete, every Session 13 key true. Session 15 still has no contract. A live deploy, a paid host, a production image build, Exit 78, and the exit string are not keys. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-14-prompt-integrity.md`. No live provider call is made.

@@ -11,6 +11,7 @@ import pytest
 
 from money_machine.control.state import (
     SESSION_EVIDENCE_KEYS,
+    SESSION_PROMPTS,
     ControlState,
     ControlStateError,
     validate_activation_transition,
@@ -40,8 +41,18 @@ def _live() -> ControlState:
 
 
 def _activation_candidate(evidence: dict[str, bool]) -> tuple[ControlState, ControlState]:
-    """The revision-104 close. This test does not write the state file."""
+    """The revision-104 close, rebuilt after activation replaces the live file."""
     previous = _live()
+    previous["state_revision"] = 104
+    previous["session_status"] = "complete"
+    previous["current_session"] = 13
+    previous["completed_sessions"] = list(range(14))
+    previous["next_session"] = 14
+    previous["next_prompt"] = SESSION_PROMPTS[14]
+    previous["updated_at"] = "2026-10-17T14:40:00Z"
+    previous["head_sha"] = CLOSURE_HEAD
+    previous["evidence_closure_commit_sha"] = CLOSURE_HEAD
+    previous["required_completion_evidence"] = {key: True for key in SESSION_EVIDENCE_KEYS[13]}
     current = copy.deepcopy(previous)
     current["state_revision"] = 105
     current["session_status"] = "incomplete"
@@ -58,16 +69,19 @@ def test_session_14_contract_is_the_fixture_surface() -> None:
     assert "v0.1.0-rc1" not in SESSION_EVIDENCE_KEYS[14]
 
 
-def test_live_pointer_stays_complete_session_13() -> None:
-    """The contract does not activate Session 14."""
+def test_live_pointer_is_incomplete_session_14() -> None:
+    """Session 14 is activated. Every key is false."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 104
-    assert live["current_session"] == 13
-    assert live["session_status"] == "complete"
+    assert live["state_revision"] == 105
+    assert live["current_session"] == 14
+    assert live["session_status"] == "incomplete"
+    assert live["updated_at"] == ACTIVATED_AT
     assert live["next_session"] == 14
     assert live["head_sha"] == CLOSURE_HEAD
-    assert live["required_completion_evidence"].keys() == SESSION_EVIDENCE_KEYS[13]
+    evidence = live["required_completion_evidence"]
+    assert set(evidence) == set(SESSION_14_KEYS)
+    assert not any(evidence.values())
     assert "SESSION_14_PRODUCTION_DEPLOYMENT_COMPLETE" not in text
 
 

@@ -119,6 +119,16 @@ _SESSION_12_CLOSURE = "d81db61033561bdd40869ff1316f0c935c74cdf4"
 _SESSION_13_CLOSURE = "fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a"
 _SESSION_13_PROMPT = "16_SESSION_13_E2E_HARDENING_AND_FAILURE_RECOVERY.md"
 _SESSION_14_PROMPT = "17_SESSION_14_DEPLOYMENT.md"
+_SESSION_14_KEYS = frozenset(
+    {
+        "deployment_target_recorded",
+        "production_packaging_defined",
+        "release_rollback_implemented",
+        "service_controls_fail_closed",
+        "control_files_and_checkpoint_current",
+        "evidence_closure_commit_recorded",
+    }
+)
 _DECIDED = datetime(2026, 10, 16, tzinfo=UTC)
 _PUBLISHED = datetime(2026, 3, 1, tzinfo=UTC)
 _LISTING = UUID("00000000-0000-4000-8000-0000000000a1")
@@ -699,6 +709,9 @@ def _prove_control_files() -> None:
         raise Session10ProofError("control_checkpoint")
     evidence = decoded.get("required_completion_evidence")
     status = decoded.get("session_status")
+    if decoded.get("current_session") == 14:
+        _prove_activated_session_14(decoded, evidence, status)
+        return
     if decoded.get("current_session") == 13:
         _prove_activated_session_13(decoded, evidence, status)
         return
@@ -845,5 +858,36 @@ def _prove_activated_session_13(
         or decoded.get("completed_sessions") != list(range(14))
         or decoded.get("next_prompt") != _SESSION_14_PROMPT
         or any(value is not True for value in evidence.values())
+    ):
+        raise Session10ProofError("control_checkpoint")
+
+
+def _prove_activated_session_14(
+    decoded: Mapping[str, object],
+    evidence: object,
+    status: object,
+) -> None:
+    """Session 10 stays closed while Session 14 is incomplete and every key is false."""
+    recorded: set[str] = set()
+    values_are_bool = False
+    evidence_count = -1
+    if isinstance(evidence, dict):
+        evidence_count = len(evidence)
+        for key in evidence:
+            if isinstance(key, str):
+                recorded.add(key)
+        values_are_bool = all(isinstance(value, bool) for value in evidence.values())
+    keys_match = frozenset(recorded) == _SESSION_14_KEYS and len(recorded) == evidence_count
+    if (
+        decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
+        or decoded.get("head_sha") != _SESSION_13_CLOSURE
+        or not keys_match
+        or not values_are_bool
+        or not isinstance(evidence, dict)
+        or status != "incomplete"
+        or decoded.get("next_session") != 14
+        or decoded.get("completed_sessions") != list(range(14))
+        or decoded.get("next_prompt") != _SESSION_14_PROMPT
+        or any(value is not False for value in evidence.values())
     ):
         raise Session10ProofError("control_checkpoint")

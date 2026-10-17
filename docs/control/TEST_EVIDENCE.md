@@ -1,5 +1,17 @@
 # Test Evidence
 
+## 2026-10-17 — Session 14 activated
+
+**Verification scope**: live `activate` from revision 104 to 105. No live HTTP. Exit 78 stays HELD. The exit string is not written.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 14, `incomplete`, revision 105, `updated_at` `2026-10-17T14:55:00Z` | PASS |
+| Keys | Every Session 14 key is false | PASS |
+| Head | `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a` | PASS |
+
+The command printed `{"applied": true, "command": "activate", "session": 14, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 105}`. The activation pin, the Session 13 contract, the Session 13 proof, the evidence index, the prompt-integrity gate, the four earlier live pointers, the continuity shape, both Session 08 activation checks, the merchandising exit pin, and the seven Notion live-pointer tests printed 37 passed in 3.18s.
+
 ## 2026-10-17 — Session 14 evidence contract installed
 
 **Verification scope**: contract installation only. `IMPLEMENTATION_STATE.json` stays revision 104. No live HTTP. Exit 78 stays HELD. The exit string is not written.

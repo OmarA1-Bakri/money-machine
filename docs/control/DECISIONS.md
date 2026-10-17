@@ -1242,3 +1242,19 @@ The Session 14 contract has six keys: `deployment_target_recorded`, `production_
 ### Consequences
 
 The contract is installed and every key is unrecorded. The next honest step is activation, which installs every Session 14 key false. The product modules that earn the four fixture keys come after activation. A live deploy stays deferred.
+
+## D-0081 — Session 14 activation
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 13 is complete at revision 104. The Session 14 contract is installed (D-0080) and the session is not activated. The prompt-integrity addendum is `docs/control/reviews/2026-10-17-session-14-prompt-integrity.md`.
+
+### Decision
+
+`activate` advances `state_revision` from 104 to 105. `updated_at` is `2026-10-17T14:55:00Z`. `current_session` is 14. `session_status` is incomplete. `completed_sessions` stays 0 through 13. `next_session` stays 14. Every Session 14 key is false. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. This activation does not earn a key and does not write the exit string.
+
+### Consequences
+
+Session 14 is the active incomplete session. The next honest step is `deployment_target_recorded`, earned by a selector that returns `local-wsl` and refuses a new paid host. A live deploy stays deferred.

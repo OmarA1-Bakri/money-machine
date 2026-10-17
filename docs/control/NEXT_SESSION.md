@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 14 is activated (2026-10-17)
+
+Revision 105 is incomplete Session 14. Every Session 14 key is false. `completed_sessions` stays 0 through 13. `next_session` stays 14. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Exit 78 stays HELD. The next honest step is `deployment_target_recorded`: a selector returns `local-wsl` and refuses a new paid host. A live deploy stays deferred.
+
 ## Session 14 contract is installed (2026-10-17)
 
 D-0080 names six Session 14 keys. Revision 104 stays complete Session 13. Every Session 13 key stays true. `head_sha` stays `fbaf8e8bdd73b1e3b6fa4f87158574057b72d18a`. Session 14 is not activated. Exit 78 stays HELD. The next honest step is activation, which installs every Session 14 key false.
