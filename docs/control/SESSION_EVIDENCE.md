@@ -1,8 +1,8 @@
 # Session evidence
 
-The checked-in pointer is Session 11 at state revision 90.
-`current_session` is 11. `session_status` is complete.
-Every Session 11 key is true.
+The checked-in pointer is Session 12 at state revision 91.
+`current_session` is 12. `session_status` is incomplete.
+Every Session 12 key is false.
 Session 10 is complete and every one of its keys is true.
 Session 09 is complete and every one of its keys is true.
 Session 08 is complete and every one of its keys is true.
@@ -12,7 +12,7 @@ D-0036 recorded the twelve Session 07 keys true. The closure commit is
 `5a48a4c9c04c74019e382a62b2c3c0abfd5b9cfb`. `head_sha` stays the close tip.
 Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
-Session 12's contract is installed and the session is not activated.
+Session 12 is incomplete. Every key is false.
 Sessions 13-15 have no contract and are not activated.
 
 ## Session 00
@@ -273,7 +273,7 @@ Head SHA: `f16c7ed0598daf3f4627955b52585f253ae1b918`.
 
 Session 10 is complete. Every key is true.
 Session 11 is complete. Every key is true.
-Session 12's contract is installed and the session is not activated.
+Session 12 is incomplete. Every key is false.
 Sessions 13-15 have no contract and are not activated.
 A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 
@@ -282,7 +282,7 @@ A fixture path is code on the trunk. It is not, by itself, a true evidence key.
 Prompt: `14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md`.
 Status: complete.
 Evidence contract: installed.
-Every Session 11 key is earned. Session 12 is not activated. A16 stays DESIGNED.
+Every Session 11 key is earned. Session 12 is activated and its keys are not earned. A16 stays DESIGNED.
 
 Fixture paths:
 
@@ -300,20 +300,20 @@ Fixture paths:
 ## Session 12
 
 Prompt: `15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md`.
-Status: not activated.
-Evidence contract: installed, not activated.
-The evidence contract is installed and the session is not activated. The operator console is not built.
+Status: incomplete.
+Evidence contract: installed.
+Every Session 12 key is false. The operator console is not built.
 
 Fixture paths: none.
 
 | Key | Recorded |
 |---|---|
-| `console_read_model_implemented` | not installed |
-| `control_files_and_checkpoint_current` | not installed |
-| `evidence_closure_commit_recorded` | not installed |
-| `exception_views_implemented` | not installed |
-| `operator_actions_fail_closed` | not installed |
-| `telemetry_redaction_implemented` | not installed |
+| `console_read_model_implemented` | false |
+| `control_files_and_checkpoint_current` | false |
+| `evidence_closure_commit_recorded` | false |
+| `exception_views_implemented` | false |
+| `operator_actions_fail_closed` | false |
+| `telemetry_redaction_implemented` | false |
 
 ## Session 13
 

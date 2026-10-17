@@ -58,6 +58,16 @@ _PRIOR_HEAD = "f16c7ed0598daf3f4627955b52585f253ae1b918"
 _CLOSURE_HEAD = "d095501665fbda0f9e6a0e77b57531bc33fda4e2"
 _SESSION_11_PROMPT = "14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md"
 _SESSION_12_PROMPT = "15_SESSION_12_OPERATOR_CONSOLE_AND_POSTHOG.md"
+_SESSION_12_KEYS = frozenset(
+    {
+        "console_read_model_implemented",
+        "exception_views_implemented",
+        "telemetry_redaction_implemented",
+        "operator_actions_fail_closed",
+        "control_files_and_checkpoint_current",
+        "evidence_closure_commit_recorded",
+    }
+)
 _DRAFT_BODY = (
     "We received this once. the file hash is aaaa path-token-1 Reply if the issue remains."
 )
@@ -402,6 +412,9 @@ def _prove_control_files() -> None:
     evidence = decoded.get("required_completion_evidence")
     recorded = set(evidence) if isinstance(evidence, dict) else set()
     status = decoded.get("session_status")
+    if decoded.get("current_session") == 12:
+        _prove_activated_session_12(decoded, evidence, status, recorded)
+        return
     if (
         decoded.get("current_session") != 11
         or decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
@@ -431,5 +444,30 @@ def _prove_control_files() -> None:
         or decoded.get("next_prompt") != _SESSION_12_PROMPT
         or evidence.get(_CLOSURE_EVIDENCE_KEY) is not True
         or evidence.get(CONTROL_EVIDENCE_KEY) is not True
+    ):
+        raise Session11ProofError("control_checkpoint")
+
+
+def _prove_activated_session_12(
+    decoded: dict[str, object],
+    evidence: object,
+    status: object,
+    recorded: set[str],
+) -> None:
+    """Session 11 stays closed while Session 12 is incomplete."""
+    values_are_bool = isinstance(evidence, dict) and all(
+        isinstance(value, bool) for value in evidence.values()
+    )
+    if (
+        status != "incomplete"
+        or decoded.get("head_sha") != decoded.get("evidence_closure_commit_sha")
+        or decoded.get("head_sha") != _CLOSURE_HEAD
+        or decoded.get("next_session") != 12
+        or decoded.get("completed_sessions") != list(range(12))
+        or decoded.get("next_prompt") != _SESSION_12_PROMPT
+        or recorded != set(_SESSION_12_KEYS)
+        or not values_are_bool
+        or not isinstance(evidence, dict)
+        or len(evidence) != len(recorded)
     ):
         raise Session11ProofError("control_checkpoint")

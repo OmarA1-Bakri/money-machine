@@ -1,5 +1,19 @@
 # Test Evidence
 
+## 2026-10-17 — Session 12 activated
+
+**Verification scope**: live `activate` from revision 90 to 91. No live HTTP. Exit 78 stays HELD. `head_sha` does not move.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Pointer | `current_session` 12, `incomplete`, revision 91, `updated_at` `2026-10-17T12:55:00Z` | PASS |
+| Keys | Every Session 12 key is false | PASS |
+| Head | `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2` | PASS |
+| Shape | The revision-90 close still validates, and a true key is refused | PASS |
+| Exit 78 | `worker.py` still contains `Exit 78 held` | PASS |
+
+The command printed `{"applied": true, "command": "activate", "session": 12, "state_path": "docs/control/IMPLEMENTATION_STATE.json", "state_revision": 91}`. The activation pin, the Session 12 contract, the Session 11 contract and intake proof, the evidence index, the Session 10 contract and control-file proof, the Session 09 contract and preflight proof, the continuity shape, both Session 08 activation checks, the merchandising exit pin, the seven Notion live-pointer tests, and the support intake unit tests printed 80 passed in 3.10s.
+
 ## 2026-10-17 — Session 12 evidence contract installed
 
 **Verification scope**: D-0064 installs the contract. The state file stays revision 90. Session 12 is not activated. No live HTTP. Exit 78 stays HELD.

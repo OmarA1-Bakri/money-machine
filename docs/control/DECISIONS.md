@@ -986,3 +986,19 @@ Live PostHog capture, a deployed API, a Next.js app, browser end-to-end tests, l
 ### Consequences
 
 `validate_activation_transition` accepts a candidate that installs these six keys all false from the revision-90 close. A true key, a missing key, or an extra key is refused. Sessions 13–15 still have no contract. Activation is the next transition and is not this commit.
+
+## D-0065 — Session 12 is activated with every key false
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 11 is complete at revision 90 and D-0064 installed the Session 12 contract. `next_session` is 12. The prompt-integrity addendum keeps live PostHog, live operator mutations, the deployed console, Exit 78, and the exit string out of the contract.
+
+### Decision
+
+`activate` moves `current_session` from 11 to 12, sets `session_status` to incomplete, and installs the six Session 12 keys all false. `completed_sessions` stays 0 through 11. `next_session` stays 12. `head_sha` stays `d095501665fbda0f9e6a0e77b57531bc33fda4e2`. Exit 78 stays HELD. No live provider call is made.
+
+### Consequences
+
+Revision 91 is incomplete Session 12. Every Session 12 key is false. The next honest step is the first earned key, through its own proof.

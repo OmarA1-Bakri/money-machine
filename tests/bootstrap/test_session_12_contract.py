@@ -39,9 +39,15 @@ def _live() -> ControlState:
 
 
 def _activation_candidate(evidence: dict[str, bool]) -> tuple[ControlState, ControlState]:
+    """The revision-90 close, rebuilt after activation replaces the live file."""
     previous = _live()
+    previous["state_revision"] = 90
+    previous["session_status"] = "complete"
+    previous["current_session"] = 11
+    previous["updated_at"] = "2026-10-17T12:40:00Z"
+    previous["required_completion_evidence"] = {key: True for key in SESSION_EVIDENCE_KEYS[11]}
     current = copy.deepcopy(previous)
-    current["state_revision"] = previous["state_revision"] + 1
+    current["state_revision"] = 91
     current["session_status"] = "incomplete"
     current["current_session"] = 12
     current["updated_at"] = ACTIVATED_AT
@@ -55,15 +61,16 @@ def test_session_12_contract_is_the_fixture_surface() -> None:
     assert "SESSION_12_OPERATOR_CONSOLE_COMPLETE" not in SESSION_EVIDENCE_KEYS[12]
 
 
-def test_live_pointer_stays_complete_session_11() -> None:
-    """The contract does not activate Session 12 or edit the state file."""
+def test_live_pointer_is_the_session_12_activation() -> None:
+    """Session 12 is incomplete. Every Session 12 key is false."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 90
-    assert live["current_session"] == 11
-    assert live["session_status"] == "complete"
+    assert live["state_revision"] == 91
+    assert live["current_session"] == 12
+    assert live["session_status"] == "incomplete"
+    assert live["completed_sessions"] == list(range(12))
     assert live["next_session"] == 12
-    assert set(live["required_completion_evidence"]) == set(SESSION_EVIDENCE_KEYS[11])
+    assert live["required_completion_evidence"] == dict.fromkeys(sorted(SESSION_12_KEYS), False)
     assert "SESSION_12_OPERATOR_CONSOLE_COMPLETE" not in text
 
 
