@@ -1,5 +1,9 @@
 # Next Session
 
+## Session 09 continuity directory gate (2026-10-17)
+
+The control directory holds the five continuity files and `SESSION_EVIDENCE.md`. The transition set stays the five files. Revision 75 is unchanged. The closure key stays false. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. The next honest step is the closure key, through `apply-completion` onto a commit that contains `def prove_session_09`.
+
 ## Session 09 control-file key is recorded (2026-10-17)
 
 Revision 75 records `control_files_and_checkpoint_current`. Preflight, the ramp, the receipt, and the fixture draft stay true. The closure key stays false. `updated_at` is `2026-10-17T11:05:00Z`. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. The next honest step is the closure key, through a commit that contains this proof.

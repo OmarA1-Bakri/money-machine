@@ -296,10 +296,11 @@ def prepare_transition(tmp_path: Path) -> GitTransition:
     return GitTransition(repo, state_path, candidate_path, candidate, bootstrap, closure)
 
 
-def test_control_files_are_exactly_the_five_continuity_files() -> None:
-    assert {
-        path.name for path in (ROOT / "docs/control").iterdir() if path.is_file()
-    } == CONTROL_FILES
+def test_continuity_files_stay_five_and_the_catalogue_is_the_only_extra() -> None:
+    """Transitions still require the five continuity files. The catalogue is the extra file."""
+    present = {path.name for path in (ROOT / "docs/control").iterdir() if path.is_file()}
+    assert present >= CONTROL_FILES
+    assert present - CONTROL_FILES == {"SESSION_EVIDENCE.md"}
 
 
 def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:

@@ -1,5 +1,17 @@
 # Test Evidence
 
+## 2026-10-17 — Session 09 continuity directory gate
+
+**Verification scope**: the control directory. No state transition. No live HTTP. Revision 75 stays. The closure key stays false.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Continuity set | The five files named by `CONTROL_FILES` are present | PASS |
+| Catalogue | The only extra file is `SESSION_EVIDENCE.md` | PASS |
+| Pointer | `IMPLEMENTATION_STATE.json` stays revision 75 | PASS |
+
+`test_continuity_files_stay_five_and_the_catalogue_is_the_only_extra`, the Session 09 proof, and the rendered catalogue check printed 3 passed in 0.69s.
+
 ## 2026-10-17 — Session 09 control-file key recorded
 
 **Verification scope**: live `record-evidence` from revision 74 to 75. No live HTTP. Exit 78 stays HELD. The exit string is not written. `head_sha` does not move.

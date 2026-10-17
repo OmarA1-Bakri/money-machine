@@ -655,3 +655,19 @@ Revision 74 has preflight, the ramp, the receipt, and the fixture draft true. Th
 ### Consequences
 
 Revision 75 records the control-file key true. The closure key stays false. Session 09 stays incomplete.
+
+## D-0046 — The evidence catalogue sits beside the five continuity files
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+`test_control_files_are_exactly_the_five_continuity_files` fails because `docs/control/SESSION_EVIDENCE.md` is a sixth file. The transition still requires the five continuity files in `_CONTROL_FILE_PATHS`. The catalogue is the rendered index. It is not a sixth file that `record-evidence` or `apply-completion` must find in a fixture worktree.
+
+### Decision
+
+The directory may contain the five continuity files and `SESSION_EVIDENCE.md`. The transition set stays those five files. The catalogue must match `render_session_evidence()`.
+
+### Consequences
+
+The directory gate passes. Session 09 stays incomplete at revision 75. The closure key stays false.

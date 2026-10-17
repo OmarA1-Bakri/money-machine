@@ -1,3 +1,7 @@
+## 2026-10-17 — Session 09 continuity directory gate
+
+`docs/control` contains the five continuity files and `SESSION_EVIDENCE.md`. The transition set stays the five files. The catalogue stays the rendered index. `IMPLEMENTATION_STATE.json` stays revision 75. The closure key stays false. No live Etsy call is made.
+
 ## 2026-10-17 — Session 09 control-file key recorded
 
 `record-evidence` advanced `state_revision` from 74 to 75. `updated_at` is `2026-10-17T11:05:00Z`. `control_files_and_checkpoint_current` is true. Preflight, the ramp, the receipt, and the fixture draft stay true. The closure key stays false. `head_sha` stays `01b7dd84ef98442ff26a5239e8c7de742739d844`. Exit 78 stays HELD. The exit string is not written. No live Etsy call is made.
