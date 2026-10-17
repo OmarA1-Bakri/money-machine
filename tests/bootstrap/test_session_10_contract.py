@@ -74,10 +74,10 @@ def test_session_10_contract_is_the_fixture_surface() -> None:
 
 
 def test_live_pointer_records_the_closure_key() -> None:
-    """Session 10 stays closed. Session 11 records intake, routing, repair, and the draft."""
+    """Session 10 stays closed. Session 11 records every key except the closure key."""
     live = _live()
     text = STATE_PATH.read_text(encoding="utf-8")
-    assert live["state_revision"] == 88
+    assert live["state_revision"] == 89
     assert live["current_session"] == 11
     assert live["session_status"] == "incomplete"
     assert live["completed_sessions"] == list(range(11))
@@ -89,6 +89,7 @@ def test_live_pointer_records_the_closure_key() -> None:
         False,
     )
     evidence["incident_routing_implemented"] = True
+    evidence["control_files_and_checkpoint_current"] = True
     evidence["draft_reply_implemented"] = True
     evidence["repair_resolution_implemented"] = True
     evidence["support_intake_implemented"] = True

@@ -1,4 +1,4 @@
-"""Earn the Session 11 intake, routing, repair, and draft keys.
+"""Earn the Session 11 intake, routing, repair, draft, and control keys.
 
 The proof does not open a socket, read a credential, insert a job, or send a message.
 """
@@ -6,6 +6,7 @@ The proof does not open a socket, read a credential, insert a job, or send a mes
 from __future__ import annotations
 
 import inspect
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
@@ -28,9 +29,32 @@ INTAKE_EVIDENCE_KEY = "support_intake_implemented"
 ROUTING_EVIDENCE_KEY = "incident_routing_implemented"
 REPAIR_EVIDENCE_KEY = "repair_resolution_implemented"
 DRAFT_EVIDENCE_KEY = "draft_reply_implemented"
+CONTROL_EVIDENCE_KEY = "control_files_and_checkpoint_current"
+_CLOSURE_EVIDENCE_KEY = "evidence_closure_commit_recorded"
 EARNED_EVIDENCE_KEYS = frozenset(
-    {INTAKE_EVIDENCE_KEY, ROUTING_EVIDENCE_KEY, REPAIR_EVIDENCE_KEY, DRAFT_EVIDENCE_KEY}
+    {
+        INTAKE_EVIDENCE_KEY,
+        ROUTING_EVIDENCE_KEY,
+        REPAIR_EVIDENCE_KEY,
+        DRAFT_EVIDENCE_KEY,
+        CONTROL_EVIDENCE_KEY,
+    }
 )
+_BEHAVIORAL_KEYS = (
+    INTAKE_EVIDENCE_KEY,
+    ROUTING_EVIDENCE_KEY,
+    REPAIR_EVIDENCE_KEY,
+    DRAFT_EVIDENCE_KEY,
+)
+_CONTROL_FILES = (
+    Path("docs/control/IMPLEMENTATION_STATE.json"),
+    Path("docs/control/IMPLEMENTATION_LOG.md"),
+    Path("docs/control/DECISIONS.md"),
+    Path("docs/control/TEST_EVIDENCE.md"),
+    Path("docs/control/NEXT_SESSION.md"),
+    Path("docs/control/SESSION_EVIDENCE.md"),
+)
+_HEAD = "f16c7ed0598daf3f4627955b52585f253ae1b918"
 _DRAFT_BODY = (
     "We received this once. the file hash is aaaa path-token-1 Reply if the issue remains."
 )
@@ -78,6 +102,7 @@ def prove_session_11() -> frozenset[str]:
     _prove_routing()
     _prove_repair()
     _prove_draft()
+    _prove_control_files()
     return EARNED_EVIDENCE_KEYS
 
 
@@ -351,3 +376,44 @@ def _prove_draft() -> None:
             raise Session11ProofError("draft_blank") from error
     else:
         raise Session11ProofError("draft_blank")
+
+
+def _prove_control_files() -> None:
+    """The continuity files and the catalogue match the checked-in pointer."""
+    root = Path(__file__).resolve().parents[3]
+    for relative in _CONTROL_FILES:
+        path = root / relative
+        if not path.is_file() or path.stat().st_size == 0:
+            raise Session11ProofError("control_files")
+    # session_evidence imports state, and state imports this module.
+    from money_machine.control.session_evidence import render_session_evidence
+
+    catalogue = root / "docs/control/SESSION_EVIDENCE.md"
+    if catalogue.read_text(encoding="utf-8") != render_session_evidence():
+        raise Session11ProofError("control_checkpoint")
+    decoded: object = json.loads(
+        (root / "docs/control/IMPLEMENTATION_STATE.json").read_text(encoding="utf-8")
+    )
+    if not isinstance(decoded, dict):
+        raise Session11ProofError("control_checkpoint")
+    evidence = decoded.get("required_completion_evidence")
+    recorded = set(evidence) if isinstance(evidence, dict) else set()
+    if (
+        decoded.get("current_session") != 11
+        or decoded.get("session_status") != "incomplete"
+        or decoded.get("head_sha") != _HEAD
+        or decoded.get("evidence_closure_commit_sha") != _HEAD
+        or decoded.get("next_session") != 11
+        or decoded.get("completed_sessions") != list(range(11))
+        or decoded.get("next_prompt") != "14_SESSION_11_CUSTOMER_SUPPORT_AND_REPAIR.md"
+        or recorded != set(_BEHAVIORAL_KEYS) | {CONTROL_EVIDENCE_KEY, _CLOSURE_EVIDENCE_KEY}
+        or not isinstance(evidence, dict)
+    ):
+        raise Session11ProofError("control_checkpoint")
+    for key in _BEHAVIORAL_KEYS:
+        if evidence.get(key) is not True:
+            raise Session11ProofError("control_checkpoint")
+    if evidence.get(_CLOSURE_EVIDENCE_KEY) is not False or not isinstance(
+        evidence.get(CONTROL_EVIDENCE_KEY), bool
+    ):
+        raise Session11ProofError("control_checkpoint")

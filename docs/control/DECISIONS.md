@@ -929,3 +929,19 @@ Session 11 is incomplete at revision 87. Intake, routing, and repair are true. T
 ### Consequences
 
 Revision 88 records the intake, routing, repair, and draft keys true. The other two Session 11 keys stay false. The control-file key is the next proof.
+
+## D-0062 — Session 11 control files are the fifth earned key
+
+**Status:** accepted 2026-10-17. Standing order: finish the application.
+
+### Context
+
+Session 11 is incomplete at revision 88. Intake, routing, repair, and the draft are true. The control-file key and the closure key are false. The five continuity files and the evidence catalogue are already on the trunk.
+
+### Decision
+
+`prove_session_11()` earns the intake, routing, repair, draft, and control-file keys. `record-evidence` on incomplete Session 11 keeps the first four keys and flips `control_files_and_checkpoint_current`. The closure key stays false. Any other flip is refused. `head_sha` does not move. Exit 78 stays HELD. A16 stays `DESIGNED`. The exit string is not written. No message is sent and no job is inserted.
+
+### Consequences
+
+Revision 89 records every Session 11 key except the closure key. The closure key is the next proof, through `apply-completion`.

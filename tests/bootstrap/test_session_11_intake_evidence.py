@@ -79,10 +79,10 @@ def test_a_later_key_is_refused() -> None:
     previous = _false_pointer()
     current = _earned(previous)
     evidence = dict(current["required_completion_evidence"])
-    evidence["control_files_and_checkpoint_current"] = True
+    evidence["evidence_closure_commit_recorded"] = True
     current["required_completion_evidence"] = evidence
 
-    with pytest.raises(ControlStateError, match="exactly the keys the fixture proof earned"):
+    with pytest.raises(ControlStateError, match="the closure key stays false"):
         validate_session_11_evidence_record(previous, current)
 
 
@@ -151,6 +151,6 @@ def test_apply_records_the_intake_key_without_touching_the_live_file(tmp_path: P
     assert evidence["incident_routing_implemented"] is True
     assert evidence["repair_resolution_implemented"] is True
     assert evidence["draft_reply_implemented"] is True
-    assert evidence["control_files_and_checkpoint_current"] is False
+    assert evidence["control_files_and_checkpoint_current"] is True
     assert evidence["evidence_closure_commit_recorded"] is False
     assert STATE_PATH.read_bytes() == live_bytes
