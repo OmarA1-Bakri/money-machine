@@ -1,3 +1,7 @@
+## 2026-10-18 — Prompt pack stored
+
+`src/money_machine/deploy/prompt_pack.py` records the twenty-one implementation prompts. Each file matches its manifest hash and is tracked with `MANIFEST.json` and `TRACEABILITY.json`. A rewrite request raises and does not write a prompt. The state pointer stays revision 119. `updated_at` stays `2026-10-17T16:50:00Z`. Exit 78 stays HELD. The exit string is not written.
+
 ## 2026-10-17 — Private source PDF excluded
 
 `src/money_machine/deploy/source_exclusion.py` records that `The-Hands-Off-Money-Machine-Playbook.pdf` is `ignored_private_source`. Git ignores the root name and the `private/source` copy. No tracked path ends in `.pdf`. A stage request raises and does not call `git add`. The PDF bytes are not opened. The state pointer stays revision 119. `updated_at` stays `2026-10-17T16:50:00Z`. Exit 78 stays HELD. The exit string is not written.

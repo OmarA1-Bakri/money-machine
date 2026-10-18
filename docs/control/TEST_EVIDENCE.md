@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-18 — Prompt pack stored
+
+**Verification scope**: stored prompt files and the git index. No prompt file is rewritten. No live HTTP. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Stored | Twenty-one prompts from `00_READ_ME_FIRST.md` through `20_FINAL_ACCEPTANCE_CHECKLIST.md` are present | PASS |
+| Hash | Each prompt matches the manifest SHA-256 and the trace names the same files | PASS |
+| Tracked | `git ls-files` tracks the prompts, `MANIFEST.json`, and `TRACEABILITY.json` | PASS |
+| Hold | A rewrite request raises. Exit 78 stays HELD | PASS |
+
+The prompt-pack tests printed 6 passed in 0.05s. The prompt-pack tests, the evidence index, and the continuity proof printed 16 passed in 1.08s. `ruff check` and `pyright` on the prompt-pack module and the evidence catalogue were clean.
+
 ## 2026-10-17 — Private source PDF excluded
 
 **Verification scope**: git ignore and the source register. The PDF bytes are not opened. No `git add`. No live HTTP. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.

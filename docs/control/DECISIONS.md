@@ -1530,3 +1530,19 @@ Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. 
 ### Consequences
 
 The private source PDF is excluded from git. The next checklist line is "Prompt pack is stored in the repo." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0099 — Prompt pack is stored
+
+**Status:** accepted 2026-10-18. Standing order: finish the application.
+
+### Context
+
+Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. The acceptance checklist line "Prompt pack is stored in the repo." has no typed proof. The hash-verified prompt files must not be edited.
+
+### Decision
+
+`src/money_machine/deploy/prompt_pack.py` reads `prompts/implementation/MANIFEST.json` and `TRACEABILITY.json`. The two lists name the same files. Each prompt is present, its SHA-256 matches, and `git ls-files` tracks the prompt, the manifest, and the trace. `refuse_prompt_rewrite` raises on a path under `prompts/implementation` and does not write a file. The state pointer stays revision 119.
+
+### Consequences
+
+The prompt pack is stored in the repo. The next checklist line is "Fresh bootstrap succeeds." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
