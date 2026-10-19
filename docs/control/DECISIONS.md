@@ -1546,3 +1546,19 @@ Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. 
 ### Consequences
 
 The prompt pack is stored in the repo. The next checklist line is "Fresh bootstrap succeeds." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0100 — Fresh bootstrap succeeds
+
+**Status:** accepted 2026-10-19. Standing order: finish the application.
+
+### Context
+
+Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. The acceptance checklist line "Fresh bootstrap succeeds." has no typed proof. The operator scripts name `uv sync --frozen`, `pnpm install --frozen-lockfile`, and `docker compose config --quiet`. The Docker CLI is not installed here. Starting the stack would be a live runtime.
+
+### Decision
+
+`src/money_machine/deploy/bootstrap.py` reads both bootstrap scripts and requires those three commands. A script that publishes, checks out, pushes, or runs `docker compose up` is refused. The proof runs `uv lock --check` and `pnpm install --frozen-lockfile --lockfile-only --ignore-scripts`. It renders `compose.yaml` in process: the five services stay `postgres`, `api`, `web`, `worker`, and `scheduler`. Postgres, the API, and the web service keep a healthcheck. Worker and scheduler restart stay `no`. `refuse_stack_start` raises on `compose up`, publish, purchase, and checkout. Docker is not called. No container is started. The state pointer stays revision 119.
+
+### Consequences
+
+The fresh bootstrap checks succeed. The next checklist line is "Production compose succeeds." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.

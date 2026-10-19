@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-19 — Fresh bootstrap recorded
+
+**Verification scope**: frozen locks and the rendered compose file. Docker is not called. No container is started. No live HTTP to a provider. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Python | `uv lock --check` succeeds | PASS |
+| Node | `pnpm install --frozen-lockfile --lockfile-only --ignore-scripts` succeeds | PASS |
+| Compose | `compose.yaml` renders postgres, api, web, worker, and scheduler | PASS |
+| Hold | A stack start raises. Exit 78 stays HELD | PASS |
+
+The bootstrap tests printed 6 passed in 0.32s. The bootstrap tests, the evidence index, and the continuity proof printed 16 passed in 1.27s. `ruff check` and `pyright` on the bootstrap module and the evidence catalogue were clean.
+
 ## 2026-10-18 — Prompt pack stored
 
 **Verification scope**: stored prompt files and the git index. No prompt file is rewritten. No live HTTP. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.

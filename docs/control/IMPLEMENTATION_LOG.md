@@ -1,3 +1,7 @@
+## 2026-10-19 — Fresh bootstrap recorded
+
+`src/money_machine/deploy/bootstrap.py` checks the frozen Python lock and the frozen pnpm lock, then renders `compose.yaml`. The five services stay in place. Worker and scheduler restart stay `no`. A stack start raises. Docker is not called and no container is started. The state pointer stays revision 119. `updated_at` stays `2026-10-17T16:50:00Z`. Exit 78 stays HELD. The exit string is not written.
+
 ## 2026-10-18 — Prompt pack stored
 
 `src/money_machine/deploy/prompt_pack.py` records the twenty-one implementation prompts. Each file matches its manifest hash and is tracked with `MANIFEST.json` and `TRACEABILITY.json`. A rewrite request raises and does not write a prompt. The state pointer stays revision 119. `updated_at` stays `2026-10-17T16:50:00Z`. Exit 78 stays HELD. The exit string is not written.
