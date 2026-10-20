@@ -397,6 +397,7 @@ Fixture paths:
 - `src/money_machine/deploy/backup_restore.py`
 - `src/money_machine/deploy/service_health.py`
 - `src/money_machine/deploy/restart_recovery.py`
+- `src/money_machine/deploy/durable_jobs.py`
 - `src/money_machine/deploy/prompt_pack.py`
 - `src/money_machine/deploy/source_exclusion.py`
 - `src/money_machine/integrations/provider_connections.py`

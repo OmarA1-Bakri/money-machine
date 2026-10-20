@@ -1,5 +1,9 @@
 # Next Session
 
+## Durable jobs are recorded (2026-10-20)
+
+Revision 119 stays complete Session 15. A committed READY job is claimed from a new connection and stays RUNNING. A later job stays READY. A memory-only claim is refused. The next checklist line is "Dependencies block and release correctly." Exit 78 stays HELD. A live account stays deferred.
+
 ## Restart recovery is recorded (2026-10-20)
 
 Revision 119 stays complete Session 15. An expired lease returns to READY. A live lease stays RUNNING. A second reclaim changes nothing. No process is restarted. The next checklist line is "PostgreSQL durable jobs are active." Exit 78 stays HELD. A live account stays deferred.

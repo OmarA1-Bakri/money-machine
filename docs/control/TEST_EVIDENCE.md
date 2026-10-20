@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-20 — Durable jobs recorded
+
+**Verification scope**: one isolated loopback database after the migration chain. The writing connection is closed before the claim. The shared `money_machine` database is not used. Docker is not called. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Durable | A third connection still reads the claimed job as RUNNING | PASS |
+| Claim | `claim_ready_job` moves the due job to RUNNING for `worker-0` | PASS |
+| Later | A job scheduled later stays READY and a second claim returns nothing | PASS |
+| Hold | A memory-only claim, a Docker socket, the shared database, and a remote host are refused | PASS |
+
+The durable-job tests printed 7 passed in 1.86s. The durable-job tests, the evidence index, and the continuity proof printed 17 passed in 2.49s. `ruff check` and `pyright` on the durable-job module and the evidence catalogue were clean.
+
 ## 2026-10-20 — Restart recovery recorded
 
 **Verification scope**: one isolated loopback database after the migration chain. The shared `money_machine` database is not used. Docker is not called. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.

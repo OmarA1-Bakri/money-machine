@@ -1642,3 +1642,19 @@ Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. 
 ### Consequences
 
 Restart recovery succeeds for one expired lease on an isolated database. A live lease is left in place. A process restart stays deferred because Docker is not called. The next checklist line is "PostgreSQL durable jobs are active." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0106 — PostgreSQL durable jobs are active
+
+**Status:** accepted 2026-10-20. Standing order: finish the application.
+
+### Context
+
+Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. The acceptance checklist line "PostgreSQL durable jobs are active." has no typed proof. An in-memory job is not durable. Starting the worker would contradict Exit 78.
+
+### Decision
+
+`src/money_machine/deploy/durable_jobs.py` commits one due READY job and one later READY job on an isolated loopback database whose name matches `mm_t_` plus twenty hex characters. The writing connection is closed. A second connection calls `claim_ready_job` and moves the due job to RUNNING with lease owner `worker-0`. A third connection still reads that RUNNING row, leaves the later job READY, and a second claim returns nothing. `memory_only` raises before a connection. A Docker socket, the shared `money_machine` database, a remote host, and any other standing database name are refused. `confirm_exit_78_held` must still read Exit 78. No container is started. The state pointer stays revision 119.
+
+### Consequences
+
+PostgreSQL durable jobs are active: a committed job is claimed from a later connection. A memory-only claim is refused. The next checklist line is "Dependencies block and release correctly." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.

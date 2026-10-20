@@ -1,3 +1,7 @@
+## 2026-10-20 — Durable jobs recorded
+
+`src/money_machine/deploy/durable_jobs.py` commits a due READY job on an isolated loopback database, closes that connection, and claims the job from a new connection. A third connection still sees the row RUNNING with lease owner `worker-0`. A later job stays READY. A second claim returns nothing. A memory-only claim raises. The shared database and a remote host are refused before a connection. No container is started. The state pointer stays revision 119. `updated_at` stays `2026-10-17T16:50:00Z`. Exit 78 stays HELD. The exit string is not written.
+
 ## 2026-10-20 — Restart recovery recorded
 
 `src/money_machine/deploy/restart_recovery.py` reclaims one expired RUNNING lease on an isolated loopback database. The job returns to READY with the lease cleared and the attempt set to 1. A live lease stays RUNNING with the same owner. A second reclaim returns nothing. A process restart raises. The shared database and a remote host are refused before a connection. No container is started. The state pointer stays revision 119. `updated_at` stays `2026-10-17T16:50:00Z`. Exit 78 stays HELD. The exit string is not written.
