@@ -1,5 +1,9 @@
 # Next Session
 
+## Service health is recorded (2026-10-20)
+
+Revision 119 stays complete Session 15. The API health function returns ok, the web route stays a static unverified contract, and PostgreSQL answers on a throwaway database. The worker and scheduler stay held. No container is started. The next checklist line is "Restart recovery succeeds." Exit 78 stays HELD. A live account stays deferred.
+
 ## Backup and restore is recorded (2026-10-20)
 
 Revision 119 stays complete Session 15. The fixture shop restores once and a second restore inserts nothing. An isolated database copy matches the declared schema. A live backup is refused. The next checklist line is "API, worker, scheduler, web and PostgreSQL are healthy." Exit 78 stays HELD. A live account stays deferred.

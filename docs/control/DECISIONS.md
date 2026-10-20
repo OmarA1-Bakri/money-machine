@@ -1610,3 +1610,19 @@ Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. 
 ### Consequences
 
 Backup and restore succeed for the fixture shop and an isolated database. The next checklist line is "API, worker, scheduler, web and PostgreSQL are healthy." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0104 — API, web, and PostgreSQL are healthy
+
+**Status:** accepted 2026-10-20. Standing order: finish the application.
+
+### Context
+
+Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. The acceptance checklist line "API, worker, scheduler, web and PostgreSQL are healthy." has no typed proof. Starting the compose stack would open Docker. The worker and scheduler are registered and uncommissioned, so a health probe that reports them running would contradict Exit 78.
+
+### Decision
+
+`src/money_machine/deploy/service_health.py` calls the API `health` function in process and requires `status="ok"` and `service="api"`. It reads `apps/web/app/api/health/route.ts` and requires the static body: service `operator-console`, status `healthy`, dependencies `unverified`, and `externalActions: false`. It creates a throwaway loopback database named `mm_t_` plus twenty hex characters, proves `SELECT 1` through `check_connectivity`, and drops that database. The admin connection must be the loopback maintenance database `postgres`. The shared `money_machine` database, a remote host, and any other database name are refused before a connection. `confirm_exit_78_held` must still read Exit 78 from the worker and scheduler sources. A Docker socket and a claim that those processes are running both raise. No container is started. The state pointer stays revision 119.
+
+### Consequences
+
+The API liveness check, the web health route, and a PostgreSQL round trip succeed. The worker and scheduler stay held and not running. Live container health stays deferred because Docker is not called. The next checklist line is "Restart recovery succeeds." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.

@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-20 — Service health recorded
+
+**Verification scope**: the API health function, the static web health route, and one throwaway loopback database. The shared `money_machine` database is not probed. Docker is not called. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| API | The in-process health function returns `ok` for service `api` | PASS |
+| Web | The route stays static, `unverified`, and `externalActions: false` | PASS |
+| PostgreSQL | `SELECT 1` succeeds on a throwaway database that is then dropped | PASS |
+| Hold | A Docker socket, a running claim, the shared database, and a remote host are refused | PASS |
+
+The service-health tests printed 8 passed in 0.80s. The service-health tests, the evidence index, and the continuity proof printed 18 passed in 2.35s. `ruff check` and `pyright` on the service-health module and the evidence catalogue were clean.
+
 ## 2026-10-20 — Backup and restore recorded
 
 **Verification scope**: the fixture shop and one throwaway loopback database copied with `CREATE DATABASE ... TEMPLATE`. The shared `money_machine` database is not copied. `pg_dump` is not run. No live HTTP. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.

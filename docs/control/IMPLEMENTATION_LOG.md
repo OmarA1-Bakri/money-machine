@@ -1,3 +1,7 @@
+## 2026-10-20 — Service health recorded
+
+`src/money_machine/deploy/service_health.py` calls the API health function in process, reads the static web health route, and proves `SELECT 1` on a throwaway loopback database that is dropped before return. The worker and scheduler still name Exit 78 and are not running. A Docker socket and a running claim raise. No container is started. The state pointer stays revision 119. `updated_at` stays `2026-10-17T16:50:00Z`. Exit 78 stays HELD. The exit string is not written.
+
 ## 2026-10-20 — Backup and restore recorded
 
 `src/money_machine/deploy/backup_restore.py` restores the fixture shop and copies one throwaway loopback database with `CREATE DATABASE ... TEMPLATE`. The second fixture restore inserts nothing. The copied tables match the declared schema at `b2c3d4e5f6a7`. The shared `money_machine` database, a standing database, and a remote host are refused before a connection. `pg_dump` is not run. The state pointer stays revision 119. `updated_at` stays `2026-10-17T16:50:00Z`. Exit 78 stays HELD. The exit string is not written.
