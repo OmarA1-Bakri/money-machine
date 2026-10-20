@@ -1,5 +1,9 @@
 # Next Session
 
+## Restart recovery is recorded (2026-10-20)
+
+Revision 119 stays complete Session 15. An expired lease returns to READY. A live lease stays RUNNING. A second reclaim changes nothing. No process is restarted. The next checklist line is "PostgreSQL durable jobs are active." Exit 78 stays HELD. A live account stays deferred.
+
 ## Service health is recorded (2026-10-20)
 
 Revision 119 stays complete Session 15. The API health function returns ok, the web route stays a static unverified contract, and PostgreSQL answers on a throwaway database. The worker and scheduler stay held. No container is started. The next checklist line is "Restart recovery succeeds." Exit 78 stays HELD. A live account stays deferred.

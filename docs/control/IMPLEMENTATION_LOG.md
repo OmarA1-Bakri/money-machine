@@ -1,3 +1,7 @@
+## 2026-10-20 — Restart recovery recorded
+
+`src/money_machine/deploy/restart_recovery.py` reclaims one expired RUNNING lease on an isolated loopback database. The job returns to READY with the lease cleared and the attempt set to 1. A live lease stays RUNNING with the same owner. A second reclaim returns nothing. A process restart raises. The shared database and a remote host are refused before a connection. No container is started. The state pointer stays revision 119. `updated_at` stays `2026-10-17T16:50:00Z`. Exit 78 stays HELD. The exit string is not written.
+
 ## 2026-10-20 — Service health recorded
 
 `src/money_machine/deploy/service_health.py` calls the API health function in process, reads the static web health route, and proves `SELECT 1` on a throwaway loopback database that is dropped before return. The worker and scheduler still name Exit 78 and are not running. A Docker socket and a running claim raise. No container is started. The state pointer stays revision 119. `updated_at` stays `2026-10-17T16:50:00Z`. Exit 78 stays HELD. The exit string is not written.

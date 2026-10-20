@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-20 — Restart recovery recorded
+
+**Verification scope**: one isolated loopback database after the migration chain. The shared `money_machine` database is not used. Docker is not called. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Expired lease | The crashed job returns to READY with attempt 1 and no lease | PASS |
+| Live lease | The unexpired job stays RUNNING with the same owner | PASS |
+| Repeat | A second reclaim returns nothing | PASS |
+| Hold | A process restart, a Docker socket, the shared database, and a remote host are refused | PASS |
+
+The restart-recovery tests printed 7 passed in 1.89s. The restart-recovery tests, the evidence index, and the continuity proof printed 17 passed in 2.55s. `ruff check` and `pyright` on the restart-recovery module and the evidence catalogue were clean.
+
 ## 2026-10-20 — Service health recorded
 
 **Verification scope**: the API health function, the static web health route, and one throwaway loopback database. The shared `money_machine` database is not probed. Docker is not called. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.

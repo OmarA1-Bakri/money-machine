@@ -1626,3 +1626,19 @@ Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. 
 ### Consequences
 
 The API liveness check, the web health route, and a PostgreSQL round trip succeed. The worker and scheduler stay held and not running. Live container health stays deferred because Docker is not called. The next checklist line is "Restart recovery succeeds." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0105 — Restart recovery succeeds
+
+**Status:** accepted 2026-10-20. Standing order: finish the application.
+
+### Context
+
+Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. The acceptance checklist line "Restart recovery succeeds." has no typed proof. Restarting the worker or the compose stack would start a process. Exit 78 stays held, so recovery is a database reclaim, not a process start.
+
+### Decision
+
+`src/money_machine/deploy/restart_recovery.py` writes two RUNNING jobs into an isolated loopback database whose name matches `mm_t_` plus twenty hex characters. One lease is already expired. `reclaim_expired_leases` moves that job through FAILED to READY, clears the lease, and increments the attempt to 1. The other lease is still live, stays RUNNING, and keeps its owner. A second reclaim returns nothing. `refuse_process_restart` raises on any process command. A Docker socket, the shared `money_machine` database, a remote host, and any other standing database name are refused before a connection. `confirm_exit_78_held` must still read Exit 78. No container is started. The state pointer stays revision 119.
+
+### Consequences
+
+Restart recovery succeeds for one expired lease on an isolated database. A live lease is left in place. A process restart stays deferred because Docker is not called. The next checklist line is "PostgreSQL durable jobs are active." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
