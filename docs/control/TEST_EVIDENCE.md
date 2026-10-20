@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-20 — Database migrations recorded
+
+**Verification scope**: the Alembic chain and one throwaway loopback database. The shared `money_machine` database is not migrated. No live HTTP. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Chain | Revisions `9f46f3152a68`, `a1b2c3d4e5f6`, and `b2c3d4e5f6a7` are linear | PASS |
+| Apply | An isolated database upgrades to head, downgrades to base, and upgrades again | PASS |
+| Tables | The public tables match the declared schema | PASS |
+| Hold | The shared database and a remote host are refused before a connection | PASS |
+
+The database-migration tests printed 5 passed in 1.82s. The database-migration tests, the evidence index, and the continuity proof printed 15 passed in 2.38s. `ruff check` and `pyright` on the database-migration module and the evidence catalogue were clean.
+
 ## 2026-10-20 — Production compose recorded
 
 **Verification scope**: `compose.prod.yaml` and the six runbooks. Docker is not called. No image is built. No container is started. No live HTTP. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.

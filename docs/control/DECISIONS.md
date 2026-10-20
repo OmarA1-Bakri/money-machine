@@ -1578,3 +1578,19 @@ Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. 
 ### Consequences
 
 The production compose spec succeeds. The next checklist line is "Database migrations succeed." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0102 — Database migrations succeed
+
+**Status:** accepted 2026-10-20. Standing order: finish the application.
+
+### Context
+
+Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. The acceptance checklist line "Database migrations succeed." has no typed proof. The shared development database must not be migrated. A remote database is a live mutation.
+
+### Decision
+
+`src/money_machine/deploy/database_migrations.py` reads the linear chain `9f46f3152a68`, `a1b2c3d4e5f6`, `b2c3d4e5f6a7`. It upgrades an isolated loopback database to head, downgrades to base, and upgrades to head again. The public tables match the declared schema. `refuse_shared_database` raises before a connection when the database name is `money_machine`, `postgres`, `template0`, or `template1`, and when the host is not loopback. The state pointer stays revision 119.
+
+### Consequences
+
+Database migrations succeed on an isolated database. The next checklist line is "Backup and restore succeed." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.

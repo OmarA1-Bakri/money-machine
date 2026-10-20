@@ -1,3 +1,7 @@
+## 2026-10-20 — Database migrations recorded
+
+`src/money_machine/deploy/database_migrations.py` applies the linear chain `9f46f3152a68`, `a1b2c3d4e5f6`, `b2c3d4e5f6a7` to an isolated loopback database. The upgrade creates the declared tables, the downgrade to base leaves only `alembic_version`, and the second upgrade restores the same tables. The shared `money_machine` database and any remote host are refused before a connection. The state pointer stays revision 119. `updated_at` stays `2026-10-17T16:50:00Z`. Exit 78 stays HELD. The exit string is not written.
+
 ## 2026-10-20 — Production compose recorded
 
 `src/money_machine/deploy/production_compose.py` reads `compose.prod.yaml` and the six runbooks. The five services stay in place. Worker and scheduler restart stay `no`. An image build raises. Docker is not called. No image is built and no container is started. The state pointer stays revision 119. `updated_at` stays `2026-10-17T16:50:00Z`. Exit 78 stays HELD. The exit string is not written.

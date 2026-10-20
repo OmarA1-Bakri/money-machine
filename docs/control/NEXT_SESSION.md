@@ -1,5 +1,9 @@
 # Next Session
 
+## Database migrations are recorded (2026-10-20)
+
+Revision 119 stays complete Session 15. The migration chain upgrades, reverses, and upgrades an isolated loopback database. The shared database is refused. The next checklist line is "Backup and restore succeed." Exit 78 stays HELD. A live account stays deferred.
+
 ## Production compose is recorded (2026-10-20)
 
 Revision 119 stays complete Session 15. `compose.prod.yaml` renders the five services. No image is built. The next checklist line is "Database migrations succeed." Exit 78 stays HELD. A live account stays deferred.
