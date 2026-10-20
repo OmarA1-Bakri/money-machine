@@ -1,5 +1,9 @@
 # Next Session
 
+## Production compose is recorded (2026-10-20)
+
+Revision 119 stays complete Session 15. `compose.prod.yaml` renders the five services. No image is built. The next checklist line is "Database migrations succeed." Exit 78 stays HELD. A live account stays deferred.
+
 ## Fresh bootstrap is recorded (2026-10-19)
 
 Revision 119 stays complete Session 15. The frozen Python and pnpm locks check, and `compose.yaml` renders the five services. No container is started. The next checklist line is "Production compose succeeds." Exit 78 stays HELD. A live account stays deferred.

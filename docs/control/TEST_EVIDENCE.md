@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-20 — Production compose recorded
+
+**Verification scope**: `compose.prod.yaml` and the six runbooks. Docker is not called. No image is built. No container is started. No live HTTP. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Services | postgres, api, web, worker, and scheduler are in the production spec | PASS |
+| Restart | Worker and scheduler restart stay `no` | PASS |
+| Shortcut | A passing `docker compose config` does not earn the result | PASS |
+| Hold | An image build raises. Exit 78 stays HELD | PASS |
+
+The production-compose tests printed 5 passed in 0.04s. The production-compose tests, the evidence index, and the continuity proof printed 15 passed in 1.02s. `ruff check` and `pyright` on the production-compose module and the evidence catalogue were clean.
+
 ## 2026-10-19 — Fresh bootstrap recorded
 
 **Verification scope**: frozen locks and the rendered compose file. Docker is not called. No container is started. No live HTTP to a provider. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.

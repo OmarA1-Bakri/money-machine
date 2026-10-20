@@ -1562,3 +1562,19 @@ Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. 
 ### Consequences
 
 The fresh bootstrap checks succeed. The next checklist line is "Production compose succeeds." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0101 — Production compose succeeds
+
+**Status:** accepted 2026-10-20. Standing order: finish the application.
+
+### Context
+
+Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. The acceptance checklist line "Production compose succeeds." has no typed proof. Building an image or starting the production stack needs Docker, which is not installed here.
+
+### Decision
+
+`src/money_machine/deploy/production_compose.py` reads `compose.prod.yaml` through `define_production_package`. The five services stay `postgres`, `api`, `web`, `worker`, and `scheduler`. Worker and scheduler restart stay `no`. A passing `docker compose config` does not earn the result. `refuse_image_build` raises on `compose build`, `compose up`, `docker build`, and publish. Docker is not called. No image is built and no container is started. The state pointer stays revision 119.
+
+### Consequences
+
+The production compose spec succeeds. The next checklist line is "Database migrations succeed." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.

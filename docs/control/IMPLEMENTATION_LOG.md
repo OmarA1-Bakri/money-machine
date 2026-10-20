@@ -1,3 +1,7 @@
+## 2026-10-20 — Production compose recorded
+
+`src/money_machine/deploy/production_compose.py` reads `compose.prod.yaml` and the six runbooks. The five services stay in place. Worker and scheduler restart stay `no`. An image build raises. Docker is not called. No image is built and no container is started. The state pointer stays revision 119. `updated_at` stays `2026-10-17T16:50:00Z`. Exit 78 stays HELD. The exit string is not written.
+
 ## 2026-10-19 — Fresh bootstrap recorded
 
 `src/money_machine/deploy/bootstrap.py` checks the frozen Python lock and the frozen pnpm lock, then renders `compose.yaml`. The five services stay in place. Worker and scheduler restart stay `no`. A stack start raises. Docker is not called and no container is started. The state pointer stays revision 119. `updated_at` stays `2026-10-17T16:50:00Z`. Exit 78 stays HELD. The exit string is not written.
