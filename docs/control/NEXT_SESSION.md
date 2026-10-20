@@ -1,5 +1,9 @@
 # Next Session
 
+## Backup and restore is recorded (2026-10-20)
+
+Revision 119 stays complete Session 15. The fixture shop restores once and a second restore inserts nothing. An isolated database copy matches the declared schema. A live backup is refused. The next checklist line is "API, worker, scheduler, web and PostgreSQL are healthy." Exit 78 stays HELD. A live account stays deferred.
+
 ## Database migrations are recorded (2026-10-20)
 
 Revision 119 stays complete Session 15. The migration chain upgrades, reverses, and upgrades an isolated loopback database. The shared database is refused. The next checklist line is "Backup and restore succeed." Exit 78 stays HELD. A live account stays deferred.

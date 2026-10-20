@@ -1594,3 +1594,19 @@ Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. 
 ### Consequences
 
 Database migrations succeed on an isolated database. The next checklist line is "Backup and restore succeed." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.
+
+## D-0103 — Backup and restore succeed
+
+**Status:** accepted 2026-10-20. Standing order: finish the application.
+
+### Context
+
+Session 15 is complete at revision 119. `updated_at` is `2026-10-17T16:50:00Z`. The acceptance checklist line "Backup and restore succeed." has no typed proof. A live PostgreSQL backup of the shared database is refused. `pg_dump` is not the proof.
+
+### Decision
+
+`src/money_machine/deploy/backup_restore.py` restores the fixture shop from `backup(mode="fixture")`. The workflow, job, product, listing, incident, artifact, and simulation config come back. A second restore inserts nothing. It then copies an isolated loopback database whose name matches `mm_t_` plus twenty hex characters, using `CREATE DATABASE ... TEMPLATE`. The copy's public tables match the declared schema and the Alembic version is `b2c3d4e5f6a7`. The copy is dropped before the function returns. `refuse_live_backup` raises on `pg_dump`, `pg_restore`, `money_machine`, and `postgres`. A remote host, the shared database, and any other standing database name are refused before a connection. The state pointer stays revision 119.
+
+### Consequences
+
+Backup and restore succeed for the fixture shop and an isolated database. The next checklist line is "API, worker, scheduler, web and PostgreSQL are healthy." A live account stays deferred. Exit 78 stays HELD. The exit string is not written.

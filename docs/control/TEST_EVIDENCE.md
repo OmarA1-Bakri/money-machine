@@ -1,5 +1,18 @@
 # Test Evidence
 
+## 2026-10-20 — Backup and restore recorded
+
+**Verification scope**: the fixture shop and one throwaway loopback database copied with `CREATE DATABASE ... TEMPLATE`. The shared `money_machine` database is not copied. `pg_dump` is not run. No live HTTP. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Fixture | The shop restores once and a second restore inserts nothing | PASS |
+| Database | The copied tables match the declared schema at `b2c3d4e5f6a7` | PASS |
+| Isolated | A standing database name is refused | PASS |
+| Hold | A live backup, the shared database, and a remote host are refused | PASS |
+
+The backup-and-restore tests printed 5 passed in 2.26s. The backup-and-restore tests, the evidence index, and the continuity proof printed 15 passed in 2.91s. `ruff check` and `pyright` on the backup-and-restore module and the evidence catalogue were clean.
+
 ## 2026-10-20 — Database migrations recorded
 
 **Verification scope**: the Alembic chain and one throwaway loopback database. The shared `money_machine` database is not migrated. No live HTTP. Exit 78 stays HELD. The exit string is not written. Revision 119 and `2026-10-17T16:50:00Z` stay the pointer.

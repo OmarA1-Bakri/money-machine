@@ -394,6 +394,7 @@ Fixture paths:
 - `src/money_machine/deploy/bootstrap.py`
 - `src/money_machine/deploy/production_compose.py`
 - `src/money_machine/deploy/database_migrations.py`
+- `src/money_machine/deploy/backup_restore.py`
 - `src/money_machine/deploy/prompt_pack.py`
 - `src/money_machine/deploy/source_exclusion.py`
 - `src/money_machine/integrations/provider_connections.py`
