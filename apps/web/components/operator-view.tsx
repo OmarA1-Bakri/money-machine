@@ -104,7 +104,7 @@ function ProductProof({ summary, view }: { summary: RunSummary; view: OperatorVi
     artifact.media_type.split(";")[0]?.trim() === "text/html");
   return <section className="product-proof" aria-label="Stored product proof">
     <div className="proof-heading"><div><p className="eyebrow">Produced product · Fixture only</p>
-      <h2>{summary.product_title}</h2></div><span className="state">{summary.product_state}</span></div>
+      <h2>{summary.product_title}</h2></div><span className="state">Production lifecycle: {summary.product_state}</span></div>
     {showWorkflow && <>
       <div className="completion-strip"><div><span className="label">Fixture workflow</span>
         <strong>{summary.fixture_completed ? "Fixture completed" : "Fixture in progress"}</strong>

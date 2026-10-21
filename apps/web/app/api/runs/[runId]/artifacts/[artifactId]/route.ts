@@ -1,4 +1,4 @@
-import { isRunIdentifier } from "../../../../../../lib/operator-summary";
+import { isArtifactIdentifier, isRunIdentifier } from "../../../../../../lib/operator-summary";
 
 export const dynamic = "force-dynamic";
 const safeHeaders = ["content-type", "content-disposition", "content-security-policy", "x-content-type-options",
@@ -12,7 +12,7 @@ export async function GET(_request: Request, { params }: {
   params: Promise<{ runId: string; artifactId: string }>;
 }) {
   const { runId, artifactId } = await params;
-  if (!isRunIdentifier(runId) || !isRunIdentifier(artifactId)) return unavailable(404);
+  if (!isRunIdentifier(runId) || !isArtifactIdentifier(artifactId)) return unavailable(404);
   const base = process.env.API_BASE_URL;
   if (!base) return unavailable(503);
   try {
