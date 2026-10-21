@@ -1415,7 +1415,10 @@ def test_case_variant_repo_root_spelling_is_the_same_worktree(tmp_path: Path) ->
     prepared = prepare_completed_session_zero(tmp_path)
     variant = prepared.repo.with_name(prepared.repo.name.swapcase())
     if not (variant.exists() and os.path.samefile(variant, prepared.repo)):
-        pytest.skip("filesystem is case-sensitive; case-variant identity cannot be exercised")
+        # Exercise a real alternate spelling of the same inode on case-sensitive hosts.
+        assert not variant.exists()
+        variant.symlink_to(prepared.repo, target_is_directory=True)
+    assert os.path.samefile(variant, prepared.repo)
     candidate = load_state(prepared.candidate_path)
     candidate["repo_root"] = str(variant)
     state = load_state(prepared.state_path)

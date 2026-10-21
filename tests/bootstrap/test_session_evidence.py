@@ -15,7 +15,7 @@ from money_machine.control.state import SESSION_EVIDENCE_KEYS, SESSION_PROMPTS
 
 ROOT = Path(__file__).parents[2]
 STATE_PATH = ROOT / "docs/control/IMPLEMENTATION_STATE.json"
-INDEX_PATH = ROOT / "docs/control/SESSION_EVIDENCE.md"
+INDEX_PATH = ROOT / "docs/SESSION_EVIDENCE.md"
 
 
 def _state_at(commit: str) -> dict[str, object]:

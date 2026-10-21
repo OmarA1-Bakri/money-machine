@@ -2,7 +2,7 @@
 
 ## Session evidence is indexed, the pointer is still Session 07 (2026-10-16)
 
-`docs/control/SESSION_EVIDENCE.md` names the completion commit and every evidence key for sessions 00-07, and the missing contract for sessions 08-15. Sessions 00-06 are true. Session 07's twelve keys are false. Sessions 08-15 are not activated. `current_session` stays 7. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. The next honest step for the pointer is still Session 07 evidence that D-0032 does not yet record, then activation of Session 08.
+`docs/SESSION_EVIDENCE.md` names the completion commit and every evidence key for sessions 00-07, and the missing contract for sessions 08-15. Sessions 00-06 are true. Session 07's twelve keys are false. Sessions 08-15 are not activated. `current_session` stays 7. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. The next honest step for the pointer is still Session 07 evidence that D-0032 does not yet record, then activation of Session 08.
 
 ## Session 11 fixture intake, session still not activated (2026-10-16)
 
