@@ -6858,3 +6858,8 @@ Reviewed dry-run-default recover-session-seven CLI with durable exactlegacy-stat
 ## One-product private build integration checkpoint (RUN_ID20261021T184946Z)
 
 PR124 merged45e1206448423a508b6c424678429a33f9c32891. This wave integrates real Notion private adapters, the existing SQL effect ledger, a finite three-variant builder and an explicit operator-assisted runner. The runner binds clean reviewed source and one approved run/product/spec, retains per-write reconciliation and lease guards, and does not activate the programme. Actual control recovery and provider creation remain pending at this checkpoint. Historical Session07 close is preserved; compatibility checks accept only exact legacy64 or the authorized recovery65 with all12 evidence keys false. No generated evidence, credentials or source PDF are committed.
+
+
+## Applied control recovery (RUN_ID20261021T184946Z)
+
+Applied the supported D0039 recovery on clean merged trunk48b2d2a217ed8cb607b9383ad7f6c7c0829484d3. BeforeSHAfc0fb4143c8fdfaaa81abfb9cca32687d42eb92e8979cfa0c9a911460886a624; afterSHA590c36f9a1cfd20442e4f630cb872dc526cea67c9f089630f88a03a7240d0f39. Canonical revision65 reopens Session07 with actual Hetzner root, completed0..6,next7;12false keys/commissioned[]/all historical notes preserved. Durable intent, final receipt and exact before/after bytes retained outside Git. This records recovery, not Session07 completion or provider delivery.

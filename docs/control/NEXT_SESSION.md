@@ -243,3 +243,8 @@ User authorized one real product through verified Etsy draft, publishing/spend d
 ## Current one-product build handoff (RUN_ID20261021T184946Z)
 
 Resume metadata /srv/work/state/integrator.json and real Hetzner /srv/work/money-machine; preserve accepted fixture workflow20261020T211445Z and unrelated services. After the provider integration wave passes independent review/CI and merges, apply only recover-session-seven on clean trunk with exact before SHA and HEAD, preserve its durable receipt and commit the generated transition before launching the guarded real builder. Operator-owned /srv/work/state/real-draft-approval.json binds the existing active RUN_ID/product/spec digest; credentials remain private outside Git. Verify actual Notion objects, then native media/PDF bytes and one fresh Etsy DRAFT. Publishing/spend/recurring activation remain disabled; no full-commissioning claim.
+
+
+## Applied control recovery (RUN_ID20261021T184946Z)
+
+Current canonical state is the audited recovery65, source on local build/full-automation. Do not reapply or hand-edit state. The generated transition is committed locally so the guarded one-product runner can launch on clean source; it must be carried into the final delivery PR, never direct-pushed to trunk. Start the real private Notion build for existing RUN_ID20261021T184946Z/approvedSpec after dry preflight; preserve fixture app and all unrelated services. Global commissioning, public sharing, publishing, paid calls and recurring activation remain disabled. Read current metadata checkpoint before resuming.

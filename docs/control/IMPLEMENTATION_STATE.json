@@ -1,15 +1,15 @@
 {
   "programme": "hands-off-money-machine",
   "version": "1.0",
-  "repo_root": "/mnt/d/Money Machine",
+  "repo_root": "/srv/work/money-machine",
   "windows_repo_root": "D:\\Money Machine",
   "branch": "build/full-automation",
-  "head_sha": "b782751fdb1b255c436ff7f6fa655e6d783b1e8c",
+  "head_sha": "0f94d585f23d79e5ac18479f01e14f67cbaad332",
   "bootstrap_commit_sha": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
   "evidence_closure_commit_sha": "0f94d585f23d79e5ac18479f01e14f67cbaad332",
   "last_verified_commit": "1abf0d7cca3a6b8cd7efcd0a45523538fd5bfd9d",
-  "state_revision": 64,
-  "session_status": "complete",
+  "state_revision": 65,
+  "session_status": "incomplete",
   "current_session": 7,
   "completed_sessions": [
     0,
@@ -18,8 +18,7 @@
     3,
     4,
     5,
-    6,
-    7
+    6
   ],
   "services": {
     "api": "container_healthy_readiness_true_migrated_2026-09-07",
@@ -148,7 +147,7 @@
     "completion_requires_later_state_pointer_commit": true,
     "unsupported_completion_is_rejected": true
   },
-  "next_session": 8,
-  "next_prompt": "11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md",
-  "updated_at": "2026-10-10T05:36:46Z"
+  "next_session": 7,
+  "next_prompt": "10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md",
+  "updated_at": "2026-10-21T23:01:49.905664Z"
 }
