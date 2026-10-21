@@ -144,3 +144,28 @@ def test_live_mode_is_refused_before_evidence(tmp_path: Path) -> None:
     )
     assert result.returncode != 0 and "refuses live/provider mode" in result.stderr
     assert list(tmp_path.iterdir()) == []
+
+
+async def test_partial_render_refuses_existing_different_video(
+    tmp_path: Path, test_database: str
+) -> None:
+    upgrade(test_database, Path.cwd())
+    run_id = "test-partial-video"
+    bundle = tmp_path / run_id / "e2e"
+    bundle.mkdir(parents=True)
+    target = bundle / "walkthrough.mp4"
+    original = b"preserve prior partial-render evidence"
+    target.write_bytes(original)
+    env = dict(
+        os.environ,
+        APP_ENV="test",
+        MONEY_MACHINE_DATABASE_URL=test_database,
+        MONEY_MACHINE_RUN_ID=run_id,
+        MONEY_MACHINE_EVIDENCE_ROOT=str(tmp_path),
+    )
+    completed = subprocess.run(
+        ["bash", "scripts/e2e.sh", "--fixture"], env=env, capture_output=True, text=True
+    )
+    assert completed.returncode != 0
+    assert "refuse replacing existing artifact: walkthrough.mp4" in completed.stderr
+    assert target.read_bytes() == original
