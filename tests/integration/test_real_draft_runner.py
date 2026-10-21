@@ -382,3 +382,30 @@ def test_preflight_binds_clean_reviewed_tree_and_one_approved_product(
     else:
         with pytest.raises(DraftRunRefused):
             launch_preflight()
+
+
+@pytest.mark.parametrize(
+    "case", ["valid", "foreign_owner", "world_readable", "symlink", "directory"]
+)
+def test_credential_requires_owned_private_regular_file(monkeypatch, tmp_path, case):
+    import money_machine.cli.real_draft as module
+
+    p = tmp_path / "credential"
+    p.write_text("test-only-credential")
+    p.chmod(0o600)
+    if case == "foreign_owner":
+        actual_uid = module.os.getuid()
+        monkeypatch.setattr(module.os, "getuid", lambda: actual_uid + 1)
+    elif case == "world_readable":
+        p.chmod(0o644)
+    elif case == "symlink":
+        link = tmp_path / "link"
+        link.symlink_to(p)
+        p = link
+    elif case == "directory":
+        p = tmp_path
+    if case == "valid":
+        assert module.read_private_credential(p) == "test-only-credential"
+    else:
+        with pytest.raises(DraftRunRefused, match="private_credential_file_required"):
+            module.read_private_credential(p)

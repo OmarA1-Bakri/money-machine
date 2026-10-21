@@ -160,6 +160,7 @@ class SqlDraftEffects:
                 )
         # No database lock spans the provider request. Pending reservations are durable.
         mutation_started = False
+        create_returned = False
         try:
             observed = await reconcile(known_id)
             if observed is None:
@@ -176,11 +177,39 @@ class SqlDraftEffects:
                 context = self._active_key.set(key)
                 try:
                     created = await create()
+                    create_returned = True
                 finally:
                     self._active_key.reset(context)
                 created_id = str(created.get("id", ""))
                 if not created_id:
                     raise DraftEffectUncertain("provider_object_id_missing")
+                # Preserve an accepted object's identity BEFORE any fallible QA/readback.
+                known_id = created_id
+                async with self.factory() as session, session.begin():
+                    await self._job(session)
+                    prior = await get_latest_effect_attempt(session, idempotency_key=key)
+                    reservation = await get_idempotency_record(session, idempotency_key=key)
+                    if reservation is None:
+                        raise DraftEffectUncertain("accepted_effect_reservation_missing")
+                    if reservation.completed_at is not None:
+                        if (
+                            prior is None
+                            or prior.effect_state != "CONFIRMED"
+                            or prior.provider_object_id != created_id
+                        ):
+                            raise DraftEffectUncertain("concurrent_confirmation_identity_mismatch")
+                    else:
+                        await record_effect_attempt(
+                            session,
+                            idempotency_key=key,
+                            job_id=self.job_id,
+                            agent_run_id=None,
+                            provider=provider,
+                            operation=operation,
+                            effect_state="UNKNOWN",
+                            provider_object_id=created_id,
+                            reconciliation_attempt=prior.reconciliation_attempt + 1 if prior else 0,
+                        )
                 observed = await reconcile(created_id)
                 if observed is None or str(observed.get("id", "")) != created_id:
                     raise DraftEffectUncertain("fresh_provider_readback_missing")
@@ -190,8 +219,8 @@ class SqlDraftEffects:
         except Exception as exc:
             # Only trusted adapters may use DraftRunRefused for a definite refusal.
             # Timeouts, lost responses and uncertain writes never permit a new POST.
-            definite_absence = (may_create and isinstance(exc, DraftRunRefused)) or (
-                may_create and not mutation_started
+            definite_absence = may_create and (
+                not mutation_started or (isinstance(exc, DraftRunRefused) and not create_returned)
             )
             async with self.factory() as session, session.begin():
                 await self._job(session)

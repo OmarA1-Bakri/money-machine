@@ -435,3 +435,123 @@ async def test_provider_callback_observes_committed_active_reservation(session_f
     assert result == objects[0]
     with pytest.raises(DraftRunRefused, match="active_effect_reservation_required"):
         await effects.assert_lease()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("refusal", ["notion_read_failed", "database_schema_readback_mismatch"])
+async def test_accepted_create_followed_by_refused_read_retains_id_and_never_reposts(
+    session_factory, refusal
+):
+    from money_machine.persistence.tables import EffectAttempt
+
+    effects, parent = await prepare(session_factory)
+    objects = []
+    writes = 0
+    phase = "first"
+
+    async def create():
+        nonlocal writes
+        writes += 1
+        obj = {"id": str(uuid4())}
+        objects.append(obj)
+        return obj
+
+    async def read(object_id):
+        if phase == "first":
+            if objects:
+                raise DraftRunRefused(refusal)
+            return None
+        if phase == "invisible":
+            return None
+        assert object_id == objects[0]["id"]
+        return objects[0]
+
+    async def execute():
+        return await effects.execute(
+            "post-read",
+            provider="notion",
+            operation="notion.private_product.write",
+            create=create,
+            reconcile=read,
+            notion_parent_id=parent,
+        )
+
+    with pytest.raises(DraftRunRefused, match=refusal):
+        await execute()
+    async with session_factory() as session:
+        latest = await session.scalar(
+            select(EffectAttempt)
+            .order_by(EffectAttempt.reconciliation_attempt.desc(), EffectAttempt.recorded_at.desc())
+            .limit(1)
+        )
+        assert latest is not None and latest.effect_state == "UNKNOWN"
+        assert latest.provider_object_id == objects[0]["id"]
+    phase = "invisible"
+    with pytest.raises(DraftEffectUncertain):
+        await execute()
+    assert writes == 1
+    phase = "readable"
+    assert await execute() == objects[0]
+    assert writes == 1
+    async with session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(Receipt)) == 1
+
+
+@pytest.mark.asyncio
+async def test_concurrent_replay_confirmation_is_never_regressed_by_delayed_create_response(
+    session_factory,
+):
+    from money_machine.persistence.tables import EffectAttempt
+
+    effects, parent = await prepare(session_factory)
+    accepted, response = asyncio.Event(), asyncio.Event()
+    objects = []
+    writes = 0
+    fail_reads = False
+
+    async def create():
+        nonlocal writes
+        writes += 1
+        obj = {"id": str(uuid4())}
+        objects.append(obj)
+        accepted.set()
+        await response.wait()
+        return obj
+
+    async def read(object_id):
+        if fail_reads:
+            raise DraftRunRefused("temporary_read_failure")
+        return objects[0] if objects else None
+
+    async def execute():
+        return await effects.execute(
+            "delayed-response",
+            provider="notion",
+            operation="notion.private_product.write",
+            create=create,
+            reconcile=read,
+            notion_parent_id=parent,
+        )
+
+    first = asyncio.create_task(execute())
+    try:
+        await asyncio.wait_for(accepted.wait(), timeout=5)
+        assert await execute() == objects[0]
+        fail_reads = True
+        response.set()
+        with pytest.raises(DraftRunRefused, match="temporary_read_failure"):
+            await first
+    finally:
+        response.set()
+        if not first.done():
+            first.cancel()
+            await asyncio.gather(first, return_exceptions=True)
+    async with session_factory() as session:
+        latest = await session.scalar(
+            select(EffectAttempt).order_by(EffectAttempt.reconciliation_attempt.desc()).limit(1)
+        )
+        assert latest is not None and latest.effect_state == "CONFIRMED"
+        assert latest.provider_object_id == objects[0]["id"] and writes == 1
+        record = await session.scalar(select(IdempotencyRecord))
+        assert record is not None and record.completed_at is not None
+        assert await session.scalar(select(func.count()).select_from(Receipt)) == 1

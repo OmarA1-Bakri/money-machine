@@ -66,6 +66,26 @@ def validate_database_url(url: str) -> None:
         raise DraftRunRefused("database_scope")
 
 
+def read_private_credential(path: Path) -> str:
+    """Validate ownership and mode on the same no-follow descriptor that is read."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError:
+        raise DraftRunRefused("private_credential_file_required") from None
+    try:
+        info = os.fstat(fd)
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or stat.S_IMODE(info.st_mode) != 0o600
+            or info.st_uid != os.getuid()
+        ):
+            raise DraftRunRefused("private_credential_file_required")
+        with os.fdopen(fd, "r", closefd=False) as source:
+            return source.read().strip()
+    finally:
+        os.close(fd)
+
+
 def preflight(
     *, spec_path: Path, run_id: str, workspace_id: UUID, expected_head: str, root: Path = ROOT
 ) -> Spec:
@@ -417,14 +437,7 @@ async def execute(args: argparse.Namespace, spec: Spec) -> dict[str, Any]:
         or Path(args.evidence_root).is_symlink()
     ):
         raise DraftRunRefused("evidence_root_scope")
-    credential = Path(args.credential_file)
-    info = credential.lstat()
-    if (
-        credential.is_symlink()
-        or not stat.S_ISREG(info.st_mode)
-        or stat.S_IMODE(info.st_mode) != 0o600
-    ):
-        raise DraftRunRefused("private_credential_file_required")
+    token = read_private_credential(Path(args.credential_file))
     authority = DraftRunAuthority(
         run_id=args.run_id,
         product_id=spec.product_id,
@@ -450,7 +463,7 @@ async def execute(args: argparse.Namespace, spec: Spec) -> dict[str, Any]:
                 limits=httpx.Limits(max_connections=1, max_keepalive_connections=1),
             ) as http,
             AsyncClient(
-                auth=credential.read_text().strip(),
+                auth=token,
                 notion_version="2025-09-03",
                 client=http,
                 timeout_ms=20000,
