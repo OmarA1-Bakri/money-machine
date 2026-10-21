@@ -9,6 +9,7 @@ import subprocess
 from dataclasses import asdict, replace
 from html import escape
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 from uuid import uuid5
 
@@ -197,33 +198,43 @@ def render_bundle(spec, probe, built, request, copy, directory: Path):
     source_video = directory / "walkthrough.mkv"
     video_id = record("walkthrough.mkv", "walkthrough_source", video.video, tuple(source_ids))
     target = directory / "walkthrough.mp4"
-    subprocess.run(
-        [
-            "ffmpeg",
-            "-nostdin",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-y",
-            "-i",
-            str(source_video),
-            "-an",
-            "-c:v",
-            "libx264",
-            "-pix_fmt",
-            "yuv420p",
-            "-threads",
-            "1",
-            "-map_metadata",
-            "-1",
-            "-fflags",
-            "+bitexact",
-            "-flags:v",
-            "+bitexact",
-            str(target),
-        ],
-        check=True,
-        capture_output=True,
+    with TemporaryDirectory(prefix="money-machine-fixture-video-") as temporary:
+        encoded = Path(temporary) / "walkthrough.mp4"
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-nostdin",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-i",
+                str(source_video),
+                "-an",
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                "-threads",
+                "1",
+                "-map_metadata",
+                "-1",
+                "-fflags",
+                "+bitexact",
+                "-flags:v",
+                "+bitexact",
+                str(encoded),
+            ],
+            check=True,
+            capture_output=True,
+        )
+        video_bytes = encoded.read_bytes()
+    record(
+        "walkthrough.mp4",
+        "walkthrough",
+        video_bytes,
+        (video_id,),
+        bind_asset(video.lineage),
     )
     metadata = subprocess.run(
         ["ffprobe", "-v", "error", "-show_format", "-show_streams", "-of", "json", str(target)],
@@ -237,13 +248,6 @@ def render_bundle(spec, probe, built, request, copy, directory: Path):
     ):
         raise ValueError("MP4 codec verification failed")
     record("video-probe.json", "video_probe", metadata, (video_id,))
-    record(
-        "walkthrough.mp4",
-        "walkthrough",
-        target.read_bytes(),
-        (video_id,),
-        bind_asset(video.lineage),
-    )
     for role, renderer in (("readme", render_readme_pdf), ("free_gift", render_gift_pdf)):
         pdf = renderer(copy, request, tokens, build_version=built.build_version)
         record(f"{role}.pdf", "delivery_pdf", pdf.pdf, (), bind_asset(pdf.lineage))
