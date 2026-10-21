@@ -3,11 +3,23 @@
 import json
 import os
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
+from money_machine.application.fixture_run import FixtureRun
 from tests.integration.alembic_support import upgrade
+
+
+def test_fixture_run_resolves_relative_evidence_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    run = FixtureRun("relative-root", Path("relative-evidence"))
+    assert run.directory.is_absolute()
+    assert run.directory == tmp_path / "relative-evidence" / "relative-root" / "e2e"
+    assert run.directory.is_dir()
 
 
 async def test_fixture_command_writes_verified_bundle(tmp_path: Path, test_database: str) -> None:
@@ -17,7 +29,7 @@ async def test_fixture_command_writes_verified_bundle(tmp_path: Path, test_datab
         APP_ENV="test",
         MONEY_MACHINE_DATABASE_URL=test_database,
         MONEY_MACHINE_RUN_ID="test-fixture-bundle",
-        MONEY_MACHINE_EVIDENCE_ROOT=str(tmp_path),
+        MONEY_MACHINE_EVIDENCE_ROOT=os.path.relpath(tmp_path),
     )
     completed = subprocess.run(
         ["bash", "scripts/e2e.sh", "--fixture"], env=env, capture_output=True, text=True
@@ -28,11 +40,38 @@ async def test_fixture_command_writes_verified_bundle(tmp_path: Path, test_datab
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import create_async_engine
 
-    from money_machine.persistence.tables import AgentRun, Job, ListingVersionArtifact
+    from money_machine.persistence.tables import (
+        AgentRun,
+        Artifact,
+        Job,
+        ListingVersionArtifact,
+        WorkflowRun,
+    )
 
     engine = create_async_engine(test_database)
     try:
         async with engine.connect() as connection:
+            workflow = (
+                await connection.execute(
+                    select(WorkflowRun.completed_at, WorkflowRun.product_state).where(
+                        WorkflowRun.id == ids["workflow_id"]
+                    )
+                )
+            ).one()
+            assert workflow.completed_at is not None
+            assert workflow.product_state == "DISCOVERED"
+            draft_jobs = (
+                (
+                    await connection.execute(
+                        select(Job.status).where(
+                            Job.workflow_id == ids["workflow_id"], Job.job_type == "DraftListingJob"
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert draft_jobs == ["READY"]
             outputs = (
                 (
                     await connection.execute(
@@ -51,6 +90,25 @@ async def test_fixture_command_writes_verified_bundle(tmp_path: Path, test_datab
                     )
                 )
             ).all()
+            storage_references = (
+                (
+                    await connection.execute(
+                        select(Artifact.storage_reference)
+                        .join(
+                            ListingVersionArtifact,
+                            ListingVersionArtifact.artifact_id == Artifact.id,
+                        )
+                        .where(
+                            ListingVersionArtifact.listing_version_id == ids["listing_version_id"]
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert len(storage_references) == 13
+            assert all(Path(reference).is_absolute() for reference in storage_references)
+            assert all(Path(reference).is_file() for reference in storage_references)
             assert len(membership) == 13
             assert len({row.artifact_id for row in membership}) == 13
             assert sorted(row.role for row in membership) == sorted(
@@ -75,12 +133,15 @@ async def test_fixture_command_writes_verified_bundle(tmp_path: Path, test_datab
         assert hashlib.sha256(value).hexdigest() == row["sha256"]
 
     before = (bundle / "receipts.jsonl").read_bytes()
+    receipts_hash = hashlib.sha256(before).hexdigest()
+    env["MONEY_MACHINE_EVIDENCE_ROOT"] = str(tmp_path.resolve())
     replay = subprocess.run(
         ["bash", "scripts/e2e.sh", "--fixture"], env=env, capture_output=True, text=True
     )
     assert replay.returncode == 0, replay.stderr
     assert json.loads(replay.stdout) == ids
     assert (bundle / "receipts.jsonl").read_bytes() == before
+    assert hashlib.sha256((bundle / "receipts.jsonl").read_bytes()).hexdigest() == receipts_hash
     assert len(json.loads((bundle / "fixture-marketplace.json").read_text())) == 1
     target = bundle / rows[0]["relative_path"]
     original = target.read_bytes()
@@ -130,6 +191,79 @@ async def test_crash_after_render_reconciles_without_duplicate_draft(
     assert completed.returncode == 0, completed.stderr
     assert (bundle / "lineage.jsonl").read_bytes() == manifest
     assert len(json.loads((bundle / "fixture-marketplace.json").read_text())) == 1
+    from sqlalchemy import func, select
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from money_machine.persistence import tables as t
+
+    ids = json.loads(completed.stdout)
+    engine = create_async_engine(test_database)
+    try:
+        async with engine.connect() as connection:
+            workflow = (
+                await connection.execute(
+                    select(t.WorkflowRun.completed_at, t.WorkflowRun.product_state).where(
+                        t.WorkflowRun.id == ids["workflow_id"]
+                    )
+                )
+            ).one()
+            assert workflow.completed_at is not None
+            assert workflow.product_state == "DISCOVERED"
+            jobs = (
+                await connection.execute(
+                    select(t.Job.job_type, t.Job.status).where(
+                        t.Job.workflow_id == ids["workflow_id"]
+                    )
+                )
+            ).all()
+            assert (
+                sum(job.job_type == "DraftListingJob" and job.status == "READY" for job in jobs)
+                == 1
+            )
+            assert (
+                sum(
+                    job.job_type == "ExpectedFixtureNegativeJob" and job.status == "BLOCKED"
+                    for job in jobs
+                )
+                == 1
+            )
+            tables = (
+                t.EtsyListing,
+                t.ListingVersion,
+                t.Event,
+                t.Incident,
+                t.Decision,
+                t.DecisionEvidence,
+                t.IntegrationAccount,
+            )
+            counts = [
+                (await connection.execute(select(func.count()).select_from(table))).scalar_one()
+                for table in tables
+            ]
+            assert counts == [1] * len(tables)
+        receipts = (bundle / "receipts.jsonl").read_bytes()
+        stages = [json.loads(line)["stage"] for line in receipts.splitlines()]
+        assert len(stages) == len(set(stages))
+        assert {"fixture_etsy_draft", "expected_negative"}.issubset(stages)
+        replay = subprocess.run(
+            ["bash", "scripts/e2e.sh", "--fixture"], env=env, capture_output=True, text=True
+        )
+        assert replay.returncode == 0, replay.stderr
+        assert json.loads(replay.stdout) == ids
+        assert (bundle / "receipts.jsonl").read_bytes() == receipts
+        assert len(json.loads((bundle / "fixture-marketplace.json").read_text())) == 1
+        async with engine.connect() as connection:
+            assert [
+                (await connection.execute(select(func.count()).select_from(table))).scalar_one()
+                for table in tables
+            ] == counts
+            assert (
+                await connection.execute(
+                    select(t.WorkflowRun.completed_at).where(t.WorkflowRun.id == ids["workflow_id"])
+                )
+            ).scalar_one() == workflow.completed_at
+    finally:
+        await engine.dispose()
 
 
 def test_live_mode_is_refused_before_evidence(tmp_path: Path) -> None:
@@ -169,3 +303,50 @@ async def test_partial_render_refuses_existing_different_video(
     assert completed.returncode != 0
     assert "refuse replacing existing artifact: walkthrough.mp4" in completed.stderr
     assert target.read_bytes() == original
+
+
+async def test_malformed_rendered_pdf_is_refused_before_fixture_draft(
+    tmp_path: Path, test_database: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sqlalchemy import func, select
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from money_machine.assets import fixture_bundle
+    from money_machine.persistence import tables as t
+
+    upgrade(test_database, Path.cwd())
+    original_renderer = fixture_bundle.render_readme_pdf
+
+    def malformed_renderer(*args, **kwargs):
+        rendered = original_renderer(*args, **kwargs)
+        assert b"/Type /Catalog" in rendered.pdf
+        mutated = rendered.pdf.replace(b"/Type /Catalog", b"/Evil /Catalog", 1)
+        return replace(rendered, pdf=mutated)
+
+    monkeypatch.setattr(fixture_bundle, "render_readme_pdf", malformed_renderer)
+    run = FixtureRun("malformed-export", tmp_path)
+    with pytest.raises(ValueError, match="pdf catalog keys"):
+        await run.execute(test_database)
+    assert not (run.directory / "fixture-marketplace.json").exists()
+    engine = create_async_engine(test_database)
+    try:
+        async with engine.connect() as connection:
+            assert (
+                await connection.execute(select(func.count()).select_from(t.EtsyListing))
+            ).scalar_one() == 0
+            assert (
+                await connection.execute(
+                    select(func.count())
+                    .select_from(t.Job)
+                    .where(t.Job.job_type == "DraftListingJob")
+                )
+            ).scalar_one() == 0
+            assert (
+                await connection.execute(
+                    select(t.WorkflowRun.completed_at).where(
+                        t.WorkflowRun.id == run.key("workflow")
+                    )
+                )
+            ).scalar_one() is None
+    finally:
+        await engine.dispose()

@@ -21,6 +21,7 @@ from money_machine.assets.asset_lineage import BoundAsset, bind_asset
 from money_machine.assets.delivery_pdfs import render_gift_pdf, render_readme_pdf
 from money_machine.assets.design_tokens import listing_token_payload, load_tokens
 from money_machine.assets.listing_images import render_listing_images
+from money_machine.assets.pdf_objects import delivery_link_uris
 from money_machine.assets.screenshots import LAUNCH_ARGS
 from money_machine.assets.video import render_walkthrough
 
@@ -50,20 +51,45 @@ def verify_bundle(directory: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def expected_readme_links(request) -> tuple[str, ...]:
+    facts = [fact.fact_value for fact in request.facts if fact.fact_key == "secret_links"]
+    if len(facts) != 1 or not request.variants:
+        raise ValueError("fixture PDF expected links missing")
+    # Current templates link every variant and the final duplication instruction.
+    return (facts[0],) * (len(request.variants) + 1)
+
+
+def admit_delivery_pdf(pdf: bytes, expected: tuple[str, ...]) -> None:
+    actual = delivery_link_uris(pdf, accepted=frozenset(expected))
+    if actual != expected:
+        raise ValueError("fixture PDF links disagree with checked facts")
+
+
+def validate_delivery_pdfs(directory: Path, readme_links: tuple[str, ...]) -> None:
+    for name, expected in (("readme.pdf", readme_links), ("free_gift.pdf", ())):
+        admit_delivery_pdf((directory / name).read_bytes(), expected)
+
+
+def load_verified_assets(directory: Path, rows) -> tuple[BoundAsset, ...]:
+    saved_assets = TypeAdapter(tuple[BoundAsset, ...]).validate_json(
+        (directory / "bound-assets.json").read_bytes()
+    )
+    for asset in saved_assets:
+        matched = [
+            row for row in rows if str(directory / row["relative_path"]) == asset.storage_uri
+        ]
+        if len(matched) != 1 or matched[0]["sha256"] != asset.output_sha256:
+            raise ValueError("saved asset binding disagrees with verified bytes")
+    return saved_assets
+
+
 def render_bundle(spec, probe, built, request, copy, directory: Path):
     """Paint actual fixture structure; existing claim-gated renderers derive buyer files."""
     manifest = directory / "lineage.jsonl"
     if manifest.exists():
         rows = verify_bundle(directory)
-        saved_assets = TypeAdapter(tuple[BoundAsset, ...]).validate_json(
-            (directory / "bound-assets.json").read_bytes()
-        )
-        for asset in saved_assets:
-            matched = [
-                row for row in rows if str(directory / row["relative_path"]) == asset.storage_uri
-            ]
-            if len(matched) != 1 or matched[0]["sha256"] != asset.output_sha256:
-                raise ValueError("saved asset binding disagrees with verified bytes")
+        validate_delivery_pdfs(directory, expected_readme_links(request))
+        saved_assets = load_verified_assets(directory, rows)
         return rows, saved_assets
     rows: list[dict[str, Any]] = []
     assets: list[BoundAsset] = []
@@ -250,6 +276,7 @@ def render_bundle(spec, probe, built, request, copy, directory: Path):
     record("video-probe.json", "video_probe", metadata, (video_id,))
     for role, renderer in (("readme", render_readme_pdf), ("free_gift", render_gift_pdf)):
         pdf = renderer(copy, request, tokens, build_version=built.build_version)
+        admit_delivery_pdf(pdf.pdf, expected_readme_links(request) if role == "readme" else ())
         record(f"{role}.pdf", "delivery_pdf", pdf.pdf, (), bind_asset(pdf.lineage))
     record(
         "README.txt",
