@@ -11,13 +11,13 @@ const summary = {
   fixture_completed: true, completed_at: "2026-10-22T10:00:00Z", product_state: "DISCOVERED",
   jobs: [{ id: "job-one", job_type: "DraftListingJob", status: "READY" },
     { id: "job-two", job_type: "NegativeFixtureJob", status: "BLOCKED" }],
-  artifacts: [{ id: "artifact-one", label: "Product HTML", kind: "product_html",
-    media_type: "text/html", byte_size: 123, href: "/operator/runs/run-one/artifacts/artifact-one" },
-  { id: "artifact-two", label: "Printable PDF", kind: "delivery_pdf", media_type: "application/pdf",
-    byte_size: 456, href: "/operator/runs/run-one/artifacts/artifact-two" }],
+  artifacts: [{ id: "ca11a410-cdde-5af8-9a96-b436cc4ef822", label: "Product HTML", kind: "product_html",
+    media_type: "text/html", byte_size: 123, href: "/operator/runs/run-one/artifacts/ca11a410-cdde-5af8-9a96-b436cc4ef822" },
+  { id: "A9F30C26-4F08-5206-BCFA-6B51BEC15732", label: "Printable PDF", kind: "delivery_pdf", media_type: "application/pdf",
+    byte_size: 456, href: "/operator/runs/run-one/artifacts/A9F30C26-4F08-5206-BCFA-6B51BEC15732" }],
 };
-const context = { params: Promise.resolve({ runId: "run-one", artifactId: "artifact-one" }) };
-const request = new Request("http://localhost/api/runs/run-one/artifacts/artifact-one");
+const context = { params: Promise.resolve({ runId: "run-one", artifactId: "ca11a410-cdde-5af8-9a96-b436cc4ef822" }) };
+const request = new Request("http://localhost/api/runs/run-one/artifacts/ca11a410-cdde-5af8-9a96-b436cc4ef822");
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe("stored run summary", () => {
@@ -33,6 +33,7 @@ describe("stored run summary", () => {
     { ...summary, run_id: "another-run" }, { ...summary, jobs: [{ status: "READY" }] },
     { ...summary, fixture_completed: true, completed_at: null },
     { ...summary, fixture_completed: false },
+    { ...summary, artifacts: [{ ...summary.artifacts[0], id: "artifact-one" }] },
     { ...summary, artifacts: [{ ...summary.artifacts[0], byte_size: -1 }] },
   ])("rejects malformed or mismatched completion evidence", async (invalid) => {
     vi.stubEnv("API_BASE_URL", "http://127.0.0.1:8100");
@@ -51,12 +52,28 @@ describe("stored run summary", () => {
 });
 
 describe("artifact byte proxy", () => {
+  it("rejects non-UUID artifact identifiers before making a request", async () => {
+    vi.stubEnv("API_BASE_URL", "http://127.0.0.1:8100");
+    const fetch = vi.fn().mockResolvedValue(new Response("unexpected"));
+    vi.stubGlobal("fetch", fetch);
+    const response = await artifactGET(request, { params: Promise.resolve({ runId: "run-one", artifactId: "artifact-one" }) });
+    expect(response.status).toBe(404);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("rejects run identifiers longer than the backend limit before making a request", async () => {
+    vi.stubEnv("API_BASE_URL", "http://127.0.0.1:8100");
+    const fetch = vi.fn().mockResolvedValue(new Response("unexpected"));
+    vi.stubGlobal("fetch", fetch);
+    const response = await artifactGET(request, { params: Promise.resolve({ runId: "r".repeat(81), artifactId: summary.artifacts[0]!.id }) });
+    expect(response.status).toBe(404);
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it("forwards verified bytes and content safety headers from only the configured API", async () => {
     vi.stubEnv("API_BASE_URL", "http://127.0.0.1:8100");
     const csp = "sandbox; default-src 'none'; style-src 'unsafe-inline'; form-action 'none'";
     const fetch = vi.fn().mockResolvedValue(new Response("<h1>Actual stored template</h1>", { headers: {
       "content-type": "text/html", "content-security-policy": csp,
-      "x-content-type-options": "nosniff", "content-disposition": "inline; filename=artifact-one.html",
+      "x-content-type-options": "nosniff", "content-disposition": "inline; filename=ca11a410-cdde-5af8-9a96-b436cc4ef822.html",
     } }));
     vi.stubGlobal("fetch", fetch);
     const response = await artifactGET(request, context);
@@ -65,7 +82,7 @@ describe("artifact byte proxy", () => {
     expect(response.headers.get("content-security-policy")).toBe(csp);
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(fetch).toHaveBeenCalledWith("http://127.0.0.1:8100/operator/runs/run-one/artifacts/artifact-one",
+    expect(fetch).toHaveBeenCalledWith("http://127.0.0.1:8100/operator/runs/run-one/artifacts/ca11a410-cdde-5af8-9a96-b436cc4ef822",
       expect.objectContaining({ cache: "no-store", redirect: "error" }));
   });
   it.each([404, 409, 503])("preserves artifact failure HTTP %s without exposing upstream detail", async (status) => {
@@ -109,6 +126,7 @@ describe("product proof views", () => {
     expect(html).toContain("READY");
     expect(html).toContain("BLOCKED");
     expect(html).toContain("DISCOVERED");
+    expect(html).toContain("Production lifecycle: DISCOVERED");
   });
   it.each(["now", "shop"] as const)("embeds the stored product in an inert frame and links real files on %s", async (view) => {
     vi.stubEnv("API_BASE_URL", "http://127.0.0.1:8100");
@@ -116,8 +134,8 @@ describe("product proof views", () => {
       url.endsWith("/summary") ? summary : { run_id: "run-one", view, items: [] }))));
     const html = renderToStaticMarkup(await OperatorViewPage({ view, searchParams: Promise.resolve({ run_id: "run-one" }) }));
     expect(html).toContain('sandbox=""');
-    expect(html).toContain('src="/api/runs/run-one/artifacts/artifact-one"');
-    expect(html).toContain('href="/api/runs/run-one/artifacts/artifact-two"');
+    expect(html).toContain('src="/api/runs/run-one/artifacts/ca11a410-cdde-5af8-9a96-b436cc4ef822"');
+    expect(html).toContain('href="/api/runs/run-one/artifacts/A9F30C26-4F08-5206-BCFA-6B51BEC15732"');
     expect(html).not.toContain("127.0.0.1:8100");
     expect(html).not.toContain("allow-scripts");
   });

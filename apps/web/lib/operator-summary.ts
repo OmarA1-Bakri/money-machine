@@ -10,7 +10,10 @@ export interface RunSummary {
 export type RunSummaryResult = { kind: "ready"; data: RunSummary } | { kind: "unavailable" };
 
 export function isRunIdentifier(value: string): boolean {
-  return /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value);
+  return /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/.test(value);
+}
+export function isArtifactIdentifier(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 export function artifactPath(runId: string, artifactId: string): string {
   return `/api/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(artifactId)}`;
@@ -31,7 +34,7 @@ function isSummary(value: unknown, runId: string): value is RunSummary {
   return value.jobs.every((job) => isObject(job) && hasStrings(job, ["id", "job_type", "status"])) &&
     value.artifacts.every((artifact) => isObject(artifact) &&
       hasStrings(artifact, ["id", "label", "kind", "media_type", "href"]) &&
-      typeof artifact.id === "string" && isRunIdentifier(artifact.id) &&
+      typeof artifact.id === "string" && isArtifactIdentifier(artifact.id) &&
       typeof artifact.byte_size === "number" && Number.isSafeInteger(artifact.byte_size) && artifact.byte_size >= 0);
 }
 export async function fetchRunSummary(runId: string): Promise<RunSummaryResult> {
