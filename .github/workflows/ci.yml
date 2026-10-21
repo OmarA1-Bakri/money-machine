@@ -31,6 +31,8 @@ jobs:
       MONEY_MACHINE_DATABASE_URL: postgresql+asyncpg://money_machine:ci-validation-only@127.0.0.1:5432/money_machine
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
