@@ -88,7 +88,7 @@ async def operator_view(
         by_workflow = {workflow.id: product for product, workflow in products}
         versions = (
             await session.execute(
-                select(ListingVersion, EtsyListing)
+                select(ListingVersion, EtsyListing, Product)
                 .join(EtsyListing, ListingVersion.listing_id == EtsyListing.id)
                 .join(Product, ListingVersion.product_id == Product.id)
                 .join(WorkflowRun, Product.workflow_id == WorkflowRun.id)
@@ -103,7 +103,7 @@ async def operator_view(
                 )
             )
         ).all()
-        latest = {version.product_id: version.id for version, _listing in versions}
+        latest = {version.product_id: version.id for version, _listing, _product in versions}
         items: list[OperatorRecord] = []
 
         def record(
@@ -135,14 +135,13 @@ async def operator_view(
                     product,
                 )
         elif view == OperatorView.SHOP:
-            by_product = {product.id: product for product, _workflow in products}
-            for version, listing in versions:
+            for version, listing, product in versions:
                 record(
                     version.id,
                     version.title,
                     listing.listing_state,
                     f"version {version.listing_version}; {version.currency} {version.price}",
-                    by_product[version.product_id],
+                    product,
                     version.id,
                 )
         elif view in (OperatorView.PIPELINE, OperatorView.BLOCKED):
@@ -182,7 +181,7 @@ async def operator_view(
                 product = by_workflow.get(incident.workflow_id)
                 # Explicit incident lineage must also belong to this shop's product.
                 version_id = incident.listing_version_id
-                if version_id not in {version.id for version, _listing in versions}:
+                if version_id not in {version.id for version, _listing, _product in versions}:
                     version_id = None
                 record(
                     incident.id,

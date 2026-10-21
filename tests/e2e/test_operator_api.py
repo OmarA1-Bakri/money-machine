@@ -190,6 +190,54 @@ async def seed_views(factory: async_sessionmaker[AsyncSession]) -> dict[str, Any
         }
 
 
+async def test_shop_reads_product_from_same_statement_as_listing(
+    operator_state: ApplicationState,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from sqlalchemy import false
+
+    from money_machine.persistence.tables import ListingVersion, WorkflowRun
+
+    rows = await seed_views(operator_state.session_factory)
+    await seed_product(operator_state.session_factory, "another-run")
+    original_execute = AsyncSession.execute
+    empty_product_reads = 0
+    listing_reads = 0
+
+    async def execute(session: AsyncSession, statement: Any, *args: Any, **kwargs: Any) -> Any:
+        nonlocal empty_product_reads, listing_reads
+        entities = [column["entity"] for column in statement.column_descriptions]
+        if entities == [Product, WorkflowRun]:
+            # Model an earlier READ COMMITTED snapshot before the product became visible.
+            empty_product_reads += 1
+            statement = statement.where(false())
+        elif entities and entities[0] is ListingVersion:
+            listing_reads += 1
+        return await original_execute(session, statement, *args, **kwargs)
+
+    monkeypatch.setattr(AsyncSession, "execute", execute)
+    app = create_app()
+    app.state.application = operator_state
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://api"
+    ) as client:
+        response = await client.get("/operator/shop", params={"run_id": RUN_ID})
+    assert empty_product_reads == 1
+    assert listing_reads == 1
+    assert response.status_code == 200
+    assert response.json()["run_id"] == RUN_ID
+    assert response.json()["items"] == [
+        {
+            "id": str(rows["shop"].id),
+            "label": "Stored listing",
+            "state": "DRAFT",
+            "detail": "version 1; USD 10.00",
+            "product_id": str(rows["now"].id),
+            "listing_version_id": str(rows["shop"].id),
+        }
+    ]
+
+
 @pytest.mark.parametrize(
     "view", ["now", "pipeline", "shop", "blocked", "decisions", "incidents", "settings"]
 )
