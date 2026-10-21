@@ -119,7 +119,7 @@ def test_authorized_operations(operation: str) -> None:
     ],
 )
 def test_forbidden_operations_cannot_be_enabled(operation: str) -> None:
-    with pytest.raises(DraftRunRefused):
+    with pytest.raises(DraftRunRefused, match="operation_not_authorized"):
         authority().authorize(
             operation,
             notion_parent_id=PARENT,
@@ -160,7 +160,16 @@ def test_wrong_scope_or_spend_refused(changes: dict[str, object]) -> None:
         "cost": Decimal("0"),
         **changes,
     }
-    with pytest.raises(DraftRunRefused):
+    reason = (
+        "run_product_scope"
+        if set(changes) & {"run_id", "product_id"}
+        else "zero_spend_required"
+        if "cost" in changes
+        else "draft_state_required"
+        if "listing_state" in changes
+        else "shop_scope"
+    )
+    with pytest.raises(DraftRunRefused, match=reason):
         authority().authorize("etsy.create_draft", **cast(Any, kwargs))
 
 
@@ -212,7 +221,23 @@ def test_real_readback_satisfies_exact_product_and_shop() -> None:
     ],
 )
 def test_invalid_or_incomplete_readback_is_refused(changes: dict[str, object]) -> None:
-    with pytest.raises(DraftRunRefused):
+    key = next(iter(changes))
+    reason = (
+        "real_verified_readback_required"
+        if key in {"source", "verified"}
+        else "draft_state_required"
+        if key == "state"
+        else "shop_scope"
+        if key in {"shop_id", "shop_name"}
+        else "run_product_scope"
+        if key in {"run_id", "product_id"}
+        else "fresh_readback_required"
+        if key == "observed_at"
+        else "attachment_count_mismatch"
+        if key.endswith("_ids")
+        else "listing_copy_mismatch"
+    )
+    with pytest.raises(DraftRunRefused, match=reason):
         verify(proof(**changes))
 
 

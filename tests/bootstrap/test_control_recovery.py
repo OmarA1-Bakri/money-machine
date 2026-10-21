@@ -37,6 +37,22 @@ def repo(tmp_path: Path) -> Path:
     git(target, "checkout", "-b", "build/full-automation", "HEAD")
     git(target, "config", "user.name", "Recovery Test")
     git(target, "config", "user.email", "recovery@example.invalid")
+    legacy = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(ROOT),
+            "show",
+            "18edb5c508b46aabe95cb968a2235a07086a5aff:" + STATE.as_posix(),
+        ],
+        check=True,
+        capture_output=True,
+    ).stdout
+    assert hashlib.sha256(legacy).hexdigest() == recovery.LEGACY_STATE_SHA256
+    (target / STATE).write_bytes(legacy)
+    git(target, "add", STATE.as_posix())
+    if git(target, "diff", "--cached", "--name-only"):
+        git(target, "commit", "-m", "Seed exact historical Session07 recovery fixture")
     return target
 
 

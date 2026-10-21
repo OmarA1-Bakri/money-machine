@@ -30,7 +30,7 @@ def main(argv: list[str] | None = None) -> int:
         authority.authorize("local.qa", run_id=authority.run_id, product_id=authority.product_id)
     except (ValueError, ValidationError):
         parser.exit(2, "invalid draft scope; no effects performed\n")
-    blockers = []
+    blockers = ["PROVIDER_VERIFICATION_NOT_PERFORMED"]
     if authority.verified_notion_parent_id is None:
         blockers.append("NOTION_PARENT_UNVERIFIED")
     if authority.verified_shop_id is None:

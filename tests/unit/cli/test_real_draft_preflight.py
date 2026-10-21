@@ -28,10 +28,15 @@ def test_preflight_preserves_zero_effects_and_unknown_provider_identity() -> Non
     assert body["effects_performed"] is False
     assert body["publishing_enabled"] is False
     assert body["spending_enabled"] is False
-    assert set(body["blockers"]) == {"NOTION_PARENT_UNVERIFIED", "ETSY_NUMERIC_SHOP_ID_UNVERIFIED"}
+    assert set(body["blockers"]) == {
+        "PROVIDER_VERIFICATION_NOT_PERFORMED",
+        "NOTION_PARENT_UNVERIFIED",
+        "ETSY_NUMERIC_SHOP_ID_UNVERIFIED",
+    }
 
 
 def test_supplied_ids_are_not_reported_as_provider_verification() -> None:
+    parent = uuid4()
     result = invoke(
         "--run-id",
         "real-test",
@@ -40,13 +45,15 @@ def test_supplied_ids_are_not_reported_as_provider_verification() -> None:
         "--verified-shop-id",
         "123",
         "--notion-parent-id",
-        str(uuid4()),
+        str(parent),
     )
     assert result.returncode == 0, result.stderr
     body = json.loads(result.stdout)
     assert body["provider_verification_performed"] is False
     assert body["effects_performed"] is False
     assert body["authority"]["verified_shop_id"] == 123
+    assert body["authority"]["verified_notion_parent_id"] == str(parent)
+    assert body["blockers"] == ["PROVIDER_VERIFICATION_NOT_PERFORMED"]
 
 
 def test_preflight_rejects_publication_override() -> None:
