@@ -1,5 +1,11 @@
 ## 2026-10-16 — Session evidence index for sessions 00-15
 
+## 2026-10-21 — Approved fixture recovery in progress
+
+RUN_ID: `20261020T211445Z`. D-0036 authorizes the plan and three lanes. Prerequisite PR #122 merged as BASE_SHA `5b95386c5e42ec849d452691740b0179e5d9284d` after exact-head CI success. The prerequisite PostgreSQL-backed suite executed 5,244 tests with zero skips. API and console integration and the real fixture producer are separate recovery work, not Session 08 activation. Independent review and final integrated acceptance are required before a delivery claim. Final-tip receipts and the original 120-item ledger live under `/srv/work/evidence/20261020T211445Z/` and must identify their actual tested SHA.
+
+The actual control attempts and unchanged state digest are recorded in D-0037. No live provider, commissioning, scheduler activation or production deployment is claimed. The immutable source files, prompt pack and state JSON remain unchanged.
+
 `current_session` stays 7. `state_revision` stays 64. `IMPLEMENTATION_STATE.json` is unchanged. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. No evidence key flips.
 
 `docs/SESSION_EVIDENCE.md` lists every contract key for sessions 00-08 and records sessions 09-15 as having no contract. Sessions 00-06 are true at their completion commits. Session 07 is false at `00b952a83bffcec8d442468223d64dd9b2d3e6df` under D-0032. Sessions 08-15 are not activated. The index is rendered from `src/money_machine/control/session_evidence.py` and checked against those commits by `tests/bootstrap/test_session_evidence.py`.

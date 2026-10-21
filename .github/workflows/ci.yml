@@ -70,8 +70,10 @@ jobs:
           if created or corrected:
               raise SystemExit(f"seed is not idempotent: created={created} corrected={corrected}")
           PY
-      - run: uv run pytest
       - run: pnpm install --frozen-lockfile
+      - name: Install the pinned browser for real fixture and console tests
+        run: uv run playwright install --with-deps chromium
+      - run: uv run pytest
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test

@@ -1,5 +1,11 @@
 # Test Evidence
 
+## 2026-10-21 — Recovery evidence boundary
+
+RUN_ID: `20261020T211445Z`. Prerequisite exact-head CI run `39601425077` passed for `292d9820f81e969b3453e2f10339fdd8f7a9d259` before PR #122 merged. The equivalent local production/test bytes passed 5,244 PostgreSQL-backed tests with zero skips; the only subsequent prerequisite change supplied full Git history to CI. BASE_SHA is `5b95386c5e42ec849d452691740b0179e5d9284d`.
+
+Feature-focused and final exit results must be read from `/srv/work/evidence/20261020T211445Z/` with their head SHA, command, exit status and reviewer verdict. Prior focused results and this committed narrative do not establish final acceptance. Actual control CLI exits are both 2; state digest is unchanged (D-0037). The control clause is UNPROVEN. No state boolean or agent commissioning is inferred from fixture tests.
+
 ## 2026-10-16 — Session evidence index
 
 **Verification scope**: `session_evidence.py`, `SESSION_EVIDENCE.md`, and `test_session_evidence.py`. No `IMPLEMENTATION_STATE.json` change. No live HTTP. No key flip.
