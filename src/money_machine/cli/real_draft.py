@@ -10,6 +10,8 @@ import os
 import stat
 import subprocess
 import time
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -428,6 +430,28 @@ async def claim_build_job(
     return job
 
 
+@asynccontextmanager
+async def private_notion_client(
+    token: str, *, transport: httpx.AsyncBaseTransport | None = None
+) -> AsyncGenerator[AsyncClient, None]:
+    """Own the paced transport; notion-client2.7.0 context entry replaces clients."""
+    last_request = 0.0
+
+    async def pace(_request: httpx.Request) -> None:
+        nonlocal last_request
+        await asyncio.sleep(max(0.0, 0.4 - (time.monotonic() - last_request)))
+        last_request = time.monotonic()
+
+    async with httpx.AsyncClient(
+        event_hooks={"request": [pace]},
+        limits=httpx.Limits(max_connections=1, max_keepalive_connections=1),
+        transport=transport,
+    ) as http:
+        # SDK2.7.0 __aenter__ creates a fresh HTTP client and discards the injected hooks.
+        sdk = AsyncClient(auth=token, notion_version="2025-09-03", client=http, timeout_ms=20000)
+        yield sdk
+
+
 async def execute(args: argparse.Namespace, spec: Spec) -> dict[str, Any]:
     url = os.environ.get("MONEY_MACHINE_DATABASE_URL", "")
     validate_database_url(url)
@@ -449,26 +473,8 @@ async def execute(args: argparse.Namespace, spec: Spec) -> dict[str, Any]:
         "real-draft:" + str(os.getpid()) + ":" + uuid5(NAMESPACE_URL, str(time.time_ns())).hex[:12]
     )
     job_id = None
-    last_request = 0.0
-
-    async def pace(_request: httpx.Request) -> None:
-        nonlocal last_request
-        await asyncio.sleep(max(0.0, 0.4 - (time.monotonic() - last_request)))
-        last_request = time.monotonic()
-
     try:
-        async with (
-            httpx.AsyncClient(
-                event_hooks={"request": [pace]},
-                limits=httpx.Limits(max_connections=1, max_keepalive_connections=1),
-            ) as http,
-            AsyncClient(
-                auth=token,
-                notion_version="2025-09-03",
-                client=http,
-                timeout_ms=20000,
-            ) as sdk,
-        ):
+        async with private_notion_client(token) as sdk:
             me = await sdk.users.me()
             bot = me.get("bot", {})
             if (

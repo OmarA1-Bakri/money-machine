@@ -555,3 +555,45 @@ async def test_concurrent_replay_confirmation_is_never_regressed_by_delayed_crea
         record = await session.scalar(select(IdempotencyRecord))
         assert record is not None and record.completed_at is not None
         assert await session.scalar(select(func.count()).select_from(Receipt)) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["cancelled", "expired"])
+async def test_accepted_id_survives_lease_loss_during_create(session_factory, outcome):
+    from money_machine.persistence.tables import EffectAttempt
+
+    effects, parent = await prepare(session_factory)
+    accepted_id = str(uuid4())
+    writes = 0
+
+    async def create():
+        nonlocal writes
+        writes += 1
+        async with session_factory() as session, session.begin():
+            job = await session.get(Job, effects.job_id)
+            assert job is not None
+            if outcome == "cancelled":
+                job.status = "CANCELLED"
+            else:
+                job.lease_expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        return {"id": accepted_id}
+
+    async def read(object_id):
+        return None
+
+    with pytest.raises(DraftRunRefused, match="lease"):
+        await effects.execute(
+            "lease-lost-after-accept",
+            provider="notion",
+            operation="notion.private_product.write",
+            create=create,
+            reconcile=read,
+            notion_parent_id=parent,
+        )
+    async with session_factory() as session:
+        latest = await session.scalar(
+            select(EffectAttempt).order_by(EffectAttempt.reconciliation_attempt.desc()).limit(1)
+        )
+        assert latest is not None and latest.effect_state == "UNKNOWN"
+        assert latest.provider_object_id == accepted_id and writes == 1
+        assert await session.scalar(select(func.count()).select_from(Receipt)) == 0

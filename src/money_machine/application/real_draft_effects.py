@@ -53,19 +53,15 @@ class SqlDraftEffects:
         self.lease_owner = lease_owner
         self._active_key: ContextVar[str | None] = ContextVar("real_draft_effect_key", default=None)
 
-    async def _job(self, session: AsyncSession) -> Job:
+    async def _scoped_job(self, session: AsyncSession) -> Job:
+        """Lock static identity; accepted evidence remains recordable after cancellation."""
         job = await session.scalar(select(Job).where(Job.id == self.job_id).with_for_update())
-        now = datetime.now(UTC)
         if (
             job is None
             or job.object_id != self.authority.product_id
             or job.input.get("run_id") != self.authority.run_id
             or job.allowed_mode != "draft"
             or job.side_effect_class != SideEffectClass.EXTERNAL_WRITE.value
-            or job.status != "RUNNING"
-            or job.lease_owner != self.lease_owner
-            or job.lease_expires_at is None
-            or job.lease_expires_at <= now
         ):
             raise DraftRunRefused("durable_job_scope_or_lease")
         shop_name = await session.scalar(
@@ -75,6 +71,17 @@ class SqlDraftEffects:
         )
         if shop_name != self.authority.shop_name:
             raise DraftRunRefused("durable_workflow_shop_scope")
+        return job
+
+    async def _job(self, session: AsyncSession) -> Job:
+        job = await self._scoped_job(session)
+        if (
+            job.status != "RUNNING"
+            or job.lease_owner != self.lease_owner
+            or job.lease_expires_at is None
+            or job.lease_expires_at <= datetime.now(UTC)
+        ):
+            raise DraftRunRefused("durable_job_scope_or_lease")
         return job
 
     async def assert_lease(self) -> None:
@@ -186,10 +193,14 @@ class SqlDraftEffects:
                 # Preserve an accepted object's identity BEFORE any fallible QA/readback.
                 known_id = created_id
                 async with self.factory() as session, session.begin():
-                    await self._job(session)
+                    await self._scoped_job(session)
                     prior = await get_latest_effect_attempt(session, idempotency_key=key)
                     reservation = await get_idempotency_record(session, idempotency_key=key)
-                    if reservation is None:
+                    if (
+                        reservation is None
+                        or reservation.job_id != self.job_id
+                        or reservation.operation != operation
+                    ):
                         raise DraftEffectUncertain("accepted_effect_reservation_missing")
                     if reservation.completed_at is not None:
                         if (
@@ -210,6 +221,8 @@ class SqlDraftEffects:
                             provider_object_id=created_id,
                             reconciliation_attempt=prior.reconciliation_attempt + 1 if prior else 0,
                         )
+                async with self.factory() as session, session.begin():
+                    await self._job(session)
                 observed = await reconcile(created_id)
                 if observed is None or str(observed.get("id", "")) != created_id:
                     raise DraftEffectUncertain("fresh_provider_readback_missing")

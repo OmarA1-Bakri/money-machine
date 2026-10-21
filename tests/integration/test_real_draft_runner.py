@@ -409,3 +409,31 @@ def test_credential_requires_owned_private_regular_file(monkeypatch, tmp_path, c
     else:
         with pytest.raises(DraftRunRefused, match="private_credential_file_required"):
             module.read_private_credential(p)
+
+
+@pytest.mark.asyncio
+async def test_real_sdk_retains_paced_mock_transport_headers_and_closes_it():
+    import time
+
+    import httpx
+
+    from money_machine.cli.real_draft import private_notion_client
+
+    timestamps = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        assert request.headers["authorization"] == "Bearer test-only-token"
+        assert request.headers["Notion-Version"] == "2025-09-03"
+        timestamps.append(time.monotonic())
+        return httpx.Response(200, json={"object": "user", "id": str(uuid4())})
+
+    async with private_notion_client(
+        "test-only-token", transport=httpx.MockTransport(handle)
+    ) as sdk:
+        client = sdk.client
+        # Fail before sending anything if SDK context entry discarded our transport/hooks.
+        assert len(client.event_hooks["request"]) == 1
+        await sdk.users.me()
+        await sdk.users.me()
+        assert len(timestamps) == 2 and timestamps[1] - timestamps[0] >= 0.35
+    assert client.is_closed
