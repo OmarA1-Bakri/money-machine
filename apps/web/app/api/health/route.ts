@@ -10,5 +10,6 @@ export async function GET() {
     status: result.kind === "ready" ? "available" : "unavailable",
     externalActions: false,
     businessTransitions: false,
+    dependencies: [{ name: "API", state: result.kind === "ready" ? "verified" : "unverified" }],
   }, { status: result.kind === "ready" ? 200 : 503 });
 }

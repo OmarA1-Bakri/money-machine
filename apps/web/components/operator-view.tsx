@@ -1,3 +1,4 @@
+import { artifactPath, fetchRunSummary, type RunSummary } from "../lib/operator-summary";
 import { fetchOperatorView, operatorViews, type OperatorView } from "../lib/operator";
 
 const descriptions: Record<OperatorView, string> = {
@@ -24,6 +25,9 @@ export async function OperatorViewPage({ view, searchParams }: OperatorPageProps
   const requestedRun = Array.isArray(selected) ? selected[0] : selected;
   const result = await fetchOperatorView(view, requestedRun);
   const runId = result.kind === "ready" ? result.data.run_id : requestedRun;
+  const needsSummary = view === "now" || view === "pipeline" || view === "shop";
+  const summary = result.kind === "ready" && needsSummary && runId
+    ? await fetchRunSummary(runId) : null;
   const query = runId === undefined ? "" : "?" + new URLSearchParams({ run_id: runId }).toString();
   return (
     <div className="console-shell">
@@ -64,6 +68,12 @@ export async function OperatorViewPage({ view, searchParams }: OperatorPageProps
               <div><span className="label">Fixture run</span><code>{result.data.run_id}</code></div>
               <span className="read-label">Stored records · Read only</span>
             </section>
+            {summary?.kind === "unavailable" && (
+              <section className="notice proof-unavailable" role="status"><h2>Product proof unavailable</h2>
+                <p>The API could not verify this run’s completion or stored files. Reload to try again.</p>
+              </section>
+            )}
+            {summary?.kind === "ready" && <ProductProof summary={summary.data} view={view} />}
             <section aria-label={titles[view] + " records"} className="records">
               {result.data.items.length === 0 ? (
                 <div className="notice"><h2>No records returned</h2><p>This run has no stored records for this view.</p></div>
@@ -85,4 +95,37 @@ export async function OperatorViewPage({ view, searchParams }: OperatorPageProps
       </main>
     </div>
   );
+}
+
+function ProductProof({ summary, view }: { summary: RunSummary; view: OperatorView }) {
+  const showWorkflow = view === "now" || view === "pipeline";
+  const showArtifacts = view === "now" || view === "shop";
+  const template = summary.artifacts.find((artifact) => artifact.kind === "product_html" &&
+    artifact.media_type.split(";")[0]?.trim() === "text/html");
+  return <section className="product-proof" aria-label="Stored product proof">
+    <div className="proof-heading"><div><p className="eyebrow">Produced product · Fixture only</p>
+      <h2>{summary.product_title}</h2></div><span className="state">{summary.product_state}</span></div>
+    {showWorkflow && <>
+      <div className="completion-strip"><div><span className="label">Fixture workflow</span>
+        <strong>{summary.fixture_completed ? "Fixture completed" : "Fixture in progress"}</strong>
+        {summary.completed_at && <time dateTime={summary.completed_at}>{summary.completed_at}</time>}
+      </div><p>Fixture completion records the local proof. Job states below remain as stored; production is not commissioned.</p></div>
+      <ol className="job-list" aria-label="Stored workflow jobs">{summary.jobs.map((job) =>
+        <li key={job.id}><div><strong>{job.job_type}</strong><code>{job.id}</code></div>
+          <span className="state" data-state={job.status}>{job.status}</span></li>)}</ol>
+      {summary.jobs.length === 0 && <p className="record-detail">No jobs returned for this workflow.</p>}
+    </>}
+    {showArtifacts && <div className="artifact-section">
+      <div className="artifact-heading"><h3>Produced template</h3>
+        {template && <a className="file-link" href={artifactPath(summary.run_id, template.id)} target="_blank" rel="noreferrer">Open template ↗</a>}</div>
+      {template ? <iframe className="template-preview" title={summary.product_title + " — stored product preview"}
+        src={artifactPath(summary.run_id, template.id)} sandbox="" referrerPolicy="no-referrer" />
+        : <p className="record-detail">No stored HTML template returned for this run.</p>}
+      <ul className="artifact-list" aria-label="Stored product files">{summary.artifacts.map((artifact) =>
+        <li key={artifact.id}><a href={artifactPath(summary.run_id, artifact.id)} target="_blank" rel="noreferrer">
+          <span>{artifact.label}<small>{artifact.media_type} · {artifact.byte_size.toLocaleString("en-US")} bytes</small></span><span aria-hidden="true">↗</span>
+        </a></li>)}</ul>
+      {summary.artifacts.length === 0 && <p className="record-detail">No stored product files returned.</p>}
+    </div>}
+  </section>;
 }
