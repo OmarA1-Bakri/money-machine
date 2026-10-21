@@ -25,6 +25,32 @@ async def test_fixture_command_writes_verified_bundle(tmp_path: Path, test_datab
     assert completed.returncode == 0, completed.stdout + completed.stderr
     ids = json.loads((tmp_path / "test-fixture-bundle" / "ids.json").read_text())
     assert ids["product_id"] and ids["listing_version_id"]
+    from sqlalchemy import select
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from money_machine.persistence.tables import AgentRun, Job
+
+    engine = create_async_engine(test_database)
+    try:
+        async with engine.connect() as connection:
+            outputs = (
+                (
+                    await connection.execute(
+                        select(AgentRun.output)
+                        .join(Job, AgentRun.job_id == Job.id)
+                        .where(Job.workflow_id == ids["workflow_id"])
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert outputs
+            assert all(
+                output["execution_kind"] == "deterministic_fixture_library" for output in outputs
+            )
+            assert all(output["prompt_used"] is False for output in outputs)
+    finally:
+        await engine.dispose()
     bundle = tmp_path / "test-fixture-bundle" / "e2e"
     rows = [json.loads(line) for line in (bundle / "lineage.jsonl").read_text().splitlines()]
     assert len([row for row in rows if row["kind"] == "listing_image"]) == 10

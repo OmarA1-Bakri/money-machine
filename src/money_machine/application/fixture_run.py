@@ -456,7 +456,11 @@ class FixtureRun:
                         update={"spec_id": self.key("spec"), "product_id": self.key("product")}
                     )
                     write_json(spec_path, spec.model_dump(mode="json"))
-                    strategy_run.output = result.output
+                    strategy_run.output = {
+                        **result.output,
+                        "execution_kind": "deterministic_fixture_library",
+                        "prompt_used": False,
+                    }
                 product = await session.get(t.Product, spec.product_id)
                 if product is None:
                     session.add(
