@@ -34,7 +34,14 @@ from money_machine.assets.etsy_preflight import (
     PreflightClaim,
     run_etsy_preflight,
 )
-from money_machine.assets.fixture_bundle import render_bundle, sha, verify_bundle, write_json
+from money_machine.assets.fixture_bundle import (
+    load_verified_assets,
+    render_bundle,
+    sha,
+    validate_delivery_pdfs,
+    verify_bundle,
+    write_json,
+)
 from money_machine.domain.enums import AgentRunStatus, JobStatus, RetryClass, SideEffectClass
 from money_machine.domain.models.common import SuccessContract
 from money_machine.domain.models.jobs import JobEnvelope
@@ -74,11 +81,18 @@ class FixtureDraftTransport:
 class FixtureRun:
     def __init__(self, run_id: str, root: Path):
         self.run_id = run_id
-        self.directory = root / run_id / "e2e"
+        self.directory = root.resolve() / run_id / "e2e"
         self.directory.mkdir(parents=True, exist_ok=True)
         self.namespace = uuid5(NAMESPACE_URL, "money-machine:fixture:" + run_id)
         self.when = datetime(2026, 10, 20, 21, 14, 45, tzinfo=UTC)
-        self.receipts = []
+        receipts_path = self.directory / "receipts.jsonl"
+        self.receipts = (
+            [json.loads(line) for line in receipts_path.read_text().splitlines()]
+            if receipts_path.exists()
+            else []
+        )
+        if any(row.get("run_id") != run_id for row in self.receipts):
+            raise ValueError("fixture receipt run disagrees")
 
     def key(self, label: str):
         return uuid5(self.namespace, label)
@@ -96,6 +110,10 @@ class FixtureRun:
             output_id=str(output),
             job_id=str(job.id) if job else None,
         )
+        if row in self.receipts:
+            return
+        if any(item["stage"] == stage for item in self.receipts):
+            raise ValueError("fixture receipt stage disagrees")
         self.receipts.append(row)
         (self.directory / "receipts.jsonl").write_text(
             "".join(json.dumps(item, sort_keys=True) + "\n" for item in self.receipts)
@@ -404,6 +422,11 @@ class FixtureRun:
                     if product is None:
                         raise ValueError("persisted listing has no fixture product")
                     await self.bind_listing_artifacts(session, rows)
+                    workflow = await session.get(t.WorkflowRun, self.key("workflow"))
+                    if workflow is None:
+                        raise ValueError("persisted listing has no fixture workflow")
+                    assets = load_verified_assets(self.directory, rows)
+                    await self.validate_persisted_pdfs(session, existing)
                     strategy_run = await session.get(t.AgentRun, self.key("ProductStrategyJob:run"))
                     if (
                         strategy_run is None
@@ -423,8 +446,11 @@ class FixtureRun:
                         "execution_kind": "deterministic_fixture_library",
                         "prompt_used": False,
                     }
-                    await session.commit()
                     self.shop_id = product.shop_id
+                    if workflow.completed_at is None:
+                        await self.finish_delivery(session, workflow, existing, rows, assets)
+                    else:
+                        await session.commit()
                     ids = self.ids()
                     write_json(self.directory.parent / "ids.json", ids)
                     return ids
@@ -733,7 +759,6 @@ class FixtureRun:
             asset_job,
         )
         tags = tuple(tag.text for tag in copy.draft.tags)
-        description = "\n\n".join(section.text for section in copy.draft.description_sections)
         if len(tags) != 13 or any(len(tag) > 20 for tag in tags):
             raise ValueError("tag gate failed")
         preflight = run_etsy_preflight(
@@ -775,29 +800,28 @@ class FixtureRun:
                 sort_keys=True,
             ).encode()
         )
-        session.add(
-            t.ListingVersion(
-                id=self.key("listing-version"),
-                listing_id=listing.id,
-                product_id=spec.product_id,
-                spec_id=spec.spec_id,
-                producing_job_id=asset_job.id,
-                qa_result_id=self.key("qa"),
-                listing_version=1,
-                title=copy.draft.title.text,
-                description_sections=[
-                    section.model_dump(mode="json") for section in copy.draft.description_sections
-                ],
-                tags=list(tags),
-                currency=spec.currency,
-                price=spec.real_price,
-                anchor_price=spec.anchor_price,
-                quantity=request.rules.quantity,
-                rule_version=request.rules.rule_version,
-                package_sha256=package,
-                created_at=self.when,
-            )
+        version = t.ListingVersion(
+            id=self.key("listing-version"),
+            listing_id=listing.id,
+            product_id=spec.product_id,
+            spec_id=spec.spec_id,
+            producing_job_id=asset_job.id,
+            qa_result_id=self.key("qa"),
+            listing_version=1,
+            title=copy.draft.title.text,
+            description_sections=[
+                section.model_dump(mode="json") for section in copy.draft.description_sections
+            ],
+            tags=list(tags),
+            currency=spec.currency,
+            price=spec.real_price,
+            anchor_price=spec.anchor_price,
+            quantity=request.rules.quantity,
+            rule_version=request.rules.rule_version,
+            package_sha256=package,
+            created_at=self.when,
         )
+        session.add(version)
         await session.flush()
         await self.bind_listing_artifacts(session, rows)
         session.add(
@@ -818,11 +842,51 @@ class FixtureRun:
             self.key("preflight"),
             preflight_job,
         )
+        await self.finish_delivery(session, workflow, version, rows, assets)
+
+    async def validate_persisted_pdfs(self, session, version):
+        facts = (
+            await session.scalars(
+                select(t.ProductFact).where(
+                    t.ProductFact.spec_id == version.spec_id,
+                    t.ProductFact.fact_key == "secret_links",
+                )
+            )
+        ).all()
+        variants = (
+            await session.scalars(
+                select(t.ProductVariant).where(t.ProductVariant.spec_id == version.spec_id)
+            )
+        ).all()
+        if len(facts) != 1 or not variants:
+            raise ValueError("fixture PDF checked facts missing")
+        expected = (facts[0].fact_value["value"],) * (len(variants) + 1)
+        validate_delivery_pdfs(self.directory, expected)
+
+    async def finish_delivery(self, session, workflow, version, rows, assets):
+        await session.flush()
+        listing = await session.get(t.EtsyListing, version.listing_id)
+        spec = await session.get(t.ProductSpec, version.spec_id)
+        qa = await session.get(t.QaResult, version.qa_result_id)
+        preflight = await session.get(t.PreflightResult, self.key("preflight"))
+        if (
+            listing is None
+            or spec is None
+            or qa is None
+            or qa.outcome != "PASS"
+            or preflight is None
+            or preflight.outcome != "PASS"
+            or preflight.listing_package_sha256 != version.package_sha256
+        ):
+            raise ValueError("fixture delivery persisted gates missing")
+        await self.validate_persisted_pdfs(session, version)
+        tags = tuple(version.tags)
+        description = "\n\n".join(section["text"] for section in version.description_sections)
         numeric = int(self.namespace.hex[:13], 16) + 1
         (self.directory / "draft-ledger").mkdir(exist_ok=True)
         transport = FixtureDraftTransport(self.directory, numeric)
         evidence = DraftEvidence(
-            product_id=spec.product_id,
+            product_id=version.product_id,
             spec_version=spec.version,
             shop_id=numeric,
             product_qa="passed",
@@ -830,10 +894,10 @@ class FixtureRun:
             assets=assets,
             pdf_roles=("readme", "free_gift"),
             links_passed=True,
-            title=copy.draft.title.text,
+            title=version.title,
             description=description,
-            price=str(spec.real_price),
-            quantity=request.rules.quantity,
+            price=str(version.price),
+            quantity=version.quantity,
             who_made="i_did",
             when_made="2020_2026",
             taxonomy_id=2078,
@@ -855,10 +919,12 @@ class FixtureRun:
         )
         negative = run_etsy_preflight(
             EtsyPreflightDraft(
-                quantity=request.rules.quantity,
+                quantity=version.quantity,
                 tags=tags,
-                images=tuple(str(index) for index in range(10)),
-                videos=1,
+                images=tuple(
+                    row["relative_path"] for row in rows if row["kind"] == "listing_image"
+                ),
+                videos=len([row for row in rows if row["kind"] == "walkthrough"]),
                 claims=(PreflightClaim("Unsupported fixture claim", None),),
             )
         )
@@ -870,65 +936,87 @@ class FixtureRun:
             "mode": "fixture",
             "reason": "Expected fixture negative: unsupported claim has no fact reference",
         }
-        session.add(
-            t.Incident(
-                id=self.key("incident"),
-                shop_id=shop.id,
-                incident_type="LISTING_DEFECT",
-                affected_object_type="listing_versions",
-                affected_object_id=self.key("listing-version"),
-                workflow_id=workflow.id,
-                listing_version_id=self.key("listing-version"),
-                opened_by_job_id=blocked.id,
-                safe_detail={"reason": blocked.input["reason"]},
-                opened_at=self.when,
+        if await session.get(t.Incident, self.key("incident")) is None:
+            session.add(
+                t.Incident(
+                    id=self.key("incident"),
+                    shop_id=workflow.shop_id,
+                    incident_type="LISTING_DEFECT",
+                    affected_object_type="listing_versions",
+                    affected_object_id=self.key("listing-version"),
+                    workflow_id=workflow.id,
+                    listing_version_id=self.key("listing-version"),
+                    opened_by_job_id=blocked.id,
+                    safe_detail={"reason": blocked.input["reason"]},
+                    opened_at=self.when,
+                )
             )
-        )
-        session.add(
-            t.Decision(
-                id=self.key("decision"),
-                workflow_id=workflow.id,
-                job_id=blocked.id,
-                decision_type="EXPECTED_FIXTURE_NEGATIVE",
-                branch_outcome="FAIL",
-                product_id=spec.product_id,
-                listing_id=listing.id,
-                rule_version=request.rules.rule_version,
-                explanation=blocked.input["reason"],
-                decided_at=self.when,
+        if await session.get(t.Decision, self.key("decision")) is None:
+            session.add(
+                t.Decision(
+                    id=self.key("decision"),
+                    workflow_id=workflow.id,
+                    job_id=blocked.id,
+                    decision_type="EXPECTED_FIXTURE_NEGATIVE",
+                    branch_outcome="FAIL",
+                    product_id=version.product_id,
+                    listing_id=listing.id,
+                    rule_version=version.rule_version,
+                    explanation=blocked.input["reason"],
+                    decided_at=self.when,
+                )
             )
-        )
         await session.flush()
         proof = next(row for row in rows if row["kind"] == "product_structure")
-        session.add(
-            t.DecisionEvidence(
-                decision_id=self.key("decision"),
-                evidence_type="fixture_negative",
-                source_reference=str(self.directory / "receipts.jsonl"),
-                artifact_id=UUID(proof["artifact_id"]),
-                observed_at=self.when,
+        prior_evidence = (
+            await session.scalars(
+                select(t.DecisionEvidence).where(
+                    t.DecisionEvidence.decision_id == self.key("decision"),
+                    t.DecisionEvidence.evidence_type == "fixture_negative",
+                )
             )
-        )
-        session.add(
-            t.IntegrationAccount(
-                id=self.key("integration"),
-                shop_id=shop.id,
-                provider="fixture",
-                capability_channel="INTERNAL_RENDERER",
-                connection_state="UNCONNECTED",
-                credential_present=False,
-                blocker_code="FIXTURE_ONLY",
-                safe_detail={"mode": "fixture", "reason": "No live provider connection"},
-                checked_at=self.when,
-                created_at=self.when,
+        ).all()
+        if len(prior_evidence) > 1 or (
+            prior_evidence
+            and (
+                prior_evidence[0].artifact_id != UUID(proof["artifact_id"])
+                or prior_evidence[0].source_reference != str(self.directory / "receipts.jsonl")
             )
-        )
+        ):
+            raise ValueError("fixture negative evidence disagrees")
+        if not prior_evidence:
+            session.add(
+                t.DecisionEvidence(
+                    id=self.key("decision-evidence"),
+                    decision_id=self.key("decision"),
+                    evidence_type="fixture_negative",
+                    source_reference=str(self.directory / "receipts.jsonl"),
+                    artifact_id=UUID(proof["artifact_id"]),
+                    observed_at=self.when,
+                )
+            )
+        if await session.get(t.IntegrationAccount, self.key("integration")) is None:
+            session.add(
+                t.IntegrationAccount(
+                    id=self.key("integration"),
+                    shop_id=workflow.shop_id,
+                    provider="fixture",
+                    capability_channel="INTERNAL_RENDERER",
+                    connection_state="UNCONNECTED",
+                    credential_present=False,
+                    blocker_code="FIXTURE_ONLY",
+                    safe_detail={"mode": "fixture", "reason": "No live provider connection"},
+                    checked_at=self.when,
+                    created_at=self.when,
+                )
+            )
         self.receipt(
             "expected_negative",
             "money_machine.assets.etsy_preflight.run_etsy_preflight",
             self.key("decision"),
             blocked,
         )
+        workflow.completed_at = datetime.now(UTC)
         await session.commit()
         write_json(self.directory.parent / "ids.json", self.ids())
 
