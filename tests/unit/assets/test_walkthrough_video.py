@@ -488,6 +488,8 @@ def _lineage_trailer(scene: _Scene, screenshots: tuple[str, ...], merchandising:
 # linux x86_64, imageio-ffmpeg 0.6.0, ffmpeg-linux-x86_64-v7.0.2.
 # Pinned product, spec, and workflow ids. Not other wheels or other ids.
 _GOLDEN_LINUX_X86_64 = "6318854297cd5d316fdf4c579a73f188ec5f1e2089745534aa9d4ca6245fe248"
+# imageio-ffmpeg 0.6.0's linux-aarch64-v7.0.2 wheel produces identical bitexact bytes.
+_GOLDEN_LINUX_AARCH64 = "6318854297cd5d316fdf4c579a73f188ec5f1e2089745534aa9d4ca6245fe248"
 _PINNED_PRODUCT = UUID("00000000-0000-4000-8000-0000000000a1")
 _PINNED_SPEC = UUID("00000000-0000-4000-8000-0000000000a2")
 _PINNED_WORKFLOW = UUID("00000000-0000-4000-8000-0000000000a3")
@@ -780,6 +782,12 @@ def _linux_x86_64_wheel() -> bool:
     return "linux-x86_64" in _ffmpeg()
 
 
+def _linux_aarch64_wheel() -> bool:
+    if sys.platform != "linux" or platform.machine() != "aarch64":
+        return False
+    return "linux-aarch64" in _ffmpeg()
+
+
 def _pinned_walk(scene: _Scene) -> RenderedWalkthrough:
     spec = create_fixture_product_spec(
         product_id=_PINNED_PRODUCT,
@@ -791,14 +799,14 @@ def _pinned_walk(scene: _Scene) -> RenderedWalkthrough:
 
 
 def test_linux_x86_64_hash_is_pinned(scene: _Scene) -> None:
-    if not _linux_x86_64_wheel():
-        pytest.skip("golden hash is pinned for the linux x86_64 wheel")
-    assert hashlib.sha256(_pinned_walk(scene).video).hexdigest() == _GOLDEN_LINUX_X86_64
+    if _linux_x86_64_wheel():
+        assert hashlib.sha256(_pinned_walk(scene).video).hexdigest() == _GOLDEN_LINUX_X86_64
+    else:
+        assert _linux_aarch64_wheel(), "selected encoder has no registered golden hash"
+        assert hashlib.sha256(_pinned_walk(scene).video).hexdigest() == _GOLDEN_LINUX_AARCH64
 
 
 def test_cross_process_hash_matches_the_pin() -> None:
-    if not _linux_x86_64_wheel():
-        pytest.skip("golden hash is pinned for the linux x86_64 wheel")
     env = dict(os.environ)
     env["PYTHONHASHSEED"] = "7"
     env["TZ"] = "Pacific/Kiritimati"
@@ -843,7 +851,11 @@ def test_cross_process_hash_matches_the_pin() -> None:
         cwd=Path(__file__).resolve().parents[3],
     )
     assert completed.returncode == 0, completed.stderr.decode("utf-8", errors="replace")
-    assert completed.stdout.decode().strip() == _GOLDEN_LINUX_X86_64
+    if _linux_x86_64_wheel():
+        assert completed.stdout.decode().strip() == _GOLDEN_LINUX_X86_64
+    else:
+        assert _linux_aarch64_wheel(), "selected encoder has no registered golden hash"
+        assert completed.stdout.decode().strip() == _GOLDEN_LINUX_AARCH64
 
 
 def test_empty_access_caption_is_refused() -> None:
