@@ -4,7 +4,7 @@ import "./styles.css";
 
 export const metadata: Metadata = {
   title: "Money Machine | Operator Console",
-  description: "Fail-closed bootstrap status for the Money Machine services.",
+  description: "Read-only product operations from persisted fixture records.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
