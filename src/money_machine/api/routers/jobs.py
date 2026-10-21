@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from money_machine.api.dependencies import SessionDependency
+from money_machine.api.dependencies import SessionDependency, require_operator
 from money_machine.api.schemas import JobPage, JobSummary
 from money_machine.persistence.repositories.jobs import JobRepository
 from money_machine.persistence.tables import Job
@@ -54,7 +54,7 @@ async def get_job(job_id: UUID, session: SessionDependency) -> JobSummary:
     return _summary(row)
 
 
-@router.post("/{job_id}/retry", response_model=JobSummary)
+@router.post("/{job_id}/retry", dependencies=[Depends(require_operator)], response_model=JobSummary)
 async def retry_job(job_id: UUID, session: SessionDependency) -> JobSummary:
     """Retry a failed job."""
     from datetime import UTC, datetime
@@ -77,7 +77,11 @@ async def retry_job(job_id: UUID, session: SessionDependency) -> JobSummary:
         ) from error
 
 
-@router.post("/{job_id}/reconcile", response_model=dict[str, str | None])
+@router.post(
+    "/{job_id}/reconcile",
+    dependencies=[Depends(require_operator)],
+    response_model=dict[str, str | None],
+)
 async def reconcile_job(
     job_id: UUID,
     session: SessionDependency,

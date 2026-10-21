@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from money_machine.api.dependencies import SessionDependency
+from money_machine.api.dependencies import SessionDependency, require_operator
 from money_machine.api.schemas import WorkflowPage, WorkflowSummary
 from money_machine.persistence.repositories.workflows import WorkflowRunRepository
 from money_machine.persistence.tables import WorkflowRun
@@ -51,7 +51,12 @@ async def get_workflow(workflow_id: UUID, session: SessionDependency) -> Workflo
     return _summary(row)
 
 
-@router.post("", response_model=WorkflowSummary, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    dependencies=[Depends(require_operator)],
+    response_model=WorkflowSummary,
+    status_code=status.HTTP_201_CREATED,
+)
 async def start_workflow(
     session: SessionDependency,
     workflow_type: str = Query(..., description="Workflow template name"),
@@ -74,7 +79,11 @@ async def start_workflow(
     return _summary(workflow)
 
 
-@router.post("/{workflow_id}/cancel", response_model=dict[str, str | int | None])
+@router.post(
+    "/{workflow_id}/cancel",
+    dependencies=[Depends(require_operator)],
+    response_model=dict[str, str | int | None],
+)
 async def cancel_workflow(
     workflow_id: UUID, session: SessionDependency
 ) -> dict[str, str | int | None]:
