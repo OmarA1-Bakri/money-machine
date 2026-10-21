@@ -1005,3 +1005,8 @@ W10 is a control-only flip with no feature code or tests. Updates `IMPLEMENTATIO
 - `evidence_closure_commit_recorded`: TRUE (W10)
 
 **Session 04 status:** COMPLETE. All eight evidence keys TRUE. `completed_sessions` = `[0, 1, 2, 3, 4]`; `next_session` = 5. W1–W9, Phase A, Lane C delivered agent runtime and roster. Exit 78: worker lifted conditionally (D-0028 gates), scheduler held (W9 out of scope). No S05 features, no scheduler Exit 78 lift, no live production/Notion/Etsy.
+
+
+##2026-10-22 One real draft wave1: recovery and authority
+
+RUN_ID20261021T184946Z. Root integrated93focused testsPASS4.26s, Ruff0, Pyright0. Independent UID1004reviews PASS: control-recovery18tests +beforeSHA mutantRED/restoredGREEN; real-draft-authority ACTIVE mutantRED/restored18GREEN. Protected verdicts /srv/work/reviews/20261021T184946Z/. Logs /srv/work/evidence/20261021T184946Z/control-and-authority-*. No provider mutation or actual recovery application in this wave; canonical state unchanged.

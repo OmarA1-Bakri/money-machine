@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 
+from money_machine.control.recovery import recover_session_seven
 from money_machine.control.state import (
     ControlStateError,
     apply_activation_transition,
@@ -44,6 +45,16 @@ def _parser() -> argparse.ArgumentParser:
             required=True,
             help=candidate_help,
         )
+    recovery = subparsers.add_parser(
+        "recover-session-seven", help="preview audited D-0039 recovery"
+    )
+    recovery.add_argument(
+        "--state", type=Path, default=Path("docs/control/IMPLEMENTATION_STATE.json")
+    )
+    recovery.add_argument("--repo-root", type=Path, default=Path.cwd())
+    recovery.add_argument("--expected-before-sha")
+    recovery.add_argument("--expected-head")
+    recovery.add_argument("--apply", action="store_true", help="apply the hash-bound recovery")
     return parser
 
 
@@ -51,6 +62,20 @@ def main(argv: list[str] | None = None) -> int:
     """Run the control-state command."""
     arguments = _parser().parse_args(argv)
     command: str = arguments.command
+    if command == "recover-session-seven":
+        try:
+            result = recover_session_seven(
+                arguments.state,
+                repo_root=arguments.repo_root,
+                expected_before_sha=arguments.expected_before_sha,
+                expected_head=arguments.expected_head,
+                apply=arguments.apply,
+            )
+        except ControlStateError as error:
+            print(f"control state transition rejected: {error}", file=sys.stderr)
+            return 2
+        print(json.dumps(result, sort_keys=True))
+        return 0
     if command not in _COMMANDS:
         raise AssertionError("argparse accepted an unknown command")
     transition = _COMMANDS[command][0]

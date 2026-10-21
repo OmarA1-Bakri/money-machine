@@ -6848,3 +6848,8 @@ Parallel control lane only (`docs/control/*`). No feature code, no scheduler Exi
 ##2026-10-22 One real draft: scope and integrity gate
 
 D0039 records new operator authority. Addendum: docs/control/reviews/2026-10-22-one-real-draft-prompt-integrity.md. Three independent prompt reviews resolved by bounded instructions; prompt-pack8testsPASS. Implementation not yet complete; no state evidence/commissioning assertion.
+
+
+##2026-10-22 One real draft wave1 implemented
+
+Reviewed dry-run-default recover-session-seven CLI with durable exactlegacy-state intent/replay. Immutable one-product authority and read-only preflight consumer refuse publication/spend/fixture readback. Root93focused tests and independent mutation reviews pass. Provider adapters must still integrate authority. Actual relocation/reopen not applied; original control JSON unchanged. Etsy QuietlyBuiltStudio verified via signed-in browser; supplied Notion credential verified against owner workspace (secret outsideGit). No live product/draft delivery claimed.

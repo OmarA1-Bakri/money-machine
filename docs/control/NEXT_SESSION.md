@@ -233,3 +233,8 @@ Session 03 closed 2026-09-19 after Verifier FINAL PASS (#17). Gap-close implemen
 - The shared development database `money_machine` holds another branch's schema at its own Alembic revision, and the instance carries roughly four hundred leftover test databases from other branches. Nothing on this branch touches them: database-backed tests create and drop their own throwaway databases, and `MONEY_MACHINE_TEST_ADMIN_DATABASE_URL` selects the maintenance connection.
 - `pnpm install` needs `--package-import-method copy` on this filesystem: the hardlink rename fails on the 9p `/mnt/d` mount.
 - Host port 3000 is occupied by an unrelated development server; set `WEB_PORT` to verify the web container.
+
+
+##2026-10-22 Active one-real-product draft task
+
+User authorized one real product through verified Etsy draft, publishing/spend disabled. Active branch run/real-draft/control-and-provider-path, RUN_ID20261021T184946Z, metadata /srv/work/state/integrator.json. D0039+corrective addendum govern. Wave1control recovery/policy implemented/reviewed; actualcontrol transition and realprovider delivery pending. Continue real Notion adapter and durable workflow integration. No fullSession15 activation/commissioning/release claim.
