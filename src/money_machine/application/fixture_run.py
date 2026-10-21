@@ -36,6 +36,7 @@ from money_machine.assets.etsy_preflight import (
 )
 from money_machine.assets.fixture_bundle import (
     load_verified_assets,
+    readme_links_for,
     render_bundle,
     sha,
     validate_delivery_pdfs,
@@ -860,7 +861,7 @@ class FixtureRun:
         ).all()
         if len(facts) != 1 or not variants:
             raise ValueError("fixture PDF checked facts missing")
-        expected = (facts[0].fact_value["value"],) * (len(variants) + 1)
+        expected = readme_links_for(facts[0].fact_value["value"], len(variants))
         validate_delivery_pdfs(self.directory, expected)
 
     async def finish_delivery(self, session, workflow, version, rows, assets):
