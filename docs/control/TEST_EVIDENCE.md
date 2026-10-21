@@ -1010,3 +1010,8 @@ W10 is a control-only flip with no feature code or tests. Updates `IMPLEMENTATIO
 ## 2026-10-22 One real draft wave1: recovery and authority
 
 RUN_ID20261021T184946Z. Root integrated93focused testsPASS4.26s, Ruff0, Pyright0. Independent UID1004reviews PASS: control-recovery18tests +beforeSHA mutantRED/restoredGREEN; real-draft-authority ACTIVE mutantRED/restored18GREEN. Protected verdicts /srv/work/reviews/20261021T184946Z/. Logs /srv/work/evidence/20261021T184946Z/control-and-authority-*. No provider mutation or actual recovery application in this wave; canonical state unchanged.
+
+
+## Private Notion builder integration wave (RUN_ID20261021T184946Z)
+
+Final affected regression:167 passed,0 skipped,80.71s against real isolated PG16 databases on55432; full repository Ruff/format/Pyright0errors. Independent protected SQL/adapter and finite-builder/runner reviews approved; accepted-effect/lost-response, stale lease, concurrent retry, public ancestry, changed run/product/spec, dirty source and incorrect calendar/schema negative probes retained outside Git. Real Postgres RED exposed invalid AgentRun status, corrected to SUCCESS; its replay test preserves single lineage and zero paid calls. An earlier affected run loaded the pre-fix module while new schema RED cases were added (2 failures159passes); that receipt is retained and superseded by the frozen167-pass run. No provider creation/control application is claimed by these tests. Logs/verdicts: /srv/work/evidence/20261021T184946Z/provider-wave-* and /srv/work/reviews/20261021T184946Z/.

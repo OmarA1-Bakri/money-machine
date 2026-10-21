@@ -238,3 +238,8 @@ Session 03 closed 2026-09-19 after Verifier FINAL PASS (#17). Gap-close implemen
 ##2026-10-22 Active one-real-product draft task
 
 User authorized one real product through verified Etsy draft, publishing/spend disabled. Active branch run/real-draft/control-and-provider-path, RUN_ID20261021T184946Z, metadata /srv/work/state/integrator.json. D0039+corrective addendum govern. Wave1control recovery/policy implemented/reviewed; actualcontrol transition and realprovider delivery pending. Continue real Notion adapter and durable workflow integration. No fullSession15 activation/commissioning/release claim.
+
+
+## Current one-product build handoff (RUN_ID20261021T184946Z)
+
+Resume metadata /srv/work/state/integrator.json and real Hetzner /srv/work/money-machine; preserve accepted fixture workflow20261020T211445Z and unrelated services. After the provider integration wave passes independent review/CI and merges, apply only recover-session-seven on clean trunk with exact before SHA and HEAD, preserve its durable receipt and commit the generated transition before launching the guarded real builder. Operator-owned /srv/work/state/real-draft-approval.json binds the existing active RUN_ID/product/spec digest; credentials remain private outside Git. Verify actual Notion objects, then native media/PDF bytes and one fresh Etsy DRAFT. Publishing/spend/recurring activation remain disabled; no full-commissioning claim.

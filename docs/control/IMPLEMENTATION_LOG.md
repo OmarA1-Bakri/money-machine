@@ -6853,3 +6853,8 @@ D0039 records new operator authority. Addendum: docs/control/reviews/2026-10-22-
 ## 2026-10-22 One real draft wave1 implemented
 
 Reviewed dry-run-default recover-session-seven CLI with durable exactlegacy-state intent/replay. Immutable one-product authority and read-only preflight consumer refuse publication/spend/fixture readback. Root93focused tests and independent mutation reviews pass. Provider adapters must still integrate authority. Actual relocation/reopen not applied; original control JSON unchanged. Etsy QuietlyBuiltStudio verified via signed-in browser; supplied Notion credential verified against owner workspace (secret outsideGit). No live product/draft delivery claimed.
+
+
+## One-product private build integration checkpoint (RUN_ID20261021T184946Z)
+
+PR124 merged45e1206448423a508b6c424678429a33f9c32891. This wave integrates real Notion private adapters, the existing SQL effect ledger, a finite three-variant builder and an explicit operator-assisted runner. The runner binds clean reviewed source and one approved run/product/spec, retains per-write reconciliation and lease guards, and does not activate the programme. Actual control recovery and provider creation remain pending at this checkpoint. Historical Session07 close is preserved; compatibility checks accept only exact legacy64 or the authorized recovery65 with all12 evidence keys false. No generated evidence, credentials or source PDF are committed.
