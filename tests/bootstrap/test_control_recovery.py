@@ -34,7 +34,10 @@ def repo(tmp_path: Path) -> Path:
     )
     git(target, "sparse-checkout", "init", "--cone")
     git(target, "sparse-checkout", "set", "docs/control")
-    git(target, "checkout", "-b", "build/full-automation", "HEAD")
+    if git(target, "branch", "--show-current") == "build/full-automation":
+        git(target, "checkout", "build/full-automation")
+    else:
+        git(target, "checkout", "-b", "build/full-automation", "HEAD")
     git(target, "config", "user.name", "Recovery Test")
     git(target, "config", "user.email", "recovery@example.invalid")
     legacy = subprocess.run(
