@@ -51,12 +51,18 @@ def verify_bundle(directory: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def expected_readme_links(request) -> tuple[str, ...]:
-    facts = [fact.fact_value for fact in request.facts if fact.fact_key == "secret_links"]
-    if len(facts) != 1 or not request.variants:
+def readme_links_for(secret_link: str, variant_count: int) -> tuple[str, ...]:
+    if variant_count < 1:
         raise ValueError("fixture PDF expected links missing")
     # Current templates link every variant and the final duplication instruction.
-    return (facts[0],) * (len(request.variants) + 1)
+    return (secret_link,) * (variant_count + 1)
+
+
+def expected_readme_links(request) -> tuple[str, ...]:
+    facts = [fact.fact_value for fact in request.facts if fact.fact_key == "secret_links"]
+    if len(facts) != 1:
+        raise ValueError("fixture PDF expected links missing")
+    return readme_links_for(facts[0], len(request.variants))
 
 
 def admit_delivery_pdf(pdf: bytes, expected: tuple[str, ...]) -> None:
