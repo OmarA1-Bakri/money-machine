@@ -456,3 +456,17 @@ A migration that rewrote `dedupe_key` was the other option. It was not taken. Th
 ### Consequences
 
 A seeded legacy row beside a `PENDING` `DraftListingJob` stays one event, keeps the legacy key, does not gain the product key, and the job moves to `READY`. The global key for every other event is unchanged. No migration is added. Exit 78 stays HELD. Session 08 stays inactive.
+
+## D-0036 — One-run fixture recovery under the approved corrective plan
+
+Date: 21 October 2026 (Asia/Bangkok). RUN_ID: `20261020T211445Z`.
+
+Authority: Omar explicitly approved: “Approved—the recovery plan and corrective addendum. Get the three lanes going on Hetzner and carry it through implementation, review, and verification. Don’t ask again for actions already covered by the plan.” The approved plan SHA-256 is `6a1674dcdb5084c2d17f70191603c414cc60f39cb4778a9350862fb4c4bf4b8d`; the full plan and authorization receipt remain outside Git at `/srv/work/evidence/20261020T211445Z/`.
+
+Retain the three-writer cap and one independent review per wave. No six-lane override is activated. Keep the import-only repair as an isolated commit. Diagnose baseline blockers in separate prerequisite commits before the first green trunk merge; that merge is BASE_SHA. The baseline is 5,240 passed, one failed (the sixth control-directory file), and three platform skips, with PostgreSQL available. Preserve the exact-five continuity assertion by relocating the generated session index and updating its references. Preserve existing assertions while extending real platform coverage; never deselect or weaken tests to manufacture zero skips.
+
+The fixture deliverable is an actual rendered product/listing bundle and PostgreSQL-backed seven-route console joined by one RUN_ID and product/listing identifiers. Reuse existing UnitOfWork, event/successor machinery and draft functions; do not add a shadow orchestrator. Permit a loopback API on 8100, console on 3100 and disposable PostgreSQL on 55432. Existing mutating API routes require operator authentication; no new mutating endpoint is authorized. Record visual capture metadata in hashed sidecars with recomputed image hashes. Prove process-tree egress isolation, including renderer children, or report that gate unproven.
+
+D-0032 remains binding. Do not hand-edit the state JSON, identity, revision or twelve false Session 07 keys. Fixture functionality is not live Notion/Etsy commissioning. Capture actual control CLI refusals and unchanged hashes; F1.4 remains unproven without valid earned transitions. Review process identities and filesystem access must be proved; root administrative access remains an explicitly stated limitation, not a claimed adversarial boundary.
+
+Allow at most two green PR merges from `run/integration` into `build/full-automation`: prerequisite and final delivery. Preserve PRs #68, #120 and #121 and all Windows-only work. Do not publish, spend, contact customers, deploy production, mutate live Notion/Etsy, edit immutable sources or prompt pack, force-push, or activate sessions 09–15. Keep all 120 requirements in the final distance ledger. The research defaults of 365 days/400 sales are an unsourced configurable policy; the playbook's six-month/800-sales example does not establish replacement universal thresholds.
