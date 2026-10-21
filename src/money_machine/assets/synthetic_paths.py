@@ -72,7 +72,6 @@ from money_machine.integrations.etsy.draft_client import (
     FixtureCall,
 )
 
-
 MAIN_STEPS: tuple[str, ...] = (
     "research",
     "shortlist",
