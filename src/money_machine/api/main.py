@@ -11,6 +11,8 @@ from money_machine.api.dependencies import ApplicationState
 from money_machine.api.routers.health import router as health_router
 from money_machine.api.routers.integrations import router as integrations_router
 from money_machine.api.routers.jobs import router as jobs_router
+from money_machine.api.routers.operator import router as operator_router
+from money_machine.api.routers.operator_artifacts import router as operator_artifacts_router
 from money_machine.api.routers.workflows import router as workflows_router
 from money_machine.version import __version__
 
@@ -39,6 +41,8 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     application.include_router(health_router)
+    application.include_router(operator_artifacts_router)
+    application.include_router(operator_router)
     application.include_router(workflows_router)
     application.include_router(jobs_router)
     application.include_router(integrations_router)

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import os
+import secrets
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from money_machine.config.runtime import RuntimeSettings, load_runtime_settings
@@ -55,3 +58,21 @@ async def database_session(
 StateDependency = Annotated[ApplicationState, Depends(application_state)]
 SettingsDependency = Annotated[RuntimeSettings, Depends(settings)]
 SessionDependency = Annotated[AsyncSession, Depends(database_session)]
+
+
+_bearer = HTTPBearer(auto_error=False)
+
+
+def require_operator(
+    credential: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> None:
+    """Fail closed unless an explicit server-only operator credential matches."""
+    expected = os.environ.get("MONEY_MACHINE_OPERATOR_TOKEN")
+    if (
+        not expected
+        or credential is None
+        or not secrets.compare_digest(
+            credential.credentials.encode("utf-8"), expected.encode("utf-8")
+        )
+    ):
+        raise HTTPException(status_code=401, detail="operator authorization required")

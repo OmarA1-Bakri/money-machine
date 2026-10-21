@@ -1,5 +1,11 @@
 # Next Session
 
+## 2026-10-21 — Recovery pointer and remaining control blocker
+
+RUN_ID: `20261020T211445Z`. Resume recovery from `/srv/work/state/integrator.json` and the approved `/srv/work/evidence/20261020T211445Z/PLAN.md`; do not restart from the stale Windows checkout. BASE_SHA is `5b95386c5e42ec849d452691740b0179e5d9284d`. Final acceptance and PR status require current receipts, not this narrative.
+
+The formal pointer remains Session 07, revision 64, twelve false keys, next Session 08. `apply-completion` and `activate` both refused (D-0037); F1.4 is unproven. Earn substantive Session 07 evidence and resolve the immutable recorded-host/control-contract issues before any activation. Sessions 09–15 and live commissioning remain distance-ledger work. The 365-day/400-sales research defaults remain an explicitly unsourced policy, not a playbook rule.
+
 ## Session evidence is indexed, the pointer is still Session 07 (2026-10-16)
 
 `docs/SESSION_EVIDENCE.md` names the completion commit and every evidence key for sessions 00-07, and the missing contract for sessions 08-15. Sessions 00-06 are true. Session 07's twelve keys are false. Sessions 08-15 are not activated. `current_session` stays 7. `head_sha` stays `b782751fdb1b255c436ff7f6fa655e6d783b1e8c`. The next honest step for the pointer is still Session 07 evidence that D-0032 does not yet record, then activation of Session 08.
