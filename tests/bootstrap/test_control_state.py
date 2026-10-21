@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import copy
+import hashlib
 import inspect
 import json
 import logging
@@ -80,6 +81,23 @@ Mutation = Callable[[ControlState], None]
 
 def load_state(path: Path = STATE_PATH) -> ControlState:
     return cast(ControlState, json.loads(path.read_text(encoding="utf-8")))
+
+
+def historical_session_seven_state() -> ControlState:
+    """The immutable operator-close fixture, never an alternate production path."""
+    raw = subprocess.check_output(
+        [
+            "git",
+            "show",
+            "18edb5c508b46aabe95cb968a2235a07086a5aff:docs/control/IMPLEMENTATION_STATE.json",
+        ],
+        cwd=ROOT,
+    )
+    assert (
+        hashlib.sha256(raw).hexdigest()
+        == "fc0fb4143c8fdfaaa81abfb9cca32687d42eb92e8979cfa0c9a911460886a624"
+    )
+    return cast(ControlState, json.loads(raw))
 
 
 def load_document(path: Path) -> dict[str, object]:
@@ -348,7 +366,15 @@ def test_checked_in_state_is_a_valid_session_continuity_shape() -> None:
             assert all(value is False for value in evidence.values())
         else:
             assert all(evidence.values())
-    assert state["transition_contract"]["completion_requires_next_session"] == state["next_session"]
+    if session == 7 and state["session_status"] == "incomplete":
+        assert state["state_revision"] == 65
+        assert state["transition_contract"]["completion_requires_next_session"] == 8
+        assert state["next_session"] == 7
+    else:
+        assert (
+            state["transition_contract"]["completion_requires_next_session"]
+            == state["next_session"]
+        )
     if state["session_status"] == "complete" and (session >= 6 or state["state_revision"] >= 48):
         assert 6 in state["completed_sessions"]
     if session >= 0 and state["bootstrap_commit_sha"] is not None:
@@ -1514,7 +1540,7 @@ def session_eight_activation_paths(
     repo = tmp_path / "repository"
     state_path = repo / "docs" / "control" / "IMPLEMENTATION_STATE.json"
     state_path.parent.mkdir(parents=True)
-    state = copy.deepcopy(load_state())
+    state = copy.deepcopy(historical_session_seven_state())
     assert state["current_session"] == 7
     assert state["session_status"] == "complete"
     assert state["next_session"] == 8
@@ -1560,7 +1586,10 @@ def test_session_eight_activation_rejects_false_session_seven_evidence(tmp_path:
     assert state_path.read_bytes() == original
     assert STATE_PATH.read_bytes() == checked_in
     assert load_state()["current_session"] == 7
-    assert load_state()["state_revision"] == 64
+    if load_state()["session_status"] == "complete":
+        assert load_state()["state_revision"] == 64
+    else:
+        assert load_state()["state_revision"] == 65
 
 
 def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: Path) -> None:
@@ -1584,12 +1613,16 @@ def test_session_eight_activation_accepts_true_session_seven_evidence(tmp_path: 
     assert STATE_PATH.read_bytes() == checked_in
     live = load_state()
     assert live["current_session"] == 7
-    assert live["next_session"] == 8
+    if live["session_status"] == "complete":
+        assert live["next_session"] == 8
+    else:
+        assert live["state_revision"] == 65
+        assert live["next_session"] == 7
     assert all(value is False for value in live["required_completion_evidence"].values())
 
 
 def _false_key_session_eight_pair() -> tuple[ControlState, ControlState]:
-    previous = copy.deepcopy(load_state())
+    previous = copy.deepcopy(historical_session_seven_state())
     current = copy.deepcopy(previous)
     current["state_revision"] = previous["state_revision"] + 1
     current["session_status"] = "incomplete"
@@ -1767,3 +1800,41 @@ def test_deleting_the_prior_evidence_check_or_a_session_seven_exemption_fails() 
     exempt = _load_activation_mutant(_activation_with_session_seven_exemption(activation_source))
     deleted(previous, current)
     exempt(previous, current)
+
+
+def test_canonical_state_is_exact_legacy_or_exact_authorized_recovery() -> None:
+    legacy = cast(dict[str, object], historical_session_seven_state())
+    live = load_document(STATE_PATH)
+    if live["state_revision"] == 64:
+        assert live == legacy
+    else:
+        assert live["state_revision"] == 65
+        expected = copy.deepcopy(legacy)
+        contract = cast(dict[str, object], expected["transition_contract"])
+        contract["completion_requires_next_session"] = 8
+        expected.update(
+            repo_root="/srv/work/money-machine",
+            state_revision=65,
+            session_status="incomplete",
+            completed_sessions=list(range(7)),
+            next_session=7,
+            next_prompt=control_state.SESSION_PROMPTS[7],
+            head_sha=legacy["evidence_closure_commit_sha"],
+            updated_at=live["updated_at"],
+        )
+        assert live["updated_at"] != legacy["updated_at"]
+        assert live == expected
+        assert live["repo_root"] == "/srv/work/money-machine"
+        assert live["session_status"] == "incomplete"
+        assert live["current_session"] == live["next_session"] == 7
+        assert live["completed_sessions"] == list(range(7))
+        assert live["commissioned_agents"] == []
+        assert live["required_completion_evidence"] == dict.fromkeys(
+            SESSION_07_EVIDENCE_KEYS, False
+        )
+        assert (
+            live["head_sha"]
+            == live["evidence_closure_commit_sha"]
+            == legacy["evidence_closure_commit_sha"]
+        )
+        assert live.get("notes") == legacy.get("notes")

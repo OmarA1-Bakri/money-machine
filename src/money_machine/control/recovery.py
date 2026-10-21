@@ -268,3 +268,8 @@ def recover_session_seven(
             }
         except (OSError, json.JSONDecodeError) as error:
             raise ControlStateError(f"recovery write/read failed: {error}") from error
+
+
+def verify_recovery_authority(repo_root: Path) -> None:
+    """Verify committed D-0039 authority for the bounded private draft runner."""
+    _authority(_no_symlinks(repo_root))

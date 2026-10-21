@@ -1010,3 +1010,18 @@ W10 is a control-only flip with no feature code or tests. Updates `IMPLEMENTATIO
 ## 2026-10-22 One real draft wave1: recovery and authority
 
 RUN_ID20261021T184946Z. Root integrated93focused testsPASS4.26s, Ruff0, Pyright0. Independent UID1004reviews PASS: control-recovery18tests +beforeSHA mutantRED/restoredGREEN; real-draft-authority ACTIVE mutantRED/restored18GREEN. Protected verdicts /srv/work/reviews/20261021T184946Z/. Logs /srv/work/evidence/20261021T184946Z/control-and-authority-*. No provider mutation or actual recovery application in this wave; canonical state unchanged.
+
+
+## Private Notion builder integration wave (RUN_ID20261021T184946Z)
+
+Final affected regression:167 passed,0 skipped,80.71s against real isolated PG16 databases on55432; full repository Ruff/format/Pyright0errors. Independent protected SQL/adapter and finite-builder/runner reviews approved; accepted-effect/lost-response, stale lease, concurrent retry, public ancestry, changed run/product/spec, dirty source and incorrect calendar/schema negative probes retained outside Git. Real Postgres RED exposed invalid AgentRun status, corrected to SUCCESS; its replay test preserves single lineage and zero paid calls. An earlier affected run loaded the pre-fix module while new schema RED cases were added (2 failures159passes); that receipt is retained and superseded by the frozen167-pass run. No provider creation/control application is claimed by these tests. Logs/verdicts: /srv/work/evidence/20261021T184946Z/provider-wave-* and /srv/work/reviews/20261021T184946Z/.
+
+
+### Provider review corrections (RUN_ID20261021T184946Z)
+
+Initial head7ced42bce7a088cc6ef9cc29b80beee22aac947c CI39684552171 succeeded. Automated review nevertheless identified a valid accepted-create/read-refusal duplicate hazard and missing credential ownership check. Both are corrected before provider execution. Accepted IDs persist UNKNOWN before fallible readback, post-create refusal cannot authorize re-POST, and concurrent confirmed identity cannot regress to UNKNOWN. Credential bytes come from one no-follow descriptor with current UID/0600/regular-file checks. Genuine baseline and concurrent RED probes are preserved; initial test-harness timestamp typo failures are explicitly not behavioral evidence. Final affected36tests passed0skip73.97s, Ruff/Pyright0; independent changed-diff POST_CREATE_REVIEW.md approved. Exact revised-head CI remains required.
+
+
+### SDK lifecycle and accepted-ID lease-loss corrections (RUN_ID20261021T184946Z)
+
+Headb10b67b4a0fd3e1e04d44faae2a17b1db0344aff CI39686397443 succeeded, but premerge review correctly blocked on two new findings. Installed notion-client2.7.0 AsyncClient.__aenter__ replaces its injected client; the runner now owns httpx0.28.1 lifecycle and constructs the SDK without entering it, preserving paced/mock transport, headers and closure. A genuine actual-SDK MockTransport RED exposed lost hooks without network access. Accepted provider IDs now persist under a static run/product/shop/reservation identity lock even after cancellation/expiry; strict lease checks still guard all further provider actions and confirmation. Two genuine Postgres RED cases prove the old ID-loss defect. Final affected39tests passed0skip80.11s; repository Ruff/format/Pyright0; independent SDK_LEASE_REVIEW.md approved. An additional actual read-only Notion identity smoke made2GETs0writes0spend to the correct user-owned workspace; this is access evidence, not product creation. Revised-head CI is required before merge.
