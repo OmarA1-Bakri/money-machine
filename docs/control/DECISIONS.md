@@ -492,3 +492,14 @@ A finite fixture workflow receives `completed_at` only after the real fixture dr
 Candidate `59dabd8e0ee01d57998deb850abaea3cefc9961f` passed CI with 5,272 tests but its ARM run had 5,270 passed and two PDF security-shape failures. Full Chromium 153 emitted an extra catalog ViewerPreferences field. The Playwright 1.63.0 default headless-shell 153 passes the same two assertions unchanged. Preserve the rejected candidate and regenerate the final bundle with the matching pinned headless shell and explicit PDF admission. Do not widen the PDF parser or weaken tests. The final evidence must identify the single verified fixture database and final source SHA; earlier candidate receipts do not establish final acceptance.
 
 Use a separate `/api/live` process-liveness response for the Compose health probe. `/api/health` remains request-time dependency readiness and reports unavailable on a missing API/run. D-0036 and D-0037 remain binding, including the unchanged control state, no live-provider effects, no spend and at most the two authorized trunk merges.
+
+
+## D-0039 — One real product through verified Etsy draft, zero spend and no publication
+
+Date:2026-10-22 (Asia/Bangkok). Omar: "Go ahead and get one real product through to a verified Etsy draft. Fix the control blockers and missing engineering, keep publishing and spend disabled, and only stop when you need me to authenticate an account." Reaffirmed: "Keep going with the control fixes and real-product workflow. Keep publishing and spend disabled, and only stop to give me the exact authentication link when you need me to sign in." Verified seller target QuietlyBuiltStudio, supplied by Omar.
+
+This supersedes the earlier fixture-only/no-live-provider restriction in D0036/37/38 only for the necessary private product build and one verified Etsy draft. It does not authorize publication (including public Notion pages), paid APIs/LLM calls, purchases, checkout, messages, recurring activation or production release. Existing broader settings cannot override this run envelope.
+
+An explicit audited recovery/host-migration transition may repair the historical complete-but-unproved Session07 record and immutable host mismatch. It must be hash-bound, preserve the old state and operator-close provenance, advance revision exactly once and retain all unearned evidence false. Ordinary completion/activation guards remain unchanged; no session skipping, shadow state, path alias or direct JSON edit. A separate future evidence-admission contract must earn each substantive gate before session activation.
+
+The bounded corrective addendum is docs/control/reviews/2026-10-22-one-real-draft-prompt-integrity.md. Real provider readback is required for delivery; fixture tests cannot be relabeled real. Full Session15 commissioning, v1.0.0 and public buyer-path acceptance remain deferred.
