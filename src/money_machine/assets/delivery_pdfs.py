@@ -10,6 +10,7 @@ Lineage is appended after ``%%EOF``.
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 from dataclasses import dataclass
 from html import escape
@@ -46,6 +47,7 @@ GIFT_PAGE_COUNT = 1
 _LINE_FIT = 500
 _LAUNCH_ARGS = (
     "--no-sandbox",
+    "--user-agent=Money Machine Fixture Renderer",
     "--disable-setuid-sandbox",
     "--disable-dev-shm-usage",
     "--disable-gpu",
@@ -404,7 +406,11 @@ def _paint(html: str, tokens: DesignTokens) -> bytes:
     if pdf is None:
         raise DeliveryPdfRefusal("missing_token")
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True, args=list(_LAUNCH_ARGS))
+        browser = playwright.chromium.launch(
+            headless=True,
+            args=list(_LAUNCH_ARGS),
+            executable_path=os.environ.get("MONEY_MACHINE_BROWSER_EXECUTABLE"),
+        )
         try:
             context = browser.new_context(
                 viewport={"width": pdf.width_px, "height": pdf.height_px},
@@ -415,6 +421,7 @@ def _paint(html: str, tokens: DesignTokens) -> bytes:
                 bypass_csp=True,
                 locale="en-US",
                 timezone_id="UTC",
+                user_agent="Money Machine Fixture Renderer",
             )
             try:
                 context.route("**/*", _guard)
