@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 import struct
 import zlib
 from collections.abc import Mapping
@@ -403,7 +404,11 @@ def _png_chunk(tag: bytes, data: bytes) -> bytes:
 
 def _paint(documents: tuple[str, ...]) -> tuple[bytes, ...]:
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True, args=list(_LAUNCH_ARGS))
+        browser = playwright.chromium.launch(
+            headless=True,
+            args=list(_LAUNCH_ARGS),
+            executable_path=os.environ.get("MONEY_MACHINE_BROWSER_EXECUTABLE"),
+        )
         try:
             context = browser.new_context(
                 viewport={"width": LISTING_IMAGE_WIDTH, "height": LISTING_IMAGE_HEIGHT},
