@@ -28,7 +28,7 @@ async def test_fixture_command_writes_verified_bundle(tmp_path: Path, test_datab
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import create_async_engine
 
-    from money_machine.persistence.tables import AgentRun, Job
+    from money_machine.persistence.tables import AgentRun, Job, ListingVersionArtifact
 
     engine = create_async_engine(test_database)
     try:
@@ -43,6 +43,18 @@ async def test_fixture_command_writes_verified_bundle(tmp_path: Path, test_datab
                 )
                 .scalars()
                 .all()
+            )
+            membership = (
+                await connection.execute(
+                    select(ListingVersionArtifact.role, ListingVersionArtifact.artifact_id).where(
+                        ListingVersionArtifact.listing_version_id == ids["listing_version_id"]
+                    )
+                )
+            ).all()
+            assert len(membership) == 13
+            assert len({row.artifact_id for row in membership}) == 13
+            assert sorted(row.role for row in membership) == sorted(
+                ["listing_image"] * 10 + ["listing_video", "delivery_pdf", "free_gift_pdf"]
             )
             assert outputs
             assert all(

@@ -317,6 +317,61 @@ class FixtureRun:
             existing.completed_at,
         )
 
+    async def bind_listing_artifacts(self, session, rows):
+        """Persist the media membership of the verified immutable package idempotently."""
+        expected = {}
+        ordinals = {}
+        for row in rows:
+            name = row["relative_path"]
+            role = (
+                "listing_image"
+                if row["kind"] == "listing_image"
+                else "listing_video"
+                if row["kind"] == "walkthrough"
+                else "delivery_pdf"
+                if name == "readme.pdf"
+                else "free_gift_pdf"
+                if name == "free_gift.pdf"
+                else None
+            )
+            if role is None:
+                continue
+            ordinal = ordinals.get(role, 0)
+            ordinals[role] = ordinal + 1
+            identity = self.key("listing-artifact:" + name)
+            artifact_id = UUID(row["artifact_id"])
+            expected[identity] = (artifact_id, role, ordinal)
+            existing = await session.get(t.ListingVersionArtifact, identity)
+            if existing is None:
+                session.add(
+                    t.ListingVersionArtifact(
+                        id=identity,
+                        listing_version_id=self.key("listing-version"),
+                        artifact_id=artifact_id,
+                        role=role,
+                        ordinal=ordinal,
+                    )
+                )
+            elif (existing.artifact_id, existing.role, existing.ordinal) != expected[identity]:
+                raise ValueError("listing artifact membership disagrees")
+        if ordinals != {
+            "listing_image": 10,
+            "listing_video": 1,
+            "delivery_pdf": 1,
+            "free_gift_pdf": 1,
+        }:
+            raise ValueError("verified listing media membership is incomplete")
+        await session.flush()
+        actual = (
+            await session.scalars(
+                select(t.ListingVersionArtifact).where(
+                    t.ListingVersionArtifact.listing_version_id == self.key("listing-version")
+                )
+            )
+        ).all()
+        if {row.id: (row.artifact_id, row.role, row.ordinal) for row in actual} != expected:
+            raise ValueError("listing has unexpected artifact membership")
+
     async def execute(self, url):
         engine = create_async_engine(url)
         factory = create_session_factory(engine)
@@ -348,6 +403,27 @@ class FixtureRun:
                     product = await session.get(t.Product, self.key("product"))
                     if product is None:
                         raise ValueError("persisted listing has no fixture product")
+                    await self.bind_listing_artifacts(session, rows)
+                    strategy_run = await session.get(t.AgentRun, self.key("ProductStrategyJob:run"))
+                    if (
+                        strategy_run is None
+                        or strategy_run.token_count != 0
+                        or strategy_run.cost_usd != 0
+                    ):
+                        raise ValueError("fixture strategy provenance cannot be reconciled")
+                    prompt = await session.get(t.PromptVersion, strategy_run.prompt_version_id)
+                    if (
+                        prompt is None
+                        or sha((ROOT / prompt.source_path).read_bytes())
+                        != strategy_run.prompt_sha256
+                    ):
+                        raise ValueError("fixture strategy source provenance disagrees")
+                    strategy_run.output = {
+                        **strategy_run.output,
+                        "execution_kind": "deterministic_fixture_library",
+                        "prompt_used": False,
+                    }
+                    await session.commit()
                     self.shop_id = product.shop_id
                     ids = self.ids()
                     write_json(self.directory.parent / "ids.json", ids)
@@ -723,6 +799,7 @@ class FixtureRun:
             )
         )
         await session.flush()
+        await self.bind_listing_artifacts(session, rows)
         session.add(
             t.PreflightResult(
                 id=self.key("preflight"),
