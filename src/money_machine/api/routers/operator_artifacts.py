@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import os
 import stat
@@ -203,7 +204,7 @@ async def run_artifact(run_id: RunId, artifact_id: UUID, session: SessionDepende
         raise HTTPException(status_code=404, detail="fixture artifact not found")
     artifact, asset = row
     try:
-        content = _verified_bytes(artifact, run_id)
+        content = await asyncio.to_thread(_verified_bytes, artifact, run_id)
     except (OSError, ValueError) as error:
         raise HTTPException(
             status_code=409, detail="fixture artifact unavailable or changed"
