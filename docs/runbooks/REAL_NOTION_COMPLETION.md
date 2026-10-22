@@ -137,14 +137,20 @@ Migration `c3d4e5f6a7b8` extends the existing table, preserves old terminal reco
 enforces active/terminal shapes and allows at most one active run per job. Downgrade
 refuses unresolved active rows rather than deleting or fabricating execution history.
 
-This closes one code-level lifecycle gap. The default versioned PromptStore does
-not currently contain an A07 prompt at `prompts/agents/A07/v1.md`; the existing
-fixture library has a separate registered source. Runner lifecycle tests use a
-hash-verified synthetic prompt in a temporary fixture directory and simulation
-mode. They do not establish commissioned/live A07 execution. Canonical production
-ledger/runtime binding, verified recovered source/request bytes, authenticated
-approval admission, authorized runtime invocation/deployment and actual
-thredOS registration remain prerequisites. No execution command is supplied here.
+The default versioned PromptStore now has `prompts/agents/A07/v1.md`, derived from
+the verified workbook and current contracts. Fresh fixture seeding stores its
+exact hash and source path without changing A07's DESIGNED state. Stale expected
+hashes and an existing conflicting registered version fail closed; seeding must
+not overwrite production prompt history. The earlier source-library scaffold is
+preserved. The runner lifecycle and
+recovery fixtures below load the actual default artifact with synthetic agents
+and mock provider transport.
+
+This supplies a code artifact, not a production admission or thredOS registration
+receipt. Read the canonical A07 definition and PromptVersion before reconciling
+its actual registered source/version/hash. Canonical ledger/runtime binding,
+authentic approval admission, valid production commissioning and authorized
+deployment/invocation remain prerequisites. No execution command is supplied here.
 
 ## Runner-to-guard binding (code preparation)
 
@@ -155,8 +161,8 @@ revoking it after binding still prevents transport. This factory neither claims 
 lease nor reserves an effect. Caller-provided identity cannot replace persisted
 job/run/prompt checks.
 
-Fixture tests use the real runner and observer with a temporary hash-verified
-synthetic prompt and mock SDK transport. Success replay performs one POST; a lost
+Fixture tests use the real runner and observer with the hash-verified default
+A07 prompt and mock SDK transport. Success replay performs one POST; a lost
 response leaves the new effect UNKNOWN and the next runner execution cannot send
 again. These tests preserve the original UNKNOWN, open incident and fourteen
 confirmed fixture effects. They do not establish a live production entrypoint.

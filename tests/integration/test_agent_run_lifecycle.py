@@ -175,7 +175,7 @@ async def test_concurrent_starts_keep_one_unresolved_execution(session_factory):
     "outcome", ["success", "failure", "cancelled", "wrong_run", "wrong_agent", "wrong_prompt"]
 )
 async def test_runner_commits_actual_a07_identity_before_execution(
-    session_factory, repository_root, tmp_path, outcome
+    session_factory, repository_root, outcome
 ):
     import asyncio
 
@@ -187,28 +187,7 @@ async def test_runner_commits_actual_a07_identity_before_execution(
 
     async with session_factory() as session:
         await seed(session, repository_root=repository_root)
-        # A hash-verified synthetic PromptStore fixture; no production prompt claim.
-        from hashlib import sha256
-
-        from money_machine.persistence.tables import PromptVersion
-
-        source = tmp_path / "prompts/agents/A07/v1.md"
-        source.parent.mkdir(parents=True)
-        source.write_text(
-            "# Synthetic lifecycle test\n\n## Purpose\nTest only.\n"
-            "\n## Input Contract\nJobEnvelope.\n\n## Output Contract\nAgentResult.\n"
-            "\n## Instructions\nReturn a synthetic result.\n"
-            "\n## Tool Permissions\nNo external tools.\n"
-        )
-        session.add(
-            PromptVersion(
-                prompt_reference="agent://A07/system/v1",
-                version=1,
-                sha256=sha256(source.read_bytes()).hexdigest(),
-                source_path="synthetic-fixture/prompts/agents/A07/v1.md",
-            )
-        )
-        await session.flush()
+        # The seeded default prompt supplies real lineage; the agent remains a probe.
         shop = await make_shop(session)
         workflow = await make_workflow(session, shop)
         job = await make_job(
@@ -264,7 +243,7 @@ async def test_runner_commits_actual_a07_identity_before_execution(
         active = observer(session)
         runner = AgentRunner(
             registry=AgentRegistry.from_yaml(repository_root),
-            prompt_store=PromptStore(tmp_path),
+            prompt_store=PromptStore(repository_root),
             provider=FakeLLMProvider(),
             observer=active,
         )

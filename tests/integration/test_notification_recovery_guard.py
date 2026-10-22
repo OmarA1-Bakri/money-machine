@@ -35,18 +35,11 @@ from tests.integration.test_real_draft_effects import prepare
 
 
 @pytest.fixture
-async def recovery(session_factory, request, tmp_path):
+async def recovery(session_factory, request, repository_root):
     old, parent = await prepare(session_factory)
     now = datetime.now(UTC)
     runner_mode = getattr(request, "param", None) == "runner"
-    prompt_file = tmp_path / "prompts/agents/A07/v1.md"
-    if runner_mode:
-        prompt_file.parent.mkdir(parents=True)
-        prompt_file.write_text(
-            "# Synthetic runner-binding fixture\n\n## Purpose\nTest only.\n"
-            "\n## Input Contract\nJobEnvelope.\n\n## Output Contract\nAgentResult.\n"
-            "\n## Instructions\nNo live execution.\n\n## Tool Permissions\nMock SDK only.\n"
-        )
+    prompt_file = repository_root / "prompts/agents/A07/v1.md"
     original_key = "synthetic-original-unknown"
     async with session_factory() as session, session.begin():
         original = await session.get(Job, old.job_id)
@@ -129,7 +122,7 @@ async def recovery(session_factory, request, tmp_path):
             sha256=hashlib.sha256(prompt_file.read_bytes()).hexdigest()
             if runner_mode
             else "a" * 64,
-            source_path=str(prompt_file)
+            source_path="prompts/agents/A07/v1.md"
             if runner_mode
             else "tests/integration/test_notification_recovery_guard.py",
         )
@@ -259,7 +252,7 @@ async def recovery(session_factory, request, tmp_path):
                 create=lambda: adapter.create_database(parent, "Notification", state["props"]),
             )
 
-        state["runner_root"] = tmp_path
+        state["runner_root"] = repository_root
         state["sdk"] = sdk
         state["run_context"] = run_context
         state["adapter"] = adapter

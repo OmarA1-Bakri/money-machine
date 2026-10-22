@@ -180,3 +180,54 @@ duplicate/candidate, revocation, interrupted readback and lost-response replay.
 Independent functional/provider review and affected/static checks precede push.
 Document exact runtime/identity/admission/deployment prerequisites in one packet;
 fixture authority is not human approval. No production execution is authorized.
+
+## Versioned A07 prompt and canonical read procedure
+
+The operator authorized the absent default runtime prompt artifact independently
+of production registration/admission. `prompts/agents/A07/v1.md` is missing; the
+existing source-library file is a three-line scaffold, not a loadable prompt.
+Create the required five-section artifact from the verified workbook's A07 and
+Session 07 requirements and current JobEnvelope/AgentResult/BuildResult contracts.
+Preserve both immutable blueprint/session sources and the existing scaffold.
+
+Do not change configured tools, commissioning state, publication/spend controls,
+prompt history or actual identity registration. Use real artifact/hash loading in
+isolated fixture execution; prove stale hash/admission refusal and fresh seed
+idempotency without rewriting an existing conflicting version. Unsupported
+provider capabilities must remain blockers, not invented tools or receipts.
+Independent fidelity, safety and gameability review covers the prompt before
+publication. The absent canonical PDF remains an explicit final-audit limitation.
+
+Provide the exact canonical read-only procedure and minimal output separately in
+the local checkpoint: original verified spec bytes, normal existing runtime loader,
+explicit production environment with no database fallback, transaction READ ONLY,
+fixed bounded SELECTs, no raw inputs/URLs/credentials in output, rollback only.
+State the original-owner route only to the extent retained evidence establishes
+it; no guessed SSH alias, new connection coordinates, seed/migration or production
+write. Canonical results remain unverified until that owner runs the procedure.
+
+Implemented `prompts/agents/A07/v1.md`, SHA256
+`7e29f988ebba034fa1e488d280c969a2a1105dcca2737767233951d47e37c0a0`.
+Fidelity review identified the missing ordinary-build DEDUPE PASS prerequisite;
+the prompt now requires its canonical persisted evidence while preserving prior
+lineage for scoped repairs. Fidelity, safety and gameability reviews then cleared
+the artifact. Tool configuration, commissioning, blueprint sources and scaffold
+remain unchanged. Production admission and thredOS registration are unverified.
+
+Four focused artifact cases verify fresh idempotent seeding, exact hash/source
+loading, stale hash and production refusal, conflicting version preservation,
+and actual finite-fixture run correlation. Recovery fixtures use the real prompt.
+The affected run exposed six lifecycle fixtures inserting a duplicate synthetic
+version after seeding; they now load the actual seeded artifact and preserve all
+six outcome/identity assertions. Independent changed-scope review cleared this
+correction. Final affected result: 132 passed, zero failures/skips, 80.62 seconds;
+Ruff check/format (444 files), strict Pyright and source-register checks passed.
+
+The local canonical read-only procedure received independent nonmutation/SQL
+review. Diagnostic checks were narrowed to the original job's open incident and
+fourteen confirmed effects from the exact Notion provider/operation. Compilation
+and static nonmutation checks pass. No production execution occurred. The existing
+owner route is known, but its original canonical database configuration remains
+missing; no new/default store, SQLite file, schema setup or provider call is used.
+Prior finite-path CI39807386185 passed all gates at `213813bf`; this prompt-only
+increment requires its own new-head CI result and makes no session closure claim.
