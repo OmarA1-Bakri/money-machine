@@ -338,6 +338,25 @@ class FixtureNotionAdapter(NotionAdapter):
 
         return formula
 
+    async def update_formula(
+        self, database_id: str, property_id: str, expression: str
+    ) -> NotionFormula:
+        """Replace an existing fixture formula while preserving its property identity."""
+        from dataclasses import replace
+
+        database = self.databases[database_id]
+        matches = [prop for prop in database.properties if prop.id == property_id]
+        if len(matches) != 1 or matches[0].type != "formula":
+            raise ValueError("fixture formula property is missing or ambiguous")
+        prop = matches[0]
+        formula = prop.config.get("formula")
+        if type(formula) is not NotionFormula:
+            raise ValueError("fixture formula is missing")
+        updated = replace(formula, expression=expression)
+        prop.config["formula"] = updated
+        database.updated_at = datetime.now(UTC)
+        return updated
+
     async def create_linked_view(
         self,
         source_database_id: str,

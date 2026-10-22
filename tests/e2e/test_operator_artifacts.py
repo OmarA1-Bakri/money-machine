@@ -86,9 +86,13 @@ async def test_summary_reports_only_persisted_completion_and_actual_rows(
             "listing_version_id",
             "product_title",
             "fixture_completed",
+            "execution_mode",
+            "workflow_completed",
+            "pending_effects",
             "completed_at",
             "product_state",
             "jobs",
+            "recoveries",
             "artifacts",
         }
         assert body["run_id"] == RUN_ID
@@ -226,3 +230,128 @@ async def test_artifact_serves_persisted_delivery_and_media_types(
         summary = (await client.get(f"/operator/runs/{RUN_ID}/summary")).json()
         assert summary["artifacts"][0]["kind"] == role
         assert summary["artifacts"][0]["media_type"] == media_type
+
+
+async def test_real_summary_exists_before_listing_and_counts_latest_uncertainty(
+    operator_state: ApplicationState,
+) -> None:
+    from money_machine.persistence.tables import EffectAttempt, Product, Shop
+
+    first_id = await seed_product(operator_state.session_factory)
+    second_id = await seed_product(operator_state.session_factory, "another-run")
+    async with operator_state.session_factory() as session:
+        first = await session.get(Product, first_id)
+        second = await session.get(Product, second_id)
+        assert first is not None and second is not None
+        shop = await session.get(Shop, first.shop_id)
+        first_workflow = await session.get(WorkflowRun, first.workflow_id)
+        second_workflow = await session.get(WorkflowRun, second.workflow_id)
+        assert shop is not None and first_workflow is not None and second_workflow is not None
+        shop.name = "QuietlyBuiltStudio"
+        first_workflow.workflow_type = "RealProductDraft:real-one"
+        second_workflow.workflow_type = "RealProductDraft:real-two"
+        second_workflow.shop_id = shop.id
+        second.shop_id = shop.id
+        first_job = await make_job(session, first_workflow)
+        second_job = await make_job(session, second_workflow)
+        for job, key, states in (
+            (first_job, "resolved-operation", ("UNKNOWN", "CONFIRMED")),
+            (first_job, "pending-operation", ("UNKNOWN", "UNKNOWN")),
+            (second_job, "foreign-operation", ("UNKNOWN",)),
+        ):
+            for attempt, state in enumerate(states):
+                session.add(
+                    EffectAttempt(
+                        id=uuid4(),
+                        idempotency_key=key,
+                        job_id=job.id,
+                        provider="notion",
+                        operation="private-create",
+                        effect_state=state,
+                        provider_object_id="never-expose" if state == "CONFIRMED" else None,
+                        reconciliation_attempt=attempt,
+                        observed_at=datetime.now(UTC),
+                    )
+                )
+        second_workflow.completed_at = datetime.now(UTC)
+        await session.commit()
+    async with client_for(operator_state) as client:
+        response = await client.get("/operator/runs/real-one/summary")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["execution_mode"] == "real_draft"
+        assert body["product_id"] == first_id
+        assert body["listing_version_id"] is None
+        assert body["fixture_completed"] is False
+        assert body["workflow_completed"] is False
+        assert body["pending_effects"] == 1
+        assert str(second_workflow.id) not in response.text
+        assert "never-expose" not in response.text
+        assert "pending-operation" not in response.text
+        second_body = (await client.get("/operator/runs/real-two/summary")).json()
+        # Expose both persisted facts: the console must reject conflicting proof,
+        # rather than hide the completion timestamp or the uncertain operation.
+        assert second_body["workflow_completed"] is True
+        assert second_body["completed_at"] is not None
+        assert second_body["fixture_completed"] is False
+        assert second_body["pending_effects"] == 1
+        async with operator_state.session_factory() as session:
+            session.add(
+                EffectAttempt(
+                    id=uuid4(),
+                    idempotency_key="foreign-operation",
+                    job_id=second_job.id,
+                    provider="notion",
+                    operation="private-create",
+                    effect_state="CONFIRMED",
+                    provider_object_id="never-expose",
+                    reconciliation_attempt=1,
+                    observed_at=datetime.now(UTC),
+                )
+            )
+            await session.commit()
+        resolved = (await client.get("/operator/runs/real-two/summary")).json()
+        assert resolved["workflow_completed"] is True
+        assert resolved["fixture_completed"] is False
+        assert resolved["pending_effects"] == 0
+
+
+async def test_real_artifact_and_summary_cannot_cross_workflows_in_same_shop(
+    operator_state: ApplicationState,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from money_machine.persistence.tables import Product, Shop
+
+    rows, artifact, path, content = await seed_proof(operator_state, tmp_path, monkeypatch)
+    other_id = await seed_product(operator_state.session_factory, "another-run")
+    actual_path = tmp_path / "real-one" / "e2e" / "product.html"
+    actual_path.parent.mkdir(parents=True)
+    path.rename(actual_path)
+    async with operator_state.session_factory() as session:
+        shop = await session.get(Shop, rows["now"].shop_id)
+        workflow = await session.get(WorkflowRun, rows["now"].workflow_id)
+        other = await session.get(Product, other_id)
+        stored = await session.get(Artifact, artifact.id)
+        assert shop is not None and workflow is not None and other is not None
+        assert stored is not None
+        other_workflow = await session.get(WorkflowRun, other.workflow_id)
+        assert other_workflow is not None
+        shop.name = "QuietlyBuiltStudio"
+        workflow.workflow_type = "RealProductDraft:real-one"
+        other_workflow.workflow_type = "RealProductDraft:real-two"
+        other_workflow.shop_id = shop.id
+        other.shop_id = shop.id
+        stored.storage_reference = str(actual_path)
+        await session.commit()
+    async with client_for(operator_state) as client:
+        response = await client.get(f"/operator/runs/real-one/artifacts/{artifact.id}")
+        assert response.status_code == 200 and response.content == content
+        assert (
+            await client.get(f"/operator/runs/real-two/artifacts/{artifact.id}")
+        ).status_code == 404
+        first = (await client.get("/operator/runs/real-one/summary")).json()
+        second = (await client.get("/operator/runs/real-two/summary")).json()
+        assert first["artifacts"][0]["id"] == str(artifact.id)
+        assert second["artifacts"] == []
+        assert str(rows["shop"].id) not in str(second)

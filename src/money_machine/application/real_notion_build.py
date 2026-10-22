@@ -7,6 +7,7 @@ This module never owns credentials, publication, retries or a second ledger.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Mapping
 from datetime import date
 from typing import Any
 from uuid import UUID
@@ -17,7 +18,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from money_machine.application.real_draft_authority import DraftRunAuthority, DraftRunRefused
 from money_machine.application.real_draft_effects import SqlDraftEffects
 from money_machine.domain.models.product_spec import ProductSpec
-from money_machine.integrations.notion.real_product_adapter import RealPrivateNotionAdapter
+from money_machine.integrations.notion.real_product_adapter import (
+    RealPrivateNotionAdapter,
+    external_cover,
+)
 
 Json = dict[str, Any]
 # Business architecture: playbook.txt:741-781,1240-1272; source PDF immutable.
@@ -33,6 +37,14 @@ def rich(text: str) -> list[Json]:
 
 def block(text: str, kind: str = "paragraph", color: str = "default") -> Json:
     return {"object": "block", "type": kind, kind: {"rich_text": rich(text), "color": color}}
+
+
+def page_link(page_id: str) -> Json:
+    return {
+        "object": "block",
+        "type": "link_to_page",
+        "link_to_page": {"type": "page_id", "page_id": page_id},
+    }
 
 
 def title(text: str) -> Json:
@@ -235,12 +247,14 @@ class RealNotionProductBuilder:
         session_factory: async_sessionmaker[AsyncSession],
         job_id: UUID,
         lease_owner: str,
+        cover_urls: Mapping[str, str] | None = None,
     ) -> None:
         self.authority = authority
         self.sdk = sdk
         self.factory = session_factory
         self.job_id = job_id
         self.lease_owner = lease_owner
+        self.cover_urls = dict(cover_urls) if cover_urls is not None else None
 
     def _bind(self, authority: DraftRunAuthority, workspace: UUID) -> None:
         self.effects = SqlDraftEffects(
@@ -268,7 +282,14 @@ class RealNotionProductBuilder:
         )
 
     async def _page(
-        self, key: str, parent: str, name: str, children: list[Json], icon: str = "📖"
+        self,
+        key: str,
+        parent: str,
+        name: str,
+        children: list[Json],
+        icon: str = "📖",
+        *,
+        cover: Json | None = None,
     ) -> Json:
         async def reconcile(known: str | None) -> Json | None:
             page = (
@@ -279,7 +300,23 @@ class RealNotionProductBuilder:
             if page is not None:
                 if _page_title(page) != name or page.get("parent", {}).get("page_id") != parent:
                     raise DraftRunRefused("product_page_readback_mismatch")
+                if page.get("icon") != {"type": "emoji", "emoji": icon}:
+                    raise DraftRunRefused("product_page_icon_readback_mismatch")
+                if cover is not None and page.get("cover") != cover:
+                    raise DraftRunRefused("product_page_cover_readback_mismatch")
                 observed = await self.adapter.list_blocks(page["id"])
+                expected_links = [
+                    b["link_to_page"]["page_id"]
+                    for b in children
+                    if b.get("type") == "link_to_page"
+                ]
+                actual_links = [
+                    b.get("link_to_page", {}).get("page_id")
+                    for b in observed
+                    if b.get("type") == "link_to_page"
+                ]
+                if expected_links and sorted(actual_links) != sorted(expected_links):
+                    raise DraftRunRefused("product_page_backlink_readback_mismatch")
                 expected_text = [_text(b) for b in children]
                 actual_text = [_text(b) for b in observed]
                 if any(t not in actual_text for t in expected_text):
@@ -289,7 +326,7 @@ class RealNotionProductBuilder:
         return await self._effect(
             key,
             lambda: self.adapter.create_page(
-                parent, name, children=children, icon={"type": "emoji", "emoji": icon}
+                parent, name, children=children, icon={"type": "emoji", "emoji": icon}, cover=cover
             ),
             reconcile,
         )
@@ -385,6 +422,11 @@ class RealNotionProductBuilder:
             or tuple(spec.colour_variants) != tuple(THEMES)
         ):
             raise DraftRunRefused("real_product_spec_scope")
+        if self.cover_urls is None or set(self.cover_urls) != set(spec.colour_variants):
+            raise DraftRunRefused("variant_cover_assets_required")
+        covers = {name: external_cover(url) for name, url in self.cover_urls.items()}
+        if len({c["external"]["url"] for c in covers.values()}) != len(covers):
+            raise DraftRunRefused("distinct_variant_covers_required")
         self._bind(self.authority, workspace_id)
         marker = f"mm-real-product:{run_id}:{spec.product_id}:v1"
         folder_title = f"{spec.title} — private build {run_id}"
@@ -427,6 +469,8 @@ class RealNotionProductBuilder:
         color, icon = THEMES[variant]
         prefix = marker + ":" + variant
         token = next(t.hex for t in spec.palette_tokens if t.name == variant)
+        assert self.cover_urls is not None
+        cover = external_cover(self.cover_urls[variant])
         home = await self._page(
             prefix + ":home",
             parent,
@@ -443,6 +487,7 @@ class RealNotionProductBuilder:
                 ),
             ],
             icon,
+            cover=cover,
         )
         home_id = str(home["id"])
         sources: Json = {}
@@ -523,6 +568,7 @@ class RealNotionProductBuilder:
                 [
                     block(hub.name, "heading_1", color),
                     block(hub.description),
+                    page_link(home_id),
                     block(
                         f"These views use the shared {name} source. Edit a "
                         f"row here and it changes everywhere.",
@@ -530,6 +576,7 @@ class RealNotionProductBuilder:
                     ),
                 ],
                 icon,
+                cover=cover,
             )
             page_id = str(page["id"])
             ds = source_ids[name]
@@ -569,7 +616,12 @@ class RealNotionProductBuilder:
                             prefix + ":guide:" + name + ":" + str(j),
                             page_id,
                             guide[j],
-                            [block(guide[j], "heading_2", color), block(guide[j + 1])],
+                            [
+                                block(guide[j], "heading_2", color),
+                                block(guide[j + 1]),
+                                page_link(page_id),
+                                page_link(home_id),
+                            ],
                             "📖",
                         )
                     )["id"]
@@ -646,6 +698,20 @@ class RealNotionProductBuilder:
                 "list",
             ),
         ]
+        inventory = await self._page_inventory(home_id)
+        required_pages = {
+            home_id,
+            *(h["page_id"] for h in hubs),
+            *(g for h in hubs for g in h["guide_ids"]),
+        }
+        source_databases = {notification_db, *(s["database_id"] for s in sources.values())}
+        if not required_pages.issubset(inventory["page_ids"]) or not source_databases.issubset(
+            inventory["database_ids"]
+        ):
+            raise DraftRunRefused("product_page_inventory_missing_created_object")
+        content_count = len(inventory["page_ids"]) + len(source_databases)
+        if not spec.page_target_min <= content_count <= spec.page_target_max:
+            raise DraftRunRefused("product_page_inventory_outside_spec_target")
         return {
             "name": variant,
             "palette_hex": token,
@@ -664,9 +730,61 @@ class RealNotionProductBuilder:
                     for k in ("Open tasks", "Birthdays", "Spending", "Water logged")
                 },
             },
-            "page_count_including_databases": 26,
-            "regular_page_count": 19,
+            "page_count_including_databases": len(inventory["page_ids"])
+            + len(inventory["database_ids"]),
+            "regular_page_count": len(inventory["page_ids"]),
+            "database_container_count": len(inventory["database_ids"]),
+            "page_inventory": inventory,
+            "content_page_count_including_source_databases": content_count,
+            "page_count_basis": (
+                "static_pages_and_database_containers_including_linked_views_"
+                "excluding_rows_and_links"
+            ),
         }
+
+    async def _page_inventory(self, root: str) -> dict[str, list[str]]:
+        """Observe the rendered static tree, never infer counts from the build plan.
+
+        Data-source rows and link_to_page references are not descendant static
+        pages. Each linked-view database container is counted once as a database.
+        Unknown nested content blocks stop the count rather than hide children.
+        """
+        pages: list[str] = []
+        databases: list[str] = []
+        seen: set[str] = set()
+        pending: list[tuple[str, str | None, int]] = [(root, None, 0)]
+        while pending:
+            identity, expected_parent, depth = pending.pop()
+            if identity in seen or depth > 32 or len(seen) >= 1000:
+                raise DraftRunRefused("product_page_inventory_invalid_tree")
+            seen.add(identity)
+            page = await self.adapter.get_page(identity)
+            if (
+                expected_parent is not None
+                and page.get("parent", {}).get("page_id") != expected_parent
+            ):
+                raise DraftRunRefused("product_page_inventory_parent_mismatch")
+            pages.append(identity)
+            for child in await self.adapter.list_blocks(identity):
+                kind = child.get("type")
+                if kind in {"child_page", "child_database"}:
+                    try:
+                        child_id = str(UUID(child["id"]))
+                    except (KeyError, ValueError, TypeError):
+                        raise DraftRunRefused("product_page_inventory_invalid_id") from None
+                    if kind == "child_page":
+                        pending.append((child_id, identity, depth + 1))
+                    else:
+                        if child_id in seen or len(seen) >= 1000:
+                            raise DraftRunRefused("product_page_inventory_invalid_tree")
+                        seen.add(child_id)
+                        database = await self.adapter.get_database(child_id)
+                        if database.get("parent", {}).get("page_id") != identity:
+                            raise DraftRunRefused("product_page_inventory_parent_mismatch")
+                        databases.append(child_id)
+                elif child.get("has_children"):
+                    raise DraftRunRefused("product_page_inventory_uninspected_nested_content")
+        return {"page_ids": sorted(pages), "database_ids": sorted(databases)}
 
 
 def _text(value: Json) -> str:

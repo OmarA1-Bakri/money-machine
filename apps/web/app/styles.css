@@ -68,4 +68,5 @@ footer{font-size:11px;color:var(--muted);margin-top:30px;padding-top:18px;border
 .artifact-list a{display:flex;justify-content:space-between;gap:15px;padding:14px 16px;border:1px solid var(--line);border-radius:6px;font-size:13px}
 .artifact-list a:hover{background:#223027;border-color:#536c59}.artifact-list small{display:block;font-size:10px;color:var(--muted);margin-top:5px}
 .proof-unavailable{margin-bottom:24px}
+.recovery-section{margin-top:24px}.recovery-card{border-bottom:1px solid var(--line);padding-bottom:18px}
 @media(max-width:760px){.product-proof{padding:18px 17px}.proof-heading h2{font-size:23px}.completion-strip{grid-template-columns:1fr;gap:12px}.template-preview{height:450px}.artifact-list{grid-template-columns:1fr}}

@@ -1,5 +1,48 @@
 # Next Session
 
+## 2026-10-22 — Current cloud QA continuation checkpoint
+
+Canonical coding workspace: /workspace/money-machine, baseline
+f8f26dc890943890c1925531b4b1ddb2e86eeff4. Metadata-only resume checkpoint:
+.omx/state/resume-checkpoint.json. Do not infer access to older /srv or desktop
+paths. PDF compatibility, fixture formula repair/retest and local execution
+lineage corrections are implemented; read TEST_EVIDENCE.md for fresh gates.
+Formal state remains audited revision65, Session07 incomplete, next7, twelve
+false evidence keys and no commissioned agents. Do not manufacture a closure.
+
+Production remains held for run20261021T184946Z, product
+0403629f-54ec-5ea0-ab98-3714f2f3d419, build
+9b8688d2-db02-50c7-963e-b63c4659b539. Latest UNKNOWN Notification create attempt:
+e6912e08-f0b5-4371-bc13-b16966f12f79, no retained provider request/resource ID.
+Existing effect key:
+RealProductBuild:d5dc559a-6b60-5e53-916f-6ccea9c7d4df:0403629f-54ec-5ea0-ab98-3714f2f3d419:real-notion-v1:8238ab7be3aabaf589ac8d601276267420f37044e05b12214474bc58019ca475
+Fourteen effects are confirmed; no replay/new key/production write until
+authoritative reconciliation. API search absence is not proof of rejection.
+The development DB never replaces that ledger.
+
+The real Forest intro/six databases remain an incomplete product. Dashboard,
+hubs, Notification, variants, media, draft and direct visual/buyer acceptance
+remain pending the hold. No new research collector was started:36listings from
+one search and34/40 operator judgement are not measured customer demand.
+
+Graphify is not installed/proved in this container. See runbooks/GRAPHIFY.md for
+official-source, package and twice-failed supported Library transfer evidence.
+The package-pinned installer cannot establish locked dependencies or saved
+startup persistence. No graph output exists to query. thredOS still needs its
+actual authorized SDK/API contract and registration mapping/receipts; local
+AgentDefinition IDs do not substitute for registered external identities.
+The missing original playbook PDF requires supported transfer for final audit.
+
+## 2026-10-22 — Reconciliation remains held after safe continuation
+
+Source-defined ten research seeds are integrated with27focused and13database-backed tests passing onPython3.12; no live collector was started. Latest actual research remains the36listing Etsy snapshot from2026-10-21T20:25:33Z, query notion budget planner; ranking is operator judgement, not verified sales/review demand. Fresh ledger metadata is retained outsideGit under the active run. Notification operation attempt3 stays UNKNOWN, no request/object ID. Do not replay, rename the operation or promote absence to proof. Need authoritative rejection or positive matching object adoption under the existing key, then resume existing14objects and verify the remaining product. thredOS registration and SDK correlation remain unverified; no parallel registry or invented trace IDs. Console deployment/browser proof remains complete; real product/Etsy draft are not complete.
+
+## 2026-10-22 — Real draft console integration; provider reconciliation held
+
+Resume metadata at `/srv/work/state/integrator.json` in the canonical Hetzner checkout. PRs125/126 are merged. Audited recovery revision65 preserves all12 false Session07 evidence keys; Session07 is incomplete, next7. The one-product run has14 confirmed private Notion effects; Notification creation remains UNKNOWN. No provider write/retry/new key is authorized until authoritative reconciliation of that exact operation. Support ticket5493246 has an automated response that does not establish the outcome. Console/API changes expose exact real-run scope, prelisting summaries and pending-effect counts, with independent Python/TypeScript approval. These are read-only engineering changes, not a completed product/draft or live commissioning. Existing fixture data remain preserved. Reviewed source3c4ad72 is deployed;14browser-route, fixture-template, mobile and API outage/recovery checks passed, and all7real routes respond200 through the Windows localhost13100 tunnel.
+
+Next gate: authoritative reconciliation of the existing UNKNOWN Notion operation before any provider retry; the console deployment/browser gate is complete. Preserve all provider attempt history. Publishing, public sharing and spend remain disabled. No Session07 closure or evidence promotion.
+
 ## 2026-10-21 — Recovery pointer and remaining control blocker
 
 RUN_ID: `20261020T211445Z`. Resume recovery from `/srv/work/state/integrator.json` and the approved `/srv/work/evidence/20261020T211445Z/PLAN.md`; do not restart from the stale Windows checkout. BASE_SHA is `5b95386c5e42ec849d452691740b0179e5d9284d`. Final acceptance and PR status require current receipts, not this narrative.
@@ -243,3 +286,8 @@ User authorized one real product through verified Etsy draft, publishing/spend d
 ## Current one-product build handoff (RUN_ID20261021T184946Z)
 
 Resume metadata /srv/work/state/integrator.json and real Hetzner /srv/work/money-machine; preserve accepted fixture workflow20261020T211445Z and unrelated services. After the provider integration wave passes independent review/CI and merges, apply only recover-session-seven on clean trunk with exact before SHA and HEAD, preserve its durable receipt and commit the generated transition before launching the guarded real builder. Operator-owned /srv/work/state/real-draft-approval.json binds the existing active RUN_ID/product/spec digest; credentials remain private outside Git. Verify actual Notion objects, then native media/PDF bytes and one fresh Etsy DRAFT. Publishing/spend/recurring activation remain disabled; no full-commissioning claim.
+
+
+## Applied control recovery (RUN_ID20261021T184946Z)
+
+Current canonical state is the audited recovery65, source on local build/full-automation. Do not reapply or hand-edit state. The generated transition is committed locally so the guarded one-product runner can launch on clean source; it must be carried into the final delivery PR, never direct-pushed to trunk. Start the real private Notion build for existing RUN_ID20261021T184946Z/approvedSpec after dry preflight; preserve fixture app and all unrelated services. Global commissioning, public sharing, publishing, paid calls and recurring activation remain disabled. Read current metadata checkpoint before resuming.

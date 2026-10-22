@@ -684,20 +684,20 @@ async def test_dashboard_piece_parser_rejects_bad_inputs(tmp_path: Path) -> None
     assert len(probe.pages) == pages
 
 
-def test_session_seven_close_keeps_evidence_false() -> None:
+def test_session_seven_recovery_keeps_evidence_false() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert state["current_session"] == 7
-    assert state["session_status"] == "complete"
-    assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7]
-    assert state["next_session"] == 8
-    assert state["next_prompt"] == "11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md"
-    assert state["head_sha"] == HEAD_SHA
+    assert state["session_status"] == "incomplete"
+    assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6]
+    assert state["next_session"] == 7
+    assert state["next_prompt"] == "10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md"
+    assert state["head_sha"] == CLOSURE_SHA
     assert state["evidence_closure_commit_sha"] == CLOSURE_SHA
-    assert state["head_sha"] != state["evidence_closure_commit_sha"]
+    assert state["head_sha"] == state["evidence_closure_commit_sha"]
     assert state["last_verified_commit"] == BOOTSTRAP_SHA
     assert state["commissioned_agents"] == []
     evidence = state["required_completion_evidence"]
     assert evidence.keys() == SESSION_EVIDENCE_KEYS[7]
     assert all(value is False for value in evidence.values())
-    assert state["state_revision"] == 64
+    assert state["state_revision"] == 65
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")

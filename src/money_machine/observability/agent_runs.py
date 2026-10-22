@@ -11,13 +11,15 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
+from sqlalchemy import select
+
 from money_machine.domain.enums import AgentRunStatus
 from money_machine.domain.models.common import ContractError
 from money_machine.integrations.posthog.client import PostHogClient
 from money_machine.observability.correlation import CorrelationContext
 from money_machine.observability.logging import StructuredLogSink, emit_structured_log
 from money_machine.observability.telemetry import emit_agent_run_completed, emit_agent_run_started
-from money_machine.persistence.tables import AgentRun, AgentToolCall
+from money_machine.persistence.tables import AgentRun, AgentToolCall, Job
 from money_machine.persistence.unit_of_work import UnitOfWork
 
 
@@ -41,7 +43,7 @@ class ToolCallObservation:
 
 @dataclass
 class AgentRunObservationContext:
-    """In-flight context for one agent execution before it is persisted."""
+    """Identity of one execution, including its durable active checkpoint."""
 
     run_id: UUID
     correlation: CorrelationContext
@@ -54,6 +56,8 @@ class AgentRunObservationContext:
     model: str | None
     input_hash: str
     started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    job_attempt: int | None = None
+    lease_owner: str | None = None
 
 
 @dataclass
@@ -129,6 +133,64 @@ class AgentRunObserver:
             )
         return context
 
+    async def persist_started_run(
+        self, context: AgentRunObservationContext, *, lease_owner: str
+    ) -> AgentRun:
+        """Stage a real active run; the owning UoW MUST commit before execution.
+
+        Lock the existing job to serialize starts. An interrupted active run is
+        never automatically replaced, resumed or declared failed by this method.
+        """
+        session = self.uow.session
+        await self.uow.flush()
+        job = await session.scalar(
+            select(Job)
+            .where(Job.id == context.correlation.job_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if (
+            job is None
+            or job.owner_agent_id != context.correlation.agent_id
+            or job.workflow_id != context.correlation.workflow_id
+            or job.attempt != context.correlation.attempt
+            or job.status != "RUNNING"
+            or not lease_owner
+            or job.lease_owner != lease_owner
+            or job.lease_expires_at is None
+            or job.lease_expires_at <= datetime.now(UTC)
+        ):
+            raise ValueError("active run requires matching running job and lease")
+        existing = await self.uow.agent_runs.for_job(job.id)
+        if any(run.status == "RUNNING" for run in existing):
+            raise ValueError("job already has an unresolved active run")
+        if context.run_number != max((run.run_number for run in existing), default=0) + 1:
+            raise ValueError("active run number is stale")
+        run = AgentRun(
+            id=context.run_id,
+            job_id=job.id,
+            agent_definition_id=context.agent_definition_id,
+            agent_id=context.correlation.agent_id,
+            agent_definition_version=context.agent_definition_version,
+            prompt_version_id=context.prompt_version_id,
+            prompt_reference=context.prompt_reference,
+            prompt_sha256=context.prompt_sha256,
+            run_number=context.run_number,
+            job_attempt=job.attempt,
+            lease_owner=lease_owner,
+            model=context.model,
+            input_hash=context.input_hash,
+            status="RUNNING",
+            output={},
+            error=None,
+            started_at=context.started_at,
+            completed_at=None,
+        )
+        self.uow.agent_runs.add(run)
+        await self.uow.flush()
+        context.job_attempt, context.lease_owner = job.attempt, lease_owner
+        return run
+
     async def finalize_run(
         self,
         context: AgentRunObservationContext,
@@ -148,28 +210,58 @@ class AgentRunObserver:
             0,
             int((finished_at - context.started_at).total_seconds() * 1000),
         )
-        run = AgentRun(
-            id=context.run_id,
-            job_id=context.correlation.job_id,
-            agent_definition_id=context.agent_definition_id,
-            agent_id=context.correlation.agent_id,
-            agent_definition_version=context.agent_definition_version,
-            prompt_version_id=context.prompt_version_id,
-            prompt_reference=context.prompt_reference,
-            prompt_sha256=context.prompt_sha256,
-            run_number=context.run_number,
-            model=context.model,
-            input_hash=context.input_hash,
-            token_count=token_count,
-            cost_usd=cost_usd,
-            validation_errors=validation_errors,
-            status=status.value,
-            output=output,
-            error=error.model_dump() if error is not None else None,
-            started_at=context.started_at,
-            completed_at=finished_at,
+        run = await self.uow.session.scalar(
+            select(AgentRun)
+            .where(AgentRun.id == context.run_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
         )
-        self.uow.agent_runs.add(run)
+        if run is not None:
+            identity = {
+                "job_id": context.correlation.job_id,
+                "agent_id": context.correlation.agent_id,
+                "agent_definition_id": context.agent_definition_id,
+                "agent_definition_version": context.agent_definition_version,
+                "prompt_version_id": context.prompt_version_id,
+                "prompt_reference": context.prompt_reference,
+                "prompt_sha256": context.prompt_sha256,
+                "run_number": context.run_number,
+                "model": context.model,
+                "input_hash": context.input_hash,
+                "started_at": context.started_at,
+                "job_attempt": context.job_attempt,
+                "lease_owner": context.lease_owner,
+            }
+            if any(getattr(run, key) != value for key, value in identity.items()):
+                raise ValueError("agent run context identity mismatch")
+            if run.status != "RUNNING":
+                raise ValueError("agent run is already terminal")
+        elif context.correlation.agent_id == "A07":
+            raise ValueError("A07 requires a persisted started run")
+        else:
+            # Preserve the terminal-only observer contract for other agents.
+            run = AgentRun(
+                id=context.run_id,
+                job_id=context.correlation.job_id,
+                agent_definition_id=context.agent_definition_id,
+                agent_id=context.correlation.agent_id,
+                agent_definition_version=context.agent_definition_version,
+                prompt_version_id=context.prompt_version_id,
+                prompt_reference=context.prompt_reference,
+                prompt_sha256=context.prompt_sha256,
+                run_number=context.run_number,
+                model=context.model,
+                input_hash=context.input_hash,
+                started_at=context.started_at,
+            )
+            self.uow.agent_runs.add(run)
+        run.token_count = token_count
+        run.cost_usd = cost_usd
+        run.validation_errors = validation_errors
+        run.status = status.value
+        run.output = output
+        run.error = error.model_dump() if error is not None else None
+        run.completed_at = finished_at
         await self.uow.flush()
 
         for tool_call in tool_calls:

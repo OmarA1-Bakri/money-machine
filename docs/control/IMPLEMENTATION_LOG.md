@@ -6858,3 +6858,83 @@ Reviewed dry-run-default recover-session-seven CLI with durable exactlegacy-stat
 ## One-product private build integration checkpoint (RUN_ID20261021T184946Z)
 
 PR124 merged45e1206448423a508b6c424678429a33f9c32891. This wave integrates real Notion private adapters, the existing SQL effect ledger, a finite three-variant builder and an explicit operator-assisted runner. The runner binds clean reviewed source and one approved run/product/spec, retains per-write reconciliation and lease guards, and does not activate the programme. Actual control recovery and provider creation remain pending at this checkpoint. Historical Session07 close is preserved; compatibility checks accept only exact legacy64 or the authorized recovery65 with all12 evidence keys false. No generated evidence, credentials or source PDF are committed.
+
+
+## Applied control recovery (RUN_ID20261021T184946Z)
+
+Applied the supported D0039 recovery on clean merged trunk48b2d2a217ed8cb607b9383ad7f6c7c0829484d3. BeforeSHAfc0fb4143c8fdfaaa81abfb9cca32687d42eb92e8979cfa0c9a911460886a624; afterSHA590c36f9a1cfd20442e4f630cb872dc526cea67c9f089630f88a03a7240d0f39. Canonical revision65 reopens Session07 with actual Hetzner root, completed0..6,next7;12false keys/commissioned[]/all historical notes preserved. Durable intent, final receipt and exact before/after bytes retained outside Git. This records recovery, not Session07 completion or provider delivery.
+
+
+## Real draft operator console integration (2026-10-22)
+
+Added explicit fixture/real_draft response modes and workflow-scoped real reads for the approved shop. Real summaries exist before an Etsy listing; pending-effect counts use the latest observation for each operation, without exposing keys or provider payloads. The web separates stored fixture completion from private draft progress and rejects contradictory completion/uncertainty and mismatched modes. No provider writes, ledger reconciliation, service activation or commissioning occurred in this wave. Independent TypeScript review corrected mode coercion; Python review confirmed exact run isolation and unchanged artifact guards.
+
+
+## Reviewed console deployment and browser verification (2026-10-22)
+
+Built a new console image offline from the reviewed standalone output and existing local base, preserved the previous container, gracefully restarted only the project API, and switched only console3100. Browser route, real/fixture isolation, actual fixture-file opening, mobile and API outage/recovery proofs passed. Restored the Windows localhost13100 tunnel; all7 real routes respond200. The uncertain Notion operation remains held and unchanged. This deploys truthful progress visibility; it does not complete the real product or Etsy draft.
+
+
+## Recovery continuation: source seeds and held effect (2026-10-22)
+
+Resumed the canonical clean checkout without restarting the expired real-build lease. Integrated the exact reviewed research-seed patch and passed supported focused/affected checks. Fresh read-only SQL still shows14confirmed effects and one UNKNOWN Forest Notification operation, with no provider object/request ID or recorded request-body digest. The operation-key digest matches the exact Forest notification logical key; it is not a body hash. Existing canonical Notion connection title search and accessible-database discovery yielded no positive match; that negative result does not authorize replay. No provider writes or ledger edits occurred. The scoped thredOS contract/source inspection did not establish this run's registered identity or SDK trace/span binding; existing A05AgentRun is not proof of registration. Preserve the binding requirement before future production agent execution.
+
+## 2026-10-22 — Single cloud coding continuation: bounded QA corrections
+
+Started clean at f8f26dc890943890c1925531b4b1ddb2e86eeff4 in
+/workspace/money-machine. Repository .agents/.codex skill directories were empty.
+Prompt authenticity:12 checks passed; workbook/register verified with explicit
+missing-private-PDF allowance. Three independent prompt reviews and corrective
+addendum: reviews/2026-10-22-cloud-qa-prompt-integrity.md (D-0040).
+
+Full Chromium153.0.8010.12 reproduced the PDF catalog failure. The parser now
+admits only the observed inline ViewerPreferences {Type /ViewerPreferences,
+DisplayDocTitle true}, with hostile keys/types/references refused. Structural
+PDF/link/content validation remains enabled. Initial focused PDF regression:103
+passed. No PDF source bytes or immutable prompts were edited.
+
+Known existing Notification formula drift now records FAIL_REPAIRABLE and one
+deduplicated pending finding. The finite simulation-only application consumer
+uses existing EventDispatcher/Job/AgentRunObserver/idempotency/effect/receipt/
+retry/lease controls: BUILD_QA_FAILED -> BuildRepairJob -> REPAIR_APPLIED ->
+ProductQAJob. Only passing fresh QA closes the repair. Existing property IDs
+are retained. Lost-response/pre-write retries, exhausted budgets, lying
+readback, later structural damage, confirmed-effect drift and replay are tested.
+QA checkpoint execution references cite durable job/run/definition/prompt rows;
+local identities are explicitly not thredOS registrations. Existing variants
+are reconciled through the idempotent builder, leaving no pending duplicate build.
+These remain deterministic fixture-library executions, with no model/prompt
+execution or commissioning claim.
+
+Independent code and safety reviews found four recovery/integration defects,
+all corrected; both bounded re-reviews passed. See
+reviews/2026-10-22-cloud-qa-code-review.md. Terminal DB-commit failure additionally
+proves no orphan run references or blind mutation replay: the existing lease
+recovery boundary remains held. It does not prove automatic lease recovery.
+
+The initial affected aggregate had2328passes and9failures:8 historical assertions
+expected revision64/complete despite the pinned audited revision65/incomplete
+state; one expected the old renderer catalog. Tests now assert the actual
+recovery contract while retaining every false-evidence check, and the exact
+measured PDF shape. IMPLEMENTATION_STATE.json is byte-identical to pinned HEAD.
+Final aggregate results belong in TEST_EVIDENCE.md; this is no programme closure.
+
+API/readiness and console freshly returned200, schema_current=true. Frontend:
+61tests, TypeScript, ESLint and production build passed using installed tools.
+Ruff and Pyright passed. uv's application rebuild could not resolve hatchling
+through the proxy; direct installed checks were used, without dependency changes.
+
+Graphify priority: official docs inspected; official GitHub and PyPI access
+failed. Exact0.9.93 was absent from cache. Supported Library materialization
+resolved the supplied setup archive, but its signed download returned503 twice
+including the explicitly authorized bounded retry. No archive bytes/hash
+verification, installation, local graph, external source upload, paid backend
+or saved-environment persistence is claimed. A package-pinned isolated installer
+and exact limitations are in scripts/setup_graphify.sh and runbooks/GRAPHIFY.md.
+
+Production run20261021T184946Z and its UNKNOWN Notification operation remain
+held; no production ledger import/substitution, provider mutation, publication,
+spend, email reading or deployment occurred. Real product acceptance remains
+incomplete. thredOS SDK/registration integration is absent here. Final direct
+blueprint audit needs The-Hands-Off-Money-Machine-Playbook.pdf,829165bytes,
+sha256 c9cd31775d1d79be31c3a8092d8d49fc71d52e695f97cbfb580fcbb35f240fad.

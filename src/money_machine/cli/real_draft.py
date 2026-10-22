@@ -25,9 +25,10 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from money_machine.application.real_draft_authority import DraftRunAuthority, DraftRunRefused
-from money_machine.application.real_notion_build import RealNotionProductBuilder
+from money_machine.application.real_notion_build import THEMES, RealNotionProductBuilder
 from money_machine.domain.enums import AgentRunStatus, JobStatus
 from money_machine.domain.models.product_spec import ProductSpec as Spec
+from money_machine.integrations.notion.real_product_adapter import validate_cover_url
 from money_machine.orchestration.transition_guard import require_job_transition
 from money_machine.persistence.tables import (
     AgentDefinition,
@@ -452,7 +453,25 @@ async def private_notion_client(
         yield sdk
 
 
+def load_cover_urls(path: Path | None) -> dict[str, str]:
+    """Load explicit asset inputs, independently of credentials and provider I/O."""
+    if path is None or not path.is_file() or path.stat().st_size > 8192:
+        raise DraftRunRefused("variant_cover_assets_required")
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (ValueError, UnicodeError):
+        raise DraftRunRefused("variant_cover_assets_invalid_json") from None
+    if not isinstance(value, dict) or set(value) != set(THEMES):
+        raise DraftRunRefused("variant_cover_assets_required")
+    covers = {name: validate_cover_url(url) for name, url in value.items()}
+    if len(set(covers.values())) != len(covers):
+        raise DraftRunRefused("distinct_variant_covers_required")
+    return covers
+
+
 async def execute(args: argparse.Namespace, spec: Spec) -> dict[str, Any]:
+    cover_path = getattr(args, "covers_json", None)
+    cover_urls = load_cover_urls(Path(cover_path) if cover_path else None)
     url = os.environ.get("MONEY_MACHINE_DATABASE_URL", "")
     validate_database_url(url)
     evidence = Path(args.evidence_root).resolve()
@@ -492,7 +511,12 @@ async def execute(args: argparse.Namespace, spec: Spec) -> dict[str, Any]:
                     session, job_id, authority, owner=owner, now=datetime.now(UTC)
                 )
             builder = RealNotionProductBuilder(
-                authority, sdk=sdk, session_factory=factory, job_id=job_id, lease_owner=owner
+                authority,
+                sdk=sdk,
+                session_factory=factory,
+                job_id=job_id,
+                lease_owner=owner,
+                cover_urls=cover_urls,
             )
             manifest = await builder.build(
                 spec, run_id=args.run_id, workspace_id=UUID(args.workspace_id)
@@ -563,6 +587,7 @@ def main(argv: list[str] | None = None) -> int:
         "expected-head",
     ):
         parser.add_argument("--" + name, required=True)
+    parser.add_argument("--covers-json", help="Explicit stable HTTPS cover image URLs by variant")
     parser.add_argument("--research")
     parser.add_argument("--shortlist")
     parser.add_argument("--execute", action="store_true")

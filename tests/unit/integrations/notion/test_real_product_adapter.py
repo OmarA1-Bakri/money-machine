@@ -354,3 +354,56 @@ async def test_calendar_uses_verified_date_property_configuration(setup_adapter)
         "view_range": "month",
     }
     assert sent["create_database"]["show_data_source_title"] is False
+
+
+@pytest.mark.asyncio
+async def test_page_cover_uses_supported_external_file_shape(setup_adapter):
+    adapter, calls, _, _, _ = setup_adapter
+    cover = {"type": "external", "external": {"url": "https://assets.example/forest.png"}}
+    await adapter.create_page(PAGE, "Forest", cover=cover)
+    assert calls[-1][2]["cover"] == cover
+    assert calls[-1][:2] == ("POST", "pages")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "url",
+    [
+        "fixture://palette/Forest",
+        "http://assets.example/a.png",
+        "https://user:pass@assets.example/a.png",
+        "https://assets.example/a.png?token=secret",
+        "https://assets.example/a.png#fragment",
+        "https://localhost/a.png",
+        "https://127.0.0.1/a.png",
+        "https://assets.example:443/a.png",
+        "https://assets.example/a.html",
+    ],
+)
+async def test_unsupported_cover_refused_without_write(setup_adapter, url):
+    adapter, calls, _, _, _ = setup_adapter
+    with pytest.raises(DraftRunRefused, match="cover"):
+        await adapter.create_page(
+            PAGE, "Forest", cover={"type": "external", "external": {"url": url}}
+        )
+    assert all(c[0] == "GET" for c in calls)
+
+
+@pytest.mark.asyncio
+async def test_cover_exception_does_not_enable_external_block_resources(setup_adapter):
+    adapter, calls, _, _, _ = setup_adapter
+    with pytest.raises(DraftRunRefused, match="external_resource_forbidden"):
+        await adapter.create_page(
+            PAGE,
+            "Forest",
+            children=[
+                {
+                    "type": "image",
+                    "image": {
+                        "type": "external",
+                        "external": {"url": "https://assets.example/forest.png"},
+                    },
+                }
+            ],
+        )
+    assert all(c[0] == "GET" for c in calls)

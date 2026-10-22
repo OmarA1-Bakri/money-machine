@@ -156,6 +156,7 @@ def _parse_aesthetics_checkpoint(payload: dict[object, object]) -> ProductBuildC
             "fact_ledger",
             "workflow_link",
             "test_matrix",
+            "qa_executions",
         }
     }
     base = parse_notification_checkpoint(phase_five)

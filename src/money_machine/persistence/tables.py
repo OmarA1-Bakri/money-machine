@@ -693,16 +693,19 @@ class AgentRun(Identified):
     prompt_reference: Mapped[str] = text_column()
     prompt_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     run_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    job_attempt: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    lease_owner: Mapped[str | None] = text_column(nullable=True)
     model: Mapped[str | None] = text_column(length=100, nullable=True)
     input_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(14, 6), nullable=True)
     validation_errors: Mapped[list[Any] | None] = mapped_column(JsonB, nullable=True)
-    status: Mapped[str] = state("status", _enum_values(AgentRunStatus))
+    # RUNNING is persistence-only; AgentResult still accepts terminal outcomes only.
+    status: Mapped[str] = state("status", ("RUNNING", *_enum_values(AgentRunStatus)))
     output: Mapped[dict[str, Any]] = mapped_column(JsonB, nullable=False, default=dict)
     error: Mapped[dict[str, Any] | None] = mapped_column(JsonB, nullable=True)
     started_at: Mapped[datetime] = moment()
-    completed_at: Mapped[datetime] = moment()
+    completed_at: Mapped[datetime | None] = moment(nullable=True)
 
     __table_args__ = (
         # Composite foreign keys, so the denormalised lineage cannot disagree with the rows
@@ -727,7 +730,8 @@ class AgentRun(Identified):
         ),
         CheckConstraint("length(prompt_sha256) = 64", name="prompt_sha256_length"),
         CheckConstraint(
-            "(status = 'SUCCESS' AND error IS NULL) OR (status <> 'SUCCESS' AND error IS NOT NULL)",
+            "(status IN ('RUNNING', 'SUCCESS') AND error IS NULL) OR "
+            "(status NOT IN ('RUNNING', 'SUCCESS') AND error IS NOT NULL)",
             name="structured_error_required",
         ),
         CheckConstraint(
@@ -735,11 +739,24 @@ class AgentRun(Identified):
             name="error_is_a_structured_contract_error",
         ),
         CheckConstraint("completed_at >= started_at", name="run_ends_after_start"),
+        CheckConstraint(
+            "(status = 'RUNNING' AND completed_at IS NULL AND output = '{}'::jsonb "
+            "AND job_attempt IS NOT NULL AND job_attempt >= 0 "
+            "AND lease_owner IS NOT NULL AND lease_owner <> '') OR "
+            "(status <> 'RUNNING' AND completed_at IS NOT NULL)",
+            name="completion_matches_status",
+        ),
         CheckConstraint("run_number >= 1", name="run_number_positive"),
         CheckConstraint("input_hash IS NULL OR length(input_hash) = 64", name="input_hash_length"),
         CheckConstraint("token_count IS NULL OR token_count >= 0", name="token_count_non_negative"),
         CheckConstraint("cost_usd IS NULL OR cost_usd >= 0", name="cost_usd_non_negative"),
         Index("ix_agent_runs_agent_id", "agent_id"),
+        Index(
+            "ix_agent_runs_one_running_per_job",
+            "job_id",
+            unique=True,
+            postgresql_where=text("status = 'RUNNING'"),
+        ),
     )
 
 

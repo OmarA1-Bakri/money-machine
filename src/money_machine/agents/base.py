@@ -105,6 +105,7 @@ class AgentContext:
     run_at: datetime
     tool_registry: object | None = None  # L2: ToolRegistry for invoke_tool()
     review_coordinator: object | None = None  # W6: ReviewSubagentCoordinator
+    lease_owner: str | None = None
 
     @property
     def agent_run_id(self) -> UUID:

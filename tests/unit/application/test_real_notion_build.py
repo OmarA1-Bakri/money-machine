@@ -70,12 +70,14 @@ class Adapter:
     async def get_page(self, identity):
         return deepcopy(self.objects[identity])
 
-    async def create_page(self, parent, title, *, children, icon):
+    async def create_page(self, parent, title, *, children, icon, cover=None):
         return self.put(
             {
                 "properties": {"title": {"type": "title", **module.title(title)}},
                 "parent": {"page_id": parent},
                 "blocks": children,
+                "icon": icon,
+                "cover": cover,
             },
             parent,
         )
@@ -91,7 +93,14 @@ class Adapter:
         )
 
     async def list_blocks(self, parent):
-        return deepcopy(self.objects[parent].get("blocks", []))
+        blocks = deepcopy(self.objects[parent].get("blocks", []))
+        for identity in self.children.get(parent, []):
+            obj = self.objects[identity]
+            if "db_title" in obj or "view_page" in obj:
+                blocks.append({"id": identity, "type": "child_database"})
+            elif "properties" in obj and "title" in obj["properties"]:
+                blocks.append({"id": identity, "type": "child_page"})
+        return blocks
 
     async def append_blocks(self, parent, children):
         result = []
@@ -180,6 +189,7 @@ class Adapter:
                 "type": view_type,
                 "filter": filter,
                 "view_page": page,
+                "parent": {"page_id": page},
                 "configuration": {
                     "type": "calendar",
                     "date_property_id": self.objects[source]["properties"]["Date"]["id"],
@@ -296,6 +306,7 @@ def inputs(monkeypatch):
         session_factory=cast(async_sessionmaker[AsyncSession], object()),
         job_id=uuid4(),
         lease_owner="test",
+        cover_urls={name: f"https://assets.example/{name.lower()}.png" for name in module.THEMES},
     )
     return builder, spec, workspace
 
@@ -379,3 +390,129 @@ async def test_scope_refused_before_any_effect(inputs):
     with pytest.raises(DraftRunRefused):
         await builder.build(spec, run_id="other-run", workspace_id=workspace)
     assert Adapter.writes == 0
+
+
+@pytest.mark.asyncio
+async def test_variant_covers_and_backlinks_are_read_back_and_replay_safe(inputs):
+    manifest = await build(inputs)
+    for variant in manifest["variants"]:
+        home = variant["root_id"]
+        expected_cover = {
+            "type": "external",
+            "external": {"url": f"https://assets.example/{variant['name'].lower()}.png"},
+        }
+        for page_id in [home, *(h["page_id"] for h in variant["hubs"])]:
+            assert Adapter.objects[page_id]["cover"] == expected_cover
+        for hub in variant["hubs"]:
+            links = [
+                b["link_to_page"]["page_id"]
+                for b in Adapter.objects[hub["page_id"]]["blocks"]
+                if b.get("type") == "link_to_page"
+            ]
+            assert links == [home]
+            for guide_id in hub["guide_ids"]:
+                links = [
+                    b["link_to_page"]["page_id"]
+                    for b in Adapter.objects[guide_id]["blocks"]
+                    if b.get("type") == "link_to_page"
+                ]
+                assert links == [hub["page_id"], home]
+    before = Adapter.writes
+    assert await build(inputs) == manifest
+    assert Adapter.writes == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("drift", ["cover", "icon", "backlink", "duplicate_backlink"])
+async def test_cover_or_backlink_drift_stops_without_mutation(inputs, drift):
+    manifest = await build(inputs)
+    hub = Adapter.objects[manifest["variants"][0]["hubs"][0]["page_id"]]
+    if drift in ("cover", "icon"):
+        hub[drift] = None
+    else:
+        link = next((b for b in hub["blocks"] if b.get("type") == "link_to_page"), None)
+        assert link is not None
+        if drift == "backlink":
+            link["link_to_page"]["page_id"] = str(uuid4())
+        else:
+            hub["blocks"].append(deepcopy(link))
+    before = Adapter.writes
+    with pytest.raises(DraftRunRefused):
+        await build(inputs)
+    assert Adapter.writes == before
+
+
+@pytest.mark.asyncio
+async def test_counts_are_observed_including_linked_containers_and_extra_child(inputs):
+    first = await build(inputs)
+    variant = first["variants"][0]
+    assert variant["regular_page_count"] == 19
+    assert variant["database_container_count"] == 23  # 7 sources + 16 linked views
+    assert variant["page_count_including_databases"] == 42
+    assert len(variant["page_inventory"]["page_ids"]) == 19
+    extra = await inputs[0].adapter.create_page(
+        variant["hubs"][0]["page_id"], "Extra guide", children=[], icon=None
+    )
+    before = Adapter.writes
+    second = await build(inputs)
+    observed = second["variants"][0]
+    assert observed["regular_page_count"] == 20
+    assert observed["page_count_including_databases"] == 43
+    assert extra["id"] in observed["page_inventory"]["page_ids"]
+    assert Adapter.writes == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("damage", ["cycle", "wrong_parent", "nested"])
+async def test_inventory_refuses_incomplete_or_invalid_readback(inputs, damage):
+    first = await build(inputs)
+    home = first["variants"][0]["root_id"]
+    if damage == "cycle":
+        Adapter.objects[home]["blocks"].append({"type": "child_page", "id": home})
+    elif damage == "wrong_parent":
+        identity = first["variants"][0]["hubs"][0]["guide_ids"][0]
+        Adapter.objects[identity]["parent"]["page_id"] = home
+    else:
+        Adapter.objects[home]["blocks"].append({"type": "toggle", "has_children": True})
+    before = Adapter.writes
+    with pytest.raises(DraftRunRefused):
+        await build(inputs)
+    assert Adapter.writes == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("covers", [None, {}, {"Forest": "fixture://palette/Forest/#2F5D50"}])
+async def test_missing_cover_assets_refused_before_effects(inputs, covers):
+    inputs[0].cover_urls = covers
+    with pytest.raises(DraftRunRefused, match="cover"):
+        await build(inputs)
+    assert Adapter.writes == 0
+
+
+@pytest.mark.asyncio
+async def test_incomplete_child_inventory_cannot_claim_complete_build(inputs, monkeypatch):
+    first = await build(inputs)
+    home = first["variants"][0]["root_id"]
+    missing = first["variants"][0]["hubs"][0]["page_id"]
+    original = Adapter.list_blocks
+
+    async def incomplete(self, identity):
+        children = await original(self, identity)
+        return [b for b in children if b.get("id") != missing] if identity == home else children
+
+    monkeypatch.setattr(Adapter, "list_blocks", incomplete)
+    before = Adapter.writes
+    with pytest.raises(DraftRunRefused, match="inventory_missing"):
+        await build(inputs)
+    assert Adapter.writes == before
+
+
+@pytest.mark.asyncio
+async def test_linked_containers_do_not_inflate_spec_content_target(inputs):
+    first = await build(inputs)
+    assert first["variants"][0]["content_page_count_including_source_databases"] == 26
+    inputs = (inputs[0], inputs[1].model_copy(update={"page_target_min": 40}), inputs[2])
+    before = Adapter.writes
+    with pytest.raises(DraftRunRefused, match="outside_spec_target"):
+        await build(inputs)
+    assert Adapter.writes == before

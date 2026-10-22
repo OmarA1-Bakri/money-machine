@@ -16,6 +16,7 @@ from pathlib import Path
 from uuid import UUID
 
 import pytest
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import sync_playwright
 
 from money_machine.assets.listing_images import refuse_unknown_screenshot as refuse_unknown_image
@@ -283,6 +284,85 @@ def test_the_same_fixture_has_the_same_hash() -> None:
     assert tuple(shot.png for shot in first) == tuple(shot.png for shot in second)
     hashes = [hashlib.sha256(shot.png).hexdigest() for shot in first]
     assert len(set(hashes)) == 3
+
+
+def test_capture_protocol_failure_recreates_and_revalidates_page(monkeypatch) -> None:
+    import money_machine.assets.screenshots as module
+
+    original = module._clip  # pyright: ignore[reportPrivateUsage]
+    pages = []
+    checks = []
+    validate = module.refuse_rendered_text
+
+    def checked(text):
+        checks.append(text)
+        return validate(text)
+
+    def failed_once(page):
+        pages.append(page)
+        if len(pages) == 1:
+            raise PlaywrightError(
+                "Page.screenshot: Protocol error (Page.captureScreenshot): "
+                "Unable to capture screenshot\n"
+                "Call log:\n  - fonts loaded"
+            )
+        return original(page)
+
+    monkeypatch.setattr(module, "_clip", failed_once)
+    monkeypatch.setattr(module, "refuse_rendered_text", checked)
+    shot = _capture((VariantPage(name="Sage Green"),))[0]
+    assert hashlib.sha256(shot.png).hexdigest() == _PNG_SHA256
+    assert len(pages) == len(checks) == 2 and pages[0] is not pages[1]
+    assert all(page.is_closed() for page in pages)
+
+
+@pytest.mark.parametrize(
+    ("message", "expected_calls"),
+    [
+        (
+            "Page.screenshot: Protocol error (Page.captureScreenshot): "
+            "Unable to capture screenshot",
+            2,
+        ),
+        ("Page.screenshot: Target page, context or browser has been closed", 1),
+        ("Page.screenshot: Timeout 30000ms exceeded", 1),
+    ],
+)
+def test_capture_persistent_or_other_browser_error_propagates(monkeypatch, message, expected_calls):
+    import money_machine.assets.screenshots as module
+
+    pages = []
+
+    def fail(page):
+        pages.append(page)
+        raise PlaywrightError(message)
+
+    monkeypatch.setattr(module, "_clip", fail)
+    with pytest.raises(PlaywrightError, match=r"Page\.screenshot"):
+        _capture((VariantPage(name="Sage Green"),))
+    assert len(pages) == expected_calls and all(page.is_closed() for page in pages)
+
+
+def test_capture_second_page_cannot_bypass_sensitive_text_refusal(monkeypatch) -> None:
+    import money_machine.assets.screenshots as module
+
+    clips, validations = [], []
+
+    def fail(page):
+        clips.append(page)
+        raise PlaywrightError(
+            "Page.screenshot: Protocol error (Page.captureScreenshot): Unable to capture screenshot"
+        )
+
+    def refuse_second(text):
+        validations.append(text)
+        return "sensitive_data" if len(validations) == 2 else None
+
+    monkeypatch.setattr(module, "_clip", fail)
+    monkeypatch.setattr(module, "refuse_rendered_text", refuse_second)
+    with pytest.raises(ScreenshotRefusal, match="sensitive_data"):
+        _capture((VariantPage(name="Sage Green"),))
+    assert len(clips) == 1 and len(validations) == 2
 
 
 def test_a_missing_readiness_marker_is_refused() -> None:

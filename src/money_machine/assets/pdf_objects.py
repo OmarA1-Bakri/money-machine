@@ -5,7 +5,8 @@
 exactly ``Type``, ``Subtype``, ``Rect``, ``Border``, ``F``, and ``A``, with
 ``/Subtype /Link``. ``/S`` must be ``/URI``. Any other ``/URI`` must be an
 accepted link. The catalog is trailer ``/Root`` and equals ``Type`` and
-``Pages``. A page equals the Chromium keys, plus ``Annots`` when present.
+``Pages``, optionally with Chromium's exact inert ``ViewerPreferences``.
+A page equals the Chromium keys, plus ``Annots`` when present.
 ``/Resources`` equals the measured set ``ExtGState``, ``Font``, and
 ``ProcSet``. Role checks see the resolved value. A ``/URI`` is deferred only
 for a ``/Annots`` link on a page the ``/Kids`` walk reached. A ``/Kids``
@@ -239,7 +240,20 @@ def _refuse_trailer_root(doc: PdfDocument) -> None:
     root = doc.deref(doc.trailer.get("Root"))
     if not isinstance(root, dict):
         raise ValueError("pdf catalog keys")
-    if frozenset(root) - _CATALOG_ALLOW_EXTRA != _CATALOG_KEYS:
+    keys = frozenset(root) - _CATALOG_ALLOW_EXTRA
+    if keys == _CATALOG_KEYS | {"ViewerPreferences"}:
+        # Full Chromium 153 emits this inline dictionary; the matching
+        # headless shell omits it. Do not resolve references or admit other
+        # viewer options: only the measured, non-executable shape is supported.
+        preferences = root["ViewerPreferences"]
+        if (
+            not isinstance(preferences, dict)
+            or frozenset(preferences) != frozenset({"Type", "DisplayDocTitle"})
+            or not _name_is(preferences.get("Type"), "ViewerPreferences")
+            or preferences.get("DisplayDocTitle") is not True
+        ):
+            raise ValueError("pdf viewer preferences")
+    elif keys != _CATALOG_KEYS:
         raise ValueError("pdf catalog keys")
     _refuse_root_names(doc, root)
 

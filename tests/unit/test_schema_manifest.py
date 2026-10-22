@@ -189,12 +189,11 @@ def test_taxonomy_constraints_are_table_level_so_migrations_carry_them() -> None
     assert len(checks) > 60
 
 
-def test_exactly_one_migration_revision_exists_and_it_is_the_root() -> None:
-    """The foundation ships one reviewed initial revision, not a chain of fixups."""
+def test_migrations_follow_the_reviewed_single_root_chain() -> None:
+    """The three addenda extend the canonical root without a second schema."""
     revisions = sorted(path for path in MIGRATIONS.glob("*.py"))
 
-    # Three revisions now: canonical + jev_evaluations + agent_run observability addenda
-    assert len(revisions) == 3
+    assert len(revisions) == 4
 
     # Canonical (root) migration
     canonical = next(r for r in revisions if "9f46f3152a68" in r.name)
@@ -219,6 +218,12 @@ def test_exactly_one_migration_revision_exists_and_it_is_the_root() -> None:
     assert 'down_revision = "a1b2c3d4e5f6"' in obs_body
     assert "agent_tool_calls" in obs_body
     assert 'op.add_column("agent_runs", sa.Column("run_number"' in obs_body
+
+    lifecycle = next(r for r in revisions if "c3d4e5f6a7b8" in r.name)
+    lifecycle_body = lifecycle.read_text(encoding="utf-8")
+    assert 'down_revision = "b2c3d4e5f6a7"' in lifecycle_body
+    assert "op.create_table" not in lifecycle_body
+    assert "op.drop_table" not in lifecycle_body
 
 
 def test_contract_taxonomies_are_subsets_of_their_table_taxonomies() -> None:

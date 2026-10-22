@@ -45,7 +45,7 @@ describe("request-time console probes", () => {
   it("reports ready only after receiving a valid stored-run view", async () => {
     vi.stubEnv("API_BASE_URL", "http://127.0.0.1:8100");
     const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      run_id: "stored-run", view: "now", items: [],
+      execution_mode: "fixture", run_id: "stored-run", view: "now", items: [],
     }), { status: 200 }));
     vi.stubGlobal("fetch", fetch);
     const response = await healthGET();

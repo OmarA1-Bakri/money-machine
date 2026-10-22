@@ -32,6 +32,7 @@ from playwright.sync_api import (
     WebSocketRoute,
     sync_playwright,
 )
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
 from money_machine.assets.screenshot_text import (
@@ -348,6 +349,21 @@ def _http_allowed(url: str, _resource_type: str, allowed_http: frozenset[str]) -
 
 
 def _paint_page(context: BrowserContext, document: str) -> bytes:
+    try:
+        return _paint_page_once(context, document)
+    except PlaywrightError as exc:
+        # Chromium can refuse a capture after document/font readiness. Recreate
+        # this local page once, retaining all admission checks and golden bytes.
+        # Never retry timeouts, closed targets, validation refusals or a second
+        # protocol failure. No provider operation belongs to this local renderer.
+        if str(exc).splitlines()[0] != (
+            "Page.screenshot: Protocol error (Page.captureScreenshot): Unable to capture screenshot"
+        ):
+            raise
+    return _paint_page_once(context, document)
+
+
+def _paint_page_once(context: BrowserContext, document: str) -> bytes:
     page = context.new_page()
     try:
         page.set_content(document, wait_until="load")

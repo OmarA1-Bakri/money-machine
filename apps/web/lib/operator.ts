@@ -9,7 +9,9 @@ export interface OperatorRecord {
   product_id: string | null;
   listing_version_id: string | null;
 }
+export type ExecutionMode = "fixture" | "real_draft";
 export interface OperatorEnvelope {
+  execution_mode: ExecutionMode;
   run_id: string;
   view: OperatorView;
   items: OperatorRecord[];
@@ -34,7 +36,8 @@ export async function fetchOperatorView(view: OperatorView, runId?: string): Pro
     const data: unknown = await response.json();
     if (!data || typeof data !== "object") return { kind: "unavailable" };
     const envelope = data as Record<string, unknown>;
-    if (typeof envelope.run_id !== "string" || !envelope.run_id || envelope.view !== view ||
+    if ((envelope.execution_mode !== "fixture" && envelope.execution_mode !== "real_draft") ||
+      typeof envelope.run_id !== "string" || !envelope.run_id || envelope.view !== view ||
       (runId !== undefined && envelope.run_id !== runId) ||
       !Array.isArray(envelope.items) || !envelope.items.every(isRecord)) {
       return { kind: "unavailable" };

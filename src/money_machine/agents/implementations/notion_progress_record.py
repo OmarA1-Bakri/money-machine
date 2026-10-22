@@ -186,6 +186,14 @@ def write_checkpoint(
             # An unrecoverable phase-1 rebuild is allowed to write. Reading the
             # prior jobs must not raise the recovery rule from inside the writer.
             prior = load_payload(path, allow_unrecoverable=True)
+            # Execution lineage belongs to the same checkpoint and survives
+            # later QA, ledger and matrix writes through this single writer.
+            if prior.payload is not None:
+                prior_refs = prior.payload.get("provider_object_references")
+                if isinstance(prior_refs, dict) and "qa_executions" in prior_refs:
+                    current_refs = dict(references)
+                    current_refs["qa_executions"] = prior_refs["qa_executions"]
+                    payload["provider_object_references"] = current_refs
             body["repair_jobs"] = [
                 dict(job) if type(job) is dict else job for job in prior.repair_jobs
             ]

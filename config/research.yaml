@@ -1,17 +1,17 @@
 version: 1
 research:
-  # Seed phrases from playbook for initial market research  
+  # Original playbook PDF p38 (printed p36), step 13.1; preserve search order.
   seed_phrases:
-    - budget spreadsheet
-    - business card template
-    - custom pet portrait
-    - digital planner
-    - meal planner printable
-    - printable wall art
-    - resume template
-    - social media templates
-    - vintage logo design
-    - wedding invitation template
+    - notion template
+    - notion life planner
+    - notion planner aesthetic
+    - adhd digital planner
+    - notion student planner
+    - notion budget tracker
+    - notion second brain
+    - client portal notion
+    - notion business template
+    - digital planner 2026
 
   # Research collection parameters
   target_observation_count: 30  # Target 25-40, aim for middle

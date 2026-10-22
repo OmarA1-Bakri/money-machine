@@ -3458,16 +3458,16 @@ async def test_spec_page_must_be_the_stored_home(tmp_path: Path) -> None:
         notion_variants_module._require_one_spec_page(probe, spec, stored)  # pyright: ignore[reportPrivateUsage]
 
 
-def test_session_seven_close_keeps_evidence_false() -> None:
+def test_session_seven_recovery_keeps_evidence_false() -> None:
     state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     assert state["current_session"] == 7
-    assert state["session_status"] == "complete"
-    assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6, 7]
-    assert state["next_session"] == 8
-    assert state["next_prompt"] == "11_SESSION_08_MERCHANDISING_AND_ASSET_FACTORY.md"
-    assert state["head_sha"] == HEAD_SHA
+    assert state["session_status"] == "incomplete"
+    assert state["completed_sessions"] == [0, 1, 2, 3, 4, 5, 6]
+    assert state["next_session"] == 7
+    assert state["next_prompt"] == "10_SESSION_07_PRODUCT_BUILD_VARIANTS_AND_QA.md"
+    assert state["head_sha"] == CLOSURE_SHA
     assert state["evidence_closure_commit_sha"] == CLOSURE_SHA
-    assert state["head_sha"] != state["evidence_closure_commit_sha"]
+    assert state["head_sha"] == state["evidence_closure_commit_sha"]
     assert state["last_verified_commit"] == BOOTSTRAP_SHA
     assert state["commissioned_agents"] == []
     evidence = state["required_completion_evidence"]
@@ -3475,5 +3475,5 @@ def test_session_seven_close_keeps_evidence_false() -> None:
     assert all(value is False for value in evidence.values())
     assert evidence["variant_builder_implemented"] is False
     assert evidence["product_qa_implemented"] is False
-    assert state["state_revision"] == 64
+    assert state["state_revision"] == 65
     assert "SESSION_07_PRODUCT_BUILD_AND_QA_COMPLETE" not in STATE_PATH.read_text(encoding="utf-8")

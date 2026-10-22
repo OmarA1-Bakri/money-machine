@@ -8,8 +8,11 @@ The consumer reserves durable intents and reconciles uncertain effects.
 
 from __future__ import annotations
 
+import ipaddress
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+from copy import deepcopy
 from typing import Any, Literal
+from urllib.parse import urlsplit
 from uuid import UUID
 
 from notion_client import AsyncClient
@@ -35,6 +38,42 @@ def _title(value: str) -> list[Json]:
     return [{"type": "text", "text": {"content": value}}]
 
 
+def validate_cover_url(value: object) -> str:
+    """Accept an explicit stable image URL; never invent or fetch cover assets."""
+    if not isinstance(value, str) or len(value) > 2000 or any(c.isspace() for c in value):
+        raise DraftRunRefused("stable_https_cover_required")
+    try:
+        parsed = urlsplit(value)
+        host = parsed.hostname or ""
+        if (
+            parsed.scheme != "https"
+            or not host
+            or "." not in host
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.port is not None
+            or parsed.query
+            or parsed.fragment
+            or "\\" in value
+            or host.endswith((".localhost", ".local"))
+            or not parsed.path.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
+        ):
+            raise ValueError("invalid cover")
+        try:
+            ipaddress.ip_address(host)
+        except ValueError:
+            pass
+        else:
+            raise ValueError("IP cover host")
+    except ValueError:
+        raise DraftRunRefused("stable_https_cover_required") from None
+    return value
+
+
+def external_cover(url: object) -> Json:
+    return {"type": "external", "external": {"url": validate_cover_url(url)}}
+
+
 class RealPrivateNotionAdapter:
     """Only descendants of one verified private root may be accessed.
 
@@ -53,6 +92,7 @@ class RealPrivateNotionAdapter:
         mode: str = "real-private",
         verified_workspace_id: str | UUID | None = None,
         before_write: Callable[[], Awaitable[None]] | None = None,
+        before_send: Callable[[str, str, Json], Awaitable[None]] | None = None,
     ) -> None:
         if mode != "real-private" or authority.verified_notion_parent_id is None:
             raise DraftRunRefused("real_private_verified_parent_required")
@@ -62,6 +102,7 @@ class RealPrivateNotionAdapter:
         self._workspace = _id(verified_workspace_id) if verified_workspace_id else None
         self.created_ids: set[str] = set()
         self._before_write = before_write
+        self._before_send = before_send
 
     def _authorize(self, *, write: bool = False) -> None:
         self.authority.authorize(
@@ -82,9 +123,14 @@ class RealPrivateNotionAdapter:
     ) -> Json:
         self._authorize(write=write)
         if write:
+            body = deepcopy(body)
             if self._before_write is None:
                 raise DraftRunRefused("durable_effect_guard_required")
             try:
+                if self._before_send is not None:
+                    await self._before_send(
+                        method, path, deepcopy(body) if body is not None else {}
+                    )
                 await self._before_write()
             except Exception:
                 raise DraftRunRefused("durable_effect_guard_refused") from None
@@ -210,6 +256,7 @@ class RealPrivateNotionAdapter:
         *,
         children: Sequence[Json] = (),
         icon: Json | None = None,
+        cover: Json | None = None,
     ) -> Json:
         parent = _id(parent_id)
         await self._scope("pages", parent)
@@ -223,6 +270,15 @@ class RealPrivateNotionAdapter:
             if set(icon) != {"type", "emoji"} or icon["type"] != "emoji":
                 raise DraftRunRefused("emoji_icon_required")
             body["icon"] = icon
+        if cover is not None:
+            if (
+                set(cover) != {"type", "external"}
+                or cover.get("type") != "external"
+                or not isinstance(cover.get("external"), dict)
+                or set(cover["external"]) != {"url"}
+            ):
+                raise DraftRunRefused("external_cover_required")
+            body["cover"] = external_cover(cover["external"]["url"])
         return await self._call("POST", "pages", body=body, write=True)
 
     async def _list(self, path: str, *, body: Json | None = None) -> list[Json]:

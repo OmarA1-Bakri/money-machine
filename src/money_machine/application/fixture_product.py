@@ -39,6 +39,8 @@ from money_machine.config.loader import load_yaml_model
 from money_machine.config.settings import ProductRulesConfig
 from money_machine.domain.models.product_spec import ProductSpec as BuildSpec
 from money_machine.domain.models.products import ProductSpec
+from money_machine.persistence.tables import Job
+from money_machine.persistence.unit_of_work import UnitOfWork
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -73,7 +75,14 @@ def merchandising_spec(spec: BuildSpec) -> ProductSpec:
     )
 
 
-async def build_product(spec: BuildSpec, directory: Path, when: datetime):
+async def build_product(
+    spec: BuildSpec,
+    directory: Path,
+    when: datetime,
+    *,
+    uow: UnitOfWork | None = None,
+    build_job: Job | None = None,
+):
     """Run all existing builder phases, structural gate, variants, QA and ledger."""
     probe = durable_probe(directory / "fixture-notion.json")
     checkpoint = directory / "build-checkpoint.json"
@@ -100,7 +109,12 @@ async def build_product(spec: BuildSpec, directory: Path, when: datetime):
     if len(built.database_ids) != 6 or len(built.identity_hubs) != len(spec.hubs):
         raise ValueError("base structure failed: shared databases or hubs")
     built = await build_variants(spec, probe, checkpoint, recorded_at=when)
-    built = await run_product_qa(spec, probe, checkpoint, recorded_at=when)
+    if uow is not None and build_job is not None:
+        from money_machine.application.fixture_qa_jobs import run_fixture_qa_jobs
+
+        built = await run_fixture_qa_jobs(uow, build_job, spec, probe, checkpoint, recorded_at=when)
+    else:
+        built = await run_product_qa(spec, probe, checkpoint, recorded_at=when)
     if built.qa is None or built.qa.verdict != "PASS" or not all(ok for _, ok in built.qa.checks):
         raise ValueError("real product QA blocked")
     built = await run_fact_ledger(spec, probe, checkpoint, recorded_at=when)

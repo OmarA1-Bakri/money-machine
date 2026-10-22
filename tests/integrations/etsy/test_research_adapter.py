@@ -15,6 +15,21 @@ from money_machine.integrations.etsy import (
     get_research_adapter,
 )
 
+# Original playbook PDF, physical page 38 (printed page 36), step 13.1.
+# These are source requirements, not values copied from research.yaml.
+PLAYBOOK_SEED_PHRASES = (
+    "notion template",
+    "notion life planner",
+    "notion planner aesthetic",
+    "adhd digital planner",
+    "notion student planner",
+    "notion budget tracker",
+    "notion second brain",
+    "client portal notion",
+    "notion business template",
+    "digital planner 2026",
+)
+
 
 class TestEtsyFixtureAdapter:
     """Test fixture adapter with synthetic data."""
@@ -152,6 +167,36 @@ class TestGetResearchAdapter:
 
 class TestResearchConfigIntegration:
     """Test integration with research config."""
+
+    def test_config_uses_playbook_searches(self):
+        """Default searches must preserve the original niche-research inputs."""
+        import yaml
+
+        config_path = Path(__file__).resolve().parents[3] / "config" / "research.yaml"
+        with config_path.open() as f:
+            config = yaml.safe_load(f)
+
+        assert tuple(config["research"]["seed_phrases"]) == PLAYBOOK_SEED_PHRASES
+
+    @pytest.mark.parametrize("phrase", PLAYBOOK_SEED_PHRASES)
+    def test_playbook_search_has_explicit_synthetic_fixtures(self, phrase: str):
+        """Each source search remains usable offline without invented demand proof."""
+        fixture_path = Path(__file__).resolve().parents[2] / "fixtures" / "etsy_search_results.json"
+        adapter = EtsyFixtureAdapter(fixture_path=fixture_path)
+        observations = adapter.search(phrase, target_count=30)
+
+        assert 25 <= len(observations) <= 40
+        assert [obs.rank for obs in observations] == list(range(1, len(observations) + 1))
+        for obs in observations:
+            assert obs.search_phrase == phrase
+            assert obs.title.startswith("SYNTHETIC TEST ONLY — ")
+            assert obs.listing_url.startswith("https://example.invalid/money-machine/fixtures/")
+            assert obs.shop_name.startswith("SyntheticFixtureShop")
+            assert obs.shop_sales_count is None
+            assert obs.shop_age_years is None
+            assert obs.review_count is None
+            assert not obs.badges
+            assert not obs.urgency_signals
 
     def test_config_loads_ten_seed_phrases(self):
         """Config must define exactly ten seed phrases, not hardcoded."""

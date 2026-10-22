@@ -1,4 +1,4 @@
-import { artifactPath, fetchRunSummary, type RunSummary } from "../lib/operator-summary";
+import { artifactPath, fetchRunSummary, type RunRecovery, type RunSummary } from "../lib/operator-summary";
 import { fetchOperatorView, operatorViews, type OperatorView } from "../lib/operator";
 
 const descriptions: Record<OperatorView, string> = {
@@ -7,7 +7,7 @@ const descriptions: Record<OperatorView, string> = {
   shop: "Stored listing versions and their draft state.",
   blocked: "Work waiting on a recorded blocker.",
   decisions: "The reasoning recorded along the product's path.",
-  incidents: "Recorded incidents and expected fixture negatives.",
+  incidents: "Recorded incidents for the selected run.",
   settings: "Integration connections and their operating mode.",
 };
 const titles: Record<OperatorView, string> = {
@@ -25,9 +25,12 @@ export async function OperatorViewPage({ view, searchParams }: OperatorPageProps
   const requestedRun = Array.isArray(selected) ? selected[0] : selected;
   const result = await fetchOperatorView(view, requestedRun);
   const runId = result.kind === "ready" ? result.data.run_id : requestedRun;
-  const needsSummary = view === "now" || view === "pipeline" || view === "shop";
-  const summary = result.kind === "ready" && needsSummary && runId
+  const needsSummary = view === "now" || view === "pipeline" || view === "shop" || view === "incidents";
+  const fetchedSummary = result.kind === "ready" && needsSummary && runId
     ? await fetchRunSummary(runId) : null;
+  const summary = fetchedSummary?.kind === "ready" && result.kind === "ready" &&
+    fetchedSummary.data.execution_mode !== result.data.execution_mode
+    ? { kind: "unavailable" as const } : fetchedSummary;
   const query = runId === undefined ? "" : "?" + new URLSearchParams({ run_id: runId }).toString();
   return (
     <div className="console-shell">
@@ -64,8 +67,8 @@ export async function OperatorViewPage({ view, searchParams }: OperatorPageProps
           </section>
         ) : (
           <>
-            <section className="run-strip" aria-label="Selected fixture run">
-              <div><span className="label">Fixture run</span><code>{result.data.run_id}</code></div>
+            <section className="run-strip" aria-label="Selected run">
+              <div><span className="label">{result.data.execution_mode === "fixture" ? "Fixture run" : "Real draft run"}</span><code>{result.data.run_id}</code></div>
               <span className="read-label">Stored records · Read only</span>
             </section>
             {summary?.kind === "unavailable" && (
@@ -89,7 +92,7 @@ export async function OperatorViewPage({ view, searchParams }: OperatorPageProps
                 </article>
               ))}
             </section>
-            <footer>Fixture evidence only. Provider connections are shown as recorded.</footer>
+            <footer>{result.data.execution_mode === "fixture" ? "Fixture evidence only." : "Private draft work. Publishing and spend remain disabled."} Provider connections are shown as recorded.</footer>
           </>
         )}
       </main>
@@ -98,29 +101,41 @@ export async function OperatorViewPage({ view, searchParams }: OperatorPageProps
 }
 
 function ProductProof({ summary, view }: { summary: RunSummary; view: OperatorView }) {
+  const real = summary.execution_mode === "real_draft";
+  const held = summary.pending_effects > 0;
   const showWorkflow = view === "now" || view === "pipeline";
   const showArtifacts = view === "now" || view === "shop";
   const template = summary.artifacts.find((artifact) => artifact.kind === "product_html" &&
     artifact.media_type.split(";")[0]?.trim() === "text/html");
   return <section className="product-proof" aria-label="Stored product proof">
-    <div className="proof-heading"><div><p className="eyebrow">Produced product · Fixture only</p>
+    <div className="proof-heading"><div><p className="eyebrow">{real ? "Private product · Real draft" : "Produced product · Fixture only"}</p>
       <h2>{summary.product_title}</h2></div><span className="state">Production lifecycle: {summary.product_state}</span></div>
     {showWorkflow && <>
-      <div className="completion-strip"><div><span className="label">Fixture workflow</span>
-        <strong>{summary.fixture_completed ? "Fixture completed" : "Fixture in progress"}</strong>
+      <div className="completion-strip"><div><span className="label">{real ? "Private draft workflow" : "Fixture workflow"}</span>
+        <strong>{held ? "Held for provider reconciliation" : real
+          ? (summary.workflow_completed ? "Draft workflow completed" : "Draft workflow in progress")
+          : (summary.fixture_completed ? "Fixture completed" : "Fixture in progress")}</strong>
         {summary.completed_at && <time dateTime={summary.completed_at}>{summary.completed_at}</time>}
-      </div><p>Fixture completion records the local proof. Job states below remain as stored; production is not commissioned.</p></div>
+      </div><p>{real ? "Publishing and spend remain disabled. Job states below remain as stored; production is not commissioned."
+        : "Fixture completion records the local proof. Job states below remain as stored; production is not commissioned."}</p></div>
+      {held && <p role="status">{summary.pending_effects} uncertain provider operation{summary.pending_effects === 1 ? "" : "s"}. Writes are held until the outcome is reconciled.</p>}
       <ol className="job-list" aria-label="Stored workflow jobs">{summary.jobs.map((job) =>
         <li key={job.id}><div><strong>{job.job_type}</strong><code>{job.id}</code></div>
           <span className="state" data-state={job.status}>{job.status}</span></li>)}</ol>
       {summary.jobs.length === 0 && <p className="record-detail">No jobs returned for this workflow.</p>}
     </>}
+    {(showWorkflow || view === "incidents") && summary.recoveries.length > 0 &&
+      <section className="recovery-section" aria-label="Stored A07 recovery">
+        <h3>Notification recovery</h3>
+        <p className="record-detail">Effect confirmation does not complete the repair or workflow. Retained response identities may still require verification.</p>
+        {summary.recoveries.map((recovery) => <RecoveryProof key={recovery.job_id} recovery={recovery} held={held} />)}
+      </section>}
     {showArtifacts && <div className="artifact-section">
       <div className="artifact-heading"><h3>Produced template</h3>
         {template && <a className="file-link" href={artifactPath(summary.run_id, template.id)} target="_blank" rel="noreferrer">Open template ↗</a>}</div>
       {template ? <iframe className="template-preview" title={summary.product_title + " — stored product preview"}
         src={artifactPath(summary.run_id, template.id)} sandbox="" referrerPolicy="no-referrer" />
-        : <p className="record-detail">No stored HTML template returned for this run.</p>}
+        : <p className="record-detail">{real ? "No verified template preview has been recorded yet." : "No stored HTML template returned for this run."}</p>}
       <ul className="artifact-list" aria-label="Stored product files">{summary.artifacts.map((artifact) =>
         <li key={artifact.id}><a href={artifactPath(summary.run_id, artifact.id)} target="_blank" rel="noreferrer">
           <span>{artifact.label}<small>{artifact.media_type} · {artifact.byte_size.toLocaleString("en-US")} bytes</small></span><span aria-hidden="true">↗</span>
@@ -128,4 +143,28 @@ function ProductProof({ summary, view }: { summary: RunSummary; view: OperatorVi
       {summary.artifacts.length === 0 && <p className="record-detail">No stored product files returned.</p>}
     </div>}
   </section>;
+}
+
+function RecoveryProof({ recovery, held }: { recovery: RunRecovery; held: boolean }) {
+  const nextStep = recovery.effect_state === "UNKNOWN" || recovery.agent_run_status === "UNCERTAIN_EXTERNAL_EFFECT"
+    ? (recovery.database_id && recovery.data_source_id
+      ? "Read the retained database and data source through the original authorized connection, then reconcile this operation in the canonical ledger. Keep writes held. Do not resend create."
+      : "Recover this operation’s retained provider request or resource evidence through the original authorized connection, then reconcile it in the canonical ledger. Keep writes held. Do not resend create.")
+    : recovery.agent_run_status === "SUCCESS" && recovery.effect_state === "CONFIRMED"
+      ? (held ? "Keep the original UNKNOWN held until the production owner reconciles it and verifies canonical selection before completing this repair."
+        : "Ask the production owner to verify canonical selection and the original operation in the canonical ledger before completing this repair.")
+      : recovery.agent_run_status === "RUNNING"
+        ? "Check the persisted A07 run before proceeding. An active run does not authorize another send; reconcile unresolved effects first."
+        : "Review the persisted A07 outcome and this job’s operation in the canonical ledger before taking any recovery action. Do not resend create.";
+  return <article className="recovery-card">
+    <dl className="identities">
+      <div><dt>Recovery job</dt><dd>{recovery.job_id}</dd></div>
+      <div><dt>Latest A07 run</dt><dd>{recovery.agent_run_id ?? "Not recorded"}</dd></div>
+      <div><dt>Agent outcome</dt><dd>{recovery.agent_run_status ?? "Not recorded"}</dd></div>
+      <div><dt>Effect state</dt><dd>{recovery.effect_state ?? "Not correlated or not recorded"}</dd></div>
+      <div><dt>Database</dt><dd>{recovery.database_id ?? "Not retained"}</dd></div>
+      <div><dt>Data source</dt><dd>{recovery.data_source_id ?? "Not retained"}</dd></div>
+    </dl>
+    <p className="record-detail"><strong>Next step: </strong>{nextStep}</p>
+  </article>;
 }
