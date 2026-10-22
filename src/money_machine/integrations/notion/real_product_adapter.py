@@ -8,8 +8,10 @@ The consumer reserves durable intents and reconciles uncertain effects.
 
 from __future__ import annotations
 
+import ipaddress
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any, Literal
+from urllib.parse import urlsplit
 from uuid import UUID
 
 from notion_client import AsyncClient
@@ -33,6 +35,42 @@ def _title(value: str) -> list[Json]:
     if not value.strip() or len(value) > 2000:
         raise DraftRunRefused("invalid_title")
     return [{"type": "text", "text": {"content": value}}]
+
+
+def validate_cover_url(value: object) -> str:
+    """Accept an explicit stable image URL; never invent or fetch cover assets."""
+    if not isinstance(value, str) or len(value) > 2000 or any(c.isspace() for c in value):
+        raise DraftRunRefused("stable_https_cover_required")
+    try:
+        parsed = urlsplit(value)
+        host = parsed.hostname or ""
+        if (
+            parsed.scheme != "https"
+            or not host
+            or "." not in host
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.port is not None
+            or parsed.query
+            or parsed.fragment
+            or "\\" in value
+            or host.endswith((".localhost", ".local"))
+            or not parsed.path.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
+        ):
+            raise ValueError("invalid cover")
+        try:
+            ipaddress.ip_address(host)
+        except ValueError:
+            pass
+        else:
+            raise ValueError("IP cover host")
+    except ValueError:
+        raise DraftRunRefused("stable_https_cover_required") from None
+    return value
+
+
+def external_cover(url: object) -> Json:
+    return {"type": "external", "external": {"url": validate_cover_url(url)}}
 
 
 class RealPrivateNotionAdapter:
@@ -210,6 +248,7 @@ class RealPrivateNotionAdapter:
         *,
         children: Sequence[Json] = (),
         icon: Json | None = None,
+        cover: Json | None = None,
     ) -> Json:
         parent = _id(parent_id)
         await self._scope("pages", parent)
@@ -223,6 +262,15 @@ class RealPrivateNotionAdapter:
             if set(icon) != {"type", "emoji"} or icon["type"] != "emoji":
                 raise DraftRunRefused("emoji_icon_required")
             body["icon"] = icon
+        if cover is not None:
+            if (
+                set(cover) != {"type", "external"}
+                or cover.get("type") != "external"
+                or not isinstance(cover.get("external"), dict)
+                or set(cover["external"]) != {"url"}
+            ):
+                raise DraftRunRefused("external_cover_required")
+            body["cover"] = external_cover(cover["external"]["url"])
         return await self._call("POST", "pages", body=body, write=True)
 
     async def _list(self, path: str, *, body: Json | None = None) -> list[Json]:

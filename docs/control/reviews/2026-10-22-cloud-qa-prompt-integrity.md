@@ -48,3 +48,32 @@ Real product/variants/media/draft/buyer access/visual acceptance remain pending
 authoritative reconciliation. Final direct source audit also needs the missing
 playbook PDF. Those deferrals do not block specified bounded local corrections.
 No unresolved critical/high finding blocks this local scope.
+
+## Workbook completion continuation (11:45 UTC)
+
+This Level 2 wave reuses the authenticated Session 07 prompt and the three
+independent prompt review verdicts above; no session closure is attempted.
+The operator explicitly authorized covers, hub backlinks and observed counts.
+
+1. Add a real cover input path through the existing private adapter, builder and
+   CLI. Require explicit per-variant stable HTTPS asset URLs before effects;
+   fixture palette URLs cannot stand in for real assets. Read back exact cover
+   and icon values. Approved asset bytes and visual acceptance remain pending.
+2. Add coherent hub/guide backlinks within each variant at page creation and
+   validate actual target IDs on replay. Existing effect keys/guard/reconciliation
+   stay unchanged; mismatched old pages stop without blind retry.
+3. Enumerate the complete paginated child-page/database tree for counts, using
+   scoped reads and refusing malformed/cyclic ancestry. Count linked database
+   containers explicitly; rows in data sources and link-to-page blocks do not
+   count as static pages. Persist observed inventory and count semantics.
+4. Prove defects RED, then correction/replay/drift/malformed-input refusal with
+   mocks. One provider-boundary review plus functional review precedes affected
+   checks and a reviewed increment on existing draft PR #127. No production
+   writes, retry of UNKNOWN, publication, spend or deployment is authorized.
+
+High: fabricated cover URLs or fixed expected IDs can fake completeness. Resolve
+by requiring explicit assets, exact readback, enumeration independent of planned
+IDs, extra/missing child coverage, and retaining pending native visual review.
+Canonical PDF absence and thredOS registration remain existing blockers; neither
+is silently promoted by this wave. No unresolved critical/high finding blocks
+these bounded code corrections.

@@ -36,3 +36,30 @@ next Session07, preserved closure/bootstrap identities, all twelve false evidenc
 keys and no commissioned agents; no control-state bytes changed. The README
 shape assertion validates the exact measured preferences while preserving every
 page/resource/annotation assertion. No reviewed runtime mechanism changed.
+
+## Workbook completion increment
+
+Bounded diff from `5df61e2b369facd3c119bce1d82a99d6f8e1d8bb` reviewed by the
+same independent, read-only reviewers (no implementation delegates):
+
+- `prompt_fidelity`: no blocking functional findings, including observed child
+  inventory, missing-created-child refusal, content target excluding linked-view
+  inflation, exact hub/guide backlinks and explicit cover inputs/readback.
+- `prompt_safety`: no blocking provider/effect finding. The cover exception is
+  field-specific; arbitrary external blocks remain forbidden. Scope, lease,
+  durable reservations, logical effect keys and UNKNOWN handling are unchanged.
+  Missing/different covers or backlinks refuse replacement writes.
+
+Reviewers inspected source only; execution evidence belongs to the integrator.
+Cover provenance, image availability, palette fidelity and native visual acceptance
+remain unverified. Three approved real cover asset URLs are still needed.
+This increment does not claim completed product, source PDF verification,
+thredOS registration or production effect reconciliation.
+
+Fresh integrated verification after both reviews: 1,073 affected application,
+Notion adapter, cover CLI and real-draft effects/runner checks passed with zero
+failures/skips (19.37 seconds). Ruff check and format passed across src/tests;
+strict Pyright reported zero errors. Workbook and Session 07 hashes are unchanged;
+canonical clean-clone source-register validation passed. No full-suite rerun was
+needed for this Level 2 wave; the preceding published commit already has green
+CI run 39769233582. New CI status belongs to the new remote commit.
