@@ -7,7 +7,7 @@ const descriptions: Record<OperatorView, string> = {
   shop: "Stored listing versions and their draft state.",
   blocked: "Work waiting on a recorded blocker.",
   decisions: "The reasoning recorded along the product's path.",
-  incidents: "Recorded incidents and expected fixture negatives.",
+  incidents: "Recorded incidents for the selected run.",
   settings: "Integration connections and their operating mode.",
 };
 const titles: Record<OperatorView, string> = {
@@ -26,8 +26,11 @@ export async function OperatorViewPage({ view, searchParams }: OperatorPageProps
   const result = await fetchOperatorView(view, requestedRun);
   const runId = result.kind === "ready" ? result.data.run_id : requestedRun;
   const needsSummary = view === "now" || view === "pipeline" || view === "shop";
-  const summary = result.kind === "ready" && needsSummary && runId
+  const fetchedSummary = result.kind === "ready" && needsSummary && runId
     ? await fetchRunSummary(runId) : null;
+  const summary = fetchedSummary?.kind === "ready" && result.kind === "ready" &&
+    fetchedSummary.data.execution_mode !== result.data.execution_mode
+    ? { kind: "unavailable" as const } : fetchedSummary;
   const query = runId === undefined ? "" : "?" + new URLSearchParams({ run_id: runId }).toString();
   return (
     <div className="console-shell">
@@ -64,8 +67,8 @@ export async function OperatorViewPage({ view, searchParams }: OperatorPageProps
           </section>
         ) : (
           <>
-            <section className="run-strip" aria-label="Selected fixture run">
-              <div><span className="label">Fixture run</span><code>{result.data.run_id}</code></div>
+            <section className="run-strip" aria-label="Selected run">
+              <div><span className="label">{result.data.execution_mode === "fixture" ? "Fixture run" : "Real draft run"}</span><code>{result.data.run_id}</code></div>
               <span className="read-label">Stored records · Read only</span>
             </section>
             {summary?.kind === "unavailable" && (
@@ -89,7 +92,7 @@ export async function OperatorViewPage({ view, searchParams }: OperatorPageProps
                 </article>
               ))}
             </section>
-            <footer>Fixture evidence only. Provider connections are shown as recorded.</footer>
+            <footer>{result.data.execution_mode === "fixture" ? "Fixture evidence only." : "Private draft work. Publishing and spend remain disabled."} Provider connections are shown as recorded.</footer>
           </>
         )}
       </main>
@@ -98,18 +101,24 @@ export async function OperatorViewPage({ view, searchParams }: OperatorPageProps
 }
 
 function ProductProof({ summary, view }: { summary: RunSummary; view: OperatorView }) {
+  const real = summary.execution_mode === "real_draft";
+  const held = summary.pending_effects > 0;
   const showWorkflow = view === "now" || view === "pipeline";
   const showArtifacts = view === "now" || view === "shop";
   const template = summary.artifacts.find((artifact) => artifact.kind === "product_html" &&
     artifact.media_type.split(";")[0]?.trim() === "text/html");
   return <section className="product-proof" aria-label="Stored product proof">
-    <div className="proof-heading"><div><p className="eyebrow">Produced product · Fixture only</p>
+    <div className="proof-heading"><div><p className="eyebrow">{real ? "Private product · Real draft" : "Produced product · Fixture only"}</p>
       <h2>{summary.product_title}</h2></div><span className="state">Production lifecycle: {summary.product_state}</span></div>
     {showWorkflow && <>
-      <div className="completion-strip"><div><span className="label">Fixture workflow</span>
-        <strong>{summary.fixture_completed ? "Fixture completed" : "Fixture in progress"}</strong>
+      <div className="completion-strip"><div><span className="label">{real ? "Private draft workflow" : "Fixture workflow"}</span>
+        <strong>{held ? "Held for provider reconciliation" : real
+          ? (summary.workflow_completed ? "Draft workflow completed" : "Draft workflow in progress")
+          : (summary.fixture_completed ? "Fixture completed" : "Fixture in progress")}</strong>
         {summary.completed_at && <time dateTime={summary.completed_at}>{summary.completed_at}</time>}
-      </div><p>Fixture completion records the local proof. Job states below remain as stored; production is not commissioned.</p></div>
+      </div><p>{real ? "Publishing and spend remain disabled. Job states below remain as stored; production is not commissioned."
+        : "Fixture completion records the local proof. Job states below remain as stored; production is not commissioned."}</p></div>
+      {held && <p role="status">{summary.pending_effects} uncertain provider operation{summary.pending_effects === 1 ? "" : "s"}. Writes are held until the outcome is reconciled.</p>}
       <ol className="job-list" aria-label="Stored workflow jobs">{summary.jobs.map((job) =>
         <li key={job.id}><div><strong>{job.job_type}</strong><code>{job.id}</code></div>
           <span className="state" data-state={job.status}>{job.status}</span></li>)}</ol>
@@ -120,7 +129,7 @@ function ProductProof({ summary, view }: { summary: RunSummary; view: OperatorVi
         {template && <a className="file-link" href={artifactPath(summary.run_id, template.id)} target="_blank" rel="noreferrer">Open template ↗</a>}</div>
       {template ? <iframe className="template-preview" title={summary.product_title + " — stored product preview"}
         src={artifactPath(summary.run_id, template.id)} sandbox="" referrerPolicy="no-referrer" />
-        : <p className="record-detail">No stored HTML template returned for this run.</p>}
+        : <p className="record-detail">{real ? "No verified template preview has been recorded yet." : "No stored HTML template returned for this run."}</p>}
       <ul className="artifact-list" aria-label="Stored product files">{summary.artifacts.map((artifact) =>
         <li key={artifact.id}><a href={artifactPath(summary.run_id, artifact.id)} target="_blank" rel="noreferrer">
           <span>{artifact.label}<small>{artifact.media_type} · {artifact.byte_size.toLocaleString("en-US")} bytes</small></span><span aria-hidden="true">↗</span>

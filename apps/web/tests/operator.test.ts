@@ -3,7 +3,7 @@ import { fetchOperatorView } from "../lib/operator";
 
 const record = { id: "stored-row", label: "Stored title", state: "BLOCKED",
   detail: "Expected fixture negative", product_id: null, listing_version_id: null };
-const envelope = { run_id: "run-one", view: "blocked", items: [record] };
+const envelope = { execution_mode: "fixture", run_id: "run-one", view: "blocked", items: [record] };
 
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
@@ -45,6 +45,7 @@ describe("request-time operator reads", () => {
     expect(await fetchOperatorView("blocked")).toEqual({ kind: "ready", data: envelope });
   });
   it.each([
+    { ...envelope, execution_mode: ["fixture"] }, { ...envelope, execution_mode: "live" }, { ...envelope, execution_mode: undefined },
     { ...envelope, view: "shop" }, { ...envelope, run_id: "wrong-run" },
     { ...envelope, items: [{ ...record, state: null }] }, { ...envelope, items: null },
   ])("rejects an invalid or mismatched envelope", async (invalid) => {

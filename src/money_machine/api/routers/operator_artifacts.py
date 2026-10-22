@@ -18,9 +18,15 @@ from sqlalchemy import Select, select
 from sqlalchemy.exc import SQLAlchemyError
 
 from money_machine.api.dependencies import SessionDependency
+from money_machine.api.routers.operator_runs import (
+    ExecutionMode,
+    OperatorRun,
+    select_operator_run,
+)
 from money_machine.persistence.tables import (
     Artifact,
     Asset,
+    EffectAttempt,
     EtsyListing,
     Job,
     ListingVersion,
@@ -57,41 +63,55 @@ class RunSummary(ProofModel):
     run_id: str
     workflow_id: UUID
     product_id: UUID
-    listing_version_id: UUID
+    listing_version_id: UUID | None
     product_title: str
+    execution_mode: ExecutionMode
     fixture_completed: bool
+    workflow_completed: bool
+    pending_effects: int
     completed_at: datetime | None
     product_state: str
     jobs: list[ProofJob]
     artifacts: list[ProofArtifact]
 
 
-def _artifact_query(run_id: str) -> Select[tuple[Artifact, Asset]]:
+def _artifact_query(selected: OperatorRun) -> Select[tuple[Artifact, Asset]]:
     return (
         select(Artifact, Asset)
         .join(Asset, Asset.artifact_id == Artifact.id)
         .join(Product, Asset.product_id == Product.id)
         .join(WorkflowRun, Product.workflow_id == WorkflowRun.id)
         .join(Shop, Product.shop_id == Shop.id)
-        .where(Shop.name == "fixture:" + run_id, WorkflowRun.shop_id == Shop.id)
+        .where(
+            Shop.id == selected.shop.id,
+            WorkflowRun.shop_id == Shop.id,
+            selected.workflow_scope(),
+        )
     )
 
 
 @router.get("/{run_id}/summary", response_model=RunSummary)
 async def run_summary(run_id: RunId, session: SessionDependency) -> RunSummary:
     try:
+        selected_run = await select_operator_run(session, run_id)
         selected = (
             await session.execute(
                 select(Product, WorkflowRun, ListingVersion)
                 .join(WorkflowRun, Product.workflow_id == WorkflowRun.id)
                 .join(Shop, Product.shop_id == Shop.id)
-                .join(EtsyListing, EtsyListing.product_id == Product.id)
-                .join(ListingVersion, ListingVersion.listing_id == EtsyListing.id)
+                .outerjoin(
+                    EtsyListing,
+                    (EtsyListing.product_id == Product.id) & (EtsyListing.shop_id == Shop.id),
+                )
+                .outerjoin(
+                    ListingVersion,
+                    (ListingVersion.listing_id == EtsyListing.id)
+                    & (ListingVersion.product_id == Product.id),
+                )
                 .where(
-                    Shop.name == "fixture:" + run_id,
+                    Shop.id == selected_run.shop.id,
+                    selected_run.workflow_scope(),
                     WorkflowRun.shop_id == Shop.id,
-                    EtsyListing.shop_id == Shop.id,
-                    ListingVersion.product_id == Product.id,
                 )
                 .order_by(
                     Product.created_at.desc(),
@@ -114,25 +134,42 @@ async def run_summary(run_id: RunId, session: SessionDependency) -> RunSummary:
             )
         ).first()
         if selected is None:
-            raise HTTPException(status_code=404, detail="fixture product not found")
+            raise HTTPException(status_code=404, detail="operator product not found")
         product, workflow, listing = selected
         jobs = await session.scalars(
             select(Job).where(Job.workflow_id == workflow.id).order_by(Job.created_at, Job.id)
         )
         artifacts = (
             await session.execute(
-                _artifact_query(run_id)
+                _artifact_query(selected_run)
                 .where(Asset.product_id == product.id)
                 .order_by(Asset.asset_role, Asset.ordinal, Artifact.id)
             )
         ).all()
+        # Historical UNKNOWN attempts remain durable; only the latest observation
+        # per operation determines whether reconciliation is still required.
+        effects = await session.scalars(
+            select(EffectAttempt)
+            .join(Job, EffectAttempt.job_id == Job.id)
+            .where(Job.workflow_id == workflow.id)
+            .order_by(EffectAttempt.idempotency_key, EffectAttempt.reconciliation_attempt.desc())
+        )
+        latest_effects: dict[str, str] = {}
+        for effect in effects:
+            latest_effects.setdefault(effect.idempotency_key, effect.effect_state)
+        pending_effects = sum(state == "UNKNOWN" for state in latest_effects.values())
         return RunSummary(
             run_id=run_id,
             workflow_id=workflow.id,
             product_id=product.id,
-            listing_version_id=listing.id,
+            listing_version_id=listing.id if listing is not None else None,
             product_title=product.working_title,
-            fixture_completed=workflow.completed_at is not None,
+            execution_mode=selected_run.execution_mode,
+            fixture_completed=(
+                selected_run.execution_mode == "fixture" and workflow.completed_at is not None
+            ),
+            workflow_completed=workflow.completed_at is not None,
+            pending_effects=pending_effects,
             completed_at=workflow.completed_at,
             product_state=workflow.product_state,
             jobs=[ProofJob(id=job.id, job_type=job.job_type, status=job.status) for job in jobs],
@@ -193,9 +230,10 @@ def _verified_bytes(artifact: Artifact, run_id: str) -> bytes:
 @router.get("/{run_id}/artifacts/{artifact_id}")
 async def run_artifact(run_id: RunId, artifact_id: UUID, session: SessionDependency) -> Response:
     try:
+        selected_run = await select_operator_run(session, run_id)
         row = (
             await session.execute(
-                _artifact_query(run_id).where(Artifact.id == artifact_id).limit(1)
+                _artifact_query(selected_run).where(Artifact.id == artifact_id).limit(1)
             )
         ).first()
     except (SQLAlchemyError, OSError) as error:

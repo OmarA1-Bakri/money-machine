@@ -104,7 +104,20 @@ async def seed_views(factory: async_sessionmaker[AsyncSession]) -> dict[str, Any
         assert job is not None
         job.status = "BLOCKED"
         job.input = {"reason": "expected fixture negative", "token": "never-expose"}
-        run = await make_agent_run(session, job)
+        from money_machine.persistence.tables import AgentRun
+
+        existing_run = await session.scalar(select(AgentRun).limit(1))
+        if existing_run is None:
+            run = await make_agent_run(session, job)
+        else:
+            values = {
+                column.name: getattr(existing_run, column.name)
+                for column in AgentRun.__table__.columns
+            }
+            values.update(id=uuid4(), job_id=job.id)
+            run = AgentRun(**values)
+            session.add(run)
+            await session.flush()
         spec = ProductSpec(
             id=uuid4(),
             product_id=product.id,
@@ -447,3 +460,71 @@ async def test_authorized_existing_workflow_behavior(
     )
     assert reconciled.status_code == 400
     assert "Cannot reconcile effect" in reconciled.json()["detail"]
+
+
+async def test_real_runs_scope_every_view_to_selected_workflow(
+    operator_client: AsyncClient,
+    operator_state: ApplicationState,
+) -> None:
+    from sqlalchemy import select
+
+    from money_machine.persistence.tables import (
+        EtsyListing,
+        Incident,
+        IntegrationAccount,
+        Shop,
+        WorkflowRun,
+    )
+
+    first = await seed_views(operator_state.session_factory)
+    # Reuse a second fixture seed in the same database, then place both workflows in
+    # the actual shared-shop topology. Shop-scoped queries would expose both runs.
+    async with operator_state.session_factory() as session:
+        shop = await session.get(Shop, first["now"].shop_id)
+        assert shop is not None
+        shop.name = "QuietlyBuiltStudio"
+        workflow = await session.get(WorkflowRun, first["now"].workflow_id)
+        assert workflow is not None
+        workflow.workflow_type = "RealProductDraft:real-one"
+        await session.commit()
+    second = await seed_views(operator_state.session_factory)
+    async with operator_state.session_factory() as session:
+        shop = await session.get(Shop, first["now"].shop_id)
+        assert shop is not None
+        product = await session.get(Product, second["now"].id)
+        workflow = await session.get(WorkflowRun, second["now"].workflow_id)
+        assert product is not None
+        listing = await session.scalar(
+            select(EtsyListing).where(EtsyListing.product_id == product.id)
+        )
+        incident = await session.get(Incident, second["incidents"].id)
+        assert product is not None and workflow is not None and listing is not None
+        assert incident is not None
+        product.shop_id = shop.id
+        workflow.shop_id = shop.id
+        workflow.workflow_type = "RealProductDraft:real-two"
+        listing.shop_id = shop.id
+        incident.shop_id = shop.id
+        # Shop readiness is shared; it must not be labelled with either product's lineage.
+        account = await session.get(IntegrationAccount, first["settings"].id)
+        assert account is not None
+        account.blocker_code = "AUTH_REQUIRED"
+        await session.commit()
+    for selected, rows, other in (("real-one", first, second), ("real-two", second, first)):
+        for view in ("now", "pipeline", "shop", "blocked", "decisions", "incidents", "settings"):
+            response = await operator_client.get("/operator/" + view, params={"run_id": selected})
+            assert response.status_code == 200
+            body = response.json()
+            assert body["execution_mode"] == "real_draft"
+            assert body["run_id"] == selected
+            assert len(body["items"]) == 1
+            assert str(other["now"].id) not in response.text
+            if view == "settings":
+                assert body["items"][0]["product_id"] is None
+                assert body["items"][0]["listing_version_id"] is None
+            else:
+                assert body["items"][0]["product_id"] == str(rows["now"].id)
+                assert body["items"][0]["id"] == str(rows[view].id)
+    assert (
+        await operator_client.get("/operator/now", params={"run_id": "real-missing"})
+    ).status_code == 404

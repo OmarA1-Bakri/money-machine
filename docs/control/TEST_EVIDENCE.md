@@ -1030,3 +1030,8 @@ Headb10b67b4a0fd3e1e04d44faae2a17b1db0344aff CI39686397443 succeeded, but premer
 ## Applied control recovery (RUN_ID20261021T184946Z)
 
 Actual revision65 control regression106passed0skip21.49s, Ruff/format/Pyright0; independent APPLIED_STATE_REVIEW.md verified exact canonical-after==audited-intent-candidate and only8authorized fields changed. Initial88passed/18setup-errors came from the clone fixture inheriting the trunk branch; a narrow reviewed fixture correction resolves that environment coupling without relaxing assertions. API8100 and console3100 both returnedHTTP200 after checkout ownership repair. PR125 finalCI39688798558 passed5453Python0skip and allweb/Compose config gates. No actual product/provider write has occurred yet.
+
+
+## Real draft console integration checkpoint (2026-10-22)
+
+Final affected regression:45passed,0skips (operator API, artifact API, general API integration),156.49s. Web:61Vitest passed; typecheck,ESLint and Next16.3.0 production build passed. Ruff/check/format and Pyright1.1.411 passed for all changed Python files. Independent Python and TypeScript reviews approve final bytes after strict-mode validation correction. Fresh source ASGI read-only verification against the accepted database passed14collection reads (seven fixture and seven real) and both summaries: real pending_effects1, no listing/completion; fixture remains completed. Evidence and payloads stay outside Git. Existing preview services were not restarted; browser proof of these new bytes is still pending. These checks do not prove Notion completion, an Etsy draft, buyer access or programme commissioning.

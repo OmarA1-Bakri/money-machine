@@ -1,9 +1,12 @@
+import type { ExecutionMode } from "./operator";
+
 export interface RunJob { id: string; job_type: string; status: string }
 export interface RunArtifact {
   id: string; label: string; kind: string; media_type: string; byte_size: number; href: string;
 }
 export interface RunSummary {
-  run_id: string; workflow_id: string; product_id: string; listing_version_id: string;
+  execution_mode: ExecutionMode; workflow_completed: boolean; pending_effects: number;
+  run_id: string; workflow_id: string; product_id: string; listing_version_id: string | null;
   product_title: string; fixture_completed: boolean; completed_at: string | null;
   product_state: string; jobs: RunJob[]; artifacts: RunArtifact[];
 }
@@ -26,10 +29,17 @@ function hasStrings(value: Record<string, unknown>, keys: string[]): boolean {
 }
 function isSummary(value: unknown, runId: string): value is RunSummary {
   if (!isObject(value) || value.run_id !== runId ||
-      !hasStrings(value, ["workflow_id", "product_id", "listing_version_id", "product_title", "product_state"]) ||
+      !hasStrings(value, ["workflow_id", "product_id", "product_title", "product_state"]) ||
+      (value.execution_mode !== "fixture" && value.execution_mode !== "real_draft") ||
+      !(typeof value.listing_version_id === "string" && value.listing_version_id !== "" ||
+        value.execution_mode === "real_draft" && value.listing_version_id === null) ||
+      typeof value.workflow_completed !== "boolean" ||
+      typeof value.pending_effects !== "number" || !Number.isSafeInteger(value.pending_effects) || value.pending_effects < 0 ||
       typeof value.fixture_completed !== "boolean" ||
       !(value.completed_at === null || (typeof value.completed_at === "string" && Number.isFinite(Date.parse(value.completed_at)))) ||
-      (value.fixture_completed !== (value.completed_at !== null)) ||
+      (value.workflow_completed !== (value.completed_at !== null)) ||
+      (value.fixture_completed !== (value.execution_mode === "fixture" && value.workflow_completed)) ||
+      (value.workflow_completed && value.pending_effects > 0) ||
       !Array.isArray(value.jobs) || !Array.isArray(value.artifacts)) return false;
   return value.jobs.every((job) => isObject(job) && hasStrings(job, ["id", "job_type", "status"])) &&
     value.artifacts.every((artifact) => isObject(artifact) &&

@@ -6863,3 +6863,8 @@ PR124 merged45e1206448423a508b6c424678429a33f9c32891. This wave integrates real 
 ## Applied control recovery (RUN_ID20261021T184946Z)
 
 Applied the supported D0039 recovery on clean merged trunk48b2d2a217ed8cb607b9383ad7f6c7c0829484d3. BeforeSHAfc0fb4143c8fdfaaa81abfb9cca32687d42eb92e8979cfa0c9a911460886a624; afterSHA590c36f9a1cfd20442e4f630cb872dc526cea67c9f089630f88a03a7240d0f39. Canonical revision65 reopens Session07 with actual Hetzner root, completed0..6,next7;12false keys/commissioned[]/all historical notes preserved. Durable intent, final receipt and exact before/after bytes retained outside Git. This records recovery, not Session07 completion or provider delivery.
+
+
+## Real draft operator console integration (2026-10-22)
+
+Added explicit fixture/real_draft response modes and workflow-scoped real reads for the approved shop. Real summaries exist before an Etsy listing; pending-effect counts use the latest observation for each operation, without exposing keys or provider payloads. The web separates stored fixture completion from private draft progress and rejects contradictory completion/uncertainty and mismatched modes. No provider writes, ledger reconciliation, service activation or commissioning occurred in this wave. Independent TypeScript review corrected mode coercion; Python review confirmed exact run isolation and unchanged artifact guards.

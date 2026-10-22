@@ -1,4 +1,4 @@
-"""Read persisted fixture-run records without exposing provider payloads."""
+"""Read persisted run records without exposing provider payloads."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from money_machine.api.dependencies import SessionDependency
+from money_machine.api.routers.operator_runs import ExecutionMode, select_operator_run
 from money_machine.persistence.tables import (
     Decision,
     EtsyListing,
@@ -20,7 +21,6 @@ from money_machine.persistence.tables import (
     Job,
     ListingVersion,
     Product,
-    Shop,
     WorkflowRun,
 )
 
@@ -49,6 +49,7 @@ class OperatorRecord(BaseModel):
 
 class OperatorEnvelope(BaseModel):
     run_id: str
+    execution_mode: ExecutionMode
     view: OperatorView
     items: list[OperatorRecord]
 
@@ -68,20 +69,14 @@ async def operator_view(
 ) -> OperatorEnvelope:
     """Resolve the selected shop and read its current rows on every request."""
     try:
-        shops = select(Shop)
-        if run_id is None:
-            shops = shops.where(Shop.name.startswith("fixture:", autoescape=True))
-        else:
-            shops = shops.where(Shop.name == "fixture:" + run_id)
-        shop = await session.scalar(shops.order_by(Shop.created_at.desc(), Shop.id.desc()).limit(1))
-        if shop is None:
-            raise HTTPException(status_code=404, detail="fixture run not found")
-        selected_run = shop.name.removeprefix("fixture:")
+        selected = await select_operator_run(session, run_id)
+        shop = selected.shop
+        scope = selected.workflow_scope()
         products = (
             await session.execute(
                 select(Product, WorkflowRun)
                 .join(WorkflowRun, Product.workflow_id == WorkflowRun.id)
-                .where(Product.shop_id == shop.id, WorkflowRun.shop_id == shop.id)
+                .where(Product.shop_id == shop.id, WorkflowRun.shop_id == shop.id, scope)
                 .order_by(Product.created_at, Product.id)
             )
         ).all()
@@ -97,6 +92,7 @@ async def operator_view(
                     Product.shop_id == shop.id,
                     WorkflowRun.shop_id == shop.id,
                     EtsyListing.product_id == Product.id,
+                    scope,
                 )
                 .order_by(
                     ListingVersion.listing_version, ListingVersion.created_at, ListingVersion.id
@@ -148,7 +144,7 @@ async def operator_view(
             query = (
                 select(Job)
                 .join(WorkflowRun, Job.workflow_id == WorkflowRun.id)
-                .where(WorkflowRun.shop_id == shop.id)
+                .where(WorkflowRun.shop_id == shop.id, scope)
             )
             if view == OperatorView.BLOCKED:
                 query = query.where(Job.status == "BLOCKED")
@@ -164,7 +160,7 @@ async def operator_view(
             query = (
                 select(Decision)
                 .join(WorkflowRun, Decision.workflow_id == WorkflowRun.id)
-                .where(WorkflowRun.shop_id == shop.id)
+                .where(WorkflowRun.shop_id == shop.id, scope)
             )
             by_product = {product.id: product for product, _workflow in products}
             for decision in await session.scalars(query.order_by(Decision.decided_at, Decision.id)):
@@ -177,6 +173,10 @@ async def operator_view(
                 )
         elif view == OperatorView.INCIDENTS:
             query = select(Incident).where(Incident.shop_id == shop.id)
+            if selected.execution_mode == "real_draft":
+                query = query.join(WorkflowRun, Incident.workflow_id == WorkflowRun.id).where(
+                    WorkflowRun.shop_id == shop.id, scope
+                )
             for incident in await session.scalars(query.order_by(Incident.opened_at, Incident.id)):
                 product = by_workflow.get(incident.workflow_id)
                 # Explicit incident lineage must also belong to this shop's product.
@@ -194,7 +194,7 @@ async def operator_view(
                 items[-1].listing_version_id = version_id
         else:
             query = select(IntegrationAccount).where(IntegrationAccount.shop_id == shop.id)
-            product = products[-1][0] if products else None
+            product = products[-1][0] if products and selected.execution_mode == "fixture" else None
             for account in await session.scalars(
                 query.order_by(IntegrationAccount.provider, IntegrationAccount.id)
             ):
@@ -203,6 +203,8 @@ async def operator_view(
                 if account.blocker_code:
                     detail += f"; blocker={account.blocker_code}"
                 record(account.id, account.provider, account.connection_state, detail, product)
-        return OperatorEnvelope(run_id=selected_run, view=view, items=items)
+        return OperatorEnvelope(
+            run_id=selected.run_id, execution_mode=selected.execution_mode, view=view, items=items
+        )
     except (SQLAlchemyError, OSError) as error:
         raise HTTPException(status_code=503, detail="operator database unavailable") from error

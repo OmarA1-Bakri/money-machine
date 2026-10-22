@@ -1,5 +1,11 @@
 # Next Session
 
+## 2026-10-22 — Real draft console integration; provider reconciliation held
+
+Resume metadata at `/srv/work/state/integrator.json` in the canonical Hetzner checkout. PRs125/126 are merged. Audited recovery revision65 preserves all12 false Session07 evidence keys; Session07 is incomplete, next7. The one-product run has14 confirmed private Notion effects; Notification creation remains UNKNOWN. No provider write/retry/new key is authorized until authoritative reconciliation of that exact operation. Support ticket5493246 has an automated response that does not establish the outcome. Console/API changes expose exact real-run scope, prelisting summaries and pending-effect counts, with independent Python/TypeScript approval. These are read-only engineering changes, not a completed product/draft or live commissioning. Existing fixture services and data remain preserved; do not claim the new console deployed without runtime proof.
+
+Next gate: inspect final affected checks and source checkpoint, then verify the integrated read-only app. Preserve all provider attempt history. Publishing, public sharing and spend remain disabled. No Session07 closure or evidence promotion.
+
 ## 2026-10-21 — Recovery pointer and remaining control blocker
 
 RUN_ID: `20261020T211445Z`. Resume recovery from `/srv/work/state/integrator.json` and the approved `/srv/work/evidence/20261020T211445Z/PLAN.md`; do not restart from the stale Windows checkout. BASE_SHA is `5b95386c5e42ec849d452691740b0179e5d9284d`. Final acceptance and PR status require current receipts, not this narrative.
