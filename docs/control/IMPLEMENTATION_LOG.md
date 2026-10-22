@@ -6873,3 +6873,8 @@ Added explicit fixture/real_draft response modes and workflow-scoped real reads 
 ## Reviewed console deployment and browser verification (2026-10-22)
 
 Built a new console image offline from the reviewed standalone output and existing local base, preserved the previous container, gracefully restarted only the project API, and switched only console3100. Browser route, real/fixture isolation, actual fixture-file opening, mobile and API outage/recovery proofs passed. Restored the Windows localhost13100 tunnel; all7 real routes respond200. The uncertain Notion operation remains held and unchanged. This deploys truthful progress visibility; it does not complete the real product or Etsy draft.
+
+
+## Recovery continuation: source seeds and held effect (2026-10-22)
+
+Resumed the canonical clean checkout without restarting the expired real-build lease. Integrated the exact reviewed research-seed patch and passed supported focused/affected checks. Fresh read-only SQL still shows14confirmed effects and one UNKNOWN Forest Notification operation, with no provider object/request ID or recorded request-body digest. The operation-key digest matches the exact Forest notification logical key; it is not a body hash. Existing canonical Notion connection title search and accessible-database discovery yielded no positive match; that negative result does not authorize replay. No provider writes or ledger edits occurred. The scoped thredOS contract/source inspection did not establish this run's registered identity or SDK trace/span binding; existing A05AgentRun is not proof of registration. Preserve the binding requirement before future production agent execution.
