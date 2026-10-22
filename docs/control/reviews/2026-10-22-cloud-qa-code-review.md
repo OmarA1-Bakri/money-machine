@@ -193,3 +193,50 @@ format passed. Independent functional and privacy/provider reviewers found no
 blocker, explicitly preserving the underlying-cause limitation. Strict Pyright
 verification and the separate new-head CI receipt are recorded at publication.
 No provider/production effect, approval issuance, merge or deployment occurred.
+
+## Finite Notification recovery invocation increment
+
+The existing A07 runner can now invoke a finite consumer of an already admitted
+canonical approval, original typed spec and pinned source mappings. It verifies
+the canonical projection/hash and producer/research lineage before provider reads,
+repeats paginated inventory/schema preflight at the send boundary and verifies the
+exact returned database/data-source pair before the new effect is confirmed.
+This is an application consumer, with no issuer, CLI, registry, lease claim,
+canonical build selection, job completion/event dispatch or further build writes.
+
+Independent functional review (`prompt_fidelity`) found that the initial consumer
+lost the existing typed uncertainty contract. Provider-safety review
+(`prompt_safety`) found discarded returned data-source identity, candidate checks
+preceding the final schema reads and candidate holds that did not survive absence.
+All four findings were repaired in the existing result/ledger/job metadata models:
+
+- Results cite actual latest EffectReference records; UNKNOWN remains
+  UNCERTAIN_EXTERNAL_EFFECT, confirmed success cites CONFIRMED and definite
+  refusal cites recorded ABSENT. Candidate discovery does not invent an UNKNOWN.
+- Accepted database/data-source identities are retained before fallible readback;
+  a missing source ID preserves the database identity and UNKNOWN. A different
+  source with identical schema cannot earn confirmation or trigger another POST.
+- A final complete inventory read follows all source/schema verification at the
+  send boundary. A candidate injected during the final source GET prevents POST.
+- Candidate discovery persists an approval-scoped hold in existing repair
+  metadata. Binding, consumption and final lease validation refuse it after
+  disappearance/replay; no automatic hold clearing or second grant exists.
+
+Both reviewers re-read the bounded remediated scope and found no remaining
+blockers. They performed no tests, database queries or provider calls. The residual
+provider race after the last read and historical UNKNOWN remain explicit.
+
+Twenty focused real-runner/isolated-database/mock-SDK cases passed, including
+canonical source/spec/producer/research drift, pagination, late/disappearing
+candidates, exact returned source drift/missing ID, lost response, 400/429,
+retained-identity readback recovery and concurrent invocation. Final affected
+verification passed 219 tests, zero failures/skips (114.24 seconds), including the
+12 prompt checks, existing binding/guard/lease, observer/lifecycle, fixture QA and
+ordinary real-draft controls. Ruff check/format on 443 files, strict Pyright and
+canonical clean-clone source checks passed. No schema/migration changed in this
+increment. The original Playbook PDF is still absent/unverified.
+
+Preceding screenshot-repair CI39803201610 independently passed at 8f9e0f4:
+5,592 Python and 61 frontend tests plus all database/static/build/Compose gates.
+New-head CI is separate. No actual approval, production ledger mutation, provider
+execution, merge, deployment or product/session-completion claim occurred.

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from asyncio import current_task
 from collections.abc import Awaitable, Callable, Mapping
+from contextlib import suppress
 from contextvars import ContextVar
 from datetime import UTC, datetime
 from uuid import UUID
@@ -134,6 +135,7 @@ class SqlDraftEffects:
                     or record.get("approval") != permit[2].model_dump(mode="json")
                     or record.get("effect_key") != key
                     or "send_consumed_at" not in record
+                    or record.get("candidate_hold") is not None
                 ):
                     raise DraftRunRefused("recovery_request_guard_required")
                 self._recovery_permit.set(None)
@@ -201,6 +203,8 @@ class SqlDraftEffects:
                 raise DraftRunRefused("persisted_recovery_approval_required")
             if "send_consumed_at" in record:
                 raise DraftRunRefused("recovery_send_authority_consumed")
+            if record.get("candidate_hold") is not None:
+                raise DraftRunRefused("recovery_candidate_hold_requires_reconciliation")
             reservation = await get_idempotency_record(session, idempotency_key=expected_key)
             if (
                 reservation is None
@@ -257,6 +261,30 @@ class SqlDraftEffects:
         # Only this task's next adapter lease guard can spend this in-memory permit.
         # Durable consumption above survives cancellation/process loss/DB readback failure.
         self._recovery_permit.set((expected_key, id(current_task()), approval))
+
+    async def hold_notification_recovery_candidates(
+        self, approval: NotificationReplacementApproval, candidate_ids: list[str]
+    ) -> None:
+        """Keep an observed candidate held even if it later moves or disappears."""
+        async with self.factory() as session, session.begin():
+            job = await self._job(session)
+            record = job.input.get("notification_recovery")
+            if not isinstance(record, dict) or record.get("approval") != approval.model_dump(
+                mode="json"
+            ):
+                raise DraftRunRefused("persisted_recovery_approval_required")
+            job.input = {
+                **job.input,
+                "notification_recovery": {
+                    **record,
+                    "candidate_hold": {
+                        "approval_id": str(approval.approval_id),
+                        "candidate_ids": sorted({str(UUID(value)) for value in candidate_ids}),
+                        "agent_run_id": str(self.agent_run_id),
+                        "observed_at": datetime.now(UTC).isoformat(),
+                    },
+                },
+            }
 
     async def execute(
         self,
@@ -352,8 +380,19 @@ class SqlDraftEffects:
                     raise DraftEffectUncertain("provider_object_id_missing")
                 # Preserve an accepted object's identity BEFORE any fallible QA/readback.
                 known_id = created_id
+                recovery_source_id: str | None = None
+                is_recovery = ":notification-replacement:" in key
+                if is_recovery:
+                    returned_sources = created.get("data_sources")
+                    if (
+                        isinstance(returned_sources, list)
+                        and len(returned_sources) == 1
+                        and isinstance(returned_sources[0], dict)
+                    ):
+                        with suppress(ValueError, TypeError):
+                            recovery_source_id = str(UUID(str(returned_sources[0].get("id"))))
                 async with self.factory() as session, session.begin():
-                    await self._scoped_job(session)
+                    accepted_job = await self._scoped_job(session)
                     prior = await get_latest_effect_attempt(session, idempotency_key=key)
                     reservation = await get_idempotency_record(session, idempotency_key=key)
                     if (
@@ -381,6 +420,22 @@ class SqlDraftEffects:
                             provider_object_id=created_id,
                             reconciliation_attempt=prior.reconciliation_attempt + 1 if prior else 0,
                         )
+                    if is_recovery:
+                        record = accepted_job.input.get("notification_recovery", {})
+                        if not isinstance(record, dict):
+                            record = {}
+                        accepted_job.input = {
+                            **accepted_job.input,
+                            "notification_recovery": {
+                                **record,
+                                "accepted_resource": {
+                                    "database_id": created_id,
+                                    "data_source_id": recovery_source_id,
+                                },
+                            },
+                        }
+                if is_recovery and recovery_source_id is None:
+                    raise DraftEffectUncertain("accepted_notification_source_identity_missing")
                 async with self.factory() as session, session.begin():
                     await self._job(session)
                 observed = await reconcile(created_id)
@@ -462,6 +517,7 @@ class SqlDraftEffects:
         authority: DraftRunAuthority,
         sdk: AsyncClient,
         approval: NotificationReplacementApproval,
+        before_recovery_send: Callable[[RealPrivateNotionAdapter], Awaitable[None]] | None = None,
     ) -> tuple[SqlDraftEffects, RealPrivateNotionAdapter]:
         """Bind an actual A07 execution to the existing one-send guard.
 
@@ -514,11 +570,15 @@ class SqlDraftEffects:
                 mode="json"
             ):
                 raise DraftRunRefused("persisted_recovery_approval_required")
+            if record.get("candidate_hold") is not None:
+                raise DraftRunRefused("recovery_candidate_hold_requires_reconciliation")
             now = datetime.now(UTC)
             if not approval.approved_at <= now < approval.expires_at:
                 raise DraftRunRefused("recovery_approval_expired_or_future")
 
         async def before_send(method: str, path: str, body: dict[str, object]) -> None:
+            if before_recovery_send is not None:
+                await before_recovery_send(adapter)
             await effects.consume_notification_recovery_send(approval, method, path, body)
 
         adapter = RealPrivateNotionAdapter(

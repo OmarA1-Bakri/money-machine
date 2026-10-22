@@ -161,3 +161,22 @@ errors and persistent failure must propagate. Fault injection and real rendering
 independent functional/privacy review and affected asset checks precede publishing.
 No browser dependency, security setting, provider permission or retry policy for
 external effects changes. Production UNKNOWN and all holds remain intact.
+
+## Finite recovery invocation preparation
+
+The operator requests a complete bounded code path using existing controls.
+Implement one A07 application consumer of an already admitted canonical approval,
+typed original ProductSpec and pinned source mappings. Use the existing runner,
+binding, SDK, effect ledger and leases; do not create an issuer, CLI, registry,
+scheduler or production grant. Verify canonical spec/hash lineage before reads,
+and full parent/source/schema/candidate preflight again at the send boundary.
+Verify the exact returned object/data source before its new receipt is confirmed.
+Unknown responses without retained resource identity cannot adopt a title match.
+
+Return effect-only evidence; never select the replacement for a build, close the
+original UNKNOWN/incident, emit repair-complete events or continue other writes.
+Prove the finite path through real runner/DB and mock SDK, including drift,
+duplicate/candidate, revocation, interrupted readback and lost-response replay.
+Independent functional/provider review and affected/static checks precede push.
+Document exact runtime/identity/admission/deployment prerequisites in one packet;
+fixture authority is not human approval. No production execution is authorized.

@@ -216,6 +216,7 @@ async def recovery(session_factory, request, tmp_path):
             )
         state["object"] = {
             "id": db_id,
+            "data_sources": [{"id": str(uuid4())}],
             "parent": {"type": "page_id", "page_id": str(parent)},
             "archived": False,
             "public_url": None,

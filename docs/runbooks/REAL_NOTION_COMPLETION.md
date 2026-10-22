@@ -143,7 +143,7 @@ fixture library has a separate registered source. Runner lifecycle tests use a
 hash-verified synthetic prompt in a temporary fixture directory and simulation
 mode. They do not establish commissioned/live A07 execution. Canonical production
 ledger/runtime binding, verified recovered source/request bytes, authenticated
-approval admission, a finite recovery entrypoint, authorized deployment and actual
+approval admission, authorized runtime invocation/deployment and actual
 thredOS registration remain prerequisites. No execution command is supplied here.
 
 ## Runner-to-guard binding (code preparation)
@@ -161,6 +161,55 @@ response leaves the new effect UNKNOWN and the next runner execution cannot send
 again. These tests preserve the original UNKNOWN, open incident and fourteen
 confirmed fixture effects. They do not establish a live production entrypoint.
 
-Canonical approval admission, a finite invocation using this binding, source and
-ledger verification, actual registered identity/prompt and authorized deployment
-remain required. No live approval or production action is provided by this code.
+The finite consumer below supplies the code invocation. Canonical approval
+admission, source/ledger verification, actual registered identity/prompt and
+authorized runtime deployment remain required. No live approval or production
+action is provided by this code.
+
+## Finite approved-operation consumer (code preparation)
+
+`application.notification_recovery.NotificationRecoveryAgent` is an existing A07
+implementation invoked once by AgentRunner. It consumes an already admitted
+BuildRepairJob approval and the typed original ProductSpec; it does not issue or
+authenticate approval, claim a lease, install credentials or provide a CLI.
+Supply the canonical session factory, original authorized Notion SDK, scoped
+authority, spec and exact database/data-source mappings. Both mappings must match
+existing `input.notification_recovery.source_database_ids` and
+`source_data_source_ids`. Production execution retains the runner's commissioning
+and prompt checks. Simulation fixtures do not authorize a live invocation.
+
+Before provider reads, the consumer checks the typed spec hash against the
+approval, original/repair job inputs and producing run; it checks the canonical
+spec projection and product/producer/research lineage. It then reads complete
+paginated Forest children and all six source schemas/parents. The send callback
+repeats these checks and ends with another complete inventory read immediately
+before durable consumption. This cannot eliminate the residual race after the
+last provider read or establish historical non-creation.
+
+Any unbound Notification candidate persists an approval-scoped `candidate_hold`
+in existing repair metadata. Binding, consumption and the final lease guard
+refuse it even after the object disappears. No automatic hold clearing exists;
+positive reconciliation must be separately admitted. A lost response without a
+retained resource ID cannot adopt a matching title/schema.
+
+Accepted database/data-source IDs are retained together in existing repair
+metadata before fallible readback. A missing source ID preserves the database ID
+as UNKNOWN. A changed source ID cannot earn confirmation even with matching
+schema. Readback must verify the exact retained pair and full schema/inventory
+before the new receipt is confirmed. A later invocation can verify that retained
+pair without resending; interrupted active runs retain the lifecycle hold.
+
+Terminal results cite the actual latest ledger EffectReference. UNKNOWN becomes
+UNCERTAIN_EXTERNAL_EFFECT, confirmed success cites CONFIRMED, and a recorded
+definite refusal cites ABSENT. The result is explicitly effect-only: it emits no
+events, leaves the job status alone, selects no canonical build replacement and
+does not close the original incident or declare repair completion. Stop after
+this finite invocation; normal repair/build continuation requires separately
+reviewed authority and verified binding to the retained original effects.
+
+The remaining indispensable runtime gates are canonical production ledger/spec
+verification, original-account fresh preflight, authentic approval admission,
+registered execution identity and valid production prompt/commissioning, and
+authorized deployment/runtime binding. Extra telemetry or a generic approval
+framework is unnecessary. Actual product QA and native visual acceptance remain
+requirements for finishing the product after separately authorized continuation.
