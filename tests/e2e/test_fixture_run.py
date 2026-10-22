@@ -240,7 +240,10 @@ async def test_crash_after_render_reconciles_without_duplicate_draft(
                 (await connection.execute(select(func.count()).select_from(table))).scalar_one()
                 for table in tables
             ]
-            assert counts == [1] * len(tables)
+            assert counts == [1, 1, 3, 1, 1, 1, 1]
+            assert sorted(
+                (await connection.execute(select(t.Event.event_name))).scalars().all()
+            ) == ["ASSETS_COMPLETED", "BUILD_COMPLETED", "BUILD_QA_PASSED"]
         receipts = (bundle / "receipts.jsonl").read_bytes()
         stages = [json.loads(line)["stage"] for line in receipts.splitlines()]
         assert len(stages) == len(set(stages))

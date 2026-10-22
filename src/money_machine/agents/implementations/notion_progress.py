@@ -53,8 +53,13 @@ REBUILD_REFUSED = "rebuild_refused"
 _QA_REPAIR_KIND = "qa_repair"
 _QA_REPAIR_OPERATION = "qa.repair"
 _QA_REPAIR_PHASE = "qa"
-_QA_REPAIR_RESPONSES = frozenset({"published", "duplicate_button", "search_indexing"})
-_ACCEPTED_JOB_KINDS = frozenset({"provider_response", REBUILD_REFUSED, _QA_REPAIR_KIND})
+_QA_REPAIR_RESPONSES = frozenset(
+    {"published", "duplicate_button", "search_indexing", "notification_formulas"}
+)
+_QA_REQUIRED_KIND = "qa_repair_required"
+_ACCEPTED_JOB_KINDS = frozenset(
+    {"provider_response", REBUILD_REFUSED, _QA_REPAIR_KIND, _QA_REQUIRED_KIND}
+)
 _RECOVERIES = frozenset({"recoverable", "unrecoverable"})
 _PROGRESS_FIELDS = (
     "completed_operations",
@@ -494,6 +499,16 @@ def record_provider_failure(path: Path, operation: str, response: str, phase: st
     _append_job(path, _repair_job(operation, response, phase))
 
 
+def record_required_qa_repairs(path: Path, names: tuple[str, ...]) -> None:
+    """Record pending findings, distinct from repairs that actually ran."""
+    for name in names:
+        if name not in _QA_REPAIR_RESPONSES:
+            raise ProductBuildError("qa repair is unsupported")
+        _append_job(
+            path, _repair_job(_QA_REPAIR_OPERATION, name, _QA_REPAIR_PHASE, kind=_QA_REQUIRED_KIND)
+        )
+
+
 def append_refused_rebuild(path: Path, reason: str) -> None:
     """Append one rebuild_refused job through write_checkpoint.
 
@@ -530,7 +545,7 @@ def _same_provider_job(jobs: list[object], fresh: Mapping[str, str]) -> bool:
     with a different response, operation, or phase is a different job. A
     rebuild refusal is not a provider response and is never collapsed here.
     """
-    if fresh.get("kind") != "provider_response":
+    if fresh.get("kind") not in {"provider_response", _QA_REQUIRED_KIND}:
         return False
     for item in jobs:
         if type(item) is not dict:

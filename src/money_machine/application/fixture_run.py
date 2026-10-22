@@ -616,7 +616,13 @@ class FixtureRun:
                 await session.commit()
                 build_job = await self.job(session, "ProductBuildJob", "A07")
                 await session.commit()
-                probe, built = await build_product(spec, self.directory, self.when)
+                probe, built = await build_product(
+                    spec,
+                    self.directory,
+                    self.when,
+                    uow=UnitOfWork(session),
+                    build_job=build_job,
+                )
                 request = merchandising_request(spec, built)
                 copy = merchandise(request)
                 # Synchronous Playwright must run outside this event loop.

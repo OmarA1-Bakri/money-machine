@@ -395,12 +395,12 @@ def test_modules_do_not_import_a_network_provider() -> None:
         assert all(token not in folded for token in banned)
 
 
-def test_state_commissioning_and_exit_78_are_unchanged() -> None:
+def test_recovered_state_commissioning_and_exit_78_are_unchanged() -> None:
     state = json.loads(Path("docs/control/IMPLEMENTATION_STATE.json").read_text(encoding="utf-8"))
     assert state["current_session"] == 7
-    assert state["state_revision"] == 64
-    assert state["session_status"] == "complete"
-    assert state["next_session"] == 8
+    assert state["state_revision"] == 65
+    assert state["session_status"] == "incomplete"
+    assert state["next_session"] == 7
     assert state["commissioned_agents"] == []
     evidence = state["required_completion_evidence"]
     assert evidence

@@ -59,6 +59,7 @@ from money_machine.agents.implementations.notion_progress import (
     raise_recorded,
     raised_in_package,
     record_applied_repairs,
+    record_required_qa_repairs,
     stored_qa_repair_names,
 )
 from money_machine.agents.implementations.notion_progress_record import write_checkpoint
@@ -101,7 +102,7 @@ _QA_LOCAL_FAILED = "qa failed in local code"
 _QA_KEY = "qa"
 _NOTIFICATION_TITLE = "Notification dashboard"
 _SECTION_ROLES = ("purpose", "practice", "buyer")
-_REPAIRABLE = ("published", "duplicate_button", "search_indexing")
+_REPAIRABLE = ("published", "duplicate_button", "search_indexing", "notification_formulas")
 _QA_KEYS = frozenset({"checks", "facts", "proof_page_id", "prose_digest", "repairs", "verdict"})
 _VERDICTS = frozenset({"PASS", "FAIL_REPAIRABLE", "BLOCKED"})
 _SLUG_DATABASE = {
@@ -153,14 +154,23 @@ async def run_product_qa(
             return replace(stored, next_phase=PHASE_FACT_LEDGER, qa=saved)
         plan = await _plan(fixture, stored, validated)
         repairs: tuple[str, ...] = ()
-        if not plan.blocked and plan.repairs:
-            repairs = await _apply_repairs(fixture, stored, plan.repairs, path)
+        flag_repairs = tuple(name for name in plan.repairs if name != "notification_formulas")
+        if not plan.blocked and flag_repairs:
+            repairs = await _apply_repairs(fixture, stored, flag_repairs, path)
             # Each name was stored as its write returned. This call only
             # fills a name that the loop returned and had not stored yet.
             record_applied_repairs(path, repairs)
             plan = await _plan(fixture, stored, validated)
         repairs = tuple(dict.fromkeys((*stored_qa_repair_names(path), *repairs)))
-        if plan.blocked or plan.repairs:
+        if plan.blocked:
+            verdict = "BLOCKED"
+            proof = ""
+        elif plan.repairs == ("notification_formulas",):
+            verdict = "FAIL_REPAIRABLE"
+            proof = ""
+            record_required_qa_repairs(path, plan.repairs)
+            repairs = tuple(dict.fromkeys((*repairs, *plan.repairs)))
+        elif plan.repairs:
             verdict = "BLOCKED"
             proof = ""
         else:
@@ -247,6 +257,12 @@ def _require_qa(value: object) -> QaRecord:
     if verdict == "PASS" and any(passed is False for _name, passed in parsed_checks):
         raise ProductBuildError("qa record does not match")
     repairs = _require_repairs(entry["repairs"])
+    if verdict == "FAIL_REPAIRABLE" and (
+        dict(parsed_checks).get("notification_values") is not False
+        or "notification_formulas" not in repairs
+        or proof != ""
+    ):
+        raise ProductBuildError("qa record does not match")
     facts = _require_pairs(entry["facts"], "fact", "value")
     digest = entry["prose_digest"]
     if type(digest) is not str or len(digest) != 64 or not _hex_digest(digest):
@@ -347,6 +363,8 @@ async def _saved_holds(
         return False
     plan = await _plan(probe, stored, spec)
     facts = _facts(stored, spec, probe)
+    if saved.verdict == "FAIL_REPAIRABLE":
+        return False
     if saved.verdict == "BLOCKED":
         if saved.proof_page_id != "":
             raise ProductBuildError("qa record does not match")
@@ -375,8 +393,14 @@ async def _plan(
     flags = _flag_failures(probe, stored)
     structural = await _structural_checks(probe, stored, spec)
     checks = structural + flags
-    blocked = any(not passed for _name, passed in structural)
+    failures = {name for name, passed in structural if not passed}
+    formula_repairable = failures == {"notification_values"} and bool(
+        formula_repair_targets(probe, stored, spec)
+    )
+    blocked = bool(failures) and not formula_repairable
     repairs = tuple(name for name, _passed in flags if name in _REPAIRABLE and not _passed)
+    if formula_repairable:
+        repairs = (*repairs, "notification_formulas")
     if blocked:
         repairs = ()
     proof = _existing_proof_id(probe, stored, spec)
@@ -629,6 +653,27 @@ def dashboard_formula_expressions(spec: ProductSpec) -> dict[str, tuple[str, str
         name: (generated.databases[name], expression)
         for name, expression in generated.expressions.items()
     }
+
+
+def formula_repair_targets(
+    probe: FixtureNotionAdapter, stored: ProductBuildCheckpoint, spec: ProductSpec
+) -> tuple[tuple[str, str, str, str], ...]:
+    """Known existing formula IDs and old/new expressions; never create properties."""
+    targets: list[tuple[str, str, str, str]] = []
+    for name, (kind, expected) in dashboard_formula_expressions(spec).items():
+        database = _kind_database(probe, stored, kind)
+        if database is None:
+            return ()
+        properties = [prop for prop in database.properties if prop.name == name]
+        if len(properties) != 1 or properties[0].type != "formula":
+            return ()
+        prop = properties[0]
+        formula = prop.config.get("formula")
+        if type(formula) is not NotionFormula or type(formula.expression) is not str:
+            return ()
+        if formula.expression != expected:
+            targets.append((database.id, prop.id, formula.expression, expected))
+    return tuple(targets)
 
 
 async def fixture_matrix_flags(

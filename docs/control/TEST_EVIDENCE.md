@@ -1045,3 +1045,72 @@ Reviewed code3c4ad726d3699f47389adc84716189132bbf4cdd is deployed to the existin
 ## Source-defined research seeds integration (2026-10-22)
 
 Applied the separately reviewed three-file patch with SHA256 cddf65f4003e8dfb242459c14be135e5e00a391a99f78657cc8a0b063c8314ae after all target base hashes matched exactly. All candidate file hashes match its reviewed manifest. Supported Python3.12.3:27adapter/config tests and13database-backed market-research integration tests passed, zero skips. Ruff0.16.2 check and format-check passed. All300legacy fixture rows are preserved;250new cases are explicitly synthetic, use example.invalid and supply no demand metrics. Non-seed configuration, including the already logged unsupported365day/400sales policy defaults, is unchanged. This restores PDF physicalp38 step13.1 searches; it does not commission live collection or validate demand.
+
+## 2026-10-22 — Cloud PDF/QA repair integrated increment
+
+Baseline f8f26dc890943890c1925531b4b1ddb2e86eeff4, selected cloud workspace
+/workspace/money-machine. Both independent code/safety re-reviews passed before
+final aggregate verification (reviews/2026-10-22-cloud-qa-code-review.md).
+
+Final affected aggregate: **2338 passed, zero failures, zero skips**,274.23s.
+This is the broad affected suite below, not a claim that every repository test
+was run. It includes real PostgreSQL test databases, actual full Chromium153
+PDF output, fixture delivery bytes/crash replay, QA controls, provider-effect
+regressions and prompt integrity. No real provider effects were exercised.
+
+```sh
+PLAYWRIGHT_BROWSERS_PATH=/workspace/.cache/ms-playwright \
+MONEY_MACHINE_BROWSER_EXECUTABLE=/workspace/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome \
+.venv/bin/pytest -q tests/unit/agents tests/unit/assets \
+  tests/unit/integrations/notion/test_fixture_adapter.py \
+  tests/integration/test_fixture_qa_jobs.py \
+  tests/integration/test_agent_run_observability.py \
+  tests/integration/test_event_driven_successors.py \
+  tests/integration/test_real_draft_effects.py \
+  tests/integration/test_real_draft_runner.py tests/e2e/test_fixture_run.py \
+  tests/bootstrap/test_prompt_pack.py tests/bootstrap/test_prompt_integrity.py
+```
+
+Focused evidence: the new PDF tests first failed on the exact renderer catalog;
+103 PDF/security neighboring checks then passed. Formula-drift contract first
+failed with BLOCKED/empty repairs. Ten real-DB repair scenarios now pass, covering
+correction/readback/retest, duplicate dispatch, accepted-write/lost-response,
+failure before write, lying repair, post-repair structural damage, retry-budget
+exhaustion, corrected BLOCKED recovery, confirmed-effect/checkpoint failure with
+later drift, and terminal DB-commit failure preserving the standard lease hold.
+The latter proves no blind replay/dangling trace, not automatic lease recovery.
+The last focused run was11passes (ten DB scenarios plus the actual README link
+round-trip). Eight corrected historical control assertions separately passed.
+All are included in the final2338-pass aggregate.
+
+An earlier aggregate was2328passes/9failures. Eight failures were stale revision64
+completion assertions contradicted by pinned revision65/incomplete; the ninth
+was the generator's old PDF catalog expectation. Test-only corrections retain
+the twelve false evidence keys, uncommissioned agents and strict PDF structure.
+No control-state or immutable source bytes were changed to make tests pass.
+
+Fresh static gates: Ruff format-check432files, Ruff lint, Pyright0errors,
+`git diff --check`, and `bash -n scripts/setup_graphify.sh` passed. Canonical
+source/register verification passed with `--allow-missing-private-pdf`; this
+checks the registered workbook and coverage metadata, not the absent PDF bytes.
+
+Frontend using installed binaries:61 Vitest tests passed; TypeScript, ESLint
+and production Next16.3.0 build passed. API/readiness and console returned200;
+readiness reported reachable=true, schema_current=true at b2c3d4e5f6a7. uv cache
+paths were corrected to writable workspace storage; uv's attempted editable
+rebuild could not download hatchling through the proxy, so installed venv tools
+were used directly. No application dependency/lockfile changes were made.
+
+Graphify: **not installed, no graph output verified**. Official GitHub clone,
+PyPI installation and supported Library setup transfer failed; the explicitly
+authorized bounded transfer retry also returned503. Version0.9.93 is absent
+from cache. No source/model upload or paid backend ran. Package-pinned setup
+script and transfer/dependency/startup-persistence limitations are recorded in
+runbooks/GRAPHIFY.md. These are tooling execution failures, not a proven
+permission denial.
+
+The real product is still incomplete. UNKNOWN attempt
+e6912e08-f0b5-4371-bc13-b16966f12f79 stays held; no production ledger or provider
+state was replaced. thredOS registration and SDK correlation remain unverified.
+Session07 remains incomplete at revision65, next7, all twelve keys false.
+No release/commissioning/publication/deployment claim follows from these gates.

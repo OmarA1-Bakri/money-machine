@@ -1,5 +1,38 @@
 # Next Session
 
+## 2026-10-22 — Current cloud QA continuation checkpoint
+
+Canonical coding workspace: /workspace/money-machine, baseline
+f8f26dc890943890c1925531b4b1ddb2e86eeff4. Metadata-only resume checkpoint:
+.omx/state/resume-checkpoint.json. Do not infer access to older /srv or desktop
+paths. PDF compatibility, fixture formula repair/retest and local execution
+lineage corrections are implemented; read TEST_EVIDENCE.md for fresh gates.
+Formal state remains audited revision65, Session07 incomplete, next7, twelve
+false evidence keys and no commissioned agents. Do not manufacture a closure.
+
+Production remains held for run20261021T184946Z, product
+0403629f-54ec-5ea0-ab98-3714f2f3d419, build
+9b8688d2-db02-50c7-963e-b63c4659b539. Latest UNKNOWN Notification create attempt:
+e6912e08-f0b5-4371-bc13-b16966f12f79, no retained provider request/resource ID.
+Existing effect key:
+RealProductBuild:d5dc559a-6b60-5e53-916f-6ccea9c7d4df:0403629f-54ec-5ea0-ab98-3714f2f3d419:real-notion-v1:8238ab7be3aabaf589ac8d601276267420f37044e05b12214474bc58019ca475
+Fourteen effects are confirmed; no replay/new key/production write until
+authoritative reconciliation. API search absence is not proof of rejection.
+The development DB never replaces that ledger.
+
+The real Forest intro/six databases remain an incomplete product. Dashboard,
+hubs, Notification, variants, media, draft and direct visual/buyer acceptance
+remain pending the hold. No new research collector was started:36listings from
+one search and34/40 operator judgement are not measured customer demand.
+
+Graphify is not installed/proved in this container. See runbooks/GRAPHIFY.md for
+official-source, package and twice-failed supported Library transfer evidence.
+The package-pinned installer cannot establish locked dependencies or saved
+startup persistence. No graph output exists to query. thredOS still needs its
+actual authorized SDK/API contract and registration mapping/receipts; local
+AgentDefinition IDs do not substitute for registered external identities.
+The missing original playbook PDF requires supported transfer for final audit.
+
 ## 2026-10-22 — Reconciliation remains held after safe continuation
 
 Source-defined ten research seeds are integrated with27focused and13database-backed tests passing onPython3.12; no live collector was started. Latest actual research remains the36listing Etsy snapshot from2026-10-21T20:25:33Z, query notion budget planner; ranking is operator judgement, not verified sales/review demand. Fresh ledger metadata is retained outsideGit under the active run. Notification operation attempt3 stays UNKNOWN, no request/object ID. Do not replay, rename the operation or promote absence to proof. Need authoritative rejection or positive matching object adoption under the existing key, then resume existing14objects and verify the remaining product. thredOS registration and SDK correlation remain unverified; no parallel registry or invented trace IDs. Console deployment/browser proof remains complete; real product/Etsy draft are not complete.

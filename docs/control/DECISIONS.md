@@ -503,3 +503,16 @@ This supersedes the earlier fixture-only/no-live-provider restriction in D0036/3
 An explicit audited recovery/host-migration transition may repair the historical complete-but-unproved Session07 record and immutable host mismatch. It must be hash-bound, preserve the old state and operator-close provenance, advance revision exactly once and retain all unearned evidence false. Ordinary completion/activation guards remain unchanged; no session skipping, shadow state, path alias or direct JSON edit. A separate future evidence-admission contract must earn each substantive gate before session activation.
 
 The bounded corrective addendum is docs/control/reviews/2026-10-22-one-real-draft-prompt-integrity.md. Real provider readback is required for delivery; fixture tests cannot be relabeled real. Full Session15 commissioning, v1.0.0 and public buyer-path acceptance remain deferred.
+
+## D-0040 — Bounded cloud QA correction under production hold
+
+Accepted 2026-10-22 for the explicitly delegated cloud continuation.
+Current user authorization supersedes D-0038 only to admit the measured inert
+Chromium ViewerPreferences shape with substantive safety checks preserved, and
+D-0030 only for the existing targeted formula repair/retest path. D-0024 fresh
+verification semantics remain mandatory. See reviews/2026-10-22-cloud-qa-prompt-integrity.md
+for three independent prompt reviews and executable acceptance requirements.
+Production run 20261021T184946Z remains held on UNKNOWN attempt
+e6912e08-f0b5-4371-bc13-b16966f12f79. No production mutation or commissioning
+evidence promotion is authorized by these local corrections. Existing local
+agent identities are not evidence of thredOS registration.

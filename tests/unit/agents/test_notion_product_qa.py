@@ -300,7 +300,8 @@ async def test_wrong_formula_expression_is_blocked(tmp_path: Path) -> None:
 
     checkpoint = await run_product_qa(spec, probe, path, recorded_at=QA_AT)
 
-    assert checkpoint.qa is not None and checkpoint.qa.verdict == "BLOCKED"
+    assert checkpoint.qa is not None and checkpoint.qa.verdict == "FAIL_REPAIRABLE"
+    assert checkpoint.qa.repairs == ("notification_formulas",)
     assert _flag(checkpoint, "notification_values") is False
     assert _flag(checkpoint, "formulas_compile") is True
     assert calls == []

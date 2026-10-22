@@ -1324,7 +1324,13 @@ def _assert_readme_link_shape(pdf: bytes, count: int) -> None:
     doc = PdfDocument(pdf)
     root = doc.deref(doc.trailer.get("Root"))
     assert isinstance(root, dict)
-    assert set(root) == {"Pages", "Type"}
+    assert set(root) in ({"Pages", "Type"}, {"Pages", "Type", "ViewerPreferences"})
+    if "ViewerPreferences" in root:
+        preferences = root["ViewerPreferences"]
+        assert isinstance(preferences, dict)
+        assert set(preferences) == {"Type", "DisplayDocTitle"}
+        assert preferences["Type"] == PdfName("ViewerPreferences")
+        assert preferences["DisplayDocTitle"] is True
     assert isinstance(root["Type"], PdfName)
     assert root["Type"].value == "Catalog"
     pages = doc.deref(root.get("Pages"))
