@@ -95,3 +95,47 @@ authority/metadata/hook, altered request/scope, mutable hook arguments, revocati
 and expiry during locking/after consumption. Existing ordinary ABSENT retries
 remain green. Preceding bd00b06e has independently confirmed full CI success
 (5,525 Python and 61 frontend tests); this increment has separate CI evidence.
+
+
+## Durable A07 lifecycle increment
+
+Independent read-only functional/migration review (`prompt_fidelity`) and provider
+safety review (`prompt_safety`) found three initial boundary defects: committing
+an explicitly managed caller transaction, validating stale cached job fields, and
+borrowing an unresolved run after lease/attempt turnover. The executor repaired
+all three and both reviewers inspected the changed scope and reported no remaining
+blocker. Reviewers did not execute tests or query databases/providers.
+
+The existing agent_runs row now records RUNNING with its actual job attempt and
+lease owner before A07 work, then updates that same identity to a terminal result.
+A07 caller transaction ownership is explicit, active starts serialize under the
+refreshed job lock, and terminal overwrite/identity drift/restart of unresolved
+execution are refused. Effect sends require the original owner/attempt; historical
+accepted-effect recording retains its scoped lineage path. No approval issuer,
+recovery CLI, shadow registry or production binding is introduced.
+
+Focused lifecycle/guard verification passed 46 tests. This includes 20 lifecycle
+cases and four guard integration cases added in this increment; all 22 earlier
+guard cases remain. Fixtures now use a real observer-persisted active run rather
+than a synthetic terminal success row. Runner tests use a hash-verified synthetic
+PromptStore and production=False; missing versioned A07 runtime prompt and actual
+thredOS registration remain explicit deployment/readiness gaps.
+
+The first affected pass had 332 passing checks and one stale three-revision
+assertion. The schema test now checks the four reviewed migrations, the same
+canonical root and absence of a new lifecycle table. Its 106-check subset passed.
+Final affected and static verification is recorded below after execution.
+
+The lifecycle migration preserves old terminal history and refuses downgrade
+with unresolved active rows. Isolated DB tests exercise upgrade/downgrade/schema
+drift and truthful terminal shapes. Original production UNKNOWN, its incident
+and fourteen confirmed effects remain held; zero provider/production mutations.
+
+Final post-review affected verification: 333 tests passed, zero failures/skips
+(117.56 seconds), including migrations/schema/reversal, seed, repositories,
+leases, runner/observer, fixture QA/repair and original real-draft controls.
+The 12 prompt-pack/integrity checks passed separately. Ruff check across CI paths,
+format checks on 440 files, strict Pyright (zero errors) and canonical clean-clone
+source verification passed. The private Playbook PDF remains absent; no PDF-byte
+identity/coverage verification or session completion is claimed. New commit CI
+is tracked separately from the preceding green 22302db run.

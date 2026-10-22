@@ -16,7 +16,8 @@ from sqlalchemy import select
 from money_machine.application import real_draft_authority as authority_module
 from money_machine.application.real_draft_authority import DraftRunRefused
 from money_machine.application.real_draft_effects import DraftEffectUncertain, SqlDraftEffects
-from money_machine.domain.enums import SideEffectClass
+from money_machine.domain.enums import AgentRunStatus, SideEffectClass
+from money_machine.domain.models.common import ContractError
 from money_machine.integrations.notion.real_product_adapter import RealPrivateNotionAdapter
 from money_machine.orchestration.idempotency import record_effect_attempt, reserve_idempotency_key
 from money_machine.persistence.tables import (
@@ -28,6 +29,7 @@ from money_machine.persistence.tables import (
     PromptVersion,
     Receipt,
 )
+from tests.integration.test_agent_run_lifecycle import observer
 from tests.integration.test_real_draft_effects import prepare
 
 
@@ -119,21 +121,21 @@ async def recovery(session_factory):
         )
         session.add_all([definition, prompt])
         await session.flush()
-        run = AgentRun(
-            job_id=job.id,
+        active = observer(session)
+        from money_machine.observability.correlation import CorrelationContext
+
+        run_context = active.begin_run(
+            correlation=CorrelationContext(job.id, "A07", job.workflow_id, attempt=job.attempt),
             agent_definition_id=definition.id,
-            agent_id="A07",
-            agent_definition_version=definition.contract_version,
+            agent_definition_version=1,
             prompt_version_id=prompt.id,
             prompt_reference=prompt.prompt_reference,
             prompt_sha256=prompt.sha256,
-            status="SUCCESS",
-            output={"scope": "synthetic guard test, not registration"},
-            started_at=now,
-            completed_at=now,
+            run_number=1,
+            model=None,
+            input_payload={"fixture": "synthetic guard test"},
         )
-        session.add(run)
-        await session.flush()
+        run = await active.persist_started_run(run_context, lease_owner="repair-owner")
         body = {
             "parent": {"type": "page_id", "page_id": str(parent)},
             "title": [{"type": "text", "text": {"content": "Notification"}}],
@@ -240,6 +242,7 @@ async def recovery(session_factory):
                 create=lambda: adapter.create_database(parent, "Notification", state["props"]),
             )
 
+        state["run_context"] = run_context
         state["adapter"] = adapter
         yield state, effects, approval, execute
     async with session_factory() as session:
@@ -523,4 +526,92 @@ async def test_expiry_after_consumption_before_final_lease_check(
     adapter._before_send = expired
     with pytest.raises(DraftRunRefused):
         await execute()
+    assert state["posts"] == 0
+
+
+@pytest.mark.parametrize("end_before_send", [True, False])
+async def test_guard_uses_active_observer_run_and_retains_trace_after_failure(
+    recovery, session_factory, end_before_send
+):
+    state, effects, _approval, execute = recovery
+    context = state["run_context"]
+    async with session_factory() as session:
+        run = await session.get(AgentRun, context.run_id)
+        assert run.status == "RUNNING" and run.completed_at is None
+        if end_before_send:
+            await observer(session).finalize_run(
+                context,
+                status=AgentRunStatus.FAILURE,
+                output={},
+                error=ContractError(code="TEST_FAILED", message="synthetic terminal failure"),
+            )
+            await session.commit()
+    if end_before_send:
+        with pytest.raises(DraftRunRefused, match="active_agent_run_required"):
+            await execute()
+        assert state["posts"] == 0
+    else:
+        state["failure"] = "lost"
+        with pytest.raises(DraftEffectUncertain):
+            await execute()
+        assert state["posts"] == 1
+        async with session_factory() as session:
+            await observer(session).finalize_run(
+                context,
+                status=AgentRunStatus.FAILURE,
+                output={},
+                error=ContractError(code="TEST_LOST_RESPONSE", message="synthetic lost response"),
+            )
+            await session.commit()
+        with pytest.raises(DraftRunRefused, match="active_agent_run_required"):
+            await execute()
+        assert state["posts"] == 1
+        async with session_factory() as session:
+            attempts = list(
+                (
+                    await session.scalars(
+                        select(EffectAttempt).where(EffectAttempt.job_id == effects.job_id)
+                    )
+                ).all()
+            )
+            assert attempts and all(attempt.agent_run_id == context.run_id for attempt in attempts)
+            assert attempts[-1].effect_state == "UNKNOWN"
+
+
+@pytest.mark.parametrize("change", ["owner", "attempt"])
+async def test_old_active_run_cannot_be_reused_after_lease_turnover(
+    recovery, session_factory, change
+):
+    state, effects, _approval, _execute = recovery
+    new_owner = "new-repair-owner" if change == "owner" else effects.lease_owner
+    async with session_factory() as session:
+        job = await session.get(Job, effects.job_id)
+        job.lease_owner = new_owner
+        if change == "attempt":
+            job.attempt += 1
+        await session.commit()
+    # Even a caller possessing the new valid lease cannot borrow the prior run.
+    stale_trace = SqlDraftEffects(
+        session_factory,
+        effects.authority,
+        effects.job_id,
+        lease_owner=new_owner,
+        agent_run_id=effects.agent_run_id,
+    )
+
+    async def forbidden_create() -> dict[str, object]:
+        raise AssertionError("old run must be refused before any provider call")
+
+    async def absent(_known: str | None) -> None:
+        return None
+
+    with pytest.raises(DraftRunRefused, match="active_agent_run_required"):
+        await stale_trace.execute(
+            "no-borrowing-run",
+            provider="notion",
+            operation="notion.private_product.write",
+            notion_parent_id=_approval.parent_id,
+            create=forbidden_create,
+            reconcile=absent,
+        )
     assert state["posts"] == 0

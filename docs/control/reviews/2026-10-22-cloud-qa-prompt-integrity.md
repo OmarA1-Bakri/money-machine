@@ -102,3 +102,35 @@ durable one-shot consumption even after definite refusal, and no repair-complete
 or old-incident closure from this guard. Real approval/request freeze and canonical
 binding remain future gates; this message grants neither production execution nor
 permission to manufacture operator approval. No critical/high issue blocks prep.
+
+## Durable A07 lifecycle continuation
+
+The operator separately authorized this existing readiness gap while evidence
+transfer remains blocked. Reuse the three prompt verdicts and immutable source
+hash above. This Level 2 increment does not close Session 07.
+
+1. Persist an actual in-progress A07 run in the existing agent_runs table before
+   execution, with no terminal result or invented registration receipt. Extend
+   that table through one reversible migration; the prior guard-only migration
+   exclusion is superseded only for this lifecycle correction. Keep AgentResult's
+   terminal taxonomy unchanged.
+2. Commit the run checkpoint through the existing owning unit of work before
+   agent/provider work. Lock the existing job, retain one active run per job,
+   reject restart/replay while its outcome is unresolved, and update the same run
+   to its terminal result. Do not infer failure or automatically retry on restart.
+3. Reject mismatched run identity, terminal overwrites and sending with terminal
+   run lineage. Keep accepted-effect recording possible after execution ends.
+4. Exercise real fixture databases, runner/observer lifecycle and mock transport:
+   durable pre-execution visibility, failures, interrupted restart, concurrent
+   starts, replay and job/run/trace correlation. Never insert a fake SUCCESS run
+   as a substitute for an executing sender.
+5. Independently review migration/lifecycle and provider safety, remediate, run
+   affected/static/schema/reversal checks and publish to existing draft PR127.
+   No deployment, live grant, generic approval system or provider action.
+
+High: an uncommitted start cannot bind a provider effect from another session;
+make the A07 checkpoint transaction explicit. High: a crashed run is unknown,
+not successful; preserve it and refuse a second start until separately resolved.
+High: widening AgentResult to RUNNING could admit nonterminal outputs; keep the
+new persistence-only state out of that terminal contract. Source transfer,
+canonical binding, approval admission and live execution remain deferred.

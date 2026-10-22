@@ -97,6 +97,16 @@ class SqlDraftEffects:
             or job.lease_expires_at <= datetime.now(UTC)
         ):
             raise DraftRunRefused("durable_job_scope_or_lease")
+        if self.agent_run_id is not None:
+            run = await session.get(AgentRun, self.agent_run_id)
+            if (
+                run is None
+                or run.status != "RUNNING"
+                or run.completed_at is not None
+                or run.job_attempt != job.attempt
+                or run.lease_owner != self.lease_owner
+            ):
+                raise DraftRunRefused("active_agent_run_required")
         return job
 
     async def assert_lease(self) -> None:

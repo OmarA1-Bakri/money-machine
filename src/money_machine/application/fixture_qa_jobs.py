@@ -229,6 +229,10 @@ async def run_fixture_qa_jobs(
         )
         job.status, job.lease_owner = "RUNNING", str(context.run_id)
         job.lease_expires_at = now + timedelta(minutes=5)
+        if job.owner_agent_id == "A07":
+            await uow.flush()
+            await observer.persist_started_run(context, lease_owner=str(context.run_id))
+            await uow.commit()
         try:
             verdict = await action()
         except Exception:

@@ -16,6 +16,7 @@ from typing import Any, Final
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import SessionTransactionOrigin
 
 from money_machine.agents.base import (
     AgentContext,
@@ -119,10 +120,29 @@ class AgentRunner:
         agent: BaseAgent,
         production: bool = True,
         run_at: datetime | None = None,
+        lease_owner: str | None = None,
     ) -> tuple[AgentResult, AgentRunReceipt]:
-        """Execute one agent for a job, persist a run receipt, and return both."""
+        """Execute one agent for a job and return its durable receipt.
+
+        A07 requires a dedicated owning session/UoW and its actual lease owner.
+        Its start and terminal checkpoints commit that UoW. Caller-managed
+        explicit/nested transactions are refused before executing or committing.
+        Other agents retain the existing caller-controlled transaction behavior.
+        """
         started_at = run_at or datetime.now(tz=UTC)
         definition = self.definition_for_job(job)
+        durable_start = definition.agent_id == "A07"
+        transaction = session.sync_session.get_transaction()
+        if durable_start and (
+            not lease_owner
+            or session.in_nested_transaction()
+            or (
+                transaction is not None and transaction.origin != SessionTransactionOrigin.AUTOBEGIN
+            )
+        ):
+            raise AgentRegistryError(
+                "A07 requires a dedicated implicit-transaction UoW and lease owner"
+            )
         if production:
             self.assert_production_executable(definition)
 
@@ -163,6 +183,14 @@ class AgentRunner:
             input_payload=dict(job.input),
         )
         observation_context.started_at = started_at
+        if durable_start:
+            # A07 effects use separate ledger sessions. Their real run must be
+            # durable before execution, not inserted with a fictitious outcome.
+            if observer.uow.session is not session:
+                raise AgentRegistryError("A07 observer must use the owning job session")
+            assert lease_owner is not None
+            await observer.persist_started_run(observation_context, lease_owner=lease_owner)
+            await observer.uow.commit()
         run_id = observation_context.run_id
         review_coordinator = ReviewSubagentCoordinator(
             job_id=job.job_id,
@@ -188,7 +216,15 @@ class AgentRunner:
         )
         try:
             result = await agent.execute(context)
-        except AgentNotCommissionedError:
+        except AgentNotCommissionedError as error:
+            if durable_start:
+                await observer.finalize_run(
+                    observation_context,
+                    status=AgentRunStatus.BLOCKED,
+                    output={},
+                    error=ContractError(code="AGENT_NOT_COMMISSIONED", message=str(error)),
+                )
+                await observer.uow.commit()
             raise
         except Exception as error:
             completed_at = datetime.now(tz=UTC)
@@ -206,6 +242,8 @@ class AgentRunner:
                 error=contract_error,
                 completed_at=completed_at,
             )
+            if durable_start:
+                await observer.uow.commit()
             receipt = _receipt_from_run(run, error=contract_error)
             failure = AgentResult(
                 job_id=job.job_id,
@@ -228,12 +266,28 @@ class AgentRunner:
             )
             return failure, receipt
 
+        identity_error = None
         if result.agent_run_id != run_id:
-            msg = "agent result must cite the run id assigned by AgentRunner"
-            raise AgentRegistryError(msg)
-        if result.job_id != job.job_id:
-            msg = "agent result job_id must match the job envelope"
-            raise AgentRegistryError(msg)
+            identity_error = "agent result must cite the run id assigned by AgentRunner"
+        elif result.job_id != job.job_id:
+            identity_error = "agent result job_id must match the job envelope"
+        elif durable_start and (
+            result.agent_id != definition.agent_id
+            or result.agent_definition_version != definition.contract_version
+            or result.prompt_reference != prompt_version.prompt_reference
+            or result.prompt_sha256 != prompt_version.sha256
+        ):
+            identity_error = "agent result must cite its actual agent and prompt identity"
+        if identity_error is not None:
+            if durable_start:
+                await observer.finalize_run(
+                    observation_context,
+                    status=AgentRunStatus.FAILURE,
+                    output={},
+                    error=ContractError(code="AGENT_RESULT_IDENTITY", message=identity_error),
+                )
+                await observer.uow.commit()
+            raise AgentRegistryError(identity_error)
 
         completed_at = datetime.now(tz=UTC)
         if completed_at < started_at:
@@ -245,6 +299,8 @@ class AgentRunner:
             error=result.error,
             completed_at=completed_at,
         )
+        if durable_start:
+            await observer.uow.commit()
         receipt = _receipt_from_run(run, error=result.error)
         return result, receipt
 
@@ -322,6 +378,8 @@ def _receipt_from_run(
     metadata: LLMCallMetadata | None = None,
 ) -> AgentRunReceipt:
     """Map one persisted agent run row to the runner receipt contract."""
+    if run.completed_at is None:
+        raise AgentRegistryError("an active agent run has no terminal receipt")
     return AgentRunReceipt(
         run_id=run.id,
         job_id=run.job_id,

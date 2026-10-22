@@ -105,3 +105,40 @@ The guard never completes a repair/job, chooses a canonical replacement, closes
 an incident, or updates the original UNKNOWN. Those remain separate verified and
 explicitly authorized steps. Existing provider visibility, source, identity and
 quality requirements also remain in force.
+
+## Durable A07 execution lifecycle (code preparation)
+
+The existing observer can persist a truthful `RUNNING` row in `agent_runs`, with
+the original job attempt, lease owner and registered local definition/prompt
+lineage. It has no terminal output/error/completion time. The owning unit of work
+commits this checkpoint before execution. The terminal result updates that same
+row under a lock; mismatched identity and a second terminal write are refused.
+`AgentResult` still accepts terminal outcomes only. This is not thredOS registration.
+
+`AgentRunner.execute` requires A07 callers to supply the actual `lease_owner` and
+a dedicated job session with implicit transactions. Explicit/nested transactions
+are refused before any checkpoint commit or agent invocation. A07 start/terminal
+checkpoints commit that owning UoW; callers must not mix unrelated changes into it.
+Existing non-A07 transaction behavior is unchanged. The fixture repair consumer
+uses this same observer lifecycle and commits its active run before fixture work.
+
+An unresolved active run blocks restart/replay and concurrent second starts.
+Cancellation/process interruption leaves `RUNNING`, never a fabricated success or
+automatic failure/retry. A separately reconciled terminal result is needed before
+another execution. Effects with supplied run lineage require its persisted owner
+and attempt to match the current job/worker, so a replacement lease cannot borrow
+the previous unresolved run. Historical accepted-effect recording retains the
+existing scoped identity path. No UNKNOWN effect is resolved by terminal tracing.
+
+Migration `c3d4e5f6a7b8` extends the existing table, preserves old terminal records,
+enforces active/terminal shapes and allows at most one active run per job. Downgrade
+refuses unresolved active rows rather than deleting or fabricating execution history.
+
+This closes one code-level lifecycle gap. The default versioned PromptStore does
+not currently contain an A07 prompt at `prompts/agents/A07/v1.md`; the existing
+fixture library has a separate registered source. Runner lifecycle tests use a
+hash-verified synthetic prompt in a temporary fixture directory and simulation
+mode. They do not establish commissioned/live A07 execution. Canonical production
+ledger/runtime binding, verified recovered source/request bytes, authenticated
+approval admission, a finite recovery entrypoint, authorized deployment and actual
+thredOS registration remain prerequisites. No execution command is supplied here.
