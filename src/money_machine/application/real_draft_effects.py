@@ -6,6 +6,7 @@ reconcile; a missing result after an uncertain write never authorizes another PO
 
 from __future__ import annotations
 
+from asyncio import current_task
 from collections.abc import Awaitable, Callable, Mapping
 from contextvars import ContextVar
 from datetime import UTC, datetime
@@ -14,7 +15,12 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from money_machine.application.real_draft_authority import DraftRunAuthority, DraftRunRefused
+from money_machine.application.real_draft_authority import (
+    DraftRunAuthority,
+    DraftRunRefused,
+    NotificationReplacementApproval,
+    notion_request_sha256,
+)
 from money_machine.domain.enums import SideEffectClass
 from money_machine.orchestration.idempotency import (
     derive_idempotency_key,
@@ -25,7 +31,7 @@ from money_machine.orchestration.idempotency import (
     record_receipt,
     reserve_idempotency_key,
 )
-from money_machine.persistence.tables import Job, Shop, WorkflowRun
+from money_machine.persistence.tables import AgentRun, Job, Shop, WorkflowRun
 
 ProviderObject = Mapping[str, object]
 Create = Callable[[], Awaitable[ProviderObject]]
@@ -46,11 +52,16 @@ class SqlDraftEffects:
         job_id: UUID,
         *,
         lease_owner: str,
+        agent_run_id: UUID | None = None,
     ) -> None:
         self.factory = session_factory
         self.authority = authority
         self.job_id = job_id
         self.lease_owner = lease_owner
+        self.agent_run_id = agent_run_id
+        self._recovery_permit: ContextVar[
+            tuple[str, int, NotificationReplacementApproval] | None
+        ] = ContextVar("recovery_wire_permit", default=None)
         self._active_key: ContextVar[str | None] = ContextVar("real_draft_effect_key", default=None)
 
     async def _scoped_job(self, session: AsyncSession) -> Job:
@@ -71,6 +82,10 @@ class SqlDraftEffects:
         )
         if shop_name != self.authority.shop_name:
             raise DraftRunRefused("durable_workflow_shop_scope")
+        if self.agent_run_id is not None:
+            run = await session.get(AgentRun, self.agent_run_id)
+            if run is None or run.job_id != job.id or run.agent_id != job.owner_agent_id:
+                raise DraftRunRefused("durable_agent_run_scope")
         return job
 
     async def _job(self, session: AsyncSession) -> Job:
@@ -90,7 +105,25 @@ class SqlDraftEffects:
         if key is None:
             raise DraftRunRefused("active_effect_reservation_required")
         async with self.factory() as session, session.begin():
-            await self._job(session)
+            job = await self._job(session)
+            permit = self._recovery_permit.get()
+            if (
+                "notification_recovery" in job.input
+                or ":notification-replacement:" in key
+                or permit is not None
+            ):
+                record = job.input.get("notification_recovery", {})
+                if (
+                    permit is None
+                    or permit[:2] != (key, id(current_task()))
+                    or not permit[2].approved_at <= datetime.now(UTC) < permit[2].expires_at
+                    or not isinstance(record, dict)
+                    or record.get("approval") != permit[2].model_dump(mode="json")
+                    or record.get("effect_key") != key
+                    or "send_consumed_at" not in record
+                ):
+                    raise DraftRunRefused("recovery_request_guard_required")
+                self._recovery_permit.set(None)
             reservation = await get_idempotency_record(session, idempotency_key=key)
             if (
                 reservation is None
@@ -98,6 +131,119 @@ class SqlDraftEffects:
                 or reservation.completed_at is not None
             ):
                 raise DraftRunRefused("active_effect_reservation_required")
+
+    async def consume_notification_recovery_send(
+        self,
+        approval: NotificationReplacementApproval,
+        method: str,
+        path: str,
+        body: dict[str, object],
+    ) -> None:
+        """Consume a persisted one-send grant at the adapter's actual request boundary.
+
+        A consumed grant permits no further send, including after ABSENT or a
+        crash before transport. Ordinary effects retain their existing policy.
+        This never resolves the old UNKNOWN or closes a job/repair/incident.
+        """
+        if type(approval) is not NotificationReplacementApproval:
+            raise DraftRunRefused("explicit_recovery_approval_required")
+        now = datetime.now(UTC)
+        if not approval.approved_at <= now < approval.expires_at:
+            raise DraftRunRefused("recovery_approval_expired_or_future")
+        if (
+            method != "POST"
+            or path != "databases"
+            or set(body) != {"parent", "title", "is_inline", "initial_data_source"}
+            or body.get("parent") != {"type": "page_id", "page_id": str(approval.parent_id)}
+            or body.get("title") != [{"type": "text", "text": {"content": "Notification"}}]
+            or body.get("is_inline") is not True
+            or notion_request_sha256(body) != approval.request_sha256
+        ):
+            raise DraftRunRefused("recovery_request_digest_or_scope")
+        key = self._active_key.get()
+        async with self.factory() as session, session.begin():
+            job = await self._job(session)
+            expected_key = derive_idempotency_key(
+                job_type=job.job_type,
+                workflow_id=job.workflow_id,
+                object_id=job.object_id,
+                operation=approval.operation_key,
+            )
+            if (
+                job.job_type != "BuildRepairJob"
+                or job.owner_agent_id != "A07"
+                or job.id != approval.repair_job_id
+                or job.workflow_id != approval.workflow_id
+                or job.object_id != approval.product_id
+                or self.authority.run_id != approval.run_id
+                or self.authority.verified_notion_parent_id != approval.parent_id
+                or self.agent_run_id is None
+                or key != expected_key
+            ):
+                raise DraftRunRefused("recovery_job_operation_scope")
+            record = job.input.get("notification_recovery")
+            if not isinstance(record, dict) or record.get("approval") != approval.model_dump(
+                mode="json"
+            ):
+                raise DraftRunRefused("persisted_recovery_approval_required")
+            if "send_consumed_at" in record:
+                raise DraftRunRefused("recovery_send_authority_consumed")
+            reservation = await get_idempotency_record(session, idempotency_key=expected_key)
+            if (
+                reservation is None
+                or reservation.job_id != job.id
+                or reservation.operation != "notion.private_product.write"
+                or reservation.completed_at is not None
+            ):
+                raise DraftRunRefused("active_effect_reservation_required")
+            original = await session.get(Job, approval.original_job_id)
+            old_reservation = await get_idempotency_record(
+                session, idempotency_key=approval.original_effect_key
+            )
+            old_attempt = await get_latest_effect_attempt(
+                session, idempotency_key=approval.original_effect_key
+            )
+            if (
+                original is None
+                or original.id == job.id
+                or original.workflow_id != job.workflow_id
+                or original.object_id != job.object_id
+                or original.input.get("run_id") != approval.run_id
+                or (
+                    original.status == "RUNNING"
+                    and original.lease_expires_at is not None
+                    and original.lease_expires_at > now
+                )
+                or old_reservation is None
+                or old_reservation.job_id != original.id
+                or old_reservation.completed_at is not None
+                or old_attempt is None
+                or old_attempt.id != approval.original_attempt_id
+                or old_attempt.job_id != original.id
+                or old_attempt.effect_state != "UNKNOWN"
+                or old_attempt.provider != "notion"
+                or old_attempt.operation != "notion.private_product.write"
+            ):
+                raise DraftRunRefused("original_unknown_scope_or_state")
+            now = datetime.now(UTC)
+            if not approval.approved_at <= now < approval.expires_at:
+                raise DraftRunRefused("recovery_approval_expired_or_future")
+            if job.lease_expires_at is None or job.lease_expires_at <= now:
+                raise DraftRunRefused("durable_job_scope_or_lease")
+            job.input = {
+                **job.input,
+                "notification_recovery": {
+                    **record,
+                    "send_consumed_at": now.isoformat(),
+                    "effect_key": key,
+                    "request_sha256": approval.request_sha256,
+                    "agent_run_id": str(self.agent_run_id),
+                },
+            }
+            await session.flush()
+        # Only this task's next adapter lease guard can spend this in-memory permit.
+        # Durable consumption above survives cancellation/process loss/DB readback failure.
+        self._recovery_permit.set((expected_key, id(current_task()), approval))
 
     async def execute(
         self,
@@ -158,7 +304,7 @@ class SqlDraftEffects:
                     session,
                     idempotency_key=key,
                     job_id=self.job_id,
-                    agent_run_id=None,
+                    agent_run_id=self.agent_run_id,
                     provider=provider,
                     operation=operation,
                     effect_state="UNKNOWN",
@@ -186,6 +332,7 @@ class SqlDraftEffects:
                     created = await create()
                     create_returned = True
                 finally:
+                    self._recovery_permit.set(None)
                     self._active_key.reset(context)
                 created_id = str(created.get("id", ""))
                 if not created_id:
@@ -214,7 +361,7 @@ class SqlDraftEffects:
                             session,
                             idempotency_key=key,
                             job_id=self.job_id,
-                            agent_run_id=None,
+                            agent_run_id=self.agent_run_id,
                             provider=provider,
                             operation=operation,
                             effect_state="UNKNOWN",
@@ -244,7 +391,7 @@ class SqlDraftEffects:
                         session,
                         idempotency_key=key,
                         job_id=self.job_id,
-                        agent_run_id=None,
+                        agent_run_id=self.agent_run_id,
                         provider=provider,
                         operation=operation,
                         effect_state="ABSENT" if definite_absence else "UNKNOWN",
@@ -265,7 +412,7 @@ class SqlDraftEffects:
                     session,
                     idempotency_key=key,
                     job_id=self.job_id,
-                    agent_run_id=None,
+                    agent_run_id=self.agent_run_id,
                     provider=provider,
                     operation=operation,
                     effect_state="CONFIRMED",
@@ -287,6 +434,7 @@ class SqlDraftEffects:
                         "product_id": str(self.authority.product_id),
                         "provenance": "real_provider_readback",
                         "scope": "one_private_product_etsy_draft",
+                        **({"agent_run_id": str(self.agent_run_id)} if self.agent_run_id else {}),
                     },
                 )
                 await mark_idempotency_completed(session, idempotency_key=key)

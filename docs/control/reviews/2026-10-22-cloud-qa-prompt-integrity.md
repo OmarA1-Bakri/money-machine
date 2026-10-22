@@ -77,3 +77,28 @@ IDs, extra/missing child coverage, and retaining pending native visual review.
 Canonical PDF absence and thredOS registration remain existing blockers; neither
 is silently promoted by this wave. No unresolved critical/high finding blocks
 these bounded code corrections.
+
+## One-send recovery guard preparation
+
+This continuation reuses the Session 07 source hash and prompt review verdicts.
+The operator authorized implementation/tests/publication of a guard, explicitly
+withholding replacement creation and production ledger mutation.
+
+1. Add one request-aware guard at the existing private Notion adapter boundary.
+   Bind an explicit, persisted, expiring one-operation approval to exact canonical
+   request digest, job/workflow/product/run/Forest parent and original UNKNOWN.
+2. Under existing BuildRepairJob/effect lease locks, consume send authority in
+   existing job metadata before send. Every later send is refused even after
+   ABSENT, 400/429 or a crash before actual transport. Never mint another key.
+3. Reuse real job/run/agent-definition/prompt lineage. No registry, scheduler,
+   migration, approval issuer, execution CLI or canonical replacement binding.
+4. Test only synthetic request IDs/digests via mock SDK transport and isolated
+   databases. Preserve original UNKNOWN/incident/receipts and ordinary retry rules.
+5. Run focused/affected checks, static gates and independent functional/provider
+   safety review, then publish the bounded increment to existing draft PR127.
+
+High findings from the proposal review are resolved by exact wire-body checking,
+durable one-shot consumption even after definite refusal, and no repair-complete
+or old-incident closure from this guard. Real approval/request freeze and canonical
+binding remain future gates; this message grants neither production execution nor
+permission to manufacture operator approval. No critical/high issue blocks prep.

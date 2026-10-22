@@ -7,6 +7,9 @@ writing. This policy neither performs effects nor authenticates provider evidenc
 
 from __future__ import annotations
 
+import hashlib
+import json
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Annotated, Literal
@@ -182,3 +185,55 @@ class DraftRunAuthority(BaseModel):
         ):
             if type(expected) is not int or expected < 1 or actual != expected:
                 raise DraftRunRefused("attachment_count_mismatch")
+
+
+def notion_request_sha256(body: Mapping[str, object]) -> str:
+    """Hash canonical UTF-8 JSON body bytes, not a logical operation key."""
+    try:
+        canonical = json.dumps(
+            dict(body), sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+        ).encode("utf-8")
+    except (TypeError, ValueError):
+        raise DraftRunRefused("recovery_request_not_json") from None
+    return hashlib.sha256(canonical).hexdigest()
+
+
+class NotificationReplacementApproval(BaseModel):
+    """Explicit operator-issued one-operation envelope; this module never issues it.
+
+    Must match canonical BuildRepairJob metadata. No default approval, CLI loader
+    or production request is provided. Registration/approval provenance remains
+    the caller's existing control responsibility, not a self-issued receipt.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    approval_id: UUID
+    repair_job_id: UUID
+    original_job_id: UUID
+    original_attempt_id: UUID
+    original_effect_key: Annotated[str, Field(min_length=1, max_length=200)]
+    workflow_id: UUID
+    product_id: UUID
+    run_id: Annotated[str, Field(min_length=1, max_length=128)]
+    parent_id: UUID
+    request_sha256: Sha256
+    spec_sha256: Sha256
+    decision_sha256: Sha256
+    operator_reference: Annotated[str, Field(min_length=1, max_length=300)]
+    approved_at: datetime
+    expires_at: datetime
+    max_sends: Literal[1] = 1
+    operation: Literal["notion.notification.replacement.create"] = (
+        "notion.notification.replacement.create"
+    )
+
+    @field_validator("approved_at", "expires_at")
+    @classmethod
+    def aware_approval_time(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("approval time must be timezone-aware")
+        return value
+
+    @property
+    def operation_key(self) -> str:
+        return "notification-replacement:" + str(self.approval_id)

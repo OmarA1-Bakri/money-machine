@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ipaddress
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+from copy import deepcopy
 from typing import Any, Literal
 from urllib.parse import urlsplit
 from uuid import UUID
@@ -91,6 +92,7 @@ class RealPrivateNotionAdapter:
         mode: str = "real-private",
         verified_workspace_id: str | UUID | None = None,
         before_write: Callable[[], Awaitable[None]] | None = None,
+        before_send: Callable[[str, str, Json], Awaitable[None]] | None = None,
     ) -> None:
         if mode != "real-private" or authority.verified_notion_parent_id is None:
             raise DraftRunRefused("real_private_verified_parent_required")
@@ -100,6 +102,7 @@ class RealPrivateNotionAdapter:
         self._workspace = _id(verified_workspace_id) if verified_workspace_id else None
         self.created_ids: set[str] = set()
         self._before_write = before_write
+        self._before_send = before_send
 
     def _authorize(self, *, write: bool = False) -> None:
         self.authority.authorize(
@@ -120,9 +123,14 @@ class RealPrivateNotionAdapter:
     ) -> Json:
         self._authorize(write=write)
         if write:
+            body = deepcopy(body)
             if self._before_write is None:
                 raise DraftRunRefused("durable_effect_guard_required")
             try:
+                if self._before_send is not None:
+                    await self._before_send(
+                        method, path, deepcopy(body) if body is not None else {}
+                    )
                 await self._before_write()
             except Exception:
                 raise DraftRunRefused("durable_effect_guard_refused") from None

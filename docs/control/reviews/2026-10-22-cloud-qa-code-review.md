@@ -63,3 +63,35 @@ strict Pyright reported zero errors. Workbook and Session 07 hashes are unchange
 canonical clean-clone source-register validation passed. No full-suite rerun was
 needed for this Level 2 wave; the preceding published commit already has green
 CI run 39769233582. New CI status belongs to the new remote commit.
+
+## One-send recovery guard preparation
+
+Independent read-only review of the diff from `bd00b06e` by `prompt_fidelity`
+and `prompt_safety` identified three material boundary gaps. The executor fixed
+mutable hook/transport sharing, missing-metadata downgrade, and approval expiry
+across lock waits. Both reviewers read the corrected code and regressions and
+reported no remaining blockers in that changed scope. They did not run tests.
+
+The remediated guard uses existing BuildRepairJob metadata, durable reservations,
+lease locks, effect attempts, receipts and persisted agent-run lineage. The wire
+body is independently copied and hashed; recovery identity independently requires
+a guard; authorization is consumed durably before send, rechecked after locking
+and at final permit consumption, and cannot be retried after ABSENT/400/429.
+No approval issuer, CLI, scheduler, database migration, canonical-selection
+binding, thredOS registration claim or production execution is included.
+
+The original UNKNOWN/incident and fourteen confirmed receipts are preserved in
+isolated regression fixtures. Fixture IDs/approvals are synthetic and grant no
+production authority. Actual spec/schema/hash-definition and provider execution
+remain blocked independently of this code preparation.
+
+After final review, 1,107 affected application/Notion/CLI, recovery-guard,
+real-draft effects/runner, observability and existing fixture-repair tests passed
+with zero failures/skips (48.26 seconds). Ruff check/format across the CI source
+paths, strict Pyright and source-register checks passed. The 22 new database
+scenarios cover success/replay and persisted lineage, concurrent dispatch, lost
+response, 400/429 refusal, crashes on both sides of durable consumption, missing
+authority/metadata/hook, altered request/scope, mutable hook arguments, revocation
+and expiry during locking/after consumption. Existing ordinary ABSENT retries
+remain green. Preceding bd00b06e has independently confirmed full CI success
+(5,525 Python and 61 frontend tests); this increment has separate CI evidence.
