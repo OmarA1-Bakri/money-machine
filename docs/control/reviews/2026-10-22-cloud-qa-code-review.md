@@ -169,3 +169,27 @@ The preceding 1b68de4 lifecycle head has independently confirmed full CI success
 New-head CI is separate. No production ledger/provider mutation, deployment,
 live approval, canonical-selection binding, finite invocation or session closure
 is included. Actual thredOS registration and production prompt remain unverified.
+
+## Screenshot capture CI correction
+
+Independent run39798293205 failed at the unchanged fixture hash test with the raw
+Chromium Page.captureScreenshot error after font readiness: 5,586 Python tests
+passed, one failed; downstream frontend/Compose gates were skipped. The exact
+test passed locally with the already installed Chromium cache. The underlying
+browser cause is not reproduced or classified as flaky. Driver inspection shows
+the capture error is propagated after readiness, with no local renderer recovery.
+
+The local renderer now recreates the page once for that exact protocol error,
+repeating readiness, structure, sensitive-text validation and PNG canonicalization.
+Persistent failure, timeout, closed target and validation refusal still fail.
+No launch flag, dependency, security/network setting, hash, assertion or provider
+retry behavior changed. Five injected scenarios prove fresh-page cleanup, the
+original pinned hash, persistent/other-error propagation and second-pass privacy
+refusal. The injected one-failure case reproduced RED before the correction.
+
+All 72 screenshot tests passed (22.26 seconds); 128 affected image/video/lineage,
+mutant, draft-successor and readiness tests passed (27.41 seconds). Ruff check and
+format passed. Independent functional and privacy/provider reviewers found no
+blocker, explicitly preserving the underlying-cause limitation. Strict Pyright
+verification and the separate new-head CI receipt are recorded at publication.
+No provider/production effect, approval issuance, merge or deployment occurred.

@@ -149,3 +149,15 @@ Preserve original UNKNOWN and existing controls. Independent functional/provider
 review and affected/static checks precede publication to the existing draft PR.
 Canonical admission, production prompt/registration, finite invocation and actual
 runtime deployment remain independent prerequisites; a binding is not consent.
+
+## CI screenshot failure correction
+
+CI39798293205 failed on the unchanged fixture screenshot renderer's raw Chromium
+capture error. Diagnose with the installed pinned browser and local fixtures;
+do not call it flaky or weaken pinned hashes, isolation, readiness, structure or
+sensitive-text assertions. A bounded recovery may recreate the local page once
+for the exact capture protocol error, with every admission check repeated. Other
+errors and persistent failure must propagate. Fault injection and real rendering,
+independent functional/privacy review and affected asset checks precede publishing.
+No browser dependency, security setting, provider permission or retry policy for
+external effects changes. Production UNKNOWN and all holds remain intact.
