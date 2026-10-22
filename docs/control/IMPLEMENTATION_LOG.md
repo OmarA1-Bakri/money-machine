@@ -6868,3 +6868,8 @@ Applied the supported D0039 recovery on clean merged trunk48b2d2a217ed8cb607b938
 ## Real draft operator console integration (2026-10-22)
 
 Added explicit fixture/real_draft response modes and workflow-scoped real reads for the approved shop. Real summaries exist before an Etsy listing; pending-effect counts use the latest observation for each operation, without exposing keys or provider payloads. The web separates stored fixture completion from private draft progress and rejects contradictory completion/uncertainty and mismatched modes. No provider writes, ledger reconciliation, service activation or commissioning occurred in this wave. Independent TypeScript review corrected mode coercion; Python review confirmed exact run isolation and unchanged artifact guards.
+
+
+## Reviewed console deployment and browser verification (2026-10-22)
+
+Built a new console image offline from the reviewed standalone output and existing local base, preserved the previous container, gracefully restarted only the project API, and switched only console3100. Browser route, real/fixture isolation, actual fixture-file opening, mobile and API outage/recovery proofs passed. Restored the Windows localhost13100 tunnel; all7 real routes respond200. The uncertain Notion operation remains held and unchanged. This deploys truthful progress visibility; it does not complete the real product or Etsy draft.
