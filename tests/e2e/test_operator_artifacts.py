@@ -92,6 +92,7 @@ async def test_summary_reports_only_persisted_completion_and_actual_rows(
             "completed_at",
             "product_state",
             "jobs",
+            "recoveries",
             "artifacts",
         }
         assert body["run_id"] == RUN_ID

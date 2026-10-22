@@ -24,6 +24,7 @@ from money_machine.api.routers.operator_runs import (
     select_operator_run,
 )
 from money_machine.persistence.tables import (
+    AgentRun,
     Artifact,
     Asset,
     EffectAttempt,
@@ -59,6 +60,17 @@ class ProofArtifact(ProofModel):
     href: str
 
 
+class ProofRecovery(ProofModel):
+    """Allowlisted persisted facts, independent of workflow/job completion."""
+
+    job_id: UUID
+    agent_run_id: UUID | None
+    agent_run_status: str | None
+    effect_state: str | None
+    database_id: UUID | None
+    data_source_id: UUID | None
+
+
 class RunSummary(ProofModel):
     run_id: str
     workflow_id: UUID
@@ -72,7 +84,70 @@ class RunSummary(ProofModel):
     completed_at: datetime | None
     product_state: str
     jobs: list[ProofJob]
+    recoveries: list[ProofRecovery]
     artifacts: list[ProofArtifact]
+
+
+def _resource_id(value: object) -> UUID | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return UUID(value)
+    except ValueError:
+        return None
+
+
+def _recovery_proofs(
+    product_id: UUID,
+    jobs: list[Job],
+    runs: list[AgentRun],
+    effects: list[EffectAttempt],
+) -> list[ProofRecovery]:
+    latest_runs: dict[UUID, AgentRun] = {}
+    for run in runs:  # Already ordered by descending run_number within each job.
+        latest_runs.setdefault(run.job_id, run)
+    proofs = []
+    for job in jobs:
+        record = job.input.get("notification_recovery")
+        if (
+            job.job_type != "BuildRepairJob"
+            or job.owner_agent_id != "A07"
+            or job.object_type != "Product"
+            or job.object_id != product_id
+            or not isinstance(record, dict)
+        ):
+            continue
+        accepted = record.get("accepted_resource")
+        accepted = accepted if isinstance(accepted, dict) else {}
+        run = latest_runs.get(job.id)
+        database_id = _resource_id(accepted.get("database_id"))
+        observations = [
+            effect
+            for effect in effects
+            if effect.job_id == job.id
+            and effect.provider == "notion"
+            and effect.operation == "notion.private_product.write"
+            and effect.idempotency_key == record.get("effect_key")
+        ]
+        effect = observations[0] if len(observations) == 1 else None
+        # A retained response is not proof that a different provider object was verified.
+        if effect is not None and (
+            (effect.effect_state == "CONFIRMED" or effect.provider_object_id is not None)
+            and (database_id is None or _resource_id(effect.provider_object_id) != database_id)
+        ):
+            effect = None
+        proofs.append(
+            ProofRecovery(
+                job_id=job.id,
+                agent_run_id=run.id if run else None,
+                agent_run_status=run.status if run else None,
+                # Only the exact, identity-consistent recovery observation is eligible.
+                effect_state=effect.effect_state if effect else None,
+                database_id=database_id,
+                data_source_id=_resource_id(accepted.get("data_source_id")),
+            )
+        )
+    return proofs
 
 
 def _artifact_query(selected: OperatorRun) -> Select[tuple[Artifact, Asset]]:
@@ -136,8 +211,18 @@ async def run_summary(run_id: RunId, session: SessionDependency) -> RunSummary:
         if selected is None:
             raise HTTPException(status_code=404, detail="operator product not found")
         product, workflow, listing = selected
-        jobs = await session.scalars(
-            select(Job).where(Job.workflow_id == workflow.id).order_by(Job.created_at, Job.id)
+        jobs = list(
+            await session.scalars(
+                select(Job).where(Job.workflow_id == workflow.id).order_by(Job.created_at, Job.id)
+            )
+        )
+        runs = list(
+            await session.scalars(
+                select(AgentRun)
+                .join(Job, AgentRun.job_id == Job.id)
+                .where(Job.workflow_id == workflow.id, AgentRun.agent_id == "A07")
+                .order_by(AgentRun.job_id, AgentRun.run_number.desc(), AgentRun.id.desc())
+            )
         )
         artifacts = (
             await session.execute(
@@ -154,10 +239,12 @@ async def run_summary(run_id: RunId, session: SessionDependency) -> RunSummary:
             .where(Job.workflow_id == workflow.id)
             .order_by(EffectAttempt.idempotency_key, EffectAttempt.reconciliation_attempt.desc())
         )
-        latest_effects: dict[str, str] = {}
+        latest_effects: dict[str, EffectAttempt] = {}
         for effect in effects:
-            latest_effects.setdefault(effect.idempotency_key, effect.effect_state)
-        pending_effects = sum(state == "UNKNOWN" for state in latest_effects.values())
+            latest_effects.setdefault(effect.idempotency_key, effect)
+        pending_effects = sum(
+            effect.effect_state == "UNKNOWN" for effect in latest_effects.values()
+        )
         return RunSummary(
             run_id=run_id,
             workflow_id=workflow.id,
@@ -173,6 +260,7 @@ async def run_summary(run_id: RunId, session: SessionDependency) -> RunSummary:
             completed_at=workflow.completed_at,
             product_state=workflow.product_state,
             jobs=[ProofJob(id=job.id, job_type=job.job_type, status=job.status) for job in jobs],
+            recoveries=_recovery_proofs(product.id, jobs, runs, list(latest_effects.values())),
             artifacts=[
                 ProofArtifact(
                     id=artifact.id,

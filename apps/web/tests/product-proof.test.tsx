@@ -12,6 +12,7 @@ const summary = {
   fixture_completed: true, completed_at: "2026-10-22T10:00:00Z", product_state: "DISCOVERED",
   jobs: [{ id: "job-one", job_type: "DraftListingJob", status: "READY" },
     { id: "job-two", job_type: "NegativeFixtureJob", status: "BLOCKED" }],
+  recoveries: [],
   artifacts: [{ id: "ca11a410-cdde-5af8-9a96-b436cc4ef822", label: "Product HTML", kind: "product_html",
     media_type: "text/html", byte_size: 123, href: "/operator/runs/run-one/artifacts/ca11a410-cdde-5af8-9a96-b436cc4ef822" },
   { id: "A9F30C26-4F08-5206-BCFA-6B51BEC15732", label: "Printable PDF", kind: "delivery_pdf", media_type: "application/pdf",
@@ -202,4 +203,57 @@ it("rejects a mode mismatch between view and proof", async () => {
   expect(html).toContain("Product proof unavailable");
   expect(html).not.toContain("Fixture completed");
   expect(html).not.toContain("<iframe");
+});
+
+
+describe("persisted A07 recovery proof", () => {
+  const proof = {
+    job_id: "4f24f619-a439-447f-a921-6d87ffddc3a7",
+    agent_run_id: "fd640c88-4adf-43c3-b621-0cb806111936", agent_run_status: "SUCCESS",
+    effect_state: "CONFIRMED", database_id: "c2c145da-908c-47a7-9635-bcfc9e8a01ca",
+    data_source_id: "a2f8495e-e2bb-4827-b219-b59b25e9a01d",
+  };
+  const recoverySummary = { ...summary, execution_mode: "real_draft", workflow_completed: false,
+    fixture_completed: false, completed_at: null, listing_version_id: null, pending_effects: 1,
+    jobs: [{ id: proof.job_id, job_type: "BuildRepairJob", status: "RUNNING" }],
+    recoveries: [proof], artifacts: [] };
+  it.each(["now", "pipeline", "incidents"] as const)("shows retained outcome and actionable hold on %s", async (view) => {
+    vi.stubEnv("API_BASE_URL", "http://127.0.0.1:8100");
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async (url: string) => new Response(JSON.stringify(
+      url.endsWith("/summary") ? recoverySummary : { execution_mode: "real_draft", run_id: "run-one", view, items: [] }))));
+    const html = renderToStaticMarkup(await OperatorViewPage({ view, searchParams: Promise.resolve({ run_id: "run-one" }) }));
+    for (const value of [proof.job_id, proof.agent_run_id, proof.database_id, proof.data_source_id, "SUCCESS", "CONFIRMED"])
+      expect(html).toContain(value);
+    expect(html).toContain("original UNKNOWN");
+    expect(html).toContain("canonical selection");
+    expect(html).toContain("Effect confirmation does not complete the repair or workflow");
+    expect(html).not.toContain("Draft workflow completed");
+    expect(html).not.toContain("<button");
+  });
+  it("shows uncertain readback with a read-only next step and no resend control", async () => {
+    vi.stubEnv("API_BASE_URL", "http://127.0.0.1:8100");
+    const data = { ...recoverySummary, pending_effects: 2,
+      recoveries: [{ ...proof, agent_run_status: "UNCERTAIN_EXTERNAL_EFFECT", effect_state: "UNKNOWN" }] };
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async (url: string) => new Response(JSON.stringify(
+      url.endsWith("/summary") ? data : { execution_mode: "real_draft", run_id: "run-one", view: "incidents", items: [] }))));
+    const html = renderToStaticMarkup(await OperatorViewPage({ view: "incidents", searchParams: Promise.resolve({ run_id: "run-one" }) }));
+    expect(html).toContain("UNCERTAIN_EXTERNAL_EFFECT");
+    expect(html).toContain("original authorized connection");
+    expect(html).toContain("Do not resend create");
+    expect(html).toContain("Retained response identities");
+    expect(html).not.toContain("<button");
+  });
+  it.each([
+    { ...proof, database_id: "https://private.invalid" },
+    { ...proof, agent_run_status: "COMPLETED" },
+    { ...proof, agent_run_status: ["SUCCESS"] },
+    { ...proof, effect_state: ["CONFIRMED"] },
+    { ...proof, agent_run_id: null },
+    { ...proof, effect_state: "VERIFIED" },
+    { ...proof, job_id: "fd640c88-4adf-43c3-b621-0cb806111936" },
+  ])("rejects malformed or unrelated recovery proof", async (invalid) => {
+    vi.stubEnv("API_BASE_URL", "http://127.0.0.1:8100");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...recoverySummary, recoveries: [invalid] }))));
+    expect(await fetchRunSummary("run-one")).toEqual({ kind: "unavailable" });
+  });
 });
