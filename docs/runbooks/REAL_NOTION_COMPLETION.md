@@ -82,10 +82,13 @@ The body digest is SHA-256 of UTF-8 JSON with sorted keys, separators `,`/`:`,
 method/path are separately fixed to `POST databases`. It is a canonical JSON body
 digest, not a logical-key hash or a claim about byte ordering in SDK transport.
 
-A future approved caller must supply its persisted existing agent-run ID to
-`SqlDraftEffects`, use the approval's deterministic operation key and install
-`consume_notification_recovery_send` as the private adapter's `before_send`
-callback alongside `assert_lease`. The guard verifies the original UNKNOWN and
+A future approved caller uses `SqlDraftEffects.bind_notification_recovery` with
+its actual runner context, canonical session factory, scoped authority, injected
+SDK and already persisted approval. The binding verifies the active A07
+BuildRepairJob/run, attempt, lease, prompt lineage and exact stored approval,
+then returns effects and an adapter with both existing callbacks installed.
+It performs no provider call or approval admission. Use the approval's
+deterministic operation key. The guard verifies the original UNKNOWN and
 active repair lease, then commits `send_consumed_at` in existing repair metadata
 before transport. Attempts and receipts cite the existing run; its definition and
 prompt foreign keys retain ordinary lineage checks. No telemetry service starts.
@@ -142,3 +145,22 @@ mode. They do not establish commissioned/live A07 execution. Canonical productio
 ledger/runtime binding, verified recovered source/request bytes, authenticated
 approval admission, a finite recovery entrypoint, authorized deployment and actual
 thredOS registration remain prerequisites. No execution command is supplied here.
+
+## Runner-to-guard binding (code preparation)
+
+The runner forwards its actual worker lease owner through the existing context.
+The binding refuses context drift, expired authority and stored approval mismatch
+before returning an adapter. Approval is checked again at the actual send, so
+revoking it after binding still prevents transport. This factory neither claims a
+lease nor reserves an effect. Caller-provided identity cannot replace persisted
+job/run/prompt checks.
+
+Fixture tests use the real runner and observer with a temporary hash-verified
+synthetic prompt and mock SDK transport. Success replay performs one POST; a lost
+response leaves the new effect UNKNOWN and the next runner execution cannot send
+again. These tests preserve the original UNKNOWN, open incident and fourteen
+confirmed fixture effects. They do not establish a live production entrypoint.
+
+Canonical approval admission, a finite invocation using this binding, source and
+ledger verification, actual registered identity/prompt and authorized deployment
+remain required. No live approval or production action is provided by this code.

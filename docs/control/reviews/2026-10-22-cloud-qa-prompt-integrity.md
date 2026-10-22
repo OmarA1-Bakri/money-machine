@@ -134,3 +134,18 @@ not successful; preserve it and refuse a second start until separately resolved.
 High: widening AgentResult to RUNNING could admit nonterminal outputs; keep the
 new persistence-only state out of that terminal contract. Source transfer,
 canonical binding, approval admission and live execution remain deferred.
+
+## Runner-to-recovery binding continuation
+
+The operator authorized the next smallest independent integration gap. Forward
+the actual runner lease owner through the existing AgentContext, then provide a
+narrow application binding that verifies that context against the persisted active
+A07 BuildRepairJob/run and already stored approval before wiring both existing
+adapter callbacks. Do not create an approval, resource, registry or execution CLI.
+
+Use only isolated databases and mock SDK transport. Prove runner-to-guard trace
+correlation, one-send/replay refusal and context/approval/lease mismatch refusal.
+Preserve original UNKNOWN and existing controls. Independent functional/provider
+review and affected/static checks precede publication to the existing draft PR.
+Canonical admission, production prompt/registration, finite invocation and actual
+runtime deployment remain independent prerequisites; a binding is not consent.

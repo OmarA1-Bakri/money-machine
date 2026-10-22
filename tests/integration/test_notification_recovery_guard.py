@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -34,9 +35,18 @@ from tests.integration.test_real_draft_effects import prepare
 
 
 @pytest.fixture
-async def recovery(session_factory):
+async def recovery(session_factory, request, tmp_path):
     old, parent = await prepare(session_factory)
     now = datetime.now(UTC)
+    runner_mode = getattr(request, "param", None) == "runner"
+    prompt_file = tmp_path / "prompts/agents/A07/v1.md"
+    if runner_mode:
+        prompt_file.parent.mkdir(parents=True)
+        prompt_file.write_text(
+            "# Synthetic runner-binding fixture\n\n## Purpose\nTest only.\n"
+            "\n## Input Contract\nJobEnvelope.\n\n## Output Contract\nAgentResult.\n"
+            "\n## Instructions\nNo live execution.\n\n## Tool Permissions\nMock SDK only.\n"
+        )
     original_key = "synthetic-original-unknown"
     async with session_factory() as session, session.begin():
         original = await session.get(Job, old.job_id)
@@ -114,28 +124,34 @@ async def recovery(session_factory):
             commissioning_evidence=[],
         )
         prompt = PromptVersion(
-            prompt_reference="prompt://A07/synthetic-guard-test",
+            prompt_reference="agent://A07/system/v1",
             version=1,
-            sha256="a" * 64,
-            source_path="tests/integration/test_notification_recovery_guard.py",
+            sha256=hashlib.sha256(prompt_file.read_bytes()).hexdigest()
+            if runner_mode
+            else "a" * 64,
+            source_path=str(prompt_file)
+            if runner_mode
+            else "tests/integration/test_notification_recovery_guard.py",
         )
         session.add_all([definition, prompt])
         await session.flush()
         active = observer(session)
         from money_machine.observability.correlation import CorrelationContext
 
-        run_context = active.begin_run(
-            correlation=CorrelationContext(job.id, "A07", job.workflow_id, attempt=job.attempt),
-            agent_definition_id=definition.id,
-            agent_definition_version=1,
-            prompt_version_id=prompt.id,
-            prompt_reference=prompt.prompt_reference,
-            prompt_sha256=prompt.sha256,
-            run_number=1,
-            model=None,
-            input_payload={"fixture": "synthetic guard test"},
-        )
-        run = await active.persist_started_run(run_context, lease_owner="repair-owner")
+        run_context, run = None, None
+        if not runner_mode:
+            run_context = active.begin_run(
+                correlation=CorrelationContext(job.id, "A07", job.workflow_id, attempt=job.attempt),
+                agent_definition_id=definition.id,
+                agent_definition_version=1,
+                prompt_version_id=prompt.id,
+                prompt_reference=prompt.prompt_reference,
+                prompt_sha256=prompt.sha256,
+                run_number=1,
+                model=None,
+                input_payload={"fixture": "synthetic guard test"},
+            )
+            run = await active.persist_started_run(run_context, lease_owner="repair-owner")
         body = {
             "parent": {"type": "page_id", "page_id": str(parent)},
             "title": [{"type": "text", "text": {"content": "Notification"}}],
@@ -163,7 +179,7 @@ async def recovery(session_factory):
             **job.input,
             "notification_recovery": {"approval": approval.model_dump(mode="json")},
         }
-        job_id, run_id, incident_id = job.id, run.id, incident.id
+        job_id, run_id, incident_id = job.id, run.id if run is not None else None, incident.id
     effects = SqlDraftEffects(
         session_factory, old.authority, job_id, lease_owner="repair-owner", agent_run_id=run_id
     )
@@ -242,6 +258,8 @@ async def recovery(session_factory):
                 create=lambda: adapter.create_database(parent, "Notification", state["props"]),
             )
 
+        state["runner_root"] = tmp_path
+        state["sdk"] = sdk
         state["run_context"] = run_context
         state["adapter"] = adapter
         yield state, effects, approval, execute

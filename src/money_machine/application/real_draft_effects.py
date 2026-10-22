@@ -12,9 +12,11 @@ from contextvars import ContextVar
 from datetime import UTC, datetime
 from uuid import UUID
 
+from notion_client import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from money_machine.agents.base import AgentContext
 from money_machine.application.real_draft_authority import (
     DraftRunAuthority,
     DraftRunRefused,
@@ -22,6 +24,7 @@ from money_machine.application.real_draft_authority import (
     notion_request_sha256,
 )
 from money_machine.domain.enums import SideEffectClass
+from money_machine.integrations.notion.real_product_adapter import RealPrivateNotionAdapter
 from money_machine.orchestration.idempotency import (
     derive_idempotency_key,
     get_idempotency_record,
@@ -31,7 +34,7 @@ from money_machine.orchestration.idempotency import (
     record_receipt,
     reserve_idempotency_key,
 )
-from money_machine.persistence.tables import AgentRun, Job, Shop, WorkflowRun
+from money_machine.persistence.tables import AgentRun, Job, PromptVersion, Shop, WorkflowRun
 
 ProviderObject = Mapping[str, object]
 Create = Callable[[], Awaitable[ProviderObject]]
@@ -449,3 +452,79 @@ class SqlDraftEffects:
                 )
                 await mark_idempotency_completed(session, idempotency_key=key)
         return observed
+
+    @classmethod
+    async def bind_notification_recovery(
+        cls,
+        context: AgentContext,
+        *,
+        session_factory: async_sessionmaker[AsyncSession],
+        authority: DraftRunAuthority,
+        sdk: AsyncClient,
+        approval: NotificationReplacementApproval,
+    ) -> tuple[SqlDraftEffects, RealPrivateNotionAdapter]:
+        """Bind an actual A07 execution to the existing one-send guard.
+
+        No approval admission, lease claim, effect reservation or provider call occurs
+        here. The caller supplies an already admitted canonical approval and SDK. The
+        matching persisted approval remains mandatory at binding AND at actual send.
+        """
+        if type(approval) is not NotificationReplacementApproval or (
+            context.definition.agent_id != "A07"
+            or context.job.owner_agent_id != "A07"
+            or context.job.job_type != "BuildRepairJob"
+            or context.job.status.value != "RUNNING"
+            or context.job.job_id != approval.repair_job_id
+            or context.job.workflow_id != approval.workflow_id
+            or context.job.object_id != approval.product_id
+            or context.job.input.get("run_id") != approval.run_id
+            or authority.run_id != approval.run_id
+            or authority.product_id != approval.product_id
+            or authority.verified_notion_parent_id != approval.parent_id
+            or not context.lease_owner
+            or context.definition.system_prompt_reference != context.prompt_reference
+        ):
+            raise DraftRunRefused("recovery_context_scope")
+        effects = cls(
+            session_factory,
+            authority,
+            context.job.job_id,
+            lease_owner=context.lease_owner,
+            agent_run_id=context.run_id,
+        )
+        async with session_factory() as session, session.begin():
+            job = await effects._job(session)
+            run = await session.get(AgentRun, context.run_id)
+            prompt = await session.get(PromptVersion, run.prompt_version_id) if run else None
+            if (
+                job.job_type != context.job.job_type
+                or job.workflow_id != context.job.workflow_id
+                or job.attempt != context.job.attempt
+                or job.idempotency_key != context.job.idempotency_key
+                or run is None
+                or run.agent_definition_version != context.definition.contract_version
+                or run.prompt_reference != context.prompt_reference
+                or run.prompt_sha256 != context.prompt_sha256
+                or prompt is None
+                or prompt.version != context.prompt_version
+            ):
+                raise DraftRunRefused("recovery_context_lineage")
+            record = job.input.get("notification_recovery")
+            if not isinstance(record, dict) or record.get("approval") != approval.model_dump(
+                mode="json"
+            ):
+                raise DraftRunRefused("persisted_recovery_approval_required")
+            now = datetime.now(UTC)
+            if not approval.approved_at <= now < approval.expires_at:
+                raise DraftRunRefused("recovery_approval_expired_or_future")
+
+        async def before_send(method: str, path: str, body: dict[str, object]) -> None:
+            await effects.consume_notification_recovery_send(approval, method, path, body)
+
+        adapter = RealPrivateNotionAdapter(
+            authority,
+            sdk=sdk,
+            before_send=before_send,
+            before_write=effects.assert_lease,
+        )
+        return effects, adapter

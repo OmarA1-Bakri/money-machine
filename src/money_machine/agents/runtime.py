@@ -211,6 +211,7 @@ class AgentRunner:
             prompt_version=prompt_version.version,
             provider=self._provider,
             run_at=started_at,
+            lease_owner=lease_owner,
             tool_registry=self._tool_registry,
             review_coordinator=review_coordinator,
         )

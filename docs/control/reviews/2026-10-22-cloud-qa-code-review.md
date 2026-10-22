@@ -139,3 +139,33 @@ format checks on 440 files, strict Pyright (zero errors) and canonical clean-clo
 source verification passed. The private Playbook PDF remains absent; no PDF-byte
 identity/coverage verification or session completion is claimed. New commit CI
 is tracked separately from the preceding green 22302db run.
+
+## Runner-to-recovery binding increment
+
+Independent read-only functional review (`prompt_fidelity`) and provider-safety
+review (`prompt_safety`) found no blockers. Both confirmed the final classmethod
+refactor and additional revocation/drift regressions. They performed no tests,
+database queries or provider operations. Strict Pyright initially identified
+protected method access and a possibly unbound fixture path; moving the factory
+inside SqlDraftEffects and assigning the path before its conditional resolved both.
+
+AgentRunner forwards its actual lease owner through the existing context. The
+binding checks that context against the persisted active A07 BuildRepairJob,
+attempt, job/run/prompt lineage and exact stored approval. It returns existing
+effects and an injected SDK adapter with both callbacks installed; it neither
+admits an approval nor claims a lease, reserves an effect or invokes a provider.
+Approval revocation after binding still refuses the actual transport boundary.
+
+All 16 new binding scenarios passed, including actual runner-created durable run
+lineage, success replay, lost-response replay and context/approval drift. The final
+affected suite passed 349 tests with zero failures/skips (131.01 seconds), covering
+runner/observer, existing guard/effect controls, fixture repair/QA, leases,
+repositories, schema/migrations/reversal and seed. The 12 prompt checks passed;
+Ruff check/format (441 files), strict Pyright (zero errors) and canonical-source
+verification passed. The original Playbook PDF remains absent and unverified.
+
+The preceding 1b68de4 lifecycle head has independently confirmed full CI success:
+5,571 Python and 61 frontend tests plus the database/build/static/Compose gates.
+New-head CI is separate. No production ledger/provider mutation, deployment,
+live approval, canonical-selection binding, finite invocation or session closure
+is included. Actual thredOS registration and production prompt remain unverified.
